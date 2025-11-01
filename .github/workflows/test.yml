@@ -15,7 +15,7 @@ on:
       - '**/modules/web/**'
   workflow_run:
     workflows: [Build Web]
-    branches: [master]
+    branches: [test]
     types:
       - completed
   workflow_dispatch:
