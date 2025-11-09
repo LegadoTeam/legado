@@ -10,4 +10,10 @@
         android:checkable="true"
         app:showAsAction="never" />
 
+    <item
+        android:id="@+id/menu_enable_regex"
+        android:title="@string/regex"
+        android:checkable="true"
+        app:showAsAction="never" />
+
 </menu>

@@ -97,6 +97,10 @@ class SearchContentActivity :
                 viewModel.replaceEnabled = !viewModel.replaceEnabled
                 item.isChecked = viewModel.replaceEnabled
             }
+            R.id.menu_enable_regex -> {
+                viewModel.regexReplace = !viewModel.regexReplace
+                item.isChecked = viewModel.regexReplace
+            }
         }
         return super.onCompatOptionsItemSelected(item)
     }

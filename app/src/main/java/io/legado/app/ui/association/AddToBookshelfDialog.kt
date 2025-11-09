@@ -68,6 +68,16 @@ class AddToBookshelfDialog() : BaseDialogFragment(R.layout.dialog_add_to_bookshe
             dismiss()
             return
         }
+        appDb.bookDao.getBook(bookUrl)?.let { //已在书架时直接跳转到书籍详情页
+            AppLog.put("${it.name} 已在书架", null, true)
+            startActivity<BookInfoActivity> {
+                putExtra("name", it.name)
+                putExtra("author", it.author)
+                putExtra("bookUrl", it.bookUrl)
+            }
+            dismiss()
+            return
+        }
         viewModel.loadStateLiveData.observe(this) {
             if (it) {
                 binding.rotateLoading.visible()
@@ -102,9 +112,9 @@ class AddToBookshelfDialog() : BaseDialogFragment(R.layout.dialog_add_to_bookshe
 
         fun load(bookUrl: String, success: (book: Book) -> Unit) {
             execute {
-                appDb.bookDao.getBook(bookUrl)?.let {
-                    throw NoStackTraceException("${it.name} 已在书架")
-                }
+//                appDb.bookDao.getBook(bookUrl)?.let {
+//                    throw NoStackTraceException("${it.name} 已在书架")
+//                } //onFragmentCreated的时候已经判断
                 val baseUrl = NetworkUtils.getBaseUrl(bookUrl)
                     ?: throw NoStackTraceException("书籍地址格式不对")
                 val urlMatcher = AnalyzeUrl.paramPattern.matcher(bookUrl)
