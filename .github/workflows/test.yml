@@ -3,7 +3,7 @@ name: Test Build
 on:
   push:
     branches:
-      - main
+      - master
     paths:
       - '**'
       # - '!**/assets/**'
@@ -34,7 +34,6 @@ jobs:
       versionL: ${{ steps.set-ver.outputs.versionL }}
       lanzou: ${{ steps.check.outputs.lanzou }}
       telegram: ${{ steps.check.outputs.telegram }}
-      gitee: ${{ steps.check.outputs.gitee }}
     steps:
       - id: set-ver
         run: |
@@ -47,9 +46,6 @@ jobs:
           fi
           if [ -n "${{ secrets.BOT_TOKEN }}" ]; then
             echo "telegram=yes" >> $GITHUB_OUTPUT
-          fi
-          if [ -n "${{ secrets.GITEE_TOKEN }}" ]; then
-            echo "gitee=yes" >> $GITHUB_OUTPUT
           fi
 
   build:
@@ -81,11 +77,11 @@ jobs:
       - name: Release Apk Sign
         run: |
           echo "给apk增加签名"
-          cp $GITHUB_WORKSPACE/.github/workflows/legado.jks $GITHUB_WORKSPACE/app/legado.jks
+          echo ${{ secrets.RELEASE_KEY_STORE }} | base64 --decode > $GITHUB_WORKSPACE/app/legado.jks
+          echo RELEASE_KEY_PASSWORD='${{ secrets.RELEASE_KEY_PASSWORD }}' >> gradle.properties
+          echo RELEASE_STORE_PASSWORD='${{ secrets.RELEASE_STORE_PASSWORD }}' >> gradle.properties
           sed '$a\RELEASE_STORE_FILE=./legado.jks'          $GITHUB_WORKSPACE/gradle.properties -i
           sed '$a\RELEASE_KEY_ALIAS=legado'                 $GITHUB_WORKSPACE/gradle.properties -i
-          sed '$a\RELEASE_STORE_PASSWORD=gedoor_legado'     $GITHUB_WORKSPACE/gradle.properties -i
-          sed '$a\RELEASE_KEY_PASSWORD=gedoor_legado'       $GITHUB_WORKSPACE/gradle.properties -i
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
@@ -93,10 +89,10 @@ jobs:
       - name: Build With Gradle
         continue-on-error: true
         run: |
-          if [ "${{ env.type }}" == 'release' ]; then
-            typeName="原包名"
+          if [ ${{ env.type }} == 'release' ]; then
+            typeName="新包名"
           else
-            typeName="共存"
+            typeName="新共存"
             sed "s/'.release'/'.releaseA'/" $GITHUB_WORKSPACE/app/build.gradle  -i
             sed 's/.release/.releaseA/'     $GITHUB_WORKSPACE/app/google-services.json -i
           fi
@@ -159,7 +155,7 @@ jobs:
 
   prerelease:
     needs: [ prepare, build ]
-    if: github.event_name != 'pull_request' && github.repository == 'Luoyacheng/legado'
+    if: github.event_name != 'pull_request' && github.repository == 'LegadoTeam/legado'
     runs-on: ubuntu-latest
     env: 
       VERSION: ${{ needs.prepare.outputs.version }}
@@ -175,10 +171,10 @@ jobs:
           rm -rf */
 
           for file in `ls *.apk`; do
-            if [[ "$file" == *原包名* ]]; then
-              mv "$file" $(echo $file | sed s/原包名/release/)
+            if [[ "$file" == *新包名* ]]; then
+              mv "$file" $(echo $file | sed s/新包名/release/)
             else
-              mv "$file" $(echo $file | sed s/共存/releaseA/)
+              mv "$file" $(echo $file | sed s/新共存/releaseA/)
             fi
           done
 
@@ -275,67 +271,6 @@ jobs:
         with:
           chat_id: ${{ secrets.CHANNEL_ID }}
           bot_token: ${{ secrets.BOT_TOKEN }}
-          context: "#阅读 #Legado #Beta ${{ needs.prepare.outputs.versionL }}"
+          context: "#阅读 #Legado #Beta #新包名 ${{ needs.prepare.outputs.versionL }}"
           path: apk/*
           method: sendFile
-
-  gitee:
-    needs: [ prepare, build ]
-    if: ${{ github.event_name != 'pull_request' && needs.prepare.outputs.gitee == 'yes' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v5
-        with:
-          path: apk/
-      - working-directory: apk/
-        run: |
-          mv */*.apk .
-          rm -rf */
-
-          for file in `ls *.apk`; do
-            if [[ "$file" == *原包名* ]]; then
-              mv "$file" $(echo $file | sed s/原包名/release/)
-            else
-              mv "$file" $(echo $file | sed s/共存/releaseA/)
-            fi
-          done
-
-      - name: Upload to Gitee Release
-        env:
-          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
-          GITEE_USER: "lyc486"
-          GITEE_REPO: "legado"
-          VERSION: ${{ needs.prepare.outputs.version }}
-        run: |
-          # 安装依赖工具
-          sudo apt-get -qq install -y jq curl
-          # API基础URL
-          API_BASE="https://gitee.com/api/v5/repos/$GITEE_USER/$GITEE_REPO"
-          AUTH_HEADER="Authorization: token $GITEE_TOKEN"
-          # 检查并删除旧Release
-          if release_data=$(curl -sH "$AUTH_HEADER" "$API_BASE/releases/tags/beta" | jq -e .id); then
-          curl -sX DELETE -H "$AUTH_HEADER" "$API_BASE/releases/$release_data"
-          echo "✅ Deleted old beta release"
-          fi
-
-          # 创建新Release
-          RELEASE_JSON=$(curl -sX POST \
-              -H "Content-Type: application/json" \
-              -H "$AUTH_HEADER" \
-              -d '{"tag_name": "beta", "name": "legado_app_'"$VERSION"'","body": "同步自：https://github.com/Luoyacheng/legado/releases", "target_commitish": "main", "prerelease": true}' \
-              "$API_BASE/releases")
-          # 检查Release创建是否成功
-          if ! RELEASE_ID=$(jq -re .id <<< "$RELEASE_JSON"); then
-          echo "❌ Release creation failed"
-          jq . <<< "$RELEASE_JSON"
-          exit 1
-          fi
-          # 上传所有APK文件
-          for APK_FILE in apk/*.apk; do
-            curl -sX POST \
-              -H "$AUTH_HEADER" \
-              -F "file=@$APK_FILE" \
-              "$API_BASE/releases/$RELEASE_ID/attach_files" > /dev/null # 忽略响应
-            echo "✅ 已上传$APK_FILE"
-          done

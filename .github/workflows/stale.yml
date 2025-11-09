@@ -15,7 +15,7 @@ jobs:
   stale:
 
     runs-on: ubuntu-latest
-    if: ${{ github.repository == 'Luoyacheng/legado' }}
+    if: ${{ github.repository == 'LegadoTeam/legado' }}
     permissions:
       issues: write
 
