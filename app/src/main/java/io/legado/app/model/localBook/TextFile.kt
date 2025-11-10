@@ -74,6 +74,9 @@ class TextFile(private var book: Book) {
     private var txtBuffer: ByteArray? = null
     private var bufferStart = -1L
     private var bufferEnd = -1L
+    //选中更好的目录规则判断阈值
+    private val overRuleCount = 2
+    private val toSearchBook = book.toSearchBook()
 
     //选中更好的目录规则判断阈值
     private val overRuleCount = 2
@@ -274,6 +277,7 @@ class TextFile(private var book: Book) {
                             curChapter.end = curChapter.start
                             toc.add(curChapter)
                         } else { //否则就block分割之后，上一个章节的剩余内容
+                            val title = replacement(matcher.group(), jsStr, toc.size).takeIf { it.isNotEmpty() } ?: continue
                             //获取上一章节
                             val lastChapter = toc.last()
                             val title = replacement(
@@ -300,6 +304,7 @@ class TextFile(private var book: Book) {
                         bookWordCount += chapterContentLength
                         lastChapterWordCount = 0
                     } else {
+                        val title = replacement(matcher.group(), jsStr, toc.size).takeIf { it.isNotEmpty() } ?: continue
                         if (toc.isNotEmpty()) { //获取章节内容
                             //获取上一章节
                             val lastChapter = toc.last()
@@ -538,6 +543,23 @@ class TextFile(private var book: Book) {
             bindings["index"] = index + 1
             bindings["prevTitle"] = prevTitle
             bindings["prevLength"] = prevLength
+            eval(jsStr, bindings)
+        }.toString()
+    }
+
+
+    /**
+     * 净化标题
+     */
+    private fun replacement(content: String,jsStr: String?, index: Int): String {
+        if (jsStr.isNullOrBlank()) {
+            return content
+        }
+        return RhinoScriptEngine.run {
+            val bindings = ScriptBindings()
+            bindings["result"] = content
+            bindings["book"] = toSearchBook
+            bindings["index"] = index + 1
             eval(jsStr, bindings)
         }.toString()
     }

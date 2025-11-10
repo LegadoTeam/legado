@@ -49,6 +49,7 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
         customBtnListData.postValue(AudioPlay.bookSource?.customButton == true)
         titleData.postValue(book.name)
         coverData.postValue(book.getDisplayCover())
+        bookUrl.postValue(book.bookUrl)
         if (book.tocUrl.isEmpty() && !loadBookInfo(book)) {
             return
         }

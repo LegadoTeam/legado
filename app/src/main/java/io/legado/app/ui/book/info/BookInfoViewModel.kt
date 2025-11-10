@@ -469,6 +469,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 if (it.isLocal) {
                     LocalBook.deleteBook(it, deleteOriginal)
                 }
+                SourceCallBack.callBackBook(SourceCallBack.DEL_BOOK_SHELF, bookSource, it)
             }
         }.onSuccess {
             success?.invoke()
