@@ -7,7 +7,6 @@ import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
-import android.widget.EditText
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
 import androidx.core.view.isGone
@@ -57,21 +56,22 @@ class CodeEditActivity :
             softKeyboardTool.initialPadding = windowInsets.imeHeight
             windowInsets
         }
-        editor.colorScheme = TextMateColorScheme2(
-            ThemeRegistry.getInstance(),
-            ThemeRegistry.getInstance().currentThemeModel
-        )
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         softKeyboardTool.attachToWindow(window)
+        viewModel.loadTextMateThemes()
+        viewModel.colorScheme = viewModel.colorScheme ?: ThemeRegistry.getInstance().let { registry ->
+            TextMateColorScheme2(registry, registry.currentThemeModel)
+        }
+        editor.colorScheme = viewModel.colorScheme!! //先设置颜色,避免一开始的白屏
         viewModel.initData(intent) {
             editor.apply {
                 setEditorLanguage(viewModel.language)
                 upEdit(AppConfig.editFontScale, null, AppConfig.editAutoWrap)
                 setText(viewModel.initialText)
                 if (!viewModel.writable) {
-                    editor.editable = false
+                    editable = false
                     binding.titleBar.title = getString(R.string.view_code)
                 }
                 requestFocus()

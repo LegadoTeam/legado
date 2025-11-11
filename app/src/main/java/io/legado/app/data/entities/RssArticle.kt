@@ -62,4 +62,16 @@ data class RssArticle(
         type = type,
         durPos = durPos
     )
+
+    fun toRecord() = RssReadRecord(
+        origin = origin,
+        sort = sort,
+        title = title,
+        readTime = System.currentTimeMillis(),
+        record = link,
+        image = image,
+        type = type,
+        durPos = durPos,
+        pubDate = pubDate
+    )
 }

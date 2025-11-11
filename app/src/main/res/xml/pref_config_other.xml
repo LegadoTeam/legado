@@ -180,6 +180,11 @@
             app:iconSpaceReserved="false" />
 
         <io.legado.app.lib.prefs.Preference
+            android:key="videoSetting"
+            android:summary="@string/video_setting_summary"
+            android:title="@string/video_setting" />
+
+        <io.legado.app.lib.prefs.Preference
             android:key="webPort"
             android:title="@string/web_port_title"
             app:iconSpaceReserved="false" />

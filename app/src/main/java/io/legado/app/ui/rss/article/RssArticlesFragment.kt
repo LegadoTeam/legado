@@ -208,7 +208,6 @@ class RssArticlesFragment() : VMBaseFragment<RssArticlesViewModel>(R.layout.frag
 
     override fun readRss(rssArticle: RssArticle) {
         fullRefresh = false //activityViewModel.read会触发数据库更新,此时进行差异化更新
-        activityViewModel.read(rssArticle)
         ReadRss.readRss(this, rssArticle, activityViewModel.rssSource)
     }
 }

@@ -186,17 +186,17 @@ class RssSourceActivity : VMBaseActivity<ActivityRssSourceBinding, RssSourceView
             R.id.menu_remove_group -> selectionRemoveFromGroups()
             R.id.menu_top_sel -> viewModel.topSource(*adapter.selection.toTypedArray())
             R.id.menu_bottom_sel -> viewModel.bottomSource(*adapter.selection.toTypedArray())
-            R.id.menu_export_selection -> viewModel.saveToFile(adapter.selection) { file ->
+            R.id.menu_export_selection -> viewModel.saveToFile(adapter.selection) { file, name ->
                 exportResult.launch {
                     mode = HandleFileContract.EXPORT
                     fileData = HandleFileContract.FileData(
-                        "exportRssSource.json", file, "application/json"
+                        name, file, "application/json"
                     )
                 }
             }
 
-            R.id.menu_share_source -> viewModel.saveToFile(adapter.selection) {
-                share(it)
+            R.id.menu_share_source -> viewModel.saveToFile(adapter.selection) { file, name ->
+                share(file)
             }
 
             R.id.menu_check_selected_interval -> adapter.checkSelectedInterval()

@@ -53,7 +53,7 @@
 
     <io.legado.app.lib.prefs.PreferenceCategory
         android:title="@string/setting"
-        app:allowDividerAbove="true"
+        app:allowDividerAbove="false"
         app:allowDividerBelow="false"
         app:iconSpaceReserved="false">
 
@@ -84,7 +84,7 @@
     <io.legado.app.lib.prefs.PreferenceCategory
         android:key="aboutCategory"
         android:title="@string/other"
-        app:allowDividerAbove="true"
+        app:allowDividerAbove="false"
         app:allowDividerBelow="false"
         app:iconSpaceReserved="false"
         app:layout="@layout/view_preference_category">

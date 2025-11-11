@@ -1,5 +1,6 @@
 package io.legado.app.help
 
+import android.webkit.JavascriptInterface
 import android.webkit.WebSettings
 import androidx.annotation.Keep
 import cn.hutool.core.codec.Base64
@@ -88,7 +89,7 @@ interface JsExtensions : JsEncodeUtils {
     fun getSource(): BaseSource?
 
     private val context: CoroutineContext
-        get() = rhinoContext.coroutineContext ?: EmptyCoroutineContext
+        get() = rhinoContextOrNull?.coroutineContext ?: EmptyCoroutineContext
 
     /**
      * 访问网络,返回String
@@ -103,7 +104,7 @@ interface JsExtensions : JsEncodeUtils {
         return kotlin.runCatching {
             analyzeUrl.getStrResponse().body
         }.onFailure {
-            rhinoContext.ensureActive()
+            rhinoContextOrNull?.ensureActive()
             AppLog.put("ajax(${urlStr}) error\n${it.localizedMessage}", it)
         }.getOrElse {
             it.stackTraceStr
@@ -155,7 +156,7 @@ interface JsExtensions : JsEncodeUtils {
         return kotlin.runCatching {
             analyzeUrl.getStrResponse()
         }.onFailure {
-            rhinoContext.ensureActive()
+            rhinoContextOrNull?.ensureActive()
             AppLog.put("connect(${urlStr}) error\n${it.localizedMessage}", it)
         }.getOrElse {
             StrResponse(analyzeUrl.url, it.stackTraceStr)
@@ -173,7 +174,7 @@ interface JsExtensions : JsEncodeUtils {
         return kotlin.runCatching {
             analyzeUrl.getStrResponse()
         }.onFailure {
-            rhinoContext.ensureActive()
+            rhinoContextOrNull?.ensureActive()
             AppLog.put("ajax($urlStr,$header) error\n${it.localizedMessage}", it)
         }.getOrElse {
             StrResponse(analyzeUrl.url, it.stackTraceStr)
@@ -251,6 +252,7 @@ interface JsExtensions : JsEncodeUtils {
      * @param title 视频的标题
      * @param float 是否悬浮窗打开
      */
+    @JavascriptInterface
     fun openVideoPlayer(url: String, title: String, float: Boolean) {
         SourceHelp.openVideoPlayer(getSource(), url, title, float)
     }
@@ -300,6 +302,7 @@ interface JsExtensions : JsEncodeUtils {
     /**
      * 可从网络，本地文件(阅读私有数据目录相对路径)导入JavaScript脚本
      */
+    @JavascriptInterface
     fun importScript(path: String): String {
         val result = when {
             path.startsWith("http") -> cacheFile(path)
@@ -314,6 +317,7 @@ interface JsExtensions : JsEncodeUtils {
      * @param urlStr 网络文件的链接
      * @return 返回缓存后的文件内容
      */
+    @JavascriptInterface
     fun cacheFile(urlStr: String): String {
         return cacheFile(urlStr, 0)
     }
@@ -322,6 +326,7 @@ interface JsExtensions : JsEncodeUtils {
      * 缓存以文本方式保存的文件 如.js .txt等
      * @param saveTime 缓存时间，单位：秒
      */
+    @JavascriptInterface
     fun cacheFile(urlStr: String, saveTime: Int): String {
         val key = md5Encode16(urlStr)
         val cachePath = CacheManager.get(key)
@@ -358,8 +363,9 @@ interface JsExtensions : JsEncodeUtils {
      * @param url 下载地址:可带参数type
      * @return 下载的文件相对路径
      */
+    @JavascriptInterface
     fun downloadFile(url: String): String {
-        rhinoContext.ensureActive()
+        rhinoContextOrNull?.ensureActive()
         val analyzeUrl = AnalyzeUrl(url, source = getSource(), coroutineContext = context)
         val type = UrlUtil.getSuffix(url, analyzeUrl.type)
         val path = FileUtils.getPath(
@@ -393,8 +399,9 @@ interface JsExtensions : JsEncodeUtils {
         "Deprecated",
         ReplaceWith("downloadFile(url)")
     )
+    @JavascriptInterface
     fun downloadFile(content: String, url: String): String {
-        rhinoContext.ensureActive()
+        rhinoContextOrNull?.ensureActive()
         val type = AnalyzeUrl(url, source = getSource(), coroutineContext = context).type
             ?: return ""
         val path = FileUtils.getPath(
@@ -420,7 +427,7 @@ interface JsExtensions : JsEncodeUtils {
         } else headers
         val rateLimiter = ConcurrentRateLimiter(getSource())
         val response = rateLimiter.withLimitBlocking {
-            rhinoContext.ensureActive()
+            rhinoContextOrNull?.ensureActive()
             Jsoup.connect(urlStr)
                 .sslSocketFactory(SSLHelper.unsafeSSLSocketFactory)
                 .ignoreContentType(true)
@@ -441,7 +448,7 @@ interface JsExtensions : JsEncodeUtils {
         } else headers
         val rateLimiter = ConcurrentRateLimiter(getSource())
         val response = rateLimiter.withLimitBlocking {
-            rhinoContext.ensureActive()
+            rhinoContextOrNull?.ensureActive()
             Jsoup.connect(urlStr)
                 .sslSocketFactory(SSLHelper.unsafeSSLSocketFactory)
                 .ignoreContentType(true)
@@ -462,7 +469,7 @@ interface JsExtensions : JsEncodeUtils {
         } else headers
         val rateLimiter = ConcurrentRateLimiter(getSource())
         val response = rateLimiter.withLimitBlocking {
-            rhinoContext.ensureActive()
+            rhinoContextOrNull?.ensureActive()
             Jsoup.connect(urlStr)
                 .sslSocketFactory(SSLHelper.unsafeSSLSocketFactory)
                 .ignoreContentType(true)
@@ -476,19 +483,23 @@ interface JsExtensions : JsEncodeUtils {
     }
 
     /* Str转ByteArray */
+    @JavascriptInterface
     fun strToBytes(str: String): ByteArray {
         return str.toByteArray(charset("UTF-8"))
     }
 
+    @JavascriptInterface
     fun strToBytes(str: String, charset: String): ByteArray {
         return str.toByteArray(charset(charset))
     }
 
     /* ByteArray转Str */
+    @JavascriptInterface
     fun bytesToStr(bytes: ByteArray): String {
         return String(bytes, charset("UTF-8"))
     }
 
+    @JavascriptInterface
     fun bytesToStr(bytes: ByteArray, charset: String): String {
         return String(bytes, charset(charset))
     }
@@ -496,18 +507,22 @@ interface JsExtensions : JsEncodeUtils {
     /**
      * js实现base64解码,不能删
      */
+    @JavascriptInterface
     fun base64Decode(str: String?): String {
         return Base64.decodeStr(str)
     }
 
+    @JavascriptInterface
     fun base64Decode(str: String?, charset: String): String {
         return Base64.decodeStr(str, charset(charset))
     }
 
+    @JavascriptInterface
     fun base64Decode(str: String, flags: Int): String {
         return EncoderUtils.base64Decode(str, flags)
     }
 
+    @JavascriptInterface
     fun base64DecodeToByteArray(str: String?): ByteArray? {
         if (str.isNullOrBlank()) {
             return null
@@ -515,6 +530,7 @@ interface JsExtensions : JsEncodeUtils {
         return EncoderUtils.base64DecodeToByteArray(str, 0)
     }
 
+    @JavascriptInterface
     fun base64DecodeToByteArray(str: String?, flags: Int): ByteArray? {
         if (str.isNullOrBlank()) {
             return null
@@ -522,25 +538,30 @@ interface JsExtensions : JsEncodeUtils {
         return EncoderUtils.base64DecodeToByteArray(str, flags)
     }
 
+    @JavascriptInterface
     fun base64Encode(str: String): String? {
         return EncoderUtils.base64Encode(str, 2)
     }
 
+    @JavascriptInterface
     fun base64Encode(str: String, flags: Int): String? {
         return EncoderUtils.base64Encode(str, flags)
     }
 
     /* HexString 解码为字节数组 */
+    @JavascriptInterface
     fun hexDecodeToByteArray(hex: String): ByteArray? {
         return HexUtil.decodeHex(hex)
     }
 
     /* hexString 解码为utf8String*/
+    @JavascriptInterface
     fun hexDecodeToString(hex: String): String? {
         return HexUtil.decodeHexStr(hex)
     }
 
     /* utf8 编码为hexString */
+    @JavascriptInterface
     fun hexEncodeToString(utf8: String): String? {
         return HexUtil.encodeHexStr(utf8)
     }
@@ -548,6 +569,7 @@ interface JsExtensions : JsEncodeUtils {
     /**
      * 格式化时间
      */
+    @JavascriptInterface
     fun timeFormatUTC(time: Long, format: String, sh: Int): String? {
         val utc = SimpleTimeZone(sh, "UTC")
         return SimpleDateFormat(format, Locale.getDefault()).run {
@@ -559,10 +581,12 @@ interface JsExtensions : JsEncodeUtils {
     /**
      * 时间格式化
      */
+    @JavascriptInterface
     fun timeFormat(time: Long): String {
         return dateFormat.format(Date(time))
     }
 
+    @JavascriptInterface
     fun encodeURI(str: String): String {
         return try {
             URLEncoder.encode(str, "UTF-8")
@@ -571,6 +595,7 @@ interface JsExtensions : JsEncodeUtils {
         }
     }
 
+    @JavascriptInterface
     fun encodeURI(str: String, enc: String): String {
         return try {
             URLEncoder.encode(str, enc)
@@ -579,18 +604,22 @@ interface JsExtensions : JsEncodeUtils {
         }
     }
 
+    @JavascriptInterface
     fun htmlFormat(str: String): String {
         return HtmlFormatter.formatKeepImg(str)
     }
 
+    @JavascriptInterface
     fun t2s(text: String): String {
         return ChineseUtils.t2s(text)
     }
 
+    @JavascriptInterface
     fun s2t(text: String): String {
         return ChineseUtils.s2t(text)
     }
 
+    @JavascriptInterface
     fun getWebViewUA(): String {
         return WebSettings.getDefaultUserAgent(appCtx)
     }
@@ -602,6 +631,7 @@ interface JsExtensions : JsEncodeUtils {
      * @param path 相对路径
      * @return File
      */
+    @JavascriptInterface
     fun getFile(path: String): File {
         val cachePath = appCtx.externalCache.absolutePath
         val aPath = if (path.startsWith(File.separator)) {
@@ -617,6 +647,7 @@ interface JsExtensions : JsEncodeUtils {
         return file
     }
 
+    @JavascriptInterface
     fun readFile(path: String): ByteArray? {
         val file = getFile(path)
         if (file.exists()) {
@@ -625,6 +656,7 @@ interface JsExtensions : JsEncodeUtils {
         return null
     }
 
+    @JavascriptInterface
     fun readTxtFile(path: String): String {
         val file = getFile(path)
         if (file.exists()) {
@@ -634,6 +666,7 @@ interface JsExtensions : JsEncodeUtils {
         return ""
     }
 
+    @JavascriptInterface
     fun readTxtFile(path: String, charsetName: String): String {
         val file = getFile(path)
         if (file.exists()) {
@@ -645,6 +678,7 @@ interface JsExtensions : JsEncodeUtils {
     /**
      * 删除本地文件
      */
+    @JavascriptInterface
     fun deleteFile(path: String): Boolean {
         val file = getFile(path)
         return FileUtils.delete(file, true)
@@ -655,6 +689,7 @@ interface JsExtensions : JsEncodeUtils {
      * @param zipPath 相对路径
      * @return 相对路径
      */
+    @JavascriptInterface
     fun unzipFile(zipPath: String): String {
         return unArchiveFile(zipPath)
     }
@@ -664,6 +699,7 @@ interface JsExtensions : JsEncodeUtils {
      * @param zipPath 相对路径
      * @return 相对路径
      */
+    @JavascriptInterface
     fun un7zFile(zipPath: String): String {
         return unArchiveFile(zipPath)
     }
@@ -673,6 +709,7 @@ interface JsExtensions : JsEncodeUtils {
      * @param zipPath 相对路径
      * @return 相对路径
      */
+    @JavascriptInterface
     fun unrarFile(zipPath: String): String {
         return unArchiveFile(zipPath)
     }
@@ -682,6 +719,7 @@ interface JsExtensions : JsEncodeUtils {
      * @param zipPath 相对路径
      * @return 相对路径
      */
+    @JavascriptInterface
     fun unArchiveFile(zipPath: String): String {
         if (zipPath.isEmpty()) return ""
         val zipFile = getFile(zipPath)
@@ -695,6 +733,7 @@ interface JsExtensions : JsEncodeUtils {
      * @param path 文件夹相对路径
      * @return 所有文件字符串换行连接
      */
+    @JavascriptInterface
     fun getTxtInFolder(path: String): String {
         if (path.isEmpty()) return ""
         val folder = getFile(path)
@@ -719,12 +758,14 @@ interface JsExtensions : JsEncodeUtils {
      * @param path 所需获取文件在zip内的路径
      * @return zip指定文件的数据
      */
+    @JavascriptInterface
     fun getZipStringContent(url: String, path: String): String {
         val byteArray = getZipByteArrayContent(url, path) ?: return ""
         val charsetName = EncodingDetect.getEncode(byteArray)
         return String(byteArray, Charset.forName(charsetName))
     }
 
+    @JavascriptInterface
     fun getZipStringContent(url: String, path: String, charsetName: String): String {
         val byteArray = getZipByteArrayContent(url, path) ?: return ""
         return String(byteArray, Charset.forName(charsetName))
@@ -736,12 +777,14 @@ interface JsExtensions : JsEncodeUtils {
      * @param path 所需获取文件在zip内的路径
      * @return zip指定文件的数据
      */
+    @JavascriptInterface
     fun getRarStringContent(url: String, path: String): String {
         val byteArray = getRarByteArrayContent(url, path) ?: return ""
         val charsetName = EncodingDetect.getEncode(byteArray)
         return String(byteArray, Charset.forName(charsetName))
     }
 
+    @JavascriptInterface
     fun getRarStringContent(url: String, path: String, charsetName: String): String {
         val byteArray = getRarByteArrayContent(url, path) ?: return ""
         return String(byteArray, Charset.forName(charsetName))
@@ -753,12 +796,14 @@ interface JsExtensions : JsEncodeUtils {
      * @param path 所需获取文件在7zip内的路径
      * @return zip指定文件的数据
      */
+    @JavascriptInterface
     fun get7zStringContent(url: String, path: String): String {
         val byteArray = get7zByteArrayContent(url, path) ?: return ""
         val charsetName = EncodingDetect.getEncode(byteArray)
         return String(byteArray, Charset.forName(charsetName))
     }
 
+    @JavascriptInterface
     fun get7zStringContent(url: String, path: String, charsetName: String): String {
         val byteArray = get7zByteArrayContent(url, path) ?: return ""
         return String(byteArray, Charset.forName(charsetName))
@@ -770,6 +815,7 @@ interface JsExtensions : JsEncodeUtils {
      * @param path 所需获取文件在zip内的路径
      * @return zip指定文件的数据
      */
+    @JavascriptInterface
     fun getZipByteArrayContent(url: String, path: String): ByteArray? {
         val bytes = if (url.isAbsUrl()) {
             AnalyzeUrl(url, source = getSource(), coroutineContext = context).getByteArray()
@@ -798,6 +844,7 @@ interface JsExtensions : JsEncodeUtils {
      * @param path 所需获取文件在Rar内的路径
      * @return Rar指定文件的数据
      */
+    @JavascriptInterface
     fun getRarByteArrayContent(url: String, path: String): ByteArray? {
         val bytes = if (url.isAbsUrl()) {
             AnalyzeUrl(url, source = getSource(), coroutineContext = context).getByteArray()
@@ -816,6 +863,7 @@ interface JsExtensions : JsEncodeUtils {
      * @param path 所需获取文件在7zip内的路径
      * @return 7zip指定文件的数据
      */
+    @JavascriptInterface
     fun get7zByteArrayContent(url: String, path: String): ByteArray? {
         val bytes = if (url.isAbsUrl()) {
             AnalyzeUrl(url, source = getSource(), coroutineContext = context).getByteArray()
@@ -952,6 +1000,7 @@ interface JsExtensions : JsEncodeUtils {
     /**
      * 章节数转数字
      */
+    @JavascriptInterface
     fun toNumChapter(s: String?): String? {
         s ?: return null
         val matcher = AppPattern.titleNumPattern.matcher(s)
@@ -975,7 +1024,7 @@ interface JsExtensions : JsEncodeUtils {
      * 弹窗提示
      */
     fun toast(msg: Any?) {
-        rhinoContext.ensureActive()
+        rhinoContextOrNull?.ensureActive()
         appCtx.toastOnUi("${getSource()?.getTag()}: ${msg.toString()}")
     }
 
@@ -983,7 +1032,7 @@ interface JsExtensions : JsEncodeUtils {
      * 弹窗提示 停留时间较长
      */
     fun longToast(msg: Any?) {
-        rhinoContext.ensureActive()
+        rhinoContextOrNull?.ensureActive()
         appCtx.longToastOnUi("${getSource()?.getTag()}: ${msg.toString()}")
     }
 
@@ -1013,22 +1062,26 @@ interface JsExtensions : JsEncodeUtils {
     /**
      * 生成UUID
      */
+    @JavascriptInterface
     fun randomUUID(): String {
         return UUID.randomUUID().toString()
     }
 
+    @JavascriptInterface
     fun androidId(): String {
         return AppConst.androidId
     }
 
+    @JavascriptInterface
     fun openUrl(url: String) {
         openUrl(url, null)
     }
 
     // 新增 mimeType 参数，默认为 null（保持兼容性）
+    @JavascriptInterface
     fun openUrl(url: String, mimeType: String? = null) {
         require(url.length < 64 * 1024) { "openUrl parameter url too long" }
-        rhinoContext.ensureActive()
+        rhinoContextOrNull?.ensureActive()
         if (url.startsWith("legado://") || url.startsWith("yuedu://")) {
             appCtx.startActivity<OnLineImportActivity> {
                 data = url.toUri()

@@ -2,9 +2,12 @@ package io.legado.app.model
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Context.MODE_PRIVATE
+import android.content.SharedPreferences
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
+import androidx.core.content.edit
 import com.shuyu.gsyvideoplayer.listener.GSYMediaPlayerListener
 import com.shuyu.gsyvideoplayer.utils.CommonUtil
 import com.shuyu.gsyvideoplayer.video.StandardGSYVideoPlayer
@@ -15,22 +18,44 @@ import io.legado.app.data.entities.BaseSource
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.RssReadRecord
 import io.legado.app.data.entities.RssSource
+import io.legado.app.data.entities.RssStar
+import io.legado.app.exception.ContentEmptyException
 import io.legado.app.help.book.update
 import io.legado.app.help.gsyVideo.ExoVideoManager
 import io.legado.app.help.gsyVideo.ExoVideoManager.Companion.FULLSCREEN_ID
 import io.legado.app.help.gsyVideo.FloatingPlayer
 import io.legado.app.help.gsyVideo.VideoPlayer
 import io.legado.app.model.analyzeRule.AnalyzeUrl
+import io.legado.app.model.rss.Rss
 import io.legado.app.model.webBook.WebBook
+import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.externalCache
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.withContext
 import splitties.init.appCtx
 import java.io.File
 
 object VideoPlay : CoroutineScope by MainScope(){
+    const val VIDEO_PREF_NAME = "video_config"
+    private val videoPrefs: SharedPreferences by lazy { appCtx.getSharedPreferences(VIDEO_PREF_NAME, MODE_PRIVATE) }
+    /**  是否自动播放  **/
+    var autoPlay
+        get() = videoPrefs.getBoolean("autoPlay", true)
+        set(value) {
+            videoPrefs.edit { putBoolean("autoPlay", value) }
+        }
+    /**  直接全屏，需先启用自动播放  **/
+    var startFull
+        get() = videoPrefs.getBoolean("startFull", false)
+        set(value) {
+            videoPrefs.edit { putBoolean("startFull", value) }
+        }
     val videoManager by lazy { ExoVideoManager() }
     var videoUrl: String? = null //直接的播放链接
     var chapterContent: String? = null //章节内容->播放链接
@@ -49,11 +74,16 @@ object VideoPlay : CoroutineScope by MainScope(){
     /**  本集的进度  **/
     var durChapterPos = 0
     var inBookshelf = true
+    /**  订阅收藏  **/
+    var rssStar: RssStar? = null
+    /**  订阅历史记录,收藏优先  **/
+    var rssRecord: RssReadRecord? = null
 
     /**
      * 开始播放
      */
     fun startPlay(player: StandardGSYVideoPlayer) {
+        if (source == null) return
         val player = player.getCurrentPlayer()
         durChapterPos.takeIf { it > 0 }?.toLong()?.let { player.seekOnStart = it }
         if (videoUrl != null) {
@@ -65,7 +95,54 @@ object VideoPlay : CoroutineScope by MainScope(){
                 chapter = null
             )
             player.setUp(analyzeUrl.url, false, File(appCtx.externalCache, "exoplayer"),analyzeUrl.headerMap.toMap(), videoTitle)
-            player.startPlayLogic()
+            if (autoPlay) {
+                player.startPlayLogic()
+            }
+            return
+        }
+        (source as? RssSource)?.let { s ->
+            val rssArticle = rssStar?.toRssArticle() ?: rssRecord?.toRssArticle()
+            if (rssArticle == null) {
+                appCtx.toastOnUi("未找到订阅")
+                return
+            }
+            val ruleContent = s.ruleContent
+            if (ruleContent.isNullOrBlank()) {
+                chapterContent = rssArticle.link
+                val analyzeUrl = AnalyzeUrl(
+                    chapterContent!!,
+                    source = source,
+                    ruleData = rssArticle
+                )
+                player.mapHeadData = analyzeUrl.headerMap
+                player.setUp(analyzeUrl.url, false, File(appCtx.externalCache, "exoplayer"), videoTitle)
+                if (autoPlay) {
+                    player.startPlayLogic()
+                }
+            } else {
+                Rss.getContent(this, rssArticle, ruleContent, s)
+                    .onSuccess(IO) { body ->
+                        if (body.isBlank()) {
+                            throw ContentEmptyException("正文为空")
+                        }
+                        val url = NetworkUtils.getAbsoluteURL(rssArticle.link, body)
+                        chapterContent = url
+                        val analyzeUrl = AnalyzeUrl(
+                            url,
+                            source = source,
+                            ruleData = rssArticle
+                        )
+                        withContext(Main) {
+                            player.mapHeadData = analyzeUrl.headerMap
+                            player.setUp(analyzeUrl.url, false, File(appCtx.externalCache, "exoplayer"), videoTitle)
+                            if (autoPlay) {
+                                player.startPlayLogic()
+                            }
+                        }
+                    }.onError {
+                        AppLog.put("加载为链接的正文失败", it, true)
+                    }
+            }
             return
         }
         if (book == null) {
@@ -91,7 +168,7 @@ object VideoPlay : CoroutineScope by MainScope(){
             return
         }
         WebBook.getContent(this, source as BookSource, book!!, chapter)
-            .onSuccess { content ->
+            .onSuccess(IO) { content ->
                 if (content.isEmpty()) {
                     appCtx.toastOnUi("未获取到资源链接")
                 } else {
@@ -102,9 +179,13 @@ object VideoPlay : CoroutineScope by MainScope(){
                         ruleData = book,
                         chapter = chapter
                     )
-                    player.mapHeadData = analyzeUrl.headerMap
-                    player.setUp(analyzeUrl.url, false, File(appCtx.externalCache, "exoplayer"), videoTitle)
-                    player.startPlayLogic()
+                    withContext(Main) {
+                        player.mapHeadData = analyzeUrl.headerMap
+                        player.setUp(analyzeUrl.url, false, File(appCtx.externalCache, "exoplayer"), videoTitle)
+                        if (autoPlay) {
+                            player.startPlayLogic()
+                        }
+                    }
                 }
             }.onError {
                 AppLog.put("获取资源链接出错\n$it", it, true)
@@ -138,14 +219,22 @@ object VideoPlay : CoroutineScope by MainScope(){
             videoManager.listener().onCompletion()
         }
         videoManager.releaseMediaPlayer()
+        //还原所有状态
         videoUrl = null
         chapterContent = null
+        videoTitle = null
         source = null
         book = null
         toc = null
         volumes.clear()
         episodes = null
+        chapterInVolumeIndex = 0
+        durVolumeIndex = 0
         durVolume = null
+        durChapterPos = 0
+        inBookshelf = true
+        rssStar = null
+        rssRecord = null
     }
     /**
      * 暂停播放
@@ -206,7 +295,7 @@ object VideoPlay : CoroutineScope by MainScope(){
         sMediaPlayerListener = null
     }
 
-    fun initSource(sourceKey: String?, sourceType: Int?, bookUrl: String?): BaseSource? {
+    fun initSource(sourceKey: String?, sourceType: Int?, bookUrl: String?, record:String?): Boolean {
         source = sourceKey?.let {
             when (sourceType) {
                 SourceType.book -> appDb.bookSourceDao.getBookSource(it)
@@ -217,9 +306,9 @@ object VideoPlay : CoroutineScope by MainScope(){
         book = bookUrl?.let {
             toc = appDb.bookChapterDao.getChapterList(it)
             volumes.clear()
-            toc?.forEach { it ->
-                if (it.isVolume) {
-                    volumes.add(it)
+            toc?.forEach { t ->
+                if (t.isVolume) {
+                    volumes.add(t)
                 }
             }
             appDb.bookDao.getBook(it) ?: appDb.searchBookDao.getSearchBook(it)?.toBook()
@@ -230,8 +319,23 @@ object VideoPlay : CoroutineScope by MainScope(){
             source = appDb.bookSourceDao.getBookSource(b.origin)
         }
         upEpisodes()
-        return source
+        if (source == null) {
+            appCtx.toastOnUi("未找到源")
+            return false
+        }
+        record?.let{ //订阅源
+            rssStar =appDb.rssStarDao.get(sourceKey!!, it)?.also{ r ->
+                durChapterPos = r.durPos
+            }
+            if (rssStar == null) {
+                rssRecord = appDb.rssReadRecordDao.getRecord(it,sourceKey)?.also{ r ->
+                    durChapterPos = r.durPos
+                }
+            }
+        }
+        return true
     }
+
     fun upSource() {
         when (source) {
             is BookSource -> {
@@ -284,6 +388,16 @@ object VideoPlay : CoroutineScope by MainScope(){
             videoTitle = toc?.getOrNull(durChapterIndex)?.title
             book.durChapterTitle = videoTitle
             book.update()
+        }
+        rssStar?.let {
+            it.durPos = durChapterPos
+            videoTitle = it.title
+            appDb.rssStarDao.update(it)
+        }
+        rssRecord?.let {
+            it.durPos = durChapterPos
+            videoTitle = it.title
+            appDb.rssReadRecordDao.update(it)
         }
     }
 }

@@ -45,7 +45,7 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
     var headerMap: Map<String, String> = emptyMap()
     var origin: String? = null
 
-    fun initData(intent: Intent) {
+    fun initData(intent: Intent, success: (() -> Unit)? = null) {
         execute {
             origin = intent.getStringExtra("origin") ?: return@execute
             val link = intent.getStringExtra("link")
@@ -97,6 +97,8 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
                     loadContent(rssArticle, ruleContent)
                 }
             }
+        }.onSuccess {
+            success?.invoke()
         }.onFinally {
             upStarMenuData.postValue(true)
         }
@@ -302,11 +304,13 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
     }
 
     fun readRss(title: String, link: String, origin: String?) {
+        if (origin == null) return
         execute {
-            val rssReadRecord = RssReadRecord(
+            val rss =appDb.rssStarDao.get(origin, link)?.toRecord() ?: appDb.rssArticleDao.getByLink(origin, link)?.toRecord()
+            val rssReadRecord = rss ?: RssReadRecord(
                 record = link,
                 title = title,
-                origin = origin ?: "",
+                origin = origin,
                 readTime = System.currentTimeMillis()
             )
             appDb.rssReadRecordDao.insertRecord(rssReadRecord)

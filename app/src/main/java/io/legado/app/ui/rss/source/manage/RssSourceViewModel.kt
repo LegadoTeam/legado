@@ -9,10 +9,13 @@ import io.legado.app.help.DefaultData
 import io.legado.app.help.source.SourceHelp
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
+import io.legado.app.utils.normalizeFileName
 import io.legado.app.utils.splitNotBlank
 import io.legado.app.utils.stackTraceStr
 import io.legado.app.utils.toastOnUi
 import java.io.File
+import java.util.Date
+import java.util.Locale
 
 /**
  * 订阅源管理数据修改
@@ -80,15 +83,21 @@ class RssSourceViewModel(application: Application) : BaseViewModel(application) 
         }
     }
 
-    fun saveToFile(sources: List<RssSource>, success: (file: File) -> Unit) {
+    fun saveToFile(sources: List<RssSource>, success: (file: File, name: String) -> Unit) {
         execute {
+            val name = if (sources.size == 1) {
+                "rssSource_${sources.first().sourceName.normalizeFileName()}.json"
+            } else {
+                val timestamp = java.text.SimpleDateFormat("yyyyMMddHHmm", Locale.getDefault()).format(Date())
+                "rssSource_$timestamp.json"
+            }
             val path = "${context.filesDir}/shareRssSource.json"
             FileUtils.delete(path)
             val file = FileUtils.createFileWithReplace(path)
             file.writeText(GSON.toJson(sources))
-            file
+            Pair(file, name)
         }.onSuccess {
-            success.invoke(it)
+            success.invoke(it.first, it.second)
         }.onError {
             context.toastOnUi(it.stackTraceStr)
         }

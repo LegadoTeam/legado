@@ -1,6 +1,7 @@
 package io.legado.app.help
 
 import android.util.Base64
+import android.webkit.JavascriptInterface
 import cn.hutool.crypto.digest.DigestUtil
 import cn.hutool.crypto.digest.HMac
 import cn.hutool.crypto.symmetric.SymmetricCrypto
@@ -17,10 +18,12 @@ import io.legado.app.utils.MD5Utils
 @Suppress("unused")
 interface JsEncodeUtils {
 
+    @JavascriptInterface
     fun md5Encode(str: String): String {
         return MD5Utils.md5Encode(str)
     }
 
+    @JavascriptInterface
     fun md5Encode16(str: String): String {
         return MD5Utils.md5Encode16(str)
     }
@@ -39,6 +42,7 @@ interface JsEncodeUtils {
      */
 
     /* 调用SymmetricCrypto key为null时使用随机密钥*/
+    @JavascriptInterface
     fun createSymmetricCrypto(
         transformation: String,
         key: ByteArray?,
@@ -48,6 +52,7 @@ interface JsEncodeUtils {
         return if (iv != null && iv.isNotEmpty()) symmetricCrypto.setIv(iv) else symmetricCrypto
     }
 
+    @JavascriptInterface
     fun createSymmetricCrypto(
         transformation: String,
         key: ByteArray
@@ -55,6 +60,7 @@ interface JsEncodeUtils {
         return createSymmetricCrypto(transformation, key, null)
     }
 
+    @JavascriptInterface
     fun createSymmetricCrypto(
         transformation: String,
         key: String
@@ -62,6 +68,7 @@ interface JsEncodeUtils {
         return createSymmetricCrypto(transformation, key, null)
     }
 
+    @JavascriptInterface
     fun createSymmetricCrypto(
         transformation: String,
         key: String,
@@ -74,6 +81,7 @@ interface JsEncodeUtils {
     //******************非对称加密解密************************//
 
     /* keys都为null时使用随机密钥 */
+    @JavascriptInterface
     fun createAsymmetricCrypto(
         transformation: String
     ): AsymmetricCrypto {
@@ -435,6 +443,7 @@ interface JsEncodeUtils {
      * @param algorithm 签名算法
      * @return 16进制字符串
      */
+    @JavascriptInterface
     fun digestHex(
         data: String,
         algorithm: String,
@@ -449,6 +458,7 @@ interface JsEncodeUtils {
      * @param algorithm 签名算法
      * @return Base64字符串
      */
+    @JavascriptInterface
     fun digestBase64Str(
         data: String,
         algorithm: String,
@@ -465,6 +475,7 @@ interface JsEncodeUtils {
      * @return 16进制字符串
      */
     @Suppress("FunctionName")
+    @JavascriptInterface
     fun HMacHex(
         data: String,
         algorithm: String,
@@ -482,6 +493,7 @@ interface JsEncodeUtils {
      * @return Base64字符串
      */
     @Suppress("FunctionName")
+    @JavascriptInterface
     fun HMacBase64(
         data: String,
         algorithm: String,

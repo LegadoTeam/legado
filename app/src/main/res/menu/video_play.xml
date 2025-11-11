@@ -5,10 +5,22 @@
     tools:ignore="AlwaysShowAction">
 
     <item
+        android:id="@+id/menu_rss_star"
+        android:icon="@drawable/ic_star_border"
+        android:title="@string/favorite"
+        android:visible="false"
+        app:showAsAction="always" />
+
+    <item
         android:id="@+id/menu_float_window"
         android:icon="@drawable/ic_float_window"
         android:title="@string/float_window"
         app:showAsAction="always" />
+
+    <item
+        android:id="@+id/menu_config_settings"
+        android:title="@string/config_settings"
+        app:showAsAction="never" />
 
     <item
         android:id="@+id/menu_login"

@@ -41,7 +41,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
-import kotlin.coroutines.coroutineContext
+import androidx.core.content.edit
+import io.legado.app.model.VideoPlay.VIDEO_PREF_NAME
+import kotlinx.coroutines.currentCoroutineContext
 
 /**
  * 备份
@@ -78,7 +80,8 @@ object Backup {
             ReadBookConfig.configFileName,
             ReadBookConfig.shareConfigFileName,
             ThemeConfig.configFileName,
-            "config.xml"
+            "config.xml",
+            "videoConfig.xml"
         )
     }
 
@@ -152,7 +155,7 @@ object Backup {
                     .writeText(it)
             }
         }
-        coroutineContext.ensureActive()
+        currentCoroutineContext().ensureActive()
         GSON.toJson(ReadBookConfig.configList).let {
             FileUtils.createFileIfNotExist(backupPath + File.separator + ReadBookConfig.configFileName)
                 .writeText(it)
@@ -169,7 +172,7 @@ object Backup {
             FileUtils.createFileIfNotExist(backupPath + File.separator + DirectLinkUpload.ruleFileName)
                 .writeText(GSON.toJson(it))
         }
-        coroutineContext.ensureActive()
+        currentCoroutineContext().ensureActive()
         appCtx.getSharedPreferences(backupPath, "config")?.let { sp ->
             val edit = sp.edit()
             appCtx.defaultSharedPreferences.all.forEach { (key, value) ->
@@ -193,7 +196,21 @@ object Backup {
             }
             edit.commit()
         }
-        coroutineContext.ensureActive()
+        currentCoroutineContext().ensureActive()
+        appCtx.getSharedPreferences(backupPath, "videoConfig")?.let { sp ->
+            sp.edit(commit = true) {
+                appCtx.getSharedPreferences(VIDEO_PREF_NAME, Context.MODE_PRIVATE).all.forEach { (key, value) ->
+                    when (value) {
+                        is Int -> putInt(key, value)
+                        is Boolean -> putBoolean(key, value)
+                        is Long -> putLong(key, value)
+                        is Float -> putFloat(key, value)
+                        is String -> putString(key, value)
+                    }
+                }
+            }
+        }
+        currentCoroutineContext().ensureActive()
         val zipFileName = getNowZipFileName()
         val paths = arrayListOf(*backupFileNames)
         for (i in 0 until paths.size) {
@@ -228,7 +245,7 @@ object Backup {
         }
         FileUtils.delete(backupPath)
         FileUtils.delete(zipFilePath)
-        coroutineContext.ensureActive()
+        currentCoroutineContext().ensureActive()
         ReadBookConfig.getAllPicBgStr().map {
             if (it.contains(File.separator)) {
                 File(it)
@@ -241,7 +258,7 @@ object Backup {
     }
 
     private suspend fun writeListToJson(list: List<Any>, fileName: String, path: String) {
-        coroutineContext.ensureActive()
+        currentCoroutineContext().ensureActive()
         withContext(IO) {
             if (list.isNotEmpty()) {
                 LogUtils.d(TAG, "阅读备份 $fileName 列表大小 ${list.size}")

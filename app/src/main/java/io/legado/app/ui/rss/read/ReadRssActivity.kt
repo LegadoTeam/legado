@@ -39,6 +39,8 @@ import io.legado.app.constant.AppConst.imagePathKey
 import io.legado.app.constant.AppLog
 import io.legado.app.data.entities.RssSource
 import io.legado.app.databinding.ActivityRssReadBinding
+import io.legado.app.help.WebJsExtensions
+import io.legado.app.help.WebJsExtensions.Companion.JS_INJECTION
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.CookieManager
 import io.legado.app.lib.dialogs.SelectItem
@@ -100,6 +102,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     private var starMenuItem: MenuItem? = null
     private var ttsMenuItem: MenuItem? = null
     private var isfullscreen = false
+    private var isHtml: Boolean = true
     private var customWebViewCallback: WebChromeClient.CustomViewCallback? = null
     private val selectImageDir = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
@@ -134,7 +137,13 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
         initView()
         initWebView()
         initLiveData()
-        viewModel.initData(intent)
+        viewModel.initData(intent) {
+            //添加java函数扩展
+            viewModel.rssSource?.let {
+                val webJsExtensions =WebJsExtensions(it, this, binding.webView)
+                binding.webView.addJavascriptInterface(webJsExtensions, "java")
+            }
+        }
         onBackPressedDispatcher.addCallback(this) {
             if (binding.customWebView.size > 0) {
                 customWebViewCallback?.onCustomViewHidden()
@@ -223,9 +232,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                 }
             }
             R.id.menu_log -> showDialogFragment<AppLogDialog>()
-            R.id.menu_read_record -> {
-                showDialogFragment<ReadRecordDialog>()
-            }
+            R.id.menu_read_record -> showDialogFragment(ReadRecordDialog(viewModel.rssSource?.sourceUrl))
         }
         return super.onCompatOptionsItemSelected(item)
     }
@@ -246,11 +253,6 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
         viewModel.delFavorite()
     }
 
-    @JavascriptInterface
-    fun isNightTheme(): Boolean {
-        return AppConfig.isNightTheme
-    }
-
     private fun initView() {
         binding.root.setOnApplyWindowInsetsListenerCompat { view, windowInsets ->
             val typeMask = WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime()
@@ -264,7 +266,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     private fun initWebView() {
         binding.progressBar.fontColor = accentColor
         binding.webView.webChromeClient = CustomWebChromeClient()
-        //添加屏幕方向控制接口
+        //添加屏幕方向控制，网页关闭，openUI
         binding.webView.addJavascriptInterface(JSInterface(), "AndroidComm")
         binding.webView.webViewClient = CustomWebViewClient()
         binding.webView.settings.apply {
@@ -277,7 +279,6 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             displayZoomControls = false
             setDarkeningAllowed(AppConfig.isNightTheme)
         }
-        binding.webView.addJavascriptInterface(this, "thisActivity")
         binding.webView.setOnLongClickListener {
             val hitTestResult = binding.webView.hitTestResult
             if (hitTestResult.type == WebView.HitTestResult.IMAGE_TYPE || hitTestResult.type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE) {
@@ -345,24 +346,6 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
         }
 
         @JavascriptInterface
-        fun request(jsCode: String, id: String) {
-            Coroutine.async(lifecycleScope) {
-                AnalyzeRule(null, viewModel.rssSource).run {
-                    setCoroutineContext(coroutineContext)
-                    evalJS(jsCode).toString()
-                }
-            }.onSuccess { data ->
-                binding.webView.evaluateJavascript(
-                    "window.JSBridgeResult('$id', '${data.escapeForJs()}', null);", null
-                )
-            }.onError {
-                binding.webView.evaluateJavascript(
-                    "window.JSBridgeResult('$id', null, '${it.localizedMessage?.escapeForJs()}');", null
-                )
-            }
-        }
-
-        @JavascriptInterface
         fun onCloseRequested() {
             finish()
         }
@@ -386,24 +369,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                     };
                     screen.orientation.__patched = true;
                 };
-                window.run = function(jsCode) {
-                    return new Promise((resolve, reject) => {
-                        const requestId = 'req_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5);
-                        window.JSBridgeCallbacks = window.JSBridgeCallbacks || {};
-                        window.JSBridgeCallbacks[requestId] = { resolve, reject };
-                        window.AndroidComm?.request(String(jsCode), requestId);
-                    });
-                };
-                window.JSBridgeResult = function(requestId, result, error) {
-                    if (window.JSBridgeCallbacks?.[requestId]) {
-                        if (error) {
-                            window.JSBridgeCallbacks[requestId].reject(error);
-                        } else {
-                            window.JSBridgeCallbacks[requestId].resolve(result);
-                        }
-                        delete window.JSBridgeCallbacks[requestId];
-                    }
-                };
+                ${if (isHtml) JS_INJECTION else ""}
                 window.close = function() {
                     window.AndroidComm?.onCloseRequested();
                 };
@@ -481,6 +447,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                         baseUrl, processedHtml, "text/html;charset=utf-8", "utf-8", urlState.url
                     )
                 } else {
+                    isHtml = false
                     loadUrl(urlState.url, urlState.headerMap)
                 }
             }

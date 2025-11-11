@@ -7,6 +7,7 @@ import io.github.rosemoe.sora.langs.textmate.registry.FileProviderRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.model.ThemeModel
 import io.github.rosemoe.sora.widget.CodeEditor
+import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
 import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppPattern.JS_PATTERN
 import io.legado.app.exception.NoStackTraceException
@@ -35,6 +36,7 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
     var initialText = ""
     var cursorPosition = 0
     var language: TextMateLanguage? = null
+    var colorScheme: EditorColorScheme? = null
     var languageName = "source.js"
     val themeRegistry: ThemeRegistry = ThemeRegistry.getInstance()
     var writable = true
@@ -59,7 +61,6 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
             context.toastOnUi("error\n${it.localizedMessage}")
             it.printOnDebug()
         }
-        loadTextMateThemes()
     }
 
     private fun isHtmlStr(text: String): Boolean {

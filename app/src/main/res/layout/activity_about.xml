@@ -26,7 +26,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
-                android:text="@string/app_name"
+                android:text="@string/app_name_sigma"
                 android:textSize="20sp"
                 android:textStyle="bold" />
 
@@ -34,7 +34,7 @@
                 android:id="@+id/tv_app_summary"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/about_description" />
+                android:text="@string/about_description_sigma" />
         </LinearLayout>
 
     </io.legado.app.ui.widget.TitleBar>

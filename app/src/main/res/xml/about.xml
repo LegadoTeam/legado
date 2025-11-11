@@ -4,7 +4,7 @@
 
     <io.legado.app.lib.prefs.Preference
         android:key="contributors"
-        android:summary="@string/contributors_summary"
+        android:summary="@string/contributors_summary_sigma"
         android:title="@string/contributors"
         app:iconSpaceReserved="false" />
 

@@ -153,24 +153,26 @@ class VideoPlayService : BaseService() {
                 return START_NOT_STICKY
             }
         }
-        intent?.let {
-            isNew = intent.getBooleanExtra("isNew", true)
-            intent.getStringExtra("videoUrl")?.apply {
-                VideoPlay.videoUrl = this
-            }
+        if (intent == null) return START_NOT_STICKY
+        isNew = intent.getBooleanExtra("isNew", true)
+        if (isNew) {
+            intent.getStringExtra("videoUrl")?.let { VideoPlay.videoUrl = it }
             VideoPlay.videoTitle = intent.getStringExtra("videoTitle")
             val sourceKey = intent.getStringExtra("sourceKey")
             val sourceType = intent.getIntExtra("sourceType", 0)
             val bookUrl = intent.getStringExtra("bookUrl")
-            if (isNew) {
-                VideoPlay.initSource(sourceKey, sourceType, bookUrl) ?: stopSelf()
-                VideoPlay.saveRead()
-                VideoPlay.startPlay(playerView)
-            } else {
-                VideoPlay.clonePlayState(playerView)
-                playerView.setSurfaceToPlay()
-                playerView.startAfterPrepared()
+            val record = intent.getStringExtra("record")
+            VideoPlay.inBookshelf = intent.getBooleanExtra("inBookshelf", true)
+            if (!VideoPlay.initSource(sourceKey, sourceType, bookUrl, record)) {
+                stopSelf()
+                return START_NOT_STICKY
             }
+            VideoPlay.saveRead()
+            VideoPlay.startPlay(playerView)
+        } else {
+            VideoPlay.clonePlayState(playerView)
+            playerView.setSurfaceToPlay()
+            playerView.startAfterPrepared()
         }
         setupPlayerView()
         if (floatingView.parent == null) {
