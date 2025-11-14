@@ -52,9 +52,9 @@ import java.net.URLDecoder
 import android.webkit.JavascriptInterface
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.constant.AppLog
+import io.legado.app.help.WebCacheManager
+import io.legado.app.help.WebJsExtensions
 import io.legado.app.help.coroutine.Coroutine
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
 import io.legado.app.help.http.CookieManager as AppCookieManager
@@ -62,6 +62,10 @@ import io.legado.app.model.ReadBook
 import io.legado.app.utils.escapeForJs
 
 class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
+    companion object {
+        // 是否输出日志
+        var sessionShowWebLog = false
+    }
 
     override val binding by viewBinding(ActivityWebViewBinding::inflate)
     override val viewModel by viewModels<WebViewModel>()
@@ -70,7 +74,6 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
     private var isCloudflareChallenge = false
     private var isFullScreen = false
     private var isfullscreen = false
-    private var localhtml = false
     private val saveImage = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
             ACache.get().put(imagePathKey, uri.toString())
@@ -89,7 +92,14 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
             if (html.isNullOrEmpty()) {
                 binding.webView.loadUrl(url, headerMap)
             } else {
-                localhtml = true
+                if (viewModel.localHtml) {
+                    viewModel.source?.let {
+                        val webJsExtensions =WebJsExtensions(it, this, binding.webView)
+                        binding.webView.addJavascriptInterface(webJsExtensions, "java")
+                        binding.webView.addJavascriptInterface(it, "source")
+                        binding.webView.addJavascriptInterface(WebCacheManager, "cache")
+                    }
+                }
                 binding.webView.loadDataWithBaseURL(url, html, "text/html", "utf-8", url)
             }
         }
@@ -121,7 +131,7 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
             menu.findItem(R.id.menu_disable_source)?.isVisible = true
             menu.findItem(R.id.menu_delete_source)?.isVisible = true
         }
-        menu.findItem(R.id.menu_show_web_log)?.isChecked = viewModel.showWebLog
+        menu.findItem(R.id.menu_show_web_log)?.isChecked = sessionShowWebLog
         return super.onPrepareOptionsMenu(menu)
     }
 
@@ -141,8 +151,8 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
 
             R.id.menu_full_screen -> toggleFullScreen()
             R.id.menu_show_web_log -> {
-                viewModel.toggleShowWebLog()
-                item.isChecked = viewModel.showWebLog
+                sessionShowWebLog = !sessionShowWebLog
+                item.isChecked = sessionShowWebLog
             }
             R.id.menu_disable_source -> {
                 viewModel.disableSource {
@@ -286,30 +296,10 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
                     });
                 };
                 screen.orientation.__patched = true;
-            }
-            ${if (localhtml) """
-            window.run = function(jsCode) {
-                return new Promise((resolve, reject) => {
-                const requestId = 'req_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5);
-                window.JSBridgeCallbacks = window.JSBridgeCallbacks || {};
-                window.JSBridgeCallbacks[requestId] = { resolve, reject };
-                window.AndroidComm?.request(String(jsCode), requestId);
-                });
-            };
-            window.JSBridgeResult = function(requestId, result, error) {
-                if (window.JSBridgeCallbacks?.[requestId]) {
-                    if (error) {
-                        window.JSBridgeCallbacks[requestId].reject(error);
-                    } else {
-                        window.JSBridgeCallbacks[requestId].resolve(result);
-                    }
-                    delete window.JSBridgeCallbacks[requestId];
-                }
             };
             window.close = function() {
                 window.AndroidComm?.onCloseRequested();
             };
-            """ else ""}
         })();
         """.trimIndent()
         binding.webView.evaluateJavascript(js, null)
@@ -374,14 +364,6 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
             customWebViewCallback = callback
             keepScreenOn(true)
             toggleSystemBar(false)
-            lifecycleScope.launch {
-                delay(100)
-                if (!isFinishing && !isDestroyed) {
-                    if (requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) {
-                        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
-                    }
-                }
-            }
         }
 
         override fun onHideCustomView() {
@@ -401,7 +383,7 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
         /* 监听网页日志 */
         override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
             viewModel.source?.let {
-                if (viewModel.showWebLog) {
+                if (sessionShowWebLog) {
                     val consoleException = Exception("${consoleMessage.messageLevel().name}: \n${consoleMessage.message()}\n-Line ${consoleMessage.lineNumber()} of ${consoleMessage.sourceId()}")
                     val message = viewModel.sourceName + ": ${consoleMessage.message()}"
                     when (consoleMessage.messageLevel()) {

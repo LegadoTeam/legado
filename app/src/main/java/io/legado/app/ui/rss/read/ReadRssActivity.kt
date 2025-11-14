@@ -18,7 +18,6 @@ import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 import android.webkit.SslErrorHandler
 import android.webkit.URLUtil
 import android.webkit.WebChromeClient
@@ -39,8 +38,8 @@ import io.legado.app.constant.AppConst.imagePathKey
 import io.legado.app.constant.AppLog
 import io.legado.app.data.entities.RssSource
 import io.legado.app.databinding.ActivityRssReadBinding
+import io.legado.app.help.WebCacheManager
 import io.legado.app.help.WebJsExtensions
-import io.legado.app.help.WebJsExtensions.Companion.JS_INJECTION
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.CookieManager
 import io.legado.app.lib.dialogs.SelectItem
@@ -78,9 +77,6 @@ import splitties.views.bottomPadding
 import java.io.ByteArrayInputStream
 import java.net.URLDecoder
 import java.util.regex.PatternSyntaxException
-import io.legado.app.help.coroutine.Coroutine
-import io.legado.app.model.analyzeRule.AnalyzeRule
-import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
 import io.legado.app.ui.rss.article.RssSortActivity
 import io.legado.app.utils.GSONStrict
 import io.legado.app.utils.fromJsonObject
@@ -88,7 +84,6 @@ import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.rss.article.ReadRecordDialog
 import io.legado.app.ui.rss.source.edit.RssSourceEditActivity
 import io.legado.app.utils.StartActivityContract
-import io.legado.app.utils.escapeForJs
 
 /**
  * rss阅读界面
@@ -101,8 +96,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
 
     private var starMenuItem: MenuItem? = null
     private var ttsMenuItem: MenuItem? = null
-    private var isfullscreen = false
-    private var isHtml: Boolean = true
+    private var isFullscreen = false
     private var customWebViewCallback: WebChromeClient.CustomViewCallback? = null
     private val selectImageDir = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
@@ -137,13 +131,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
         initView()
         initWebView()
         initLiveData()
-        viewModel.initData(intent) {
-            //添加java函数扩展
-            viewModel.rssSource?.let {
-                val webJsExtensions =WebJsExtensions(it, this, binding.webView)
-                binding.webView.addJavascriptInterface(webJsExtensions, "java")
-            }
-        }
+        viewModel.initData(intent)
         onBackPressedDispatcher.addCallback(this) {
             if (binding.customWebView.size > 0) {
                 customWebViewCallback?.onCustomViewHidden()
@@ -313,11 +301,12 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
         @JavascriptInterface
         fun lockOrientation(orientation: String) {
             runOnUiThread {
-                if (isfullscreen) {
+                if (isFullscreen) {
                     requestedOrientation = when (orientation) {
                         "portrait", "portrait-primary" -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                         "portrait-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
-                        "landscape", "landscape-primary" -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                        "landscape", "landscape-primary" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE //横屏的时候受重力正反控制
+                            //ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                         "landscape-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
                         "any", "unspecified" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR
                         else -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
@@ -369,11 +358,10 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                     };
                     screen.orientation.__patched = true;
                 };
-                ${if (isHtml) JS_INJECTION else ""}
                 window.close = function() {
                     window.AndroidComm?.onCloseRequested();
                 };
-                window.openui = function(name,object) {
+                window.openUi = function(name,object) {
                     return new Promise((resolve, reject) => {
                         window.AndroidComm?.openUI(name, JSON.stringify(object))
                         resolve()
@@ -410,6 +398,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
         viewModel.contentLiveData.observe(this) { content ->
             viewModel.rssArticle?.let {
                 upJavaScriptEnable()
+                initJavascriptInterface()
                 val url = NetworkUtils.getAbsoluteURL(it.origin, it.link).substringBefore("@js")
                 val html = viewModel.clHtml(content)
                 binding.webView.settings.userAgentString =
@@ -441,13 +430,13 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                 val processedHtml = viewModel.rssSource?.ruleContent?.takeIf { it.isNotEmpty() }
                     ?.let(viewModel::clHtml)
                 if (processedHtml != null) {
+                    initJavascriptInterface()
                     val baseUrl =
                         if (viewModel.rssSource?.loadWithBaseUrl == true) urlState.url else null
                     loadDataWithBaseURL(
                         baseUrl, processedHtml, "text/html;charset=utf-8", "utf-8", urlState.url
                     )
                 } else {
-                    isHtml = false
                     loadUrl(urlState.url, urlState.headerMap)
                 }
             }
@@ -455,6 +444,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
         viewModel.htmlLiveData.observe(this) { html ->
             viewModel.rssSource?.let {
                 upJavaScriptEnable()
+                initJavascriptInterface()
                 binding.webView.settings.userAgentString =
                     viewModel.headerMap[AppConst.UA_NAME] ?: AppConfig.userAgent
                 val baseUrl =
@@ -470,6 +460,15 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     private fun upJavaScriptEnable() {
         if (viewModel.rssSource?.enableJs == true) {
             binding.webView.settings.javaScriptEnabled = true
+        }
+    }
+
+    private fun initJavascriptInterface() {
+        viewModel.rssSource?.let {
+            val webJsExtensions =WebJsExtensions(it, this, binding.webView)
+            binding.webView.addJavascriptInterface(webJsExtensions, "java")
+            binding.webView.addJavascriptInterface(it, "source")
+            binding.webView.addJavascriptInterface(WebCacheManager, "cache")
         }
     }
 
@@ -528,24 +527,16 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
         }
 
         override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
-            isfullscreen = true
+            isFullscreen = true
             binding.llView.invisible()
             binding.customWebView.addView(view)
             customWebViewCallback = callback
             keepScreenOn(true)
             toggleSystemBar(false)
-            lifecycleScope.launch {
-                delay(100)
-                if (!isFinishing && !isDestroyed) {
-                    if (requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) {
-                        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
-                    }
-                }
-            }
         }
 
         override fun onHideCustomView() {
-            isfullscreen = false
+            isFullscreen = false
             binding.customWebView.removeAllViews()
             binding.llView.visible()
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
@@ -661,7 +652,6 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
 
         private fun shouldOverrideUrlLoading(url: Uri): Boolean {
             viewModel.rssSource?.let { source ->
-                handleSpecialSchemes(source, url)?.let { return it }
                 source.shouldOverrideUrlLoading?.takeUnless(String::isNullOrBlank)?.let { js ->
                     val startTime = SystemClock.uptimeMillis()
                     val result = kotlin.runCatching {
@@ -683,25 +673,6 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             return handleCommonSchemes(url)
         }
 
-        private fun handleSpecialSchemes(source: RssSource, url: Uri): Boolean? {
-            return when (url.scheme) {
-                "opensorturl" -> {
-                    val decodedUrl = decodeUrl(url, "sorturl://")
-                    RssSortActivity.start(this@ReadRssActivity, decodedUrl, source.sourceUrl)
-                    true
-                }
-
-                "openrssurl" -> {
-                    val decodedUrl = decodeUrl(url, "rssurl://")
-                    viewModel.readRss(source.sourceName, decodedUrl, viewModel.origin)
-                    start(this@ReadRssActivity, source.sourceName, decodedUrl, source.sourceUrl)
-                    true
-                }
-
-                else -> null
-            }
-        }
-
         private fun handleCommonSchemes(url: Uri): Boolean {
             return when (url.scheme) {
                 "http", "https", "jsbridge" -> false
@@ -717,10 +688,6 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                     true
                 }
             }
-        }
-
-        private fun decodeUrl(url: Uri, prefix: String): String {
-            return URLDecoder.decode(url.toString().substringAfter(prefix), "UTF-8")
         }
 
         @SuppressLint("WebViewClientOnReceivedSslError")

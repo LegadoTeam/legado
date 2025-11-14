@@ -1,5 +1,6 @@
 package io.legado.app.help
 
+import android.webkit.JavascriptInterface
 import androidx.annotation.Keep
 import androidx.collection.LruCache
 import io.legado.app.data.appDb
@@ -124,5 +125,40 @@ object CacheManager {
         appDb.cacheDao.delete(key)
         deleteMemory(key)
         ACache.get().remove(key)
+    }
+}
+
+object WebCacheManager {
+    @JavascriptInterface
+    fun put(key: String, value: String, saveTime: Int = 0) {
+        CacheManager.put(key, value, saveTime)
+    }
+    @JavascriptInterface
+    fun putMemory(key: String, value: String) {
+        memoryLruCache.put(key, value)
+    }
+    @JavascriptInterface
+    fun getFromMemory(key: String): String? {
+        return memoryLruCache[key] as String?
+    }
+    @JavascriptInterface
+    fun deleteMemory(key: String) {
+        memoryLruCache.remove(key)
+    }
+    @JavascriptInterface
+    fun get(key: String): String? {
+        return CacheManager.get(key)
+    }
+    @JavascriptInterface
+    fun putFile(key: String, value: String, saveTime: Int = 0) {
+        CacheManager.putFile(key, value, saveTime)
+    }
+    @JavascriptInterface
+    fun getFile(key: String): String? {
+        return CacheManager.getFile(key)
+    }
+    @JavascriptInterface
+    fun delete(key: String) {
+        CacheManager.delete(key)
     }
 }

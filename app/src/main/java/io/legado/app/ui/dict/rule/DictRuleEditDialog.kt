@@ -69,10 +69,12 @@ class DictRuleEditDialog() : BaseDialogFragment(R.layout.dialog_dict_rule_edit, 
     private fun onFullEditClicked() {
         val view = dialog?.window?.decorView?.findFocus()
         if (view is EditText) {
+            val hint = findParentTextInputLayout(view)?.hint?.toString()
             focusedEditText = view
             val currentText = view.text.toString()
             val intent = Intent(requireActivity(), CodeEditActivity::class.java).apply {
                 putExtra("text", currentText)
+                putExtra("title", hint)
                 putExtra("cursorPosition", view.selectionStart)
             }
             textEditLauncher.launch(intent)

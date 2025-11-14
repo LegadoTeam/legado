@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -16,7 +15,6 @@
             android:paddingBottom="16dp"
             android:text="@string/config_settings"
             android:textSize="18sp" />
-
 
         <TextView
             android:id="@+id/tv_font_size"
@@ -50,6 +48,107 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checked="true" />
+
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/non_printable_set"
+            android:textColor="@color/primaryText"
+            android:textSize="16sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingTop="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/whitespace_leading"
+                android:textColor="@color/primaryText"
+                android:textSize="16sp" />
+
+            <CheckBox
+                android:id="@+id/FLAG_DRAW_WHITESPACE_LEADING"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="false" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/whitespace_inner"
+                android:textColor="@color/primaryText"
+                android:textSize="16sp" />
+
+            <CheckBox
+                android:id="@+id/FLAG_DRAW_WHITESPACE_INNER"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="false" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/whitespace_trailing"
+                android:textColor="@color/primaryText"
+                android:textSize="16sp" />
+
+            <CheckBox
+                android:id="@+id/FLAG_DRAW_WHITESPACE_TRAILING"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="false" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/whitespace_empty"
+                android:textColor="@color/primaryText"
+                android:textSize="16sp" />
+
+            <CheckBox
+                android:id="@+id/FLAG_DRAW_WHITESPACE_FOR_EMPTY_LINE"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="false" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/line_separator"
+                android:textColor="@color/primaryText"
+                android:textSize="16sp" />
+
+            <CheckBox
+                android:id="@+id/FLAG_DRAW_LINE_SEPARATOR"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="false" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/whitespace_selection"
+                android:textColor="@color/primaryText"
+                android:textSize="16sp" />
+
+            <CheckBox
+                android:id="@+id/FLAG_DRAW_WHITESPACE_IN_SELECTION"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="false" />
 
         </LinearLayout>
 

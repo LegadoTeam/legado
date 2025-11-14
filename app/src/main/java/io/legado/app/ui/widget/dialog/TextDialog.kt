@@ -64,7 +64,8 @@ class TextDialog() : BaseDialogFragment(R.layout.dialog_text_view) {
         binding.toolBar.inflateMenu(R.menu.dialog_text)
         binding.toolBar.menu.applyTint(requireContext())
         arguments?.let {
-            binding.toolBar.title = it.getString("title")
+            val title = it.getString("title")
+            binding.toolBar.title = title
             val content = IntentData.get(it.getString("content")) ?: ""
             val mode = it.getString("mode")
             when (mode) {
@@ -101,6 +102,7 @@ class TextDialog() : BaseDialogFragment(R.layout.dialog_text_view) {
                     R.id.menu_fullscreen_edit -> {
                         startActivity<CodeEditActivity> {
                             putExtra("text", content)
+                            putExtra("title", title)
                             putExtra("writable", false)
                             putExtra("languageName", if (mode == Mode.MD.name) "text.html.markdown" else "text.html.basic")
                         }

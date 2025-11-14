@@ -10,6 +10,7 @@ import android.widget.EditText
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.widget.Toolbar
 import androidx.fragment.app.viewModels
+import com.google.android.material.textfield.TextInputLayout
 import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.data.entities.HttpTTS
@@ -109,10 +110,12 @@ class HttpTtsEditDialog() : BaseDialogFragment(R.layout.dialog_http_tts_edit, tr
     private fun onFullEditClicked() {
         val view = dialog?.window?.decorView?.findFocus()
         if (view is EditText) {
+            val hint = findParentTextInputLayout(view)?.hint?.toString()
             focusedEditText = view
             val currentText = view.text.toString()
             val intent = Intent(requireActivity(), CodeEditActivity::class.java).apply {
                 putExtra("text", currentText)
+                putExtra("title", hint)
                 putExtra("cursorPosition", view.selectionStart)
             }
             textEditLauncher.launch(intent)

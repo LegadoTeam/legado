@@ -280,7 +280,12 @@ object BookChapterList {
                 Debug.log(bookSource.bookSourceUrl, "≡首章信息", log)
                 Debug.log(bookSource.bookSourceUrl, "◇章节名称:${chapterList[0].title}", log)
                 Debug.log(bookSource.bookSourceUrl, "◇章节链接:${chapterList[0].url}", log)
-                Debug.log(bookSource.bookSourceUrl, "◇章节信息:${chapterList[0].tag}", log)
+                chapterList[0].wordCount?.run{
+                    Debug.log(bookSource.bookSourceUrl, "◇章节信息:${chapterList[0].tag} $this", log)
+                    Debug.log(bookSource.bookSourceUrl, "⇒已识别到章节信息中的字数",log)
+                } ?: run {
+                    Debug.log(bookSource.bookSourceUrl, "◇章节信息:${chapterList[0].tag}", log)
+                }
                 Debug.log(bookSource.bookSourceUrl, "◇是否VIP:${chapterList[0].isVip}", log)
                 Debug.log(bookSource.bookSourceUrl, "◇是否购买:${chapterList[0].isPay}", log)
             }

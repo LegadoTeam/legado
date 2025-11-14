@@ -95,12 +95,16 @@ interface JsExtensions : JsEncodeUtils {
      * 访问网络,返回String
      */
     fun ajax(url: Any): String? {
+        return ajax(url, null)
+    }
+
+    fun ajax(url: Any, callTimeout: Long?): String? {
         val urlStr = if (url is List<*>) {
             url.firstOrNull().toString()
         } else {
             url.toString()
         }
-        val analyzeUrl = AnalyzeUrl(urlStr, source = getSource(), coroutineContext = context)
+        val analyzeUrl = AnalyzeUrl(urlStr, source = getSource(), callTimeout = callTimeout, coroutineContext = context)
         return kotlin.runCatching {
             analyzeUrl.getStrResponse().body
         }.onFailure {
@@ -164,18 +168,23 @@ interface JsExtensions : JsEncodeUtils {
     }
 
     fun connect(urlStr: String, header: String?): StrResponse {
+        return connect(urlStr, header, null)
+    }
+
+    fun connect(urlStr: String, header: String?, callTimeout: Long?): StrResponse {
         val headerMap = GSON.fromJsonObject<Map<String, String>>(header).getOrNull()
         val analyzeUrl = AnalyzeUrl(
             urlStr,
             headerMapF = headerMap,
             source = getSource(),
+            callTimeout = callTimeout,
             coroutineContext = context
         )
         return kotlin.runCatching {
             analyzeUrl.getStrResponse()
         }.onFailure {
             rhinoContextOrNull?.ensureActive()
-            AppLog.put("ajax($urlStr,$header) error\n${it.localizedMessage}", it)
+            AppLog.put("connect($urlStr,$header) error\n${it.localizedMessage}", it)
         }.getOrElse {
             StrResponse(analyzeUrl.url, it.stackTraceStr)
         }
@@ -346,10 +355,12 @@ interface JsExtensions : JsEncodeUtils {
     /**
      *js实现读取cookie
      */
+    @JavascriptInterface
     fun getCookie(tag: String): String {
         return getCookie(tag, null)
     }
 
+    @JavascriptInterface
     fun getCookie(tag: String, key: String?): String {
         return if (key != null) {
             CookieStore.getKey(tag, key)
@@ -422,6 +433,10 @@ interface JsExtensions : JsEncodeUtils {
      * js实现重定向拦截,网络访问get
      */
     fun get(urlStr: String, headers: Map<String, String>): Connection.Response {
+        return get(urlStr, headers, null)
+    }
+
+    fun get(urlStr: String, headers: Map<String, String>, timeout: Int?): Connection.Response {
         val requestHeaders = if (getSource()?.enabledCookieJar == true) {
             headers.toMutableMap().apply { put(cookieJarHeader, "1") }
         } else headers
@@ -430,6 +445,7 @@ interface JsExtensions : JsEncodeUtils {
             rhinoContextOrNull?.ensureActive()
             Jsoup.connect(urlStr)
                 .sslSocketFactory(SSLHelper.unsafeSSLSocketFactory)
+                .timeout(timeout ?: 30000)
                 .ignoreContentType(true)
                 .followRedirects(false)
                 .headers(requestHeaders)
@@ -443,6 +459,10 @@ interface JsExtensions : JsEncodeUtils {
      * js实现重定向拦截,网络访问head,不返回Response Body更省流量
      */
     fun head(urlStr: String, headers: Map<String, String>): Connection.Response {
+        return head(urlStr, headers, null)
+    }
+
+    fun head(urlStr: String, headers: Map<String, String>, timeout: Int?): Connection.Response {
         val requestHeaders = if (getSource()?.enabledCookieJar == true) {
             headers.toMutableMap().apply { put(cookieJarHeader, "1") }
         } else headers
@@ -451,6 +471,7 @@ interface JsExtensions : JsEncodeUtils {
             rhinoContextOrNull?.ensureActive()
             Jsoup.connect(urlStr)
                 .sslSocketFactory(SSLHelper.unsafeSSLSocketFactory)
+                .timeout(timeout ?: 30000)
                 .ignoreContentType(true)
                 .followRedirects(false)
                 .headers(requestHeaders)
@@ -464,6 +485,10 @@ interface JsExtensions : JsEncodeUtils {
      * 网络访问post
      */
     fun post(urlStr: String, body: String, headers: Map<String, String>): Connection.Response {
+        return post(urlStr, body, headers, null)
+    }
+
+    fun post(urlStr: String, body: String, headers: Map<String, String>, timeout: Int?): Connection.Response {
         val requestHeaders = if (getSource()?.enabledCookieJar == true) {
             headers.toMutableMap().apply { put(cookieJarHeader, "1") }
         } else headers
@@ -472,6 +497,7 @@ interface JsExtensions : JsEncodeUtils {
             rhinoContextOrNull?.ensureActive()
             Jsoup.connect(urlStr)
                 .sslSocketFactory(SSLHelper.unsafeSSLSocketFactory)
+                .timeout(timeout ?: 30000)
                 .ignoreContentType(true)
                 .followRedirects(false)
                 .requestBody(body)
@@ -483,23 +509,19 @@ interface JsExtensions : JsEncodeUtils {
     }
 
     /* Str转ByteArray */
-    @JavascriptInterface
     fun strToBytes(str: String): ByteArray {
         return str.toByteArray(charset("UTF-8"))
     }
 
-    @JavascriptInterface
     fun strToBytes(str: String, charset: String): ByteArray {
         return str.toByteArray(charset(charset))
     }
 
     /* ByteArray转Str */
-    @JavascriptInterface
     fun bytesToStr(bytes: ByteArray): String {
         return String(bytes, charset("UTF-8"))
     }
 
-    @JavascriptInterface
     fun bytesToStr(bytes: ByteArray, charset: String): String {
         return String(bytes, charset(charset))
     }
@@ -522,7 +544,6 @@ interface JsExtensions : JsEncodeUtils {
         return EncoderUtils.base64Decode(str, flags)
     }
 
-    @JavascriptInterface
     fun base64DecodeToByteArray(str: String?): ByteArray? {
         if (str.isNullOrBlank()) {
             return null
@@ -530,7 +551,6 @@ interface JsExtensions : JsEncodeUtils {
         return EncoderUtils.base64DecodeToByteArray(str, 0)
     }
 
-    @JavascriptInterface
     fun base64DecodeToByteArray(str: String?, flags: Int): ByteArray? {
         if (str.isNullOrBlank()) {
             return null
@@ -549,7 +569,6 @@ interface JsExtensions : JsEncodeUtils {
     }
 
     /* HexString 解码为字节数组 */
-    @JavascriptInterface
     fun hexDecodeToByteArray(hex: String): ByteArray? {
         return HexUtil.decodeHex(hex)
     }
@@ -631,7 +650,6 @@ interface JsExtensions : JsEncodeUtils {
      * @param path 相对路径
      * @return File
      */
-    @JavascriptInterface
     fun getFile(path: String): File {
         val cachePath = appCtx.externalCache.absolutePath
         val aPath = if (path.startsWith(File.separator)) {
@@ -647,7 +665,6 @@ interface JsExtensions : JsEncodeUtils {
         return file
     }
 
-    @JavascriptInterface
     fun readFile(path: String): ByteArray? {
         val file = getFile(path)
         if (file.exists()) {
@@ -815,7 +832,6 @@ interface JsExtensions : JsEncodeUtils {
      * @param path 所需获取文件在zip内的路径
      * @return zip指定文件的数据
      */
-    @JavascriptInterface
     fun getZipByteArrayContent(url: String, path: String): ByteArray? {
         val bytes = if (url.isAbsUrl()) {
             AnalyzeUrl(url, source = getSource(), coroutineContext = context).getByteArray()
@@ -844,7 +860,6 @@ interface JsExtensions : JsEncodeUtils {
      * @param path 所需获取文件在Rar内的路径
      * @return Rar指定文件的数据
      */
-    @JavascriptInterface
     fun getRarByteArrayContent(url: String, path: String): ByteArray? {
         val bytes = if (url.isAbsUrl()) {
             AnalyzeUrl(url, source = getSource(), coroutineContext = context).getByteArray()
@@ -863,7 +878,6 @@ interface JsExtensions : JsEncodeUtils {
      * @param path 所需获取文件在7zip内的路径
      * @return 7zip指定文件的数据
      */
-    @JavascriptInterface
     fun get7zByteArrayContent(url: String, path: String): ByteArray? {
         val bytes = if (url.isAbsUrl()) {
             AnalyzeUrl(url, source = getSource(), coroutineContext = context).getByteArray()

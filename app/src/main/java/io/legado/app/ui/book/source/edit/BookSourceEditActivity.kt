@@ -144,9 +144,11 @@ class BookSourceEditActivity :
     private fun onFullEditClicked() {
         val view = window.decorView.findFocus()
         if (view is EditText) {
+            val hint = findParentTextInputLayout(view)?.hint?.toString()
             val currentText = view.text.toString()
             val intent = Intent(this, CodeEditActivity::class.java).apply {
                 putExtra("text", currentText)
+                putExtra("title", hint)
                 putExtra("cursorPosition", view.selectionStart)
             }
             textEditLauncher.launch(intent)

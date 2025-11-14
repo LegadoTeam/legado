@@ -17,6 +17,9 @@ import io.github.rosemoe.sora.event.PublishSearchResultEvent
 import io.github.rosemoe.sora.event.SelectionChangeEvent
 import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
 import io.github.rosemoe.sora.widget.CodeEditor
+import io.github.rosemoe.sora.widget.CodeEditor.FLAG_DRAW_WHITESPACE_INNER
+import io.github.rosemoe.sora.widget.CodeEditor.FLAG_DRAW_WHITESPACE_LEADING
+import io.github.rosemoe.sora.widget.CodeEditor.FLAG_DRAW_WHITESPACE_TRAILING
 import io.github.rosemoe.sora.widget.EditorSearcher
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
@@ -39,13 +42,14 @@ import io.legado.app.utils.viewbindingdelegate.viewBinding
 class CodeEditActivity :
     VMBaseActivity<ActivityCodeEditBinding, CodeEditViewModel>(),
     KeyboardToolPop.CallBack, ChangeThemeDialog.CallBack, SettingsDialog.CallBack {
+    companion object {
+        private var isInitialized = false
+    }
     override val binding by viewBinding(ActivityCodeEditBinding::inflate)
     override val viewModel by viewModels<CodeEditViewModel>()
     private val softKeyboardTool by lazy {
         KeyboardToolPop(this, lifecycleScope, binding.root, this)
     }
-
-
     private val editor: CodeEditor by lazy { binding.editText }
     private val editorSearcher: EditorSearcher by lazy { editor.searcher }
     private var options = EditorSearcher.SearchOptions(false, true)
@@ -59,21 +63,22 @@ class CodeEditActivity :
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
-        softKeyboardTool.attachToWindow(window)
-        viewModel.loadTextMateThemes()
-        viewModel.colorScheme = viewModel.colorScheme ?: ThemeRegistry.getInstance().let { registry ->
-            TextMateColorScheme2(registry, registry.currentThemeModel)
+        if (!isInitialized) {
+            viewModel.initSora()
+            isInitialized = true
         }
-        editor.colorScheme = viewModel.colorScheme!! //先设置颜色,避免一开始的白屏
+        softKeyboardTool.attachToWindow(window)
+        editor.colorScheme = TextMateColorScheme2.create(ThemeRegistry.getInstance()) //先设置颜色,避免一开始的白屏
         viewModel.initData(intent) {
             editor.apply {
+                viewModel.title?.let {
+                    binding.titleBar.title = it
+                }
+                nonPrintablePaintingFlags = AppConfig.editNonPrintable
                 setEditorLanguage(viewModel.language)
                 upEdit(AppConfig.editFontScale, null, AppConfig.editAutoWrap)
                 setText(viewModel.initialText)
-                if (!viewModel.writable) {
-                    editable = false
-                    binding.titleBar.title = getString(R.string.view_code)
-                }
+                editable = viewModel.writable
                 requestFocus()
                 postDelayed({
                     val pos = cursor.indexer.getCharPosition(viewModel.cursorPosition)
@@ -116,7 +121,7 @@ class CodeEditActivity :
         }
     }
 
-    override fun upEdit(fontSize: Int?, autoComplete: Boolean?, autoWarp: Boolean?) {
+    override fun upEdit(fontSize: Int?, autoComplete: Boolean?, autoWarp: Boolean?, editNonPrintable: Int?) {
         if (fontSize != null) {
             editor.setTextSize(fontSize.toFloat())
         }
@@ -126,6 +131,9 @@ class CodeEditActivity :
         }
         if (autoWarp != null) {
             editor.isWordwrap = autoWarp
+        }
+        if (editNonPrintable != null) {
+            editor.nonPrintablePaintingFlags = editNonPrintable
         }
     }
 
@@ -243,7 +251,7 @@ class CodeEditActivity :
             R.id.menu_config_settings -> showDialogFragment(SettingsDialog(this))
             R.id.menu_auto_wrap -> {
                 item.isChecked = !AppConfig.editAutoWrap
-                upEdit(null, null, !AppConfig.editAutoWrap)
+                upEdit(autoWarp = !AppConfig.editAutoWrap)
                 putPrefBoolean(PreferKey.editAutoWrap, !AppConfig.editAutoWrap)
             }
             R.id.menu_log -> showDialogFragment<AppLogDialog>()

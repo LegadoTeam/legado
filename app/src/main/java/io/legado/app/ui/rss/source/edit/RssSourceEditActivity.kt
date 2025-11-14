@@ -99,7 +99,7 @@ class RssSourceEditActivity :
     override fun onPostCreate(savedInstanceState: Bundle?) {
         super.onPostCreate(savedInstanceState)
         if (!LocalConfig.ruleHelpVersionIsLast) {
-            showHelp("ruleHelp")
+            showHelp("rssRuleHelp")
         }
     }
 
@@ -151,9 +151,11 @@ class RssSourceEditActivity :
     private fun onFullEditClicked() {
         val view = window.decorView.findFocus()
         if (view is EditText) {
+            val hint = findParentTextInputLayout(view)?.hint?.toString()
             val currentText = view.text.toString()
             val intent = Intent(this, CodeEditActivity::class.java).apply {
                 putExtra("text", currentText)
+                putExtra("title", hint)
                 putExtra("cursorPosition", view.selectionStart)
             }
             textEditLauncher.launch(intent)
@@ -199,7 +201,7 @@ class RssSourceEditActivity :
             )
 
             R.id.menu_log -> showDialogFragment<AppLogDialog>()
-            R.id.menu_help -> showHelp("ruleHelp")
+            R.id.menu_help -> showHelp("rssRuleHelp")
         }
         return super.onCompatOptionsItemSelected(item)
     }
@@ -465,7 +467,7 @@ class RssSourceEditActivity :
                 sendText(it)
             }.show()
 
-            "ruleHelp" -> showHelp("ruleHelp")
+            "ruleHelp" -> showHelp("rssRuleHelp")
             "jsHelp" -> showHelp("jsHelp")
             "regexHelp" -> showHelp("regexHelp")
             "selectFile" -> selectDoc.launch {

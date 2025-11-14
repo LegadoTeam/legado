@@ -8,18 +8,55 @@ import io.legado.app.data.entities.BaseSource
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
+import io.legado.app.utils.GSON
 import io.legado.app.utils.escapeForJs
+import io.legado.app.utils.fromJsonObject
 
 class WebJsExtensions(private val source: BaseSource, private val activity: AppCompatActivity, private val webView: WebView): JsExtensions {
     override fun getSource(): BaseSource {
         return source
     }
     @JavascriptInterface
-    fun request(jsCode: String, id: String) {
+    fun put(key: String, value: String): String {
+        getSource().put(key, value)
+        return value
+    }
+    @JavascriptInterface
+    fun get(key: String): String {
+        return getSource().get(key)
+    }
+    /**
+     * 由软件主动注入的js函数调用
+     */
+    @JavascriptInterface
+    fun request(funName: String, jsParam: Array<String>, id: String) {
         Coroutine.async(activity.lifecycleScope) {
-            AnalyzeRule(null, source).run {
-                setCoroutineContext(coroutineContext)
-                evalJS(jsCode).toString()
+            when (funName) {
+                "run" -> {
+                    AnalyzeRule(null, source).run {
+                        setCoroutineContext(coroutineContext)
+                        evalJS(jsParam[0]).toString()
+                    }
+                }
+                "ajaxAwait" -> {
+                    ajax(jsParam[0], jsParam[1].toInt()).toString()
+                }
+                "connectAwait" -> {
+                    connect(jsParam[0], jsParam[1], jsParam[2].toInt())
+                }
+                "getAwait" -> {
+                    get(jsParam[0], jsParam[1], jsParam[2].toInt())
+                }
+                "headAwait" -> {
+                    head(jsParam[0], jsParam[1], jsParam[2].toInt())
+                }
+                "postAwait" -> {
+                    post(jsParam[0], jsParam[1], jsParam[2], jsParam[3].toInt())
+                }
+                "webViewAwait" -> {
+                    webView(jsParam[0], jsParam[1], jsParam[2]).toString()
+                }
+                else -> "error funName"
             }
         }.onSuccess { data ->
             webView.evaluateJavascript("window.JSBridgeResult('$id', '${data.escapeForJs()}', null);", null)
@@ -36,23 +73,118 @@ class WebJsExtensions(private val source: BaseSource, private val activity: AppC
         super.longToast(msg)
     }
     @JavascriptInterface
-    fun log(msg: String?) {
-        super.log(msg)
+    fun log(msg: String?): String {
+        return super.log(msg).toString()
     }
     @JavascriptInterface
     fun ajax(url: String): String? {
-        return super.ajax(url)
+        return super.ajax(url, 9000)
     }
-
+    @JavascriptInterface
+    fun ajax(url: String, callTimeout: Int): String? {
+        return super.ajax(url, callTimeout.toLong())
+    }
+    @JavascriptInterface
+    fun connect(urlStr: String?): String {
+        if (urlStr.isNullOrEmpty()) return "error empty url"
+        return super.connect(urlStr, null, 9000).toString()
+    }
+    @JavascriptInterface
+    fun connect(urlStr: String, header: String): String {
+        return super.connect(urlStr, header, 9000).toString()
+    }
+    @JavascriptInterface
+    fun connect(urlStr: String, header: String, callTimeout: Int): String {
+        return super.connect(urlStr, header, callTimeout.toLong()).toString()
+    }
+    @JavascriptInterface
+    fun get(urlStr: String, headers: String): String {
+        val headerMap = GSON.fromJsonObject<Map<String, String>>(headers).getOrNull() ?: emptyMap()
+        return super.get(urlStr, headerMap, 9000).body()
+    }
+    @JavascriptInterface
+    fun get(urlStr: String, headers: String, timeout: Int): String {
+        val headerMap = GSON.fromJsonObject<Map<String, String>>(headers).getOrNull() ?: emptyMap()
+        return super.get(urlStr, headerMap, timeout).body()
+    }
+    @JavascriptInterface
+    fun post(urlStr: String, body: String, headers: String): String {
+        val headerMap = GSON.fromJsonObject<Map<String, String>>(headers).getOrNull() ?: emptyMap()
+        return super.post(urlStr, body, headerMap, 9000).body()
+    }
+    @JavascriptInterface
+    fun post(urlStr: String, body: String, headers: String, timeout: Int): String {
+        val headerMap = GSON.fromJsonObject<Map<String, String>>(headers).getOrNull() ?: emptyMap()
+        return super.post(urlStr, body, headerMap, timeout).body()
+    }
+    @JavascriptInterface
+    fun head(urlStr: String, headers: String): String {
+        val headerMap = GSON.fromJsonObject<Map<String, String>>(headers).getOrNull() ?: emptyMap()
+        return GSON.toJson(super.head(urlStr, headerMap, 9000).headers())
+    }
+    @JavascriptInterface
+    fun head(urlStr: String, headers: String, timeout: Int): String {
+        val headerMap = GSON.fromJsonObject<Map<String, String>>(headers).getOrNull() ?: emptyMap()
+        return GSON.toJson(super.head(urlStr, headerMap, timeout).headers())
+    }
 
     companion object{
         const val JS_INJECTION = """
+            const requestId = n => 'req_' + n + '_' + Date.now() + '_' + Math.random().toString(36).slice(-3);
             window.run = function(jsCode) {
                 return new Promise((resolve, reject) => {
-                    const requestId = 'req_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5);
+                    const id = requestId("run");
                     window.JSBridgeCallbacks = window.JSBridgeCallbacks || {};
-                    window.JSBridgeCallbacks[requestId] = { resolve, reject };
-                    window.java?.request(String(jsCode), requestId);
+                    window.JSBridgeCallbacks[id] = { resolve, reject };
+                    window.java?.request("run", [String(jsCode)], id);
+                });
+            };
+            window.ajaxAwait = function(url, callTimeout) {
+                return new Promise((resolve, reject) => {
+                    const id = requestId("ajaxAwait");
+                    window.JSBridgeCallbacks = window.JSBridgeCallbacks || {};
+                    window.JSBridgeCallbacks[id] = { resolve, reject };
+                    window.java?.request("ajaxAwait", [String(url), String(callTimeout)], id);
+                });
+            };
+            window.connectAwait = function(url, header, callTimeout) {
+                return new Promise((resolve, reject) => {
+                    const id = requestId("connectAwait");
+                    window.JSBridgeCallbacks = window.JSBridgeCallbacks || {};
+                    window.JSBridgeCallbacks[id] = { resolve, reject };
+                    window.java?.request("connectAwait", [String(url), String(header), String(callTimeout)], id);
+                });
+            };
+            window.getAwait = function(url, header, callTimeout) {
+                return new Promise((resolve, reject) => {
+                    const id = requestId("getAwait");
+                    window.JSBridgeCallbacks = window.JSBridgeCallbacks || {};
+                    window.JSBridgeCallbacks[id] = { resolve, reject };
+                    window.java?.request("getAwait", [String(url), String(header), String(callTimeout)], id);
+                });
+            };
+            window.headAwait = function(url, header, callTimeout) {
+                return new Promise((resolve, reject) => {
+                    const id = requestId("headAwait");
+                    window.JSBridgeCallbacks = window.JSBridgeCallbacks || {};
+                    window.JSBridgeCallbacks[id] = { resolve, reject };
+                    window.java?.request("headAwait", [String(url), String(header), String(callTimeout)], id);
+                });
+            };
+            window.postAwait = function(url, body, header, callTimeout) {
+                return new Promise((resolve, reject) => {
+                    const id = requestId("postAwait");
+                    window.JSBridgeCallbacks = window.JSBridgeCallbacks || {};
+                    window.JSBridgeCallbacks[id] = { resolve, reject };
+                    window.java?.request("postAwait", [String(url), String(body), String(header), String(callTimeout)], id);
+                });
+            };
+            window.webViewAwait = function(html, url, js) {
+                return new Promise((resolve, reject) => {
+                    const id = requestId("webViewAwait");
+                    window.JSBridgeCallbacks = window.JSBridgeCallbacks || {};
+                    window.JSBridgeCallbacks[id] = { resolve, reject };
+                    window.java?.request("webViewAwait", [String(html), String(url), String(js)], id);
                 });
             };
             window.JSBridgeResult = function(requestId, result, error) {

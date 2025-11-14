@@ -1576,8 +1576,9 @@ class ReadBookActivity : BaseReadBookActivity(),
     private fun jumpToPosition(searchResult: SearchResult) {
         val curTextChapter = ReadBook.curTextChapter ?: return
         binding.searchMenu.updateSearchInfo()
-        val (pageIndex, lineIndex, charIndex, addLine, charIndex2) =
+        val searchResultPositions =
             viewModel.searchResultPositions(curTextChapter, searchResult)
+        val (pageIndex, lineIndex, charIndex, addLine, charIndex2) = searchResultPositions
         ReadBook.skipToPage(pageIndex) {
             isSelectingSearchResult = true
             binding.readView.curPage.selectStartMoveIndex(0, lineIndex, charIndex)
@@ -1585,7 +1586,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                 0 -> binding.readView.curPage.selectEndMoveIndex(
                     0,
                     lineIndex,
-                    charIndex + viewModel.searchContentQuery.length - 1
+                    charIndex + searchResultPositions[5] - 1
                 )
 
                 1 -> binding.readView.curPage.selectEndMoveIndex(

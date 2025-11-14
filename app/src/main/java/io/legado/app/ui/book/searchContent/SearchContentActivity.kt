@@ -87,19 +87,20 @@ class SearchContentActivity :
     }
 
     override fun onMenuOpened(featureId: Int, menu: Menu): Boolean {
-        menu.findItem(R.id.menu_enable_replace)?.isChecked = viewModel.replaceEnabled
+        menu.findItem(R.id.menu_enable_replace)?.isChecked = SearchContentViewModel.replaceEnabled
+        menu.findItem(R.id.menu_enable_regex)?.isChecked = SearchContentViewModel.regexReplace
         return super.onMenuOpened(featureId, menu)
     }
 
     override fun onCompatOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.menu_enable_replace -> {
-                viewModel.replaceEnabled = !viewModel.replaceEnabled
-                item.isChecked = viewModel.replaceEnabled
+                SearchContentViewModel.replaceEnabled = !SearchContentViewModel.replaceEnabled
+                item.isChecked = SearchContentViewModel.replaceEnabled
             }
             R.id.menu_enable_regex -> {
-                viewModel.regexReplace = !viewModel.regexReplace
-                item.isChecked = viewModel.regexReplace
+                SearchContentViewModel.regexReplace = !SearchContentViewModel.regexReplace
+                item.isChecked = SearchContentViewModel.regexReplace
             }
         }
         return super.onCompatOptionsItemSelected(item)

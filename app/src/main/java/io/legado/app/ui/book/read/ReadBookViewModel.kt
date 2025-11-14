@@ -420,13 +420,14 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
         // calculate search result's pageIndex
         val pages = textChapter.pages
         val content = textChapter.getContent()
-        val queryLength = searchContentQuery.length
+        var queryLength = searchContentQuery.length
 
         var index: Int
         if (searchResult.isRegex) {
             val regex = Regex(searchContentQuery)
             val matches = regex.findAll(content)
             val match = matches.elementAtOrNull(searchResult.resultCountWithinChapter)
+            queryLength = match?.value?.length ?: 0
             index = match?.range?.first ?: -1
         } else {
             var count = 0
@@ -477,7 +478,7 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
             addLine = -1
             charIndex2 = charIndex + queryLength - curLineLength - 1
         }
-        return arrayOf(pageIndex, lineIndex, charIndex, addLine, charIndex2)
+        return arrayOf(pageIndex, lineIndex, charIndex, addLine, charIndex2, queryLength)
     }
 
     /**

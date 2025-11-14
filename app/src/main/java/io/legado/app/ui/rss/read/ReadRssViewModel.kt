@@ -18,6 +18,7 @@ import io.legado.app.data.entities.RssSource
 import io.legado.app.data.entities.RssStar
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.TTS
+import io.legado.app.help.WebJsExtensions.Companion.JS_INJECTION
 import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.model.analyzeRule.AnalyzeUrl
@@ -27,9 +28,9 @@ import io.legado.app.utils.ACache
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.writeBytes
 import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.currentCoroutineContext
 import splitties.init.appCtx
 import java.util.Date
-import kotlin.coroutines.coroutineContext
 
 
 class ReadRssViewModel(application: Application) : BaseViewModel(application) {
@@ -45,7 +46,7 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
     var headerMap: Map<String, String> = emptyMap()
     var origin: String? = null
 
-    fun initData(intent: Intent, success: (() -> Unit)? = null) {
+    fun initData(intent: Intent) {
         execute {
             origin = intent.getStringExtra("origin") ?: return@execute
             val link = intent.getStringExtra("link")
@@ -82,7 +83,7 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
                 val startHtml = intent.getBooleanExtra("startHtml", false)
                 val openUrl = intent.getStringExtra("openUrl")
                 if (startHtml) {
-                    htmlLiveData.postValue(hbHtml())
+                    loadStartHtml()
                 }
                 else if (ruleContent.isNullOrBlank()) {
                     loadUrl(openUrl ?: origin!!, origin!!)
@@ -97,8 +98,6 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
                     loadContent(rssArticle, ruleContent)
                 }
             }
-        }.onSuccess {
-            success?.invoke()
         }.onFinally {
             upStarMenuData.postValue(true)
         }
@@ -109,7 +108,7 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
             mUrl = url,
             baseUrl = baseUrl,
             source = rssSource,
-            coroutineContext = coroutineContext,
+            coroutineContext = currentCoroutineContext(),
             hasLoginHeader = false
         )
         urlLiveData.postValue(analyzeUrl)
@@ -219,65 +218,54 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
-    fun clHtml(content: String): String {
-        return when {
-            !rssSource?.style.isNullOrEmpty() -> {
-                """
-                    <style>
-                        ${rssSource?.style}
-                    </style>
-                    $content
-                """.trimIndent()
-            }
-
-            content.contains("<style>".toRegex()) -> {
-                content
-            }
-
-            else -> {
-                """
-                    <style>
-                        img{max-width:100% !important; width:auto; height:auto;}
-                        video{object-fit:fill; max-width:100% !important; width:auto; height:auto;}
-                        body{word-wrap:break-word; height:auto;max-width: 100%; width:auto;}
-                    </style>
-                    $content
-                """.trimIndent()
-            }
+    fun clHtml(content: String, style: String? = rssSource?.style): String {
+        var processedHtml = content
+        processedHtml = if (processedHtml.contains("<head>")) {
+            processedHtml.replaceFirst("<head>", "<head><script>$JS_INJECTION</script>")
+        } else {
+            "<head><script>$JS_INJECTION</script></head>$processedHtml"
         }
+        if (processedHtml.contains("<style>")) {
+            if (!style.isNullOrBlank()) {
+                processedHtml = processedHtml.replaceFirst("</style>", "</style><style>$style</style>")
+            }
+        } else {
+            processedHtml = processedHtml.replaceFirst("</head>", "<style>${
+                style.takeIf { !it.isNullOrBlank() } ?:
+                "img{max-width:100% !important; width:auto; height:auto;}video{object-fit:fill; max-width:100% !important; width:auto; height:auto;}body{word-wrap:break-word; height:auto;max-width: 100%; width:auto;}"
+            }</style></head>")
+        }
+        return processedHtml
     }
 
-    fun hbHtml(): String {
-        rssSource?.let{
-            var processedHtml = it.startHtml!!.let{ html  ->
-                try {
-                    when {
-                        html.startsWith("@js:") -> it.evalJS( html.substring(4)).toString()
-                        html.startsWith("<js>") -> it.evalJS(html.substring(4, html.lastIndexOf("<"))).toString()
-                        else -> html
-                    }
-                } catch (e: Throwable) {
-                    e.printOnDebug()
-                    html
-                }
-            }
-            val javascript = rssSource?.startJs
-            if (!javascript.isNullOrBlank()) {
-                processedHtml = if (processedHtml.contains("</body>")) {
-                    processedHtml.replaceFirst("</body>", "<script>$javascript</script></body>")
-                } else {
-                    "<body>$processedHtml<script>$javascript</script></body>"
-                }
-            }
-            val style = rssSource?.run { startStyle ?: style } ?: """"img{max-width:100% !important; width:auto; height:auto;}video{object-fit:fill; max-width:100% !important; width:auto; height:auto;}body{word-wrap:break-word; height:auto;max-width: 100%; width:auto;}"""
-            processedHtml = if (processedHtml.contains("<head>")) {
-                processedHtml.replaceFirst("<head>", "<head><style>$style</style>")
-            } else {
-                "<head><style>$style</style></head>$processedHtml"
-            }
-            return processedHtml
+    private fun loadStartHtml() {
+        val source = rssSource
+        if (source == null) {
+            htmlLiveData.postValue("<body>rssSource is null</body>")
+            return
         }
-        return "<body>rssSource is null</body>"
+        var processedHtml = source.startHtml?.let{ html  ->
+            try {
+                when {
+                    html.startsWith("@js:") -> source.evalJS( html.substring(4)).toString()
+                    html.startsWith("<js>") -> source.evalJS(html.substring(4, html.lastIndexOf("<"))).toString()
+                    else -> html
+                }
+            } catch (e: Throwable) {
+                e.printOnDebug()
+                html
+            }
+        } ?: return
+        val javascript = rssSource?.startJs
+        if (!javascript.isNullOrBlank()) {
+            processedHtml = if (processedHtml.contains("</body>")) {
+                processedHtml.replaceFirst("</body>", "<script>$javascript</script></body>")
+            } else {
+                "<body>$processedHtml<script>$javascript</script></body>"
+            }
+        }
+        processedHtml = clHtml(processedHtml, source.startStyle ?: source.style)
+        htmlLiveData.postValue(processedHtml)
     }
 
     @Synchronized

@@ -42,7 +42,6 @@ interface JsEncodeUtils {
      */
 
     /* 调用SymmetricCrypto key为null时使用随机密钥*/
-    @JavascriptInterface
     fun createSymmetricCrypto(
         transformation: String,
         key: ByteArray?,
@@ -52,7 +51,6 @@ interface JsEncodeUtils {
         return if (iv != null && iv.isNotEmpty()) symmetricCrypto.setIv(iv) else symmetricCrypto
     }
 
-    @JavascriptInterface
     fun createSymmetricCrypto(
         transformation: String,
         key: ByteArray
@@ -60,7 +58,6 @@ interface JsEncodeUtils {
         return createSymmetricCrypto(transformation, key, null)
     }
 
-    @JavascriptInterface
     fun createSymmetricCrypto(
         transformation: String,
         key: String
@@ -68,7 +65,6 @@ interface JsEncodeUtils {
         return createSymmetricCrypto(transformation, key, null)
     }
 
-    @JavascriptInterface
     fun createSymmetricCrypto(
         transformation: String,
         key: String,
@@ -81,7 +77,6 @@ interface JsEncodeUtils {
     //******************非对称加密解密************************//
 
     /* keys都为null时使用随机密钥 */
-    @JavascriptInterface
     fun createAsymmetricCrypto(
         transformation: String
     ): AsymmetricCrypto {
@@ -122,9 +117,10 @@ interface JsEncodeUtils {
      * @param iv ECB模式的偏移向量
      */
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).decryptStr(str)")
     )
+    @JavascriptInterface
     fun aesDecodeToString(
         str: String, key: String, transformation: String, iv: String
     ): String? {
@@ -142,9 +138,10 @@ interface JsEncodeUtils {
      * @return 解密后的字符串
      */
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).decryptStr(data)")
     )
+    @JavascriptInterface
     fun aesDecodeArgsBase64Str(
         data: String,
         key: String,
@@ -184,9 +181,10 @@ interface JsEncodeUtils {
      * @param iv ECB模式的偏移向量
      */
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).decryptStr(str)")
     )
+    @JavascriptInterface
     fun aesBase64DecodeToString(
         str: String, key: String, transformation: String, iv: String
     ): String? {
@@ -218,9 +216,10 @@ interface JsEncodeUtils {
      * @param iv ECB模式的偏移向量
      */
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).decryptStr(data)")
     )
+    @JavascriptInterface
     fun aesEncodeToString(
         data: String, key: String, transformation: String, iv: String
     ): String? {
@@ -252,9 +251,10 @@ interface JsEncodeUtils {
      * @param iv ECB模式的偏移向量
      */
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).encryptBase64(data)")
     )
+    @JavascriptInterface
     fun aesEncodeToBase64String(
         data: String, key: String, transformation: String, iv: String
     ): String? {
@@ -273,9 +273,10 @@ interface JsEncodeUtils {
      * @return 加密后的Base64
      */
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).encryptBase64(data)")
     )
+    @JavascriptInterface
     fun aesEncodeArgsBase64Str(
         data: String,
         key: String,
@@ -288,9 +289,10 @@ interface JsEncodeUtils {
 
     /////DES
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).decryptStr(data)")
     )
+    @JavascriptInterface
     fun desDecodeToString(
         data: String, key: String, transformation: String, iv: String
     ): String? {
@@ -298,9 +300,10 @@ interface JsEncodeUtils {
     }
 
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).decryptStr(data)")
     )
+    @JavascriptInterface
     fun desBase64DecodeToString(
         data: String, key: String, transformation: String, iv: String
     ): String? {
@@ -308,9 +311,10 @@ interface JsEncodeUtils {
     }
 
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).encrypt(data)")
     )
+    @JavascriptInterface
     fun desEncodeToString(
         data: String, key: String, transformation: String, iv: String
     ): String? {
@@ -318,9 +322,10 @@ interface JsEncodeUtils {
     }
 
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).encryptBase64(data)")
     )
+    @JavascriptInterface
     fun desEncodeToBase64String(
         data: String, key: String, transformation: String, iv: String
     ): String? {
@@ -339,9 +344,10 @@ interface JsEncodeUtils {
      * @return 解密后的字符串
      */
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).decryptStr(data)")
     )
+    @JavascriptInterface
     fun tripleDESDecodeStr(
         data: String,
         key: String,
@@ -363,9 +369,10 @@ interface JsEncodeUtils {
      * @return 解密后的字符串
      */
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).decryptStr(data)")
     )
+    @JavascriptInterface
     fun tripleDESDecodeArgsBase64Str(
         data: String,
         key: String,
@@ -392,9 +399,10 @@ interface JsEncodeUtils {
      * @return 加密后的Base64
      */
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).encryptBase64(data)")
     )
+    @JavascriptInterface
     fun tripleDESEncodeBase64Str(
         data: String,
         key: String,
@@ -417,9 +425,10 @@ interface JsEncodeUtils {
      * @return 加密后的Base64
      */
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).encryptBase64(data)")
     )
+    @JavascriptInterface
     fun tripleDESEncodeArgsBase64Str(
         data: String,
         key: String,

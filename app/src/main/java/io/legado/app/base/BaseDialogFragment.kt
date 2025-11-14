@@ -7,12 +7,14 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
+import android.widget.EditText
 import androidx.annotation.LayoutRes
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.textfield.TextInputLayout
 import io.legado.app.R
 import io.legado.app.constant.AppLog
 import io.legado.app.help.config.AppConfig
@@ -110,5 +112,13 @@ abstract class BaseDialogFragment(
     ) = Coroutine.async(scope, context) { block() }
 
     open fun observeLiveBus() {
+    }
+
+    fun findParentTextInputLayout(view: View): TextInputLayout? {
+        var parent = view.parent
+        while (parent != null && parent !is TextInputLayout) {
+            parent = parent.parent
+        }
+        return parent
     }
 }

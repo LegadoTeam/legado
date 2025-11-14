@@ -21,7 +21,10 @@ data class SearchResult(
         if (query.isNotBlank()) {
             if (isRegex) { // 正则表达式高亮处理
                 try {
-                    val match = Regex(query).find(resultText)
+                    var match = Regex(query).find(resultText, 20)
+                    if (match == null) {
+                        match = Regex(query).find(resultText)
+                    }
                     if (match != null) {
                         val matchedText = match.value
                         val start = match.range.first
@@ -56,7 +59,11 @@ data class SearchResult(
                 }
             } else {
                 // 普通搜索高亮
-                val queryIndexInSurrounding = resultText.indexOf(query)
+                //在20个字符之后查找，因为展示内容在getResultAndQueryIndex的时候左右移动20个字符
+                var queryIndexInSurrounding = resultText.indexOf(query, 20)
+                if (queryIndexInSurrounding < 0) {
+                    queryIndexInSurrounding = resultText.indexOf(query)
+                }
                 if (queryIndexInSurrounding >= 0) {
                     val leftString = resultText.take(queryIndexInSurrounding)
                     val rightString = resultText.substring(queryIndexInSurrounding + query.length)
