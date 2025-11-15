@@ -533,6 +533,9 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             customWebViewCallback = callback
             keepScreenOn(true)
             toggleSystemBar(false)
+            if (viewModel.rssSource?.enableJs == false) {
+                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
+            }
         }
 
         override fun onHideCustomView() {

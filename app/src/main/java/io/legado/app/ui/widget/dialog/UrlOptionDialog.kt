@@ -45,6 +45,7 @@ class UrlOptionDialog(context: Context, private val success: (String) -> Unit) :
         urlOption.setType(binding.editType.text.toString())
         urlOption.setWebJs(binding.editWebJs.text.toString())
         urlOption.setJs(binding.editJs.text.toString())
+        urlOption.setDnsIp(binding.editDnsIp.text.toString())
         return urlOption
     }
 

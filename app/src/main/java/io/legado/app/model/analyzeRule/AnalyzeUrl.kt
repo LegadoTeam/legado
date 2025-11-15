@@ -3,6 +3,7 @@ package io.legado.app.model.analyzeRule
 import android.annotation.SuppressLint
 import android.util.Base64
 import androidx.annotation.Keep
+import androidx.collection.LruCache
 import androidx.media3.common.MediaItem
 import cn.hutool.core.codec.PercentCodec
 import cn.hutool.core.net.RFC3986
@@ -48,6 +49,7 @@ import io.legado.app.utils.isJson
 import io.legado.app.utils.isJsonArray
 import io.legado.app.utils.isJsonObject
 import io.legado.app.utils.isXml
+import io.legado.app.utils.parseIpsFromString
 import kotlinx.coroutines.runBlocking
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -58,6 +60,7 @@ import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.net.URLEncoder
 import java.nio.charset.Charset
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 import kotlin.coroutines.ContinuationInterceptor
@@ -106,6 +109,7 @@ class AnalyzeUrl(
     private var retry: Int = 0
     private var useWebView: Boolean = false
     private var webJs: String? = null
+    private var dnsIp: String? = null
     private val enabledCookieJar = source?.enabledCookieJar == true
     private val domain: String
     private var webViewDelayTime: Long = 0
@@ -241,6 +245,7 @@ class AnalyzeUrl(
                 retry = option.getRetry()
                 useWebView = option.useWebView()
                 webJs = option.getWebJs()
+                dnsIp = option.getDnsIp()
                 option.getJs()?.let { jsStr ->
                     evalJS(jsStr, url)?.toString()?.let {
                         url = it
@@ -557,11 +562,11 @@ class AnalyzeUrl(
 
     private fun getClient(): OkHttpClient {
         val client = getProxyClient(proxy)
-        val host = extractHostFromUrl(urlNoQuery)
-        if (host.isNullOrEmpty()) return client
-        val hasDns = AppConfig.addressCache[host] != null
-        if (readTimeout == null && callTimeout == null && !hasDns) {
+        if (readTimeout == null && callTimeout == null && dnsIp == null) {
             return client
+        }
+        if (AppConfig.isCronet && dnsIp != null) {
+            customIp[urlNoQuery] = dnsIp!!
         }
         return client.newBuilder().run {
             if (readTimeout != null) {
@@ -571,10 +576,10 @@ class AnalyzeUrl(
             if (callTimeout != null) {
                 callTimeout(callTimeout, TimeUnit.MILLISECONDS)
             }
-            if (hasDns) {
+            if (dnsIp != null) {
+                val inetAddress = dnsIp!!.parseIpsFromString()
                 dns { hostname ->
-                    val cachedAddress = AppConfig.addressCache[hostname]
-                    cachedAddress ?: Dns.SYSTEM.lookup(hostname)
+                    inetAddress ?: Dns.SYSTEM.lookup(hostname)
                 }
             }
             build()
@@ -726,8 +731,7 @@ class AnalyzeUrl(
         private val pagePattern = Pattern.compile("<(.*?)>")
         private val queryEncoder =
             RFC3986.UNRESERVED.orNew(PercentCodec.of("!$%&()*+,/:;=?@[\\]^`{|}"))
-        private val isCronet: Boolean by lazy {AppConfig.isCronet}
-
+        val customIp by lazy { ConcurrentHashMap<String, String>() }
         fun AnalyzeUrl.getMediaItem(): MediaItem {
             setCookie()
             return ExoPlayerHelper.createMediaItem(url, headerMap)
@@ -761,6 +765,10 @@ class AnalyzeUrl(
          * webView中执行的js
          **/
         private var webJs: String? = null,
+        /**
+         * 自定义的域名ip
+         **/
+        private var dnsIp: String? = null,
         /**
          * 解析完url参数时执行的js
          * 执行结果会赋值给url
@@ -863,6 +871,13 @@ class AnalyzeUrl(
 
         fun getWebJs(): String? {
             return webJs
+        }
+        fun setDnsIp(value: String?) {
+            dnsIp = if (value.isNullOrBlank()) null else value
+        }
+
+        fun getDnsIp(): String? {
+            return dnsIp
         }
 
         fun setJs(value: String?) {

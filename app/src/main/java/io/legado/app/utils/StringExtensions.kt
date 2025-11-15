@@ -13,6 +13,7 @@ import io.legado.app.constant.AppPattern.dataUriRegex
 import java.io.File
 import java.lang.Character.codePointCount
 import java.lang.Character.offsetByCodePoints
+import java.net.InetAddress
 import java.util.Locale
 import java.util.regex.Pattern
 
@@ -156,3 +157,13 @@ fun String.escapeForJs(): String {
         .replace("\u2028", "\\u2028")
         .replace("\u2029", "\\u2029")
 }
+
+/**
+ * 将ip字符串转为InetAddress
+ */
+fun String.parseIpsFromString(): List<InetAddress>? =
+    split(",")
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .mapNotNull { it.runCatching { InetAddress.getByName(this) }.getOrNull() }
+        .takeIf { it.isNotEmpty() }

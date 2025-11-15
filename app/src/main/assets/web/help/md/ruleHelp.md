@@ -158,6 +158,11 @@ https://www.baidu.com,{"js":"java.headerMap.put('xxx', 'yyy')"}
 https://www.baidu.com,{"js":"java.url=java.url+'yyyy'"}
 ```
 
+* url添加dnsIp参数,解析url时执行,强制指定链接访问的ip地址,例
+```
+https://dns.google,{"dnsIp":"8.8.8.8"}
+```
+
 * 增加js方法，用于重定向拦截
   * `java.get(urlStr: String, headers: Map<String, String>)`
   * `java.post(urlStr: String, body: String, headers: Map<String, String>)`

@@ -2,6 +2,7 @@ package io.legado.app.data.entities
 
 import android.os.Parcelable
 import android.text.TextUtils
+import android.webkit.JavascriptInterface
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
@@ -109,10 +110,12 @@ data class RssSource(
     var searchUrl: String? = null
 ) : Parcelable, BaseSource {
 
+    @JavascriptInterface
     override fun getTag(): String {
         return sourceName
     }
 
+    @JavascriptInterface
     override fun getKey(): String {
         return sourceUrl
     }
