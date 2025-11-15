@@ -7,6 +7,7 @@ object PreferKey {
     const val themeMode = "themeMode"
     const val userAgent = "userAgent"
     const val customHosts = "customHosts"
+    const val videoSetting = "videoSetting"
     const val editTheme = "editTheme"
     const val showUnread = "showUnread"
     const val showBooknameLayout = "showBooknameLayout"
@@ -190,6 +191,7 @@ object PreferKey {
     const val readBarStyleFollowPage = "readBarStyleFollowPage"
     const val contentSelectSpeakMod = "contentReadAloudMod"
     const val editFontScale = "editFontScale"
+    const val editNonPrintable = "editNonPrintable"
     const val editAutoWrap = "editAutoWrap"
     const val editAutoComplete = "editAutoComplete"
 }

@@ -4,8 +4,10 @@ import android.app.Application
 import android.content.Intent
 import io.github.rosemoe.sora.langs.textmate.TextMateLanguage
 import io.github.rosemoe.sora.langs.textmate.registry.FileProviderRegistry
+import io.github.rosemoe.sora.langs.textmate.registry.GrammarRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.model.ThemeModel
+import io.github.rosemoe.sora.langs.textmate.registry.provider.AssetsFileResolver
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppPattern.JS_PATTERN
@@ -17,6 +19,7 @@ import io.legado.app.utils.printOnDebug
 import io.legado.app.utils.toastOnUi
 import org.eclipse.tm4e.core.registry.IThemeSource
 import org.jsoup.Jsoup
+import splitties.init.appCtx
 
 class CodeEditViewModel(application: Application) : BaseViewModel(application) {
     companion object {
@@ -38,6 +41,16 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
     var languageName = "source.js"
     val themeRegistry: ThemeRegistry = ThemeRegistry.getInstance()
     var writable = true
+    var title: String? = null
+
+    fun initSora() {
+        //初始化sora加载
+        FileProviderRegistry.getInstance().addFileProvider(
+            AssetsFileResolver(appCtx.assets)
+        )
+        loadTextMateThemes()
+        GrammarRegistry.getInstance().loadGrammars("textmate/languages.json")
+    }
 
     fun initData(
         intent: Intent, success: () -> Unit
@@ -53,13 +66,13 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
             language = TextMateLanguage.create(languageName, AppConfig.editAutoComplete)
             cursorPosition = intent.getIntExtra("cursorPosition", 0)
             writable = intent.getBooleanExtra("writable", true)
+            title = intent.getStringExtra("title")
         }.onSuccess {
             success.invoke()
         }.onError {
             context.toastOnUi("error\n${it.localizedMessage}")
             it.printOnDebug()
         }
-        loadTextMateThemes()
     }
 
     private fun isHtmlStr(text: String): Boolean {

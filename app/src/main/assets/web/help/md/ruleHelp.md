@@ -158,6 +158,11 @@ https://www.baidu.com,{"js":"java.headerMap.put('xxx', 'yyy')"}
 https://www.baidu.com,{"js":"java.url=java.url+'yyyy'"}
 ```
 
+* url添加dnsIp参数,解析url时执行,强制指定链接访问的ip地址,例
+```
+https://dns.google,{"dnsIp":"8.8.8.8"}
+```
+
 * 增加js方法，用于重定向拦截
   * `java.get(urlStr: String, headers: Map<String, String>)`
   * `java.post(urlStr: String, body: String, headers: Map<String, String>)`
@@ -283,40 +288,27 @@ result = "https://example.mp3" + "\n" + "[00:00.00][by:花丸的蜜柑面包]"
 ```
 
 * 网页JS
-> 本地html中的额外支持的js函数
-
 > `window.close()` 关闭浏览器界面  
 > `screen.orientation.lock()` 全屏后可控制屏幕方向  
 
-> 异步执行阅读函数，并返回字符串结果
+> 本地html中的额外支持的js函数  
 
+> 异步执行阅读函数，并返回字符串结果
 ```js
 window.run("java.toast('执行成功');'成功'")
 .then(r=>alert(r))
 .catch(e=>alert("执行出错:"+e));
 ```
 
-* 图片控制
-> 在线书籍的图片链接中含有"js"键时，点击图片会执行一次键值的函数  
+* 书源控制图片
+> 图片链接中含有"js"键时，点击图片会执行一次键值的函数  
 > 加载图片时，执行结果作为图片链接  
 
 > "style"键值控制单个图片的样式  
 > 目前支持"text"、"full"、"single"、"left"、"right"  
 > "TEXT"且处于段尾时，占1.5个字符位  
 
-```
-https://www.baidu.com/img/flexible/logo/pc/result.png,{
-  "js": "if (book) java.toast('这是'+book.name+'的图');result",
-  "style": "right"
-}
-```
-
-* 订阅源
-> 内置浏览器额外支持的函数和超链  
-
 ```js
-`opensorturl://${encodeURIComponent("https://example.com")}` //超链接打开分类界面
-`openrssurl://${encodeURIComponent("https://example.com")}` //超链接打开正文界面
-window.openui("sort", {"分类":"https://example.com"}) //函数打开分类界面
-window.openui("rss", {"正文":"https://example.com"}) //函数打开正文界面
+var url = `https://www.baidu.com/img/flexible/logo/pc/result.png,{"js": "if (book) java.toast('这是'+book.name+'正文的图被点击了');result", "style": "right"}`;
+result = `<img src = "${url}">`;
 ```

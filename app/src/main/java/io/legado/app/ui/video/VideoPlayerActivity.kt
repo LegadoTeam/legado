@@ -31,28 +31,35 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.gsyVideo.VideoPlayer
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.backgroundColor
+import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.model.VideoPlay
 import io.legado.app.service.VideoPlayService
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
 import io.legado.app.ui.book.toc.TocActivityResult
+import io.legado.app.ui.video.config.SettingsDialog
 import io.legado.app.ui.login.SourceLoginActivity
+import io.legado.app.ui.rss.favorites.RssFavoritesDialog
 import io.legado.app.ui.rss.source.edit.RssSourceEditActivity
 import io.legado.app.utils.StartActivityContract
 import io.legado.app.utils.gone
 import io.legado.app.utils.sendToClip
+import io.legado.app.utils.setTintMutate
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.toggleSystemBar
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.legado.app.utils.visible
 
-class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlayerViewModel>() {
+class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlayerViewModel>(),
+    SettingsDialog.CallBack,RssFavoritesDialog.Callback {
     override val binding by viewBinding(ActivityVideoPlayerBinding::inflate)
     override val viewModel by viewModels<VideoPlayerViewModel>()
     private var orientationUtils: OrientationUtils? = null
     private val playerView: VideoPlayer by lazy { binding.playerView }
+    private var starMenuItem: MenuItem? = null
     private var isNew = true
+    private var isFullScreen = false
     private val bookSourceEditResult =
         registerForActivityResult(StartActivityContract(BookSourceEditActivity::class.java)) {
             if (it.resultCode == RESULT_OK) {
@@ -100,22 +107,23 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             }
         }
     }
-    private var isFullScreen = false
 
     @OptIn(UnstableApi::class)
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         playerView.enlargeImageRes = R.drawable.ic_fullscreen
         isNew = intent.getBooleanExtra("isNew", true)
-        intent.getStringExtra("videoUrl")?.apply {
-            VideoPlay.videoUrl = this
-        }
-        VideoPlay.videoTitle = intent.getStringExtra("videoTitle")
-        val sourceKey = intent.getStringExtra("sourceKey")
-        val sourceType = intent.getIntExtra("sourceType", 0)
-        val bookUrl = intent.getStringExtra("bookUrl")
-        VideoPlay.inBookshelf = intent.getBooleanExtra("inBookshelf", true)
         if (isNew) {
-            VideoPlay.initSource(sourceKey, sourceType, bookUrl)
+            intent.getStringExtra("videoUrl")?.let { VideoPlay.videoUrl = it }
+            VideoPlay.videoTitle = intent.getStringExtra("videoTitle")
+            val sourceKey = intent.getStringExtra("sourceKey")
+            val sourceType = intent.getIntExtra("sourceType", 0)
+            val bookUrl = intent.getStringExtra("bookUrl")
+            val record = intent.getStringExtra("record")
+            VideoPlay.inBookshelf = intent.getBooleanExtra("inBookshelf", true)
+            if (!VideoPlay.initSource(sourceKey, sourceType, bookUrl, record)) {
+                finish()
+                return
+            }
             VideoPlay.saveRead()
             VideoPlay.startPlay(playerView)
         } else {
@@ -126,6 +134,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         setupPlayerView()
         initView()
         upView()
+        orientationUtils = OrientationUtils(this, playerView) //旋转辅助
         onBackPressedDispatcher.addCallback(this) {
             if (isFullScreen) {
                 toggleFullScreen()
@@ -133,10 +142,10 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             }
             finish()
         }
-        orientationUtils = OrientationUtils(this, playerView) //旋转辅助
     }
 
     private fun initView() {
+        viewModel.upStarMenuData.observe(this) { upStarMenu() }
         binding.root.setBackgroundColor(backgroundColor)
         if (VideoPlay.book != null) {
             VideoPlay.book?.let { showBook(it) }
@@ -311,6 +320,10 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             override fun onStartPrepared(url: String?, vararg objects: Any?) {}
             override fun onPrepared(url: String?, vararg objects: Any?) {
                 playerView.post {
+                    if (VideoPlay.startFull && VideoPlay.autoPlay && !isFullScreen) {
+                        toggleFullScreen()
+                        return@post
+                    }
                     //根据实际视频比例再次调整
                     val videoWidth = playerView.currentVideoWidth
                     val videoHeight = playerView.currentVideoHeight
@@ -319,7 +332,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                         val parentWidth = playerView.width
                         val aspectRatio = videoHeight.toFloat() / videoWidth.toFloat()
                         if (aspectRatio > 1.2) {
-                            //如何提前进入了横全屏，纠正回竖屏
+                            //如果提前进入了横全屏，纠正回竖屏
                             orientationUtils?.backToProtVideo()
                         }
                         val height = (parentWidth * aspectRatio).toInt()
@@ -368,15 +381,40 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         return super.onCompatCreateOptionsMenu(menu)
     }
 
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        starMenuItem = menu.findItem(R.id.menu_rss_star)
+        upStarMenu()
+        return super.onPrepareOptionsMenu(menu)
+    }
+
+    private fun upStarMenu() {
+        if (VideoPlay.rssStar != null) {
+            starMenuItem?.isVisible = true
+            starMenuItem?.setIcon(R.drawable.ic_star)
+            starMenuItem?.setTitle(R.string.in_favorites)
+            starMenuItem?.icon?.setTintMutate(primaryTextColor)
+        } else if(VideoPlay.rssRecord != null) {
+            starMenuItem?.isVisible = true
+            starMenuItem?.setIcon(R.drawable.ic_star_border)
+            starMenuItem?.setTitle(R.string.out_favorites)
+            starMenuItem?.icon?.setTintMutate(primaryTextColor)
+        } else {
+            starMenuItem?.isVisible = false
+        }
+    }
+
     override fun onMenuOpened(featureId: Int, menu: Menu): Boolean {
-        menu.findItem(R.id.menu_login)?.isVisible =
-            !VideoPlay.source?.loginUrl.isNullOrBlank()
+        menu.findItem(R.id.menu_login)?.isVisible = !VideoPlay.source?.loginUrl.isNullOrBlank()
         return super.onMenuOpened(featureId, menu)
     }
 
     override fun onCompatOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
+            R.id.menu_rss_star -> viewModel.addFavorite {
+                VideoPlay.rssStar?.let { showDialogFragment(RssFavoritesDialog(it)) }
+            }
             R.id.menu_float_window -> startFloatingWindow()
+            R.id.menu_config_settings -> showDialogFragment(SettingsDialog(this))
             R.id.menu_login -> VideoPlay.source?.let {s ->
                 val type = when (s) {
                     is BookSource -> "bookSource"
@@ -447,5 +485,13 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                 noButton { viewModel.removeFromBookshelf { super.finish() } }
             }
         }
+    }
+
+    override fun updateFavorite(title: String?, group: String?) {
+        viewModel.updateFavorite(title, group)
+    }
+
+    override fun deleteFavorite() {
+        viewModel.delFavorite()
     }
 }

@@ -136,17 +136,23 @@ java.getWebViewUA(): String
 * 网络请求
 ```js
 java.ajax(urlStr): String
+java.ajax(urlStr, callTimeout): String
 java.ajaxAll(urlList: Array<String>): Array<StrResponse>
 java.ajaxTestAll(urlList: Array<String>, timeout: Int): Array<StrResponse> //仅支持get连接
 //仅ajaxTestAll支持callTime()获取响应时间，对应的错误码值（-1超过设定时间，-2超时，-3域名错误，-4连接被拒绝，-5连接被重置，-6SSL证书错误，-7其它错误）
 //返回StrResponse 方法body() code() message() headers() raw() toString() 
 java.connect(urlStr): StrResponse
+java.connect(urlStr, header): StrResponse
+java.connect(urlStr, header, callTimeout): StrResponse
 
 java.post(url: String, body: String, headerMap: Map<String, String>): Connection.Response
+java.post(url: String, body: String, headerMap: Map<String, String>, timeout: Int?): Connection.Response
 
 java.get(url: String, headerMap: Map<String, String>): Connection.Response
+java.get(url: String, headerMap: Map<String, String>, timeout: Int?): Connection.Response
 
 java.head(url: String, headerMap: Map<String, String>): Connection.Response
+java.head(url: String, headerMap: Map<String, String>, timeout: Int?): Connection.Response
 
 * 使用webView访问网络
 * @param html 直接用webView载入的html, 如果html为空直接访问url

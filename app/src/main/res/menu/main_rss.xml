@@ -4,6 +4,12 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
+        android:id="@+id/menu_read_record"
+        android:icon="@drawable/ic_history"
+        android:title="@string/history"
+        app:showAsAction="always" />
+
+    <item
         android:id="@+id/menu_rss_star"
         android:title="@string/favorite"
         android:icon="@drawable/ic_star"

@@ -1,5 +1,6 @@
 package io.legado.app.data.entities
 
+import android.webkit.JavascriptInterface
 import cn.hutool.crypto.symmetric.AES
 import com.script.ScriptBindings
 import com.script.buildScriptBindings
@@ -81,6 +82,7 @@ interface BaseSource : JsExtensions {
     /**
      * 调用login函数 实现登录请求
      */
+    @JavascriptInterface
     fun login() {
         val loginJs = getLoginJs()
         if (!loginJs.isNullOrBlank()) {
@@ -133,6 +135,7 @@ interface BaseSource : JsExtensions {
     /**
      * 获取用于登录的头部信息
      */
+    @JavascriptInterface
     fun getLoginHeader(): String? {
         return CacheManager.get("loginHeader_${getKey()}")
     }
@@ -163,6 +166,7 @@ interface BaseSource : JsExtensions {
      * 获取用户信息,可以用来登录
      * 用户信息采用aes加密存储
      */
+    @JavascriptInterface
     fun getLoginInfo(): String? {
         try {
             val key = AppConst.androidId.encodeToByteArray(0, 16)
@@ -215,6 +219,7 @@ interface BaseSource : JsExtensions {
     /**
      * 保存用户信息,aes加密
      */
+    @JavascriptInterface
     fun putLoginInfo(info: String): Boolean {
         return try {
             val key = (AppConst.androidId).encodeToByteArray(0, 16)
@@ -227,6 +232,7 @@ interface BaseSource : JsExtensions {
         }
     }
 
+    @JavascriptInterface
     fun removeLoginInfo() {
         CacheManager.delete("userInfo_${getKey()}")
     }
@@ -247,6 +253,7 @@ interface BaseSource : JsExtensions {
      * 设置自定义变量
      * 新,统一为put名称存变量
      */
+    @JavascriptInterface
     fun putVariable(variable: String?) {
         if (variable != null) {
             CacheManager.put("sourceVariable_${getKey()}", variable)
@@ -258,6 +265,7 @@ interface BaseSource : JsExtensions {
     /**
      * 获取自定义变量
      */
+    @JavascriptInterface
     fun getVariable(): String {
         return CacheManager.get("sourceVariable_${getKey()}") ?: ""
     }
@@ -265,6 +273,7 @@ interface BaseSource : JsExtensions {
     /**
      * 保存数据
      */
+    @JavascriptInterface
     fun put(key: String, value: String): String {
         CacheManager.put("v_${getKey()}_${key}", value)
         return value
@@ -273,6 +282,7 @@ interface BaseSource : JsExtensions {
     /**
      * 获取保存的数据
      */
+    @JavascriptInterface
     fun get(key: String): String {
         return CacheManager.get("v_${getKey()}_${key}") ?: ""
     }

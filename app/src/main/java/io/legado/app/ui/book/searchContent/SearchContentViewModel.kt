@@ -14,6 +14,10 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
 class SearchContentViewModel(application: Application) : BaseViewModel(application) {
+    companion object {
+        var replaceEnabled: Boolean = false
+        var regexReplace: Boolean = false
+    }
     var bookUrl: String = ""
     var book: Book? = null
     private var contentProcessor: ContentProcessor? = null
@@ -21,8 +25,6 @@ class SearchContentViewModel(application: Application) : BaseViewModel(applicati
     var searchResultCounts = 0
     val cacheChapterNames = hashSetOf<String>()
     val searchResultList: MutableList<SearchResult> = mutableListOf()
-    var replaceEnabled = false
-    var regexReplace = false
 
     fun initBook(bookUrl: String, success: () -> Unit) {
         this.bookUrl = bookUrl

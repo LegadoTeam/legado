@@ -25,23 +25,20 @@ import io.legado.app.utils.toastOnUi
 import org.apache.commons.text.StringEscapeUtils
 import java.util.Date
 import io.legado.app.data.entities.BaseSource
+import io.legado.app.help.WebJsExtensions.Companion.JS_INJECTION
 
 class WebViewModel(application: Application) : BaseViewModel(application) {
     var source: BaseSource? = null
     var intent: Intent? = null
     var baseUrl: String = ""
     var html: String? = null
+    var localHtml: Boolean = false
     val headerMap: HashMap<String, String> = hashMapOf()
     var sourceVerificationEnable: Boolean = false
     var refetchAfterSuccess: Boolean = true
     var sourceName: String = ""
     var sourceOrigin: String = ""
     var sourceType = SourceType.book
-    companion object {
-        // 应用期间保持状态
-        var sessionShowWebLog = false
-    }
-    var showWebLog = false
 
     fun initData(
         intent: Intent,
@@ -56,8 +53,14 @@ class WebViewModel(application: Application) : BaseViewModel(application) {
             sourceType = intent.getIntExtra("sourceType", SourceType.book)
             sourceVerificationEnable = intent.getBooleanExtra("sourceVerificationEnable", false)
             refetchAfterSuccess = intent.getBooleanExtra("refetchAfterSuccess", true)
-            html = intent.getStringExtra("html")
-            showWebLog = sessionShowWebLog
+            html = intent.getStringExtra("html")?.let{
+                localHtml = true
+                if (it.contains("<head>")) {
+                    it.replaceFirst("<head>", "<head><script>$JS_INJECTION</script>")
+                } else {
+                    "<head><script>$JS_INJECTION</script></head>$it"
+                }
+            }
             source = SourceHelp.getSource(sourceOrigin, sourceType)
             val analyzeUrl = AnalyzeUrl(url, source = source, coroutineContext = coroutineContext)
             baseUrl = analyzeUrl.url
@@ -90,12 +93,6 @@ class WebViewModel(application: Application) : BaseViewModel(application) {
         }.onSuccess {
             context.toastOnUi("保存成功")
         }
-    }
-
-    fun toggleShowWebLog() {
-        val newValue = !showWebLog
-        showWebLog = newValue
-        sessionShowWebLog = newValue
     }
 
     private suspend fun webData2bitmap(data: String): ByteArray? {

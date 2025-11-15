@@ -14,11 +14,10 @@ import io.legado.app.data.entities.RssStar
 import io.legado.app.databinding.FragmentRssArticlesBinding
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
-import io.legado.app.ui.rss.read.ReadRssActivity
+import io.legado.app.ui.rss.read.ReadRss
 import io.legado.app.ui.widget.recycler.VerticalDivider
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.setEdgeEffectColor
-import io.legado.app.utils.startActivity
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.flow.catch
@@ -68,12 +67,7 @@ class RssFavoritesFragment() : VMBaseFragment<RssFavoritesViewModel>(R.layout.fr
     }
 
     override fun readRss(rssStar: RssStar) {
-        startActivity<ReadRssActivity> {
-            putExtra("title", rssStar.title)
-            putExtra("origin", rssStar.origin)
-            putExtra("link", rssStar.link)
-            putExtra("sort", rssStar.sort)
-        }
+        ReadRss.readRss(this, rssStar.toRssArticle())
     }
 
     override fun delStar(rssStar: RssStar) {

@@ -333,9 +333,7 @@ class RssSortActivity : VMBaseActivity<ActivityRssArtivlesBinding, RssSortViewMo
                 upFragments()
             }
 
-            R.id.menu_read_record -> {
-                showDialogFragment<ReadRecordDialog>()
-            }
+            R.id.menu_read_record -> showDialogFragment(ReadRecordDialog(viewModel.rssSource?.sourceUrl))
         }
         return super.onCompatOptionsItemSelected(item)
     }

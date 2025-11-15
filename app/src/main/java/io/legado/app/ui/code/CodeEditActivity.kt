@@ -7,7 +7,6 @@ import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
-import android.widget.EditText
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
 import androidx.core.view.isGone
@@ -40,13 +39,14 @@ import io.legado.app.utils.viewbindingdelegate.viewBinding
 class CodeEditActivity :
     VMBaseActivity<ActivityCodeEditBinding, CodeEditViewModel>(),
     KeyboardToolPop.CallBack, ChangeThemeDialog.CallBack, SettingsDialog.CallBack {
+    companion object {
+        private var isInitialized = false
+    }
     override val binding by viewBinding(ActivityCodeEditBinding::inflate)
     override val viewModel by viewModels<CodeEditViewModel>()
     private val softKeyboardTool by lazy {
         KeyboardToolPop(this, lifecycleScope, binding.root, this)
     }
-
-
     private val editor: CodeEditor by lazy { binding.editText }
     private val editorSearcher: EditorSearcher by lazy { editor.searcher }
     private var options = EditorSearcher.SearchOptions(false, true)
@@ -57,23 +57,25 @@ class CodeEditActivity :
             softKeyboardTool.initialPadding = windowInsets.imeHeight
             windowInsets
         }
-        editor.colorScheme = TextMateColorScheme2(
-            ThemeRegistry.getInstance(),
-            ThemeRegistry.getInstance().currentThemeModel
-        )
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        if (!isInitialized) {
+            viewModel.initSora()
+            isInitialized = true
+        }
         softKeyboardTool.attachToWindow(window)
+        editor.colorScheme = TextMateColorScheme2.create(ThemeRegistry.getInstance()) //先设置颜色,避免一开始的白屏
         viewModel.initData(intent) {
             editor.apply {
+                viewModel.title?.let {
+                    binding.titleBar.title = it
+                }
+                nonPrintablePaintingFlags = AppConfig.editNonPrintable
                 setEditorLanguage(viewModel.language)
                 upEdit(AppConfig.editFontScale, null, AppConfig.editAutoWrap)
                 setText(viewModel.initialText)
-                if (!viewModel.writable) {
-                    editor.editable = false
-                    binding.titleBar.title = getString(R.string.view_code)
-                }
+                editable = viewModel.writable
                 requestFocus()
                 postDelayed({
                     val pos = cursor.indexer.getCharPosition(viewModel.cursorPosition)
@@ -116,7 +118,7 @@ class CodeEditActivity :
         }
     }
 
-    override fun upEdit(fontSize: Int?, autoComplete: Boolean?, autoWarp: Boolean?) {
+    override fun upEdit(fontSize: Int?, autoComplete: Boolean?, autoWarp: Boolean?, editNonPrintable: Int?) {
         if (fontSize != null) {
             editor.setTextSize(fontSize.toFloat())
         }
@@ -126,6 +128,9 @@ class CodeEditActivity :
         }
         if (autoWarp != null) {
             editor.isWordwrap = autoWarp
+        }
+        if (editNonPrintable != null) {
+            editor.nonPrintablePaintingFlags = editNonPrintable
         }
     }
 
@@ -243,7 +248,7 @@ class CodeEditActivity :
             R.id.menu_config_settings -> showDialogFragment(SettingsDialog(this))
             R.id.menu_auto_wrap -> {
                 item.isChecked = !AppConfig.editAutoWrap
-                upEdit(null, null, !AppConfig.editAutoWrap)
+                upEdit(autoWarp = !AppConfig.editAutoWrap)
                 putPrefBoolean(PreferKey.editAutoWrap, !AppConfig.editAutoWrap)
             }
             R.id.menu_log -> showDialogFragment<AppLogDialog>()

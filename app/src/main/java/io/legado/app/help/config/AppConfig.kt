@@ -14,6 +14,7 @@ import io.legado.app.utils.getPrefInt
 import io.legado.app.utils.getPrefLong
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.isNightMode
+import io.legado.app.utils.parseIpsFromString
 import io.legado.app.utils.putPrefBoolean
 import io.legado.app.utils.putPrefInt
 import io.legado.app.utils.putPrefLong
@@ -29,8 +30,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val isCronet = appCtx.getPrefBoolean(PreferKey.cronet)
     var useAntiAlias = appCtx.getPrefBoolean(PreferKey.antiAlias)
     var userAgent: String = getPrefUserAgent()
-    var customHosts = appCtx.getPrefString(PreferKey.customHosts) ?: ""
-    var hostMap = GSON.fromJsonObject<Map<String, Any?>>(customHosts).getOrNull()
+    var customHosts = appCtx.getPrefString(PreferKey.customHosts)
     var editTheme = appCtx.getPrefInt(PreferKey.editTheme, 0)
     var isEInkMode = appCtx.getPrefString(PreferKey.themeMode) == "3"
     var clickActionTL = appCtx.getPrefInt(PreferKey.clickActionTL, 2)
@@ -48,12 +48,14 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             && appCtx.getPrefBoolean(PreferKey.optimizeRender, false)
     var recordLog = appCtx.getPrefBoolean(PreferKey.recordLog)
     var editFontScale = appCtx.getPrefInt(PreferKey.editFontScale, 16)
+    var editNonPrintable = appCtx.getPrefInt(PreferKey.editNonPrintable, 0)
     var editAutoWrap = appCtx.getPrefBoolean(PreferKey.editAutoWrap, true)
     var editAutoComplete = appCtx.getPrefBoolean(PreferKey.editAutoComplete, true)
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
         when (key) {
             PreferKey.editFontScale -> editFontScale = appCtx.getPrefInt(PreferKey.editFontScale, 16)
+            PreferKey.editNonPrintable -> editNonPrintable = appCtx.getPrefInt(PreferKey.editNonPrintable, 0)
             PreferKey.editAutoWrap -> editAutoWrap = appCtx.getPrefBoolean(PreferKey.editAutoWrap, true)
             PreferKey.editAutoComplete -> editAutoComplete = appCtx.getPrefBoolean(PreferKey.editAutoComplete, true)
 
@@ -98,8 +100,8 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             PreferKey.userAgent -> userAgent = getPrefUserAgent()
 
             PreferKey.customHosts -> {
-                customHosts = appCtx.getPrefString(PreferKey.customHosts) ?: ""
-                hostMap = GSON.fromJsonObject<Map<String, Any?>>(customHosts).getOrNull()
+                customHosts = appCtx.getPrefString(PreferKey.customHosts)
+                _hostMap = null
                 _addressCache = null
             }
 
@@ -119,26 +121,27 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     }
 
     //dns配置
+    private var _hostMap: Map<String, Any?>? = null
+    val hostMap: Map<String, Any?>
+        get() = _hostMap ?: run {
+            val cache = GSON.fromJsonObject<Map<String, Any?>>(customHosts).getOrNull() ?: emptyMap()
+            _hostMap = cache
+            cache
+        }
     private var _addressCache: Map<String, List<InetAddress>>? = null
     val addressCache: Map<String, List<InetAddress>>
         get() = _addressCache ?: run {
-            val cache = hostMap?.mapNotNull { (host, ipValue) ->
+            val cache = hostMap.mapNotNull { (host, ipValue) ->
                 val addresses = when (ipValue) {
                     is String -> ipValue.parseIpsFromString()
                     is List<*> -> ipValue.parseIpsFromList()
                     else -> null
                 }
                 addresses?.let { host to it }
-            }?.toMap() ?: emptyMap()
+            }.toMap()
             _addressCache = cache
             cache
         }
-    private fun String.parseIpsFromString(): List<InetAddress>? =
-        split(",")
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .mapNotNull { it.runCatching { InetAddress.getByName(this) }.getOrNull() }
-            .takeIf { it.isNotEmpty() }
     private fun List<*>.parseIpsFromList(): List<InetAddress> =
         mapNotNull { element ->
             (element as? String)?.trim()?.takeIf { it.isNotEmpty() }

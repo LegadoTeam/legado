@@ -1,6 +1,7 @@
 package io.legado.app.help
 
 import android.util.Base64
+import android.webkit.JavascriptInterface
 import cn.hutool.crypto.digest.DigestUtil
 import cn.hutool.crypto.digest.HMac
 import cn.hutool.crypto.symmetric.SymmetricCrypto
@@ -17,10 +18,12 @@ import io.legado.app.utils.MD5Utils
 @Suppress("unused")
 interface JsEncodeUtils {
 
+    @JavascriptInterface
     fun md5Encode(str: String): String {
         return MD5Utils.md5Encode(str)
     }
 
+    @JavascriptInterface
     fun md5Encode16(str: String): String {
         return MD5Utils.md5Encode16(str)
     }
@@ -114,9 +117,10 @@ interface JsEncodeUtils {
      * @param iv ECB模式的偏移向量
      */
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).decryptStr(str)")
     )
+    @JavascriptInterface
     fun aesDecodeToString(
         str: String, key: String, transformation: String, iv: String
     ): String? {
@@ -134,9 +138,10 @@ interface JsEncodeUtils {
      * @return 解密后的字符串
      */
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).decryptStr(data)")
     )
+    @JavascriptInterface
     fun aesDecodeArgsBase64Str(
         data: String,
         key: String,
@@ -176,9 +181,10 @@ interface JsEncodeUtils {
      * @param iv ECB模式的偏移向量
      */
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).decryptStr(str)")
     )
+    @JavascriptInterface
     fun aesBase64DecodeToString(
         str: String, key: String, transformation: String, iv: String
     ): String? {
@@ -210,9 +216,10 @@ interface JsEncodeUtils {
      * @param iv ECB模式的偏移向量
      */
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).decryptStr(data)")
     )
+    @JavascriptInterface
     fun aesEncodeToString(
         data: String, key: String, transformation: String, iv: String
     ): String? {
@@ -244,9 +251,10 @@ interface JsEncodeUtils {
      * @param iv ECB模式的偏移向量
      */
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).encryptBase64(data)")
     )
+    @JavascriptInterface
     fun aesEncodeToBase64String(
         data: String, key: String, transformation: String, iv: String
     ): String? {
@@ -265,9 +273,10 @@ interface JsEncodeUtils {
      * @return 加密后的Base64
      */
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).encryptBase64(data)")
     )
+    @JavascriptInterface
     fun aesEncodeArgsBase64Str(
         data: String,
         key: String,
@@ -280,9 +289,10 @@ interface JsEncodeUtils {
 
     /////DES
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).decryptStr(data)")
     )
+    @JavascriptInterface
     fun desDecodeToString(
         data: String, key: String, transformation: String, iv: String
     ): String? {
@@ -290,9 +300,10 @@ interface JsEncodeUtils {
     }
 
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).decryptStr(data)")
     )
+    @JavascriptInterface
     fun desBase64DecodeToString(
         data: String, key: String, transformation: String, iv: String
     ): String? {
@@ -300,9 +311,10 @@ interface JsEncodeUtils {
     }
 
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).encrypt(data)")
     )
+    @JavascriptInterface
     fun desEncodeToString(
         data: String, key: String, transformation: String, iv: String
     ): String? {
@@ -310,9 +322,10 @@ interface JsEncodeUtils {
     }
 
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).encryptBase64(data)")
     )
+    @JavascriptInterface
     fun desEncodeToBase64String(
         data: String, key: String, transformation: String, iv: String
     ): String? {
@@ -331,9 +344,10 @@ interface JsEncodeUtils {
      * @return 解密后的字符串
      */
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).decryptStr(data)")
     )
+    @JavascriptInterface
     fun tripleDESDecodeStr(
         data: String,
         key: String,
@@ -355,9 +369,10 @@ interface JsEncodeUtils {
      * @return 解密后的字符串
      */
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).decryptStr(data)")
     )
+    @JavascriptInterface
     fun tripleDESDecodeArgsBase64Str(
         data: String,
         key: String,
@@ -384,9 +399,10 @@ interface JsEncodeUtils {
      * @return 加密后的Base64
      */
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).encryptBase64(data)")
     )
+    @JavascriptInterface
     fun tripleDESEncodeBase64Str(
         data: String,
         key: String,
@@ -409,9 +425,10 @@ interface JsEncodeUtils {
      * @return 加密后的Base64
      */
     @Deprecated(
-        "过于繁琐弃用",
+        "过于繁琐弃用,但是web需要调用",
         ReplaceWith("createSymmetricCrypto(transformation, key, iv).encryptBase64(data)")
     )
+    @JavascriptInterface
     fun tripleDESEncodeArgsBase64Str(
         data: String,
         key: String,
@@ -435,6 +452,7 @@ interface JsEncodeUtils {
      * @param algorithm 签名算法
      * @return 16进制字符串
      */
+    @JavascriptInterface
     fun digestHex(
         data: String,
         algorithm: String,
@@ -449,6 +467,7 @@ interface JsEncodeUtils {
      * @param algorithm 签名算法
      * @return Base64字符串
      */
+    @JavascriptInterface
     fun digestBase64Str(
         data: String,
         algorithm: String,
@@ -465,6 +484,7 @@ interface JsEncodeUtils {
      * @return 16进制字符串
      */
     @Suppress("FunctionName")
+    @JavascriptInterface
     fun HMacHex(
         data: String,
         algorithm: String,
@@ -482,6 +502,7 @@ interface JsEncodeUtils {
      * @return Base64字符串
      */
     @Suppress("FunctionName")
+    @JavascriptInterface
     fun HMacBase64(
         data: String,
         algorithm: String,

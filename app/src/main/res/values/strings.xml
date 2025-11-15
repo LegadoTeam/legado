@@ -1229,7 +1229,6 @@
     <string name="manga_epaper_value">阈值</string>
     <string name="disable_horizontal_animation">禁用水平滚动动画</string>
     <string name="enable_manga_gray">开启图片灰色</string>
-    <string name="sure_cache_book">是否确认开始缓存？</string>
     <string name="play_mode">播放模式</string>
     <string name="speed_control">语速控制</string>
     <string name="next">下一首</string>
@@ -1289,4 +1288,17 @@
     <string name="close_welcome_summary">启用后进入app不再展示欢迎页</string>
     <string name="domain">域名</string>
     <string name="write_source_comment">写入源注释</string>
+    <string name="auto_play">自动播放</string>
+    <string name="start_full">直接全屏播放</string>
+    <string name="video_setting">视频设置</string>
+    <string name="video_setting_summary">自动播放、全屏播放等配置</string>
+    <string name="history">历史记录</string>
+    <string name="sure_cache_book">是否确认开始缓存？</string>
+    <string name="non_printable_set">不可视字符设定</string>
+    <string name="whitespace_leading">行首</string>
+    <string name="whitespace_inner">行中</string>
+    <string name="whitespace_trailing">行尾</string>
+    <string name="whitespace_empty">空行</string>
+    <string name="line_separator">换行</string>
+    <string name="whitespace_selection">选中</string>
 </resources>

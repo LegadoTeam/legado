@@ -172,7 +172,7 @@ class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>()
         when (item.itemId) {
             R.id.menu_download,
             R.id.menu_download_after -> {
-                if (!CacheBook.isRun)  sureCacheBook {
+                if (!CacheBook.isRun) sureCacheBook {
                     adapter.getItems().forEach { book ->
                         CacheBook.start(
                             this@CacheActivity,
@@ -554,7 +554,7 @@ class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>()
             cancelButton()
         }
     }
-    
+
     private fun sureCacheBook(action: () -> Unit) {
         alert(R.string.draw) {
             setMessage(R.string.sure_cache_book)

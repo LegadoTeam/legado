@@ -296,17 +296,4 @@ object NetworkUtils {
         return isIPv4Address(input) || isIPv6Address(input)
     }
 
-    fun resolveCustomHost(host: String): String? {
-        val configIps = AppConfig.hostMap?.get(host) ?: return null
-        return when (configIps) {
-            is String -> configIps.splitToSequence(',')
-                .firstOrNull { it.isNotBlank() }
-                ?.trim()
-            is List<*> -> configIps.firstOrNull()
-                ?.toString()
-                ?.takeIf { it.isNotBlank() }
-                ?.trim()
-            else -> null
-        }
-    }
 }

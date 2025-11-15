@@ -22,7 +22,7 @@ import io.legado.app.ui.rss.read.ReadRss
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 
-class ReadRecordDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
+class ReadRecordDialog(private val origin: String? = null) : BaseDialogFragment(R.layout.dialog_recycler_view),
     Toolbar.OnMenuItemClickListener {
 
     private val viewModel by viewModels<RssSortViewModel>()
@@ -45,7 +45,7 @@ class ReadRecordDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
             recyclerView.layoutManager = LinearLayoutManager(requireContext())
             recyclerView.adapter = adapter
         }
-        adapter.setItems(viewModel.getRecords())
+        adapter.setItems(viewModel.getRecords(origin))
         adapter.setOnRecordClickListener(object : OnRecordClickListener {
             override fun onRecordClick(record: RssReadRecord?) {
                 record?.let { ReadRss.readRss(activity as AppCompatActivity, it)}
@@ -57,11 +57,11 @@ class ReadRecordDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
         when (item?.itemId) {
             R.id.menu_clear -> {
                 alert(R.string.draw) {
-                    val countRead = viewModel.countRecords()
+                    val countRead = viewModel.countRecords(origin)
                     setMessage(getString(R.string.sure_del) + "\n" + countRead + " " + getString(R.string.read_record))
                     noButton()
                     yesButton {
-                        viewModel.deleteAllRecord()
+                        viewModel.deleteAllRecord(origin)
                         adapter.clearItems()
                     }
                 }

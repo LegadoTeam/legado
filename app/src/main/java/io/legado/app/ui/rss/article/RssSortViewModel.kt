@@ -53,21 +53,6 @@ class RssSortViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
-    fun read(rssArticle: RssArticle) {
-        execute {
-            val rssReadRecord = RssReadRecord(
-                record = rssArticle.link,
-                title = rssArticle.title,
-                origin = rssArticle.origin,
-                sort = rssArticle.sort,
-                readTime = System.currentTimeMillis(),
-                type = rssArticle.type,
-                durPos = rssArticle.durPos
-            )
-            appDb.rssReadRecordDao.insertRecord(rssReadRecord)
-        }
-    }
-
     fun clearArticles() {
         execute {
             url?.let {
@@ -87,16 +72,26 @@ class RssSortViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
-    fun getRecords(): List<RssReadRecord> {
+    fun getRecords(origin: String? = null): List<RssReadRecord> {
+        origin?.let {
+            return appDb.rssReadRecordDao.getRecordsByOrigin(it)
+        }
         return appDb.rssReadRecordDao.getRecords()
     }
 
-    fun countRecords() : Int {
+    fun countRecords(origin: String? = null) : Int {
+        origin?.let {
+            return appDb.rssReadRecordDao.countRecordsByOrigin(it)
+        }
         return appDb.rssReadRecordDao.countRecords
     }
 
-    fun deleteAllRecord() {
+    fun deleteAllRecord(origin: String? = null) {
         execute {
+            origin?.let {
+                appDb.rssReadRecordDao.deleteRecordsByOrigin(it)
+                return@execute
+            }
             appDb.rssReadRecordDao.deleteAllRecord()
         }
     }
