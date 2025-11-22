@@ -3,7 +3,6 @@ package io.legado.app.ui.widget.image
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Outline
 import android.graphics.Paint
 import android.graphics.Typeface
@@ -29,16 +28,19 @@ import io.legado.app.model.BookCover
 import io.legado.app.utils.textHeight
 import io.legado.app.utils.toStringArray
 import android.view.ViewOutlineProvider
+import androidx.collection.LruCache
 import androidx.core.graphics.createBitmap
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.SearchBook
-import io.legado.app.utils.BitmapUtils
-import io.legado.app.utils.FileUtils
-import io.legado.app.utils.externalFiles
+import io.legado.app.lib.theme.backgroundColor
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import splitties.init.appCtx
-import java.io.File
-import java.io.FileOutputStream
-import androidx.core.graphics.scale
+import java.lang.ref.SoftReference
 
 /**
  * 封面
@@ -49,11 +51,15 @@ class CoverImageView @JvmOverloads constructor(
     attrs: AttributeSet? = null
 ) : AppCompatImageView(context, attrs) {
     companion object {
-        private val rootPath by lazy { appCtx.externalFiles }
+        private val nameBitmapCache by lazy { LruCache<String, Bitmap>(1024 * 1024 * 99) }
+        private val backgroundColor by lazy { appCtx.backgroundColor }
+        private val accentColor by lazy { appCtx.accentColor }
     }
     private var viewWidth: Float = 0f
     private var viewHeight: Float = 0f
-    private var defaultCover = true
+    private var defaultCover = false
+    private var cachedBitmap: SoftReference<Bitmap>? = null
+    private var currentJob: Job? = null
     var bitmapPath: String? = null
         private set
     private var isSaveBook = false
@@ -116,22 +122,50 @@ class CoverImageView @JvmOverloads constructor(
 
     private fun drawNameAuthor(canvas: Canvas) {
         if (!BookCover.drawBookName) return
-        var pathName = name.toString()
+        if (width <= 0 || height <= 0) return
+        var pathName = name ?: return
+        cachedBitmap?.get()?.let {
+            canvas.drawBitmap(it, 0f, 0f, null)
+            return
+        }
         if (isSaveBook) {
             if (BookCover.drawBookAuthor) {
                 pathName += author.toString()
             }
-            pathName += ".png"
-            val filePath =FileUtils.getPath(rootPath, "covers_bitmap", pathName)
-            val vFile = File(filePath)
-            if (vFile.exists()) {
-                val cacheBitmap = BitmapUtils.decodeBitmap(vFile.absolutePath, width, height)?.scale(width, height) //先近似缩放再精确缩放
-                if (cacheBitmap != null) {
-                    canvas.drawBitmap(cacheBitmap, 0f, 0f, null)
-                    return
-                }
+            val cacheBitmap = nameBitmapCache[pathName + width]
+            if (cacheBitmap != null) {
+                canvas.drawBitmap(cacheBitmap, 0f, 0f, null)
+                return
             }
         }
+        generateCoverAsync(pathName)
+    }
+    private fun generateCoverAsync(pathName: String) {
+        currentJob?.cancel()
+        val executeTask: suspend () -> Unit = {
+            try {
+                val bitmap = generateCoverBitmap(pathName).also {
+                        if (isSaveBook) {
+                            nameBitmapCache.put(pathName + width, it)
+                        }
+                    }
+                cachedBitmap = SoftReference(bitmap)
+                withContext(Dispatchers.Main) {
+                    invalidate()
+                }
+            } catch (e: CancellationException) {
+                // 正常取消处理
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                currentJob = null
+            }
+        }
+        currentJob = CoroutineScope(Dispatchers.IO).launch {
+            executeTask()
+        }
+    }
+    private fun generateCoverBitmap(pathName: String): Bitmap {
         viewWidth = width.toFloat()
         viewHeight = height.toFloat()
         val bitmap = createBitmap(width, height)
@@ -143,10 +177,10 @@ class CoverImageView @JvmOverloads constructor(
             namePaint.textSize = viewWidth / 7
             namePaint.strokeWidth = namePaint.textSize / 6
             name.forEachIndexed { index, char ->
-                namePaint.color = Color.WHITE
+                namePaint.color = backgroundColor
                 namePaint.style = Paint.Style.STROKE
                 bitmapCanvas.drawText(char, startX, startY, namePaint)
-                namePaint.color = context.accentColor
+                namePaint.color = accentColor
                 namePaint.style = Paint.Style.FILL
                 bitmapCanvas.drawText(char, startX, startY, namePaint)
                 startY += namePaint.textHeight
@@ -170,9 +204,7 @@ class CoverImageView @JvmOverloads constructor(
             }
         }
         if (!BookCover.drawBookAuthor){
-            if (isSaveBook) { saveBitmapToFileAsPng(bitmap, pathName) }
-            canvas.drawBitmap(bitmap, 0f, 0f, null)
-            return
+            return bitmap
         }
         author?.toStringArray()?.let { author ->
             authorPaint.textSize = viewWidth / 10
@@ -181,10 +213,10 @@ class CoverImageView @JvmOverloads constructor(
             startY = viewHeight * 0.95f - author.size * authorPaint.textHeight
             startY = maxOf(startY, viewHeight * 0.3f)
             author.forEach {
-                authorPaint.color = Color.WHITE
+                authorPaint.color = backgroundColor
                 authorPaint.style = Paint.Style.STROKE
                 bitmapCanvas.drawText(it, startX, startY, authorPaint)
-                authorPaint.color = context.accentColor
+                authorPaint.color = accentColor
                 authorPaint.style = Paint.Style.FILL
                 bitmapCanvas.drawText(it, startX, startY, authorPaint)
                 startY += authorPaint.textHeight
@@ -193,21 +225,7 @@ class CoverImageView @JvmOverloads constructor(
                 }
             }
         }
-        if (isSaveBook) { saveBitmapToFileAsPng(bitmap, pathName) }
-        canvas.drawBitmap(bitmap, 0f, 0f, null)
-    }
-
-    private fun saveBitmapToFileAsPng(bitmap: Bitmap, pathName: String) {
-        Thread {
-            try {
-                val file = FileUtils.createFileIfNotExist(rootPath, "covers_bitmap", pathName)
-                FileOutputStream(file).use { fos ->
-                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }.start()
+        return bitmap
     }
 
     fun setHeight(height: Int) {
@@ -270,9 +288,10 @@ class CoverImageView @JvmOverloads constructor(
             this.name = it.name.replace(AppPattern.bdRegex, "").trim()
             this.author = it.author.replace(AppPattern.bdRegex, "").trim()
         }
-        defaultCover = true
-        invalidate()
+//        defaultCover = true
+//        invalidate() 测试发现调用load后会自动刷新
         if (AppConfig.useDefaultCover) {
+            defaultCover = true
             ImageLoader.load(context, BookCover.defaultDrawable)
                 .centerCrop()
                 .into(this)
@@ -318,6 +337,13 @@ class CoverImageView @JvmOverloads constructor(
                 .centerCrop()
                 .into(this)
         }
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        currentJob?.cancel()
+        currentJob = null
+        cachedBitmap = null
     }
 
 }

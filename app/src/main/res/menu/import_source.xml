@@ -37,4 +37,10 @@
         android:checkable="true"
         app:showAsAction="never" />
 
+    <item
+        android:id="@+id/menu_show_comment"
+        android:title="@string/show_source_comment"
+        android:checkable="true"
+        app:showAsAction="never" />
+
 </menu>

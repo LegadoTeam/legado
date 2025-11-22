@@ -48,6 +48,18 @@ window.getAwait(url, header, callTimeout) //返回响应体
 window.headAwait(url, header, callTimeout) //序列化后的响应头
 window.postAwait(url, body, header, callTimeout) //返回响应体
 window.webViewAwait(html, url, js) //用Java.webView异步访问
+window.decryptStrAwait(transformation, key, iv, data)
+//同java.createSymmetricCrypto(transformation, key, iv).decryptStr(data)
+window.encryptBase64Await(transformation, key, iv, data)
+//同java.createSymmetricCrypto(transformation, key, iv).encryptBase64(data)
+window.encryptHexAwait(transformation, key, iv, data)
+//同java.createSymmetricCrypto(transformation, key, iv).encryptHex(data)
+window.createSignHexAwait(algorithm, publicKey, privateKey, data)
+//同java.createSign(algorithm).setPublicKey(publicKey).setPrivateKey(privateKey).signHex(data)
+window.downloadFileAwait(url) //同java.downloadFile(url)
+window.readTxtFileAwait(path) //同java.readTxtFile(url)
+window.importScriptAwait(url) //同java.importScript(url)
+window.getStringAwait(ruleStr, mContent) //同java.getString(ruleStr, mContent)
 ```
 > 同步调用  
 

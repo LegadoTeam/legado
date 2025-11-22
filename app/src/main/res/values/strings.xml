@@ -3,6 +3,7 @@
     <!--App-->
     <string name="app_name">Legado</string>
     <string name="app_name_a">Legado·A</string>
+    <string name="app_name_s" translatable="false">LegadoPlus</string>
     <string name="receiving_shared_label">Legado·search</string>
     <string name="tip_perm_request_storage">Legado needs storage access to find and read books. please go "App Settings" to allow "Storage permission".</string>
 
@@ -1183,6 +1184,7 @@
     <string name="official_version">正式版</string>
     <string name="beta_release_version">测试版</string>
     <string name="beta_releaseA_version">共存版</string>
+    <string name="beta_releaseS_version" translatable="false">正式版</string>
     <string name="stream_read_aloud_audio">流式播放音频</string>
     <string name="stream_read_aloud_audio_summary">即边下边播，网络不好时播放会断断续续，仅TTS源有效</string>
     <string name="pause_read_aloud_while_phone_calls_title">来电期间暂停朗读</string>
@@ -1278,7 +1280,6 @@
     <string name="replace_to_js">js处理</string>
     <string name="layout_type">样式：</string>
     <string name="layout_list_compact">紧凑列表</string>
-    <string name="clear_bitmap_covers">清除绘制封面的缓存</string>
     <string name="enable_preload">预加载</string>
     <string name="is_event_listener">事件监听</string>
     <string name="rule_call_back">回调操作（callBackJs）</string>
@@ -1301,4 +1302,10 @@
     <string name="whitespace_empty">空行</string>
     <string name="line_separator">换行</string>
     <string name="whitespace_selection">选中</string>
+    <string name="press_speed">长按倍数</string>
+    <string name="full_bottom_progress">全屏时显示底部进度条</string>
+    <string name="json_format">json格式</string>
+    <string name="open_other_video_player">其它播放器打开</string>
+    <string name="show_source_comment">显示源注释</string>
+    <string name="adapt_special_style">适配特殊样式</string>
 </resources>

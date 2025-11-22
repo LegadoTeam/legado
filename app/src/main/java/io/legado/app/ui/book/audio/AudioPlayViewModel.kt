@@ -25,7 +25,7 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
     val coverData = MutableLiveData<String>()
     val customBtnListData = MutableLiveData<Boolean>()
 
-    fun initData(intent: Intent) = AudioPlay.apply {
+    fun initData(intent: Intent, success: (() -> Unit)) = AudioPlay.apply {
         execute {
             inBookshelf = intent.getBooleanExtra("inBookshelf", true)
             val bookUrl = intent.getStringExtra("bookUrl") ?: book?.bookUrl ?: return@execute
@@ -34,6 +34,8 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
                 book?.also { appDb.bookDao.insert(it) } ?: return@execute
             }
             initBook(targetBook)
+        }.onSuccess {
+            success.invoke()
         }.onFinally {
             saveRead(true)
         }

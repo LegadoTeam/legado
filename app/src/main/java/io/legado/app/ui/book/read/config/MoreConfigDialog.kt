@@ -134,7 +134,8 @@ class MoreConfigDialog : BasePrefDialogFragment() {
 
                 PreferKey.textFullJustify,
                 PreferKey.textBottomJustify,
-                PreferKey.useZhLayout -> {
+                PreferKey.useZhLayout,
+                PreferKey.adaptSpecialStyle-> {
                     postEvent(EventBus.UP_CONFIG, arrayListOf(5))
                 }
 

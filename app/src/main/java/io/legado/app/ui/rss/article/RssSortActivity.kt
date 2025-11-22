@@ -322,7 +322,7 @@ class RssSortActivity : VMBaseActivity<ActivityRssArtivlesBinding, RssSortViewMo
             R.id.menu_clear -> {
                 viewModel.url?.let {
                     viewModel.clearArticles()
-                    if (viewModel.isWaterLayout) {
+                    if (viewModel.articleStyle == 3) {
                         clearImageHeight()
                     }
                 }

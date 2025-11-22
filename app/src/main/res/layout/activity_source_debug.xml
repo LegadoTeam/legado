@@ -41,7 +41,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:visibility="gone"
-        app:layout_constraintTop_toBottomOf="@+id/title_bar">
+        app:layout_constraintTop_toBottomOf="@+id/title_bar"
+        tools:visibility="visible">
 
         <LinearLayout
             android:layout_width="match_parent"

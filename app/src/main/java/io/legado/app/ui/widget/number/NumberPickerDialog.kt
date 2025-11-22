@@ -7,8 +7,7 @@ import io.legado.app.R
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.hideSoftInput
 
-
-class NumberPickerDialog(context: Context) {
+class NumberPickerDialog(context: Context, private val isDecimalMode: Boolean = false) {
     private val builder = AlertDialog.Builder(context)
     private var numberPicker: NumberPicker? = null
     private var maxValue: Int? = null
@@ -52,10 +51,10 @@ class NumberPickerDialog(context: Context) {
 
     fun show(callBack: ((value: Int) -> Unit)?) {
         builder.setPositiveButton(R.string.ok) { _, _ ->
-            numberPicker?.let {
-                it.clearFocus()
-                it.hideSoftInput()
-                callBack?.invoke(it.value)
+            numberPicker?.let { np ->
+                np.clearFocus()
+                np.hideSoftInput()
+                callBack?.invoke(np.value)
             }
         }
         builder.setNegativeButton(R.string.cancel, null)
@@ -70,6 +69,11 @@ class NumberPickerDialog(context: Context) {
             }
             value?.let {
                 np.value = it
+            }
+            if (isDecimalMode) {
+                np.displayedValues = Array(maxValue!! - minValue!! + 1) { i ->
+                    ((minValue!! + i) / 10.0).toString()
+                }
             }
         }
     }

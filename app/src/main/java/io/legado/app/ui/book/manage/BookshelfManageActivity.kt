@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
-import android.view.MotionEvent
 import android.widget.CheckBox
 import android.widget.LinearLayout
 import androidx.activity.viewModels
@@ -43,12 +42,9 @@ import io.legado.app.utils.FileUtils
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.cnCompare
 import io.legado.app.utils.dpToPx
-import io.legado.app.utils.externalFiles
-import io.legado.app.utils.hideSoftInput
 import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setEdgeEffectColor
-import io.legado.app.utils.shouldHideSoftInput
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.toastOnUi
@@ -79,6 +75,7 @@ class BookshelfManageActivity :
     override val groupList: ArrayList<BookGroup> = arrayListOf()
     private val groupRequestCode = 22
     private val addToGroupRequestCode = 34
+    private val removeToGroupRequestCode = 42
     private val adapter by lazy { BookAdapter(this, this) }
     private val itemTouchCallback by lazy { ItemTouchCallback(adapter) }
     private var booksFlowJob: Job? = null
@@ -120,20 +117,6 @@ class BookshelfManageActivity :
         initOtherView()
         initGroupData()
         upBookDataByGroupId()
-    }
-
-    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        if (ev.action == MotionEvent.ACTION_DOWN) {
-            currentFocus?.let {
-                if (it.shouldHideSoftInput(ev)) {
-                    it.post {
-                        it.clearFocus()
-                        it.hideSoftInput()
-                    }
-                }
-            }
-        }
-        return super.dispatchTouchEvent(ev)
     }
 
     override fun observeLiveBus() {
@@ -304,14 +287,6 @@ class BookshelfManageActivity :
                     )
                 }
             }
-            R.id.menu_clear_bitmap_covers ->  {
-                val path = FileUtils.getPath(externalFiles, "covers_bitmap")
-                if (FileUtils.delete(path)) {
-                    toastOnUi("清理完成")
-                } else {
-                    toastOnUi("清理失败")
-                }
-            }
 
             else -> if (item.groupId == R.id.menu_group) {
                 viewModel.groupName = item.title.toString()
@@ -334,6 +309,7 @@ class BookshelfManageActivity :
                 viewModel.upCanUpdate(adapter.selection, false)
 
             R.id.menu_add_to_group -> selectGroup(addToGroupRequestCode, 0)
+            R.id.menu_remove_to_group -> selectGroup(removeToGroupRequestCode, 0)
             R.id.menu_change_source -> showDialogFragment<SourcePickerDialog>()
             R.id.menu_clear_cache -> viewModel.clearCache(adapter.selection)
             R.id.menu_check_selected_interval -> adapter.checkSelectedInterval()
@@ -394,6 +370,14 @@ class BookshelfManageActivity :
                 val array = Array(books.size) { index ->
                     val book = books[index]
                     book.copy(group = book.group or groupId)
+                }
+                viewModel.updateBook(*array)
+            }
+
+            removeToGroupRequestCode -> adapter.selection.let { books ->
+                val array = Array(books.size) { index ->
+                    val book = books[index]
+                    book.copy(group = book.group and groupId.inv())
                 }
                 viewModel.updateBook(*array)
             }

@@ -18,6 +18,7 @@
 		<item>单列</item>
 		<item>双列</item>
 		<item>瀑布</item>
+        <item>三列</item>
 	</string-array>
 
 	<string-array name="rss_type">
@@ -169,9 +170,8 @@
 
 	<string-array name="default_app_variant">
 		<item>@string/default_version</item>
-		<item>@string/official_version</item>
 		<item>@string/beta_release_version</item>
-		<item>@string/beta_releaseA_version</item>
+		<item>@string/beta_releaseS_version</item>
 	</string-array>
 
 	<string-array name="default_home_page_value">
@@ -183,9 +183,8 @@
 
 	<string-array name="default_app_variant_value">
 		<item>default_version</item>
-		<item>official_version</item>
 		<item>beta_release_version</item>
-		<item>beta_releaseA_version</item>
+		<item>beta_releaseS_version</item>
 	</string-array>
 
 	<string-array name="tip_color">

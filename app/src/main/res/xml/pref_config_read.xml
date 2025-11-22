@@ -89,6 +89,13 @@
 
     <io.legado.app.lib.prefs.SwitchPreference
         android:defaultValue="true"
+        android:key="adaptSpecialStyle"
+        android:title="@string/adapt_special_style"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:defaultValue="true"
         android:key="mouseWheelPage"
         android:title="@string/mouse_wheel_page"
         app:iconSpaceReserved="false"

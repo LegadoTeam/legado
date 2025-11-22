@@ -217,6 +217,11 @@ object ReadBookConfig {
      * 底部对齐
      */
     val textBottomJustify get() = appCtx.getPrefBoolean(PreferKey.textBottomJustify, true)
+
+    /**
+     * 是否展示特殊样式
+     */
+    val adaptSpecialStyle get() = appCtx.getPrefBoolean(PreferKey.adaptSpecialStyle, true)
     var hideStatusBar = appCtx.getPrefBoolean(PreferKey.hideStatusBar)
     var hideNavigationBar = appCtx.getPrefBoolean(PreferKey.hideNavigationBar)
     var useZhLayout = appCtx.getPrefBoolean(PreferKey.useZhLayout)

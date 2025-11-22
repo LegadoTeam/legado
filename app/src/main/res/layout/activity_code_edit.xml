@@ -1,29 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:orientation="vertical">
 
-    <LinearLayout
+    <io.legado.app.ui.widget.TitleBar
+        android:id="@+id/title_bar"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical">
+        android:layout_height="wrap_content"
+        app:title="@string/edit_code" />
 
-        <io.legado.app.ui.widget.TitleBar
-            android:id="@+id/title_bar"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:title="@string/edit_code" />
-
-        <io.github.rosemoe.sora.widget.CodeEditor
-            android:id="@+id/editText"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            app:textSize="18sp"
-            tools:text="Hello, world!" />
-
-    </LinearLayout>
+    <io.github.rosemoe.sora.widget.CodeEditor
+        android:id="@+id/editText"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        app:textSize="18sp"
+        tools:text="Hello, world!" />
 
     <LinearLayout
         android:id="@+id/search_group"
@@ -202,4 +197,5 @@
                 android:textSize="14sp" />
         </LinearLayout>
     </LinearLayout>
-</FrameLayout>
+</LinearLayout>
+

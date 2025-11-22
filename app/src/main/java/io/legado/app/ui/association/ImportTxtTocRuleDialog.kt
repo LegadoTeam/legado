@@ -19,6 +19,7 @@ import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.widget.dialog.CodeDialog
 import io.legado.app.ui.widget.dialog.WaitDialog
 import io.legado.app.utils.GSON
+import io.legado.app.utils.gone
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.viewbindingdelegate.viewBinding
@@ -140,6 +141,12 @@ class ImportTxtTocRuleDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
             binding.apply {
                 cbSourceName.isChecked = viewModel.selectStatus[holder.layoutPosition]
                 cbSourceName.text = item.name
+                item.example?.takeIf{ it.isNotBlank() }?.let {
+                    showComment.text = it
+                    showComment.visible()
+                } ?: run {
+                    showComment.gone()
+                }
                 val localSource = viewModel.checkSources[holder.layoutPosition]
                 tvSourceState.text = when {
                     localSource == null -> "新增"

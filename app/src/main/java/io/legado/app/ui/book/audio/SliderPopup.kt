@@ -12,6 +12,7 @@ import io.legado.app.databinding.PopupSeekBarBinding
 import io.legado.app.model.AudioPlay
 import io.legado.app.service.AudioPlayService
 import io.legado.app.ui.widget.seekbar.SeekBarChangeListener
+import kotlin.math.roundToInt
 
 class TimerSliderPopup(private val context: Context) :
     PopupWindow(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT) {
@@ -73,16 +74,14 @@ class SpeedControlPopup(private val context: Context) :
         }
         binding.seekBar.max = 200
         binding.seekBar.progress = (AudioPlayService.playSpeed * 100).toInt()
-        
-        // 设置初始值文本
-        updateSpeedText(binding.seekBar.progress)
-        
+        updateSpeedText(AudioPlayService.playSpeed)
         binding.seekBar.setOnSeekBarChangeListener(object : SeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-                updateSpeedText(progress)
+                val speed = (progress / 10f).roundToInt() / 10f
+                updateSpeedText(speed)
                 if (fromUser) {
                     // 设置播放速度 (转换为0.5-2.0范围)
-                    AudioPlay.setSpeed(progress / 100f)
+                    AudioPlay.setSpeed(speed)
                 }
             }
         })
@@ -98,15 +97,7 @@ class SpeedControlPopup(private val context: Context) :
         binding.seekBar.progress = (AudioPlayService.playSpeed * 100).toInt()
     }
     
-    private fun updateSpeedText(speedPercent: Int) {
-        //  ( 100 -> 1.0, 120 -> 1.2)
-        val speed = speedPercent / 100f
-        binding.tvSeekValue.text = if (speed % 1 == 0f) {
-            // 整数速度 (如 1.0X, 2.0X)
-            "${speed.toInt()}.0X"
-        } else {
-            // 小数速度 (如 1.2X, 1.5X)
-            "%.1fX".format(speed)
-        }
+    private fun updateSpeedText(speed: Float) {
+        binding.tvSeekValue.text = "%.1fX".format(speed)
     }
 }

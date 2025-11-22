@@ -14,6 +14,7 @@ import com.jeremyliao.liveeventbus.LiveEventBus
 import io.legado.app.R
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
+import io.legado.app.databinding.DialogEditCodeBinding
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.AppFreezeMonitor
 import io.legado.app.help.DispatchersMonitor
@@ -28,6 +29,7 @@ import io.legado.app.receiver.SharedReceiverActivity
 import io.legado.app.service.WebService
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.video.config.SettingsDialog
+import io.legado.app.ui.widget.code.addJsonPattern
 import io.legado.app.ui.widget.number.NumberPickerDialog
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.getPrefBoolean
@@ -277,8 +279,9 @@ class OtherConfigFragment : PreferenceFragment(),
     @SuppressLint("InflateParams")
     private fun showCustomHostsDialog() {
         alert(getString(R.string.custom_hosts)) {
-            val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
-                editView.hint = getString(R.string.custom_hosts)
+            val alertBinding = DialogEditCodeBinding.inflate(layoutInflater).apply {
+                editViewC.hint = getString(R.string.json_format)
+                editView.addJsonPattern()
                 editView.setText(AppConfig.customHosts)
             }
             customView { alertBinding.root }

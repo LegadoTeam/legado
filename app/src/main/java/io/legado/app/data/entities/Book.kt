@@ -301,20 +301,38 @@ data class Book(
     }
 
     // 片头 的 setter 和 getter
-    fun setopencredits(opencredits: Int) {
-        config.opencredits = opencredits
+    fun setOpenCredits(openCredits: Int) {
+        config.openCredits = openCredits
     }
 
-    fun getopencredits(): Int {
-        return config.opencredits
+    fun getOpenCredits(): Int {
+        return config.openCredits
     }
     // 片尾 的 setter 和 getter
-    fun setclosecredits(closecredits: Int) {
-        config.closecredits = closecredits
+    fun setCloseCredits(closeCredits: Int) {
+        config.closeCredits = closeCredits
     }
 
-    fun getclosecredits(): Int {
-        return config.closecredits
+    fun getCloseCredits(): Int {
+        return config.closeCredits
+    }
+
+    // 播放模式 的 setter 和 getter
+    fun setPlayMode(playMode: Int) {
+        config.playMode = playMode
+    }
+
+    fun getPlayMode(): Int {
+        return config.playMode
+    }
+
+    // 播放速度 的 setter 和 getter
+    fun setPlaySpeed(playSpeed: Float) {
+        config.playSpeed = playSpeed
+    }
+
+    fun getPlaySpeed(): Float {
+        return config.playSpeed
     }
 
     fun getDelTag(tag: Long): Boolean {
@@ -426,9 +444,10 @@ data class Book(
         var startDate: LocalDate? = null,
         var startChapter: Int? = null,     // 用户设置的起始章节
         var dailyChapters: Int = 3,    // 用户设置的每日更新章节数
-        var opencredits: Int = 0,       //音频片头
-        var closecredits: Int = 0       //音频片尾
-        
+        var openCredits: Int = 0,       //音频片头
+        var closeCredits: Int = 0,       //音频片尾
+        var playMode: Int = 0,           //音频播放模式
+        var playSpeed: Float = 1.0f      //音频播放速度
     ) : Parcelable
 
     class Converters {
