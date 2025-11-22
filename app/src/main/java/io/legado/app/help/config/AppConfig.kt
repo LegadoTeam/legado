@@ -509,6 +509,11 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         set(value) {
             appCtx.putPrefBoolean(PreferKey.importKeepEnable, value)
         }
+    var importShowComment: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.importShowComment, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.importShowComment, value)
+        }
 
     var previewImageByClick: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.previewImageByClick, false)

@@ -138,12 +138,16 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
     private fun initMenu() {
         binding.toolBar.setOnMenuItemClickListener(this)
         binding.toolBar.inflateMenu(R.menu.import_source)
-        binding.toolBar.menu.findItem(R.id.menu_keep_original_name)
-            ?.isChecked = AppConfig.importKeepName
-        binding.toolBar.menu.findItem(R.id.menu_keep_group)
-            ?.isChecked = AppConfig.importKeepGroup
-        binding.toolBar.menu.findItem(R.id.menu_keep_enable)
-            ?.isChecked = AppConfig.importKeepEnable
+        binding.toolBar.menu.apply {
+            findItem(R.id.menu_keep_original_name)
+                ?.isChecked = AppConfig.importKeepName
+            findItem(R.id.menu_keep_group)
+                ?.isChecked = AppConfig.importKeepGroup
+            findItem(R.id.menu_keep_enable)
+                ?.isChecked = AppConfig.importKeepEnable
+            findItem(R.id.menu_show_comment)
+                ?.isChecked = AppConfig.importShowComment
+        }
     }
 
     @SuppressLint("InflateParams", "NotifyDataSetChanged")
@@ -185,6 +189,12 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
             R.id.menu_keep_enable -> {
                 item.isChecked = !item.isChecked
                 AppConfig.importKeepEnable = item.isChecked
+            }
+
+            R.id.menu_show_comment -> {
+                item.isChecked = !item.isChecked
+                AppConfig.importShowComment = item.isChecked
+                adapter.notifyDataSetChanged()
             }
         }
         return false
@@ -244,6 +254,16 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
             binding.apply {
                 cbSourceName.isChecked = viewModel.selectStatus[holder.layoutPosition]
                 cbSourceName.text = item.bookSourceName
+                if (AppConfig.importShowComment) {
+                    item.bookSourceComment?.takeIf{ it.isNotBlank() }?.let {
+                        showComment.text = it
+                        showComment.visible()
+                    } ?: run {
+                        showComment.gone()
+                    }
+                } else {
+                    showComment.gone()
+                }
                 val localSource = viewModel.checkSources[holder.layoutPosition]
                 tvSourceState.text = when {
                     localSource == null -> "新增"

@@ -9,7 +9,8 @@
         android:icon="@drawable/ic_star_border"
         android:title="@string/favorite"
         android:visible="false"
-        app:showAsAction="always" />
+        app:showAsAction="always"
+        tools:visible="true"/>
 
     <item
         android:id="@+id/menu_float_window"
@@ -30,6 +31,11 @@
     <item
         android:id="@+id/menu_copy_video_url"
         android:title="@string/copy_play_url"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_open_other_video_player"
+        android:title="@string/open_other_video_player"
         app:showAsAction="never" />
 
     <item

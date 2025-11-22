@@ -19,9 +19,13 @@ import io.legado.app.ui.widget.number.NumberPickerDialog
 import io.legado.app.utils.putPrefBoolean
 import io.legado.app.utils.putPrefInt
 import io.legado.app.utils.viewbindingdelegate.viewBinding
+import splitties.init.appCtx
 
 class SettingsDialog(private val callBack: CallBack) :
     BaseDialogFragment(R.layout.dialog_edit_settings) {
+    companion object {
+        private val fontSizeStr by lazy { appCtx.getString(R.string.font_size) + " " }
+    }
     private val binding by viewBinding(DialogEditSettingsBinding::bind)
     private val editNonPrintable = AppConfig.editNonPrintable
 
@@ -30,7 +34,6 @@ class SettingsDialog(private val callBack: CallBack) :
         initView()
     }
 
-    val fontSizeStr by lazy { getString(R.string.font_size) + " " }
 
     @SuppressLint("SetTextI18n")
     private fun initData() {

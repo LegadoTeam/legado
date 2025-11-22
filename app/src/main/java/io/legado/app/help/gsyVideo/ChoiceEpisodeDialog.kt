@@ -13,8 +13,7 @@ import android.widget.ListView
 import io.legado.app.R
 import io.legado.app.data.entities.BookChapter
 
-
-class SwitchVideoTypeDialog(private val mContext: Context) : Dialog(
+class ChoiceEpisodeDialog(private val mContext: Context) : Dialog(
     mContext, R.style.dialog_style
 ) {
     private var listView: ListView? = null
@@ -47,17 +46,18 @@ class SwitchVideoTypeDialog(private val mContext: Context) : Dialog(
         this.onItemClickListener = onItemClickListener
         this.data = data
         val inflater = LayoutInflater.from(mContext)
-        val view: View = inflater.inflate(R.layout.switch_video_dialog, null)
+        val view: View = inflater.inflate(R.layout.switch_episode_video_dialog, null)
         view.findViewById<TextView>(R.id.listCount).text = "选集（${data.size}）"
         listView = view.findViewById(R.id.switch_dialog_list)
         setContentView(view)
-        adapter = SwitchVideoAdapter(mContext, data)
+        adapter = SwitchVideoAdapter(mContext, data) { item -> item.title }
         listView!!.setAdapter(adapter)
-        listView!!.onItemClickListener = this@SwitchVideoTypeDialog.OnItemClickListener()
+        listView!!.onItemClickListener = this@ChoiceEpisodeDialog.OnItemClickListener()
         val dialogWindow = window
         val lp = dialogWindow!!.attributes
         val d = mContext.resources.displayMetrics // 获取屏幕宽、高用
         lp.width = (d.widthPixels * 0.4).toInt() // 宽度设置为屏幕的0.4
+        lp.height = d.heightPixels
         lp.gravity = android.view.Gravity.END // 设置靠右对齐
         dialogWindow.setAttributes(lp)
     }

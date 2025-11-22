@@ -56,9 +56,21 @@ object VideoPlay : CoroutineScope by MainScope(){
         set(value) {
             videoPrefs.edit { putBoolean("startFull", value) }
         }
+    /**  长按倍速  **/
+    var longPressSpeed
+        get() = videoPrefs.getInt("longPressSpeed", 30)
+        set(value) {
+            videoPrefs.edit { putInt("longPressSpeed", value) }
+        }
+    /**  全屏底部进度条  **/
+    var fullBottomProgressBar
+        get() = videoPrefs.getBoolean("fullBottomProgressBar", true)
+        set(value) {
+            videoPrefs.edit { putBoolean("fullBottomProgressBar", value) }
+        }
     val videoManager by lazy { ExoVideoManager() }
-    var videoUrl: String? = null //直接的播放链接
-    var chapterContent: String? = null //章节内容->播放链接
+    var videoUrl: String? = null //播放链接
+    var singleUrl = false
     var videoTitle: String? = null
     var source: BaseSource? = null
     var book: Book? = null
@@ -86,7 +98,8 @@ object VideoPlay : CoroutineScope by MainScope(){
         if (source == null) return
         val player = player.getCurrentPlayer()
         durChapterPos.takeIf { it > 0 }?.toLong()?.let { player.seekOnStart = it }
-        if (videoUrl != null) {
+        if (singleUrl) {
+            if (videoUrl == null) return
             inBookshelf = true
             val analyzeUrl = AnalyzeUrl(
                 videoUrl!!,
@@ -108,9 +121,9 @@ object VideoPlay : CoroutineScope by MainScope(){
             }
             val ruleContent = s.ruleContent
             if (ruleContent.isNullOrBlank()) {
-                chapterContent = rssArticle.link
+                videoUrl = rssArticle.link
                 val analyzeUrl = AnalyzeUrl(
-                    chapterContent!!,
+                    videoUrl!!,
                     source = source,
                     ruleData = rssArticle
                 )
@@ -126,7 +139,7 @@ object VideoPlay : CoroutineScope by MainScope(){
                             throw ContentEmptyException("正文为空")
                         }
                         val url = NetworkUtils.getAbsoluteURL(rssArticle.link, body)
-                        chapterContent = url
+                        videoUrl = url
                         val analyzeUrl = AnalyzeUrl(
                             url,
                             source = source,
@@ -172,7 +185,7 @@ object VideoPlay : CoroutineScope by MainScope(){
                 if (content.isEmpty()) {
                     appCtx.toastOnUi("未获取到资源链接")
                 } else {
-                    chapterContent = content
+                    videoUrl = content
                     val analyzeUrl = AnalyzeUrl(
                         content,
                         source = source,
@@ -221,7 +234,7 @@ object VideoPlay : CoroutineScope by MainScope(){
         videoManager.releaseMediaPlayer()
         //还原所有状态
         videoUrl = null
-        chapterContent = null
+        singleUrl = false
         videoTitle = null
         source = null
         book = null

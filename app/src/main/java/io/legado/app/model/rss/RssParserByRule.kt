@@ -34,7 +34,7 @@ object RssParserByRule {
                 appCtx.getString(R.string.error_get_web_content, rssSource.sourceUrl)
             )
         }
-        Debug.log(sourceUrl, "≡获取成功:$sourceUrl")
+//        Debug.log(sourceUrl, "≡获取成功:$sortUrl") //补上登录检测后todo
         Debug.log(sourceUrl, body, state = 10)
         var ruleArticles = rssSource.ruleArticles
         if (ruleArticles.isNullOrBlank()) {

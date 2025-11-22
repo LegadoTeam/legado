@@ -185,33 +185,29 @@ interface BaseSource : JsExtensions {
     }
 
     fun getLoginInfoMap(): Map<String, String> {
-        val json = getLoginInfo()
-        if (json == null) {
-            if (loginUi.isNullOrBlank()) {
-                return mutableMapOf()
-            } else {
-                val loginUiJson = loginUi?.let {
-                    when {
-                        it.startsWith("@js:") -> evalJS((getLoginJs()?: "") +
-                            it.substring(4),
-                            configureScriptBindings()
-                        ).toString()
+        val json = getLoginInfo() ?: if (loginUi.isNullOrBlank()) {
+            return mutableMapOf()
+        } else {
+            val loginUiJson = loginUi?.let {
+                when {
+                    it.startsWith("@js:") -> evalJS((getLoginJs() ?: "") + it.substring(4),
+                        configureScriptBindings()
+                    ).toString()
 
-                        it.startsWith("<js>") -> evalJS((getLoginJs()?: "") +
-                            it.substring(4, it.lastIndexOf("<")),
-                            configureScriptBindings()
-                        ).toString()
+                    it.startsWith("<js>") -> evalJS(
+                        (getLoginJs() ?: "") + it.substring(4, it.lastIndexOf("<")),
+                        configureScriptBindings()
+                    ).toString()
 
-                        else -> it
-                    }
+                    else -> it
                 }
-                val longinInfo = GSON.fromJsonArray<RowUi>(loginUiJson).getOrNull()
-                    ?.filter { it.type != "button" }
-                    ?.associate { it.name to (it.default ?: "") }?.also {
-                        putLoginInfo(GSON.toJson(it))
-                    }
-                return longinInfo ?: mutableMapOf()
             }
+            val longinInfo = GSON.fromJsonArray<RowUi>(loginUiJson).getOrNull()
+                ?.filter { it.type != "button" }
+                ?.associate { it.name to (it.default ?: "") }?.also {
+                    putLoginInfo(GSON.toJson(it))
+                }
+            return longinInfo ?: mutableMapOf()
         }
         return GSON.fromJsonObject<Map<String, String>>(json).getOrNull() ?: mutableMapOf()
     }

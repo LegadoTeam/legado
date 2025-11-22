@@ -18,10 +18,19 @@ class VideoPlayer: StandardGSYVideoPlayer {
     constructor(context: Context?) : super(context)
     constructor(context: Context?, attrs: AttributeSet?) : super(context, attrs)
 
-    private var mSwitchSize: TextView? = null
+    private var episodeList: TextView? = null
+    private var playbackSpeed: TextView? = null
+    private var playSpeed: Float = 1.0f
     private var btnNext: ImageView? = null
+    private var tipView: TextView? = null
     private var isChanging = false
+    private var isLongPressSpeed = false
 
+    override fun getLayoutId(): Int {
+        return if (mIfCurrentIsFullscreen)
+            R.layout.video_layout_controller_full
+        else R.layout.video_layout_controller
+    }
 
     override fun init(context: Context) {
         super.init(context)
@@ -44,31 +53,68 @@ class VideoPlayer: StandardGSYVideoPlayer {
                     }
 
                     override fun onLongPress(e: MotionEvent) {
-                        setSpeed(3f, true)
+                        if (mCurrentState == CURRENT_STATE_PLAYING) {
+                            val speed = VideoPlay.longPressSpeed / 10.0f
+                            setSpeed(speed, true)
+                            showOverlayTip("${speed}倍速播放中")
+                            isLongPressSpeed = true
+                        }
                         super.onLongPress(e)
                     }
                 }
             )
         }
     }
+
     override fun touchSurfaceUp(){
-        speed = 1f
+        if (isLongPressSpeed) {
+            isLongPressSpeed = false
+            setSpeed(playSpeed, true)
+            showOverlayTip()
+        }
         super.touchSurfaceUp()
     }
 
+    fun showOverlayTip(message: String? = null, delay: Long = 0) {
+        tipView?.apply {
+            message?.also {
+                text = it
+                visibility = VISIBLE
+                alpha = 1f
+                if (delay > 0) {
+                    postDelayed({
+                        alpha = 0f
+                    }, delay)
+                }
+            } ?: run {
+                visibility = INVISIBLE
+                alpha = 0f
+            }
+        }
+    }
 
     private fun initView() {
-        mSwitchSize = findViewById(R.id.switchSize)
+        playbackSpeed = findViewById(R.id.playback_speed)
+        playbackSpeed?.setOnClickListener {
+            if (mHadPlay && !isChanging) {
+                showSpeedDialog()
+            }
+        }
+        tipView = findViewById(R.id.tip_view)
+        if (mIfCurrentIsFullscreen && !VideoPlay.fullBottomProgressBar) {
+            mBottomProgressBar = null
+        }
+        //切换选集
+        episodeList = findViewById(R.id.episode_list)
         btnNext = findViewById(R.id.next)
         if (VideoPlay.episodes == null) {
-            mSwitchSize?.visibility = GONE
+            episodeList?.visibility = GONE
             btnNext?.visibility = GONE
             return
         }
-        //切换选集
-        mSwitchSize?.setOnClickListener {
+        episodeList?.setOnClickListener {
             if (mHadPlay && !isChanging) {
-                showSwitchDialog()
+                showEpisodeDialog()
             }
         }
         btnNext?.setOnClickListener {
@@ -77,16 +123,16 @@ class VideoPlayer: StandardGSYVideoPlayer {
                 VideoPlay.startPlay(this)
             }
         }
-
     }
-    private fun showSwitchDialog() {
+
+    private fun showEpisodeDialog() {
         if (!mHadPlay || VideoPlay.episodes.isNullOrEmpty()) {
             return
         }
         isChanging = true
-        val switchVideoTypeDialog = SwitchVideoTypeDialog(context)
-        switchVideoTypeDialog.initList(VideoPlay.episodes!!, object :
-            SwitchVideoTypeDialog.OnListItemClickListener {
+        val choiceEpisodeDialog = ChoiceEpisodeDialog(mContext)
+        choiceEpisodeDialog.initList(VideoPlay.episodes!!, object :
+            ChoiceEpisodeDialog.OnListItemClickListener {
             override fun onItemClick(position: Int) {
                 VideoPlay.chapterInVolumeIndex = position
                 VideoPlay.durChapterPos = 0
@@ -98,13 +144,31 @@ class VideoPlayer: StandardGSYVideoPlayer {
                 isChanging = false
             }
         })
-        switchVideoTypeDialog.show()
+        choiceEpisodeDialog.show()
     }
 
-    override fun getLayoutId(): Int {
-        return if (mIfCurrentIsFullscreen)
-            R.layout.video_layout_controller_full
-        else R.layout.video_layout_controller
+    private fun showSpeedDialog() {
+        if (!mHadPlay) {
+            return
+        }
+        isChanging = true
+        val choiceSpeedDialog = ChoiceSpeedDialog(mContext)
+        choiceSpeedDialog.initList(listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f, 2.5f, 3.0f).reversed(), object :
+            ChoiceSpeedDialog.OnListItemClickListener {
+            override fun onItemClick(value: Float) {
+                playSpeed = value
+                setSpeed(playSpeed, true)
+                if (playSpeed != 1.0f) {
+                    playbackSpeed?.text = "${playSpeed}X"
+                    showOverlayTip("${playSpeed}倍播放中", 2000)
+                }
+            }
+
+            override fun finishDialog() {
+                isChanging = false
+            }
+        })
+        choiceSpeedDialog.show()
     }
 
     override fun updateStartImage() {
