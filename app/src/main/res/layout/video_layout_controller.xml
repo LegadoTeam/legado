@@ -113,4 +113,19 @@
         android:layout_marginBottom="30dp"
         android:visibility="gone" />
 
+    <TextView
+        android:id="@+id/tip_view"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_centerInParent="true"
+        android:layout_marginTop="50dp"
+        android:alpha="0"
+        android:background="@drawable/selector_fillet_btn_bg"
+        android:elevation="4dp"
+        android:gravity="center"
+        android:padding="12dp"
+        android:textColor="@android:color/white"
+        android:visibility="invisible" />
+
 </RelativeLayout>

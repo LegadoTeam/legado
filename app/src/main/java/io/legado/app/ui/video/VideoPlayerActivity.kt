@@ -3,6 +3,7 @@ package io.legado.app.ui.video
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.res.Configuration
+import android.net.Uri
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
@@ -50,6 +51,7 @@ import io.legado.app.utils.startActivity
 import io.legado.app.utils.toggleSystemBar
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.legado.app.utils.visible
+import androidx.core.net.toUri
 
 class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlayerViewModel>(),
     SettingsDialog.CallBack,RssFavoritesDialog.Callback {
@@ -113,7 +115,10 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         playerView.enlargeImageRes = R.drawable.ic_fullscreen
         isNew = intent.getBooleanExtra("isNew", true)
         if (isNew) {
-            intent.getStringExtra("videoUrl")?.let { VideoPlay.videoUrl = it }
+            intent.getStringExtra("videoUrl")?.let {
+                VideoPlay.videoUrl = it
+                VideoPlay.singleUrl = true
+            }
             VideoPlay.videoTitle = intent.getStringExtra("videoTitle")
             val sourceKey = intent.getStringExtra("sourceKey")
             val sourceType = intent.getIntExtra("sourceType", 0)
@@ -429,7 +434,13 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                 }
             }
 
-            R.id.menu_copy_video_url -> (VideoPlay.videoUrl ?: VideoPlay.chapterContent)?.let { sendToClip(it) }
+            R.id.menu_copy_video_url -> VideoPlay.videoUrl?.let { sendToClip(it) }
+            R.id.menu_open_other_video_player -> VideoPlay.videoUrl?.let {
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(it.toUri(), "video/*")
+                }
+                startActivity(intent)
+            }
             R.id.menu_edit_source -> VideoPlay.source?.let {s  ->
                 when (s) {
                     is BookSource -> bookSourceEditResult.launch {

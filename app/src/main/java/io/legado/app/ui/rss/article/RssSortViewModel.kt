@@ -17,8 +17,7 @@ class RssSortViewModel(application: Application) : BaseViewModel(application) {
     var sortUrl: String? = null
     var rssSource: RssSource? = null
     var order = System.currentTimeMillis()
-    val isGridLayout get() = rssSource?.articleStyle == 2
-    val isWaterLayout get() = rssSource?.articleStyle == 3
+    val articleStyle get() = rssSource?.articleStyle
     var searchKey: String? = null
     var sourceName: String? = null
 
@@ -42,7 +41,7 @@ class RssSortViewModel(application: Application) : BaseViewModel(application) {
 
     fun switchLayout() {
         rssSource?.let {
-            if (it.articleStyle < 3) {
+            if (it.articleStyle < 4) {
                 it.articleStyle += 1
             } else {
                 it.articleStyle = 0

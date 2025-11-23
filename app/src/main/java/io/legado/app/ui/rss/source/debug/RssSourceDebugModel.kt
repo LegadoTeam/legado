@@ -27,13 +27,6 @@ class RssSourceDebugModel(application: Application) : BaseViewModel(application)
         this.callback = callback
     }
 
-    fun startDebug(source: RssSource) {
-        execute {
-            Debug.callback = this@RssSourceDebugModel
-            Debug.startDebug(this, source)
-        }
-    }
-
     fun startDebug(key: String, start: (() -> Unit)? = null, error: (() -> Unit)? = null) {
         execute {
             Debug.callback = this@RssSourceDebugModel

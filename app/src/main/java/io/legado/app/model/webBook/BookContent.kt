@@ -24,8 +24,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.flow
 import org.apache.commons.text.StringEscapeUtils
 import splitties.init.appCtx
-import kotlin.coroutines.coroutineContext
 import io.legado.app.help.book.isAudio
+import kotlinx.coroutines.currentCoroutineContext
 
 /**
  * 获取正文
@@ -60,10 +60,10 @@ object BookContent {
         val analyzeRule = AnalyzeRule(book, bookSource)
         analyzeRule.setContent(body, baseUrl)
         analyzeRule.setRedirectUrl(redirectUrl)
-        analyzeRule.setCoroutineContext(coroutineContext)
+        analyzeRule.setCoroutineContext(currentCoroutineContext())
         analyzeRule.setChapter(bookChapter)
         analyzeRule.setNextChapterUrl(mNextChapterUrl)
-        coroutineContext.ensureActive()
+        currentCoroutineContext().ensureActive()
         var contentData = analyzeContent(
             book, baseUrl, redirectUrl, body, contentRule, bookChapter, bookSource, mNextChapterUrl
         )
@@ -76,12 +76,12 @@ object BookContent {
                     == NetworkUtils.getAbsoluteURL(redirectUrl, mNextChapterUrl)
                 ) break
                 nextUrlList.add(nextUrl)
-                coroutineContext.ensureActive()
+                currentCoroutineContext().ensureActive()
                 val analyzeUrl = AnalyzeUrl(
                     mUrl = nextUrl,
                     source = bookSource,
                     ruleData = book,
-                    coroutineContext = coroutineContext
+                    coroutineContext = currentCoroutineContext()
                 )
                 val res = analyzeUrl.getStrResponseAwait() //控制并发访问
                 res.body?.let { nextBody ->
@@ -108,7 +108,7 @@ object BookContent {
                     mUrl = urlStr,
                     source = bookSource,
                     ruleData = book,
-                    coroutineContext = coroutineContext
+                    coroutineContext = currentCoroutineContext()
                 )
                 val res = analyzeUrl.getStrResponseAwait() //控制并发访问
                 analyzeContent(
@@ -118,7 +118,7 @@ object BookContent {
                     printLog = false
                 ).first
             }.collect {
-                coroutineContext.ensureActive()
+                currentCoroutineContext().ensureActive()
                 contentList.add(it)
             }
         }
@@ -190,7 +190,7 @@ object BookContent {
     ): Pair<String, List<String>> {
         val analyzeRule = AnalyzeRule(book, bookSource)
         analyzeRule.setContent(body, baseUrl)
-        analyzeRule.setCoroutineContext(coroutineContext)
+        analyzeRule.setCoroutineContext(currentCoroutineContext())
         val rUrl = analyzeRule.setRedirectUrl(redirectUrl)
         analyzeRule.setNextChapterUrl(nextChapterUrl)
         val nextUrlList = arrayListOf<String>()

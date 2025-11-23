@@ -156,7 +156,10 @@ class VideoPlayService : BaseService() {
         if (intent == null) return START_NOT_STICKY
         isNew = intent.getBooleanExtra("isNew", true)
         if (isNew) {
-            intent.getStringExtra("videoUrl")?.let { VideoPlay.videoUrl = it }
+            intent.getStringExtra("videoUrl")?.let {
+                VideoPlay.videoUrl = it
+                VideoPlay.singleUrl = true
+            }
             VideoPlay.videoTitle = intent.getStringExtra("videoTitle")
             val sourceKey = intent.getStringExtra("sourceKey")
             val sourceType = intent.getIntExtra("sourceType", 0)

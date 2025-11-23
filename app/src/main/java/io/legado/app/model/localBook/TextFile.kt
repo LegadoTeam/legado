@@ -503,11 +503,11 @@ class TextFile(private var book: Book) {
                         num++
                     }
                     start = matcher.end()
-                } else if (contentLength < 500) {
-                    numE++
+                } else if (contentLength < 100) {
+                    numE++ //这种不住100字的一般被识别为卷，即错误识别，正常章节数不大于卷3倍的不选
                 }
             }
-            if (num > numE && (num > maxNum + overRuleCount)) { //后面的规则匹配数量没超过最大值2个，那么依旧用前面那个
+            if (num > numE * 3 && (num > maxNum + overRuleCount)) { //后面的规则匹配数量没超过最大值2个，那么依旧用前面那个
                 maxNum = num
                 mTocRule = tocRule
                 if (maxNum > 70) {

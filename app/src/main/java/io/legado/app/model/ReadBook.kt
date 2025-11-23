@@ -283,10 +283,10 @@ object ReadBook : CoroutineScope by MainScope() {
     }
 
     fun upReadTime() {
+        if (!AppConfig.enableReadRecord) {
+            return
+        }
         executor.execute {
-            if (!AppConfig.enableReadRecord) {
-                return@execute
-            }
             readRecord.readTime = readRecord.readTime + System.currentTimeMillis() - readStartTime
             readStartTime = System.currentTimeMillis()
             readRecord.lastRead = System.currentTimeMillis()

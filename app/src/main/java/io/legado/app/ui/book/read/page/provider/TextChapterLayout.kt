@@ -85,6 +85,7 @@ class TextChapterLayout(
     private val useZhLayout = ReadBookConfig.useZhLayout
     private val isMiddleTitle = ReadBookConfig.isMiddleTitle
     private val textFullJustify = ReadBookConfig.textFullJustify
+    private val adaptSpecialStyle = ReadBookConfig.adaptSpecialStyle
 
     private var pendingTextPage = TextPage()
 
@@ -252,6 +253,12 @@ class TextChapterLayout(
         var wordCount = 0
         contents.forEach { content ->
             currentCoroutineContext().ensureActive()
+            if (adaptSpecialStyle) {
+                if (content.trim() == "[newpage]") {
+                    prepareNextPageIfNeed()
+                    return@forEach
+                }
+            }
             var text = content.replace(srcReplaceCharC, srcReplaceCharD)
             if (isTextImageStyle) {
                 //图片样式为文字嵌入类型

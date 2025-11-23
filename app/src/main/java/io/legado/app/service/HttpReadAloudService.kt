@@ -45,6 +45,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
@@ -58,7 +59,6 @@ import java.io.File
 import java.io.InputStream
 import java.net.ConnectException
 import java.net.SocketTimeoutException
-import kotlin.coroutines.coroutineContext
 
 /**
  * 在线朗读
@@ -196,7 +196,7 @@ class HttpReadAloudService : BaseReadAloudService(),
             .take(10)
             .toList()
         contentList.forEach { content ->
-            coroutineContext.ensureActive()
+            currentCoroutineContext().ensureActive()
             val fileName = md5SpeakFileName(content)
             val speakText = content.replace(AppPattern.notReadAloudRegex, "")
             if (speakText.isEmpty()) {
@@ -265,7 +265,7 @@ class HttpReadAloudService : BaseReadAloudService(),
             .take(10)
             .toList()
         contentList.forEach { content ->
-            coroutineContext.ensureActive()
+            currentCoroutineContext().ensureActive()
             val fileName = md5SpeakFileName(content)
             val speakText = content.replace(AppPattern.notReadAloudRegex, "")
             val dataSourceFactory = createDataSourceFactory(httpTts, speakText)
@@ -331,10 +331,10 @@ class HttpReadAloudService : BaseReadAloudService(),
                     speakSpeed = speechRate,
                     source = httpTts,
                     readTimeout = 300 * 1000L,
-                    coroutineContext = coroutineContext
+                    coroutineContext = currentCoroutineContext()
                 )
                 var response = analyzeUrl.getResponseAwait()
-                coroutineContext.ensureActive()
+                currentCoroutineContext().ensureActive()
                 val checkJs = httpTts.loginCheckJs
                 if (checkJs?.isNotBlank() == true) {
                     response = analyzeUrl.evalJS(checkJs, response) as Response
@@ -352,7 +352,7 @@ class HttpReadAloudService : BaseReadAloudService(),
                         }
                     }
                 }
-                coroutineContext.ensureActive()
+                currentCoroutineContext().ensureActive()
                 response.body.byteStream().let { stream ->
                     downloadErrorNo = 0
                     return stream

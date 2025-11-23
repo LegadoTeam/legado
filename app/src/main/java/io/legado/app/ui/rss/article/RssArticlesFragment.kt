@@ -52,9 +52,10 @@ class RssArticlesFragment() : VMBaseFragment<RssArticlesViewModel>(R.layout.frag
     override val viewModel by viewModels<RssArticlesViewModel>()
     private val isPreload by lazy { activityViewModel.rssSource?.preload ?: false }
     private val adapter: BaseRssArticlesAdapter<*> by lazy {
-        when (activityViewModel.rssSource?.articleStyle) {
+        when (activityViewModel.articleStyle) {
             1 -> RssArticlesAdapter1(requireContext(), this@RssArticlesFragment)
             2 -> RssArticlesAdapter2(requireContext(), this@RssArticlesFragment)
+            4 -> RssArticlesAdapter4(requireContext(), this@RssArticlesFragment)
             3 -> RssArticlesAdapter3(requireContext(), this@RssArticlesFragment)
             else -> RssArticlesAdapter(requireContext(), this@RssArticlesFragment)
         }
@@ -64,7 +65,7 @@ class RssArticlesFragment() : VMBaseFragment<RssArticlesViewModel>(R.layout.frag
     }
     private var articlesFlowJob: Job? = null
     override val isGridLayout: Boolean
-        get() = activityViewModel.isGridLayout
+        get() = activityViewModel.articleStyle == 2
     private var fullRefresh = true
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
@@ -82,16 +83,24 @@ class RssArticlesFragment() : VMBaseFragment<RssArticlesViewModel>(R.layout.frag
                 scrollToBottom(true)
             }
         }
-        val layoutManager = if (activityViewModel.isWaterLayout) {
-            recyclerView.itemAnimator = null
-            recyclerView.setPadding(4, 0, 4, 0)
-            StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)
-        } else if (activityViewModel.isGridLayout) {
-            recyclerView.setPadding(8, 0, 8, 0)
-            GridLayoutManager(requireContext(), 2)
-        } else {
-            recyclerView.addItemDecoration(VerticalDivider(requireContext()))
-            LinearLayoutManager(requireContext())
+        val layoutManager = when (activityViewModel.articleStyle) {
+            3 -> {
+                recyclerView.itemAnimator = null
+                recyclerView.setPadding(4, 0, 4, 0)
+                StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)
+            }
+            2 -> {
+                recyclerView.setPadding(8, 0, 8, 0)
+                GridLayoutManager(requireContext(), 2)
+            }
+            4 -> {
+                recyclerView.setPadding(4, 0, 4, 0)
+                GridLayoutManager(requireContext(), 3)
+            }
+            else -> {
+                recyclerView.addItemDecoration(VerticalDivider(requireContext()))
+                LinearLayoutManager(requireContext())
+            }
         }
         recyclerView.layoutManager = layoutManager
         recyclerView.adapter = adapter

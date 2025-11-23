@@ -53,7 +53,7 @@ class AnalyzeRule(
     private var ruleData: RuleDataInterface? = null,
     private val source: BaseSource? = null,
     private val preUpdateJs: Boolean = false,
-    private var isFromBookInfo : Boolean? = null
+    private var isFromBookInfo : Boolean = false
 ) : JsExtensions {
 
     private val book get() = ruleData as? BaseBook
@@ -843,7 +843,7 @@ class AnalyzeRule(
      */
     fun reGetBook() {
         if (!preUpdateJs) throw NoStackTraceException("只能在 preUpdateJs 中调用")
-        if (isFromBookInfo == true) {
+        if (isFromBookInfo) {
             log("重新获取book")
         }
         val bookSource = source as? BookSource
@@ -868,7 +868,7 @@ class AnalyzeRule(
      */
     fun refreshTocUrl() {
         if (!preUpdateJs) throw NoStackTraceException("只能在 preUpdateJs 中调用")
-        if (isFromBookInfo == true) {
+        if (isFromBookInfo) {
             log("已跳过重复加载详情页，请优化代码")
             return
         }

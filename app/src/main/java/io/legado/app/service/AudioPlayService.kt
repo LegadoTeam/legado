@@ -29,6 +29,7 @@ import io.legado.app.constant.EventBus
 import io.legado.app.constant.IntentAction
 import io.legado.app.constant.NotificationId
 import io.legado.app.constant.Status
+import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.MediaHelp
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
@@ -41,6 +42,7 @@ import io.legado.app.receiver.MediaButtonReceiver
 import io.legado.app.ui.book.audio.AudioPlayActivity
 import io.legado.app.utils.activityPendingIntent
 import io.legado.app.utils.broadcastPendingIntent
+import io.legado.app.utils.isJsonArray
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.printOnDebug
 import io.legado.app.utils.servicePendingIntent
@@ -156,6 +158,9 @@ class AudioPlayService : BaseService(),
                         else -> AudioPlay.book?.durChapterPos ?: 0
                     }
                     url = AudioPlay.durPlayUrl
+                    if (playSpeed != 1f) {
+                        upSpeed(playSpeed)
+                    }
                     upMediaSessionPlaybackState(PlaybackStateCompat.STATE_BUFFERING)
                     play()
                 }
@@ -225,17 +230,27 @@ class AudioPlayService : BaseService(),
             AudioPlay.status = Status.STOP
             postEvent(EventBus.AUDIO_STATE, Status.STOP)
             upPlayProgressJob?.cancel()
-            val analyzeUrl = AnalyzeUrl(
-                url,
-                source = AudioPlay.bookSource,
-                ruleData = book,
-                chapter = AudioPlay.durChapter,
-                coroutineContext = coroutineContext
-            )
-            exoPlayer.setMediaItem(analyzeUrl.getMediaItem())
+            if (url.isJsonArray()) {
+                val mediaSource = ExoPlayerHelper.getMediaSource(this@AudioPlayService, url)
+                if (mediaSource ==  null) {
+                    NoStackTraceException("url格式错误")
+                    return@execute
+                }
+                exoPlayer.setMediaSource(mediaSource)
+                position = 0
+            } else {
+                val analyzeUrl = AnalyzeUrl(
+                    url,
+                    source = AudioPlay.bookSource,
+                    ruleData = book,
+                    chapter = AudioPlay.durChapter,
+                    coroutineContext = coroutineContext
+                )
+                exoPlayer.setMediaItem(analyzeUrl.getMediaItem())
+            }
             exoPlayer.playWhenReady = true
             //获取片头设定
-            val skipStartMs = (book?.getopencredits() ?: 0) * 1000L
+            val skipStartMs = (book?.getOpenCredits() ?: 0) * 1000L
             val playtime = if (position == 0) skipStartMs else position.toLong()
             exoPlayer.seekTo(playtime)
             exoPlayer.prepare()
@@ -434,24 +449,20 @@ class AudioPlayService : BaseService(),
     }
 
     /**
-     * 每隔1秒发送播放进度
+     * 每隔0.5秒发送播放进度
      */
     private fun upPlayProgress() {
         upPlayProgressJob?.cancel()
         upPlayProgressJob = lifecycleScope.launch {
-            val skipEnds = AudioPlay.book?.getclosecredits() ?: 0
-            var isOnetime = true
+            val skipEnds = AudioPlay.book?.getCloseCredits() ?: 0
             while (isActive) {
                 val durP = exoPlayer.currentPosition
-                if (isOnetime) {
-                    //更新buffer位置
-                    AudioPlay.playPositionChanged(durP.toInt())
-                    postEvent(EventBus.AUDIO_BUFFER_PROGRESS, exoPlayer.bufferedPosition.toInt())
-                    postEvent(EventBus.AUDIO_PROGRESS, AudioPlay.durChapterPos)
-                    postEvent(EventBus.AUDIO_SIZE, exoPlayer.duration.toInt())
-                    upMediaSessionPlaybackState(PlaybackStateCompat.STATE_PLAYING)
-                }
-                isOnetime = !isOnetime
+                //更新buffer位置
+                AudioPlay.playPositionChanged(durP.toInt())
+                postEvent(EventBus.AUDIO_BUFFER_PROGRESS, exoPlayer.bufferedPosition.toInt())
+                postEvent(EventBus.AUDIO_PROGRESS, AudioPlay.durChapterPos)
+                postEvent(EventBus.AUDIO_SIZE, exoPlayer.duration.toInt())
+                upMediaSessionPlaybackState(PlaybackStateCompat.STATE_PLAYING)
                 //更新歌词
                 AudioPlay.callback?.upLyricP(durP.toInt())
                 // === 添加片尾跳过检查 ===
