@@ -124,8 +124,14 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
     private fun buttonUi(source: BaseSource, rowUis: List<RowUi>?) {
         val loginInfo = viewModel.loginInfo
         rowUis?.forEachIndexed { index, rowUi ->
-            rowUiName.add(rowUi.name)
-            when (rowUi.type) {
+            val type = rowUi.type
+            val name = rowUi.name
+            if (type == null || name.isNullOrEmpty()) { //不能省略，json反序列化也有出现null的可能
+                AppLog.put(source.getTag() + " loginUi json err", null, true)
+                return@forEachIndexed
+            }
+            rowUiName.add(name)
+            when (type) {
                 RowUi.Type.text -> ItemSourceEditBinding.inflate(
                     layoutInflater,
                     binding.root,
@@ -133,8 +139,8 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                 ).let {
                     binding.flexbox.addView(it.root)
                     it.root.id = index + 1000
-                    it.textInputLayout.hint = rowUi.name
-                    it.editText.setText(loginInfo[rowUi.name])
+                    it.textInputLayout.hint = name
+                    it.editText.setText(loginInfo[name])
                 }
 
                 RowUi.Type.password -> ItemSourceEditBinding.inflate(
@@ -144,10 +150,10 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                 ).let {
                     binding.flexbox.addView(it.root)
                     it.root.id = index + 1000
-                    it.textInputLayout.hint = rowUi.name
+                    it.textInputLayout.hint = name
                     it.editText.inputType =
                         InputType.TYPE_TEXT_VARIATION_PASSWORD or InputType.TYPE_CLASS_TEXT
-                    it.editText.setText(loginInfo[rowUi.name])
+                    it.editText.setText(loginInfo[name])
                 }
 
                 RowUi.Type.button -> ItemFilletTextBinding.inflate(
@@ -158,11 +164,17 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                     binding.flexbox.addView(it.root)
                     rowUi.style().apply(it.root)
                     it.root.id = index + 1000
-                    it.textView.text = rowUi.name
+                    it.textView.text = name
                     rowUi.viewName?.let { jsStr ->
                         execute {
                             evalUiJs(jsStr)
-                        }.onSuccess { name -> it.textView.text = name }
+                        }.onSuccess { n ->
+                            if (n.isNullOrEmpty()) {
+                                it.textView.text = "err null"
+                            } else {
+                                it.textView.text = n
+                            }
+                        }
                     }
                     it.textView.setPadding(16.dpToPx())
                     var downTime = 0L
@@ -198,13 +210,19 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                     rowUi.style().apply(it.root)
                     it.root.id = index + 1000
                     val chars = rowUi.chars ?: arrayOf("chars is null")
-                    var char = loginInfo[rowUi.name]?.takeIf { c -> c.isNotEmpty() } ?: rowUi.default ?: chars.getOrNull(0) ?: "chars is []"
+                    var char = loginInfo[name]?.takeIf { c -> c.isNotEmpty() } ?: rowUi.default ?: chars.getOrNull(0) ?: "chars is []"
                     rowUi.default = char
-                    it.textView.text = char + rowUi.name
+                    it.textView.text = char + name
                     rowUi.viewName?.let { jsStr ->
                         execute {
                             evalUiJs(jsStr)
-                        }.onSuccess { name -> it.textView.text = char + name }
+                        }.onSuccess { n ->
+                            if (n.isNullOrEmpty()) {
+                                it.textView.text = "err null"
+                            } else {
+                                it.textView.text = n
+                            }
+                        }
                     }
                     it.textView.setPadding(16.dpToPx())
                     var downTime = 0L
@@ -225,13 +243,13 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                                 if (currentIndex == -1) {
                                     char = chars.getOrNull(0) ?: ""
                                     rowUi.default = char
-                                    it.textView.text = char + rowUi.name
+                                    it.textView.text = char + name
                                 }
                                 else {
                                     val nextIndex = (currentIndex + 1) % chars.size
                                     char = chars.getOrNull(nextIndex) ?: ""
                                     rowUi.default = char
-                                    it.textView.text = char + rowUi.name
+                                    it.textView.text = char + name
                                 }
                                 handleButtonClick(source, rowUi, rowUis, upTime > downTime + 666)
                             }

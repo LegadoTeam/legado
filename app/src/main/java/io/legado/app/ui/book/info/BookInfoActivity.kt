@@ -191,7 +191,7 @@ class BookInfoActivity :
         binding.llInfo.setBackgroundColor(backgroundColor)
         binding.ivCoverC.setCardBackgroundColor(backgroundColor)
         binding.flAction.setBackgroundColor(bottomBackground)
-        binding.flAction.applyNavigationBarPadding()
+        binding.vwBg.applyNavigationBarPadding()
         binding.tvShelf.setTextColor(getPrimaryTextColor(ColorUtils.isColorLight(bottomBackground)))
         binding.tvToc.text = getString(R.string.toc_s, getString(R.string.loading))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {

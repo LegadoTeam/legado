@@ -23,7 +23,7 @@ class RssSortViewModel(application: Application) : BaseViewModel(application) {
 
     fun initData(intent: Intent, finally: () -> Unit) {
         execute {
-            url = intent.getStringExtra("url")
+            url = intent.getStringExtra("sourceUrl")
             url?.let { url ->
                 rssSource = appDb.rssSourceDao.getByKey(url)
                 rssSource?.let {

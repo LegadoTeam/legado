@@ -195,7 +195,7 @@ class RssFragment() : VMBaseFragment<RssViewModel>(R.layout.fragment_rss),
         }
         else if(rssSource.startHtml.isNullOrBlank()) {
             startActivity<RssSortActivity> {
-                putExtra("url", rssSource.sourceUrl)
+                putExtra("sourceUrl", rssSource.sourceUrl)
             }
         } else {
             startActivity<ReadRssActivity> {

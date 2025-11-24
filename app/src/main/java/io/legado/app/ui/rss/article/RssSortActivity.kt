@@ -55,6 +55,7 @@ class RssSortActivity : VMBaseActivity<ActivityRssArtivlesBinding, RssSortViewMo
     ) {
         if (it.resultCode == RESULT_OK) {
             viewModel.initData(intent) {
+                sortUrls = null
                 upFragments()
             }
         }
@@ -165,15 +166,17 @@ class RssSortActivity : VMBaseActivity<ActivityRssArtivlesBinding, RssSortViewMo
 
     //更新选中状态
     private fun updateTabSelection(position: Int) {
-        tabRows.forEachIndexed { rowIndex, row ->
-            for (i in 0 until row.childCount) {
-                val tabIndex = rowIndex * maxTagsPerRow + i
-                val tabView = row.getChildAt(i) as? TextView
-                tabView?.isSelected = tabIndex == position
+        if (!isDestroyed && !isFinishing) {
+            tabRows.forEachIndexed { rowIndex, row ->
+                for (i in 0 until row.childCount) {
+                    val tabIndex = rowIndex * maxTagsPerRow + i
+                    val tabView = row.getChildAt(i) as? TextView
+                    tabView?.isSelected = tabIndex == position
+                }
             }
+            // 确保选中标签在视图内
+            ensureTabVisible(position)
         }
-        // 确保选中标签在视图内
-        ensureTabVisible(position)
     }
 
     private fun ensureTabVisible(position: Int) {
@@ -313,9 +316,9 @@ class RssSortActivity : VMBaseActivity<ActivityRssArtivlesBinding, RssSortViewMo
                 viewModel.clearSortCache { upFragments() }
             }
             R.id.menu_set_source_variable -> setSourceVariable()
-            R.id.menu_edit_source -> viewModel.rssSource?.sourceUrl?.let {
+            R.id.menu_edit_source -> viewModel.rssSource?.let {
                 editSourceResult.launch {
-                    putExtra("sourceUrl", it)
+                    putExtra("sourceUrl", it.sourceUrl)
                 }
             }
 
@@ -455,7 +458,7 @@ class RssSortActivity : VMBaseActivity<ActivityRssArtivlesBinding, RssSortViewMo
         fun start(context: Context, sortUrl: String?, sourceUrl: String, key: String? = null) {
             context.startActivity<RssSortActivity> {
                 putExtra("sortUrl", sortUrl)
-                putExtra("url", sourceUrl)
+                putExtra("sourceUrl", sourceUrl)
                 putExtra("key", key)
             }
         }

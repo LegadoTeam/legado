@@ -10,7 +10,6 @@ import android.widget.EditText
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
-import androidx.core.view.ViewCompat
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
@@ -179,8 +178,13 @@ class ReplaceEditActivity :
         if (text.isEmpty()) return
         val view = window?.decorView?.findFocus()
         if (view is EditText) {
-            val start = view.selectionStart
-            val end = view.selectionEnd
+            var start = view.selectionStart
+            var end = view.selectionEnd
+            if (start > end) {
+                val temp = start
+                start = end
+                end = temp
+            }
             //获取EditText的文字
             val edit = view.editableText
             if (start < 0 || start >= edit.length) {
