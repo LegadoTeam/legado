@@ -281,8 +281,13 @@ class CodeEditActivity :
     override fun sendText(text: String) {
         val view = window.decorView.findFocus()
         if (view is TextInputEditText) {
-            val start = view.selectionStart
-            val end = view.selectionEnd
+            var start = view.selectionStart
+            var end = view.selectionEnd
+            if (start > end) {
+                val temp = start
+                start = end
+                end = temp
+            }
             if (text.isNotEmpty()) {
                 val edit = view.editableText//获取EditText的文字
                 if (start < 0 || start >= edit.length) {

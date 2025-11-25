@@ -2,8 +2,8 @@ package io.legado.app.ui.video
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.res.Configuration
-import android.net.Uri
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
@@ -13,12 +13,12 @@ import androidx.activity.addCallback
 import androidx.activity.viewModels
 import androidx.annotation.OptIn
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.media3.common.util.UnstableApi
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.LinearSmoothScroller
 import androidx.recyclerview.widget.RecyclerView
-import com.shuyu.gsyvideoplayer.listener.VideoAllCallBack
-import com.shuyu.gsyvideoplayer.utils.OrientationUtils
+import com.shuyu.gsyvideoplayer.listener.GSYSampleCallBack
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.BookType
@@ -38,10 +38,10 @@ import io.legado.app.service.VideoPlayService
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
 import io.legado.app.ui.book.toc.TocActivityResult
-import io.legado.app.ui.video.config.SettingsDialog
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.rss.favorites.RssFavoritesDialog
 import io.legado.app.ui.rss.source.edit.RssSourceEditActivity
+import io.legado.app.ui.video.config.SettingsDialog
 import io.legado.app.utils.StartActivityContract
 import io.legado.app.utils.gone
 import io.legado.app.utils.sendToClip
@@ -51,17 +51,17 @@ import io.legado.app.utils.startActivity
 import io.legado.app.utils.toggleSystemBar
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.legado.app.utils.visible
-import androidx.core.net.toUri
 
 class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlayerViewModel>(),
     SettingsDialog.CallBack,RssFavoritesDialog.Callback {
     override val binding by viewBinding(ActivityVideoPlayerBinding::inflate)
     override val viewModel by viewModels<VideoPlayerViewModel>()
-    private var orientationUtils: OrientationUtils? = null
     private val playerView: VideoPlayer by lazy { binding.playerView }
     private var starMenuItem: MenuItem? = null
     private var isNew = true
     private var isFullScreen = false
+    private var isPortraitVideo = false
+    private var orientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
     private val bookSourceEditResult =
         registerForActivityResult(StartActivityContract(BookSourceEditActivity::class.java)) {
             if (it.resultCode == RESULT_OK) {
@@ -139,7 +139,6 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         setupPlayerView()
         initView()
         upView()
-        orientationUtils = OrientationUtils(this, playerView) //旋转辅助
         onBackPressedDispatcher.addCallback(this) {
             if (isFullScreen) {
                 toggleFullScreen()
@@ -266,23 +265,26 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         isFullScreen = !isFullScreen
         toggleSystemBar(!isFullScreen)
         if (isFullScreen) {
-            orientationUtils?.isOnlyRotateLand = true //旋转时仅处理横屏
-            orientationUtils?.isRotateWithSystem = false //跟随系统旋转
-            orientationUtils?.resolveByClick()
+            orientation = requestedOrientation
+            requestedOrientation = if (isPortraitVideo) {
+                ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT //竖屏
+            } else {
+                ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE //横屏
+            }
             supportActionBar?.hide()
             binding.chaptersContainer.gone()
             binding.data.gone()
             playerView.startWindowFullscreen(this, false, false)
         } else {
-            orientationUtils?.isOnlyRotateLand = false
-            orientationUtils?.isRotateWithSystem = true
-            orientationUtils?.resolveByClick()
+            requestedOrientation = orientation
             supportActionBar?.show()
             if (VideoPlay.book != null) {
                 binding.chaptersContainer.visible()
                 binding.data.visible()
             }
-            playerView.backFromFull(this)
+            playerView.postDelayed({
+                playerView.backFromFull(this)
+            }, if (isPortraitVideo) 300 else 0)
             upView()
         }
     }
@@ -292,15 +294,23 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     @SuppressLint("SwitchIntDef")
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        when (newConfig.orientation) {
-            Configuration.ORIENTATION_LANDSCAPE -> {
-                window.clearFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN)
-                window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
-            }
-
-            Configuration.ORIENTATION_PORTRAIT -> {
-                window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
-                window.addFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN)
+        if (isFullScreen) {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN)
+            window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
+            window.addFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN)
+            when (newConfig.orientation) {
+                Configuration.ORIENTATION_LANDSCAPE -> {
+                    if (!isPortraitVideo) {
+                        toggleFullScreen()
+                    }
+                }
+                Configuration.ORIENTATION_PORTRAIT -> {
+                    if (isPortraitVideo) {
+                        toggleFullScreen()
+                    }
+                }
             }
         }
     }
@@ -317,18 +327,13 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         //高度不超过一半屏幕
         layoutParams.height = if (height < screenHeight / 2) height else screenHeight / 2
         playerView.layoutParams = layoutParams
-        //是否根据视频尺寸，自动选择竖屏全屏或者横屏全屏
-        playerView.isAutoFullWithSize = true
+        playerView.isNeedOrientationUtils = false //关闭自带的屏幕方向控制
         playerView.fullscreenButton.setOnClickListener { toggleFullScreen() }
         playerView.setBackFromFullScreenListener { toggleFullScreen() }
-        playerView.setVideoAllCallBack(object : VideoAllCallBack {
-            override fun onStartPrepared(url: String?, vararg objects: Any?) {}
+        playerView.setVideoAllCallBack(object : GSYSampleCallBack() {
             override fun onPrepared(url: String?, vararg objects: Any?) {
+                super.onPrepared(url, *objects)
                 playerView.post {
-                    if (VideoPlay.startFull && VideoPlay.autoPlay && !isFullScreen) {
-                        toggleFullScreen()
-                        return@post
-                    }
                     //根据实际视频比例再次调整
                     val videoWidth = playerView.currentVideoWidth
                     val videoHeight = playerView.currentVideoHeight
@@ -336,9 +341,14 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                         val layoutParams = playerView.layoutParams
                         val parentWidth = playerView.width
                         val aspectRatio = videoHeight.toFloat() / videoWidth.toFloat()
-                        if (aspectRatio > 1.2) {
-                            //如果提前进入了横全屏，纠正回竖屏
-                            orientationUtils?.backToProtVideo()
+                        isPortraitVideo = if (aspectRatio > 1.2) true else false
+                        if (isFullScreen && isPortraitVideo) {
+                            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT //提前进入了全屏，并且默认横屏了，纠正回来
+                            return@post
+                        }
+                        if (VideoPlay.startFull && VideoPlay.autoPlay && !isFullScreen) {
+                            toggleFullScreen()
+                            return@post
                         }
                         val height = (parentWidth * aspectRatio).toInt()
                         val displayMetrics = resources.displayMetrics
@@ -349,35 +359,14 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                     }
                 }
             }
-
-            override fun onClickStartIcon(url: String?, vararg objects: Any?) {}
             override fun onAutoComplete(url: String?, vararg objects: Any?) {
+                super.onAutoComplete(url, *objects)
                 if (VideoPlay.upDurIndex(1)) {
                     VideoPlay.saveRead()
                     upView()
                     VideoPlay.startPlay(playerView)
                 }
             }
-
-            override fun onComplete(url: String?, vararg objects: Any?) {}
-            override fun onEnterFullscreen(url: String?, vararg objects: Any?) {}
-            override fun onQuitFullscreen(url: String?, vararg objects: Any?) {}
-            override fun onQuitSmallWidget(url: String?, vararg objects: Any?) {}
-            override fun onEnterSmallWidget(url: String?, vararg objects: Any?) {}
-            override fun onTouchScreenSeekVolume(url: String?, vararg objects: Any?) {}
-            override fun onTouchScreenSeekPosition(url: String?, vararg objects: Any?) {}
-            override fun onTouchScreenSeekLight(url: String?, vararg objects: Any?) {}
-            override fun onPlayError(url: String?, vararg objects: Any?) {}
-            override fun onClickStartThumb(url: String?, vararg objects: Any?) {}
-            override fun onClickBlank(url: String?, vararg objects: Any?) {}
-            override fun onClickBlankFullscreen(url: String?, vararg objects: Any?) {}
-            override fun onClickStartError(url: String?, vararg objects: Any?) {}
-            override fun onClickStop(url: String?, vararg objects: Any?) {}
-            override fun onClickStopFullscreen(url: String?, vararg objects: Any?) {}
-            override fun onClickResume(url: String?, vararg objects: Any?) {}
-            override fun onClickResumeFullscreen(url: String?, vararg objects: Any?) {}
-            override fun onClickSeekbar(url: String?, vararg objects: Any?) {}
-            override fun onClickSeekbarFullscreen(url: String?, vararg objects: Any?) {}
         })
     }
 
@@ -473,7 +462,6 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         VideoPlay.saveRead()
         playerView.getCurrentPlayer().release()
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        orientationUtils?.releaseListener()
         super.onDestroy()
     }
 

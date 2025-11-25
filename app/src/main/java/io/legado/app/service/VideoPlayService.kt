@@ -26,7 +26,7 @@ import androidx.dynamicanimation.animation.FloatPropertyCompat
 import androidx.dynamicanimation.animation.SpringAnimation
 import androidx.dynamicanimation.animation.SpringForce
 import androidx.media3.common.util.UnstableApi
-import com.shuyu.gsyvideoplayer.listener.VideoAllCallBack
+import com.shuyu.gsyvideoplayer.listener.GSYSampleCallBack
 import io.legado.app.R
 import io.legado.app.base.BaseService
 import io.legado.app.constant.AppConst
@@ -357,9 +357,9 @@ class VideoPlayService : BaseService() {
             toggleFullScreen()
         }
         playerView.backButton.setOnClickListener { stopSelf() }
-        playerView.setVideoAllCallBack(object : VideoAllCallBack {
-            override fun onStartPrepared(url: String?, vararg objects: Any?) {}
+        playerView.setVideoAllCallBack(object : GSYSampleCallBack() {
             override fun onPrepared(url: String?, vararg objects: Any?) {
+                super.onPrepared(url, *objects)
                 // 更新媒体会话元数据
                 updateMediaMetadata()
                 // 更新播放状态
@@ -380,31 +380,15 @@ class VideoPlayService : BaseService() {
                     windowManager.updateViewLayout(floatingView, params)
                 }
             }
-
-            override fun onClickStartIcon(url: String?, vararg objects: Any?) {}
             override fun onAutoComplete(url: String?, vararg objects: Any?) {
-                stopSelf()
+                super.onAutoComplete(url, *objects)
+                if (VideoPlay.upDurIndex(1)) {
+                    VideoPlay.saveRead()
+                    VideoPlay.startPlay(playerView)
+                } else {
+                    stopSelf()
+                }
             }
-
-            override fun onComplete(url: String?, vararg objects: Any?) {}
-            override fun onEnterFullscreen(url: String?, vararg objects: Any?) {}
-            override fun onQuitFullscreen(url: String?, vararg objects: Any?) {}
-            override fun onQuitSmallWidget(url: String?, vararg objects: Any?) {}
-            override fun onEnterSmallWidget(url: String?, vararg objects: Any?) {}
-            override fun onTouchScreenSeekVolume(url: String?, vararg objects: Any?) {}
-            override fun onTouchScreenSeekPosition(url: String?, vararg objects: Any?) {}
-            override fun onTouchScreenSeekLight(url: String?, vararg objects: Any?) {}
-            override fun onPlayError(url: String?, vararg objects: Any?) {}
-            override fun onClickStartThumb(url: String?, vararg objects: Any?) {}
-            override fun onClickBlank(url: String?, vararg objects: Any?) {}
-            override fun onClickBlankFullscreen(url: String?, vararg objects: Any?) {}
-            override fun onClickStartError(url: String?, vararg objects: Any?) {}
-            override fun onClickStop(url: String?, vararg objects: Any?) {}
-            override fun onClickStopFullscreen(url: String?, vararg objects: Any?) {}
-            override fun onClickResume(url: String?, vararg objects: Any?) {}
-            override fun onClickResumeFullscreen(url: String?, vararg objects: Any?) {}
-            override fun onClickSeekbar(url: String?, vararg objects: Any?) {}
-            override fun onClickSeekbarFullscreen(url: String?, vararg objects: Any?) {}
         })
     }
 
