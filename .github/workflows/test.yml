@@ -216,6 +216,30 @@ jobs:
           body: "此版本为测试版，签名与正式版不同，可能存在不稳定情况，升级前请务必备份好数据。"
           prerelease: true
           artifacts: ${{ github.workspace }}/apk/*.apk
+  CDN:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    env:
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          path: apk/
+      - working-directory: apk/
+        run: mv */*.apk . || true && rm -rf */
+      - name: Deploy imagebuilder to server
+        uses: easingthemes/ssh-deploy@main
+        continue-on-error: true
+        if: env.SSH_PRIVATE_KEY && ! contains(github.event.action, 'noser')
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          ARGS: "-avzr"
+          SOURCE: apk/
+          REMOTE_HOST: ${{ secrets.SERVER_HOST }}
+          REMOTE_PORT: ${{ secrets.SERVER_PORT }}
+          REMOTE_USER: ${{ secrets.SERVER_USERNAME }}
+          TARGET: "/www/wwwroot/cdn.mgz.la/app"
 
   lanzou:
     needs: [prepare, build]
