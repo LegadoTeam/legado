@@ -228,7 +228,7 @@ jobs:
           path: apk/
       - working-directory: apk/
         run: mv */*.apk . || true && rm -rf */
-      - name: Deploy imagebuilder to server
+      - name: Deploy apk to server
         uses: easingthemes/ssh-deploy@main
         continue-on-error: true
         if: env.SSH_PRIVATE_KEY && ! contains(github.event.action, 'noser')
