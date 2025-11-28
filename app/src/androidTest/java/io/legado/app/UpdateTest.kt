@@ -3,9 +3,7 @@ package io.legado.app
 import com.google.gson.Gson
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.http.okHttpClient
-import io.legado.app.help.update.GiteeRelease
-import io.legado.app.utils.GSON
-import io.legado.app.utils.fromJsonArray
+import io.legado.app.help.update.GithubRelease
 import io.legado.app.utils.fromJsonObject
 import okhttp3.Request
 import org.junit.Assert.assertTrue
@@ -14,24 +12,24 @@ import org.junit.Test
 class UpdateTest {
 
     private val lastReleaseUrl =
-        "https://gitee.com/api/v5/repos/lyc486/legado/releases?page=1&per_page=3&direction=desc"
+        "https://api.github.com/repos/LegadoTeam/legado/releases/latest"
 
     private val lastBetaReleaseUrl =
-        "https://gitee.com/api/v5/repos/lyc486/legado/releases/tags/beta"
+        "https://api.github.com/repos/LegadoTeam/legado/releases/tags/beta"
 
     @Test
     fun updateApp_beta() {
         val body = okHttpClient.newCall(Request.Builder().url(lastBetaReleaseUrl).build()).execute()
             .body!!.string()
 
-        val releaseList = Gson().fromJsonObject<GiteeRelease>(body)
+        val releaseList = Gson().fromJsonObject<GithubRelease>(body)
             .getOrElse {
                 throw NoStackTraceException("获取新版本出错 " + it.localizedMessage)
             }
             .gitReleaseToAppReleaseInfo()
             .sortedByDescending { it.createdAt }
 
-        assertTrue(releaseList.isNotEmpty())
+        assertTrue(releaseList.size == 2)
         assertTrue(releaseList.all { it.downloadUrl.isNotBlank() })
         assertTrue(releaseList.all { it.versionName.isNotBlank() })
     }
@@ -41,15 +39,14 @@ class UpdateTest {
         val body = okHttpClient.newCall(Request.Builder().url(lastReleaseUrl).build()).execute()
             .body!!.string()
 
-        val releaseList = GSON.fromJsonArray<GiteeRelease>(body)
+        val releaseList = Gson().fromJsonObject<GithubRelease>(body)
             .getOrElse {
                 throw NoStackTraceException("获取新版本出错 " + it.localizedMessage)
             }
-            .first { !it.prerelease }
             .gitReleaseToAppReleaseInfo()
             .sortedByDescending { it.createdAt }
 
-        assertTrue(releaseList.size == 2)
+        assertTrue(releaseList.size == 1)
         assertTrue(releaseList.all { it.downloadUrl.isNotBlank() })
         assertTrue(releaseList.all { it.versionName.isNotBlank() })
     }
