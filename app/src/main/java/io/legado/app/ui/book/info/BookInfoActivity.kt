@@ -387,7 +387,10 @@ class BookInfoActivity :
         tvOrigin.text = getString(R.string.origin_show, book.originName)
         tvLasted.text = getString(R.string.lasted_show, book.latestChapterTitle)
         tvIntro.text = book.getDisplayIntro()
-        llToc.visible(!book.isWebFile)
+        if (book.isWebFile) {
+            llToc.gone()
+            tvLasted.text = getString(R.string.lasted_show, "下载中...")
+        }
         upTvBookshelf()
         upKinds(book)
         upGroup(book.group)
@@ -434,6 +437,7 @@ class BookInfoActivity :
                     R.string.toc_s,
                     getString(R.string.error_load_toc)
                 )
+                binding.tvLasted.text = getString(R.string.lasted_show, book?.latestChapterTitle)
             }
 
             else -> {

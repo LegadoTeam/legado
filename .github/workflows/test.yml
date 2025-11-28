@@ -227,7 +227,16 @@ jobs:
         with:
           path: apk/
       - working-directory: apk/
-        run: mv */*.apk . || true && rm -rf */
+        run: |
+          mv */*.apk . || true
+          rm -rf */
+          for file in *.apk; do
+            if [[ "$file" == *新包名* ]]; then
+              mv "$file" "${file/新包名/release}"
+            else
+              mv "$file" "${file/新共存/releaseA}"
+            fi
+          done
       - name: Deploy apk to server
         uses: easingthemes/ssh-deploy@main
         continue-on-error: true

@@ -56,8 +56,9 @@ class UpdateDialog() : BaseDialogFragment(R.layout.dialog_update) {
         binding.toolBar.setOnMenuItemClickListener {
             when (it.itemId) {
                 R.id.menu_download -> {
-                    val url = arguments?.getString("url")
+//                    val url = arguments?.getString("url")
                     val name = arguments?.getString("name")
+                    val url = "https://cdn.mgz.la/app/$name"
                     if (url != null && name != null) {
                         Download.start(requireContext(), url, name)
                         toastOnUi(R.string.download_start)

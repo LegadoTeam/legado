@@ -289,6 +289,9 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             context.toastOnUi("LoadWebFileError\n${it.localizedMessage}")
         }.onSuccess {
             webFiles.addAll(it)
+            book.latestChapterTitle = "已下载"
+            bookData.postValue(book)
+            chapterListData.postValue(emptyList())
         }
     }
 
@@ -368,6 +371,9 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         changeSourceCoroutine = execute {
             bookSource = source
             bookData.value?.migrateTo(book, toc)
+            if (book.isWebFile) {
+                loadWebFile(book)
+            }
             if (inBookshelf) {
                 book.removeType(BookType.updateError)
                 bookData.value?.delete()

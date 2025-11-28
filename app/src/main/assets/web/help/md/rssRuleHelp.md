@@ -26,12 +26,6 @@
 > `screen.orientation.lock()` 全屏后可控制屏幕方向  
 
 * 内置浏览器额外支持的函数
-> 打开对应界面  
-```js
-window.openUi("sort", {"分类":"https://example.com"}); //函数打开分类界面
-window.openUi("sort", {"分类1":"https://example1.com","分类2":"https://example2.com"}); //函数打开多个分类界面
-window.openUi("rss", {"正文标题":"https://example.com"}); //函数打开正文界面
-```
 
 > 异步执行阅读函数代码字符串，并返回字符串结果  
 ```js
@@ -64,7 +58,8 @@ window.getStringAwait(ruleStr, mContent) //同java.getString(ruleStr, mContent)
 > 同步调用  
 
 支持直接调用java、source和cache对象上的函数。  
-参数和返回结果不是字符串、数字、布尔、空的函数不支持。  
+java函数支持度同js教程[RssJsExtensions](https://github.com/Luoyacheng/legado/blob/main/app/src/main/java/io/legado/app/ui/rss/read/RssJsExtensions.kt)。  
+额外注意，参数或返回结果任意一个不属于字符串、数字、布尔、空的函数无法支持，  
 再次打开浏览器startBrowser等相关函数不支持。
 ```js
 //部分示例参考
@@ -74,6 +69,7 @@ java.ajax("https://example.com");
 java.get("https://example.com","{}");
 java.base64Encode("cs");
 java.aesDecodeToString("str","key","tran","iv");
+java.searchBook("系统");
 source.login();
 source.getLoginInfo();
 cache.putMemory("cs","v");

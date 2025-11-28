@@ -8,23 +8,12 @@ import io.legado.app.data.entities.BaseSource
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
+import io.legado.app.ui.rss.read.RssJsExtensions
 import io.legado.app.utils.GSON
 import io.legado.app.utils.escapeForJs
 import io.legado.app.utils.fromJsonObject
 
-class WebJsExtensions(private val source: BaseSource, private val activity: AppCompatActivity, private val webView: WebView): JsExtensions {
-    override fun getSource(): BaseSource {
-        return source
-    }
-    @JavascriptInterface
-    fun put(key: String, value: String): String {
-        getSource().put(key, value)
-        return value
-    }
-    @JavascriptInterface
-    fun get(key: String): String {
-        return getSource().get(key)
-    }
+class WebJsExtensions(private val source: BaseSource, private val activity: AppCompatActivity, private val webView: WebView): RssJsExtensions(activity, source) {
     /**
      * 由软件主动注入的js函数调用
      */
