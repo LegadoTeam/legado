@@ -126,10 +126,6 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
         rowUis?.forEachIndexed { index, rowUi ->
             val type = rowUi.type
             val name = rowUi.name
-            if (type == null || name.isNullOrEmpty()) { //不能省略，json反序列化也有出现null的可能
-                AppLog.put(source.getTag() + " loginUi json err", null, true)
-                return@forEachIndexed
-            }
             rowUiName.add(name)
             when (type) {
                 RowUi.Type.text -> ItemSourceEditBinding.inflate(

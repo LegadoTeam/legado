@@ -25,6 +25,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.databinding.DialogBookChangeSourceBinding
+import io.legado.app.help.book.isWebFile
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.elevation
@@ -389,6 +390,17 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
         waitDialog.setText(R.string.load_toc)
         waitDialog.show()
         val book = viewModel.bookMap[searchBook.primaryStr()] ?: searchBook.toBook()
+        if (book.isWebFile) { //文件类书源不解析目录
+            val source = appDb.bookSourceDao.getBookSource(book.origin)
+            if (source == null) {
+                AppLog.put("书源不存在", null, true)
+                return
+            }
+            waitDialog.dismiss()
+            callBack?.changeTo(source, book, emptyList())
+            onSuccess?.invoke()
+            return
+        }
         val coroutine = viewModel.getToc(book, { toc, source ->
             waitDialog.dismiss()
             callBack?.changeTo(source, book, toc)

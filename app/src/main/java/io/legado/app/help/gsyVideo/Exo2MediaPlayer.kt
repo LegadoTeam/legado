@@ -27,53 +27,9 @@ import tv.danmaku.ijk.media.exo2.demo.EventLogger
 class Exo2MediaPlayer(context: Context) : IjkExo2MediaPlayer(context) {
     companion object {
         private const val TAG = "GSYExo2MediaPlayer"
-
         private const val MAX_POSITION_FOR_SEEK_TO_PREVIOUS: Long = 3000
-
-        const val POSITION_DISCONTINUITY: Int = 899
     }
     private val window = Timeline.Window()
-
-
-    override fun onPositionDiscontinuity(
-        oldPosition: PositionInfo,
-        newPosition: PositionInfo,
-        reason: @DiscontinuityReason Int
-    ) {
-        super.onPositionDiscontinuity(oldPosition, newPosition, reason)
-        notifyOnInfo(POSITION_DISCONTINUITY, reason)
-    }
-
-    fun setDataSource(
-        uris: List<BookChapter>?,
-        book: Book?,
-        source: BookSource?,
-        headers: MutableMap<String?, String?>?,
-        index: Int,
-        cache: Boolean
-    ) {
-        mHeaders = headers
-        if (uris == null) {
-            return
-        }
-
-        /** ConcatenatingMediaSource2 是把多个视频拼成一个播放，时间轴只有一个 */
-//        val mediaSourceBuilder = ConcatenatingMediaSource2.Builder()
-//        for (uri in uris) {
-//            val mediaSource: MediaSource = mExoHelper.getMediaSource(
-//                uri,
-//                isPreview,
-//                cache,
-//                false,
-//                mCacheDir,
-//                getOverrideExtension()
-//            )
-//            mediaSourceBuilder.add(mediaSource,0)
-//        }
-//        playIndex = index
-//        mMediaSource = mediaSourceBuilder.build()
-    }
-
 
     /**
      * 上一集
@@ -124,8 +80,9 @@ class Exo2MediaPlayer(context: Context) : IjkExo2MediaPlayer(context) {
                         DefaultMediaSourceFactory(
                             ResolvingDataSource.Factory(ExoPlayerHelper.cacheDataSourceFactory){ it }
                         )
-                            .setLiveTargetOffsetMs(5000)
-                    ).build()
+                            .setLiveTargetOffsetMs(5000) //直播时延5秒
+                    )
+                    .build()
             mInternalPlayer.addListener(this@Exo2MediaPlayer)
             mInternalPlayer.addAnalyticsListener(this@Exo2MediaPlayer)
             mInternalPlayer.addListener(mEventLogger)

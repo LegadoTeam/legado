@@ -291,18 +291,4 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
         tts?.clearTts()
     }
 
-    fun readRss(title: String, link: String, origin: String?) {
-        if (origin == null) return
-        execute {
-            val rss =appDb.rssStarDao.get(origin, link)?.toRecord() ?: appDb.rssArticleDao.getByLink(origin, link)?.toRecord()
-            val rssReadRecord = rss ?: RssReadRecord(
-                record = link,
-                title = title,
-                origin = origin,
-                readTime = System.currentTimeMillis()
-            )
-            appDb.rssReadRecordDao.insertRecord(rssReadRecord)
-        }
-    }
-
 }

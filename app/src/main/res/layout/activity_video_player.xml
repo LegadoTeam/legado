@@ -135,7 +135,7 @@
                 android:contentDescription="@string/chapter_list"
                 android:padding="5dp"
                 android:src="@drawable/ic_chapter_list"
-                app:tint="@color/md_white_1000" />
+                app:tint="@color/primaryText" />
 
         </LinearLayout>
 

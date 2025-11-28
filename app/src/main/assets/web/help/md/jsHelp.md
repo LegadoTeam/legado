@@ -38,14 +38,16 @@
 ## 当前类对象的可使用的部分方法
 
 ### [RssJsExtensions](https://github.com/LegadoTeam/legado/blob/main/app/src/main/java/io/legado/app/ui/rss/read/RssJsExtensions.kt)
-> 只能在订阅源`shouldOverrideUrlLoading`规则或登录界面中使用  
+> 在订阅源`shouldOverrideUrlLoading`规则或`登录界面`中使用  
 > 订阅添加跳转url拦截, js, 返回true拦截,js变量url,可以通过js打开url  
 > url跳转拦截规则不能执行耗时操作
 
 * 调用阅读搜索  
 ```js
-java.searchBook(bookName: String)
+* @param key 搜索关键词
 * @param searchScope 搜索作用域
+//searchScope作用域,单个源为`源名称::源地址`的形式；分组为源分组名称和`,`符号隔开的形式
+java.searchBook(key: String)
 java.searchBook(key: String, searchScope: String)
 ```
 
@@ -54,11 +56,16 @@ java.searchBook(key: String, searchScope: String)
 java.addBook(bookUrl: String)
 ```
 
-* 打开订阅源界面  
+* 打开源界面  
 ```js
-* @param name 为"sort"打开分类界面、为"rss"打开正文界面
+* @param name 为"sort"打开订阅源分类界面、为"rss"打开订阅源正文界面、为"explore"打开书源发现界面、"search"打开书籍搜索界面
+* @param url 为传递到界面的链接，"sort"时为分类链接、"rss"时为正文链接、"explore"时为发现链接、"search"时该参数无意义
+//特别说明，"sort"时url可以传序列化后的键值对用来打开多个分类界面
+* @param title 为对应界面的标题，"search"时为搜索关键词
+* @param origin 打开指定源界面的源地址
 java.open(name: String, url: String)
-java.open(name: String, url: String, title: String)
+java.open(name: String, url: String?, title: String?)
+java.open(name: String, url: String?, title: String?, origin: String?)
 ```
 
 ### [SourceLoginJsExtensions](https://github.com/LegadoTeam/legado/blob/main/app/src/main/java/io/legado/app/ui/login/SourceLoginJsExtensions.kt)
@@ -66,13 +73,6 @@ java.open(name: String, url: String, title: String)
 ```js
 java.copyText(text: String) //复制文本到剪贴板
 java.upLoginData(data: Map<String, String>) //更新登录界面信息，参数是对象，例如{"telephone":"123"}
-```
-* 打开书源发现界面
-```js
-* @param url 发现页链接
-* @param title 发现页标题
-java.open("explore", url: String)
-java.open("explore", url: String, title: String)
 ```
 
 ### [AnalyzeUrl](https://github.com/LegadoTeam/legado/blob/master/app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeUrl.kt) 部分函数
