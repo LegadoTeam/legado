@@ -27,6 +27,7 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
     val upAdapterLiveData = MutableLiveData<String>()
     val booksData = MutableLiveData<List<SearchBook>>()
     val errorLiveData = MutableLiveData<String>()
+    val pageLiveData = MutableLiveData<Int>()
     private var bookSource: BookSource? = null
     private var exploreUrl: String? = null
     private var page = 1
@@ -65,6 +66,13 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
         }
     }
 
+    fun explore(page: Int) {
+        if (page > 0) {
+            books.clear()
+            this.page = page
+        }
+    }
+
     fun explore() {
         val source = bookSource
         val url = exploreUrl
@@ -75,6 +83,7 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
                 books.addAll(searchBooks)
                 booksData.postValue(books.toList())
                 appDb.searchBookDao.insert(*searchBooks.toTypedArray())
+                pageLiveData.postValue(page)
                 page++
             }.onError {
                 it.printOnDebug()

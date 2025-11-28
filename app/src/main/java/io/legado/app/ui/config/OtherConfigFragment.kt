@@ -93,7 +93,7 @@ class OtherConfigFragment : PreferenceFragment(),
         when (preference.key) {
             PreferKey.userAgent -> showUserAgentDialog()
             PreferKey.customHosts -> showCustomHostsDialog()
-            PreferKey.videoSetting -> showDialogFragment<SettingsDialog>()
+            PreferKey.videoSetting -> showDialogFragment(SettingsDialog(requireActivity()))
             PreferKey.defaultBookTreeUri -> localBookTreeSelect.launch {
                 title = getString(R.string.select_book_folder)
                 mode = HandleFileContract.DIR_SYS

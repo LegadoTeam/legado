@@ -10,6 +10,7 @@ import android.view.View
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
 import androidx.core.view.isGone
+import androidx.core.view.isVisible
 import androidx.core.widget.addTextChangedListener
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.textfield.TextInputEditText
@@ -18,6 +19,7 @@ import io.github.rosemoe.sora.event.SelectionChangeEvent
 import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.EditorSearcher
+import io.github.rosemoe.sora.widget.EditorSearcher.SearchOptions
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.PreferKey
@@ -41,6 +43,9 @@ class CodeEditActivity :
     KeyboardToolPop.CallBack, ChangeThemeDialog.CallBack, SettingsDialog.CallBack {
     companion object {
         private var isInitialized = false
+        private var findText = ""
+        private var replaceText = ""
+        private var isRegex = true
     }
     override val binding by viewBinding(ActivityCodeEditBinding::inflate)
     override val viewModel by viewModels<CodeEditViewModel>()
@@ -49,7 +54,7 @@ class CodeEditActivity :
     }
     private val editor: CodeEditor by lazy { binding.editText }
     private val editorSearcher: EditorSearcher by lazy { editor.searcher }
-    private var options = EditorSearcher.SearchOptions(false, true)
+    private lateinit var options: SearchOptions
 
 
     private fun initView() {
@@ -150,6 +155,16 @@ class CodeEditActivity :
     }
 
     private fun search() {
+        if (binding.searchGroup.isVisible) return
+        binding.switchRegex.run {
+            isChecked = isRegex
+            options =  SearchOptions(!isRegex, isRegex)
+            setOnCheckedChangeListener { _, isChecked ->
+                isRegex = isChecked
+                options =  SearchOptions(!isRegex, isRegex)
+                searchTxt(binding.etFind.text.toString())
+            }
+        }
         val receiptSearch =
             editor.subscribeEvent(PublishSearchResultEvent::class.java) { event, _ ->
                 if (event.editor == editor) {
@@ -162,7 +177,6 @@ class CodeEditActivity :
             }
         }
         binding.searchGroup.visibility = View.VISIBLE
-        binding.etFind.requestFocus()
         binding.btnCloseFind.setOnClickListener {
             binding.searchGroup.visibility = View.GONE
             editorSearcher.stopSearch()
@@ -171,13 +185,27 @@ class CodeEditActivity :
             editor.requestFocus()
             editor.invalidate()
         }
-        searchTxt(binding.etFind.text.toString())
-        binding.etFind.addTextChangedListener { text ->
-            if (!text.isNullOrEmpty()) {
-                searchTxt(text.toString())
-            } else {
-                editorSearcher.stopSearch()
-                editor.invalidate()
+        searchTxt(findText)
+        binding.etFind.run {
+            requestFocus()
+            setText(findText)
+            addTextChangedListener { text ->
+                if (!text.isNullOrEmpty()) {
+                    findText = text.toString()
+                    searchTxt(findText)
+                } else {
+                    editorSearcher.stopSearch()
+                    editor.invalidate()
+                }
+            }
+
+        }
+        binding.etReplace.run {
+            setText(replaceText)
+            addTextChangedListener { text ->
+                if (!text.isNullOrEmpty()) {
+                    replaceText = text.toString()
+                }
             }
         }
         binding.btnPrevious.setOnClickListener {
@@ -211,10 +239,6 @@ class CodeEditActivity :
                 editorSearcher.replaceAll(binding.etReplace.text.toString())
             }
         }
-        binding.switchRegex.setOnCheckedChangeListener { _, isChecked ->
-            options = EditorSearcher.SearchOptions(!isChecked, isChecked)
-            searchTxt(binding.etFind.text.toString())
-        }
     }
 
     private fun searchTxt(txt: String) {
@@ -245,7 +269,7 @@ class CodeEditActivity :
             R.id.menu_save -> save(false)
             R.id.menu_format_code -> viewModel.formatCode(editor)
             R.id.menu_change_theme -> showDialogFragment(ChangeThemeDialog(this))
-            R.id.menu_config_settings -> showDialogFragment(SettingsDialog(this))
+            R.id.menu_config_settings -> showDialogFragment(SettingsDialog(this, this))
             R.id.menu_auto_wrap -> {
                 item.isChecked = !AppConfig.editAutoWrap
                 upEdit(autoWarp = !AppConfig.editAutoWrap)
