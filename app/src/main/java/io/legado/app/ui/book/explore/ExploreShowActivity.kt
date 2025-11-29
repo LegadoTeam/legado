@@ -1,6 +1,7 @@
 package io.legado.app.ui.book.explore
 
 import android.os.Bundle
+import android.view.MenuItem
 import androidx.activity.viewModels
 import androidx.core.os.bundleOf
 import androidx.recyclerview.widget.RecyclerView
@@ -11,6 +12,7 @@ import io.legado.app.data.entities.SearchBook
 import io.legado.app.databinding.ActivityExploreShowBinding
 import io.legado.app.databinding.ViewLoadMoreBinding
 import io.legado.app.ui.book.info.BookInfoActivity
+import io.legado.app.ui.widget.number.NumberPickerDialog
 import io.legado.app.ui.widget.recycler.LoadMoreView
 import io.legado.app.ui.widget.recycler.VerticalDivider
 import io.legado.app.utils.applyNavigationBarPadding
@@ -27,6 +29,26 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
 
     private val adapter by lazy { ExploreShowAdapter(this, this) }
     private val loadMoreView by lazy { LoadMoreView(this) }
+    private val menuPage by lazy {
+        binding.titleBar.menu.add(getString(R.string.menu_page, 1)).apply {
+            setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
+            setOnMenuItemClickListener {
+                val page = viewModel.pageLiveData.value ?: 1
+                NumberPickerDialog(this@ExploreShowActivity)
+                    .setTitle(getString(R.string.change_page))
+                    .setMaxValue(999)
+                    .setMinValue(1)
+                    .setValue(page)
+                    .show {
+                        if (page != it) {
+                            viewModel.explore(it)
+                            adapter.clearItems() //清空，然后会自动触发scrollToBottom
+                        }
+                    }
+                true
+            }
+        }
+    }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         binding.titleBar.title = intent.getStringExtra("exploreName")
@@ -38,6 +60,9 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
         }
         viewModel.upAdapterLiveData.observe(this) {
             adapter.notifyItemRangeChanged(0, adapter.itemCount, bundleOf(it to null))
+        }
+        viewModel.pageLiveData.observe(this) {
+            menuPage.title = getString(R.string.menu_page, it)
         }
     }
 

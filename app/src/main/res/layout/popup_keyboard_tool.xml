@@ -8,4 +8,5 @@
     android:background="@color/background_card"
     android:orientation="horizontal"
     android:padding="5dp"
-    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+    app:spanCount="1"
+    app:layoutManager="androidx.recyclerview.widget.GridLayoutManager" />

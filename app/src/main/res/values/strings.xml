@@ -1267,7 +1267,7 @@
     <string name="format_code">格式化</string>
     <string name="config_settings">配置</string>
     <string name="auto_wrap">自动换行</string>
-    <string name="font_size">字体大小</string>
+    <string name="font_size">字体大小 %d</string>
     <string name="view_code">查看代码</string>
     <string name="show_bookname">显示书名</string>
     <string name="float_permission_rationale">阅读需要悬浮窗权限来显示播放窗口</string>
@@ -1302,10 +1302,14 @@
     <string name="whitespace_empty">空行</string>
     <string name="line_separator">换行</string>
     <string name="whitespace_selection">选中</string>
-    <string name="press_speed">长按倍速</string>
+    <string name="press_speed">长按倍速 %.1f</string>
     <string name="full_bottom_progress">全屏时显示底部进度条</string>
     <string name="json_format">json格式</string>
     <string name="open_other_video_player">其它播放器打开</string>
     <string name="show_source_comment">显示源注释</string>
     <string name="adapt_special_style">适配特殊样式</string>
+    <string name="show_line_number">展示%d行，点击进行设定</string>
+    <string name="setting_show_line_number">设置辅助按键展示的行数</string>
+    <string name="menu_page">第 %d 页</string>
+    <string name="change_page">选择页数</string>
 </resources>
