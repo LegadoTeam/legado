@@ -11,7 +11,9 @@ import androidx.core.content.edit
 import com.shuyu.gsyvideoplayer.listener.GSYMediaPlayerListener
 import com.shuyu.gsyvideoplayer.utils.CommonUtil
 import com.shuyu.gsyvideoplayer.video.StandardGSYVideoPlayer
+import io.legado.app.R
 import io.legado.app.constant.AppLog
+import io.legado.app.constant.EventBus
 import io.legado.app.constant.SourceType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BaseSource
@@ -23,6 +25,7 @@ import io.legado.app.data.entities.RssSource
 import io.legado.app.data.entities.RssStar
 import io.legado.app.exception.ContentEmptyException
 import io.legado.app.help.book.update
+import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.gsyVideo.ExoVideoManager
 import io.legado.app.help.gsyVideo.ExoVideoManager.Companion.FULLSCREEN_ID
 import io.legado.app.help.gsyVideo.FloatingPlayer
@@ -30,8 +33,10 @@ import io.legado.app.help.gsyVideo.VideoPlayer
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.rss.Rss
 import io.legado.app.model.webBook.WebBook
+import io.legado.app.ui.book.source.SourceCallBack
 import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.externalCache
+import io.legado.app.utils.postEvent
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers.IO
@@ -68,6 +73,7 @@ object VideoPlay : CoroutineScope by MainScope(){
         set(value) {
             videoPrefs.edit { putBoolean("fullBottomProgressBar", value) }
         }
+
     val videoManager by lazy { ExoVideoManager() }
     var videoUrl: String? = null //播放链接
     var singleUrl = false
@@ -75,6 +81,7 @@ object VideoPlay : CoroutineScope by MainScope(){
     var source: BaseSource? = null
     var book: Book? = null
     var toc: List<BookChapter>? =  null
+    var chapter: BookChapter? = null
     var volumes = arrayListOf<BookChapter>()
     var episodes: List<BookChapter>? =  null
     /**  在当前episodes中的位置  **/
@@ -128,7 +135,7 @@ object VideoPlay : CoroutineScope by MainScope(){
                     ruleData = rssArticle
                 )
                 player.mapHeadData = analyzeUrl.headerMap
-                player.setUp(analyzeUrl.url, false, File(appCtx.externalCache, "exoplayer"), videoTitle)
+                player.setUp(analyzeUrl.url, false, File(appCtx.externalCache, "exoplayer"), rssArticle.title)
                 if (autoPlay) {
                     player.startPlayLogic()
                 }
@@ -147,7 +154,7 @@ object VideoPlay : CoroutineScope by MainScope(){
                         )
                         withContext(Main) {
                             player.mapHeadData = analyzeUrl.headerMap
-                            player.setUp(analyzeUrl.url, false, File(appCtx.externalCache, "exoplayer"), videoTitle)
+                            player.setUp(analyzeUrl.url, false, File(appCtx.externalCache, "exoplayer"), rssArticle.title)
                             if (autoPlay) {
                                 player.startPlayLogic()
                             }
@@ -162,7 +169,7 @@ object VideoPlay : CoroutineScope by MainScope(){
             appCtx.toastOnUi("未找到书籍")
             return
         }
-        val chapter = if (episodes.isNullOrEmpty()) {
+        chapter = if (episodes.isNullOrEmpty()) {
             //没有卷目录，那么卷就是播放的章节（适合电影类，没有剧集，全是线路卷章节，如果全是章节没有卷的写法，播放完后会继续下一个线路重复播放）
             when {
                 durVolume == null -> null
@@ -180,7 +187,7 @@ object VideoPlay : CoroutineScope by MainScope(){
             appCtx.toastOnUi("未找到章节")
             return
         }
-        WebBook.getContent(this, source as BookSource, book!!, chapter)
+        WebBook.getContent(this, source as BookSource, book!!, chapter!!)
             .onSuccess(IO) { content ->
                 if (content.isEmpty()) {
                     appCtx.toastOnUi("未获取到资源链接")
@@ -194,7 +201,7 @@ object VideoPlay : CoroutineScope by MainScope(){
                     )
                     withContext(Main) {
                         player.mapHeadData = analyzeUrl.headerMap
-                        player.setUp(analyzeUrl.url, false, File(appCtx.externalCache, "exoplayer"), videoTitle)
+                        player.setUp(analyzeUrl.url, false, File(appCtx.externalCache, "exoplayer"), chapter!!.title)
                         if (autoPlay) {
                             player.startPlayLogic()
                         }
@@ -239,6 +246,7 @@ object VideoPlay : CoroutineScope by MainScope(){
         source = null
         book = null
         toc = null
+        chapter = null
         volumes.clear()
         episodes = null
         chapterInVolumeIndex = 0
@@ -270,7 +278,6 @@ object VideoPlay : CoroutineScope by MainScope(){
 
     /**
      * 恢复暂停状态
-     *
      * @param seek 是否产生seek动作,直播设置为false
      */
     fun onResume(seek: Boolean) {
@@ -279,11 +286,7 @@ object VideoPlay : CoroutineScope by MainScope(){
         }
     }
 
-    /**
-     * 播放器移植 - 辅助函数
-     *
-     *
-     */
+    //播放器移植 - 辅助函数
     @SuppressLint("StaticFieldLeak")
     private var sSwitchVideo: StandardGSYVideoPlayer? = null
     private var sMediaPlayerListener: GSYMediaPlayerListener? = null
@@ -294,7 +297,6 @@ object VideoPlay : CoroutineScope by MainScope(){
         }
         sMediaPlayerListener = switchVideo
     }
-
     fun clonePlayState(switchVideo: StandardGSYVideoPlayer) {
         when (switchVideo) {
             is VideoPlayer -> sSwitchVideo?.let { switchVideo.cloneState(it) }
@@ -330,6 +332,7 @@ object VideoPlay : CoroutineScope by MainScope(){
             durVolumeIndex = b.durVolumeIndex
             durChapterPos = b.durChapterPos
             source = appDb.bookSourceDao.getBookSource(b.origin)
+            SourceCallBack.callBackBook(SourceCallBack.START_READ, source as BookSource?, b, chapter)
         }
         upEpisodes()
         if (source == null) {
@@ -389,28 +392,36 @@ object VideoPlay : CoroutineScope by MainScope(){
     }
 
     fun saveRead() {
-        book?.let { book ->
-            book.lastCheckCount = 0
-            book.durChapterTime = System.currentTimeMillis()
-            book.durVolumeIndex = durVolumeIndex
-            book.chapterInVolumeIndex = chapterInVolumeIndex
-            val durChapterIndex = if (volumes.isEmpty()) chapterInVolumeIndex else
-                (durVolume?.index ?: 0) + chapterInVolumeIndex + 1
-            book.durChapterIndex = durChapterIndex
-            book.durChapterPos = durChapterPos
-            videoTitle = toc?.getOrNull(durChapterIndex)?.title
-            book.durChapterTitle = videoTitle
-            book.update()
+        if (book == null && rssStar == null && rssRecord == null) {
+            return
         }
-        rssStar?.let {
-            it.durPos = durChapterPos
-            videoTitle = it.title
-            appDb.rssStarDao.update(it)
-        }
-        rssRecord?.let {
-            it.durPos = durChapterPos
-            videoTitle = it.title
-            appDb.rssReadRecordDao.update(it)
+        Coroutine.async {
+            book?.let { book ->
+                book.lastCheckCount = 0
+                book.durChapterTime = System.currentTimeMillis()
+                book.durVolumeIndex = durVolumeIndex
+                book.chapterInVolumeIndex = chapterInVolumeIndex
+                val durChapterIndex = if (volumes.isEmpty()) chapterInVolumeIndex else
+                    (durVolume?.index ?: 0) + chapterInVolumeIndex + 1
+                book.durChapterIndex = durChapterIndex
+                book.durChapterPos = durChapterPos
+                val chapter = toc?.getOrNull(durChapterIndex)
+                videoTitle = chapter?.title
+                book.durChapterTitle = chapter?.title
+                SourceCallBack.callBackBook(SourceCallBack.SAVE_READ, source as BookSource?, book, chapter)
+                book.update()
+            }
+            rssStar?.let {
+                it.durPos = durChapterPos
+                videoTitle = it.title
+                appDb.rssStarDao.update(it)
+            }
+            rssRecord?.let {
+                it.durPos = durChapterPos
+                videoTitle = it.title
+                appDb.rssReadRecordDao.update(it)
+            }
+            postEvent(EventBus.VIDEO_SUB_TITLE, videoTitle ?: appCtx.getString(R.string.data_loading))
         }
     }
 }

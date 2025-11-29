@@ -14,71 +14,31 @@ import io.legado.app.service.AudioPlayService
 import io.legado.app.ui.widget.seekbar.SeekBarChangeListener
 import kotlin.math.roundToInt
 
-class TimerSliderPopup(private val context: Context) :
+class SliderPopup(private val context: Context, private val name: String) :
     PopupWindow(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT) {
+    companion object {
+        const val TIMER = "Timer"
+        const val SPEED = "Speed"
+    }
 
     private val binding = PopupSeekBarBinding.inflate(LayoutInflater.from(context))
-
     init {
         contentView = binding.root
-
         isTouchable = true
         isOutsideTouchable = false
         isFocusable = true
-
-        binding.seekBar.max = 180
-        setProcessTextValue(binding.seekBar.progress)
+        setProcess()
         binding.seekBar.setOnSeekBarChangeListener(object : SeekBarChangeListener {
-
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-                setProcessTextValue(progress)
-                if (fromUser) {
-                    AudioPlay.setTimer(progress)
+                if (name == TIMER) {
+                    setProcessTimerText(progress)
+                    if (fromUser) {
+                        AudioPlay.setTimer(progress)
+                    }
+                    return
                 }
-            }
-
-        })
-    }
-
-    override fun showAsDropDown(anchor: View?, xoff: Int, yoff: Int, gravity: Int) {
-        super.showAsDropDown(anchor, xoff, yoff, gravity)
-        binding.seekBar.progress = AudioPlayService.timeMinute
-    }
-
-    override fun showAtLocation(parent: View?, gravity: Int, x: Int, y: Int) {
-        super.showAtLocation(parent, gravity, x, y)
-        binding.seekBar.progress = AudioPlayService.timeMinute
-    }
-
-    private fun setProcessTextValue(process: Int) {
-        binding.tvSeekValue.text = context.getString(R.string.timer_m, process)
-    }
-
-}
-
-
-class SpeedControlPopup(private val context: Context) :
-    PopupWindow(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT) {
-
-    private val binding = PopupSeekBarBinding.inflate(LayoutInflater.from(context))
-
-    init {
-        contentView = binding.root
-        isTouchable = true
-        isOutsideTouchable = false
-        isFocusable = true
-
-        // 设置速度范围 (50%-200%)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            binding.seekBar.min = 50
-        }
-        binding.seekBar.max = 200
-        binding.seekBar.progress = (AudioPlayService.playSpeed * 100).toInt()
-        updateSpeedText(AudioPlayService.playSpeed)
-        binding.seekBar.setOnSeekBarChangeListener(object : SeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
                 val speed = (progress / 10f).roundToInt() / 10f
-                updateSpeedText(speed)
+                setProcessSpeedText(speed)
                 if (fromUser) {
                     // 设置播放速度 (转换为0.5-2.0范围)
                     AudioPlay.setSpeed(speed)
@@ -89,15 +49,43 @@ class SpeedControlPopup(private val context: Context) :
 
     override fun showAsDropDown(anchor: View?, xoff: Int, yoff: Int, gravity: Int) {
         super.showAsDropDown(anchor, xoff, yoff, gravity)
-        binding.seekBar.progress = (AudioPlayService.playSpeed * 100).toInt()
+        if (name == TIMER) {
+            binding.seekBar.progress = AudioPlayService.timeMinute
+        }
+        else {
+            binding.seekBar.progress = (AudioPlayService.playSpeed * 100).toInt()
+        }
     }
 
     override fun showAtLocation(parent: View?, gravity: Int, x: Int, y: Int) {
         super.showAtLocation(parent, gravity, x, y)
-        binding.seekBar.progress = (AudioPlayService.playSpeed * 100).toInt()
+        if (name == TIMER) {
+            binding.seekBar.progress = AudioPlayService.timeMinute
+        }
+        else {
+            binding.seekBar.progress = (AudioPlayService.playSpeed * 100).toInt()
+        }
     }
-    
-    private fun updateSpeedText(speed: Float) {
+
+    private fun setProcessTimerText(process: Int) {
+        binding.tvSeekValue.text = context.getString(R.string.timer_m, process)
+    }
+
+    private fun setProcessSpeedText(speed: Float) {
         binding.tvSeekValue.text = "%.1fX".format(speed)
+    }
+
+    private fun setProcess() {
+        if (name == TIMER) {
+            binding.seekBar.max = 180
+            setProcessTimerText(0)
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            binding.seekBar.min = 50
+        }
+        binding.seekBar.max = 200
+        binding.seekBar.progress = (AudioPlayService.playSpeed * 100).toInt()
+        setProcessSpeedText(AudioPlayService.playSpeed)
     }
 }

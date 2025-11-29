@@ -3,10 +3,10 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
     android:gravity="center_vertical"
     android:orientation="horizontal"
     android:padding="6dp"
-    android:background="?attr/selectableItemBackground"
     tools:ignore="UseCompoundDrawables">
 
     <TextView
@@ -16,5 +16,14 @@
         android:layout_weight="1"
         android:singleLine="true"
         android:textColor="@color/primaryText" />
+
+    <ImageView
+        android:id="@+id/ic_close"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/close"
+        android:padding="4dp"
+        android:src="@drawable/ic_baseline_close" />
 
 </LinearLayout>

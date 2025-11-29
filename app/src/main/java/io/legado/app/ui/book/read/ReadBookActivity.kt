@@ -1647,11 +1647,12 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     override fun finish() {
         val book = ReadBook.book ?: return super.finish()
-        SourceCallBack.callBackBook(SourceCallBack.END_READ, ReadBook.bookSource, ReadBook.book, ReadBook.curTextChapter?.chapter)
         if (ReadBook.inBookshelf) {
+            callBackBookEnd()
             return super.finish()
         }
         if (!AppConfig.showAddToShelfAlert) {
+            callBackBookEnd()
             viewModel.removeFromBookshelf { super.finish() }
         } else {
             alert(title = getString(R.string.add_to_bookshelf)) {
@@ -1663,9 +1664,16 @@ class ReadBookActivity : BaseReadBookActivity(),
                     ReadBook.inBookshelf = true
                     setResult(RESULT_OK)
                 }
-                noButton { viewModel.removeFromBookshelf { super.finish() } }
+                noButton {
+                    callBackBookEnd()
+                    viewModel.removeFromBookshelf { super.finish() }
+                }
             }
         }
+    }
+
+    private fun callBackBookEnd() {
+        SourceCallBack.callBackBook(SourceCallBack.END_READ, ReadBook.bookSource, ReadBook.book, ReadBook.curTextChapter?.chapter)
     }
 
     override fun onDestroy() {

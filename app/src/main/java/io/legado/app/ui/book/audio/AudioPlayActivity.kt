@@ -54,6 +54,8 @@ import java.util.Locale
 import io.legado.app.ui.book.audio.config.AudioSkipCredits
 import com.dirror.lyricviewx.OnPlayClickListener
 import io.legado.app.lib.theme.ThemeStore.Companion.accentColor
+import io.legado.app.ui.book.audio.SliderPopup.Companion.SPEED
+import io.legado.app.ui.book.audio.SliderPopup.Companion.TIMER
 import io.legado.app.ui.book.source.SourceCallBack
 import io.legado.app.utils.gone
 
@@ -68,8 +70,8 @@ class AudioPlayActivity :
 
     override val binding by viewBinding(ActivityAudioPlayBinding::inflate)
     override val viewModel by viewModels<AudioPlayViewModel>()
-    private val timerSliderPopup by lazy { TimerSliderPopup(this) }
-    private val speedControlPopup by lazy { SpeedControlPopup(this) }
+    private val timerSliderPopup by lazy { SliderPopup(this, TIMER) }
+    private val speedControlPopup by lazy { SliderPopup(this, SPEED) }
     private var adjustProgress = false
     private var playMode = AudioPlay.PlayMode.LIST_END_STOP
     private val lyricViewX by lazy { binding.lyricViewX }
@@ -308,12 +310,12 @@ class AudioPlayActivity :
 
     override fun finish() {
         val book = AudioPlay.book ?: return super.finish()
-
         if (AudioPlay.inBookshelf) {
+            callBackBookEnd()
             return super.finish()
         }
-
         if (!AppConfig.showAddToShelfAlert) {
+            callBackBookEnd()
             viewModel.removeFromBookshelf { super.finish() }
         } else {
             alert(title = getString(R.string.add_to_bookshelf)) {
@@ -321,12 +323,20 @@ class AudioPlayActivity :
                 okButton {
                     AudioPlay.book?.removeType(BookType.notShelf)
                     AudioPlay.book?.save()
+                    SourceCallBack.callBackBook(SourceCallBack.ADD_BOOK_SHELF, AudioPlay.bookSource, AudioPlay.book)
                     AudioPlay.inBookshelf = true
                     setResult(RESULT_OK)
                 }
-                noButton { viewModel.removeFromBookshelf { super.finish() } }
+                noButton {
+                    callBackBookEnd()
+                    viewModel.removeFromBookshelf { super.finish() }
+                }
             }
         }
+    }
+
+    private fun callBackBookEnd() {
+        SourceCallBack.callBackBook(SourceCallBack.END_READ, AudioPlay.bookSource, AudioPlay.book, AudioPlay.durChapter)
     }
 
     override fun onDestroy() {

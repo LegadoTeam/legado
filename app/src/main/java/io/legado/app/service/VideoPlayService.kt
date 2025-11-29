@@ -160,7 +160,9 @@ class VideoPlayService : BaseService() {
                 VideoPlay.videoUrl = it
                 VideoPlay.singleUrl = true
             }
-            VideoPlay.videoTitle = intent.getStringExtra("videoTitle")
+            intent.getStringExtra("videoTitle")?.let {
+                VideoPlay.videoTitle = it
+            }
             val sourceKey = intent.getStringExtra("sourceKey")
             val sourceType = intent.getIntExtra("sourceType", 0)
             val bookUrl = intent.getStringExtra("bookUrl")

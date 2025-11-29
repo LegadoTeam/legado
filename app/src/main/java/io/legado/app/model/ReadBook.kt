@@ -894,9 +894,9 @@ object ReadBook : CoroutineScope by MainScope() {
     }
 
     fun saveRead(pageChanged: Boolean = false) {
+        val book = book ?: return
         executor.execute {
             kotlin.runCatching {
-                val book = book ?: return@execute
                 book.lastCheckCount = 0
                 book.durChapterTime = System.currentTimeMillis()
                 val chapterChanged = book.durChapterIndex != durChapterIndex
@@ -911,7 +911,7 @@ object ReadBook : CoroutineScope by MainScope() {
                         SourceCallBack.callBackBook(SourceCallBack.SAVE_READ, bookSource, book, it)
                     }
                 }
-                appDb.bookDao.update(book)
+                book.update()
             }.onFailure {
                 AppLog.put("保存书籍阅读进度信息出错\n$it", it)
             }

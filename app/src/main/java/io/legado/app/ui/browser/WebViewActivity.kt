@@ -137,6 +137,7 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
 
     override fun onCompatOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
+            R.id.menu_web_refresh -> binding.webView.reload()
             R.id.menu_open_in_browser -> openUrl(viewModel.baseUrl)
             R.id.menu_copy_url -> sendToClip(viewModel.baseUrl)
             R.id.menu_ok -> {

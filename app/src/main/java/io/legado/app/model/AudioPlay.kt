@@ -23,6 +23,7 @@ import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.globalExecutor
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.AudioPlayService
+import io.legado.app.ui.book.source.SourceCallBack
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.startService
 import io.legado.app.utils.toastOnUi
@@ -125,6 +126,7 @@ object AudioPlay : CoroutineScope by MainScope() {
         durLyric = null
         durAudioSize = 0
         upDurChapter()
+        SourceCallBack.callBackBook(SourceCallBack.START_READ, bookSource, book, durChapter)
         postEvent(EventBus.AUDIO_BUFFER_PROGRESS, 0)
     }
 
@@ -408,6 +410,7 @@ object AudioPlay : CoroutineScope by MainScope() {
                         ContentProcessor.get(book.name, book.origin).getTitleReplaceRules(),
                         book.getUseReplaceRule()
                     )
+                    SourceCallBack.callBackBook(SourceCallBack.SAVE_READ, bookSource, book, it)
                 }
             }
             book.update()
