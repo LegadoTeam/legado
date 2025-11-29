@@ -26,7 +26,9 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
     val bookshelf: MutableSet<String> = ConcurrentHashMap.newKeySet()
     val upAdapterLiveData = MutableLiveData<String>()
     val booksData = MutableLiveData<List<SearchBook>>()
+    val addBooksData = MutableLiveData<List<SearchBook>>()
     val errorLiveData = MutableLiveData<String>()
+    val errorTopLiveData = MutableLiveData<String>()
     val pageLiveData = MutableLiveData<Int>()
     private var bookSource: BookSource? = null
     private var exploreUrl: String? = null
@@ -66,7 +68,29 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
         }
     }
 
+    /**
+     * 上滑触发的增量更新
+     */
     fun explore(page: Int) {
+        val source = bookSource
+        val url = exploreUrl
+        if (source == null || url == null) return
+        WebBook.exploreBook(viewModelScope, source, url, page)
+            .timeout(if (BuildConfig.DEBUG) 0L else 60000L)
+            .onSuccess(IO) { searchBooks ->
+                val newBooks = linkedSetOf<SearchBook>()
+                newBooks.addAll(searchBooks)
+                newBooks.addAll(books)
+                books = newBooks
+                addBooksData.postValue(searchBooks)
+                appDb.searchBookDao.insert(*searchBooks.toTypedArray())
+                pageLiveData.postValue(page)
+            }.onError {
+                it.printOnDebug()
+                errorTopLiveData.postValue(it.stackTraceStr)
+            }
+    }
+    fun skipPage(page: Int) {
         if (page > 0) {
             books.clear()
             this.page = page

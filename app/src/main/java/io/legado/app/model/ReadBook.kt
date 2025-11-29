@@ -165,7 +165,7 @@ object ReadBook : CoroutineScope by MainScope() {
         } else {
             appDb.bookSourceDao.getBookSource(book.origin)?.let {
                 bookSource = it
-                SourceCallBack.callBackBook(SourceCallBack.START_READ, it, book)
+                SourceCallBack.callBackBook(SourceCallBack.START_READ, it, book, curTextChapter?.chapter)
                 if (book.getImageStyle().isNullOrBlank()) {
                     var imageStyle = it.getContentRule().imageStyle
                     if (imageStyle.isNullOrBlank() && (book.isImage || book.isPdf)) {
@@ -908,10 +908,10 @@ object ReadBook : CoroutineScope by MainScope() {
                             ContentProcessor.get(book.name, book.origin).getTitleReplaceRules(),
                             book.getUseReplaceRule()
                         )
+                        SourceCallBack.callBackBook(SourceCallBack.SAVE_READ, bookSource, book, it)
                     }
                 }
                 appDb.bookDao.update(book)
-                SourceCallBack.callBackBook(SourceCallBack.SAVE_READ, bookSource, book)
             }.onFailure {
                 AppLog.put("保存书籍阅读进度信息出错\n$it", it)
             }

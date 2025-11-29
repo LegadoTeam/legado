@@ -31,4 +31,7 @@ interface KeyboardAssistsDao {
     @Delete
     fun delete(vararg keyboardAssist: KeyboardAssist)
 
+    @Query("delete from keyboardAssists")
+    suspend fun deleteAll()
+
 }

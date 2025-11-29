@@ -134,7 +134,7 @@ class AudioPlayActivity :
             R.id.menu_custom_btn -> {
                 AudioPlay.bookSource?.customButton?.let {
                     AudioPlay.book?.let { book ->
-                        SourceCallBack.callBackBtn(this,SourceCallBack.CLICK_CUSTOM_BUTTON, AudioPlay.bookSource, book, null)
+                        SourceCallBack.callBackBtn(this,SourceCallBack.CLICK_CUSTOM_BUTTON, AudioPlay.bookSource, book, AudioPlay.durChapter)
                     }
                 }
             }

@@ -228,6 +228,7 @@ let options = {
 "clickBookName" //详情页点击书名
 "clickAuthor" //详情页点击作者
 "clickCustomButton" //书源自定义按钮
+"longClickCustomButton" //长按自定义按钮（只存在小说的正文界面）
 "clearCache" //详情页清理缓存
 "addBookShelf" //添加到书架
 "delBookShelf" //移除书架

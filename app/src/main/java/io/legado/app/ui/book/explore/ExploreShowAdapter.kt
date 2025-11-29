@@ -80,7 +80,7 @@ class ExploreShowAdapter(context: Context, val callBack: CallBack) :
 
     override fun registerListener(holder: ItemViewHolder, binding: ItemSearchBinding) {
         holder.itemView.setOnClickListener {
-            getItem(holder.layoutPosition)?.let {
+            getItem(holder.bindingAdapterPosition - getHeaderCount())?.let {
                 callBack.showBookInfo(it.toBook())
             }
         }
