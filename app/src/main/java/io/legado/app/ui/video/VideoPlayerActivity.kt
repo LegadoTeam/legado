@@ -22,6 +22,7 @@ import com.shuyu.gsyvideoplayer.listener.GSYSampleCallBack
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.BookType
+import io.legado.app.constant.EventBus
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
@@ -36,6 +37,7 @@ import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.model.VideoPlay
 import io.legado.app.service.VideoPlayService
 import io.legado.app.ui.about.AppLogDialog
+import io.legado.app.ui.book.source.SourceCallBack
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
 import io.legado.app.ui.book.toc.TocActivityResult
 import io.legado.app.ui.login.SourceLoginActivity
@@ -44,6 +46,7 @@ import io.legado.app.ui.rss.source.edit.RssSourceEditActivity
 import io.legado.app.ui.video.config.SettingsDialog
 import io.legado.app.utils.StartActivityContract
 import io.legado.app.utils.gone
+import io.legado.app.utils.observeEventSticky
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setTintMutate
 import io.legado.app.utils.showDialogFragment
@@ -120,7 +123,10 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                 VideoPlay.videoUrl = it
                 VideoPlay.singleUrl = true
             }
-            VideoPlay.videoTitle = intent.getStringExtra("videoTitle")
+            intent.getStringExtra("videoTitle")?.let {
+                binding.titleBar.title = it
+                VideoPlay.videoTitle = it
+            }
             val sourceKey = intent.getStringExtra("sourceKey")
             val sourceType = intent.getIntExtra("sourceType", 0)
             val bookUrl = intent.getStringExtra("bookUrl")
@@ -136,6 +142,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             VideoPlay.clonePlayState(playerView)
             playerView.setSurfaceToPlay()
             playerView.startAfterPrepared()
+            binding.titleBar.title = VideoPlay.videoTitle
         }
         setupPlayerView()
         initView()
@@ -259,7 +266,6 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         if (!VideoPlay.volumes.isEmpty()) {
             scrollToDurChapter(binding.volumes, VideoPlay.durVolumeIndex)
         }
-        binding.titleBar.title = VideoPlay.videoTitle
     }
 
     private fun toggleFullScreen() {
@@ -478,12 +484,20 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         super.onDestroy()
     }
 
+    override fun observeLiveBus() {
+        observeEventSticky<String>(EventBus.VIDEO_SUB_TITLE) {
+            binding.titleBar.title = it
+        }
+    }
+
     override fun finish() {
         val book = VideoPlay.book ?: return super.finish()
         if (VideoPlay.inBookshelf) {
+            callBackBookEnd()
             return super.finish()
         }
         if (!AppConfig.showAddToShelfAlert) {
+            callBackBookEnd()
             viewModel.removeFromBookshelf { super.finish() }
         } else {
             alert(title = getString(R.string.add_to_bookshelf)) {
@@ -494,9 +508,16 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                     VideoPlay.inBookshelf = true
                     setResult(RESULT_OK)
                 }
-                noButton { viewModel.removeFromBookshelf { super.finish() } }
+                noButton {
+                    callBackBookEnd()
+                    viewModel.removeFromBookshelf { super.finish() }
+                }
             }
         }
+    }
+
+    private fun callBackBookEnd() {
+        SourceCallBack.callBackBook(SourceCallBack.END_READ, VideoPlay.source as BookSource?, VideoPlay.book, VideoPlay.chapter)
     }
 
     override fun updateFavorite(title: String?, group: String?) {

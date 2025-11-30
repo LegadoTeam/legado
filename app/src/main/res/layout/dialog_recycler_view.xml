@@ -14,15 +14,6 @@
         app:popupTheme="@style/AppTheme.PopupOverlay"
         app:titleTextAppearance="@style/ToolbarTitle" />
 
-    <TextView
-        android:id="@+id/tv_line_n"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/show_line_number"
-        android:padding="16dp"
-        android:layout_gravity="center"
-        android:textColor="@color/secondaryText" />
-
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"

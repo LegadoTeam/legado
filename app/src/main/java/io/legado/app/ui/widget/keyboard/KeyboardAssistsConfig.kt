@@ -55,16 +55,16 @@ class KeyboardAssistsConfig(private val callBack: CallBack) : BaseDialogFragment
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
-        binding.toolBar.setBackgroundColor(primaryColor)
-        binding.toolBar.setTitle(R.string.assists_key_config)
         initView()
         initMenu()
         initData()
     }
 
     private fun initView() {
-        binding.tvLineN.run {
-            text = context.getString(R.string.show_line_number, AppConfig.showBoardLine)
+        binding.toolBar.run {
+            setBackgroundColor(primaryColor)
+            setTitle(R.string.assists_key_config)
+            subtitle = AppConfig.showBoardLine.toLineStr(context)
             setOnClickListener {
                 NumberPickerDialog(requireContext())
                     .setTitle(getString(R.string.setting_show_line_number))
@@ -73,7 +73,7 @@ class KeyboardAssistsConfig(private val callBack: CallBack) : BaseDialogFragment
                     .setValue(AppConfig.showBoardLine)
                     .show {
                         putPrefInt(PreferKey.showBoardLine, it)
-                        text = context.getString(R.string.show_line_number, it)
+                        subtitle = it.toLineStr(context)
                         callBack.requestLayout()
                     }
             }
@@ -200,5 +200,9 @@ class KeyboardAssistsConfig(private val callBack: CallBack) : BaseDialogFragment
     interface CallBack {
          /**通知布局管理器重新布局*/
         fun requestLayout()
+    }
+
+    private fun Int.toLineStr(context: Context): String {
+      return context.getString(R.string.show_line_number, this)
     }
 }

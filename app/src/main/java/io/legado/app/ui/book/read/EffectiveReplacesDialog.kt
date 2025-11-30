@@ -13,6 +13,7 @@ import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.base.adapter.RecyclerAdapter
+import io.legado.app.data.appDb
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.databinding.DialogRecyclerViewBinding
 import io.legado.app.databinding.Item1lineTextBinding
@@ -96,6 +97,18 @@ class EffectiveReplacesDialog : BaseDialogFragment(R.layout.dialog_recycler_view
                         return@let
                     }
                     editActivity.launch(ReplaceEditActivity.startIntent(requireContext(), item.id))
+                }
+            }
+            binding.icClose.setOnClickListener {
+                getItem(holder.layoutPosition)?.let { item ->
+                    isEdit = true
+                    removeItem(holder.layoutPosition)
+                    if (item == chineseConvert) {
+                        AppConfig.chineseConverterType = 0
+                        return@let
+                    }
+                    item.isEnabled = false
+                    appDb.replaceRuleDao.insert(item)
                 }
             }
         }

@@ -1274,9 +1274,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     override fun showLogin() {
         ReadBook.bookSource?.let {
             startActivity<SourceLoginActivity> {
-                putExtra("type", "bookSource")
-                putExtra("key", it.bookSourceUrl)
-                putExtra("bookUrl", ReadBook.book?.bookUrl)
+                putExtra("isReadBook", true)
             }
         }
     }
@@ -1345,10 +1343,10 @@ class ReadBookActivity : BaseReadBookActivity(),
             }
             val (result, urlOptionStr) = when {
                 braceIndex != -1 -> {
-                    clickjs.substring(0, braceIndex) to clickjs.substring(braceIndex + 1)
+                    clickjs.take(braceIndex) to clickjs.substring(braceIndex + 1)
                 }
                 else -> {
-                    clickjs.substring(0, braceIndex2) to clickjs.substring(braceIndex2 + 2)
+                    clickjs.take(braceIndex2) to clickjs.substring(braceIndex2 + 2)
                 }
             }
             if (urlOptionStr.isJsonObject()) {
@@ -1649,11 +1647,12 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     override fun finish() {
         val book = ReadBook.book ?: return super.finish()
-        SourceCallBack.callBackBook(SourceCallBack.END_READ, ReadBook.bookSource, ReadBook.book)
         if (ReadBook.inBookshelf) {
+            callBackBookEnd()
             return super.finish()
         }
         if (!AppConfig.showAddToShelfAlert) {
+            callBackBookEnd()
             viewModel.removeFromBookshelf { super.finish() }
         } else {
             alert(title = getString(R.string.add_to_bookshelf)) {
@@ -1665,9 +1664,16 @@ class ReadBookActivity : BaseReadBookActivity(),
                     ReadBook.inBookshelf = true
                     setResult(RESULT_OK)
                 }
-                noButton { viewModel.removeFromBookshelf { super.finish() } }
+                noButton {
+                    callBackBookEnd()
+                    viewModel.removeFromBookshelf { super.finish() }
+                }
             }
         }
+    }
+
+    private fun callBackBookEnd() {
+        SourceCallBack.callBackBook(SourceCallBack.END_READ, ReadBook.bookSource, ReadBook.book, ReadBook.curTextChapter?.chapter)
     }
 
     override fun onDestroy() {

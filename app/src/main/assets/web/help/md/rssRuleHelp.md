@@ -41,7 +41,7 @@ window.connectAwait(url, header, callTimeout) //用java.connect异步访问，�
 window.getAwait(url, header, callTimeout) //返回响应体
 window.headAwait(url, header, callTimeout) //序列化后的响应头
 window.postAwait(url, body, header, callTimeout) //返回响应体
-window.webViewAwait(html, url, js) //用Java.webView异步访问
+window.webViewAwait(html, url, js) //用java.webView异步访问
 window.decryptStrAwait(transformation, key, iv, data)
 //同java.createSymmetricCrypto(transformation, key, iv).decryptStr(data)
 window.encryptBase64Await(transformation, key, iv, data)

@@ -12,6 +12,7 @@ object EventBus {
     const val BATTERY_CHANGED = "batteryChanged"
     const val TIME_CHANGED = "timeChanged"
     const val UP_CONFIG = "upConfig"
+    const val VIDEO_SUB_TITLE = "VideoSubTitle"
     const val AUDIO_SUB_TITLE = "audioSubTitle"
     const val AUDIO_STATE = "audioState"
     const val AUDIO_PROGRESS = "audioProgress"

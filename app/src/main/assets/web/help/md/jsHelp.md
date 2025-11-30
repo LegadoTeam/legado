@@ -72,7 +72,7 @@ java.open(name: String, url: String?, title: String?, origin: String?)
 > 只在登录界面按钮被触发时或按钮的回调事件中有效  
 ```js
 java.copyText(text: String) //复制文本到剪贴板
-java.upLoginData(data: Map<String, String>) //更新登录界面信息，参数是对象，例如{"telephone":"123"}
+java.upLoginData(data: Map<String, String>) //实时更新登录界面信息，参数是键值对对象对象，例如{"telephone":"123"}
 ```
 
 ### [AnalyzeUrl](https://github.com/LegadoTeam/legado/blob/master/app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeUrl.kt) 部分函数
@@ -474,6 +474,8 @@ login函数获取登录信息键值
 source.getLoginInfoMap().get(key: String)
 清除登录信息
 source.removeLoginInfo()
+login函数存放登录信息，在登录界面时请调用java.upLoginData
+source.putLoginInfo()
 ```
 * 书源缓存刷新
 ```js

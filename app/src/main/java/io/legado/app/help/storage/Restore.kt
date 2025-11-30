@@ -165,6 +165,7 @@ object Restore {
             appDb.dictRuleDao.insert(*it.toTypedArray())
         }
         fileToListT<KeyboardAssist>(path, "keyboardAssists.json")?.let {
+            appDb.keyboardAssistsDao.deleteAll() //先删除所有,保证和备份数据一样
             appDb.keyboardAssistsDao.insert(*it.toTypedArray())
         }
         fileToListT<ReadRecord>(path, "readRecord.json")?.let {
