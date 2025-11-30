@@ -37,7 +37,7 @@ jobs:
         uses: peter-evans/create-pull-request@v7
         continue-on-error: true
         with:
-          token: ${{ secrets.ACTIONS_TOKEN }}
+          token: ${{ secrets.TOKEN_MGZ }}
           title: ${{ env.PR_TITLE }}
           commit-message: |
             ${{ env.PR_TITLE }}
