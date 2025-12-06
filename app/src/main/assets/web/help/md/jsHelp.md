@@ -158,14 +158,18 @@ java.head(url: String, headerMap: Map<String, String>, timeout: Int?): Connectio
 * @param html 直接用webView载入的html, 如果html为空直接访问url
 * @param url html内如果有相对路径的资源不传入url访问不了
 * @param js 用来取返回值的js语句, 没有就返回整个源代码
+* @param cacheFirst 优先使用缓存,为true能提高访问速度
 * @return 返回js获取的内容
 java.webView(html: String?, url: String?, js: String?): String?
+java.webView(html: String?, url: String?, js: String?, cacheFirst: Boolean): String?
 
 * 使用webView获取跳转url
 java.webViewGetOverrideUrl(html: String?, url: String?, js: String?, overrideUrlRegex: String): String?
+java.webViewGetOverrideUrl(html: String?, url: String?, js: String?, overrideUrlRegex: String, cacheFirst: Boolean): String?
 
 * 使用webView获取资源url
 java.webViewGetSource(html: String?, url: String?, js: String?, sourceRegex: String): String?
+java.webViewGetOverrideUrl(html: String?, url: String?, js: String?, overrideUrlRegex: String, cacheFirst: Boolean): String?
 
 * 使用内置浏览器打开链接，可用于获取验证码 手动验证网站防爬
 * @param url 要打开的链接

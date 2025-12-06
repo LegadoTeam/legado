@@ -78,6 +78,8 @@ class TextFile(private var book: Book) {
     //选中更好的目录规则判断阈值
     private val overRuleCount = 2
     private val toSearchBook = book.toSearchBook()
+    class MutableRef<String>(var value: String)
+    private val lastVolumeTitle = MutableRef("")
 
     /**
      * 获取目录
@@ -159,6 +161,7 @@ class TextFile(private var book: Book) {
         if (rr[0].isEmpty()) {
             return analyze()
         }
+        lastVolumeTitle.value = ""
         val toc = arrayListOf<BookChapter>()
         var bookWordCount = 0
         LocalBook.getBookInputStream(book).use { bis ->
@@ -212,13 +215,14 @@ class TextFile(private var book: Book) {
                         val lastTitle = toc.lastOrNull()?.let {
                             it.end = it.start
                             it.isVolume = true
+                            lastVolumeTitle.value = it.title
                             it.tag = null
                             it.title
                         }
                         val title = replacement(
                             matcher.group(),
                             jsStr,
-                            toc.size,
+                            toc,
                             lastTitle,
                             chapterContentLength
                         ).takeIf { it.isNotEmpty() } ?: continue
@@ -245,7 +249,7 @@ class TextFile(private var book: Book) {
                         if (toc.isEmpty()) { //如果当前没有章节，那么就是序章
                             //加入简介
                             if (chapterContent.isNotBlank()) {
-                                val title = replacement("前言", jsStr, 0)
+                                val title = replacement("前言", jsStr, toc)
                                 if (title.isNotEmpty()) {
                                     //如果js把"前言"处理成空了，那么就不要前言,并且前言内容会全部放到简介里面去
                                     val qyChapter = BookChapter()
@@ -265,7 +269,7 @@ class TextFile(private var book: Book) {
                             val title = replacement(
                                 matcher.group(),
                                 jsStr,
-                                toc.size
+                                toc
                             ).takeIf { it.isNotEmpty() } ?: continue
                             //创建当前章节
                             val curChapter = BookChapter()
@@ -279,12 +283,16 @@ class TextFile(private var book: Book) {
                             val title = replacement(
                                 matcher.group(),
                                 jsStr,
-                                toc.size,
+                                toc,
                                 lastChapter.title,
                                 chapterContentLength
                             ).takeIf { it.isNotEmpty() } ?: continue
-                            lastChapter.isVolume =
-                                chapterContent.isBlank() //.substringAfter(lastChapter.title)
+                            if (chapterContent.isBlank()) {
+                                lastChapter.isVolume = true
+                                lastVolumeTitle.value = lastChapter.title
+                            } else {
+                                lastChapter.isVolume = false
+                            }
                             //将当前段落添加上一章去
                             lastChapter.end = lastChapter.end!! + chapterLength
                             lastChapterWordCount += chapterContentLength
@@ -306,13 +314,17 @@ class TextFile(private var book: Book) {
                             val title = replacement(
                                 matcher.group(),
                                 jsStr,
-                                toc.size,
+                                toc,
                                 lastChapter.title,
                                 chapterContentLength
                             ).takeIf { it.isNotEmpty() }
                                 ?: continue
-                            lastChapter.isVolume =
-                                chapterContent.isBlank() //.substringAfter(lastChapter.title)
+                            if (chapterContent.isBlank()) {
+                                lastChapter.isVolume = true
+                                lastVolumeTitle.value = lastChapter.title
+                            } else {
+                                lastChapter.isVolume = false
+                            }
                             lastChapter.end =
                                 lastChapter.start!! + chapterLength
                             lastChapter.wordCount =
@@ -324,7 +336,7 @@ class TextFile(private var book: Book) {
                             curChapter.end = curChapter.start
                             toc.add(curChapter)
                         } else { //如果章节不存在则创建章节
-                            val title = replacement(matcher.group(), jsStr, toc.size).takeIf { it.isNotEmpty() }
+                            val title = replacement(matcher.group(), jsStr, toc).takeIf { it.isNotEmpty() }
                                 ?: continue
                             val curChapter = BookChapter()
                             curChapter.title = title
@@ -359,6 +371,7 @@ class TextFile(private var book: Book) {
                     chapter.isVolume = true
                     chapter.tag = null
                     val lastTitle = chapter.title
+                    lastVolumeTitle.value = lastTitle
                     val (chapters, _) = analyze(
                         chapter.start!!, end
                     )
@@ -491,24 +504,24 @@ class TextFile(private var book: Book) {
             }
             val matcher = pattern.matcher(content)
             var start = 0
-            var num = 0
+            var csNum = 0
             var numE = 0
             var lastTitle: String? = null
             while (matcher.find()) {
                 val contentLength = matcher.start() - start
                 if (start == 0 || contentLength > 1000) {
-                    val title = replacement(matcher.group(), tocRule.replacement, num, lastTitle, contentLength)
+                    val title = replacement(matcher.group(), tocRule.replacement, csNum, lastTitle, contentLength)
                     if (title.isNotEmpty()) {
                         lastTitle = title
-                        num++
+                        csNum++
                     }
                     start = matcher.end()
                 } else if (contentLength < 100) {
                     numE++ //这种不住100字的一般被识别为卷，即错误识别，正常章节数不大于卷3倍的不选
                 }
             }
-            if (num > numE * 3 && (num > maxNum + overRuleCount)) { //后面的规则匹配数量没超过最大值2个，那么依旧用前面那个
-                maxNum = num
+            if (csNum > numE * 3 && (csNum > maxNum + overRuleCount)) { //后面的规则匹配数量没超过最大值2个，那么依旧用前面那个
+                maxNum = csNum
                 mTocRule = tocRule
                 if (maxNum > 70) {
                     break
@@ -518,9 +531,41 @@ class TextFile(private var book: Book) {
         return mTocRule
     }
 
+    class JsExtensions(val lastVolumeTitle: MutableRef<String>, val toc: ArrayList<BookChapter>? = null) {
+        fun putVolume(title: String) {
+            lastVolumeTitle.value = title
+            if (toc != null) {
+                val start = toc.lastOrNull()?.end ?: 0
+                toc.add(BookChapter(title = title, isVolume = true, start = start, end = start))
+            }
+        }
+    }
     /**
      * 净化标题
      */
+    private fun replacement(
+        content: String,
+        jsStr: String?,
+        toc: ArrayList<BookChapter>,
+        prevTitle: String? = null,
+        prevLength: Int = -1
+    ): String {
+        if (jsStr.isNullOrBlank()) {
+            return content
+        }
+        return RhinoScriptEngine.run {
+            val bindings = ScriptBindings()
+            bindings["result"] = content
+            bindings["book"] = toSearchBook
+            bindings["index"] = toc.size + 1
+            bindings["prevTitle"] = prevTitle
+            bindings["prevLength"] = prevLength
+            bindings["lastVolumeTitle"] = lastVolumeTitle.value
+            bindings["java"] = JsExtensions(lastVolumeTitle, toc)
+            eval(jsStr, bindings)
+        }.toString()
+    }
+
     private fun replacement(
         content: String,
         jsStr: String?,
@@ -538,6 +583,8 @@ class TextFile(private var book: Book) {
             bindings["index"] = index + 1
             bindings["prevTitle"] = prevTitle
             bindings["prevLength"] = prevLength
+            bindings["lastVolumeTitle"] = lastVolumeTitle.value
+            bindings["java"] = JsExtensions(lastVolumeTitle)
             eval(jsStr, bindings)
         }.toString()
     }

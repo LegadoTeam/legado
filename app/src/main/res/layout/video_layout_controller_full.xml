@@ -6,14 +6,17 @@
     android:layout_height="match_parent"
     android:background="@android:color/black">
 
-    <FrameLayout
+    <RelativeLayout
         android:id="@+id/surface_container"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:gravity="center">
+        android:gravity="center" />
 
-    </FrameLayout>
-
+    <master.flame.danmaku.ui.widget.DanmakuView
+        android:id="@+id/danmaku_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
 
     <RelativeLayout
         android:id="@+id/thumb"
@@ -106,6 +109,20 @@
             android:src="@drawable/ic_skip_next"
             app:layout_constraintStart_toEndOf="@+id/start"
             app:layout_constraintTop_toBottomOf="@+id/progress" />
+
+        <TextView
+            android:id="@+id/toggle_danmaku"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="16dp"
+            android:gravity="center"
+            android:minEms="2"
+            android:text="关弹幕"
+            android:textColor="#ffffff"
+            android:visibility="invisible"
+            app:layout_constraintEnd_toStartOf="@+id/episode_list"
+            app:layout_constraintTop_toBottomOf="@+id/progress"
+            tools:visibility="visible" />
 
         <TextView
             android:id="@+id/episode_list"

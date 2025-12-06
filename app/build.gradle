@@ -152,6 +152,9 @@ android {
             //options.compilerArgs << "-Xlint:unchecked"
         }
     }
+    lint { //忽略string翻译缺失，后面需要翻译时去掉，todo
+        disable 'MissingTranslation'
+    }
 }
 
 dependencies {
@@ -212,6 +215,8 @@ dependencies {
     //videoPlayer
     implementation(libs.gsyVideoPlayer.java)
     implementation(libs.gsyVideoPlayer.exo2)
+    //弹幕
+    implementation (libs.danmakuFlameMaster)
 
     //Splitties
     implementation(libs.splitties.appctx)

@@ -13,7 +13,9 @@ import kotlinx.coroutines.withContext
 
 object SourceCallBack {
     const val CLICK_AUTHOR = "clickAuthor"
+    const val LONG_CLICK_AUTHOR = "longClickAuthor"
     const val CLICK_BOOK_NAME = "clickBookName"
+    const val LONG_CLICK_BOOK_NAME = "longClickBookName"
     const val CLICK_SHARE_BOOK = "clickShareBook"
     const val CLICK_CUSTOM_BUTTON = "clickCustomButton"
     const val LONG_CLICK_CUSTOM_BUTTON = "longClickCustomButton"

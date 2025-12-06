@@ -10,6 +10,7 @@ import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.data.entities.DictRule
 import io.legado.app.databinding.DialogDictBinding
+import io.legado.app.help.GlideImageGetter
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.utils.setHtml
@@ -30,8 +31,8 @@ class DictDialog() : BaseDialogFragment(R.layout.dialog_dict) {
 
     private val viewModel by viewModels<DictViewModel>()
     private val binding by viewBinding(DialogDictBinding::bind)
-
     private var word: String? = null
+    private var glideImageGetter: GlideImageGetter? = null
 
     override fun onStart() {
         super.onStart()
@@ -50,11 +51,9 @@ class DictDialog() : BaseDialogFragment(R.layout.dialog_dict) {
         binding.tabLayout.setSelectedTabIndicatorColor(accentColor)
         binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabReselected(tab: TabLayout.Tab) {
-
             }
 
             override fun onTabUnselected(tab: TabLayout.Tab) {
-
             }
 
             override fun onTabSelected(tab: TabLayout.Tab) {
@@ -62,18 +61,19 @@ class DictDialog() : BaseDialogFragment(R.layout.dialog_dict) {
                 binding.rotateLoading.visible()
                 viewModel.dict(dictRule, word!!) {
                     binding.rotateLoading.inVisible()
-                    binding.tvDict.setHtml(it)
+                    glideImageGetter?.clear()
+                    glideImageGetter = GlideImageGetter.create(requireContext(), binding.tvDict, it)
+                    binding.tvDict.setHtml(it, glideImageGetter)
                 }
             }
         })
         viewModel.initData {
-            it.forEach {
+            it.forEach { d  ->
                 binding.tabLayout.addTab(binding.tabLayout.newTab().apply {
-                    text = it.name
-                    tag = it
+                    text = d.name
+                    tag = d
                 })
             }
-            
             setupTabLayoutMode(it.size)
         }
     }
@@ -87,5 +87,11 @@ class DictDialog() : BaseDialogFragment(R.layout.dialog_dict) {
             binding.tabLayout.tabMode = TabLayout.MODE_SCROLLABLE
             binding.tabLayout.tabGravity = TabLayout.GRAVITY_CENTER
         }
+    }
+
+    override fun onDestroyView() {
+        glideImageGetter?.clear()
+        glideImageGetter = null
+        super.onDestroyView()
     }
 }

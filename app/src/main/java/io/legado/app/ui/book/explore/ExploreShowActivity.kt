@@ -18,10 +18,8 @@ import io.legado.app.ui.widget.number.NumberPickerDialog
 import io.legado.app.ui.widget.recycler.LoadMoreView
 import io.legado.app.ui.widget.recycler.VerticalDivider
 import io.legado.app.utils.applyNavigationBarPadding
-import io.legado.app.utils.gone
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.viewbindingdelegate.viewBinding
-import io.legado.app.utils.visible
 
 /**
  * 发现列表
@@ -53,10 +51,11 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
                                     ViewLoadMoreBinding.bind(loadMoreViewTop)
                                 }
                             } else if (it != 1) { //把头显示出来
-                                loadMoreViewTop.visible()
                                 val layoutParams = loadMoreViewTop.layoutParams
-                                layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT
-                                loadMoreViewTop.layoutParams = layoutParams
+                                if (layoutParams?.height == 0) {
+                                    layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT
+                                    loadMoreViewTop.layoutParams = layoutParams
+                                }
                             }
                             oldPage = it
                             viewModel.skipPage(it)
@@ -156,10 +155,11 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
             layoutManager.scrollToPositionWithOffset(books.size, 0)
         }
         if (oldPage <= 1) { //已到顶,隐藏头
-            loadMoreViewTop.gone()
             val layoutParams = loadMoreViewTop.layoutParams
-            layoutParams.height = 0
-            loadMoreViewTop.layoutParams = layoutParams
+            if (layoutParams != null) {
+                layoutParams.height = 0
+                loadMoreViewTop.layoutParams = layoutParams
+            }
         }
     }
 

@@ -36,14 +36,17 @@ import kotlinx.coroutines.launch
 import java.util.LinkedList
 import kotlin.math.roundToInt
 import android.util.Size
+import androidx.core.text.HtmlCompat
 import io.legado.app.constant.AppPattern.noWordCountRegex
 import io.legado.app.data.appDb
-import io.legado.app.help.book.isOnLineTxt
+import io.legado.app.ui.book.read.page.entities.TextLine.Companion.atLeastApi28
+import io.legado.app.ui.book.read.page.entities.column.HtmlColumn
 import io.legado.app.ui.book.read.page.provider.ChapterProvider.reviewChar
 import io.legado.app.ui.book.read.page.provider.ChapterProvider.srcReplaceChar
 import io.legado.app.ui.book.read.page.provider.ChapterProvider.srcReplaceCharC
 import io.legado.app.ui.book.read.page.provider.ChapterProvider.srcReplaceCharD
 import io.legado.app.utils.StringUtils
+import androidx.core.text.parseAsHtml
 
 class TextChapterLayout(
     scope: CoroutineScope,
@@ -85,7 +88,7 @@ class TextChapterLayout(
     private val useZhLayout = ReadBookConfig.useZhLayout
     private val isMiddleTitle = ReadBookConfig.isMiddleTitle
     private val textFullJustify = ReadBookConfig.textFullJustify
-    private val adaptSpecialStyle = ReadBookConfig.adaptSpecialStyle
+    private val adaptSpecialStyle = AppConfig.adaptSpecialStyle
 
     private var pendingTextPage = TextPage()
 
@@ -251,11 +254,29 @@ class TextChapterLayout(
         val sb = StringBuffer()
         var isSetTypedImage = false
         var wordCount = 0
+        var useHtml = false
+        val useHtmlStr = StringBuffer()
         contents.forEach { content ->
             currentCoroutineContext().ensureActive()
             if (adaptSpecialStyle) {
-                if (content.trim() == "[newpage]") {
+                var text = content.trim()
+                if (text == "[newpage]") {
                     prepareNextPageIfNeed()
+                    return@forEach
+                } else if (text.startsWith("<usehtml>")) {
+                    useHtml = true
+                    text = text.substringAfter(">")
+                }
+                if (useHtml) {
+                    if (text.endsWith("</usehtml>")) {
+                        useHtml = false
+                        text = text.substringBeforeLast("<")
+                        useHtmlStr.append(text)
+                        setTypeHtml(book, useHtmlStr.toString(), contentPaintTextHeight)
+                        useHtmlStr.setLength(0)
+                    } else {
+                        useHtmlStr.append(text)
+                    }
                     return@forEach
                 }
             }
@@ -482,6 +503,55 @@ class TextChapterLayout(
             stringBuilder.append(" ") // 确保翻页时索引计算正确
             pendingTextPage.addLine(textLine)
         }
+        durY += textHeight * paragraphSpacing / 10f
+    }
+
+    /**
+     * 排版html样式
+     */
+    private suspend fun setTypeHtml(
+        book: Book,
+        htmlContent: String,
+        textHeight: Float,
+    ) {
+        val spanned = htmlContent.parseAsHtml(HtmlCompat.FROM_HTML_MODE_COMPACT)
+        val width = visibleWidth
+        val textPaint = ChapterProvider.contentPaint
+        val textColor = ReadBookConfig.textColor
+        if (textPaint.color != textColor) {
+            textPaint.color = textColor
+        }
+        val staticLayout = if (atLeastApi28) {
+            StaticLayout.Builder.obtain(spanned, 0, spanned.length, textPaint, width)
+                .setLineSpacing(paragraphSpacing.toFloat(), lineSpacingExtra)
+                .setIncludePad(true)
+                .setUseLineSpacingFromFallbacks(true)
+                .build()
+        } else {
+            @Suppress("DEPRECATION")
+            StaticLayout(
+                spanned,
+                textPaint,
+                width,
+                Layout.Alignment.ALIGN_NORMAL,
+                lineSpacingExtra,
+                paragraphSpacing.toFloat(),
+                true
+            )
+        } //前面执行解析和事先布局（为了获取高度）
+        val contentHeight = staticLayout.height
+        prepareNextPageIfNeed(durY + contentHeight)
+        val textLine = TextLine(isHtml = true)
+        textLine.text = " "
+        textLine.lineTop = durY + paddingTop
+        durY += contentHeight
+        textLine.lineBottom = durY + paddingTop
+        textLine.addColumn(
+            HtmlColumn(start = absStartX.toFloat(), end = absStartX + visibleWidth.toFloat(), staticLayout = staticLayout)
+        )
+        calcTextLinePosition(textPages, textLine, stringBuilder.length)
+        stringBuilder.append(" ") // 确保翻页时索引计算正确
+        pendingTextPage.addLine(textLine)
         durY += textHeight * paragraphSpacing / 10f
     }
 

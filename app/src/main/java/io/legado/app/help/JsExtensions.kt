@@ -190,14 +190,19 @@ interface JsExtensions : JsEncodeUtils {
         }
     }
 
+    fun webView(html: String?, url: String?, js: String?): String? {
+        return webView(html, url, js, false)
+    }
+
     /**
      * 使用webView访问网络
      * @param html 直接用webView载入的html, 如果html为空直接访问url
      * @param url html内如果有相对路径的资源不传入url访问不了
      * @param js 用来取返回值的js语句, 没有就返回整个源代码
+     * @param cacheFirst 优先使用缓存,为true能提高访问速度
      * @return 返回js获取的内容
      */
-    fun webView(html: String?, url: String?, js: String?): String? {
+    fun webView(html: String?, url: String?, js: String?, cacheFirst: Boolean): String? {
         if (isMainThread) {
             error("webView must be called on a background thread")
         }
@@ -207,15 +212,20 @@ interface JsExtensions : JsEncodeUtils {
                 html = html,
                 javaScript = js,
                 headerMap = getSource()?.getHeaderMap(true),
-                tag = getSource()?.getKey()
+                tag = getSource()?.getKey(),
+                cacheFirst = cacheFirst
             ).getStrResponse().body
         }
+    }
+
+    fun webViewGetSource(html: String?, url: String?, js: String?, sourceRegex: String): String? {
+        return webViewGetSource(html, url, js, sourceRegex, false)
     }
 
     /**
      * 使用webView获取资源url
      */
-    fun webViewGetSource(html: String?, url: String?, js: String?, sourceRegex: String): String? {
+    fun webViewGetSource(html: String?, url: String?, js: String?, sourceRegex: String, cacheFirst: Boolean): String? {
         if (isMainThread) {
             error("webViewGetSource must be called on a background thread")
         }
@@ -226,9 +236,14 @@ interface JsExtensions : JsEncodeUtils {
                 javaScript = js,
                 headerMap = getSource()?.getHeaderMap(true),
                 tag = getSource()?.getKey(),
-                sourceRegex = sourceRegex
+                sourceRegex = sourceRegex,
+                cacheFirst = cacheFirst
             ).getStrResponse().body
         }
+    }
+
+    fun webViewGetOverrideUrl(html: String?, url: String?, js: String?, overrideUrlRegex: String): String? {
+        return webViewGetOverrideUrl(html, url, js, overrideUrlRegex, false)
     }
 
     /**
@@ -238,7 +253,8 @@ interface JsExtensions : JsEncodeUtils {
         html: String?,
         url: String?,
         js: String?,
-        overrideUrlRegex: String
+        overrideUrlRegex: String,
+        cacheFirst: Boolean
     ): String? {
         if (isMainThread) {
             error("webViewGetOverrideUrl must be called on a background thread")
@@ -250,7 +266,8 @@ interface JsExtensions : JsEncodeUtils {
                 javaScript = js,
                 headerMap = getSource()?.getHeaderMap(true),
                 tag = getSource()?.getKey(),
-                overrideUrlRegex = overrideUrlRegex
+                overrideUrlRegex = overrideUrlRegex,
+                cacheFirst = cacheFirst
             ).getStrResponse().body
         }
     }
@@ -378,7 +395,7 @@ interface JsExtensions : JsEncodeUtils {
     fun downloadFile(url: String): String {
         rhinoContextOrNull?.ensureActive()
         val analyzeUrl = AnalyzeUrl(url, source = getSource(), coroutineContext = context)
-        val type = UrlUtil.getSuffix(url, analyzeUrl.type)
+        val type = analyzeUrl.type ?: UrlUtil.getSuffix(url)
         val path = FileUtils.getPath(
             File(FileUtils.getCachePath()),
             "${MD5Utils.md5Encode16(url)}.${type}"

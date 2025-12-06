@@ -1,26 +1,26 @@
 package io.legado.app.help.gsyVideo
 
 import android.content.Context
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.OptIn
 import androidx.media3.common.C
+import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import androidx.media3.common.Player.DiscontinuityReason
-import androidx.media3.common.Player.PositionInfo
 import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.DefaultRenderersFactory.ExtensionRendererMode
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.dash.DashMediaSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
-import io.legado.app.data.entities.Book
-import io.legado.app.data.entities.BookChapter
-import io.legado.app.data.entities.BookSource
 import io.legado.app.help.exoplayer.ExoPlayerHelper
+import io.legado.app.model.VideoPlay
 import tv.danmaku.ijk.media.exo2.IjkExo2MediaPlayer
 import tv.danmaku.ijk.media.exo2.demo.EventLogger
 

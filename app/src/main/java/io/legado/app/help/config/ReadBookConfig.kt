@@ -13,6 +13,7 @@ import io.legado.app.constant.PreferKey
 import io.legado.app.help.DefaultData
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.utils.BitmapUtils
+import io.legado.app.utils.FileDoc
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.compress.ZipUtils
@@ -162,6 +163,25 @@ object ReadBookConfig {
         return false
     }
 
+    fun clearBgAndCache() {
+        val bgs = hashSetOf<String>()
+        configList.forEach { config ->
+            repeat(3) {
+                config.getBgPath(it)?.let { path ->
+                    bgs.add(path)
+                }
+            }
+        }
+        appCtx.externalFiles.getFile("bg").listFiles()?.forEach {
+            if (!bgs.contains(it.absolutePath)) {
+                it.delete()
+            }
+        }
+        FileUtils.delete(appCtx.externalCache.getFile("readConfig"))
+        val configZipPath = FileUtils.getPath(appCtx.externalCache, "readConfig.zip")
+        FileUtils.delete(configZipPath)
+    }
+
     private fun resetAll() {
         DefaultData.readConfigs.let {
             configList.clear()
@@ -218,10 +238,6 @@ object ReadBookConfig {
      */
     val textBottomJustify get() = appCtx.getPrefBoolean(PreferKey.textBottomJustify, true)
 
-    /**
-     * 是否展示特殊样式
-     */
-    val adaptSpecialStyle get() = appCtx.getPrefBoolean(PreferKey.adaptSpecialStyle, true)
     var hideStatusBar = appCtx.getPrefBoolean(PreferKey.hideStatusBar)
     var hideNavigationBar = appCtx.getPrefBoolean(PreferKey.hideNavigationBar)
     var useZhLayout = appCtx.getPrefBoolean(PreferKey.useZhLayout)
@@ -454,7 +470,8 @@ object ReadBookConfig {
         val configFile = configDir.getFile(configFileName)
         val config: Config = GSON.fromJsonObject<Config>(configFile.readText()).getOrThrow()
         if (config.textFont.isNotEmpty()) {
-            val fontName = FileUtils.getName(config.textFont)
+            val fontDoc = FileDoc.fromFile(config.textFont)
+            val fontName = fontDoc.name
             val fontPath =
                 FileUtils.getPath(appCtx.externalFiles, "font", fontName)
             if (!FileUtils.exist(fontPath)) {
@@ -708,6 +725,30 @@ object ReadBookConfig {
                 e.printOnDebug()
             }
             return bgDrawable ?: ColorDrawable(appCtx.getCompatColor(R.color.background))
+        }
+
+        fun getBgPath(bgIndex: Int): String? {
+            val bgType = when (bgIndex) {
+                0 -> bgType
+                1 -> bgTypeNight
+                2 -> bgTypeEInk
+                else -> error("unknown bgIndex: $bgIndex")
+            }
+            if (bgType != 2) {
+                return null
+            }
+            val bgStr = when (bgIndex) {
+                0 -> bgStr
+                1 -> bgStrNight
+                2 -> bgStrEInk
+                else -> error("unknown bgIndex: $bgIndex")
+            }
+            val path = if (bgStr.contains(File.separator)) {
+                bgStr
+            } else {
+                FileUtils.getPath(appCtx.externalFiles, "bg", bgStr)
+            }
+            return path
         }
     }
 }

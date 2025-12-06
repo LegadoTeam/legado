@@ -108,11 +108,8 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
             }
             val isHtml = languageName.contains("html")
             if (isHtml) {
-                return@execute webFormatCodeHtml(text)
+                return@execute formatCodeHtml(text)
             }
-            val beautifyJs = FileProviderRegistry.getInstance()
-                .tryGetInputStream("beautify.min.js")
-                ?.use { inputStream -> inputStream.bufferedReader().readText() } ?: ""
             var start = 0
             val jsMatcher = JS_PATTERN.matcher(text)
             var result = ""
@@ -123,18 +120,17 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
                 if (jsMatcher.group(2) != null) {
                     result += "@js:\n"
                     val jsCode = jsMatcher.group(2)!!
-                    result += webFormatCode(beautifyJs, jsCode)
+                    result += webFormatCode(jsCode)
                 } else if (jsMatcher.group(1) != null) {
                     result += "<js>\n"
                     val jsCode = jsMatcher.group(1)!!
-                    result += webFormatCode(beautifyJs, jsCode)
+                    result += webFormatCode(jsCode)
                     result += "\n</js>"
                 }
                 start = jsMatcher.end()
             }
             if (start == 0) {
-                val jsCode = text
-                result += webFormatCode(beautifyJs, jsCode)
+                result += webFormatCode(text)
                 start = text.length
             }
             if (text.length > start) {
@@ -148,12 +144,12 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
-    private suspend fun webFormatCode(beautifyJs: String, jsCode: String): String? {
+    private suspend fun webFormatCode(jsCode: String): String? {
         return try {
             BackstageWebView(
                 url = null,
-                html = "<body>",
-                javaScript = """$beautifyJs
+                html = "<body><script src=\"https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.15.4/beautify.min.js\"></script></body>",
+                javaScript = """
                 js_beautify("${jsCode.escapeForJs()}", {
                 indent_size: 4,
                 indent_char: ' ',
@@ -167,8 +163,7 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
                 wrap_line_length: 0,
                 comma_first: false
                 });""".trimIndent(),
-                headerMap = null,
-                tag = null
+                cacheFirst = true
             ).getStrResponse().body
         } catch (e: Exception) {
             context.toastOnUi("格式化失败")
@@ -176,7 +171,7 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
-    private fun webFormatCodeHtml(html: String): String? {
+    private fun formatCodeHtml(html: String): String? {
         return try {
             val doc = Jsoup.parse(html)
             doc.outputSettings()

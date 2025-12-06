@@ -42,7 +42,6 @@ import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.model.BookCover
-import io.legado.app.model.VideoPlay
 import io.legado.app.model.remote.RemoteBookWebDav
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.book.audio.AudioPlayActivity
@@ -95,35 +94,15 @@ class BookInfoActivity :
             viewModel.getBook(false)?.let { book ->
                 lifecycleScope.launch {
                     withContext(IO) {
-                        if (book.isVideo) {
-                            VideoPlay.volumes.clear()
-                            appDb.bookChapterDao.getChapterList(book.bookUrl).forEach { chapter ->
-                                if (chapter.isVolume) {
-                                    VideoPlay.volumes.add(chapter)
-                                }
-                            }
-                            if (VideoPlay.volumes.isEmpty()) {
-                                VideoPlay.chapterInVolumeIndex = it.first
-                            } else {
-                                for ((index, volume) in VideoPlay.volumes.reversed().withIndex()) {
-                                    if (volume.index < it.first) {
-                                        book.chapterInVolumeIndex = it.first - volume.index - 1
-                                        book.durVolumeIndex = VideoPlay.volumes.size - index - 1
-                                        VideoPlay.durVolume = volume
-                                        break
-                                    } else if (volume.index == it.first) {
-                                        book.chapterInVolumeIndex = 0
-                                        book.durVolumeIndex = VideoPlay.volumes.size - index - 1
-                                        VideoPlay.durVolume = volume
-                                        break
-                                    }
-                                }
-                            }
-                        } else {
-                            book.durChapterIndex = it.first
-                        }
-                        book.durChapterPos = it.second
-                        chapterChanged = it.third
+                        val durChapterIndex = it[0] as Int
+                        val durChapterPos = it[1] as Int
+                        val durVolumeIndex = it[3] as Int
+                        val chapterInVolumeIndex = it[4] as Int
+                        book.durChapterIndex = durChapterIndex
+                        book.durChapterPos = durChapterPos
+                        chapterChanged = it[2] as Boolean
+                        book.durVolumeIndex = durVolumeIndex
+                        book.chapterInVolumeIndex = chapterInVolumeIndex
                         appDb.bookDao.update(book)
                     }
                     startReadActivity(book)
@@ -199,7 +178,6 @@ class BookInfoActivity :
         }
         viewModel.bookData.observe(this) { showBook(it) }
         viewModel.chapterListData.observe(this) { upLoading(false, it) }
-        viewModel.customBtnListData.observe(this) { menuCustomBtn?.isVisible = it }
         viewModel.waitDialogData.observe(this) { upWaitDialogStatus(it) }
         viewModel.initData(intent)
         initViewEvent()
@@ -208,7 +186,9 @@ class BookInfoActivity :
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.book_info, menu)
         editMenuItem = menu.findItem(R.id.menu_edit)
-        menuCustomBtn = menu.findItem(R.id.menu_custom_btn)
+        menuCustomBtn = menu.findItem(R.id.menu_custom_btn).also {
+            it.isVisible = viewModel.hasCustomBtn
+        }
         return super.onCompatCreateOptionsMenu(menu)
     }
 
@@ -391,6 +371,7 @@ class BookInfoActivity :
             llToc.gone()
             tvLasted.text = getString(R.string.lasted_show, "下载中...")
         }
+        menuCustomBtn?.isVisible = viewModel.hasCustomBtn
         upTvBookshelf()
         upKinds(book)
         upGroup(book.group)
@@ -562,6 +543,16 @@ class BookInfoActivity :
                 }
             }
         }
+        tvAuthor.setOnLongClickListener {
+            viewModel.getBook(false)?.let { book ->
+                SourceCallBack.callBackBtn(this@BookInfoActivity, SourceCallBack.LONG_CLICK_AUTHOR, viewModel.bookSource, book, null) {
+                    startActivity<SearchActivity> {
+                        putExtra("key", book.author)
+                    }
+                }
+            }
+            true
+        }
         tvName.setOnClickListener {
             viewModel.getBook(false)?.let { book ->
                 SourceCallBack.callBackBtn(this@BookInfoActivity, SourceCallBack.CLICK_BOOK_NAME, viewModel.bookSource, book, null) {
@@ -570,6 +561,16 @@ class BookInfoActivity :
                     }
                 }
             }
+        }
+        tvName.setOnLongClickListener {
+            viewModel.getBook(false)?.let { book ->
+                SourceCallBack.callBackBtn(this@BookInfoActivity, SourceCallBack.LONG_CLICK_BOOK_NAME, viewModel.bookSource, book, null) {
+                    startActivity<SearchActivity> {
+                        putExtra("key", book.name)
+                    }
+                }
+            }
+            true
         }
         refreshLayout?.setOnRefreshListener {
             refreshLayout.isRefreshing = false

@@ -394,13 +394,14 @@ class BookSourceEditActivity :
         contentEntities.clear()
         contentEntities.apply {
             add(EditEntity("content", cr.content, R.string.rule_book_content))
-            add(EditEntity("title", cr.title, R.string.rule_chapter_name))
             add(EditEntity("nextContentUrl", cr.nextContentUrl, R.string.rule_next_content))
-            add(EditEntity("webJs", cr.webJs, R.string.rule_web_js))
-            add(EditEntity("sourceRegex", cr.sourceRegex, R.string.rule_source_regex))
+            add(EditEntity("subContent", cr.subContent, R.string.rule_sub_content))
             add(EditEntity("replaceRegex", cr.replaceRegex, R.string.rule_replace_regex))
+            add(EditEntity("title", cr.title, R.string.rule_chapter_name))
+            add(EditEntity("sourceRegex", cr.sourceRegex, R.string.rule_source_regex))
             add(EditEntity("imageStyle", cr.imageStyle, R.string.rule_image_style))
             add(EditEntity("imageDecode", cr.imageDecode, R.string.rule_image_decode))
+            add(EditEntity("webJs", cr.webJs, R.string.rule_web_js))
             add(EditEntity("payAction", cr.payAction, R.string.rule_pay_action))
             add(EditEntity("callBackJs", cr.callBackJs, R.string.rule_call_back))
         }
@@ -586,9 +587,10 @@ class BookSourceEditActivity :
             it.value = it.value?.takeIf { s -> s.isNotBlank() }
             when (it.key) {
                 "content" -> contentRule.content = viewModel.ruleComplete(it.value)
-                "title" -> contentRule.title = viewModel.ruleComplete(it.value)
                 "nextContentUrl" -> contentRule.nextContentUrl =
                     viewModel.ruleComplete(it.value, type = 2)
+                "subContent" -> contentRule.subContent = viewModel.ruleComplete(it.value)
+                "title" -> contentRule.title = viewModel.ruleComplete(it.value)
 
                 "webJs" -> contentRule.webJs = it.value
                 "sourceRegex" -> contentRule.sourceRegex = it.value
