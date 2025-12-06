@@ -1,6 +1,7 @@
 package io.legado.app.ui.main
 
 import android.app.Application
+import android.os.Build
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import androidx.recyclerview.widget.RecyclerView.RecycledViewPool
@@ -218,7 +219,13 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
 
     fun postUpBooksLiveData(reset: Boolean = false) {
         if (AppConfig.showWaitUpCount) {
-            onUpBooksLiveData.postValue(waitUpTocBooks.size + onUpTocBooks.size)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                onUpBooksLiveData.postValue(waitUpTocBooks.size + onUpTocBooks.size)
+            } else {
+                var count = 0
+                onUpTocBooks.forEach { _ -> count++ }
+                onUpBooksLiveData.postValue(waitUpTocBooks.size + count)
+            }
         } else if (reset) {
             onUpBooksLiveData.postValue(0)
         }
@@ -249,8 +256,18 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
         cacheBookJob = viewModelScope.launch(upTocPool) {
             launch {
                 while (isActive && CacheBook.isRun) {
+                    val isOnUpTocBooksEmpty = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        onUpTocBooks.isEmpty()
+                    } else {
+                        var isEmpty = true
+                        onUpTocBooks.forEach { _ ->
+                            isEmpty = false
+                            return@forEach
+                        }
+                        isEmpty
+                    }
                     //有目录更新是不缓存,优先更新目录,现在更多网站限制并发
-                    CacheBook.setWorkingState(waitUpTocBooks.isEmpty() && onUpTocBooks.isEmpty())
+                    CacheBook.setWorkingState(waitUpTocBooks.isEmpty() && isOnUpTocBooksEmpty)
                     delay(1000)
                 }
             }

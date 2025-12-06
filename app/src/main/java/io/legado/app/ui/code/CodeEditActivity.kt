@@ -55,6 +55,7 @@ class CodeEditActivity :
     private val editor: CodeEditor by lazy { binding.editText }
     private val editorSearcher: EditorSearcher by lazy { editor.searcher }
     private lateinit var options: SearchOptions
+    private var menuSaveBtn: MenuItem? = null
 
 
     private fun initView() {
@@ -81,6 +82,7 @@ class CodeEditActivity :
                 upEdit(AppConfig.editFontScale, null, AppConfig.editAutoWrap)
                 setText(viewModel.initialText)
                 editable = viewModel.writable
+                menuSaveBtn?.isVisible = viewModel.writable
                 requestFocus()
                 postDelayed({
                     val pos = cursor.indexer.getCharPosition(viewModel.cursorPosition)
@@ -146,6 +148,9 @@ class CodeEditActivity :
 
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.code_edit_activity, menu)
+        menuSaveBtn = menu.findItem(R.id.menu_save).apply {
+            isVisible = viewModel.writable
+        }
         return super.onCompatCreateOptionsMenu(menu)
     }
 

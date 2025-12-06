@@ -80,25 +80,11 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         }
     private val tocActivityResult = registerForActivityResult(TocActivityResult()) {
         it?.let {
-            if (it.third) {
-                if (VideoPlay.volumes.isEmpty()) {
-                    VideoPlay.chapterInVolumeIndex = it.first
-                } else {
-                    for ((index, volume) in VideoPlay.volumes.reversed().withIndex()) {
-                        if (volume.index < it.first) {
-                            VideoPlay.chapterInVolumeIndex = it.first - volume.index - 1
-                            VideoPlay.durVolumeIndex = VideoPlay.volumes.size - index - 1
-                            VideoPlay.durVolume = volume
-                            break
-                        } else if (volume.index == it.first) {
-                            VideoPlay.chapterInVolumeIndex = 0
-                            VideoPlay.durVolumeIndex = VideoPlay.volumes.size - index - 1
-                            VideoPlay.durVolume = volume
-                            break
-                        }
-                    }
-                }
-                VideoPlay.durChapterPos = it.second
+            if (it[2] as Boolean) {
+                VideoPlay.chapterInVolumeIndex = it[0] as Int
+                VideoPlay.durChapterPos = it[1] as Int
+                VideoPlay.durVolumeIndex = it[3] as Int
+                VideoPlay.chapterInVolumeIndex = it[4] as Int
                 VideoPlay.upEpisodes()
                 VideoPlay.saveRead()
                 if (VideoPlay.episodes.isNullOrEmpty()) {

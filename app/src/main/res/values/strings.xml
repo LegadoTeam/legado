@@ -1312,4 +1312,9 @@
     <string name="setting_show_line_number">设置辅助按键展示的行数</string>
     <string name="menu_page">第 %d 页</string>
     <string name="change_page">选择页数</string>
+    <string name="auto_check_new_backup_t">自动检查新备份</string>
+    <string name="auto_check_new_backup_s">打开软件时检查是否有新备份，有新备份时提示是否更新</string>
+    <string name="r_preloadJs">预注入Js（preloadJs）</string>
+    <string name="cache_first">优先加载缓存</string>
+    <string name="rule_sub_content">副文规则（subContent）</string>
 </resources>

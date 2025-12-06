@@ -36,7 +36,13 @@ fun NavigationView.setItemTextColors(
 }
 
 fun NavigationView.disableScrollbar() {
-    val navigationMenuView = getChildAt(0) as? NavigationMenuView
-    navigationMenuView?.isVerticalScrollBarEnabled = false
+//    val navigationMenuView = getChildAt(0) as? NavigationMenuView
+//    navigationMenuView?.isVerticalScrollBarEnabled = false
+    try {
+        val navigationMenuView = getChildAt(0)
+        navigationMenuView?.javaClass?.getMethod("setVerticalScrollBarEnabled", Boolean::class.java)
+            ?.invoke(navigationMenuView, false)
+    } catch (_: Exception) {
+    }
 }
 

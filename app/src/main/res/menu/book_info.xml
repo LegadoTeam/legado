@@ -6,7 +6,6 @@
         android:id="@+id/menu_custom_btn"
         android:icon="@drawable/ic_custom"
         android:title="@string/custom_button"
-        android:visible="false"
         app:showAsAction="ifRoom" />
 
     <item

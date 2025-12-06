@@ -1,7 +1,6 @@
 package io.legado.app.help.gsyVideo
 
 import android.content.Context
-import android.media.AudioManager
 import android.util.AttributeSet
 import android.view.Surface
 import android.view.SurfaceView
@@ -27,7 +26,6 @@ class FloatingPlayer : StandardGSYVideoPlayer {
         } else {
             this.mContext = context
         }
-        mAudioManager = mContext.applicationContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager?
         initInflate(mContext)
         mTextureViewContainer = findViewById(R.id.surface_container)
         if (isInEditMode) return

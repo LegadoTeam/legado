@@ -14,46 +14,66 @@
 * jsLib、并发率、CookieJar、登录UI、请求头代理、封面解密等重复说明见书源帮助
 
 * 订阅源类型
-> 网页：用内置浏览器加载正文内容  
-> 图片：链接规则或正文规则得到图片链接，点击文章就会显示链接对应的图片  
-> 视频：链接规则或正文规则得到视频链接，点击文章就会使用内置视频播放器进行播放
+> 网页：用内置浏览器加载正文内容。  
+> 图片：链接规则或正文规则得到图片链接，点击文章就会显示链接对应的图片。  
+> 视频：链接规则或正文规则得到视频链接，点击文章就会使用内置视频播放器进行播放。
 
 * 预加载
-> 启用后会提前预加载相邻分类内容，瀑布流样式时会提前加载下一页内容
+> 启用后会提前预加载相邻分类内容，瀑布流样式时会提前加载下一页内容。
 
 * 网页JS
-> `window.close()` 关闭浏览器界面  
-> `screen.orientation.lock()` 全屏后可控制屏幕方向  
+> `window.close()` 关闭浏览器界面。  
+> `screen.orientation.lock()` 全屏后可控制屏幕方向。  
 
-* 内置浏览器额外支持的函数
+* 预注入Js规则  
+> 在网页加载前就注入到网页的js代码。
 
-> 异步执行阅读函数代码字符串，并返回字符串结果  
+* 在预注入Js规则额外支持的内置浏览器函数  
+> 需要在其它地方调用的话，在预注入Js规则将需要的函数挂到window上，类似于使用声明。
 ```js
-window.run("java.toast('执行成功');'成功'")
-.then(r=>alert(r))
-.catch(e=>alert("执行出错:"+e));
+//在预注入Js规则里
+window.ajaxAwait = ajaxAwait;
+window.java = java;
+//在网页内容
+window.ajaxAwait("https://example.com")
+.then(r=>alert(r));
+java.toast("调用java函数");
 ```
 
 > 异步函数，函数参数和返回结果类型均为字符串    
 ```js
-window.ajaxAwait(url, callTimeout) //用java.ajax异步访问
-window.connectAwait(url, header, callTimeout) //用java.connect异步访问，返回序列化后的响应
-window.getAwait(url, header, callTimeout) //返回响应体
-window.headAwait(url, header, callTimeout) //序列化后的响应头
-window.postAwait(url, body, header, callTimeout) //返回响应体
-window.webViewAwait(html, url, js) //用java.webView异步访问
-window.decryptStrAwait(transformation, key, iv, data)
+run("java.toast('执行成功');'成功'")
+.then(r=>alert(r))
+.catch(e=>alert("执行出错:"+e));
+//执行阅读函数代码字符串，并返回字符串结果
+ajaxAwait(url, callTimeout)
+//用java.ajax异步访问
+connectAwait(url, header, callTimeout)
+//用java.connect异步访问，返回序列化后的响应
+getAwait(url, header, callTimeout)
+//返回响应体
+headAwait(url, header, callTimeout)
+//返回序列化后的响应头
+postAwait(url, body, header, callTimeout)
+//返回响应体
+webViewAwait(html, url, js, cacheFirst)
+//用java.webView异步访问
+decryptStrAwait(transformation, key, iv, data)
 //同java.createSymmetricCrypto(transformation, key, iv).decryptStr(data)
-window.encryptBase64Await(transformation, key, iv, data)
+encryptBase64Await(transformation, key, iv, data)
 //同java.createSymmetricCrypto(transformation, key, iv).encryptBase64(data)
-window.encryptHexAwait(transformation, key, iv, data)
+encryptHexAwait(transformation, key, iv, data)
 //同java.createSymmetricCrypto(transformation, key, iv).encryptHex(data)
-window.createSignHexAwait(algorithm, publicKey, privateKey, data)
+createSignHexAwait(algorithm, publicKey, privateKey, data)
 //同java.createSign(algorithm).setPublicKey(publicKey).setPrivateKey(privateKey).signHex(data)
-window.downloadFileAwait(url) //同java.downloadFile(url)
-window.readTxtFileAwait(path) //同java.readTxtFile(url)
-window.importScriptAwait(url) //同java.importScript(url)
-window.getStringAwait(ruleStr, mContent) //同java.getString(ruleStr, mContent)
+downloadFileAwait(url)
+//同java.downloadFile(url)
+readTxtFileAwait(path)
+//同java.readTxtFile(url)
+importScriptAwait(url)
+//同java.importScript(url)
+getStringAwait(ruleStr, mContent)
+//同java.getString(ruleStr, mContent)
 ```
 > 同步调用  
 

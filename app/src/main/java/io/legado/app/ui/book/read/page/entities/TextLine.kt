@@ -38,6 +38,7 @@ data class TextLine(
     val isTitle: Boolean = false,
     var isParagraphEnd: Boolean = false,
     var isImage: Boolean = false,
+    var isHtml: Boolean = false,
     var startX: Float = 0f,
     var indentSize: Int = 0,
     var extraLetterSpacing: Float = 0f,
@@ -171,7 +172,7 @@ data class TextLine(
             PaintPool.recycle(underlinePaint)
         }
         
-        if (ReadBookConfig.underline && !isImage && ReadBook.book?.isImage != true) {
+        if (ReadBookConfig.underline && !isImage && !isHtml && ReadBook.book?.isImage != true) {
             drawUnderline(canvas)
         }
     }
@@ -253,6 +254,7 @@ data class TextLine(
     companion object {
         val emptyTextLine = TextLine()
         private val atLeastApi26 = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+        val atLeastApi28 = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
         private val atLeastApi35 = Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM
         private val wordSpacingWorking by lazy {
             // issue 3785 3846

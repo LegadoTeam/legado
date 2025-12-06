@@ -52,6 +52,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     var editAutoWrap = appCtx.getPrefBoolean(PreferKey.editAutoWrap, true)
     var editAutoComplete = appCtx.getPrefBoolean(PreferKey.editAutoComplete, true)
     var showBoardLine = appCtx.getPrefInt(PreferKey.showBoardLine, 1)
+    var adaptSpecialStyle = appCtx.getPrefBoolean(PreferKey.adaptSpecialStyle, true)
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
         when (key) {
@@ -60,6 +61,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             PreferKey.editAutoWrap -> editAutoWrap = appCtx.getPrefBoolean(PreferKey.editAutoWrap, true)
             PreferKey.editAutoComplete -> editAutoComplete = appCtx.getPrefBoolean(PreferKey.editAutoComplete, true)
             PreferKey.showBoardLine -> showBoardLine = appCtx.getPrefInt(PreferKey.showBoardLine, 1)
+            PreferKey.adaptSpecialStyle -> adaptSpecialStyle = appCtx.getPrefBoolean(PreferKey.adaptSpecialStyle, true)
 
             PreferKey.themeMode -> {
                 themeMode = appCtx.getPrefString(PreferKey.themeMode, "0")
@@ -558,6 +560,8 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     val onlyLatestBackup get() = appCtx.getPrefBoolean(PreferKey.onlyLatestBackup, true)
 
+    val autoCheckNewBackup get() = appCtx.getPrefBoolean(PreferKey.autoCheckNewBackup, true)
+
     val defaultHomePage get() = appCtx.getPrefString(PreferKey.defaultHomePage, "bookshelf")
 
     val updateToVariant get() = appCtx.getPrefString(PreferKey.updateToVariant, "default_version")
@@ -761,6 +765,42 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefBoolean(PreferKey.enableMangaGray, false)
         set(value) {
             appCtx.putPrefBoolean(PreferKey.enableMangaGray, value)
+        }
+
+    var welcomeImage
+        get() = appCtx.getPrefString(PreferKey.welcomeImage)
+        set(value) {
+            appCtx.putPrefString(PreferKey.welcomeImage, value)
+        }
+
+    var welcomeShowText
+        get() = appCtx.getPrefBoolean(PreferKey.welcomeShowText, true)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.welcomeShowText, value)
+        }
+
+    var welcomeShowIcon
+        get() = appCtx.getPrefBoolean(PreferKey.welcomeShowIcon, true)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.welcomeShowIcon, value)
+        }
+
+    var welcomeImageDark
+        get() = appCtx.getPrefString(PreferKey.welcomeImageDark)
+        set(value) {
+            appCtx.putPrefString(PreferKey.welcomeImageDark, value)
+        }
+
+    var welcomeShowTextDark
+        get() = appCtx.getPrefBoolean(PreferKey.welcomeShowTextDark, true)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.welcomeShowTextDark, value)
+        }
+
+    var welcomeShowIconDark
+        get() = appCtx.getPrefBoolean(PreferKey.welcomeShowIconDark, true)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.welcomeShowIconDark, value)
         }
 
 }

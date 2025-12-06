@@ -130,7 +130,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     //打开目录返回选择章节返回结果
     private val tocActivity = registerForActivityResult(TocActivityResult()) {
         it?.let {
-            viewModel.openChapter(it.first, it.second)
+            viewModel.openChapter(it[0] as Int, it[1] as Int)
         }
     }
     private val bookInfoActivity =

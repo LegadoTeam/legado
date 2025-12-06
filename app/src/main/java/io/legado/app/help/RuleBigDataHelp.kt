@@ -111,6 +111,17 @@ object RuleBigDataHelp {
         return null
     }
 
+    fun getDanmakuFile(bookUrl: String, chapterUrl: String):File? {
+        val md5BookUrl = MD5Utils.md5Encode(bookUrl)
+        val md5ChapterUrl = MD5Utils.md5Encode(chapterUrl)
+        val md5Key = MD5Utils.md5Encode("danmaku")
+        val file = File(FileUtils.getPath(bookData, md5BookUrl, md5ChapterUrl, "$md5Key.txt"))
+        if (file.exists()) {
+            return file
+        }
+        return null
+    }
+
     fun putRssVariable(origin: String, link: String, key: String, value: String?) {
         val md5Origin = MD5Utils.md5Encode(origin)
         val md5Link = MD5Utils.md5Encode(link)

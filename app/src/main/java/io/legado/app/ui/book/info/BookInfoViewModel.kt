@@ -49,9 +49,10 @@ import kotlinx.coroutines.Dispatchers.IO
 class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     val bookData = MutableLiveData<Book>()
     val chapterListData = MutableLiveData<List<BookChapter>>()
-    val customBtnListData = MutableLiveData<Boolean>()
+    val customBtnLiveData = MutableLiveData<Boolean>()
     val webFiles = mutableListOf<WebFile>()
     var inBookshelf = false
+    var hasCustomBtn = false
     var bookSource: BookSource? = null
     private var changeSourceCoroutine: Coroutine<*>? = null
     val waitDialogData = MutableLiveData<Boolean>()
@@ -96,10 +97,12 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
 
     private fun upBook(book: Book) {
         execute {
+            bookSource = if (book.isLocal) null else
+                appDb.bookSourceDao.getBookSource(book.origin)?.also {
+                    hasCustomBtn = it.customButton
+                }
             bookData.postValue(book)
             upCoverByRule(book)
-            bookSource = if (book.isLocal) null else
-                appDb.bookSourceDao.getBookSource(book.origin)
             if (book.tocUrl.isEmpty() && !book.isLocal) {
                 loadBookInfo(book, runPreUpdateJs = inBookshelf)
             } else {
@@ -110,7 +113,6 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     loadChapter(book, isFromBookInfo = true)
                 }
             }
-            customBtnListData.postValue(bookSource?.customButton == true)
         }
     }
 
@@ -369,7 +371,9 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     fun changeTo(source: BookSource, book: Book, toc: List<BookChapter>) {
         changeSourceCoroutine?.cancel()
         changeSourceCoroutine = execute {
-            bookSource = source
+            bookSource = source.also {
+                hasCustomBtn = it.customButton
+            }
             bookData.value?.migrateTo(book, toc)
             if (book.isWebFile) {
                 loadWebFile(book)

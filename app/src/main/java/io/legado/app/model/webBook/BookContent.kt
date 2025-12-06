@@ -25,6 +25,8 @@ import kotlinx.coroutines.flow.flow
 import org.apache.commons.text.StringEscapeUtils
 import splitties.init.appCtx
 import io.legado.app.help.book.isAudio
+import io.legado.app.help.book.isOnLineTxt
+import io.legado.app.help.book.isVideo
 import kotlinx.coroutines.currentCoroutineContext
 
 /**
@@ -69,6 +71,7 @@ object BookContent {
         )
         contentList.add(contentData.first)
         if (contentData.second.size == 1) {
+            val webJs = contentRule.webJs
             var nextUrl = contentData.second[0]
             while (nextUrl.isNotEmpty() && !nextUrlList.contains(nextUrl)) {
                 if (!mNextChapterUrl.isNullOrEmpty()
@@ -83,7 +86,7 @@ object BookContent {
                     ruleData = book,
                     coroutineContext = currentCoroutineContext()
                 )
-                val res = analyzeUrl.getStrResponseAwait() //控制并发访问
+                val res = analyzeUrl.getStrResponseAwait(jsStr = webJs) //控制并发访问
                 res.body?.let { nextBody ->
                     contentData = analyzeContent(
                         book, nextUrl, res.url, nextBody, contentRule,
@@ -120,6 +123,27 @@ object BookContent {
             }.collect {
                 currentCoroutineContext().ensureActive()
                 contentList.add(it)
+            }
+        }
+        val subContentRule = contentRule.subContent
+        if (!subContentRule.isNullOrBlank()) { //副内容
+            val subContent = analyzeRule.runCatching {
+                getString(subContentRule)
+            }.onFailure {
+                Debug.log(bookSource.bookSourceUrl, "获取副文出错, ${it.localizedMessage}")
+            }.getOrNull()
+            if (!subContent.isNullOrBlank()) {
+                if (book.isOnLineTxt) { //在线txt拼接到正文
+                    contentList.add(subContent)
+                } else if (book.isAudio) { //音频作为歌词
+                    bookChapter.putLyric(subContent)
+                    Debug.log(bookSource.bookSourceUrl, "┌获取副文歌词")
+                    Debug.log(bookSource.bookSourceUrl, "└\n$subContent")
+                } else if (book.isVideo) { //视频作为弹幕
+                    bookChapter.putDanmaku(subContent)
+                    Debug.log(bookSource.bookSourceUrl, "┌获取副文弹幕")
+                    Debug.log(bookSource.bookSourceUrl, "└\n$subContent")
+                }
             }
         }
         var contentStr = contentList.joinToString("\n")
@@ -164,14 +188,6 @@ object BookContent {
         if (needSave) {
             BookHelp.saveContent(bookSource, book, bookChapter, contentStr)
         }
-        if (book.isAudio) {
-            val index = contentStr.indexOf("\n")
-            if (index != -1) {
-                contentStr.substring(index).trimIndent()
-                    .takeIf { it.isNotEmpty() }?.let { bookChapter.putLyric(it) }
-                contentStr = contentStr.substring(0, index)
-            }
-        }
         return contentStr
     }
 
@@ -197,9 +213,22 @@ object BookContent {
         analyzeRule.setChapter(chapter)
         //获取正文
         var content = analyzeRule.getString(contentRule.content, unescape = false)
-        content = HtmlFormatter.formatKeepImg(content, rUrl)
-        if (content.indexOf('&') > -1) {
-            content = StringEscapeUtils.unescapeHtml4(content)
+        if (!book.isAudio && !book.isVideo) { //音频和视频获取的是链接，不需要html格式化
+            val useHtmlMap = mutableMapOf<String, String>()
+            if (AppConfig.adaptSpecialStyle) {
+                content = AppPattern.useHtmlRegex.replace(content) { matchResult ->
+                    val placeholder = "{usehtml_${useHtmlMap.size}}"
+                    useHtmlMap[placeholder] = matchResult.value
+                    placeholder
+                }
+            }
+            content = HtmlFormatter.formatKeepImg(content, rUrl) //内置净化格式化
+            if (content.indexOf('&') > -1) {
+                content = StringEscapeUtils.unescapeHtml4(content)
+            }
+            useHtmlMap.forEach { (placeholder, originalContent) ->
+                content = content.replace(placeholder, originalContent)
+            }
         }
         //获取下一页链接
         if (getNextPageUrl) {
