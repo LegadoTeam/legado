@@ -11,6 +11,7 @@ import kotlinx.parcelize.Parcelize
 @Parcelize
 data class ContentRule(
     var content: String? = null,
+    var subContent: String? = null, //副文规则，拼接在正文后面或者获取歌词等
     var title: String? = null, //有些网站只能在正文中获取标题
     var nextContentUrl: String? = null,
     var webJs: String? = null,

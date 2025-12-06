@@ -17,6 +17,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.databinding.FragmentChapterListBinding
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.isLocal
+import io.legado.app.help.book.isVideo
 import io.legado.app.help.book.simulatedTotalChapterNum
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.getPrimaryTextColor
@@ -123,7 +124,9 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                 val end = (book?.simulatedTotalChapterNum() ?: Int.MAX_VALUE) - 1
                 when {
                     searchKey.isNullOrBlank() ->
-                        appDb.bookChapterDao.getChapterList(viewModel.bookUrl, 0, end)
+                        appDb.bookChapterDao.getChapterList(viewModel.bookUrl, 0, end).also {
+                            chapterList = it
+                        }
 
                     else -> appDb.bookChapterDao.search(viewModel.bookUrl, searchKey, 0, end)
                 }
@@ -170,9 +173,43 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     override fun durChapterIndex(): Int {
         return durChapterIndex
     }
+    private var chapterList: List<BookChapter>? = null
 
     override fun openChapter(bookChapter: BookChapter) {
         activity?.run {
+            if (book?.isVideo == true) {
+                val volumes = arrayListOf<BookChapter>()
+                chapterList?.forEach { chapter ->
+                    if (chapter.isVolume) {
+                        volumes.add(chapter)
+                    }
+                }
+                var chapterInVolumeIndex = 0
+                var durVolumeIndex = 0
+                if (volumes.isNotEmpty()) {
+                    for ((index, volume) in volumes.reversed().withIndex()) {
+                        val first = bookChapter.index
+                        if (volume.index < first) {
+                            chapterInVolumeIndex = first - volume.index - 1
+                            durVolumeIndex = volumes.size - index - 1
+                            break
+                        } else if (volume.index == first) {
+                            chapterInVolumeIndex = 0
+                            durVolumeIndex = volumes.size - index - 1
+                            break
+                        }
+                    }
+                }
+                setResult(
+                    RESULT_OK, Intent()
+                        .putExtra("index", bookChapter.index)
+                        .putExtra("chapterChanged", bookChapter.index != durChapterIndex)
+                        .putExtra("durVolumeIndex", durVolumeIndex)
+                        .putExtra("chapterInVolumeIndex", chapterInVolumeIndex)
+                )
+                finish()
+                return@run
+            }
             setResult(
                 RESULT_OK, Intent()
                     .putExtra("index", bookChapter.index)

@@ -88,10 +88,10 @@ class AudioPlayActivity :
     }
     private val tocActivityResult = registerForActivityResult(TocActivityResult()) {
         it?.let {
-            if (it.first != AudioPlay.book?.durChapterIndex
-                || it.second == 0
+            if (it[0] != AudioPlay.book?.durChapterIndex
+                || it[1] == 0
             ) {
-                AudioPlay.skipTo(it.first)
+                AudioPlay.skipTo(it[0] as Int)
             }
         }
     }

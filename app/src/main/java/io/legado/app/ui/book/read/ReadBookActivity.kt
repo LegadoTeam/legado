@@ -163,7 +163,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     private val tocActivity =
         registerForActivityResult(TocActivityResult()) {
             it?.let {
-                viewModel.openChapter(it.first, it.second)
+                viewModel.openChapter(it[0] as Int, it[1] as Int)
             }
         }
     private val sourceEditActivity =

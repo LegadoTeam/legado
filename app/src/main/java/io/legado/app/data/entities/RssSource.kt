@@ -87,6 +87,8 @@ data class RssSource(
     var loadWithBaseUrl: Boolean = true,
     /**注入js**/
     var injectJs: String? = null,
+    /**提前预注入js**/
+    var preloadJs: String? = null,
     /**web形式起始页**/
     var startHtml: String? = null,
     var startStyle: String? = null,
@@ -106,6 +108,9 @@ data class RssSource(
     /**是否启用预加载**/
     @ColumnInfo(defaultValue = "0")
     var preload: Boolean = false,
+    /**是否优先加载缓存**/
+    @ColumnInfo(defaultValue = "0")
+    var cacheFirst: Boolean = false,
     /**搜索url**/
     var searchUrl: String? = null
 ) : Parcelable, BaseSource {

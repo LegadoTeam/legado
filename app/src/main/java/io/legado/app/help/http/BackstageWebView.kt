@@ -43,6 +43,7 @@ class BackstageWebView(
     private val overrideUrlRegex: String? = null,
     private val javaScript: String? = null,
     private val delayTime: Long = 0,
+    private val cacheFirst: Boolean = false
 ) {
 
     private val mHandler = Handler(Looper.getMainLooper())
@@ -114,6 +115,7 @@ class BackstageWebView(
         settings.blockNetworkImage = true
         settings.userAgentString = headerMap?.get(AppConst.UA_NAME) ?: AppConfig.userAgent
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+        settings.cacheMode = if(cacheFirst) WebSettings.LOAD_CACHE_ELSE_NETWORK else WebSettings.LOAD_DEFAULT
         if (sourceRegex.isNullOrBlank() && overrideUrlRegex.isNullOrBlank()) {
             webView.webViewClient = HtmlWebViewClient()
         } else {

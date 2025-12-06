@@ -78,6 +78,13 @@ data class BookChapter(
         }
     }
 
+    fun putDanmaku(value: String?) { //存入弹幕文本
+        if (super.putVariable("danmaku", value)) {
+            variable = GSON.toJson(variableMap)
+            appDb.bookChapterDao.update(this)
+        }
+    }
+
     @Ignore
     @IgnoredOnParcel
     var titleMD5: String? = null

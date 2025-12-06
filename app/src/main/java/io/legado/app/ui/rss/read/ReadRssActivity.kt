@@ -41,6 +41,9 @@ import io.legado.app.help.WebCacheManager
 import io.legado.app.help.WebJsExtensions
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.CookieManager
+import io.legado.app.help.http.newCallResponseBody
+import io.legado.app.help.http.okHttpClient
+import io.legado.app.help.http.text
 import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.accentColor
@@ -76,13 +79,21 @@ import splitties.views.bottomPadding
 import java.io.ByteArrayInputStream
 import java.net.URLDecoder
 import java.util.regex.PatternSyntaxException
-import io.legado.app.ui.rss.article.RssSortActivity
-import io.legado.app.utils.GSONStrict
-import io.legado.app.utils.fromJsonObject
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.rss.article.ReadRecordDialog
 import io.legado.app.ui.rss.source.edit.RssSourceEditActivity
 import io.legado.app.utils.StartActivityContract
+import kotlinx.coroutines.runBlocking
+import androidx.core.net.toUri
+import io.legado.app.constant.AppPattern
+import io.legado.app.help.WebJsExtensions.Companion.JS_INJECTION
+import io.legado.app.help.WebJsExtensions.Companion.basicJs
+import io.legado.app.help.WebJsExtensions.Companion.nameBasic
+import io.legado.app.help.WebJsExtensions.Companion.nameCache
+import io.legado.app.help.WebJsExtensions.Companion.nameJava
+import io.legado.app.help.WebJsExtensions.Companion.nameSource
+import io.legado.app.help.http.CookieStore
+import io.legado.app.help.http.newCallResponse
 
 /**
  * rss阅读界面
@@ -97,6 +108,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     private var ttsMenuItem: MenuItem? = null
     private var isFullscreen = false
     private var customWebViewCallback: WebChromeClient.CustomViewCallback? = null
+    private var isInterfaceInjected = false
     private val selectImageDir = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
             ACache.get().put(imagePathKey, uri.toString())
@@ -105,10 +117,17 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     }
     private val rssJsExtensions by lazy { RssJsExtensions(this, viewModel.rssSource) }
     private fun refresh() {
+        isInterfaceInjected = false
+        if (viewModel.rssSource?.singleUrl == true) {
+            binding.webView.reload()
+            return
+        }
         viewModel.rssArticle?.let {
             start(this@ReadRssActivity, it.title, it.link, it.origin)
         } ?: run {
-            viewModel.initData(intent)
+            viewModel.initData(intent) {
+                binding.webView.settings.cacheMode = if (viewModel.cacheFirst) WebSettings.LOAD_CACHE_ELSE_NETWORK else WebSettings.LOAD_DEFAULT
+            }
         }
     }
     private val editSourceResult = registerForActivityResult(
@@ -126,13 +145,35 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
         initView()
         initWebView()
         initLiveData()
-        viewModel.initData(intent)
+        viewModel.initData(intent) {
+            binding.webView.settings.cacheMode = if (viewModel.cacheFirst) WebSettings.LOAD_CACHE_ELSE_NETWORK else WebSettings.LOAD_DEFAULT
+        }
         onBackPressedDispatcher.addCallback(this) {
-            if (binding.customWebView.size > 0) {
+            if (binding.customWebView.size > 0) { //关闭全屏
                 customWebViewCallback?.onCustomViewHidden()
                 return@addCallback
-            } else if (binding.webView.canGoBack() && binding.webView.copyBackForwardList().size > 1) {
-                binding.webView.goBack()
+            } else if (binding.webView.canGoBack()) {
+                val list = binding.webView.copyBackForwardList() //获取历史列表
+                if (list.size < 2) { //到底了
+                    finish()
+                    return@addCallback
+                }
+                val currentIndex = list.currentIndex
+                val currentUrl = list.currentItem?.url ?: ""
+                //从后往前找，找到第一个不同链接的页面，计算需要回退多少步 避免刷新后导致返回不灵
+                var steps = 1
+                for (i in currentIndex - 1 downTo 0) {
+                    val item = list.getItemAtIndex(i)
+                    if (item.url != currentUrl) {
+                        break
+                    }
+                    steps++
+                }
+                if (list.size == steps) { //重复到底
+                    finish()
+                    return@addCallback
+                }
+                binding.webView.goBackOrForward(-steps) //可能会回退多步
                 return@addCallback
             }
             finish()
@@ -250,10 +291,9 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
         binding.progressBar.fontColor = accentColor
         binding.webView.webChromeClient = CustomWebChromeClient()
         //添加屏幕方向控制，网页关闭，openUI
-        binding.webView.addJavascriptInterface(JSInterface(), "AndroidComm")
+        binding.webView.addJavascriptInterface(JSInterface(), nameBasic)
         binding.webView.webViewClient = CustomWebViewClient()
         binding.webView.settings.apply {
-            cacheMode = WebSettings.LOAD_DEFAULT
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             domStorageEnabled = true
             mediaPlaybackRequiresUserGesture = false
@@ -316,38 +356,12 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
         }
     }
 
-    private fun injectOrientationSupport() {
-        val js = """
-            (function() {
-                if (screen.orientation && !screen.orientation.__patched) {
-                    screen.orientation.lock = function(orientation) {
-                        return new Promise((resolve, reject) => {
-                            window.AndroidComm?.lockOrientation(orientation) 
-                            resolve()
-                        });
-                    };
-                    screen.orientation.unlock = function() {
-                        return new Promise((resolve, reject) => {
-                            window.AndroidComm?.lockOrientation('unlock') 
-                            resolve()
-                        });
-                    };
-                    screen.orientation.__patched = true;
-                };
-                window.close = function() {
-                    window.AndroidComm?.onCloseRequested();
-                };
-            })();
-        """.trimIndent()
-        binding.webView.evaluateJavascript(js, null)
-    }
-
     private fun saveImage(webPic: String) {
         val path = ACache.get().getAsString(imagePathKey)
         if (path.isNullOrEmpty()) {
             selectSaveFolder(webPic)
         } else {
-            viewModel.saveImage(webPic, Uri.parse(path))
+            viewModel.saveImage(webPic, path.toUri())
         }
     }
 
@@ -395,12 +409,12 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
         viewModel.urlLiveData.observe(this) { urlState ->
             with(binding.webView) {
                 upJavaScriptEnable()
+                initJavascriptInterface()
                 CookieManager.applyToWebView(urlState.url)
                 settings.userAgentString = urlState.getUserAgent()
                 val processedHtml = viewModel.rssSource?.ruleContent?.takeIf { it.isNotEmpty() }
                     ?.let(viewModel::clHtml)
                 if (processedHtml != null) {
-                    initJavascriptInterface()
                     val baseUrl =
                         if (viewModel.rssSource?.loadWithBaseUrl == true) urlState.url else null
                     loadDataWithBaseURL(
@@ -434,11 +448,15 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     }
 
     private fun initJavascriptInterface() {
-        viewModel.rssSource?.let {
-            val webJsExtensions =WebJsExtensions(it, this, binding.webView)
-            binding.webView.addJavascriptInterface(webJsExtensions, "java")
-            binding.webView.addJavascriptInterface(it, "source")
-            binding.webView.addJavascriptInterface(WebCacheManager, "cache")
+        if (!isInterfaceInjected) {
+            isInterfaceInjected = true
+            if (!viewModel.hasPreloadJs) return
+            viewModel.rssSource?.let {
+                val webJsExtensions = WebJsExtensions(it, this, binding.webView)
+                binding.webView.addJavascriptInterface(webJsExtensions, nameJava)
+                binding.webView.addJavascriptInterface(it, nameSource)
+                binding.webView.addJavascriptInterface(WebCacheManager, nameCache)
+            }
         }
     }
 
@@ -553,7 +571,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
 
         @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION", "KotlinRedundantDiagnosticSuppress")
         override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
-            return shouldOverrideUrlLoading(Uri.parse(url))
+            return shouldOverrideUrlLoading(url.toUri())
         }
 
         /**
@@ -566,6 +584,17 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
         ): WebResourceResponse? {
             val url = request.url.toString()
             val source = viewModel.rssSource ?: return super.shouldInterceptRequest(view, request)
+            if (request.isForMainFrame) {
+                if (viewModel.hasPreloadJs || request.method == "POST") {
+                    if (url.startsWith("data:text/html;")) {
+                        return super.shouldInterceptRequest(view, request)
+                    }
+                    val preloadJs = source.preloadJs
+                    return runBlocking {
+                        getModifiedContentWithJs(url, preloadJs, request) ?: super.shouldInterceptRequest(view, request)
+                    }
+                }
+            }
             val blacklist = source.contentBlacklist?.splitNotBlank(",")
             if (!blacklist.isNullOrEmpty()) {
                 blacklist.forEach {
@@ -596,9 +625,48 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             return super.shouldInterceptRequest(view, request)
         }
 
+        private suspend fun getModifiedContentWithJs(url: String, preloadJs: String?, request: WebResourceRequest): WebResourceResponse? {
+            try {
+                val cookie = webCookieManager.getCookie(url)
+                val res = okHttpClient.newCallResponse {
+                    url(url)
+                    method(request.method, null)
+                    if (!cookie.isNullOrEmpty()) {
+                        addHeader("Cookie", cookie)
+                    }
+                    request.requestHeaders?.forEach { (key, value) ->
+                        addHeader(key, value)
+                    }
+                }
+                res.headers("Set-Cookie").forEach { setCookie ->
+                    webCookieManager.setCookie(url, setCookie)
+                }
+                val body = res.body
+                val contentType = body.contentType()
+                val mimeType = contentType?.toString()?.substringBefore(";") ?: "text/html"
+                val charset = contentType?.charset() ?: Charsets.UTF_8
+                val charsetSre = charset.name()
+                val bodyText = body.text().let { originalText ->
+                    AppPattern.htmlHeadRegex.find(originalText)?.let { match ->
+                        originalText.replaceRange(
+                            match.range,
+                            "${match.value}<script>(() => {$JS_INJECTION$preloadJs\n})();</script>"
+                        )
+                    } ?: originalText
+                }
+                return WebResourceResponse(
+                    mimeType,
+                    charsetSre,
+                    ByteArrayInputStream(bodyText.toByteArray(charset))
+                )
+            } catch (_: Exception) {
+                return null
+            }
+        }
+
         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
             super.onPageStarted(view, url, favicon)
-            injectOrientationSupport()
+            binding.webView.evaluateJavascript(basicJs, null)
         }
 
         override fun onPageFinished(view: WebView, url: String?) {
@@ -627,7 +695,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             viewModel.rssSource?.let { source ->
                 source.shouldOverrideUrlLoading?.takeUnless(String::isNullOrBlank)?.let { js ->
                     val startTime = SystemClock.uptimeMillis()
-                    val result = kotlin.runCatching {
+                    val result = runCatching {
                         runScriptWithContext(lifecycleScope.coroutineContext) {
                             source.evalJS(js) {
                                 put("java", rssJsExtensions)
@@ -680,6 +748,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                 putExtra("openUrl", url)
             }
         }
+        private val webCookieManager by lazy { android.webkit.CookieManager.getInstance() }
     }
 
 }

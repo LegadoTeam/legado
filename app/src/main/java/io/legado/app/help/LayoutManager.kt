@@ -26,7 +26,7 @@ object LayoutManager {
     }
 
 
-    fun linear(@Orientation orientation: Int, reverseLayout: Boolean): LayoutManagerFactory {
+    fun linear(@RecyclerView.Orientation orientation: Int, reverseLayout: Boolean): LayoutManagerFactory {
         return object : LayoutManagerFactory {
             override fun create(recyclerView: RecyclerView): RecyclerView.LayoutManager {
                 return LinearLayoutManager(recyclerView.context, orientation, reverseLayout)
@@ -46,7 +46,7 @@ object LayoutManager {
 
     fun grid(
         spanCount: Int,
-        @Orientation orientation: Int,
+        @RecyclerView.Orientation orientation: Int,
         reverseLayout: Boolean
     ): LayoutManagerFactory {
         return object : LayoutManagerFactory {
@@ -62,7 +62,7 @@ object LayoutManager {
     }
 
 
-    fun staggeredGrid(spanCount: Int, @Orientation orientation: Int): LayoutManagerFactory {
+    fun staggeredGrid(spanCount: Int, @RecyclerView.Orientation orientation: Int): LayoutManagerFactory {
         return object : LayoutManagerFactory {
             override fun create(recyclerView: RecyclerView): RecyclerView.LayoutManager {
                 return StaggeredGridLayoutManager(spanCount, orientation)

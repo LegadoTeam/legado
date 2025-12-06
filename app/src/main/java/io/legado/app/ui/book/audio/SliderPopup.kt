@@ -14,11 +14,11 @@ import io.legado.app.service.AudioPlayService
 import io.legado.app.ui.widget.seekbar.SeekBarChangeListener
 import kotlin.math.roundToInt
 
-class SliderPopup(private val context: Context, private val name: String) :
+class SliderPopup(private val context: Context, private val name: Int) :
     PopupWindow(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT) {
     companion object {
-        const val TIMER = "Timer"
-        const val SPEED = "Speed"
+        const val TIMER = 1
+        const val SPEED = 2
     }
 
     private val binding = PopupSeekBarBinding.inflate(LayoutInflater.from(context))

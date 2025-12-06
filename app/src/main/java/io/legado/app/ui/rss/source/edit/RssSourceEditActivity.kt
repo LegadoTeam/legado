@@ -1,20 +1,23 @@
 package io.legado.app.ui.rss.source.edit
 
 import android.content.Intent
+import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
 import android.widget.EditText
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.tabs.TabLayout
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
-import io.legado.app.constant.BookSourceType
 import io.legado.app.data.entities.RssSource
 import io.legado.app.databinding.ActivityRssSourceEditBinding
 import io.legado.app.help.config.LocalConfig
@@ -32,7 +35,6 @@ import io.legado.app.ui.rss.source.debug.RssSourceDebugActivity
 import io.legado.app.ui.widget.dialog.UrlOptionDialog
 import io.legado.app.ui.widget.dialog.VariableDialog
 import io.legado.app.ui.widget.keyboard.KeyboardToolPop
-import io.legado.app.ui.widget.recycler.NoChildScrollLinearLayoutManager
 import io.legado.app.ui.widget.text.EditEntity
 import io.legado.app.utils.GSON
 import io.legado.app.utils.imeHeight
@@ -220,9 +222,26 @@ class RssSourceEditActivity :
             text = "WEB_VIEW"
         })
         binding.recyclerView.setEdgeEffectColor(primaryColor)
-        if (adapter.editEntityMaxLine < 999) {
-            binding.recyclerView.layoutManager = NoChildScrollLinearLayoutManager(this) //启用后会阻止RecyclerView跟随光标滚动,避免文本框乱跳动
+        fun createSpanSizeLookup() = object : GridLayoutManager.SpanSizeLookup() {
+            override fun getSpanSize(position: Int): Int = when (adapter.getItemViewType(position)) {
+                EditEntity.ViewType.checkBox -> 1 //CheckBox 占1个span
+                else -> 2 //占2个span（整行）
+            }
         }
+        val gridLayoutManager = if (adapter.editEntityMaxLine < 999) {
+            object : GridLayoutManager(this, 2) {
+                init {
+                    spanSizeLookup = createSpanSizeLookup()
+                }
+                override fun requestChildRectangleOnScreen(parent: RecyclerView, child: View, rect: Rect, immediate: Boolean, focusedChildVisible: Boolean) = false
+                override fun requestChildRectangleOnScreen(parent: RecyclerView, child: View, rect: Rect, immediate: Boolean) = false
+            }
+        } else {
+            GridLayoutManager(this, 2).apply {
+                spanSizeLookup = createSpanSizeLookup()
+            }
+        }
+        binding.recyclerView.layoutManager = gridLayoutManager
         binding.recyclerView.adapter = adapter
         binding.recyclerView.viewTreeObserver.addOnGlobalFocusChangeListener { oldFocus, newFocus ->
             if (newFocus is EditText) {
@@ -297,6 +316,7 @@ class RssSourceEditActivity :
             add(EditEntity("startHtml", rs.startHtml, R.string.r_startHtml))
             add(EditEntity("startStyle", rs.startStyle, R.string.r_startStyle))
             add(EditEntity("startJs", rs.startJs, R.string.r_startJs))
+            add(EditEntity("preloadJs", rs.preloadJs, R.string.r_preloadJs))
         }
         listEntities.clear()
         listEntities.apply {
@@ -326,7 +346,7 @@ class RssSourceEditActivity :
                     EditEntity.ViewType.checkBox
                 )
             )
-             add(
+            add(
                  EditEntity(
                      "showWebLog",
                      rs.showWebLog.toString(),
@@ -334,6 +354,14 @@ class RssSourceEditActivity :
                      EditEntity.ViewType.checkBox
                  )
              )
+            add(
+                EditEntity(
+                    "cacheFirst",
+                    rs.cacheFirst.toString(),
+                    R.string.cache_first,
+                    EditEntity.ViewType.checkBox
+                )
+            )
             add(EditEntity("ruleContent", rs.ruleContent, R.string.r_content))
             add(EditEntity("style", rs.style, R.string.r_style))
             add(EditEntity("injectJs", rs.injectJs, R.string.r_inject_js))
@@ -385,6 +413,7 @@ class RssSourceEditActivity :
                 "startHtml" -> source.startHtml = it.value
                 "startStyle" -> source.startStyle = it.value
                 "startJs" -> source.startJs = it.value
+                "preloadJs" -> source.preloadJs = it.value
             }
         }
         listEntities.forEach {
@@ -416,6 +445,7 @@ class RssSourceEditActivity :
                 "enableJs" -> source.enableJs = it.value.isTrue()
                 "loadWithBaseUrl" -> source.loadWithBaseUrl = it.value.isTrue()
                 "showWebLog" -> source.showWebLog = it.value.isTrue()
+                "cacheFirst" -> source.cacheFirst = it.value.isTrue()
                 "ruleContent" -> source.ruleContent =
                     viewModel.ruleComplete(it.value, source.ruleArticles)
 
