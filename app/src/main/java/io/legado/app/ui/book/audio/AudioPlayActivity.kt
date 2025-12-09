@@ -121,7 +121,9 @@ class AudioPlayActivity :
 
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.audio_play, menu)
-        menuCustomBtn = menu.findItem(R.id.menu_custom_btn)
+        menuCustomBtn = menu.findItem(R.id.menu_custom_btn)?.also {
+            it.isVisible = viewModel.customBtnListData.value == true
+        }
         return super.onCompatCreateOptionsMenu(menu)
     }
 
@@ -134,9 +136,9 @@ class AudioPlayActivity :
     override fun onCompatOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.menu_custom_btn -> {
-                AudioPlay.bookSource?.customButton?.let {
+                AudioPlay.bookSource?.let {source ->
                     AudioPlay.book?.let { book ->
-                        SourceCallBack.callBackBtn(this,SourceCallBack.CLICK_CUSTOM_BUTTON, AudioPlay.bookSource, book, AudioPlay.durChapter)
+                        SourceCallBack.callBackBtn(this,SourceCallBack.CLICK_CUSTOM_BUTTON, source, book, AudioPlay.durChapter)
                     }
                 }
             }
@@ -146,9 +148,7 @@ class AudioPlayActivity :
 
             R.id.menu_login -> AudioPlay.bookSource?.let {
                 startActivity<SourceLoginActivity> {
-                    putExtra("type", "bookSource")
-                    putExtra("key", it.bookSourceUrl)
-                    putExtra("bookUrl", AudioPlay.book?.bookUrl)
+                    putExtra("bookType", BookType.audio)
                 }
             }
 

@@ -127,22 +127,39 @@ object BookContent {
         }
         val subContentRule = contentRule.subContent
         if (!subContentRule.isNullOrBlank()) { //副内容
-            val subContent = analyzeRule.runCatching {
-                getString(subContentRule)
-            }.onFailure {
-                Debug.log(bookSource.bookSourceUrl, "获取副文出错, ${it.localizedMessage}")
-            }.getOrNull()
-            if (!subContent.isNullOrBlank()) {
-                if (book.isOnLineTxt) { //在线txt拼接到正文
-                    contentList.add(subContent)
-                } else if (book.isAudio) { //音频作为歌词
-                    bookChapter.putLyric(subContent)
-                    Debug.log(bookSource.bookSourceUrl, "┌获取副文歌词")
-                    Debug.log(bookSource.bookSourceUrl, "└\n$subContent")
-                } else if (book.isVideo) { //视频作为弹幕
-                    bookChapter.putDanmaku(subContent)
-                    Debug.log(bookSource.bookSourceUrl, "┌获取副文弹幕")
-                    Debug.log(bookSource.bookSourceUrl, "└\n$subContent")
+            analyzeRule.getString(subContentRule).let { rawContent ->
+                runCatching {
+                    if (book.isOnLineTxt) {
+                        contentList.add(rawContent)
+                        return@let
+                    }
+                    val subContent = rawContent.trim().let {
+                        if (it.startsWith("http", true)) {
+                            AnalyzeUrl(
+                                mUrl = it,
+                                source = bookSource,
+                                ruleData = book,
+                                coroutineContext = currentCoroutineContext()
+                            ).getStrResponseAwait().body
+                        } else {
+                            it
+                        }
+                    }
+                    when {
+                        book.isAudio -> {
+                            bookChapter.putLyric(subContent)
+                            Debug.log(bookSource.bookSourceUrl, "┌获取副文歌词")
+                            Debug.log(bookSource.bookSourceUrl, "└\n$subContent")
+                        }
+
+                        book.isVideo -> {
+                            bookChapter.putDanmaku(subContent)
+                            Debug.log(bookSource.bookSourceUrl, "┌获取副文弹幕")
+                            Debug.log(bookSource.bookSourceUrl, "└\n$subContent")
+                        }
+                    }
+                }.onFailure { e ->
+                    Debug.log(bookSource.bookSourceUrl, "获取副文出错, ${e.localizedMessage}")
                 }
             }
         }

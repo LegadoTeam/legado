@@ -49,7 +49,6 @@ import kotlinx.coroutines.Dispatchers.IO
 class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     val bookData = MutableLiveData<Book>()
     val chapterListData = MutableLiveData<List<BookChapter>>()
-    val customBtnLiveData = MutableLiveData<Boolean>()
     val webFiles = mutableListOf<WebFile>()
     var inBookshelf = false
     var hasCustomBtn = false
@@ -494,7 +493,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             if (ReadManga.book?.bookUrl == bookData.value!!.bookUrl) {
                 ReadManga.clearMangaChapter()
             }
-            SourceCallBack.callBackBook(SourceCallBack.CLEAR_CACHE, bookSource, bookData.value!!)
+            SourceCallBack.callBackBook(SourceCallBack.CLICK_CLEAR_CACHE, bookSource, bookData.value!!)
         }.onSuccess {
             context.toastOnUi(R.string.clear_cache_success)
         }.onError {
