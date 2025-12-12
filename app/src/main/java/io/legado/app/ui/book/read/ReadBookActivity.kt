@@ -1274,7 +1274,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     override fun showLogin() {
         ReadBook.bookSource?.let {
             startActivity<SourceLoginActivity> {
-                putExtra("isReadBook", true)
+                putExtra("bookType", BookType.text)
             }
         }
     }

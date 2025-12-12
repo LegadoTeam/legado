@@ -5,6 +5,13 @@
     tools:ignore="AlwaysShowAction">
 
     <item
+        android:id="@+id/menu_custom_btn"
+        android:icon="@drawable/ic_custom"
+        android:title="@string/custom_button"
+        android:visible="false"
+        app:showAsAction="ifRoom" />
+
+    <item
         android:id="@+id/menu_rss_star"
         android:icon="@drawable/ic_star_border"
         android:title="@string/favorite"

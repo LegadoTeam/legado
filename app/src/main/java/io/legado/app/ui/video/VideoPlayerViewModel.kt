@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.MutableLiveData
 import io.legado.app.base.BaseViewModel
 import io.legado.app.data.appDb
+import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.RssSource
 import io.legado.app.model.VideoPlay
 
 class VideoPlayerViewModel(application: Application) : BaseViewModel(application) {
@@ -52,6 +54,19 @@ class VideoPlayerViewModel(application: Application) : BaseViewModel(application
             }
         }.onSuccess {
             upStarMenuData.postValue(true)
+        }
+    }
+
+    fun upSource(success: (() -> Unit)? = null) {
+        when (val source = VideoPlay.source) {
+            is BookSource -> {
+                VideoPlay.source = appDb.bookSourceDao.getBookSource(source.getKey())?.also {
+                    success?.invoke()
+                }
+            }
+            is RssSource -> {
+                VideoPlay.source = appDb.rssSourceDao.getByKey(source.getKey())
+            }
         }
     }
 }

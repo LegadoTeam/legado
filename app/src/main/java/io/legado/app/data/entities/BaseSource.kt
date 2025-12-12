@@ -190,7 +190,8 @@ interface BaseSource : JsExtensions {
         } else {
             val loginUiJson = loginUi?.let {
                 when {
-                    it.startsWith("@js:") -> evalJS((getLoginJs() ?: "") + it.substring(4),
+                    it.startsWith("@js:") -> evalJS(
+                        (getLoginJs() ?: "") + it.substring(4),
                         configureScriptBindings()
                     ).toString()
 

@@ -66,16 +66,19 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     private var isFullScreen = false
     private var isPortraitVideo = false
     private var orientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+    private var menuCustomBtn: MenuItem? = null
     private val bookSourceEditResult =
         registerForActivityResult(StartActivityContract(BookSourceEditActivity::class.java)) {
             if (it.resultCode == RESULT_OK) {
-                VideoPlay.upSource()
+                viewModel.upSource {
+                    menuCustomBtn?.isVisible = (VideoPlay.source as? BookSource)?.customButton == true
+                }
             }
         }
     private val rssSourceEditResult =
         registerForActivityResult(StartActivityContract(RssSourceEditActivity::class.java)) {
             if (it.resultCode == RESULT_OK) {
-                VideoPlay.upSource()
+                viewModel.upSource()
             }
         }
     private val tocActivityResult = registerForActivityResult(TocActivityResult()) {
@@ -324,6 +327,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         playerView.fullscreenButton.setOnClickListener { toggleFullScreen() }
         playerView.setBackFromFullScreenListener { toggleFullScreen() }
         playerView.setVideoAllCallBack(object : GSYSampleCallBack() {
+            @SuppressLint("SourceLockedOrientationActivity")
             override fun onPrepared(url: String?, vararg objects: Any?) {
                 super.onPrepared(url, *objects)
                 playerView.post {
@@ -369,6 +373,9 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     }
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        menuCustomBtn = menu.findItem(R.id.menu_custom_btn)?.also {
+            it.isVisible = (VideoPlay.source as? BookSource)?.customButton == true
+        }
         starMenuItem = menu.findItem(R.id.menu_rss_star)
         upStarMenu()
         return super.onPrepareOptionsMenu(menu)
@@ -397,21 +404,30 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
 
     override fun onCompatOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
+            R.id.menu_custom_btn -> {
+                (VideoPlay.source as? BookSource)?.let {source ->
+                    VideoPlay.book?.let { book ->
+                        SourceCallBack.callBackBtn(this, SourceCallBack.CLICK_CUSTOM_BUTTON, source, book, VideoPlay.chapter)
+                    }
+                }
+            }
             R.id.menu_rss_star -> viewModel.addFavorite {
                 VideoPlay.rssStar?.let { showDialogFragment(RssFavoritesDialog(it)) }
             }
             R.id.menu_float_window -> startFloatingWindow()
             R.id.menu_config_settings -> showDialogFragment(SettingsDialog(this))
             R.id.menu_login -> VideoPlay.source?.let {s ->
-                val type = when (s) {
-                    is BookSource -> "bookSource"
-                    is RssSource -> "rssSource"
-                    else -> null
-                }
-                type?.let { it ->
-                    startActivity<SourceLoginActivity> {
-                        putExtra("type", it)
-                        putExtra("key", s.getKey())
+               when (s) {
+                    is BookSource -> {
+                        startActivity<SourceLoginActivity> {
+                            putExtra("bookType", BookType.video)
+                        }
+                    }
+                    is RssSource -> {
+                        startActivity<SourceLoginActivity> {
+                            putExtra("type", "rssSource")
+                            putExtra("key", s.getKey())
+                        }
                     }
                 }
             }

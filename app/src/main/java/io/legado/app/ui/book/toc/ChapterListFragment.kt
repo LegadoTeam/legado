@@ -199,6 +199,8 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                             break
                         }
                     }
+                } else {
+                    chapterInVolumeIndex = bookChapter.index
                 }
                 setResult(
                     RESULT_OK, Intent()

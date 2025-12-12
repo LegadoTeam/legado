@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Context.MODE_PRIVATE
 import android.content.SharedPreferences
+import android.net.Uri
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
@@ -35,6 +36,7 @@ import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.rss.Rss
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.ui.book.source.SourceCallBack
+import io.legado.app.utils.FileUtils
 import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.externalCache
 import io.legado.app.utils.postEvent
@@ -78,6 +80,7 @@ object VideoPlay : CoroutineScope by MainScope(){
     var danmakuSpeed = 1.2f
 
     val videoManager by lazy { ExoVideoManager() }
+    private var isLoading = false
     var videoUrl: String? = null //播放链接
     var singleUrl = false
     var videoTitle: String? = null
@@ -151,21 +154,19 @@ object VideoPlay : CoroutineScope by MainScope(){
                 }
             } else {
                 Rss.getContent(this, rssArticle, ruleContent, s)
-                    .onSuccess(IO) { body ->
-                        val body = body.trim()
-                        val url = if (body.isEmpty()) {
+                    .onSuccess(IO) { content ->
+                        val content = content.trim()
+                        videoUrl = if (content.isEmpty()) {
                             throw ContentEmptyException("正文为空")
-                        } else if (body.startsWith("<")) { //当作mpd文本
-                            //todo 字符串转链接
-                            videoUrl = body
-                            body
+                        } else if (content.startsWith("<")) { //当作mpd文本
+                            val file = File(FileUtils.getCachePath(), "temp.mpd")
+                            file.writeText(content)
+                            Uri.fromFile(file).toString()
                         } else {
-                            NetworkUtils.getAbsoluteURL(rssArticle.link, body).also {
-                                videoUrl = it
-                            }
+                            NetworkUtils.getAbsoluteURL(rssArticle.link, content)
                         }
                         val analyzeUrl = AnalyzeUrl(
-                            url,
+                            videoUrl!!,
                             source = source,
                             ruleData = rssArticle
                         )
@@ -186,6 +187,7 @@ object VideoPlay : CoroutineScope by MainScope(){
             }
             return
         }
+        val book = book
         if (book == null) {
             appCtx.toastOnUi("未找到书籍")
             return
@@ -204,25 +206,25 @@ object VideoPlay : CoroutineScope by MainScope(){
                 episodes?.getOrNull(chapterInVolumeIndex)
             }
         }
+        val chapter = chapter
         if (chapter == null) {
             appCtx.toastOnUi("未找到章节")
             return
         }
-        WebBook.getContent(this, source as BookSource, book!!, chapter!!)
+        WebBook.getContent(this, source as BookSource, book, chapter)
             .onSuccess(IO) { content ->
                 val content = content.trim()
-                val url = if (content.isEmpty()) {
+                videoUrl = if (content.isEmpty()) {
                     throw ContentEmptyException("正文为空")
                 } else if (content.startsWith("<")) { //当作mpd文本
-                    //todo 字符串转链接
-                    videoUrl = content
-                    content
+                    val file = File(FileUtils.getCachePath(), "temp.mpd")
+                    file.writeText(content)
+                    Uri.fromFile(file).toString()
                 } else {
-                    videoUrl = content
                     content
                 }
                 val analyzeUrl = AnalyzeUrl(
-                    url,
+                    videoUrl!!,
                     source = source,
                     ruleData = book,
                     chapter = chapter
@@ -245,6 +247,7 @@ object VideoPlay : CoroutineScope by MainScope(){
             }.onError {
                 AppLog.put("获取资源链接出错\n$it", it, true)
             }
+        isLoading = true
     }
 
     /**
@@ -274,25 +277,27 @@ object VideoPlay : CoroutineScope by MainScope(){
             videoManager.listener().onCompletion()
         }
         videoManager.releaseMediaPlayer()
-        //还原所有状态
-        videoUrl = null
-        singleUrl = false
-        videoTitle = null
-        source = null
-        book = null
-        toc = null
-        chapter = null
-        volumes.clear()
-        episodes = null
-        chapterInVolumeIndex = 0
-        durVolumeIndex = 0
-        durVolume = null
-        durChapterPos = 0
-        inBookshelf = true
-        rssStar = null
-        rssRecord = null
-        danmakuStr = null
-        danmakuFile = null
+        if (!isLoading) {
+            //还原所有状态
+            videoUrl = null
+            singleUrl = false
+            videoTitle = null
+            source = null
+            book = null
+            toc = null
+            chapter = null
+            volumes.clear()
+            episodes = null
+            chapterInVolumeIndex = 0
+            durVolumeIndex = 0
+            durVolume = null
+            durChapterPos = 0
+            inBookshelf = true
+            rssStar = null
+            rssRecord = null
+            danmakuStr = null
+            danmakuFile = null
+        }
     }
     /**
      * 暂停播放
@@ -348,6 +353,7 @@ object VideoPlay : CoroutineScope by MainScope(){
     }
 
     fun initSource(sourceKey: String?, sourceType: Int?, bookUrl: String?, record:String?): Boolean {
+        isLoading = true
         source = sourceKey?.let {
             when (sourceType) {
                 SourceType.book -> appDb.bookSourceDao.getBookSource(it)
@@ -367,9 +373,6 @@ object VideoPlay : CoroutineScope by MainScope(){
         }?.also { b ->
             chapterInVolumeIndex = b.chapterInVolumeIndex
             durVolumeIndex = b.durVolumeIndex
-            if (chapterInVolumeIndex == 0 && durVolumeIndex == 0) {
-                chapterInVolumeIndex = b.durChapterIndex
-            }
             durChapterPos = b.durChapterPos
             source = appDb.bookSourceDao.getBookSource(b.origin)
             SourceCallBack.callBackBook(SourceCallBack.START_READ, source as BookSource?, b, chapter)
@@ -390,17 +393,6 @@ object VideoPlay : CoroutineScope by MainScope(){
             }
         }
         return true
-    }
-
-    fun upSource() {
-        when (source) {
-            is BookSource -> {
-                source = appDb.bookSourceDao.getBookSource(source!!.getKey())
-            }
-            is RssSource -> {
-                source = appDb.rssSourceDao.getByKey(source!!.getKey())
-            }
-        }
     }
 
     fun upEpisodes() {

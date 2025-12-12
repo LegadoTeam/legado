@@ -3,7 +3,6 @@ package io.legado.app.model.analyzeRule
 import android.annotation.SuppressLint
 import android.util.Base64
 import androidx.annotation.Keep
-import androidx.collection.LruCache
 import androidx.media3.common.MediaItem
 import cn.hutool.core.codec.PercentCodec
 import cn.hutool.core.net.RFC3986
@@ -109,6 +108,7 @@ class AnalyzeUrl(
     private var retry: Int = 0
     private var useWebView: Boolean = false
     private var webJs: String? = null
+    private var bodyJs: String? = null
     private var dnsIp: String? = null
     private val enabledCookieJar = source?.enabledCookieJar == true
     private val domain: String
@@ -245,6 +245,7 @@ class AnalyzeUrl(
                 retry = option.getRetry()
                 useWebView = option.useWebView()
                 webJs = option.getWebJs()
+                bodyJs = option.getBodyJs()
                 dnsIp = option.getDnsIp()
                 option.getJs()?.let { jsStr ->
                     evalJS(jsStr, url)?.toString()?.let {
@@ -466,6 +467,9 @@ class AnalyzeUrl(
                         ?.matches(AppPattern.xmlContentTypeRegex) == true
                     if (isXml && it.body?.trim()?.startsWith("<?xml", true) == false) {
                         StrResponse(it.raw, "<?xml version=\"1.0\"?>" + it.body)
+                    } else if (bodyJs != null) {
+                        val body = evalJS(bodyJs!!,it.body).toString()
+                        StrResponse(it.raw, body)
                     } else it
                 }
             }
@@ -775,6 +779,11 @@ class AnalyzeUrl(
          */
         private var js: String? = null,
         /**
+         * 得到访问结果后执行的js,对结果进行二次处理
+         * 执行结果返回为body
+         */
+        private var bodyJs: String? = null,
+        /**
          * 服务器id
          */
         private var serverID: Long? = null,
@@ -886,6 +895,14 @@ class AnalyzeUrl(
 
         fun getJs(): String? {
             return js
+        }
+
+        fun setBodyJs(value: String?) {
+            bodyJs = if (value.isNullOrBlank()) null else value
+        }
+
+        fun getBodyJs(): String? {
+            return bodyJs
         }
 
         fun setServerID(value: String?) {

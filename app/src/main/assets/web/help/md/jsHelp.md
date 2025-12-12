@@ -37,7 +37,7 @@
 
 ## 当前类对象的可使用的部分方法
 
-### [RssJsExtensions](https://github.com/LegadoTeam/legado/blob/main/app/src/main/java/io/legado/app/ui/rss/read/RssJsExtensions.kt)
+### [RssJsExtensions](https://github.com/LegadoTeam/legado/blob/main/app/src/main/java/io/legado/app/ui/rss/read/RssJsExtensions.kt)独有函数
 > 在订阅源`shouldOverrideUrlLoading`规则或`登录界面`中使用  
 > 订阅添加跳转url拦截, js, 返回true拦截,js变量url,可以通过js打开url  
 > url跳转拦截规则不能执行耗时操作
@@ -68,8 +68,8 @@ java.open(name: String, url: String?, title: String?)
 java.open(name: String, url: String?, title: String?, origin: String?)
 ```
 
-### [SourceLoginJsExtensions](https://github.com/LegadoTeam/legado/blob/main/app/src/main/java/io/legado/app/ui/login/SourceLoginJsExtensions.kt)
-> 只在登录界面按钮被触发时或按钮的回调事件中有效  
+### [SourceLoginJsExtensions](https://github.com/LegadoTeam/legado/blob/main/app/src/main/java/io/legado/app/ui/login/SourceLoginJsExtensions.kt)独有函数
+> 只在`登录界面按钮`被触发时或`按钮的回调`事件中有效  
 ```js
 java.copyText(text: String) //复制文本到剪贴板
 java.upLoginData(data: Map<String, String>) //实时更新登录界面信息，参数是键值对对象对象，例如{"telephone":"123"}
@@ -478,7 +478,8 @@ login函数获取登录信息键值
 source.getLoginInfoMap().get(key: String)
 清除登录信息
 source.removeLoginInfo()
-login函数存放登录信息，在登录界面时请调用java.upLoginData
+login函数存放登录信息，  
+在登录界面时请调用java.upLoginData
 source.putLoginInfo()
 ```
 * 书源缓存刷新

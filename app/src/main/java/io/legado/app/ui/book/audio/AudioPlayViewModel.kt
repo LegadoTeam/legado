@@ -95,7 +95,9 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
     fun upSource() {
         execute {
             val book = AudioPlay.book ?: return@execute
-            AudioPlay.bookSource = book.getBookSource()
+            AudioPlay.bookSource = book.getBookSource()?.also{
+                customBtnListData.postValue(it.customButton)
+            }
         }
     }
 

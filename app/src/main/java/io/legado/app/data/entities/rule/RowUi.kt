@@ -17,6 +17,7 @@ data class RowUi(
         const val password = "password"
         const val button = "button"
         const val toggle = "toggle"
+        const val select = "select"
 
     }
 
