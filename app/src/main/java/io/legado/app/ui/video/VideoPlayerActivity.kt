@@ -438,7 +438,11 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                     this.toastOnUi("暂无播放地址")
                     return true
                 }
-                sendToClip(url)
+                VideoPlay.book?.let {
+                    SourceCallBack.callBackBtn(this, SourceCallBack.CLICK_COPY_PLAY_URL, VideoPlay.source as? BookSource, it, VideoPlay.chapter) {
+                        sendToClip(url)
+                    }
+                }
             }
             R.id.menu_open_other_video_player -> {
                 val url = VideoPlay.videoUrl

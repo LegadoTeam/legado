@@ -2,6 +2,7 @@ package io.legado.app.help.storage
 
 import android.content.Context
 import android.net.Uri
+import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.PreferKey
@@ -14,6 +15,7 @@ import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ThemeConfig
 import io.legado.app.help.coroutine.Coroutine
+import io.legado.app.model.BookCover
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.LogUtils
@@ -29,6 +31,7 @@ import io.legado.app.utils.openOutputStream
 import io.legado.app.utils.outputStream
 import io.legado.app.utils.writeToOutputStream
 import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -80,6 +83,7 @@ object Backup {
             ReadBookConfig.configFileName,
             ReadBookConfig.shareConfigFileName,
             ThemeConfig.configFileName,
+            BookCover.configFileName,
             "config.xml",
             "videoConfig.xml"
         )
@@ -172,6 +176,10 @@ object Backup {
             FileUtils.createFileIfNotExist(backupPath + File.separator + DirectLinkUpload.ruleFileName)
                 .writeText(GSON.toJson(it))
         }
+        BookCover.getConfig()?.let {
+            FileUtils.createFileIfNotExist(backupPath + File.separator + BookCover.configFileName)
+                .writeText(GSON.toJson(it))
+        }
         currentCoroutineContext().ensureActive()
         appCtx.getSharedPreferences(backupPath, "config")?.let { sp ->
             val edit = sp.edit()
@@ -230,7 +238,7 @@ object Backup {
                 }
 
                 path.isContentScheme() -> {
-                    copyBackup(context, Uri.parse(path), backupFileName)
+                    copyBackup(context, path.toUri(), backupFileName)
                 }
 
                 else -> {

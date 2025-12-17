@@ -18,6 +18,7 @@
 > `{"example":"https://www.example.com/js/example.js", ...}` 自动复用已经下载的js文件
 
 > 注意此处定义的函数可能会被多个线程同时调用，在函数里的全局变量内容将会共享使用，对其进行修改可能会出现竞争问题
+> 函数内声明全局变量必须使用var
 
 * 并发率
 > 并发限制，单位ms，可填写两种格式
@@ -247,6 +248,7 @@ let options = {
 "clickClearCache" //点击详情页清理缓存按钮
 "clickCopyBookUrl" //点击详情页拷贝书籍URl按钮
 "clickCopyTocUrl" //点击详情页拷贝目录URl按钮
+"clickCopyPlayUrl" //音频、视频界面点击拷贝播放URL按钮
 //上面的事件回调执行结果返回true会消费事件，原本的软件操作不会再执行
 
 //下面的事件无法被回调结果消费

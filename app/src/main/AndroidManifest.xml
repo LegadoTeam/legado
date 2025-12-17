@@ -114,6 +114,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- 图标7 -->
+        <activity
+            android:name=".ui.welcome.Launcher7"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/launcher7">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
         <!-- 主界面 -->
         <activity
             android:name=".ui.main.MainActivity"

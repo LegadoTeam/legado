@@ -13,6 +13,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.ui.book.read.page.ContentTextView
 import io.legado.app.ui.book.read.page.entities.TextChapter.Companion.emptyTextChapter
+import io.legado.app.ui.book.read.page.entities.column.TextBaseColumn
 import io.legado.app.ui.book.read.page.entities.column.TextColumn
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.utils.canvasrecorder.CanvasRecorderFactory
@@ -50,7 +51,7 @@ data class TextPage(
     val lineSize: Int get() = textLines.size
     val charSize: Int get() = text.length.coerceAtLeast(1)
     val chapterPosition: Int get() = textLines.first().chapterPosition
-    val searchResult = hashSetOf<TextColumn>()
+    val searchResult = hashSetOf<TextBaseColumn>()
     var isMsgPage: Boolean = false
     var canvasRecorder = CanvasRecorderFactory.create(true)
     var doublePage = false
@@ -270,7 +271,7 @@ data class TextPage(
         val columns = textLines[maxIndex].columns
         for (index in 0 until columnIndex) {
             val column = columns[index]
-            if (column is TextColumn) {
+            if (column is TextBaseColumn) {
                 length += column.charData.length
             }
         }

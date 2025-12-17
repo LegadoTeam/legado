@@ -1317,4 +1317,5 @@
     <string name="r_preloadJs">预注入Js（preloadJs）</string>
     <string name="cache_first">优先加载缓存</string>
     <string name="rule_sub_content">副文规则（subContent）</string>
+    <string name="system_auto">跟随系统</string>
 </resources>

@@ -35,4 +35,5 @@ object EventBus {
     const val EXPORT_BOOK = "exportBook"
     const val UP_MANGA_CONFIG = "upMangaConfig"
     const val PLAY_MODE_CHANGED = "playModeChanged"
+    const val REFRESH_BOOK_INFO = "refreshBookInfo"
 }
