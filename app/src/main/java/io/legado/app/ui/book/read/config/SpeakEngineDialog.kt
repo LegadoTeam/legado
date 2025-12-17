@@ -286,6 +286,19 @@ class SpeakEngineDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
                         }
                     }
                 }
+                cbName.setOnLongClickListener {
+                    getItemByLayoutPosition(holder.layoutPosition)?.let { httpTTS ->
+                        if (!httpTTS.loginUrl.isNullOrBlank()) {
+                            val id = httpTTS.id.toString()
+                            startActivity<SourceLoginActivity> {
+                                putExtra("type", "httpTts")
+                                putExtra("key", id)
+                            }
+                            return@setOnLongClickListener true
+                        }
+                    }
+                    false
+                }
                 ivEdit.setOnClickListener {
                     val id = getItemByLayoutPosition(holder.layoutPosition)!!.id
                     showDialogFragment(HttpTtsEditDialog(id))

@@ -11,6 +11,7 @@ import io.github.rosemoe.sora.langs.textmate.registry.provider.AssetsFileResolve
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppPattern.JS_PATTERN
+import io.legado.app.constant.Theme
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.BackstageWebView
@@ -48,7 +49,6 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
         FileProviderRegistry.getInstance().addFileProvider(
             AssetsFileResolver(appCtx.assets)
         )
-        loadTextMateThemes()
         GrammarRegistry.getInstance().loadGrammars("textmate/languages.json")
     }
 
@@ -81,8 +81,8 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
         return htmlRegex.containsMatchIn(trimmedText) && trimmedText.endsWith(">")
     }
 
-    fun loadTextMateThemes(index: Int? = null) {
-        val theme = themeFileNames.getOrElse(index ?: AppConfig.editTheme) { "d_monokai" }
+    fun loadTextMateThemes(index: Int) {
+        val theme = themeFileNames.getOrElse(index) { "d_monokai" }
         val themeModel = themeRegistry.findThemeByFileName(theme)
         if (themeModel == null) {
             val themeAssetsPath = "textmate/$theme.json"

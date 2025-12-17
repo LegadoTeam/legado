@@ -71,8 +71,12 @@ java.open(name: String, url: String?, title: String?, origin: String?)
 ### [SourceLoginJsExtensions](https://github.com/LegadoTeam/legado/blob/main/app/src/main/java/io/legado/app/ui/login/SourceLoginJsExtensions.kt)独有函数
 > 只在`登录界面按钮`被触发时或`按钮的回调`事件中有效  
 ```js
-java.copyText(text: String) //复制文本到剪贴板
-java.upLoginData(data: Map<String, String>) //实时更新登录界面信息，参数是键值对对象对象，例如{"telephone":"123"}
+//复制文本到剪贴板
+java.copyText(text: String)
+//实时更新登录界面用户信息，upLoginData(null)会全部重置为默认值
+java.upLoginData(data: Map<String, String?>?)
+//刷新书籍详情页
+java.refreshBookInfo()
 ```
 
 ### [AnalyzeUrl](https://github.com/LegadoTeam/legado/blob/master/app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeUrl.kt) 部分函数

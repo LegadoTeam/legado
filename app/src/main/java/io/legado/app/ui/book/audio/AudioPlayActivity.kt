@@ -115,8 +115,9 @@ class AudioPlayActivity :
         }
         viewModel.customBtnListData.observe(this) { menuCustomBtn?.isVisible = it }
         viewModel.initData(intent) {
-            initView()
+            initListener()
         }
+        initView()
     }
 
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
@@ -153,7 +154,13 @@ class AudioPlayActivity :
             }
 
             R.id.menu_wake_lock -> AppConfig.audioPlayUseWakeLock = !AppConfig.audioPlayUseWakeLock
-            R.id.menu_copy_audio_url -> sendToClip(AudioPlayService.url)
+            R.id.menu_copy_audio_url -> {
+                AudioPlay.book?.let {
+                    SourceCallBack.callBackBtn(this, SourceCallBack.CLICK_COPY_PLAY_URL, AudioPlay.bookSource, it, AudioPlay.durChapter) {
+                        sendToClip(AudioPlayService.url)
+                    }
+                }
+            }
             R.id.menu_edit_source -> AudioPlay.bookSource?.let {
                 sourceEditResult.launch {
                     putExtra("sourceUrl", it.bookSourceUrl)
@@ -171,26 +178,9 @@ class AudioPlayActivity :
     }
 
     private fun initView() {
-        binding.ivPlayMode.setOnClickListener {
-            AudioPlay.changePlayMode()
-        }
-
         observeEventSticky<AudioPlay.PlayMode>(EventBus.PLAY_MODE_CHANGED) {
             playMode = it
             updatePlayModeIcon()
-        }
-
-        binding.fabPlayStop.setOnClickListener {
-            playButton()
-        }
-        binding.fabPlayStop.onLongClick {
-            AudioPlay.stop()
-        }
-        binding.ivSkipNext.setOnClickListener {
-            AudioPlay.next()
-        }
-        binding.ivSkipPrevious.setOnClickListener {
-            AudioPlay.prev()
         }
         binding.playerProgress.setOnSeekBarChangeListener(object : SeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
@@ -206,12 +196,6 @@ class AudioPlayActivity :
                 AudioPlay.adjustProgress(seekBar.progress)
             }
         })
-        binding.ivChapter.setOnClickListener {
-            AudioPlay.book?.let {
-                tocActivityResult.launch(it.bookUrl)
-            }
-        }
-
         /* 低于安卓6不显示调速按钮 */
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
             binding.ivSpeedControl.invisible()
@@ -225,6 +209,29 @@ class AudioPlayActivity :
             timerSliderPopup.showAsDropDown(it, 0, (-100).dpToPx(), Gravity.TOP)
         }
         binding.llPlayMenu.applyNavigationBarPadding()
+    }
+
+    private fun initListener() {
+        binding.ivPlayMode.setOnClickListener {
+            AudioPlay.changePlayMode()
+        }
+        binding.fabPlayStop.setOnClickListener {
+            playButton()
+        }
+        binding.fabPlayStop.onLongClick {
+            AudioPlay.stop()
+        }
+        binding.ivSkipNext.setOnClickListener {
+            AudioPlay.next()
+        }
+        binding.ivSkipPrevious.setOnClickListener {
+            AudioPlay.prev()
+        }
+        binding.ivChapter.setOnClickListener {
+            AudioPlay.book?.let {
+                tocActivityResult.launch(it.bookUrl)
+            }
+        }
     }
 
     private fun updatePlayModeIcon() {

@@ -10,12 +10,28 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <io.legado.app.ui.widget.text.AccentTextView
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingBottom="16dp"
-            android:text="@string/change_theme"
-            android:textSize="18sp" />
+            android:orientation="horizontal">
+
+            <io.legado.app.ui.widget.text.AccentTextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:paddingBottom="16dp"
+                android:text="@string/change_theme"
+                android:textSize="18sp" />
+
+            <Switch
+                android:id="@+id/switch_system_auto"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="@string/system_auto"
+                tools:ignore="UseSwitchCompatOrMaterialXml" />
+
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"

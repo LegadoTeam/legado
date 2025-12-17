@@ -77,6 +77,14 @@ data class TextLine(
         textColumns.add(column)
     }
 
+    fun addColumns(columns: Collection<BaseColumn>) {
+        onlyTextColumn = false
+        columns.forEach { column ->
+            column.textLine = this
+        }
+        textColumns.addAll(columns)
+    }
+
     fun getColumn(index: Int): BaseColumn {
         return textColumns.getOrElse(index) {
             textColumns.last()

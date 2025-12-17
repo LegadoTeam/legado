@@ -22,7 +22,7 @@ class SourceLoginViewModel(application: Application) : BaseViewModel(application
     var headerMap: Map<String, String> = emptyMap()
     var book: Book? = null
     var chapter: BookChapter? = null
-    var loginInfo: Map<String, String> = mutableMapOf()
+    var loginInfo: MutableMap<String, String> = mutableMapOf()
 
     fun initData(intent: Intent, success: (bookSource: BaseSource) -> Unit, error: () -> Unit) {
         execute {

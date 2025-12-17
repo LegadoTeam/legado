@@ -2,8 +2,8 @@ package io.legado.app.ui.book.read.page.entities.column
 
 import android.graphics.Canvas
 import android.os.Build
+import android.text.TextPaint
 import androidx.annotation.Keep
-import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.ui.book.read.page.ContentTextView
 import io.legado.app.ui.book.read.page.entities.TextLine
@@ -11,13 +11,16 @@ import io.legado.app.ui.book.read.page.entities.TextLine.Companion.emptyTextLine
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
 
 /**
- * 文字列
+ * 带html样式的文字列
  */
 @Keep
-data class TextColumn(
+data class TextHtmlColumn(
     override var start: Float,
     override var end: Float,
     override val charData: String,
+    val mTextSize: Float,
+    val mTextColor: Int,
+    val linkUrl: String?
 ) : TextBaseColumn {
 
     override var textLine: TextLine = emptyTextLine
@@ -29,6 +32,7 @@ data class TextColumn(
             }
             field = value
         }
+
     override var isSearchResult: Boolean = false
         set(value) {
             if (field != value) {
@@ -43,20 +47,28 @@ data class TextColumn(
         }
 
     override fun draw(view: ContentTextView, canvas: Canvas) {
-        val textPaint = if (textLine.isTitle) {
-            ChapterProvider.titlePaint
-        } else {
-            ChapterProvider.contentPaint
-        }
-        val textColor = if (textLine.isReadAloud || isSearchResult) {
-            ThemeStore.accentColor
-        } else {
-            ReadBookConfig.textColor
-        }
-        if (textPaint.color != textColor) {
-            textPaint.color = textColor
-        }
         val y = textLine.lineBase - textLine.lineTop
+        if (linkUrl != null) {
+            val textPaint = TextPaint(ChapterProvider.contentPaint).apply {
+                textSize = mTextSize
+                color = ThemeStore.accentColor
+                isUnderlineText = true
+            }
+            drawText(view, canvas, y, textPaint)
+            return
+        }
+        val textPaint = TextPaint(ChapterProvider.contentPaint).apply {
+            textSize = mTextSize
+            color = if (textLine.isReadAloud || isSearchResult) {
+                ThemeStore.accentColor
+            } else {
+                mTextColor
+            }
+        }
+        drawText(view, canvas, y, textPaint)
+    }
+
+    private fun drawText(view: ContentTextView, canvas: Canvas, y: Float, textPaint: TextPaint) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
             val letterSpacing = textPaint.letterSpacing * textPaint.textSize
             val letterSpacingHalf = letterSpacing * 0.5f

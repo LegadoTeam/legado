@@ -11,14 +11,17 @@ import io.legado.app.data.entities.Bookmark
 import io.legado.app.help.book.isOnLineTxt
 import io.legado.app.help.config.AppConfig
 import io.legado.app.model.ReadBook
+import io.legado.app.ui.association.OpenUrlConfirmActivity
 import io.legado.app.ui.book.read.page.delegate.PageDelegate
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.book.read.page.entities.TextPage
 import io.legado.app.ui.book.read.page.entities.TextPos
 import io.legado.app.ui.book.read.page.entities.column.BaseColumn
 import io.legado.app.ui.book.read.page.entities.column.ButtonColumn
+import io.legado.app.ui.book.read.page.entities.column.TextHtmlColumn
 import io.legado.app.ui.book.read.page.entities.column.ImageColumn
 import io.legado.app.ui.book.read.page.entities.column.ReviewColumn
+import io.legado.app.ui.book.read.page.entities.column.TextBaseColumn
 import io.legado.app.ui.book.read.page.entities.column.TextColumn
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.ui.book.read.page.provider.TextPageFactory
@@ -27,6 +30,7 @@ import io.legado.app.utils.activity
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.showDialogFragment
+import io.legado.app.utils.startActivity
 import io.legado.app.utils.toastOnUi
 import java.util.concurrent.Executors
 import kotlin.math.max
@@ -222,6 +226,11 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                     column.selected = true
                     select(textPos)
                 }
+                is TextHtmlColumn -> {
+                    if (!selectAble) return@touch
+                    column.selected = true
+                    select(textPos)
+                }
             }
         }
     }
@@ -257,6 +266,19 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                         }
                     }
                 }
+                is TextHtmlColumn -> {
+                    column.linkUrl?.let {
+                        activity?.startActivity<OpenUrlConfirmActivity> {
+                            putExtra("uri", it)
+//                            putExtra("mimeType", mimeType)
+//                            putExtra("sourceOrigin", source.getKey())
+//                            putExtra("sourceName", source.getTag())
+//                            putExtra("sourceType", source.getSourceType())
+                        }
+                        handled = true
+                    }
+
+                }
             }
         }
         return handled
@@ -271,7 +293,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         select: (textPos: TextPos) -> Unit,
     ) {
         touchRough(x, y) { _, textPos, _, _, column ->
-            if (column is TextColumn) {
+            if (column is TextBaseColumn) {
                 column.selected = true
                 select(textPos)
             }
@@ -545,7 +567,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                 textPos.lineIndex = lineIndex
                 for ((charIndex, column) in textLine.columns.withIndex()) {
                     textPos.columnIndex = charIndex
-                    if (column is TextColumn) {
+                    if (column is TextBaseColumn) {
                         val compareStart = textPos.compare(selectStart)
                         val compareEnd = textPos.compare(selectEnd)
                         column.selected = compareStart >= 0 && compareEnd <= 0
@@ -584,7 +606,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
             val textPage = relativePage(relativePos)
             textPage.lines.forEach { textLine ->
                 textLine.columns.forEach {
-                    if (it is TextColumn) {
+                    if (it is TextBaseColumn) {
                         it.selected = false
                         if (clearSearchResult) {
                             it.isSearchResult = false
@@ -612,7 +634,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                     textPos.columnIndex = charIndex
                     val compareStart = textPos.compare(selectStart)
                     val compareEnd = textPos.compare(selectEnd)
-                    if (column is TextColumn) {
+                    if (column is TextBaseColumn) {
                         when {
                             compareStart == -1 -> if (
                                 selectStart.columnIndex == textLine.columns.size
@@ -722,6 +744,6 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         fun onImageLongPress(x: Float, y: Float, src: String)
         fun onCancelSelect()
         fun onLongScreenshotTouchEvent(event: MotionEvent): Boolean
-        fun clickImg(clickjs: String)
+        fun clickImg(src: String)
     }
 }

@@ -25,6 +25,7 @@ import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.PreferKey
 import io.legado.app.databinding.ActivityCodeEditBinding
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.ThemeConfig
 import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.ui.about.AppLogDialog
@@ -57,6 +58,10 @@ class CodeEditActivity :
     private lateinit var options: SearchOptions
     private var menuSaveBtn: MenuItem? = null
 
+    private val isDark
+        get() = AppConfig.editTemeAuto && ThemeConfig.isDarkTheme()
+    private var themeIndex = -1
+
 
     private fun initView() {
         binding.root.setOnApplyWindowInsetsListenerCompat { _, windowInsets ->
@@ -66,10 +71,6 @@ class CodeEditActivity :
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
-        if (!isInitialized) {
-            viewModel.initSora()
-            isInitialized = true
-        }
         softKeyboardTool.attachToWindow(window)
         editor.colorScheme = TextMateColorScheme2.create(ThemeRegistry.getInstance()) //先设置颜色,避免一开始的白屏
         viewModel.initData(intent) {
@@ -141,9 +142,27 @@ class CodeEditActivity :
         }
     }
 
+    override fun initTheme() {
+        super.initTheme()
+        if (!isInitialized) {
+            viewModel.initSora()
+            isInitialized = true
+        }
+        val index = if (isDark) {
+            AppConfig.editThemeDark
+        } else {
+            AppConfig.editTheme
+        }
+        upTheme(index)
+        themeIndex = index
+    }
+
     override fun upTheme(index: Int) {
-        viewModel.loadTextMateThemes(index)
-        editor.setEditorLanguage(viewModel.language) //每次更改颜色后需要再执行一次语言设置,防止切换主题后高亮颜色不正确
+        if (themeIndex != index) {
+            viewModel.loadTextMateThemes(index)
+            editor.setEditorLanguage(viewModel.language) //每次更改颜色后需要再执行一次语言设置,防止切换主题后高亮颜色不正确
+            themeIndex = index
+        }
     }
 
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
@@ -273,7 +292,7 @@ class CodeEditActivity :
             R.id.menu_search -> search()
             R.id.menu_save -> save(false)
             R.id.menu_format_code -> viewModel.formatCode(editor)
-            R.id.menu_change_theme -> showDialogFragment(ChangeThemeDialog(this))
+            R.id.menu_change_theme -> showDialogFragment(ChangeThemeDialog())
             R.id.menu_config_settings -> showDialogFragment(SettingsDialog(this, this))
             R.id.menu_auto_wrap -> {
                 item.isChecked = !AppConfig.editAutoWrap

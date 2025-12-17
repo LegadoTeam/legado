@@ -184,19 +184,19 @@ interface BaseSource : JsExtensions {
         put("chapter", null)
     }
 
-    fun getLoginInfoMap(): Map<String, String> {
+    fun getLoginInfoMap(): MutableMap<String, String> {
         val json = getLoginInfo() ?: if (loginUi.isNullOrBlank()) {
             return mutableMapOf()
         } else {
             val loginUiJson = loginUi?.let {
                 when {
                     it.startsWith("@js:") -> evalJS(
-                        (getLoginJs() ?: "") + it.substring(4),
+                        "${getLoginJs() ?: ""}\n${it.substring(4)}",
                         configureScriptBindings()
                     ).toString()
 
                     it.startsWith("<js>") -> evalJS(
-                        (getLoginJs() ?: "") + it.substring(4, it.lastIndexOf("<")),
+                        "${getLoginJs() ?: ""}\n${it.substring(4, it.lastIndexOf("<"))}",
                         configureScriptBindings()
                     ).toString()
 
@@ -205,12 +205,13 @@ interface BaseSource : JsExtensions {
             }
             val longinInfo = GSON.fromJsonArray<RowUi>(loginUiJson).getOrNull()
                 ?.filter { it.type != "button" }
-                ?.associate { it.name to (it.default ?: "") }?.also {
+                ?.associate { it.name to (it.default ?: "") }
+                ?.takeIf { it.isNotEmpty() }?.also {
                     putLoginInfo(GSON.toJson(it))
                 }
-            return longinInfo ?: mutableMapOf()
+            return longinInfo?.toMutableMap() ?: mutableMapOf()
         }
-        return GSON.fromJsonObject<Map<String, String>>(json).getOrNull() ?: mutableMapOf()
+        return GSON.fromJsonObject<MutableMap<String, String>>(json).getOrNull() ?: mutableMapOf()
     }
 
     /**
