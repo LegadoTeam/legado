@@ -13,6 +13,7 @@ offset=0
 # 防止 set -u 未定义变量报错
 lastest_cronet_version=""
 lastest_cronet_main_version=""
+CRONET_TMP_DIR=""
 
 # 添加变量到 github env
 function write_github_env_variable() {
@@ -73,7 +74,7 @@ function sync_proguard_rules() {
   done
 }
 
-# ---------- 新增：Cronet jar 自洽性预检（关键长期修复） ----------
+# ---------- Cronet jar 自洽性预检 ----------
 function jar_has_class() {
   local jar="$1"
   local class_path="$2"
@@ -82,9 +83,10 @@ function jar_has_class() {
 
 function validate_cronet_jars() {
   local base="https://storage.googleapis.com/chromium-cronet/android/$lastest_cronet_version/Release/cronet"
-  local tmp_dir
-  tmp_dir="$(mktemp -d)"
-  trap 'rm -rf "$tmp_dir"' RETURN
+
+  # 用全局变量保存临时目录，避免 trap 在 set -u 下引用不到局部变量
+  CRONET_TMP_DIR="$(mktemp -d)"
+  trap 'rm -rf "${CRONET_TMP_DIR:-}"' RETURN
 
   local jars=(
     "cronet_impl_native_java.jar"
@@ -96,27 +98,27 @@ function validate_cronet_jars() {
 
   echo "preflight: download cronet jars to validate consistency: $lastest_cronet_version"
   for j in "${jars[@]}"; do
-    curl -fsSL "$base/$j" -o "$tmp_dir/$j" || return 1
+    curl -fsSL "$base/$j" -o "$CRONET_TMP_DIR/$j" || return 1
   done
 
   local native_provider="org/chromium/net/impl/NativeCronetProvider.class"
   local httpengine_provider="org/chromium/net/impl/HttpEngineNativeProvider.class"
 
+  # 只要存在 NativeCronetProvider，就要求 HttpEngineNativeProvider 也必须存在
   local has_native_provider=1
-  if jar_has_class "$tmp_dir/cronet_impl_native_java.jar" "$native_provider" \
-    || jar_has_class "$tmp_dir/cronet_impl_platform_java.jar" "$native_provider" \
-    || jar_has_class "$tmp_dir/cronet_impl_common_java.jar" "$native_provider" \
-    || jar_has_class "$tmp_dir/cronet_shared_java.jar" "$native_provider"; then
+  if jar_has_class "$CRONET_TMP_DIR/cronet_impl_native_java.jar" "$native_provider" \
+    || jar_has_class "$CRONET_TMP_DIR/cronet_impl_platform_java.jar" "$native_provider" \
+    || jar_has_class "$CRONET_TMP_DIR/cronet_impl_common_java.jar" "$native_provider" \
+    || jar_has_class "$CRONET_TMP_DIR/cronet_shared_java.jar" "$native_provider"; then
     has_native_provider=0
   fi
 
-  # 只要存在 NativeCronetProvider，就要求 HttpEngineNativeProvider 也必须存在
   if [[ $has_native_provider -eq 0 ]]; then
-    if jar_has_class "$tmp_dir/cronet_impl_native_java.jar" "$httpengine_provider" \
-      || jar_has_class "$tmp_dir/cronet_impl_platform_java.jar" "$httpengine_provider" \
-      || jar_has_class "$tmp_dir/cronet_impl_common_java.jar" "$httpengine_provider" \
-      || jar_has_class "$tmp_dir/cronet_shared_java.jar" "$httpengine_provider" \
-      || jar_has_class "$tmp_dir/cronet_api.jar" "$httpengine_provider"; then
+    if jar_has_class "$CRONET_TMP_DIR/cronet_impl_native_java.jar" "$httpengine_provider" \
+      || jar_has_class "$CRONET_TMP_DIR/cronet_impl_platform_java.jar" "$httpengine_provider" \
+      || jar_has_class "$CRONET_TMP_DIR/cronet_impl_common_java.jar" "$httpengine_provider" \
+      || jar_has_class "$CRONET_TMP_DIR/cronet_shared_java.jar" "$httpengine_provider" \
+      || jar_has_class "$CRONET_TMP_DIR/cronet_api.jar" "$httpengine_provider"; then
       echo "preflight OK: HttpEngineNativeProvider present"
       return 0
     else
@@ -128,17 +130,16 @@ function validate_cronet_jars() {
   echo "preflight OK: NativeCronetProvider not present (skip HttpEngine check)"
   return 0
 }
-# --------------------------------------------------------------
+# -------------------------------------------
 
 function fetch_version() {
-  # 获取最新 cronet 版本
   lastest_cronet_version=$(curl -s "https://chromiumdash.appspot.com/fetch_releases?channel=$branch&platform=Android&num=1&offset=$offset" | jq .[0].version -r)
   echo "lastest_cronet_version: $lastest_cronet_version"
   lastest_cronet_main_version=${lastest_cronet_version%%\.*}.0.0.0
 
   check_version_exit
 
-  # 自洽性预检：在 set -e 下需要显式捕获返回码，否则非 0 会直接退出脚本
+  # 在 set -e 下，预检返回非 0 不能直接退出，所以要捕获返回码
   set +e
   validate_cronet_jars
   local ret=$?
