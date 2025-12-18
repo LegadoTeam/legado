@@ -34,6 +34,13 @@ function version_compare() {
   fi
 }
 
+function url_exists() {
+  local url="$1"
+  local code
+  code=$(curl -s -I -o /dev/null -w "%{http_code}" "$url")
+  [[ "$code" == "200" ]]
+}
+
 function check_version_exit() {
   # 防御：如果还没取到版本就不要继续
   if [[ -z "${lastest_cronet_version:-}" ]]; then
@@ -43,11 +50,8 @@ function check_version_exit() {
 
   # 检查版本是否存在（以 cronet_api.jar 为基准）
   local jar_url="https://storage.googleapis.com/chromium-cronet/android/$lastest_cronet_version/Release/cronet/cronet_api.jar"
-  local statusCode
-  statusCode=$(curl -s -I -w %{http_code} "$jar_url" -o /dev/null)
-
-  if [[ "$statusCode" == "404" ]]; then
-    echo "storage.googleapis.com return 404 for cronet $lastest_cronet_version"
+  if ! url_exists "$jar_url"; then
+    echo "storage.googleapis.com return non-200 for cronet $lastest_cronet_version: $jar_url"
     if [[ $max_offset -gt $offset ]]; then
       offset=$(expr $offset + 1)
       echo "retry with offset $offset"
@@ -81,7 +85,26 @@ function jar_has_class() {
   unzip -l "$jar" 2>/dev/null | awk '{print $4}' | grep -Fxq "$class_path"
 }
 
+function validate_cronet_sos() {
+  local base="https://storage.googleapis.com/chromium-cronet/android/$lastest_cronet_version/Release/cronet/libs"
+  local abis=("armeabi-v7a" "arm64-v8a" "x86" "x86_64")
+
+  for abi in "${abis[@]}"; do
+    local so_url="$base/$abi/libcronet.$lastest_cronet_version.so"
+    if ! url_exists "$so_url"; then
+      echo "preflight FAIL: missing so for $abi: $so_url"
+      return 3
+    fi
+  done
+
+  echo "preflight OK: all ABI .so present"
+  return 0
+}
+
 function validate_cronet_jars() {
+  # 先检查 so 是否齐全（否则后续 gradle downloadCronet 会炸）
+  validate_cronet_sos || return $?
+
   local base="https://storage.googleapis.com/chromium-cronet/android/$lastest_cronet_version/Release/cronet"
 
   # 用全局变量保存临时目录，避免 trap 在 set -u 下引用不到局部变量
