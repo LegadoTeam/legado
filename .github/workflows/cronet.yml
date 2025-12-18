@@ -43,19 +43,6 @@ jobs:
               echo "NOT FOUND"
             fi
           done
-
-      - name: Patch Cronet jars (remove NativeCronetProvider)
-        if: ${{ env.cronet == 'ok' }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y zip
-      
-          echo "=== Patch: remove org.chromium.net.impl.NativeCronetProvider ==="
-          for f in app/cronetlib/*.jar; do
-            echo "--- $f ---"
-            zip -d "$f" "org/chromium/net/impl/NativeCronetProvider.class" 2>/dev/null || true
-            zip -d "$f" "org/chromium/net/impl/NativeCronetProvider\$*.class" 2>/dev/null || true
-          done
       
           echo "=== Verify NativeCronetProvider removed ==="
           for f in app/cronetlib/*.jar; do
