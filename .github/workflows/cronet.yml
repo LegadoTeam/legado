@@ -31,6 +31,19 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew app:downloadCronet
+      
+          echo "=== Check HttpEngineNativeProvider in jars ==="
+          for f in app/cronetlib/cronet_impl_native_java.jar \
+                   app/cronetlib/cronet_impl_platform_java.jar \
+                   app/cronetlib/cronet_impl_common_java.jar; do
+            echo "--- $f ---"
+            if jar tf "$f" | grep -F "org/chromium/net/impl/HttpEngineNativeProvider" >/dev/null; then
+              echo "FOUND"
+            else
+              echo "NOT FOUND"
+            fi
+          done
+
 
       - name: Create Pull Request
         if: ${{ env.cronet == 'ok' }}
