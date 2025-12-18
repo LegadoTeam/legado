@@ -118,12 +118,31 @@ function validate_cronet_jars() {
 # --------------------------------------------------------
 
 function fetch_version() {
-    # 获取最新 cronet 版本
     lastest_cronet_version=$(curl -s "https://chromiumdash.appspot.com/fetch_releases?channel=$branch&platform=Android&num=1&offset=$offset" | jq .[0].version -r)
     echo "lastest_cronet_version: $lastest_cronet_version"
     lastest_cronet_main_version=${lastest_cronet_version%%\.*}.0.0.0
 
     check_version_exit
+
+    # 自洽性预检：在 set -e 下要显式捕获返回码，否则非 0 会直接退出脚本
+    set +e
+    validate_cronet_jars
+    local ret=$?
+    set -e
+
+    if [[ $ret -ne 0 ]]; then
+        echo "cronet $lastest_cronet_version is not usable (preflight ret=$ret)"
+        if [[ $max_offset -gt $offset ]]; then
+            offset=$(expr $offset + 1)
+            echo "retry with offset $offset"
+            fetch_version
+        else
+            # 找不到可用版本就正常退出（不设置 env.cronet=ok，自然不会创建 PR）
+            exit 0
+        fi
+    fi
+}
+
 
     # 新增：自洽性预检，不通过就自动跳过该版本，尝试下一个 offset
     validate_cronet_jars
