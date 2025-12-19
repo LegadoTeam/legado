@@ -1,11 +1,4 @@
 plugins {
-//    id "com.android.application"
-//    id 'org.jetbrains.kotlin.android'
-//    id 'kotlin-parcelize'
-//    //id 'kotlin-kapt'
-//    id 'com.google.devtools.ksp'
-//    id "com.google.gms.google-services"
-
     alias libs.plugins.android.application
     alias libs.plugins.kotlin.android
     alias libs.plugins.kotlin.parcelize
@@ -26,6 +19,7 @@ def gitCommits = Integer.parseInt('git rev-list HEAD --count'.execute().text.tri
 android {
     compileSdk = compile_sdk_version
     namespace 'io.legado.app'
+
     kotlin {
         jvmToolchain {
             languageVersion.set(JavaLanguageVersion.of(17))
@@ -56,6 +50,7 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         project.ext.set("archivesBaseName", name + "_" + version)
 
+        // 版本号字段（你原来就有，保留）
         buildConfigField "String", "Cronet_Version", "\"$CronetVersion\""
         buildConfigField "String", "Cronet_Main_Version", "\"$CronetMainVersion\""
 
@@ -93,6 +88,7 @@ android {
                     'proguard-rules.pro',
                     'cronet-proguard-rules.pro'
         }
+
         debug {
             if (project.hasProperty("RELEASE_STORE_FILE")) {
                 signingConfig signingConfigs.myConfig
@@ -128,12 +124,10 @@ android {
         schemaDirectory "$projectDir/schemas"
     }
 
-    // 设定Room的KSP参数
     ksp {
         arg("room.incremental", "true")
         arg("room.expandProjection", "true")
         arg("room.generateKotlin", "false")
-        //arg("room.schemaLocation", "$projectDir/schemas")
     }
 
     compileOptions {
@@ -163,13 +157,16 @@ android {
 }
 
 /**
- * ✅ 关键：全局排除所有 Maven 进来的 cronet-*，避免与你 cronetlib/*.jar 重复类
+ * ✅ 方案A：只用 Maven 的 cronet-embedded
+ * ❌ 不要再 exclude org.chromium.net（否则会导致 R8 missing class）
+ * ❌ 不要再用 fileTree(cronetlib) 引入本地 jar
  */
-configurations.configureEach {
-    exclude group: "org.chromium.net"
-    // 可选：如果你工程里有人引入 GMS cronet 包装，也一起排
-    exclude group: "com.google.android.gms", module: "play-services-cronet"
-}
+
+// 如果你之前加过下面这段“全局排除 org.chromium.net”，请确保彻底删除：
+// configurations.configureEach {
+//     exclude group: "org.chromium.net"
+//     exclude group: "com.google.android.gms", module: "play-services-cronet"
+// }
 
 dependencies {
     coreLibraryDesugaring(libs.desugar)
@@ -242,10 +239,10 @@ dependencies {
     implementation(libs.okhttp)
 
     /**
-     * ✅ Cronet：只用你 app/cronetlib/ 目录下的 jar（不要再 include *.aar）
-     * 目录里应当就是你截图那 5 个 jar
+     * ✅ Cronet（方案A）：只保留 Maven 版本
+     * 建议统一用 HttpEngineNativeProviderVersion（你 gradle.properties 里已经有）
      */
-    implementation(fileTree(dir: "cronetlib", include: ["*.jar"]))
+    implementation("org.chromium.net:cronet-embedded:${HttpEngineNativeProviderVersion}")
 
     implementation(libs.protobuf.javalite)
 
