@@ -13,6 +13,7 @@ offset=0
 # 防止 set -u 未定义变量报错
 lastest_cronet_version=""
 lastest_cronet_main_version=""
+lastest_httpengine_provider_version=""
 CRONET_TMP_DIR=""
 
 # 添加变量到 github env
@@ -99,6 +100,62 @@ function validate_cronet_sos() {
   return 0
 }
 
+# 从 Google Maven metadata 中找“指定主版本(例如 141.)”的最新 httpengine-native-provider 版本
+function resolve_httpengine_provider_version_for_major() {
+  local major="$1"   # 例如 141
+  local meta_url="https://dl.google.com/dl/android/maven2/org/chromium/net/httpengine-native-provider/maven-metadata.xml"
+
+  # 取出所有 <version>...</version>，筛选 major. 前缀，排序取最大
+  local ver
+  ver=$(
+    curl -fsSL "$meta_url" \
+      | tr '\n' ' ' \
+      | sed -n 's/.*<versions>\(.*\)<\/versions>.*/\1/p' \
+      | sed 's/<version>/\n<version>/g' \
+      | sed -n 's/.*<version>\([^<]*\)<\/version>.*/\1/p' \
+      | grep -E "^${major}\." \
+      | sort -V \
+      | tail -n 1
+  ) || true
+
+  echo "${ver:-}"
+}
+
+function validate_httpengine_provider_aar_has_class() {
+  # 验证 AAR 存在且确实包含 HttpEngineNativeProvider.class
+  local ver="$1"
+  local class_path="org/chromium/net/impl/HttpEngineNativeProvider.class"
+  local base="https://dl.google.com/dl/android/maven2/org/chromium/net/httpengine-native-provider/$ver"
+  local aar_url="$base/httpengine-native-provider-$ver.aar"
+
+  if ! url_exists "$aar_url"; then
+    echo "preflight FAIL: missing httpengine-native-provider aar: $aar_url"
+    return 4
+  fi
+
+  local tmpdir
+  tmpdir="$(mktemp -d)"
+  # shellcheck disable=SC2064
+  trap "rm -rf \"$tmpdir\"" RETURN
+
+  curl -fsSL "$aar_url" -o "$tmpdir/httpengine-native-provider.aar" || return 4
+
+  # AAR 里 class 通常在 classes.jar 里
+  if ! unzip -p "$tmpdir/httpengine-native-provider.aar" classes.jar >/dev/null 2>&1; then
+    echo "preflight FAIL: aar missing classes.jar"
+    return 4
+  fi
+
+  unzip -p "$tmpdir/httpengine-native-provider.aar" classes.jar > "$tmpdir/classes.jar"
+  if jar_has_class "$tmpdir/classes.jar" "$class_path"; then
+    echo "preflight OK: HttpEngineNativeProvider present in httpengine-native-provider-$ver.aar"
+    return 0
+  fi
+
+  echo "preflight FAIL: HttpEngineNativeProvider not found inside httpengine-native-provider-$ver.aar"
+  return 4
+}
+
 function validate_cronet_jars() {
   # 先检查 so 是否齐全
   validate_cronet_sos || return $?
@@ -121,51 +178,41 @@ function validate_cronet_jars() {
     curl -fsSL "$base/$j" -o "$CRONET_TMP_DIR/$j" || return 1
   done
 
+  # 仅用于定位输出（不作为失败条件）
   local native_provider="org/chromium/net/impl/NativeCronetProvider.class"
   local httpengine_provider="org/chromium/net/impl/HttpEngineNativeProvider.class"
-
-  # 打印定位信息（非常关键：以后不再盲猜）
-  echo "preflight: locate NativeCronetProvider / HttpEngineNativeProvider"
+  echo "preflight: locate NativeCronetProvider / HttpEngineNativeProvider (informational)"
   for j in "${jars[@]}"; do
     if jar_has_class "$CRONET_TMP_DIR/$j" "$native_provider"; then
       echo "FOUND NativeCronetProvider in $j"
     fi
     if jar_has_class "$CRONET_TMP_DIR/$j" "$httpengine_provider"; then
-      echo "FOUND HttpEngineNativeProvider in $j"
+      echo "FOUND HttpEngineNativeProvider in $j (unexpected for chromium-cronet jars)"
     fi
   done
 
-  # 只要任一 jar 里存在 NativeCronetProvider，就要求 HttpEngineNativeProvider 也必须存在（否则 R8 会 missing class）
-  local has_native_provider=1
-  if jar_has_class "$CRONET_TMP_DIR/cronet_api.jar" "$native_provider" \
-    || jar_has_class "$CRONET_TMP_DIR/cronet_impl_common_java.jar" "$native_provider" \
-    || jar_has_class "$CRONET_TMP_DIR/cronet_impl_native_java.jar" "$native_provider" \
-    || jar_has_class "$CRONET_TMP_DIR/cronet_impl_platform_java.jar" "$native_provider" \
-    || jar_has_class "$CRONET_TMP_DIR/cronet_shared_java.jar" "$native_provider"; then
-    has_native_provider=0
+  # 你明确“需要 HttpEngineNativeProvider”：
+  # -> 正确检查方式：确保 Google Maven 上存在 httpengine-native-provider，并且 AAR 里包含该类
+  local major="${lastest_cronet_version%%\.*}"
+  lastest_httpengine_provider_version="$(resolve_httpengine_provider_version_for_major "$major")"
+
+  if [[ -z "${lastest_httpengine_provider_version:-}" ]]; then
+    echo "preflight FAIL: no httpengine-native-provider version found for major=$major"
+    return 2
   fi
 
-  if [[ $has_native_provider -eq 0 ]]; then
-    if jar_has_class "$CRONET_TMP_DIR/cronet_api.jar" "$httpengine_provider" \
-      || jar_has_class "$CRONET_TMP_DIR/cronet_impl_common_java.jar" "$httpengine_provider" \
-      || jar_has_class "$CRONET_TMP_DIR/cronet_impl_native_java.jar" "$httpengine_provider" \
-      || jar_has_class "$CRONET_TMP_DIR/cronet_impl_platform_java.jar" "$httpengine_provider" \
-      || jar_has_class "$CRONET_TMP_DIR/cronet_shared_java.jar" "$httpengine_provider"; then
-      echo "preflight OK: HttpEngineNativeProvider present"
-      return 0
-    else
-      echo "preflight FAIL: NativeCronetProvider exists but HttpEngineNativeProvider missing"
-      return 2
-    fi
-  fi
+  validate_httpengine_provider_aar_has_class "$lastest_httpengine_provider_version" || return $?
 
-  echo "preflight OK: NativeCronetProvider not present (skip HttpEngine check)"
+  echo "preflight OK: cronet $lastest_cronet_version + httpengine-native-provider $lastest_httpengine_provider_version"
   return 0
 }
 # --------------------------------
 
 function fetch_version() {
-  lastest_cronet_version=$(curl -s "https://chromiumdash.appspot.com/fetch_releases?channel=$branch&platform=Android&num=1&offset=$offset" | jq .[0].version -r)
+  lastest_cronet_version=$(
+    curl -s "https://chromiumdash.appspot.com/fetch_releases?channel=$branch&platform=Android&num=1&offset=$offset" \
+      | jq .[0].version -r
+  )
   echo "lastest_cronet_version: $lastest_cronet_version"
   lastest_cronet_main_version=${lastest_cronet_version%%\.*}.0.0.0
 
@@ -191,20 +238,35 @@ function fetch_version() {
 ##########
 path="$GITHUB_WORKSPACE/gradle.properties"
 current_cronet_version=$(grep "^CronetVersion=" "$path" | sed 's/CronetVersion=//')
+current_httpengine_provider_version=$(grep "^HttpEngineNativeProviderVersion=" "$path" 2>/dev/null | sed 's/HttpEngineNativeProviderVersion=//' || true)
+
 echo "current_cronet_version: $current_cronet_version"
+echo "current_httpengine_provider_version: ${current_httpengine_provider_version:-<empty>}"
 
 echo "fetch $branch release info from https://chromiumdash.appspot.com ..."
 fetch_version
 
+# 现在 lastest_cronet_version / lastest_cronet_main_version / lastest_httpengine_provider_version 都是可用组合
 if version_compare "$current_cronet_version" "$lastest_cronet_version"; then
   sed -i "s/^CronetVersion=.*/CronetVersion=$lastest_cronet_version/" "$path"
   sed -i "s/^CronetMainVersion=.*/CronetMainVersion=$lastest_cronet_main_version/" "$path"
+
+  # 写入或新增 HttpEngineNativeProviderVersion
+  if grep -q "^HttpEngineNativeProviderVersion=" "$path"; then
+    sed -i "s/^HttpEngineNativeProviderVersion=.*/HttpEngineNativeProviderVersion=$lastest_httpengine_provider_version/" "$path"
+  else
+    echo "" >> "$path"
+    echo "HttpEngineNativeProviderVersion=$lastest_httpengine_provider_version" >> "$path"
+  fi
 
   sync_proguard_rules
 
   sed -i "s/## cronet版本: .*/## cronet版本: $lastest_cronet_version/" "$GITHUB_WORKSPACE/app/src/main/assets/updateLog.md"
 
   write_github_env_variable PR_TITLE "Bump cronet from $current_cronet_version to $lastest_cronet_version"
-  write_github_env_variable PR_BODY "Changes in the [Git log](https://chromium.googlesource.com/chromium/src/+log/$current_cronet_version..$lastest_cronet_version)"
+  write_github_env_variable PR_BODY "Changes in the [Git log](https://chromium.googlesource.com/chromium/src/+log/$current_cronet_version..$lastest_cronet_version)
+HttpEngineNativeProvider: $lastest_httpengine_provider_version"
+  write_github_env_variable CRONET_VERSION "$lastest_cronet_version"
+  write_github_env_variable HTTPENGINE_PROVIDER_VERSION "$lastest_httpengine_provider_version"
   write_github_env_variable cronet ok
 fi
