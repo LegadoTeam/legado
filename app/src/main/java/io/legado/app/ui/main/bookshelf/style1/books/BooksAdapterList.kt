@@ -36,7 +36,7 @@ class BooksAdapterList(
             tvAuthor.text = item.author
             tvRead.text = item.durChapterTitle
             tvLast.text = item.latestChapterTitle
-            ivCover.load(item.getDisplayCover(), item, false, item.origin)
+            ivCover.load(item, false)
             upRefresh(binding, item)
             upLastUpdateTime(binding, item)
         } else {
@@ -49,10 +49,8 @@ class BooksAdapterList(
                         "dur" -> tvRead.text = item.durChapterTitle
                         "last" -> tvLast.text = item.latestChapterTitle
                         "cover" -> ivCover.load(
-                            item.getDisplayCover(),
                             item,
                             false,
-                            item.origin,
                             fragment,
                             lifecycle
                         )

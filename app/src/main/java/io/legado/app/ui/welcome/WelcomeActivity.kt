@@ -18,6 +18,7 @@ import io.legado.app.ui.main.MainActivity
 import io.legado.app.utils.BitmapUtils
 import io.legado.app.utils.fullScreen
 import io.legado.app.utils.getPrefBoolean
+import io.legado.app.utils.getPrefInt
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.setStatusBarColorAuto
 import io.legado.app.utils.startActivity
@@ -34,10 +35,11 @@ open class WelcomeActivity : BaseActivity<ActivityWelcomeBinding>() {
             // 避免从桌面启动程序后，会重新实例化入口类的activity
             finish()
         } else {
-            if (getPrefBoolean(PreferKey.closeWelcome)) {
+            val welcomeShowTime = getPrefInt(PreferKey.welcomeShowTime, 500)
+            if (welcomeShowTime == 0) {
                 startMainActivity()
             } else {
-                binding.root.postDelayed(500) { startMainActivity() }
+                binding.root.postDelayed(welcomeShowTime.toLong()) { startMainActivity() }
             }
         }
         binding.ivBook.setColorFilter(accentColor)

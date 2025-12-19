@@ -19,6 +19,7 @@ import splitties.views.onLongClick
 @Suppress("UNUSED_PARAMETER")
 class BooksAdapterGrid(context: Context, callBack: CallBack) :
     BaseBooksAdapter<RecyclerView.ViewHolder>(context, callBack) {
+    private val showBookname = AppConfig.showBookname
 
     override fun onCreateViewHolder(
         parent: ViewGroup,
@@ -27,7 +28,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
         return when (viewType) {
             1 -> GroupViewHolder(ItemBookshelfGridGroupBinding.inflate(inflater, parent, false))
             else -> {
-                when (AppConfig.showBookname) {
+                when (showBookname) {
                     2 -> BookViewHolder2(ItemBookshelfGrid2Binding.inflate(inflater, parent, false))
                     1 -> BookViewHolder(ItemBookshelfGridBinding.inflate(inflater, parent, false), false)
                     else -> BookViewHolder(ItemBookshelfGridBinding.inflate(inflater, parent, false), true)
@@ -70,7 +71,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
             else {
                 tvName.gone()
             }
-            ivCover.load(item.getDisplayCover(), item, false, item.origin)
+            ivCover.load(item, false)
             upRefresh(this, item)
         }
 
@@ -84,10 +85,8 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                         when (it) {
                             "name" -> tvName.text = item.name
                             "cover" -> ivCover.load(
-                                item.getDisplayCover(),
                                 item,
-                                false,
-                                item.origin
+                                false
                             )
 
                             "refresh" -> upRefresh(this, item)
@@ -128,7 +127,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
 
         fun onBind(item: Book, position: Int) = binding.run {
             tvName.text = item.name
-            ivCover.load(item.getDisplayCover(), item, false, item.origin)
+            ivCover.load(item, false)
             upRefresh(this, item)
         }
 
@@ -142,10 +141,8 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                         when (it) {
                             "name" -> tvName.text = item.name
                             "cover" -> ivCover.load(
-                                item.getDisplayCover(),
                                 item,
-                                false,
-                                item.origin
+                                false
                             )
 
                             "refresh" -> upRefresh(this, item)

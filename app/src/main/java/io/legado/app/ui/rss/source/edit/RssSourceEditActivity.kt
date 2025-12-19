@@ -11,6 +11,7 @@ import android.widget.EditText
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
+import androidx.core.view.indices
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -290,7 +291,13 @@ class RssSourceEditActivity :
             binding.cbSingleUrl.isChecked = rs.singleUrl
             binding.cbIsEnableCookie.isChecked = rs.enabledCookieJar == true
             binding.cbIsEnablePreload.isChecked = rs.preload
+            if (rs.type !in 0..<binding.spType.count) {
+                rs.type = 0
+            }
             binding.spType.setSelection(rs.type)
+            if (rs.articleStyle !in 0..<binding.lyType.count) {
+                rs.articleStyle = 0
+            }
             binding.lyType.setSelection(rs.articleStyle)
         }
         sourceEntities.clear()

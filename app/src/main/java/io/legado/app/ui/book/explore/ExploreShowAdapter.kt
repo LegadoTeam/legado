@@ -59,10 +59,8 @@ class ExploreShowAdapter(context: Context, val callBack: CallBack) :
                 llKind.setLabels(kinds)
             }
             ivCover.load(
-                item.coverUrl,
                 item,
-                AppConfig.loadCoverOnlyWifi,
-                item.origin
+                AppConfig.loadCoverOnlyWifi
             )
         }
     }

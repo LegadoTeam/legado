@@ -1,6 +1,7 @@
 package io.legado.app.ui.main.bookshelf.style2
 
 import android.content.Context
+import android.os.Parcelable
 import android.view.LayoutInflater
 import androidx.core.os.bundleOf
 import androidx.recyclerview.widget.AsyncListDiffer
@@ -14,8 +15,14 @@ abstract class BaseBooksAdapter<VH : RecyclerView.ViewHolder>(
     val context: Context,
     val callBack: CallBack
 ) : RecyclerView.Adapter<VH>() {
-
+    private var layoutState: Parcelable? = null
+    private var layoutManager: RecyclerView.LayoutManager? = null
     protected val inflater: LayoutInflater = LayoutInflater.from(context)
+
+    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
+        super.onAttachedToRecyclerView(recyclerView)
+        layoutManager = recyclerView.layoutManager
+    }
 
     private val diffItemCallback = object : DiffUtil.ItemCallback<Any>() {
 
@@ -99,10 +106,16 @@ abstract class BaseBooksAdapter<VH : RecyclerView.ViewHolder>(
     }
 
     private val asyncListDiffer by lazy {
-        AsyncListDiffer(this, diffItemCallback)
+        AsyncListDiffer(this, diffItemCallback).apply {
+            addListListener { _, _ ->
+                layoutManager?.onRestoreInstanceState(layoutState)
+                layoutState = null
+            }
+        }
     }
 
     fun updateItems() {
+        layoutState = layoutManager?.onSaveInstanceState()
         asyncListDiffer.submitList(callBack.getItems())
     }
 
