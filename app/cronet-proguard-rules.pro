@@ -1,45 +1,22 @@
-# -------- Config Path: base/android/proguard/shared_with_cronet.flags --------
-# Copyright 2016 The Chromium Authors
-# Use of this source code is governed by a BSD-style license that can be
-# found in the LICENSE file.
+#############################################
+# Cronet ProGuard / R8 rules (方案A: Maven cronet-embedded)
+# 说明：
+# - 仅用于 app 侧打包 cronet-embedded
+# - 不包含任何“文件树/DocumentFile/TreeDocumentFile”相关 keep
+#############################################
 
-# Contains flags that we want to apply not only to Chromium APKs, but also to
-# third-party apps that bundle the Cronet library.
-
-# WARNING: rules in this file are applied to entire third-party APKs, not just
-# Chromium code. They MUST be scoped appropriately to avoid side effects on app
-# code that we do not own.
-
-# Keep all CREATOR fields within Parcelable that are kept.
--keepclassmembers class !cr_allowunused,org.chromium.** implements android.os.Parcelable {
-  public static *** CREATOR;
+############### [1] AndroidX Keep 注解支持 ###############
+# third_party/androidx/androidx_annotations.flags
+-keep @androidx.annotation.Keep class *
+-keepclasseswithmembers,allowaccessmodification class * {
+  @androidx.annotation.Keep <fields>;
+}
+-keepclasseswithmembers,allowaccessmodification class * {
+  @androidx.annotation.Keep <methods>;
 }
 
-# Don't obfuscate Parcelables as they might be marshalled outside Chrome.
-# If we annotated all Parcelables that get put into Bundles other than
-# for saveInstanceState (e.g. PendingIntents), then we could actually keep the
-# names of just those ones. For now, we'll just keep them all.
--keepnames,allowaccessmodification class !cr_allowunused,org.chromium.** implements android.os.Parcelable {}
-
-# Keep all enum values and valueOf methods. See
-# http://proguard.sourceforge.net/index.html#manual/examples.html
-# for the reason for this. Also, see http://crbug.com/248037.
--keepclassmembers enum !cr_allowunused,org.chromium.** {
-    public static **[] values();
-}
-
-# Required to remove fields until b/274802355 is resolved.
--assumevalues class !cr_allowunused,** {
-  final org.chromium.base.ThreadUtils$ThreadChecker * return _NONNULL_;
-}
-# -------- Config Path: build/android/chromium_annotations.flags --------
-# Copyright 2022 The Chromium Authors
-# Use of this source code is governed by a BSD-style license that can be
-# found in the LICENSE file.
-
-# Contains flags related to annotations in //build/android that can be safely
-# shared with Cronet, and thus would be appropriate for third-party apps to
-# include.
+############### [2] Chromium 注解相关（Cronet 会用到） ###############
+# build/android/chromium_annotations.flags
 
 # Keep all annotation related attributes that can affect runtime
 -keepattributes RuntimeVisible*Annotations
@@ -48,7 +25,7 @@
 # Keeps for class level annotations.
 -keep,allowaccessmodification @org.chromium.build.annotations.UsedByReflection class ** {}
 
-# Keeps for method level annotations.
+# Keeps for method/field level annotations.
 -keepclasseswithmembers,allowaccessmodification class ** {
   @org.chromium.build.annotations.UsedByReflection <methods>;
 }
@@ -56,10 +33,7 @@
   @org.chromium.build.annotations.UsedByReflection <fields>;
 }
 
-# Never inline classes, methods, or fields with this annotation, but allow
-# shrinking and obfuscation.
-# Relevant to fields when they are needed to store strong references to objects
-# that are held as weak references by native code.
+# DoNotInline：不内联，但允许 shrink/obfuscation
 -if @org.chromium.build.annotations.DoNotInline class * {
     *** *(...);
 }
@@ -73,11 +47,12 @@
    @org.chromium.build.annotations.DoNotInline <fields>;
 }
 
+# AlwaysInline
 -alwaysinline class * {
     @org.chromium.build.annotations.AlwaysInline *;
 }
 
-# Keep all logs (Log.VERBOSE = 2). R8 does not allow setting to 0.
+# DoNotStripLogs：保留日志（R8 不允许设为 0，所以用 1）
 -maximumremovedandroidloglevel 1 class ** {
    @org.chromium.build.annotations.DoNotStripLogs <methods>;
 }
@@ -85,18 +60,15 @@
    <methods>;
 }
 
-# Never merge classes horizontally or vertically with this annotation.
-# Relevant to classes being used as a key in maps or sets.
+# DoNotClassMerge：禁止类合并
 -keep,allowaccessmodification,allowobfuscation,allowshrinking @org.chromium.build.annotations.DoNotClassMerge class *
 
-# Mark members annotated with IdentifierNameString as identifier name strings
+# IdentifierNameString
 -identifiernamestring class * {
     @org.chromium.build.annotations.IdentifierNameString *;
 }
 
-# Mark fields with this to help R8 figure out that they cannot be null.
-# Use assumevalues in addition to assumenosideeffects block because Google3 proguard cannot parse
-# assumenosideeffects blocks which overwrite return value.
+# OptimizeAsNonNull：帮助 R8 判定非空
 -assumevalues class ** {
   @org.chromium.build.annotations.OptimizeAsNonNull *** *(...) return _NONNULL_;
 }
@@ -109,32 +81,45 @@
 -assumenosideeffects class ** {
   @org.chromium.build.annotations.OptimizeAsNonNull *** *;
 }
-# -------- Config Path: components/cronet/android/cronet_impl_common_proguard.cfg --------
-# Proguard config for apps that depend on cronet_impl_common_java.jar.
 
-# Used through reflection by the API code to figure out the version of the impl
-# code it's talking to.
+############### [3] shared_with_cronet.flags ###############
+# Keep Parcelable CREATOR（仅限 org.chromium 包）
+-keepclassmembers class !cr_allowunused,org.chromium.** implements android.os.Parcelable {
+  public static *** CREATOR;
+}
+# Don't obfuscate Parcelables in org.chromium
+-keepnames,allowaccessmodification class !cr_allowunused,org.chromium.** implements android.os.Parcelable {}
+
+# Keep enum values() / valueOf（仅限 org.chromium）
+-keepclassmembers enum !cr_allowunused,org.chromium.** {
+    public static **[] values();
+}
+
+# Required to remove fields until b/274802355 is resolved.
+-assumevalues class !cr_allowunused,** {
+  final org.chromium.base.ThreadUtils$ThreadChecker * return _NONNULL_;
+}
+
+############### [4] cronet_impl_common_proguard.cfg ###############
+# Cronet API 通过反射读取 ImplVersion
 -keep public class org.chromium.net.impl.ImplVersion {
   public *;
 }
 
 -dontwarn com.google.errorprone.annotations.DoNotMock
-# -------- Config Path: components/cronet/android/cronet_impl_native_proguard.cfg --------
-# Proguard config for apps that depend on cronet_impl_native_java.jar.
 
-# This constructor is called using the reflection from Cronet API (cronet_api.jar).
+############### [5] cronet_impl_native_proguard.cfg ###############
+# Cronet API 通过反射调用 NativeCronetProvider(Context)
 -keep class org.chromium.net.impl.NativeCronetProvider {
     public <init>(android.content.Context);
 }
 
-# While Chrome doesn't need to keep these with their version of R8, some cronet
-# users may be on other optimizers which still require the annotation to be
-# kept in order for the keep rules to work.
+# 有些构建链要求 keep 注解本身，否则 keep rule 可能不生效
 -keep @interface org.chromium.build.annotations.DoNotInline
 -keep @interface org.chromium.build.annotations.UsedByReflection
 -keep @interface org.chromium.build.annotations.IdentifierNameString
-# ** prefixed since JNI Zero classes included in cronet are jarjared to prevent
-# clashes with the real JNI Zero. See https://crbug.com/353534209
+
+# JNI Zero 注解（Cronet jar 内部可能 jarjar 过，所以用 ** 前缀）
 -keep @interface **org.jni_zero.AccessedByNative
 -keep @interface **org.jni_zero.CalledByNative
 -keep @interface **org.jni_zero.CalledByNativeUnchecked
@@ -142,7 +127,6 @@
 # Suppress unnecessary warnings.
 -dontnote org.chromium.net.ProxyChangeListener$ProxyReceiver
 -dontnote org.chromium.net.AndroidKeyStore
-# Needs 'boolean onSearchRequested(android.view.SearchEvent)' (API level 23).
 -dontwarn org.chromium.base.WindowCallbackWrapper
 
 # Generated for chrome apk and not included into cronet.
@@ -150,71 +134,36 @@
 -dontwarn org.chromium.base.SysUtils
 -dontwarn org.chromium.build.NativeLibraries
 
-# Objects of this type are passed around by native code, but the class
-# is never used directly by native code. Since the class is not loaded, it does
-# not need to be preserved as an entry point.
+# Not required to keep (not loaded as entry point), but suppress note.
 -dontnote org.chromium.net.UrlRequest$ResponseHeadersMap
-# https://android.googlesource.com/platform/sdk/+/marshmallow-mr1-release/files/proguard-android.txt#54
+
+# legacy support lib warnings (有些环境会扫到)
 -dontwarn android.support.**
 
-# Skip protobuf runtime check for isOnAndroidDevice().
-# A nice-to-have optimization shamelessly stolen from //third_party/protobuf/java/lite/proguard.pgcfg.
+# Skip protobuf runtime check for isOnAndroidDevice()
 -assumevalues class com.google.protobuf.Android {
     static boolean ASSUME_ANDROID return true;
 }
 
-# See crbug.com/1440987. We must keep every native that we are manually
-# registering. If Cronet bumps its min-sdk past 21, we may be able to move to
-# automatic JNI registration.
-# ** prefixed since JNI Zero classes included in cronet are jarjared to prevent
-# clashes with the real JNI Zero. See https://crbug.com/353534209
+# 保留所有手动注册的 native 方法（Cronet 必须）
 -keepclasseswithmembers,includedescriptorclasses,allowaccessmodification class org.chromium.**,**J.N {
   native <methods>;
 }
 
-# Protobuf builder uses reflection so make sure ProGuard leaves it alone. See
-# https://crbug.com/1395764.
-# Note that we can't simply use the rule from
-# //third_party/protobuf/java/lite/proguard.pgcfg, because some users who
-# consume our ProGuard rules do not want all their protos to be kept. Instead,
-# use a more specific rule that covers Chromium protos only.
+# Chromium protos：builder 反射依赖，保留字段
 -keepclassmembers class org.chromium.** extends com.google.protobuf.GeneratedMessageLite {
   <fields>;
 }
 
-# Part of the Android System SDK; false positive when pointing ProGuard to the
-# public SDK.
+# Android System SDK false positive
 -dontwarn android.os.SystemProperties
-# -------- Config Path: components/cronet/android/cronet_shared_proguard.cfg --------
-# Proguard config for apps that depend on cronet_shared_java.jar (which should
-# be all apps that depend on any part of Cronet)
 
-# Part of the Android System SDK, so ProGuard won't be able to resolve it if
-# running against the standard SDK.
+############### [6] cronet_shared_proguard.cfg ###############
 -dontwarn android.util.StatsEvent
 -dontwarn android.util.StatsEvent$*
-# There is also an undefined reference to android.util.StatsLog.write(), which
-# R8 appears to be fine with but other processors (e.g. internal Google
-# ProGuard) may not be. See b/315269496.
 -dontwarn android.util.StatsLog
-# -------- Config Path: third_party/androidx/androidx_annotations.flags --------
-# Copyright 2023 The Chromium Authors
-# Use of this source code is governed by a BSD-style license that can be
-# found in the LICENSE file.
 
--keep @androidx.annotation.Keep class *
--keepclasseswithmembers,allowaccessmodification class * {
-  @androidx.annotation.Keep <fields>;
-}
--keepclasseswithmembers,allowaccessmodification class * {
-  @androidx.annotation.Keep <methods>;
-}
-# -------- Config Path: third_party/jni_zero/proguard.flags --------
-# Copyright 2023 The Chromium Authors
-# Use of this source code is governed by a BSD-style license that can be
-# found in the LICENSE file.
-
-# Keeps for method level annotations.
+############### [7] jni_zero/proguard.flags ###############
 -keepclasseswithmembers,allowaccessmodification class ** {
   @**org.jni_zero.AccessedByNative <fields>;
 }
@@ -225,17 +174,36 @@
   @**org.jni_zero.CalledByNativeUnchecked <methods>;
 }
 
-# Allow unused native methods to be removed, but prevent renaming on those that
-# are kept.
-# TODO(crbug.com/315973491): Restrict the broad scope of this rule.
+# 允许删除未使用 native，但保留的不要重命名（较宽；按官方保持）
 -keepclasseswithmembernames,includedescriptorclasses,allowaccessmodification class ** {
   native <methods>;
 }
 
-# Used when multiplexing. We don't package our own @UsedByReflection, so using this instead.
+# multiplexing: 保留 hash 字段（官方说明）
 -keepclasseswithmembers class !cr_allowunused,**J.N {
   public long *_HASH;
 }
-# -------- Config Path: obj/third_party/androidx/androidx_annotation_annotation_experimental_java/proguard.txt --------
-# Intentionally empty proguard rules to indicate this library is safe to shrink
 
+############### [8] Cronet 额外稳妥 keep（建议保留） ###############
+# 防止 R8 过度裁剪 Cronet API / Provider / Engine
+-keep class org.chromium.net.** { *; }
+-keep class org.chromium.net.impl.** { *; }
+
+# 你原来已有的 X509Util（保留）
+-keepclassmembers class org.chromium.net.X509Util {
+    *** sDefaultTrustManager;
+    *** sTestTrustManager;
+}
+
+############### [9] 常见 warn 抑制（不影响功能） ###############
+-dontwarn internal.org.chromium.**
+-dontwarn org.chromium.**
+
+#############################################
+# ✅ 注意：
+# 1) 这份文件不解决 Duplicate class，Duplicate 必须通过依赖层面解决：
+#    - 只能保留 Maven cronet-embedded
+#    - 删除 fileTree(cronetlib) 以及任何本地 cronet jar/aar
+#    - 不要 exclude org.chromium.net（否则会 R8 missing class）
+# 2) 这份文件已按你要求：没有任何“文件树/TreeDocumentFile”相关 keep
+#############################################
