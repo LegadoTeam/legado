@@ -44,7 +44,6 @@ jobs:
             exit 1
           fi
 
-          # 直接从 Google Maven 拉 httpengine-native-provider AAR 并验证类存在
           ver="$HTTPENGINE_PROVIDER_VERSION"
           base="https://dl.google.com/dl/android/maven2/org/chromium/net/httpengine-native-provider/$ver"
           aar_url="$base/httpengine-native-provider-$ver.aar"
