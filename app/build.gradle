@@ -46,6 +46,7 @@ android {
             }
         }
     }
+
     defaultConfig {
         applicationId "com.legado.app"
         minSdk 21
@@ -68,10 +69,12 @@ android {
             }
         }
     }
+
     buildFeatures {
         buildConfig true
         viewBinding true
     }
+
     buildTypes {
         release {
             if (project.hasProperty("RELEASE_STORE_FILE")) {
@@ -86,7 +89,9 @@ android {
 
             minifyEnabled true
             shrinkResources true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro', 'cronet-proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
+                    'proguard-rules.pro',
+                    'cronet-proguard-rules.pro'
         }
         debug {
             if (project.hasProperty("RELEASE_STORE_FILE")) {
@@ -97,9 +102,12 @@ android {
             applicationIdSuffix '.debug'
             versionNameSuffix 'debug'
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro', 'cronet-proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
+                    'proguard-rules.pro',
+                    'cronet-proguard-rules.pro'
         }
     }
+
     //noinspection GrDeprecatedAPIUsage
     flavorDimensions = ['mode']
     productFlavors {
@@ -116,58 +124,69 @@ android {
         }
     }
 
-
     room {
         schemaDirectory "$projectDir/schemas"
     }
+
     // 设定Room的KSP参数
     ksp {
         arg("room.incremental", "true")
         arg("room.expandProjection", "true")
         arg("room.generateKotlin", "false")
         //arg("room.schemaLocation", "$projectDir/schemas")
-
     }
 
     compileOptions {
-        // Flag to enable support for the new language APIs
         coreLibraryDesugaringEnabled true
-        // Sets Java compatibility
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+
     packaging {
         resources.excludes.add('META-INF/*')
     }
 
     sourceSets {
-        // Adds exported schema location as test app assets.
         androidTest.assets.srcDirs += files("$projectDir/schemas".toString())
     }
+
     lint {
         checkDependencies true
+        disable 'MissingTranslation'
     }
+
     tasks.withType(JavaCompile).tap {
         configureEach {
             //options.compilerArgs << "-Xlint:unchecked"
         }
     }
-    lint { //忽略string翻译缺失，后面需要翻译时去掉，todo
-        disable 'MissingTranslation'
-    }
+}
+
+/**
+ * ✅ 关键：全局排除所有 Maven 进来的 cronet-*，避免与你 cronetlib/*.jar 重复类
+ */
+configurations.configureEach {
+    exclude group: "org.chromium.net"
+    // 可选：如果你工程里有人引入 GMS cronet 包装，也一起排
+    exclude group: "com.google.android.gms", module: "play-services-cronet"
 }
 
 dependencies {
     coreLibraryDesugaring(libs.desugar)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.bundles.androidTest)
 
+    // kotlin
     implementation(libs.kotlin.stdlib)
 
+    // 协程
     implementation(libs.bundles.coroutines)
 
+    // 图像处理库Toolkit
     implementation(libs.renderscript.intrinsics.replacement.toolkit)
 
+    // androidX
     implementation(libs.core.ktx)
     implementation(libs.appcompat.appcompat)
     implementation(libs.activity.ktx)
@@ -179,80 +198,105 @@ dependencies {
     implementation(libs.androidx.viewpager2)
     implementation(libs.androidx.webkit)
 
+    // google
     implementation(libs.material)
     implementation(libs.flexbox)
     implementation(libs.gson)
 
+    // lifecycle
     implementation(libs.lifecycle.common.java8)
     implementation(libs.lifecycle.service)
 
+    // media
     implementation(libs.media.media)
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.datasource.okhttp)
 
+    // videoPlayer
     implementation(libs.gsyVideoPlayer.java)
     implementation(libs.gsyVideoPlayer.exo2)
     implementation(libs.danmakuFlameMaster)
 
+    // Splitties
     implementation(libs.splitties.appctx)
     implementation(libs.splitties.systemservices)
     implementation(libs.splitties.views)
 
+    // room
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
     androidTestImplementation(libs.room.testing)
 
+    // liveEventBus
     implementation(libs.liveeventbus)
 
+    // 规则相关
     implementation(libs.jsoup)
     implementation(libs.json.path)
     implementation(libs.jsoupxpath)
     implementation(project(path: ':modules:book'))
     implementation(project(path: ':modules:rhino'))
 
-    //网络
+    // 网络
     implementation(libs.okhttp)
-    implementation(fileTree(dir: 'cronetlib', include: ['*.jar', '*.aar']))
-    // ✅ 关键：把 HttpEngineNativeProvider 引入到 release classpath，避免 R8 Missing class
-    implementation("org.chromium.net:httpengine-native-provider:$HttpEngineNativeProviderVersion")
+
+    /**
+     * ✅ Cronet：只用你 app/cronetlib/ 目录下的 jar（不要再 include *.aar）
+     * 目录里应当就是你截图那 5 个 jar
+     */
+    implementation(fileTree(dir: "cronetlib", include: ["*.jar"]))
+
     implementation(libs.protobuf.javalite)
 
+    // Glide
     implementation(libs.glide.glide)
     implementation(libs.glide.okhttp)
     ksp(libs.glide.ksp)
 
+    // Svg
     implementation(libs.androidsvg)
     implementation(libs.glide.svg)
 
+    // webServer
     implementation(libs.nanohttpd.nanohttpd)
     implementation(libs.nanohttpd.websocket)
 
+    // 二维码
     implementation(libs.zxing.lite)
 
+    // 颜色选择
     implementation(libs.colorpicker)
 
+    // 压缩解压
     implementation libs.libarchive
 
+    // apache
     implementation(libs.commons.text)
 
+    // MarkDown
     implementation(libs.markwon.core)
     implementation(libs.markwon.image.glide)
     implementation(libs.markwon.ext.tables)
     implementation(libs.markwon.html)
 
+    // 转换繁体
     implementation(libs.quick.chinese.transfer.core)
 
+    // 加解密类库
     implementation(libs.hutool.crypto)
 
+    // firebase
     implementation platform(libs.firebase.bom)
     implementation libs.firebase.analytics
     implementation libs.firebase.perf
 
     implementation libs.glide.recyclerview
 
+    // 椒盐歌词
     implementation(libs.lyricViewx)
 
+    // sora-editor
     implementation(platform(libs.soraEditor.bom))
     implementation(libs.soraEditor.core)
     implementation(libs.soraEditor.language.textmate)
