@@ -3,7 +3,7 @@ set -euo pipefail
 
 # 分支 Stable / Dev / Beta
 branch=${1:-Stable}
-# API 最大偏移
+# API 最大偏移（最多回退多少次）
 max_offset=${2:-3}
 
 [ -z "${GITHUB_ENV:-}" ] && echo "Error: Unexpected github workflow environment" && exit 1
@@ -14,11 +14,16 @@ offset=0
 lastest_cronet_version=""
 lastest_cronet_main_version=""
 lastest_httpengine_provider_version=""
+
 CRONET_TMP_DIR=""
 
-# 添加变量到 github env
 function write_github_env_variable() {
-  echo "$1=$2" >> "$GITHUB_ENV"
+  # GITHUB_ENV 要求一行 KEY=VALUE；这里强制去掉回车，避免格式错误
+  local key="$1"
+  local value="$2"
+  value="${value//$'\r'/}"
+  value="${value//$'\n'/ }"
+  echo "${key}=${value}" >> "$GITHUB_ENV"
 }
 
 function version_compare() {
@@ -51,14 +56,9 @@ function check_version_exit() {
   local jar_url="https://storage.googleapis.com/chromium-cronet/android/$lastest_cronet_version/Release/cronet/cronet_api.jar"
   if ! url_exists "$jar_url"; then
     echo "storage.googleapis.com return non-200 for cronet $lastest_cronet_version: $jar_url"
-    if [[ $max_offset -gt $offset ]]; then
-      offset=$(expr $offset + 1)
-      echo "retry with offset $offset"
-      fetch_version
-    else
-      exit 0
-    fi
+    return 10
   fi
+  return 0
 }
 
 function sync_proguard_rules() {
@@ -100,12 +100,11 @@ function validate_cronet_sos() {
   return 0
 }
 
-# 从 Google Maven metadata 中找“指定主版本(例如 141.)”的最新 httpengine-native-provider 版本
 function resolve_httpengine_provider_version_for_major() {
-  local major="$1"   # 例如 141
+  # 从 Google Maven metadata 里找某个 major (例如 141) 的最新版本
+  local major="$1"
   local meta_url="https://dl.google.com/dl/android/maven2/org/chromium/net/httpengine-native-provider/maven-metadata.xml"
 
-  # 取出所有 <version>...</version>，筛选 major. 前缀，排序取最大
   local ver
   ver=$(
     curl -fsSL "$meta_url" \
@@ -122,7 +121,6 @@ function resolve_httpengine_provider_version_for_major() {
 }
 
 function validate_httpengine_provider_aar_has_class() {
-  # 验证 AAR 存在且确实包含 HttpEngineNativeProvider.class
   local ver="$1"
   local class_path="org/chromium/net/impl/HttpEngineNativeProvider.class"
   local base="https://dl.google.com/dl/android/maven2/org/chromium/net/httpengine-native-provider/$ver"
@@ -140,7 +138,6 @@ function validate_httpengine_provider_aar_has_class() {
 
   curl -fsSL "$aar_url" -o "$tmpdir/httpengine-native-provider.aar" || return 4
 
-  # AAR 里 class 通常在 classes.jar 里
   if ! unzip -p "$tmpdir/httpengine-native-provider.aar" classes.jar >/dev/null 2>&1; then
     echo "preflight FAIL: aar missing classes.jar"
     return 4
@@ -157,7 +154,6 @@ function validate_httpengine_provider_aar_has_class() {
 }
 
 function validate_cronet_jars() {
-  # 先检查 so 是否齐全
   validate_cronet_sos || return $?
 
   local base="https://storage.googleapis.com/chromium-cronet/android/$lastest_cronet_version/Release/cronet"
@@ -178,7 +174,7 @@ function validate_cronet_jars() {
     curl -fsSL "$base/$j" -o "$CRONET_TMP_DIR/$j" || return 1
   done
 
-  # 仅用于定位输出（不作为失败条件）
+  # 仅定位输出（不作为失败条件）
   local native_provider="org/chromium/net/impl/NativeCronetProvider.class"
   local httpengine_provider="org/chromium/net/impl/HttpEngineNativeProvider.class"
   echo "preflight: locate NativeCronetProvider / HttpEngineNativeProvider (informational)"
@@ -192,7 +188,7 @@ function validate_cronet_jars() {
   done
 
   # 你明确“需要 HttpEngineNativeProvider”：
-  # -> 正确检查方式：确保 Google Maven 上存在 httpengine-native-provider，并且 AAR 里包含该类
+  # -> 检查 google maven 上是否存在匹配主版本的 httpengine-native-provider，并校验 AAR 内确实有该类
   local major="${lastest_cronet_version%%\.*}"
   lastest_httpengine_provider_version="$(resolve_httpengine_provider_version_for_major "$major")"
 
@@ -208,31 +204,48 @@ function validate_cronet_jars() {
 }
 # --------------------------------
 
-function fetch_version() {
-  lastest_cronet_version=$(
-    curl -s "https://chromiumdash.appspot.com/fetch_releases?channel=$branch&platform=Android&num=1&offset=$offset" \
-      | jq .[0].version -r
-  )
-  echo "lastest_cronet_version: $lastest_cronet_version"
-  lastest_cronet_main_version=${lastest_cronet_version%%\.*}.0.0.0
+function fetch_version_loop() {
+  echo "fetch $branch release info from https://chromiumdash.appspot.com ..."
 
-  check_version_exit
+  while true; do
+    lastest_cronet_version=$(
+      curl -s "https://chromiumdash.appspot.com/fetch_releases?channel=$branch&platform=Android&num=1&offset=$offset" \
+        | jq .[0].version -r
+    )
+    echo "lastest_cronet_version: $lastest_cronet_version"
+    lastest_cronet_main_version=${lastest_cronet_version%%\.*}.0.0.0
 
-  set +e
-  validate_cronet_jars
-  local ret=$?
-  set -e
+    set +e
+    check_version_exit
+    local ok_url=$?
+    set -e
+    if [[ $ok_url -ne 0 ]]; then
+      if [[ $max_offset -gt $offset ]]; then
+        offset=$((offset + 1))
+        echo "retry with offset $offset"
+        continue
+      fi
+      exit 0
+    fi
 
-  if [[ $ret -ne 0 ]]; then
+    set +e
+    validate_cronet_jars
+    local ret=$?
+    set -e
+
+    if [[ $ret -eq 0 ]]; then
+      return 0
+    fi
+
     echo "cronet $lastest_cronet_version is not usable (preflight ret=$ret)"
     if [[ $max_offset -gt $offset ]]; then
-      offset=$(expr $offset + 1)
+      offset=$((offset + 1))
       echo "retry with offset $offset"
-      fetch_version
+      continue
     else
       exit 0
     fi
-  fi
+  done
 }
 
 ##########
@@ -243,10 +256,8 @@ current_httpengine_provider_version=$(grep "^HttpEngineNativeProviderVersion=" "
 echo "current_cronet_version: $current_cronet_version"
 echo "current_httpengine_provider_version: ${current_httpengine_provider_version:-<empty>}"
 
-echo "fetch $branch release info from https://chromiumdash.appspot.com ..."
-fetch_version
+fetch_version_loop
 
-# 现在 lastest_cronet_version / lastest_cronet_main_version / lastest_httpengine_provider_version 都是可用组合
 if version_compare "$current_cronet_version" "$lastest_cronet_version"; then
   sed -i "s/^CronetVersion=.*/CronetVersion=$lastest_cronet_version/" "$path"
   sed -i "s/^CronetMainVersion=.*/CronetMainVersion=$lastest_cronet_main_version/" "$path"
@@ -264,8 +275,9 @@ if version_compare "$current_cronet_version" "$lastest_cronet_version"; then
   sed -i "s/## cronet版本: .*/## cronet版本: $lastest_cronet_version/" "$GITHUB_WORKSPACE/app/src/main/assets/updateLog.md"
 
   write_github_env_variable PR_TITLE "Bump cronet from $current_cronet_version to $lastest_cronet_version"
-  write_github_env_variable PR_BODY "Changes in the [Git log](https://chromium.googlesource.com/chromium/src/+log/$current_cronet_version..$lastest_cronet_version)
-HttpEngineNativeProvider: $lastest_httpengine_provider_version"
+  # 必须是单行，避免 GITHUB_ENV 格式错误
+  write_github_env_variable PR_BODY "Changes in the Git log: https://chromium.googlesource.com/chromium/src/+log/$current_cronet_version..$lastest_cronet_version | HttpEngineNativeProviderVersion=$lastest_httpengine_provider_version"
+
   write_github_env_variable CRONET_VERSION "$lastest_cronet_version"
   write_github_env_variable HTTPENGINE_PROVIDER_VERSION "$lastest_httpengine_provider_version"
   write_github_env_variable cronet ok
