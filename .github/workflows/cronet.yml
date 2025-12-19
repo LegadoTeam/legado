@@ -2,8 +2,8 @@ name: Update Cronet
 
 on:
   schedule:
-  # 周一北京时间9点
-    - cron: 0 1 * * 1
+    # 周一北京时间9点（UTC 1:00）
+    - cron: "0 1 * * 1"
   workflow_dispatch:
 
 jobs:
@@ -14,7 +14,9 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Check Cronet Updates
-        run: source .github/scripts/cronet.sh Stable 100
+        run: |
+          chmod +x .github/scripts/cronet.sh
+          .github/scripts/cronet.sh Stable 100
 
       - name: Set up JDK 17
         if: ${{ env.cronet == 'ok' }}
@@ -26,33 +28,42 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
         if: ${{ env.cronet == 'ok' }}
 
-      - name: Download Cronet
+      - name: Download Cronet + Verify HttpEngineNativeProvider (AAR)
         if: ${{ env.cronet == 'ok' }}
         run: |
+          set -euo pipefail
+
           chmod +x gradlew
           ./gradlew app:downloadCronet
-      
-          echo "=== Check HttpEngineNativeProvider in jars ==="
-          for f in app/cronetlib/cronet_impl_native_java.jar \
-                   app/cronetlib/cronet_impl_platform_java.jar \
-                   app/cronetlib/cronet_impl_common_java.jar; do
-            echo "--- $f ---"
-            if jar tf "$f" | grep -F "org/chromium/net/impl/HttpEngineNativeProvider" >/dev/null; then
-              echo "FOUND"
-            else
-              echo "NOT FOUND"
-            fi
-          done
-      
-          echo "=== Verify NativeCronetProvider removed ==="
-          for f in app/cronetlib/*.jar; do
-            if jar tf "$f" | grep -F "org/chromium/net/impl/NativeCronetProvider" >/dev/null; then
-              echo "STILL PRESENT in $f"
-              exit 1
-            fi
-          done
-          echo "OK"
 
+          echo "CRONET_VERSION=${CRONET_VERSION:-}"
+          echo "HTTPENGINE_PROVIDER_VERSION=${HTTPENGINE_PROVIDER_VERSION:-}"
+
+          if [[ -z "${HTTPENGINE_PROVIDER_VERSION:-}" ]]; then
+            echo "ERROR: HTTPENGINE_PROVIDER_VERSION is empty. Did cronet.sh write it to GITHUB_ENV?"
+            exit 1
+          fi
+
+          # 直接从 Google Maven 拉 httpengine-native-provider AAR 并验证类存在
+          ver="$HTTPENGINE_PROVIDER_VERSION"
+          base="https://dl.google.com/dl/android/maven2/org/chromium/net/httpengine-native-provider/$ver"
+          aar_url="$base/httpengine-native-provider-$ver.aar"
+
+          echo "Downloading $aar_url"
+          curl -fsSL "$aar_url" -o /tmp/httpengine-native-provider.aar
+
+          echo "Extracting classes.jar from AAR"
+          unzip -p /tmp/httpengine-native-provider.aar classes.jar > /tmp/classes.jar
+
+          echo "=== Verify HttpEngineNativeProvider exists in AAR ==="
+          if jar tf /tmp/classes.jar | grep -F "org/chromium/net/impl/HttpEngineNativeProvider" >/dev/null; then
+            echo "OK: HttpEngineNativeProvider found in httpengine-native-provider-$ver.aar"
+          else
+            echo "FAIL: HttpEngineNativeProvider NOT found in httpengine-native-provider-$ver.aar"
+            exit 1
+          fi
+
+          echo "OK"
 
       - name: Create Pull Request
         if: ${{ env.cronet == 'ok' }}
