@@ -28,6 +28,8 @@ dependencyResolutionManagement {
                 includeGroupByRegex("com\\.android.*")
                 includeGroupByRegex("com\\.google.*")
                 includeGroupByRegex("androidx.*")
+                // ✅ 放行 HttpEngineNativeProvider 所在的 group：org.chromium.net
+                includeGroupByRegex("org\\.chromium\\.net.*")
             }
         }
         maven {
