@@ -40,7 +40,7 @@ class BooksAdapterGrid(context: Context, private val callBack: CallBack) :
                     } else {
                         tvName.gone()
                     }
-                    ivCover.load(item.getDisplayCover(), item, false, item.origin)
+                    ivCover.load(item, false)
                     upRefresh(binding, item)
                 } else {
                     for (i in payloads.indices) {
@@ -49,10 +49,8 @@ class BooksAdapterGrid(context: Context, private val callBack: CallBack) :
                             when (it) {
                                 "name" -> tvName.text = item.name
                                 "cover" -> ivCover.load(
-                                    item.getDisplayCover(),
                                     item,
-                                    false,
-                                    item.origin
+                                    false
                                 )
 
                                 "refresh" -> upRefresh(binding, item)
@@ -64,7 +62,7 @@ class BooksAdapterGrid(context: Context, private val callBack: CallBack) :
             is ItemBookshelfGrid2Binding -> binding.run {
                 if (payloads.isEmpty()) {
                     tvName.text = item.name
-                    ivCover.load(item.getDisplayCover(), item, false, item.origin)
+                    ivCover.load(item, false)
                     upRefresh(binding, item)
                 } else {
                     for (i in payloads.indices) {
@@ -73,10 +71,8 @@ class BooksAdapterGrid(context: Context, private val callBack: CallBack) :
                             when (it) {
                                 "name" -> tvName.text = item.name
                                 "cover" -> ivCover.load(
-                                    item.getDisplayCover(),
                                     item,
-                                    false,
-                                    item.origin
+                                    false
                                 )
 
                                 "refresh" -> upRefresh(binding, item)

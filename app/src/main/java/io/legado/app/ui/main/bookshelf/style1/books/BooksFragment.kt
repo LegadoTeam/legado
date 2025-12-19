@@ -86,7 +86,9 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
         private set
     private var upLastUpdateTimeJob: Job? = null
     private var enableRefresh = true
-    private val bookshelfMargin = AppConfig.bookshelfMargin
+    private val bookshelfMargin by lazy { AppConfig.bookshelfMargin }
+    private var itemCount = 0
+    private var totalRows = 0
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         arguments?.let {
@@ -108,35 +110,39 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
             binding.refreshLayout.isRefreshing = false
             activityViewModel.upToc(booksAdapter.getItems())
         }
-        if (bookshelfLayout < 2) {
-            binding.rvBookshelf.layoutManager = LinearLayoutManager(context)
-        } else {
+        if (bookshelfLayout >= 2) {
             binding.rvBookshelf.layoutManager = GridLayoutManager(context, bookshelfLayout)
-        }
-        if (bookshelfLayout < 2) {
-            binding.rvBookshelf.setRecycledViewPool(activityViewModel.booksListRecycledViewPool)
-        } else {
             binding.rvBookshelf.setRecycledViewPool(activityViewModel.booksGridRecycledViewPool)
+        } else {
+            binding.rvBookshelf.layoutManager = LinearLayoutManager(context)
+            binding.rvBookshelf.setRecycledViewPool(activityViewModel.booksListRecycledViewPool)
         }
         booksAdapter.stateRestorationPolicy = StateRestorationPolicy.PREVENT_WHEN_EMPTY
         binding.rvBookshelf.adapter = booksAdapter
-        booksAdapter.registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
-            override fun onItemRangeInserted(positionStart: Int, itemCount: Int) {
-                val layoutManager = binding.rvBookshelf.layoutManager
-                if (positionStart == 0 && itemCount == 1 && layoutManager is LinearLayoutManager) {
-                    val scrollTo = layoutManager.findFirstVisibleItemPosition() - itemCount
-                    binding.rvBookshelf.scrollToPosition(max(0, scrollTo))
-                }
-            }
-
-            override fun onItemRangeMoved(fromPosition: Int, toPosition: Int, itemCount: Int) {
-                val layoutManager = binding.rvBookshelf.layoutManager
-                if (toPosition == 0 && itemCount == 1 && layoutManager is LinearLayoutManager) {
-                    val scrollTo = layoutManager.findFirstVisibleItemPosition() - itemCount
-                    binding.rvBookshelf.scrollToPosition(max(0, scrollTo))
-                }
-            }
-        })
+        /**
+         * 应该是当初没有使用override val keepScrollPosition = true 加的代码
+         * 最近阅读插入顶部时会造成滚动
+         * 但是采用keepScrollPosition = true复原滚动后,代码就多余了
+         * 采用下面代码反而会向上多滚动一个行
+         * 再加上2025/12/19代码,因为下面的代码会出现很奇怪的自动滚动到顶部现象,没理出原因,注释掉下面代码
+         * **/
+//        booksAdapter.registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
+//            override fun onItemRangeInserted(positionStart: Int, itemCount: Int) {
+//                val layoutManager = binding.rvBookshelf.layoutManager
+//                if (positionStart == 0 && itemCount == 1 && layoutManager is LinearLayoutManager) {
+//                    val scrollTo = layoutManager.findFirstVisibleItemPosition() - itemCount
+//                    binding.rvBookshelf.scrollToPosition(max(0, scrollTo))
+//                }
+//            }
+//
+//            override fun onItemRangeMoved(fromPosition: Int, toPosition: Int, itemCount: Int) {
+//                val layoutManager = binding.rvBookshelf.layoutManager
+//                if (toPosition == 0 && itemCount == 1 && layoutManager is LinearLayoutManager) {
+//                    val scrollTo = layoutManager.findFirstVisibleItemPosition() - itemCount
+//                    binding.rvBookshelf.scrollToPosition(max(0, scrollTo))
+//                }
+//            }
+//        })
         binding.rvBookshelf.addItemDecoration( object : RecyclerView.ItemDecoration() {
             override fun getItemOffsets(
                 outRect: Rect,
@@ -144,10 +150,33 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
                 parent: RecyclerView,
                 state: RecyclerView.State
             ) {
-                if (bookshelfLayout < 2) {
-                    outRect.set(0, bookshelfMargin, 0, bookshelfMargin)
+                val position = parent.getChildAdapterPosition(view)
+                if (bookshelfLayout >= 2) {
+                    val spanCount = bookshelfLayout
+                    val rowIndex = position / spanCount
+                    when (rowIndex) {
+                        0 -> { //第一行加额外上边距
+                            outRect.set(bookshelfMargin, bookshelfMargin + 24, bookshelfMargin, bookshelfMargin)
+                        }
+                        totalRows - 1 -> { //最后一行加额外下边距
+                            outRect.set(bookshelfMargin, bookshelfMargin, bookshelfMargin, bookshelfMargin + 24)
+                        }
+                        else -> {
+                            outRect.set(bookshelfMargin, bookshelfMargin, bookshelfMargin, bookshelfMargin)
+                        }
+                    }
                 } else {
-                    outRect.set(bookshelfMargin, bookshelfMargin, bookshelfMargin, bookshelfMargin)
+                    when (position) {
+                        0 -> {
+                            outRect.set(0, bookshelfMargin + 24, 0, bookshelfMargin)
+                        }
+                        itemCount - 1 -> {
+                            outRect.set(0, bookshelfMargin, 0, bookshelfMargin + 24)
+                        }
+                        else -> {
+                            outRect.set(0, bookshelfMargin, 0, bookshelfMargin)
+                        }
+                    }
                 }
             }
         })
@@ -212,8 +241,13 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
             ).catch {
                 AppLog.put("书架更新出错", it)
             }.conflate().flowOn(Dispatchers.Default).collect { list ->
-                binding.tvEmptyMsg.isGone = list.isNotEmpty()
-                binding.refreshLayout.isEnabled = enableRefresh && list.isNotEmpty()
+                itemCount = list.size
+                val spanCount = bookshelfLayout
+                if (spanCount >= 2) {
+                    totalRows = if (itemCount % spanCount == 0) itemCount / spanCount else itemCount / spanCount + 1
+                }
+                binding.tvEmptyMsg.isGone = itemCount > 0
+                binding.refreshLayout.isEnabled = enableRefresh && itemCount > 0
                 booksAdapter.setItems(list)
                 delay(100)
             }
@@ -222,7 +256,7 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
 
     private fun startLastUpdateTimeJob() {
         upLastUpdateTimeJob?.cancel()
-        if (!AppConfig.showLastUpdateTime || bookshelfLayout > 1) {
+        if (!AppConfig.showLastUpdateTime || bookshelfLayout >= 2) {
             return
         }
         upLastUpdateTimeJob = viewLifecycleOwner.lifecycleScope.launch {

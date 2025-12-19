@@ -3,6 +3,7 @@ package io.legado.app.service
 import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.net.Uri
+import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -36,6 +37,7 @@ import io.legado.app.help.http.okHttpClient
 import io.legado.app.model.ReadAloud
 import io.legado.app.model.ReadBook
 import io.legado.app.model.analyzeRule.AnalyzeUrl
+import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.printOnDebug
@@ -197,7 +199,7 @@ class HttpReadAloudService : BaseReadAloudService(),
             .toList()
         contentList.forEach { content ->
             currentCoroutineContext().ensureActive()
-            val fileName = md5SpeakFileName(content)
+            val fileName = md5SpeakFileName(content, textChapter)
             val speakText = content.replace(AppPattern.notReadAloudRegex, "")
             if (speakText.isEmpty()) {
                 createSilentSound(fileName)
@@ -266,7 +268,7 @@ class HttpReadAloudService : BaseReadAloudService(),
             .toList()
         contentList.forEach { content ->
             currentCoroutineContext().ensureActive()
-            val fileName = md5SpeakFileName(content)
+            val fileName = md5SpeakFileName(content, textChapter)
             val speakText = content.replace(AppPattern.notReadAloudRegex, "")
             val dataSourceFactory = createDataSourceFactory(httpTts, speakText)
             val downloader = createDownloader(dataSourceFactory, fileName)
@@ -306,7 +308,7 @@ class HttpReadAloudService : BaseReadAloudService(),
     }
 
     private fun createDownloader(factory: CacheDataSource.Factory, fileName: String): Downloader {
-        val uri = Uri.parse(fileName)
+        val uri = fileName.toUri()
         val request = DownloadRequest.Builder(fileName, uri).build()
         return DefaultDownloaderFactory(factory, okHttpClient.dispatcher.executorService)
             .createDownloader(request)
@@ -395,7 +397,7 @@ class HttpReadAloudService : BaseReadAloudService(),
         return null
     }
 
-    private fun md5SpeakFileName(content: String): String {
+    private fun md5SpeakFileName(content: String, textChapter: TextChapter? = this.textChapter): String {
         return MD5Utils.md5Encode16(textChapter?.title ?: "") + "_" +
                 MD5Utils.md5Encode16("${ReadAloud.httpTTS?.url}-|-$speechRate-|-$content")
     }
@@ -585,7 +587,7 @@ class HttpReadAloudService : BaseReadAloudService(),
         return servicePendingIntent<HttpReadAloudService>(actionStr)
     }
 
-    inner class CustomLoadErrorHandlingPolicy : DefaultLoadErrorHandlingPolicy(0) {
+    class CustomLoadErrorHandlingPolicy : DefaultLoadErrorHandlingPolicy(0) {
         override fun getRetryDelayMsFor(loadErrorInfo: LoadErrorHandlingPolicy.LoadErrorInfo): Long {
             return C.TIME_UNSET
         }

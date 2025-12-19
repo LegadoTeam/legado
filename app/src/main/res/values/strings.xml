@@ -1192,7 +1192,7 @@
     <string name="read_aloud_read_phone_state_permission_rationale">阅读需要读取手机状态实现来电期间暂停朗读功能</string>
     <string name="read_aloud_by_media_button_title">耳机按键启动朗读</string>
     <string name="read_aloud_by_media_button_summary">通过耳机按键来启动朗读</string>
-    <string name="show_same_source">显示重复书源</string>
+    <string name="group_sources_by_domain">按域名分组显示</string>
     <string name="theme_config">主题配置</string>
     <string name="show_manga_ui">漫画浏览</string>
     <string name="disable_manga_scale">禁用漫画缩放</string>
@@ -1229,7 +1229,7 @@
     <string name="manga_epaper">墨水屏</string>
     <string name="manga_epaper_stting">墨水屏设置</string>
     <string name="manga_epaper_value">阈值</string>
-    <string name="disable_horizontal_animation">禁用水平滚动动画</string>
+    <string name="disable_horizontal_page_snap">禁用水平翻页效果</string>
     <string name="enable_manga_gray">开启图片灰色</string>
     <string name="play_mode">播放模式</string>
     <string name="speed_control">语速控制</string>
@@ -1285,8 +1285,8 @@
     <string name="rule_call_back">回调操作（callBackJs）</string>
     <string name="time_hour">小时</string>
     <string name="custom_button">定制按钮</string>
-    <string name="close_welcome">关闭欢迎页</string>
-    <string name="close_welcome_summary">启用后进入app不再展示欢迎页</string>
+    <string name="welcome_show_time">欢迎页显示时间</string>
+    <string name="welcome_show_time_summary">设为0不显示欢迎页</string>
     <string name="domain">域名</string>
     <string name="write_source_comment">写入源注释</string>
     <string name="auto_play">自动播放</string>

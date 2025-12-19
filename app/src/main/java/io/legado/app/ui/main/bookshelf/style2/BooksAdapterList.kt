@@ -62,7 +62,7 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
             tvAuthor.text = item.author
             tvRead.text = item.durChapterTitle
             tvLast.text = item.latestChapterTitle
-            ivCover.load(item.getDisplayCover(), item, false, item.origin)
+            ivCover.load(item, false)
             flHasNew.visible()
             ivAuthor.visible()
             ivLast.visible()
@@ -83,10 +83,8 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                             "dur" -> tvRead.text = item.durChapterTitle
                             "last" -> tvLast.text = item.latestChapterTitle
                             "cover" -> ivCover.load(
-                                item.getDisplayCover(),
                                 item,
-                                false,
-                                item.origin
+                                false
                             )
 
                             "refresh" -> upRefresh(this, item)
@@ -133,7 +131,7 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
             tvAuthor.text = item.author
             tvRead.text = item.durChapterTitle
             tvLast.text = item.latestChapterTitle
-            ivCover.load(item.getDisplayCover(), item, false, item.origin)
+            ivCover.load(item, false)
             flHasNew.visible()
             ivAuthor.visible()
             ivLast.visible()
@@ -153,10 +151,8 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                             "dur" -> tvRead.text = item.durChapterTitle
                             "last" -> tvLast.text = item.latestChapterTitle
                             "cover" -> ivCover.load(
-                                item.getDisplayCover(),
                                 item,
-                                false,
-                                item.origin
+                                false
                             )
 
                             "refresh" -> upRefresh(this, item)

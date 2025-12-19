@@ -163,10 +163,15 @@ data class RssSource(
                 && equal(variableComment, source.variableComment)
                 && equal(style, source.style)
                 && equal(injectJs, source.injectJs)
+                && equal(preloadJs, source.preloadJs)
                 && equal(startHtml, source.startHtml)
                 && equal(startStyle, source.startStyle)
                 && equal(startJs, source.startJs)
                 && showWebLog == source.showWebLog
+                && type == source.type
+                && preload == source.preload
+                && cacheFirst == source.cacheFirst
+                && equal(searchUrl, source.searchUrl)
     }
 
     private fun equal(a: String?, b: String?): Boolean {
