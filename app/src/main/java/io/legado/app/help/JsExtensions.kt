@@ -1140,7 +1140,7 @@ interface JsExtensions : JsEncodeUtils {
     }
 
     fun getReadBookConfigMap(): Map<String, Any> {
-【        return ReadBookConfig.durConfig.toMap()
+        return ReadBookConfig.durConfig.toMap()
     }
 
     /**
