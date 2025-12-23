@@ -51,7 +51,6 @@
         android:id="@+id/show_comment"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/selectableItemBackground"
         android:maxLines="3"
         android:ellipsize="end"
         android:padding="8dp"

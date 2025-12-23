@@ -2,7 +2,6 @@ package io.legado.app.ui.book.read.config
 
 import android.annotation.SuppressLint
 import android.content.DialogInterface
-import android.graphics.Color
 import android.graphics.PorterDuff
 import android.net.Uri
 import android.os.Bundle
@@ -12,6 +11,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.SeekBar
 import androidx.appcompat.widget.TooltipCompat
+import androidx.core.graphics.toColorInt
 import androidx.core.view.isGone
 import com.jaredrummler.android.colorpicker.ColorPickerDialog
 import io.legado.app.R
@@ -41,7 +41,6 @@ import io.legado.app.utils.FileDoc
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.MD5Utils
-import io.legado.app.utils.SelectImageContract
 import io.legado.app.utils.compress.ZipUtils
 import io.legado.app.utils.createFileIfNotExist
 import io.legado.app.utils.createFileReplace
@@ -52,7 +51,6 @@ import io.legado.app.utils.externalFiles
 import io.legado.app.utils.find
 import io.legado.app.utils.getFile
 import io.legado.app.utils.inputStream
-import io.legado.app.utils.launch
 import io.legado.app.utils.longToast
 import io.legado.app.utils.openInputStream
 import io.legado.app.utils.openOutputStream
@@ -67,12 +65,14 @@ import io.legado.app.utils.viewbindingdelegate.viewBinding
 import splitties.init.appCtx
 import java.io.File
 import java.io.FileOutputStream
+import androidx.core.graphics.toColorInt
 
 class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
 
     companion object {
         const val TEXT_COLOR = 121
         const val BG_COLOR = 122
+        const val TEXT_ACCENT_COLOR = 123
     }
 
     private val binding by viewBinding(DialogReadBgTextBinding::bind)
@@ -81,7 +81,7 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
     private var primaryTextColor = 0
     private var secondaryTextColor = 0
     private val importFormNet = "网络导入"
-    private val selectBgImage = registerForActivityResult(SelectImageContract()) {
+    private val selectBgImage = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
             setBgFromUri(uri)
         }
@@ -154,7 +154,9 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
                 ivBg.setImageResource(R.drawable.ic_image)
                 ivBg.setColorFilter(primaryTextColor, PorterDuff.Mode.SRC_IN)
                 root.setOnClickListener {
-                    selectBgImage.launch()
+                    selectBgImage.launch {
+                        mode = HandleFileContract.IMAGE
+                    }
                 }
             }
         }
@@ -216,10 +218,18 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
                 .setDialogId(TEXT_COLOR)
                 .show(requireActivity())
         }
+        binding.tvTextAccentColor.setOnClickListener {
+            ColorPickerDialog.newBuilder()
+                .setColor(curTextAccentColor())
+                .setShowAlphaSlider(false)
+                .setDialogType(ColorPickerDialog.TYPE_CUSTOM)
+                .setDialogId(TEXT_ACCENT_COLOR)
+                .show(requireActivity())
+        }
         binding.tvBgColor.setOnClickListener {
             val bgColor =
-                if (curBgType() == 0) Color.parseColor(curBgStr())
-                else Color.parseColor("#015A86")
+                if (curBgType() == 0) curBgStr().toColorInt()
+                else "#015A86".toColorInt()
             ColorPickerDialog.newBuilder()
                 .setColor(bgColor)
                 .setShowAlphaSlider(false)

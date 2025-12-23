@@ -76,6 +76,7 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
     }
     abstract val groupId: Long
     abstract val books: List<Book>
+    abstract var onlyUpdateRead: Boolean
     private var groupsLiveData: LiveData<List<BookGroup>>? = null
     private val waitDialog by lazy {
         WaitDialog(requireContext()).apply {
@@ -96,7 +97,7 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
         when (item.itemId) {
             R.id.menu_remote -> startActivity<RemoteBookActivity>()
             R.id.menu_search -> startActivity<SearchActivity>()
-            R.id.menu_update_toc -> activityViewModel.upToc(books)
+            R.id.menu_update_toc -> activityViewModel.upToc(books, onlyUpdateRead)
             R.id.menu_bookshelf_layout -> configBookshelf()
             R.id.menu_group_manage -> showDialogFragment<GroupManageDialog>()
             R.id.menu_add_local -> startActivity<ImportBookActivity>()

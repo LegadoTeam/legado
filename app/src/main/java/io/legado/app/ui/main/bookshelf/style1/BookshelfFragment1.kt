@@ -57,6 +57,7 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
             return fragment?.getBooks() ?: emptyList()
         }
 
+    override var onlyUpdateRead = false
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         setSupportToolbar(binding.titleBar.toolbar)
         initView()
@@ -163,6 +164,7 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
 
         override fun getItem(position: Int): Fragment {
             val group = bookGroups[position]
+            onlyUpdateRead = group.onlyUpdateRead
             return BooksFragment(position, group)
         }
 

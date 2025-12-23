@@ -49,7 +49,7 @@ data class TextColumn(
             ChapterProvider.contentPaint
         }
         val textColor = if (textLine.isReadAloud || isSearchResult) {
-            ThemeStore.accentColor
+            ReadBookConfig.textAccentColor
         } else {
             ReadBookConfig.textColor
         }

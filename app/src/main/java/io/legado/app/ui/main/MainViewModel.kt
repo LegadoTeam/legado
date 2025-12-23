@@ -98,7 +98,7 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
 
     fun upAllBookToc() {
         execute {
-            addToWaitUp(appDb.bookDao.hasUpdateBooks)
+            addToWaitUp(appDb.bookDao.hasUpdateBooks, AppConfig.onlyUpdateRead)
         }
     }
 
@@ -116,19 +116,20 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
-    fun upToc(books: List<Book>) {
+    fun upToc(books: List<Book>, onlyUpdateRead: Boolean) {
         execute(context = upTocPool) {
             books.filter {
                 !it.isLocal && it.canUpdate
             }.let {
-                addToWaitUp(it)
+                addToWaitUp(it, onlyUpdateRead)
             }
         }
     }
 
     @Synchronized
-    private fun addToWaitUp(books: List<Book>) {
+    private fun addToWaitUp(books: List<Book>, onlyUpdateRead: Boolean) {
         books.forEach { book ->
+            if (onlyUpdateRead && book.getUnreadChapterNum() > 0) return@forEach
             if (!waitUpTocBooks.contains(book.bookUrl) && !onUpTocBooks.contains(book.bookUrl)) {
                 waitUpTocBooks.add(book.bookUrl)
             }

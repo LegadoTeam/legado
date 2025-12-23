@@ -18,6 +18,7 @@ import io.legado.app.lib.theme.primaryTextColor
 import java.lang.reflect.Method
 
 @SuppressLint("RestrictedApi")
+@Suppress("UsePropertyAccessSyntax")
 fun Menu.applyTint(context: Context, theme: Theme = Theme.Auto): Menu = this.let { menu ->
     if (menu is MenuBuilder) {
         menu.setOptionalIconsVisible(true)
@@ -36,7 +37,7 @@ fun Menu.applyTint(context: Context, theme: Theme = Theme.Auto): Menu = this.let
 }
 
 @SuppressLint("RestrictedApi")
-fun Menu.applyOpenTint(context: Context) {
+fun Menu.applyOpenTint(context: Context, showIcon: Boolean = true) {
     //展开菜单显示图标
     if (this.javaClass.simpleName.equals("MenuBuilder", ignoreCase = true)) {
         val defaultTextColor = context.getCompatColor(R.color.primaryText)
@@ -44,13 +45,15 @@ fun Menu.applyOpenTint(context: Context) {
             var method: Method =
                 this.javaClass.getDeclaredMethod("setOptionalIconsVisible", java.lang.Boolean.TYPE)
             method.isAccessible = true
-            method.invoke(this, true)
-            method = this.javaClass.getDeclaredMethod("getNonActionItems")
-            val menuItems = method.invoke(this)
-            if (menuItems is ArrayList<*>) {
-                for (menuItem in menuItems) {
-                    if (menuItem is MenuItem) {
-                        menuItem.icon?.setTintMutate(defaultTextColor)
+            method.invoke(this, showIcon)
+            if (showIcon) {
+                method = this.javaClass.getDeclaredMethod("getNonActionItems")
+                val menuItems = method.invoke(this)
+                if (menuItems is ArrayList<*>) {
+                    for (menuItem in menuItems) {
+                        if (menuItem is MenuItem) {
+                            menuItem.icon?.setTintMutate(defaultTextColor)
+                        }
                     }
                 }
             }

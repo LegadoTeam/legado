@@ -3,15 +3,15 @@ package io.legado.app.lib.theme
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
-import android.graphics.Color
 import androidx.annotation.AttrRes
 import androidx.annotation.CheckResult
 import androidx.annotation.ColorInt
 import androidx.annotation.ColorRes
 import androidx.core.content.ContextCompat
 import io.legado.app.utils.ColorUtils
-import io.legado.app.utils.LogUtils
 import splitties.init.appCtx
+import androidx.core.graphics.toColorInt
+import androidx.core.content.edit
 
 /**
  * @author Aidan Follestad (afollestad), Karim Abou Zeid (kabouzeid)
@@ -195,7 +195,7 @@ private constructor(private val mContext: Context) : ThemeStoreInterface {
                 ThemeUtils.resolveColor(
                     context,
                     androidx.appcompat.R.attr.colorPrimary,
-                    Color.parseColor("#455A64")
+                    "#455A64".toColorInt()
                 )
             )
         }
@@ -208,7 +208,7 @@ private constructor(private val mContext: Context) : ThemeStoreInterface {
                 ThemeUtils.resolveColor(
                     context,
                     androidx.appcompat.R.attr.colorPrimaryDark,
-                    Color.parseColor("#37474F")
+                    "#37474F".toColorInt()
                 )
             )
         }
@@ -221,7 +221,7 @@ private constructor(private val mContext: Context) : ThemeStoreInterface {
                 ThemeUtils.resolveColor(
                     context,
                     androidx.appcompat.R.attr.colorAccent,
-                    Color.parseColor("#263238")
+                    "#263238".toColorInt()
                 )
             )
         }
@@ -333,7 +333,7 @@ private constructor(private val mContext: Context) : ThemeStoreInterface {
             val prefs = prefs(context)
             val lastVersion = prefs.getInt(ThemeStorePrefKeys.IS_CONFIGURED_VERSION_KEY, -1)
             if (version > lastVersion) {
-                prefs.edit().putInt(ThemeStorePrefKeys.IS_CONFIGURED_VERSION_KEY, version).apply()
+                prefs.edit { putInt(ThemeStorePrefKeys.IS_CONFIGURED_VERSION_KEY, version) }
                 return false
             }
             return true

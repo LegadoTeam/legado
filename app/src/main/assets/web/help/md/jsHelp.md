@@ -205,6 +205,21 @@ java.getVerificationCode(imageUrl)
 java.longToast(msg: Any?)
 java.toast(msg: Any?)
 ```
+* 获取用户阅读配置
+```js
+java.getReadBookConfig(): String
+java.getReadBookConfigMap(): Map<String, Any>
+```
+* 获取用户主题配置
+```js
+java.getThemeConfig(): String
+java.getThemeConfigMap(): Map<String, Any>
+```
+* 获取用户主题模式
+```js
+* @return 0 跟随系统，1 亮色主题，2 暗色主题，3 墨水屏
+fun getThemeMode(): String
+```
 * 从网络(由java.cacheFile实现)、本地读取JavaScript文件，导入上下文请手动`eval(String(...))`
 ```js
 java.importScript(url)

@@ -1,6 +1,5 @@
 package io.legado.app.help.config
 
-import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
@@ -33,6 +32,7 @@ import io.legado.app.utils.putPrefInt
 import io.legado.app.utils.resizeAndRecycle
 import splitties.init.appCtx
 import java.io.File
+import androidx.core.graphics.drawable.toDrawable
 
 /**
  * 阅读界面配置
@@ -59,6 +59,7 @@ object ReadBookConfig {
     var bg: Drawable? = null
     var bgMeanColor: Int = 0
     val textColor: Int get() = durConfig.curTextColor()
+    val textAccentColor: Int get() = durConfig.curTextAccentColor()
 
     init {
         initConfigs()
@@ -525,6 +526,7 @@ object ReadBookConfig {
             config.bgStrEInk.toColorInt()
         }
         config.curTextColor()
+        config.curTextAccentColor()
         return config
     }
 
@@ -544,6 +546,9 @@ object ReadBookConfig {
         private var textColor: String = "#3E3D3B",//白天文字颜色
         private var textColorNight: String = "#ADADAD",//夜间文字颜色
         private var textColorEInk: String = "#000000",
+        private var textAccentColor: String = "#834E00",//白天强调文字颜色
+        private var textAccentColorNight: String = "#FE4D55",//夜间强调文字颜色
+        private var textAccentColorEInk: String = "#000000",
         private var pageAnim: Int = 0,//翻页动画
         private var pageAnimEInk: Int = 4,
         var textFont: String = "",//字体
@@ -597,10 +602,29 @@ object ReadBookConfig {
         private var initColorInt = false
 
         private fun initColorInt() {
-            textColorIntEInk = Color.parseColor(textColorEInk)
-            textColorIntNight = Color.parseColor(textColorNight)
-            textColorInt = Color.parseColor(textColor)
+            textColorIntEInk = textColorEInk.toColorInt()
+            textColorIntNight = textColorNight.toColorInt()
+            textColorInt = textColor.toColorInt()
             initColorInt = true
+        }
+
+        @Transient
+        private var textAccentColorIntEInk = -1
+
+        @Transient
+        private var textAccentColorIntNight = -1
+
+        @Transient
+        private var textAccentColorInt = -1
+
+        @Transient
+        private var initAccentColorInt = false
+
+        private fun initAccentColorInt() {
+            textAccentColorIntEInk = textAccentColorEInk.toColorInt()
+            textAccentColorIntNight = textAccentColorNight.toColorInt()
+            textAccentColorInt = textAccentColor.toColorInt()
+            initAccentColorInt = true
         }
 
         fun setCurTextColor(color: Int) {
@@ -630,6 +654,36 @@ object ReadBookConfig {
                 AppConfig.isEInkMode -> textColorIntEInk
                 AppConfig.isNightTheme -> textColorIntNight
                 else -> textColorInt
+            }
+        }
+
+        fun setCurTextAccentColor(color: Int) {
+            when {
+                AppConfig.isEInkMode -> {
+                    textAccentColorEInk = "#${color.hexString}"
+                    textAccentColorIntEInk = color
+                }
+
+                AppConfig.isNightTheme -> {
+                    textAccentColorNight = "#${color.hexString}"
+                    textAccentColorIntNight = color
+                }
+
+                else -> {
+                    textAccentColor = "#${color.hexString}"
+                    textAccentColorInt = color
+                }
+            }
+        }
+
+        fun curTextAccentColor(): Int {
+            if (!initAccentColorInt) {
+                initAccentColorInt()
+            }
+            return when {
+                AppConfig.isEInkMode -> textAccentColorIntEInk
+                AppConfig.isNightTheme -> textAccentColorIntNight
+                else -> textAccentColorInt
             }
         }
 
@@ -700,17 +754,17 @@ object ReadBookConfig {
 
         fun curBgDrawable(width: Int, height: Int): Drawable {
             if (width == 0 || height == 0) {
-                return ColorDrawable(appCtx.getCompatColor(R.color.background))
+                return appCtx.getCompatColor(R.color.background).toDrawable()
             }
             var bgDrawable: Drawable? = null
             val resources = appCtx.resources
             try {
                 bgDrawable = when (curBgType()) {
-                    0 -> ColorDrawable(Color.parseColor(curBgStr()))
+                    0 -> curBgStr().toColorInt().toDrawable()
                     1 -> {
                         val path = "bg" + File.separator + curBgStr()
                         val bitmap = BitmapUtils.decodeAssetsBitmap(appCtx, path, width, height)
-                        BitmapDrawable(resources, bitmap?.resizeAndRecycle(width, height))
+                        bitmap?.resizeAndRecycle(width, height)?.toDrawable(resources)
                     }
 
                     else -> {
@@ -719,7 +773,7 @@ object ReadBookConfig {
                             else FileUtils.getPath(appCtx.externalFiles, "bg", curBgStr())
                         }
                         val bitmap = BitmapUtils.decodeBitmap(path, width, height)
-                        BitmapDrawable(resources, bitmap?.resizeAndRecycle(width, height))
+                        bitmap?.resizeAndRecycle(width, height)?.toDrawable(resources)
                     }
                 }
             } catch (e: OutOfMemoryError) {
@@ -727,7 +781,7 @@ object ReadBookConfig {
             } catch (e: Exception) {
                 e.printOnDebug()
             }
-            return bgDrawable ?: ColorDrawable(appCtx.getCompatColor(R.color.background))
+            return bgDrawable ?: appCtx.getCompatColor(R.color.background).toDrawable()
         }
 
         fun getBgPath(bgIndex: Int): String? {
@@ -753,5 +807,71 @@ object ReadBookConfig {
             }
             return path
         }
+
+        fun toMap() = mapOf(
+            "name" to name,
+            "bgStr" to bgStr,
+            "bgStrNight" to bgStrNight,
+            "bgStrEInk" to bgStrEInk,
+            "bgAlpha" to bgAlpha,
+            "bgType" to bgType,
+            "bgTypeNight" to bgTypeNight,
+            "bgTypeEInk" to bgTypeEInk,
+            "darkStatusIcon" to darkStatusIcon,
+            "darkStatusIconNight" to darkStatusIconNight,
+            "darkStatusIconEInk" to darkStatusIconEInk,
+            "textColor" to textColor,
+            "textColorNight" to textColorNight,
+            "textColorEInk" to textColorEInk,
+            "textColorInt" to textColorInt,
+            "textColorIntNight" to textColorIntNight,
+            "textColorIntEInk" to textColorIntEInk,
+            "textAccentColor" to textAccentColor,
+            "textAccentColorNight" to textAccentColorNight,
+            "textAccentColorEInk" to textAccentColorEInk,
+            "textAccentColorInt" to textAccentColorInt,
+            "textAccentColorIntNight" to textAccentColorIntNight,
+            "textAccentColorIntEInk" to textAccentColorIntEInk,
+            "pageAnim" to pageAnim,
+            "pageAnimEInk" to pageAnimEInk,
+            "textFont" to textFont,
+            "textBold" to textBold,
+            "textSize" to textSize,
+            "letterSpacing" to letterSpacing,
+            "lineSpacingExtra" to lineSpacingExtra,
+            "paragraphSpacing" to paragraphSpacing,
+            "titleMode" to titleMode,
+            "titleSize" to titleSize,
+            "titleTopSpacing" to titleTopSpacing,
+            "titleBottomSpacing" to titleBottomSpacing,
+            "paragraphIndent" to paragraphIndent,
+            "underline" to underline,
+            "paddingBottom" to paddingBottom,
+            "paddingLeft" to paddingLeft,
+            "paddingRight" to paddingRight,
+            "paddingTop" to paddingTop,
+            "headerPaddingBottom" to headerPaddingBottom,
+            "headerPaddingLeft" to headerPaddingLeft,
+            "headerPaddingRight" to headerPaddingRight,
+            "headerPaddingTop" to headerPaddingTop,
+            "footerPaddingBottom" to footerPaddingBottom,
+            "footerPaddingLeft" to footerPaddingLeft,
+            "footerPaddingRight" to footerPaddingRight,
+            "footerPaddingTop" to footerPaddingTop,
+            "showHeaderLine" to showHeaderLine,
+            "showFooterLine" to showFooterLine,
+            "tipHeaderLeft" to tipHeaderLeft,
+            "tipHeaderMiddle" to tipHeaderMiddle,
+            "tipHeaderRight" to tipHeaderRight,
+            "tipFooterLeft" to tipFooterLeft,
+            "tipFooterMiddle" to tipFooterMiddle,
+            "tipFooterRight" to tipFooterRight,
+            "tipColor" to tipColor,
+            "tipDividerColor" to tipDividerColor,
+            "headerMode" to headerMode,
+            "footerMode" to footerMode
+        )
+
     }
+
 }

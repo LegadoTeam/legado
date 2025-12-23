@@ -30,6 +30,7 @@ import io.legado.app.utils.hexString
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.printOnDebug
 import io.legado.app.utils.putPrefInt
+import io.legado.app.utils.putPrefString
 import io.legado.app.utils.stackBlur
 import splitties.init.appCtx
 import java.io.File
@@ -168,16 +169,18 @@ object ThemeConfig {
 
     fun applyConfig(context: Context, config: Config) {
         try {
-            val primary = Color.parseColor(config.primaryColor)
-            val accent = Color.parseColor(config.accentColor)
-            val background = Color.parseColor(config.backgroundColor)
-            val bBackground = Color.parseColor(config.bottomBackground)
+            val primary = config.primaryColor.toColorInt()
+            val accent = config.accentColor.toColorInt()
+            val background = config.backgroundColor.toColorInt()
+            val bBackground = config.bottomBackground.toColorInt()
             if (config.isNightTheme) {
+                context.putPrefString(PreferKey.dNThemeName, config.themeName)
                 context.putPrefInt(PreferKey.cNPrimary, primary)
                 context.putPrefInt(PreferKey.cNAccent, accent)
                 context.putPrefInt(PreferKey.cNBackground, background)
                 context.putPrefInt(PreferKey.cNBBackground, bBackground)
             } else {
+                context.putPrefString(PreferKey.dThemeName, config.themeName)
                 context.putPrefInt(PreferKey.cPrimary, primary)
                 context.putPrefInt(PreferKey.cAccent, accent)
                 context.putPrefInt(PreferKey.cBackground, background)
@@ -190,7 +193,21 @@ object ThemeConfig {
         }
     }
 
-    fun saveDayTheme(context: Context, name: String) {
+    fun getDurConfig(context: Context): Config {
+        val isNight = AppConfig.isNightTheme
+        val name = if (isNight) {
+            context.getPrefString(PreferKey.dNThemeName) ?: ""
+        } else {
+            context.getPrefString(PreferKey.dThemeName) ?: ""
+        }
+        return if (isNight) {
+            getNightTheme(context, name)
+        } else {
+            getDayTheme(context, name)
+        }
+    }
+
+    private fun getDayTheme(context: Context, name: String): Config {
         val primary =
             context.getPrefInt(PreferKey.cPrimary, context.getCompatColor(R.color.md_brown_500))
         val accent =
@@ -199,7 +216,7 @@ object ThemeConfig {
             context.getPrefInt(PreferKey.cBackground, context.getCompatColor(R.color.md_grey_100))
         val bBackground =
             context.getPrefInt(PreferKey.cBBackground, context.getCompatColor(R.color.md_grey_200))
-        val config = Config(
+        return Config(
             themeName = name,
             isNightTheme = false,
             primaryColor = "#${primary.hexString}",
@@ -207,10 +224,14 @@ object ThemeConfig {
             backgroundColor = "#${background.hexString}",
             bottomBackground = "#${bBackground.hexString}"
         )
+    }
+
+    fun saveDayTheme(context: Context, name: String) {
+        val config = getDayTheme(context, name)
         addConfig(config)
     }
 
-    fun saveNightTheme(context: Context, name: String) {
+    private fun getNightTheme(context: Context, name: String): Config {
         val primary =
             context.getPrefInt(
                 PreferKey.cNPrimary,
@@ -225,7 +246,7 @@ object ThemeConfig {
             context.getPrefInt(PreferKey.cNBackground, context.getCompatColor(R.color.md_grey_900))
         val bBackground =
             context.getPrefInt(PreferKey.cNBBackground, context.getCompatColor(R.color.md_grey_850))
-        val config = Config(
+        return Config(
             themeName = name,
             isNightTheme = true,
             primaryColor = "#${primary.hexString}",
@@ -233,6 +254,10 @@ object ThemeConfig {
             backgroundColor = "#${background.hexString}",
             bottomBackground = "#${bBackground.hexString}"
         )
+    }
+
+    fun saveNightTheme(context: Context, name: String) {
+        val config = getNightTheme(context, name)
         addConfig(config)
     }
 
@@ -335,6 +360,15 @@ object ThemeConfig {
             }
             return false
         }
+
+        fun toMap() = mapOf(
+            "themeName" to themeName,
+            "isNightTheme" to isNightTheme,
+            "primaryColor" to primaryColor,
+            "accentColor" to accentColor,
+            "backgroundColor" to backgroundColor,
+            "bottomBackground" to bottomBackground
+        )
 
     }
 

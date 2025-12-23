@@ -45,7 +45,8 @@ abstract class BaseActivity<VB : ViewBinding>(
     private val theme: Theme = Theme.Auto,
     private val toolBarTheme: Theme = Theme.Auto,
     private val transparent: Boolean = false,
-    private val imageBg: Boolean = true
+    private val imageBg: Boolean = true,
+    private val showOpenMenuIcon: Boolean = true
 ) : AppCompatActivity() {
 
     protected abstract val binding: VB
@@ -119,7 +120,7 @@ abstract class BaseActivity<VB : ViewBinding>(
     }
 
     override fun onMenuOpened(featureId: Int, menu: Menu): Boolean {
-        menu.applyOpenTint(this)
+        menu.applyOpenTint(this, showOpenMenuIcon)
         return super.onMenuOpened(featureId, menu)
     }
 

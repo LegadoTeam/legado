@@ -25,6 +25,13 @@
 
         <io.legado.app.lib.prefs.SwitchPreference
             android:defaultValue="false"
+            android:key="onlyUpdateRead"
+            android:summary="@string/ps_only_update_read"
+            android:title="@string/only_update_read"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="false"
             android:key="defaultToRead"
             android:summary="@string/ps_default_read"
             android:title="@string/pt_default_read"

@@ -11,8 +11,9 @@ abstract class VMBaseActivity<VB : ViewBinding, VM : ViewModel>(
     theme: Theme = Theme.Auto,
     toolBarTheme: Theme = Theme.Auto,
     transparent: Boolean = false,
-    imageBg: Boolean = true
-) : BaseActivity<VB>(fullScreen, theme, toolBarTheme, transparent, imageBg) {
+    imageBg: Boolean = true,
+    showOpenMenuIcon: Boolean = true
+) : BaseActivity<VB>(fullScreen, theme, toolBarTheme, transparent, imageBg, showOpenMenuIcon) {
 
     protected abstract val viewModel: VM
 
