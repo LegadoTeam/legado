@@ -193,7 +193,7 @@ data class TextLine(
             ChapterProvider.contentPaint
         }
         val textColor = if (isReadAloud) {
-            ThemeStore.accentColor
+            ReadBookConfig.textAccentColor
         } else {
             ReadBookConfig.textColor
         }

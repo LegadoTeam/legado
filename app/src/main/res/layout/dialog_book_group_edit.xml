@@ -88,6 +88,15 @@
             app:layout_constraintTop_toBottomOf="@+id/tv_sort"
             app:layout_constraintLeft_toLeftOf="@id/tv_sort" />
 
+        <io.legado.app.lib.theme.view.ThemeCheckBox
+            android:id="@+id/cb_enable_only_read"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/only_update_read"
+            android:checked="false"
+            app:layout_constraintTop_toBottomOf="@+id/cb_enable_refresh"
+            app:layout_constraintLeft_toLeftOf="@id/tv_sort" />
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <LinearLayout

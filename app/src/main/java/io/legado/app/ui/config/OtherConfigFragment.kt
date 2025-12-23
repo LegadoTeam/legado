@@ -61,6 +61,8 @@ class OtherConfigFragment : PreferenceFragment(),
         }
     }
 
+    private var onlyUpdateReadPref: Preference? = null
+
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         putPrefBoolean(PreferKey.processText, isProcessTextEnabled())
         addPreferencesFromResource(R.xml.pref_config_other)
@@ -75,6 +77,9 @@ class OtherConfigFragment : PreferenceFragment(),
         upPreferenceSummary(PreferKey.bitmapCacheSize, AppConfig.bitmapCacheSize.toString())
         upPreferenceSummary(PreferKey.imageRetainNum, AppConfig.imageRetainNum.toString())
         upPreferenceSummary(PreferKey.sourceEditMaxLine, AppConfig.sourceEditMaxLine.toString())
+        onlyUpdateReadPref = findPreference<Preference>(PreferKey.onlyUpdateRead)?.also {
+            it.isVisible = AppConfig.autoRefreshBook
+        }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -226,6 +231,11 @@ class OtherConfigFragment : PreferenceFragment(),
 
             PreferKey.sourceEditMaxLine -> {
                 upPreferenceSummary(key, AppConfig.sourceEditMaxLine.toString())
+            }
+
+            PreferKey.autoRefresh -> {
+                val isEnabled = sharedPreferences?.getBoolean(key, false) ?: false
+                onlyUpdateReadPref?.isVisible = isEnabled
             }
         }
     }

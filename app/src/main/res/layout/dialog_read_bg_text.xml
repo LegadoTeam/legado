@@ -111,6 +111,32 @@
             app:isBottomBackground="true"
             tools:ignore="HardcodedText" />
 
+        <io.legado.app.ui.widget.text.StrokeTextView
+            android:id="@+id/tv_text_accent_color"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginLeft="6dp"
+            android:layout_marginRight="6dp"
+            android:layout_weight="5"
+            android:background="?attr/selectableItemBackground"
+            android:gravity="center"
+            android:padding="6dp"
+            android:singleLine="true"
+            android:text="@string/text_accent_color"
+            android:textSize="14sp"
+            app:isBottomBackground="true"
+            tools:ignore="HardcodedText" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="6dp">
+
         <ImageView
             android:id="@+id/iv_import"
             android:layout_width="36dp"

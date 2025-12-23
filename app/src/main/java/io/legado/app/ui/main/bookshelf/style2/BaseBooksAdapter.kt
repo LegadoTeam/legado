@@ -56,7 +56,9 @@ abstract class BaseBooksAdapter<VH : RecyclerView.ViewHolder>(
 
                 oldItem is BookGroup && newItem is BookGroup -> {
                     oldItem.groupName == newItem.groupName &&
-                            oldItem.cover == newItem.cover
+                            oldItem.cover == newItem.cover &&
+                            oldItem.enableRefresh == newItem.enableRefresh &&
+                            oldItem.onlyUpdateRead == newItem.onlyUpdateRead
                 }
 
                 else -> false
@@ -85,7 +87,6 @@ abstract class BaseBooksAdapter<VH : RecyclerView.ViewHolder>(
                     if (oldItem.lastCheckCount != newItem.lastCheckCount
                         || oldItem.durChapterTime != newItem.durChapterTime
                         || oldItem.getUnreadChapterNum() != newItem.getUnreadChapterNum()
-                        || oldItem.lastCheckCount != newItem.lastCheckCount
                     ) {
                         bundle.putBoolean("refresh", true)
                     }
@@ -97,6 +98,9 @@ abstract class BaseBooksAdapter<VH : RecyclerView.ViewHolder>(
                     }
                     if (oldItem.cover != newItem.cover) {
                         bundle.putString("cover", newItem.cover)
+                    }
+                    if (oldItem.enableRefresh != newItem.enableRefresh || oldItem.onlyUpdateRead != newItem.onlyUpdateRead) {
+                        bundle.putBoolean("unviewable", true)
                     }
                 }
             }

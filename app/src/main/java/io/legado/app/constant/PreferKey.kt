@@ -115,6 +115,7 @@ object PreferKey {
     const val disableHorizontalPageSnap = "disableHorizontalPageSnap"
     const val enableMangaGray = "enableMangaGray"
     const val autoRefresh = "auto_refresh"
+    const val onlyUpdateRead = "onlyUpdateRead"
     const val defaultToRead = "defaultToRead"
     const val exportCharset = "exportCharset"
     const val exportUseReplace = "exportUseReplace"
@@ -178,6 +179,9 @@ object PreferKey {
     const val disableMangaScale = "disableMangaScale"
     const val paddingDisplayCutouts = "paddingDisplayCutouts"
     const val autoCheckNewBackup = "autoCheckNewBackup"
+
+    const val dThemeName = "durThemeName"
+    const val dNThemeName = "durThemeNameNight"
 
     const val cPrimary = "colorPrimary"
     const val cAccent = "colorAccent"

@@ -3,7 +3,6 @@ package io.legado.app.ui.book.read
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.ColorStateList
-import android.graphics.Color
 import android.graphics.PorterDuff
 import android.graphics.drawable.GradientDrawable
 import android.util.AttributeSet
@@ -53,6 +52,7 @@ import io.legado.app.utils.startActivity
 import io.legado.app.utils.visible
 import splitties.views.onClick
 import splitties.views.onLongClick
+import androidx.core.graphics.toColorInt
 
 /**
  * 阅读界面菜单
@@ -82,7 +82,7 @@ class ReadMenu @JvmOverloads constructor(
         get() = AppConfig.readBarStyleFollowPage && ReadBookConfig.durConfig.curBgType() == 0
     private var bgColor: Int = if (immersiveMenu) {
         kotlin.runCatching {
-            Color.parseColor(ReadBookConfig.durConfig.curBgStr())
+            ReadBookConfig.durConfig.curBgStr().toColorInt()
         }.getOrDefault(context.bottomBackground)
     } else {
         context.bottomBackground
@@ -250,7 +250,7 @@ class ReadMenu @JvmOverloads constructor(
     private fun upColorConfig() {
         bgColor = if (immersiveMenu) {
             kotlin.runCatching {
-                Color.parseColor(ReadBookConfig.durConfig.curBgStr())
+                ReadBookConfig.durConfig.curBgStr().toColorInt()
             }.getOrDefault(context.bottomBackground)
         } else {
             context.bottomBackground

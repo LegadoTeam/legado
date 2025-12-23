@@ -57,6 +57,8 @@ class CoverImageView @JvmOverloads constructor(
 ) : AppCompatImageView(context, attrs) {
     companion object {
         private val nameBitmapCache by lazy { LruCache<String, Bitmap>(1024 * 1024 * 99) }
+        private val backgroundColor by lazy { appCtx.backgroundColor }
+        private val accentColor by lazy { appCtx.accentColor }
     }
     private val cacheMutex = Mutex()
     private var viewWidth: Float = 0f
@@ -86,9 +88,6 @@ class CoverImageView @JvmOverloads constructor(
         textPaint.textAlign = Paint.Align.CENTER
         textPaint
     }
-
-    private val backgroundColor by lazy { appCtx.backgroundColor }
-    private val accentColor by lazy { appCtx.accentColor }
 
     override fun setLayoutParams(params: ViewGroup.LayoutParams?) {
         if (params != null) {
@@ -127,13 +126,13 @@ class CoverImageView @JvmOverloads constructor(
             val cacheBitmap = cachedBitmap?.get()
             if (cacheBitmap != null) {
                 canvas.drawBitmap(cacheBitmap, 0f, 0f, null)
-            } else if (currentJob == null) {
-                drawNameAuthor()
+            } else if (AppConfig.useDefaultCover) {
+                drawNameAuthor(false)
             }
         }
     }
 
-    private fun drawNameAuthor() {
+    private fun drawNameAuthor(asyncAwait: Boolean = true) {
         if (!BookCover.drawBookName) return
         var pathName = name ?: return
         if (cachedBitmap != null) {
@@ -143,32 +142,37 @@ class CoverImageView @JvmOverloads constructor(
         if (BookCover.drawBookAuthor) {
             pathName += author.toString()
         }
-        generateCoverAsync(pathName)
+        generateCoverAsync(pathName, asyncAwait)
     }
-    private fun generateCoverAsync(pathName: String) {
+    private fun generateCoverAsync(pathName: String, asyncAwait: Boolean) {
         currentJob?.cancel()
         val executeTask: suspend () -> Unit = {
             try {
                 var bitmap: Bitmap? = null
-                if (isSaveBook) {
+                if (isSaveBook && width != 0) {
                     cacheMutex.withLock {
                         bitmap = nameBitmapCache[pathName + width]
                     }
                 }
                 if (bitmap == null) {
+                    if (width == 0) {
+                        var attempts = 0
+                        do {
+                            delay(2L)
+                            attempts++
+                        } while (width == 0 && attempts < 100)
+                    }
                     bitmap = generateCoverBitmap(pathName)
-                    if (isSaveBook && bitmap != null) {
+                    if (isSaveBook) {
                         cacheMutex.withLock {
                             nameBitmapCache.put(pathName + width, bitmap)
                         }
                     }
                 }
-                if (bitmap != null) {
-                    cachedBitmap = SoftReference(bitmap)
-                    drawName = true
-                    withContext(Dispatchers.Main) {
-                        invalidate()
-                    }
+                drawName = true
+                cachedBitmap = SoftReference(bitmap)
+                withContext(Dispatchers.Main) {
+                    invalidate()
                 }
             } catch (e: CancellationException) {
                 // 正常取消处理
@@ -179,18 +183,16 @@ class CoverImageView @JvmOverloads constructor(
             }
         }
         currentJob = CoroutineScope(Dispatchers.IO).launch {
-            withTimeoutOrNull(1000) {
-                triggerChannel.receive()
-                while (width <= 0 || height <= 0) {
-                    delay(10)
+            if (asyncAwait) {
+                withTimeoutOrNull(1200) {
+                    triggerChannel.receive()
                 }
             }
             executeTask()
         }
     }
 
-    private fun generateCoverBitmap(pathName: String): Bitmap? {
-        if (width <= 0 || height <= 0) return null
+    fun generateCoverBitmap(pathName: String): Bitmap {
         viewWidth = width.toFloat()
         viewHeight = height.toFloat()
         val bitmap = createBitmap(width, height)
@@ -267,10 +269,7 @@ class CoverImageView @JvmOverloads constructor(
                 target: Target<Drawable>,
                 isFirstResource: Boolean
             ): Boolean {
-                if (!drawName && name != null) {
-                    drawName = true
-                    triggerChannel.trySend(Unit)
-                }
+                triggerChannel.trySend(Unit)
                 return false
             }
 
@@ -281,8 +280,10 @@ class CoverImageView @JvmOverloads constructor(
                 dataSource: DataSource,
                 isFirstResource: Boolean
             ): Boolean {
-                drawName = false
                 currentJob?.cancel()
+                currentJob = null
+                cachedBitmap = null
+                drawName = false
                 return false
             }
 
@@ -324,16 +325,15 @@ class CoverImageView @JvmOverloads constructor(
         }
         if (name != null) {
             this.name = name.replace(AppPattern.bdRegex, "").trim()
-            drawNameAuthor()
         }
         this.bitmapPath = path
         if (AppConfig.useDefaultCover) {
+            drawName = true
             ImageLoader.load(context, BookCover.defaultDrawable)
                 .centerCrop()
                 .into(this)
-            drawName = true
-            triggerChannel.trySend(Unit)
         } else {
+            drawNameAuthor()
             var options = RequestOptions().set(OkHttpModelLoader.loadOnlyWifiOption, loadOnlyWifi)
             if (sourceOrigin != null) {
                 options = options.set(OkHttpModelLoader.sourceOriginOption, sourceOrigin)

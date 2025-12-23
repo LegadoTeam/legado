@@ -583,6 +583,7 @@
     <string name="bg_image">Background images</string>
     <string name="bg_color">Background color</string>
     <string name="text_color">Text color</string>
+    <string name="text_accent_color">强调颜色</string>
     <string name="select_image">Select a picture</string>
     <string name="group_manage">Group management</string>
     <string name="group_select">Group selection</string>
@@ -1118,6 +1119,8 @@
     <string name="file_manage_summary">Managing files in the application\'s private folder</string>
     <string name="create_folder">Create Folder</string>
     <string name="allow_drop_down_refresh">Allow drop-down refresh</string>
+    <string name="only_update_read">仅更新已读完</string>
+    <string name="ps_only_update_read">自动刷新时，只更新已读完的书籍</string>
     <string name="text_underline">Text underline</string>
     <string name="select_new_source">Select new source</string>
     <string name="select_update_source">Select update source</string>
@@ -1318,4 +1321,5 @@
     <string name="cache_first">优先加载缓存</string>
     <string name="rule_sub_content">副文规则（subContent）</string>
     <string name="system_auto">跟随系统</string>
+    <string name="sys_image_picker">系统图片选择器</string>
 </resources>

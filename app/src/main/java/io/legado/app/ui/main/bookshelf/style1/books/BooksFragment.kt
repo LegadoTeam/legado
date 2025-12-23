@@ -58,6 +58,7 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
         bundle.putLong("groupId", group.groupId)
         bundle.putInt("bookSort", group.getRealBookSort())
         bundle.putBoolean("enableRefresh", group.enableRefresh)
+        bundle.putBoolean("onlyUpdateRead", group.onlyUpdateRead)
         arguments = bundle
     }
 
@@ -86,6 +87,7 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
         private set
     private var upLastUpdateTimeJob: Job? = null
     private var enableRefresh = true
+    private var onlyUpdateRead = false
     private val bookshelfMargin by lazy { AppConfig.bookshelfMargin }
     private var itemCount = 0
     private var totalRows = 0
@@ -96,6 +98,7 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
             groupId = it.getLong("groupId", -1)
             bookSort = it.getInt("bookSort", 0)
             enableRefresh = it.getBoolean("enableRefresh", true)
+            onlyUpdateRead = it.getBoolean("onlyUpdateRead", false)
             binding.refreshLayout.isEnabled = enableRefresh
         }
         initRecyclerView()
@@ -108,7 +111,7 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
         binding.refreshLayout.setColorSchemeColors(accentColor)
         binding.refreshLayout.setOnRefreshListener {
             binding.refreshLayout.isRefreshing = false
-            activityViewModel.upToc(booksAdapter.getItems())
+            activityViewModel.upToc(booksAdapter.getItems(), onlyUpdateRead)
         }
         if (bookshelfLayout >= 2) {
             binding.rvBookshelf.layoutManager = GridLayoutManager(context, bookshelfLayout)
