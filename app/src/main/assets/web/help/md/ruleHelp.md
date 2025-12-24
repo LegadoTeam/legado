@@ -42,7 +42,8 @@
 
 * 登录UI
 > 不使用内置webView登录网站，需要使用`登录URL`规则实现登录逻辑，可使用`登录检查JS`检查登录结果  
-> 版本20221113重要更改：按钮支持调用`登录URL`规则里面的函数，必须实现`login`函数
+> 版本20221113重要更改：按钮支持调用`登录URL`规则里面的函数，必须实现`login`函数  
+> 版本20251224：文本输入类型支持`action`键，在用户完成输入后执行js函数，可用来判断用户输入内容，返回true会执行保存
 ```
 规则填写示范
 [
@@ -53,7 +54,8 @@
     },
     {
         "name": "password",
-        "type": "password"
+        "type": "password",
+        "action": "checkPassword()"
     },
     {
         "name": "注册",
@@ -85,9 +87,15 @@
     },
     {
         "name": "选择排序",
+        "viewName": "'排序按钮别名'",
         "type": "select",
         "chars": ["月票", "人气"],
-        "default": "人气"
+        "default": "人气",
+        "style": {
+            "layout_flexGrow": 0,
+            "layout_flexBasisPercent": -1,
+            "layout_justifySelf": "flex_end"
+        }
     }
 ]
 ```

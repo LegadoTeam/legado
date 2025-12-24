@@ -2,6 +2,7 @@ package io.legado.app.ui.login
 
 import android.annotation.SuppressLint
 import android.content.DialogInterface
+import android.graphics.Rect
 import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
@@ -54,6 +55,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatSpinner
 import io.legado.app.data.entities.rule.RowUi.Type
 import io.legado.app.ui.widget.text.TextInputLayout
+import io.legado.app.utils.isTrue
+import kotlin.math.abs
 import kotlin.text.isNotEmpty
 
 
@@ -174,9 +177,12 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
     suspend fun evalUiJs(jsStr: String): String? = withContext(IO) {
         val source = viewModel.source ?: return@withContext null
         val loginJS = source.getLoginJs() ?: ""
+        val result = rowUis?.let {
+            getLoginData(it)
+        } ?: viewModel.loginInfo.toMutableMap()
         try {
             source.evalJS("$loginJS\n$jsStr") {
-                put("result", viewModel.loginInfo)
+                put("result", result)
                 put("book", viewModel.book)
                 put("chapter", viewModel.chapter)
             }.toString()
@@ -207,11 +213,12 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                     binding.root,
                     false
                 ).let {
+                    val editText = it.editText
                     binding.flexbox.addView(it.root)
                     rowUi.style().apply {
                         when (this.layout_justifySelf) {
-                            "center" -> it.editText.gravity = Gravity.CENTER
-                            "flex_end" -> it.editText.gravity = Gravity.END
+                            "center" -> editText.gravity = Gravity.CENTER
+                            "flex_end" -> editText.gravity = Gravity.END
                         }
                         apply(it.root)
                     }
@@ -234,7 +241,41 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                             it.textInputLayout.hint = "err"
                         }
                     }
-                    it.editText.setText(loginInfo[name])
+                    editText.setText(loginInfo[name])
+                    rowUi.action?.let {jsStr ->
+                        var content: String? = null
+                        editText.onFocusChangeListener = View.OnFocusChangeListener { view, hasFocus ->
+                            if (hasFocus) {
+                                content = editText.text.toString()
+                            } else {
+                                val reContent = editText.text.toString()
+                                if (content != reContent) {
+                                    execute {
+                                        evalUiJs(jsStr)
+                                    }.onSuccess { result ->
+                                        if (result.isTrue()) {
+                                            loginInfo[name] = reContent
+                                            hasChange = true
+                                        }
+                                    }.onError { e ->
+                                        AppLog.put("LoginUI Text ${rowUi.name} JavaScript error", e)
+                                    }
+                                }
+                            }
+                        }
+                        editText.viewTreeObserver.addOnGlobalLayoutListener {
+                            if (!editText.hasFocus()) {
+                                return@addOnGlobalLayoutListener
+                            }
+                            val rect = Rect()
+                            binding.root.getWindowVisibleDisplayFrame(rect)
+                            val screenHeight = binding.root.height
+                            val keypadHeight = screenHeight - rect.bottom
+                            if (abs(keypadHeight) < screenHeight / 5) {
+                                editText.clearFocus()
+                            }
+                        }
+                    }
                 }
 
                 Type.password -> ItemSourceEditBinding.inflate(
@@ -242,11 +283,12 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                     binding.root,
                     false
                 ).let {
+                    val editText = it.editText
                     binding.flexbox.addView(it.root)
                     rowUi.style().apply {
                         when (this.layout_justifySelf) {
-                            "center" -> it.editText.gravity = Gravity.CENTER
-                            "flex_end" -> it.editText.gravity = Gravity.END
+                            "center" -> editText.gravity = Gravity.CENTER
+                            "flex_end" -> editText.gravity = Gravity.END
                         }
                         apply(it.root)
                     }
@@ -269,9 +311,43 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                             it.textInputLayout.hint = "err"
                         }
                     }
-                    it.editText.inputType =
+                    editText.inputType =
                         InputType.TYPE_TEXT_VARIATION_PASSWORD or InputType.TYPE_CLASS_TEXT
-                    it.editText.setText(loginInfo[name])
+                    editText.setText(loginInfo[name])
+                    rowUi.action?.let {jsStr ->
+                        var content: String? = null
+                        editText.onFocusChangeListener = View.OnFocusChangeListener { view, hasFocus ->
+                            if (hasFocus) {
+                                content = editText.text.toString()
+                            } else {
+                                val reContent = editText.text.toString()
+                                if (content != reContent) {
+                                    execute {
+                                        evalUiJs(jsStr)
+                                    }.onSuccess { result ->
+                                        if (result.isTrue()) {
+                                            loginInfo[name] = reContent
+                                            hasChange = true
+                                        }
+                                    }.onError { e ->
+                                        AppLog.put("LoginUI Text ${rowUi.name} JavaScript error", e)
+                                    }
+                                }
+                            }
+                        }
+                        editText.viewTreeObserver.addOnGlobalLayoutListener {
+                            if (!editText.hasFocus()) {
+                                return@addOnGlobalLayoutListener
+                            }
+                            val rect = Rect()
+                            binding.root.getWindowVisibleDisplayFrame(rect)
+                            val screenHeight = binding.root.height
+                            val keypadHeight = screenHeight - rect.bottom
+                            if (abs(keypadHeight) < screenHeight / 5) {
+                                editText.clearFocus()
+                            }
+                        }
+                    }
                 }
 
                 Type.select -> ItemSelectorSingleBinding.inflate(
