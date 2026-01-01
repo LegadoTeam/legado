@@ -2,6 +2,7 @@ package io.legado.app.ui.widget
 
 import android.content.Context
 import android.content.res.ColorStateList
+import android.graphics.Color
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
 import android.graphics.drawable.ColorDrawable
@@ -21,6 +22,7 @@ import io.legado.app.R
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.elevation
 import io.legado.app.lib.theme.primaryColor
+import io.legado.app.lib.theme.transparentNavBar
 import io.legado.app.utils.activity
 import io.legado.app.utils.setOnApplyWindowInsetsListenerCompat
 import splitties.views.bottomPadding
@@ -58,6 +60,7 @@ class TitleBar @JvmOverloads constructor(
     private val fitStatusBar: Boolean
     private val fitNavigationBar: Boolean
     private val attachToActivity: Boolean
+    private val opaque: Boolean
 
     init {
         val a = context.obtainStyledAttributes(
@@ -70,6 +73,7 @@ class TitleBar @JvmOverloads constructor(
         displayHomeAsUp = a.getBoolean(R.styleable.TitleBar_displayHomeAsUp, true)
         fitStatusBar = a.getBoolean(R.styleable.TitleBar_fitStatusBar, true)
         fitNavigationBar = a.getBoolean(R.styleable.TitleBar_fitNavigationBar, false)
+        opaque = a.getBoolean(R.styleable.TitleBar_opaque, false)
 
         val navigationIcon = a.getDrawable(R.styleable.TitleBar_navigationIcon)
         val navigationContentDescription =
@@ -179,12 +183,14 @@ class TitleBar @JvmOverloads constructor(
 
             if (AppConfig.isEInkMode) {
                 setBackgroundResource(R.drawable.bg_eink_border_bottom)
+            } else if (!opaque && context.transparentNavBar) {
+                setBackgroundColor(Color.TRANSPARENT)
             } else {
                 setBackgroundColor(context.primaryColor)
+                elevation = context.elevation
             }
 
             stateListAnimator = null
-            elevation = context.elevation
         }
         a.recycle()
     }

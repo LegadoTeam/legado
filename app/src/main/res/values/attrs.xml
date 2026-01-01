@@ -28,6 +28,7 @@
         <attr name="navigationIcon" format="reference" />
         <attr name="fitStatusBar" format="boolean" />
         <attr name="fitNavigationBar" format="boolean" />
+        <attr name="opaque" format="boolean" />
         <attr name="navigationContentDescription" format="reference|string" />
         <attr name="navigationIconTint" format="color|reference" />
         <attr name="themeMode" />

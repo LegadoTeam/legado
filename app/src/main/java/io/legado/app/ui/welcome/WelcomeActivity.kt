@@ -58,9 +58,15 @@ open class WelcomeActivity : BaseActivity<ActivityWelcomeBinding>() {
                 when (ThemeConfig.getTheme()) {
                     Theme.Dark -> {
                         getPrefString(PreferKey.welcomeImageDark)?.let { path ->
-                            val size = windowManager.windowSize
-                            BitmapUtils.decodeBitmap(path, size.widthPixels, size.heightPixels)?.let {
-                                window.decorView.background = it.toDrawable(resources)
+                            if (path.endsWith(".9.png")) {
+                                BitmapUtils.decodeNinePatchDrawable(path)?.let {
+                                    window.decorView.background = it
+                                }
+                            } else {
+                                val size = windowManager.windowSize
+                                BitmapUtils.decodeBitmap(path, size.widthPixels, size.heightPixels)?.let {
+                                    window.decorView.background = it.toDrawable(resources)
+                                }
                             }
                         }
                         binding.tvLegado.visible(AppConfig.welcomeShowTextDark)
@@ -70,9 +76,15 @@ open class WelcomeActivity : BaseActivity<ActivityWelcomeBinding>() {
                     }
                     else -> {
                         getPrefString(PreferKey.welcomeImage)?.let { path ->
-                            val size = windowManager.windowSize
-                            BitmapUtils.decodeBitmap(path, size.widthPixels, size.heightPixels)?.let {
-                                window.decorView.background = it.toDrawable(resources)
+                            if (path.endsWith(".9.png")) {
+                                BitmapUtils.decodeNinePatchDrawable(path)?.let {
+                                    window.decorView.background = it
+                                }
+                            } else {
+                                val size = windowManager.windowSize
+                                BitmapUtils.decodeBitmap(path, size.widthPixels, size.heightPixels)?.let {
+                                    window.decorView.background = it.toDrawable(resources)
+                                }
                             }
                         }
                         binding.tvLegado.visible(AppConfig.welcomeShowText)

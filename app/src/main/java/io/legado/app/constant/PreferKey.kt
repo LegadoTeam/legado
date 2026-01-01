@@ -189,6 +189,7 @@ object PreferKey {
     const val cBBackground = "colorBottomBackground"
     const val bgImage = "backgroundImage"
     const val bgImageBlurring = "backgroundImageBlurring"
+    const val tNavBar = "transparentNavBar"
 
     const val cNPrimary = "colorPrimaryNight"
     const val cNAccent = "colorAccentNight"
@@ -196,6 +197,8 @@ object PreferKey {
     const val cNBBackground = "colorBottomBackgroundNight"
     const val bgImageN = "backgroundImageNight"
     const val bgImageNBlurring = "backgroundImageNightBlurring"
+    const val tNavBarN = "transparentNavBarNight"
+
     const val showReadTitleAddition = "showReadTitleAddition"
     const val readBarStyleFollowPage = "readBarStyleFollowPage"
     const val contentSelectSpeakMod = "contentReadAloudMod"

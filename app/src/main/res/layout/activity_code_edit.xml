@@ -10,7 +10,8 @@
         android:id="@+id/title_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:title="@string/edit_code" />
+        app:title="@string/edit_code"
+        app:opaque="true" />
 
     <io.github.rosemoe.sora.widget.CodeEditor
         android:id="@+id/editText"

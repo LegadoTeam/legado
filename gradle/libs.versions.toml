@@ -22,8 +22,6 @@ liveeventbus = "1.8.14"
 markwon = "4.6.2"
 material = "1.13.0"
 media = "1.7.1"
-media3 = "1.8.0"
-gsyvideoplayer = "11.3.0"
 danmaku = "0.9.25"
 nanoHttpd = "2.3.1"
 okhttp = "5.3.2"
@@ -31,12 +29,10 @@ preference = "1.2.1"
 quickChineseTransfer = "0.2.16"
 
 splitties = "3.0.0"
-rhino = "1.8.1"
 desugar = "2.1.5"
 
 #kotlinxSerialization = "1.8.0"
 swiperefreshlayout = "1.2.0"
-webkit = "1.14.0"
 collection = "1.5.0"
 
 zxingLite = "3.3.0"
@@ -54,9 +50,20 @@ protobufJavalite = "4.26.1"
 jsoup = "1.16.2"
 
 # 新版本使用了 Android 6 以下缺少的 Arrays.setAll 方法，导致进入阅读界面会崩溃
-#noinspection NewerVersionAvailable
+#noinspection GradleDependency,NewerVersionAvailable
 commonsText = "1.13.1"
 
+# 新版本使用了 Android 8 以下无法编译的 VarHandle.compareAndExchange 方法
+#noinspection GradleDependency
+rhino = "1.8.1"
+
+#noinspection GradleDependency,NewerVersionAvailable
+media3 = "1.8.0"
+#noinspection GradleDependency
+gsyvideoplayer = "11.3.0"
+
+#noinspection GradleDependency
+webkit = "1.14.0"
 #noinspection GradleDependency
 activity = "1.11.0"
 #noinspection GradleDependency

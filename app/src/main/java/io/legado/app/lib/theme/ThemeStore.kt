@@ -151,6 +151,11 @@ private constructor(private val mContext: Context) : ThemeStoreInterface {
         return this
     }
 
+    override fun transparentNavBar(transparent: Boolean): ThemeStore {
+        mEditor.putBoolean(ThemeStorePrefKeys.KEY_TRANSPARENT_NAV_BAR, transparent)
+        return this
+    }
+
     override fun autoGeneratePrimaryDark(autoGenerate: Boolean): ThemeStore {
         mEditor.putBoolean(ThemeStorePrefKeys.KEY_AUTO_GENERATE_PRIMARYDARK, autoGenerate)
         return this
@@ -311,6 +316,11 @@ private constructor(private val mContext: Context) : ThemeStoreInterface {
                 ThemeStorePrefKeys.KEY_APPLY_PRIMARYDARK_STATUSBAR,
                 true
             )
+        }
+
+        @CheckResult
+        fun transparentNavBar(context: Context): Boolean {
+            return prefs(context).getBoolean(ThemeStorePrefKeys.KEY_TRANSPARENT_NAV_BAR, false)
         }
 
         @CheckResult

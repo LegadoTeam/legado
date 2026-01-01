@@ -7,6 +7,8 @@ import android.graphics.Bitmap
 import android.graphics.Bitmap.Config
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.NinePatchDrawable
 import com.google.android.renderscript.Toolkit
 import java.io.*
 import kotlin.math.*
@@ -35,6 +37,17 @@ object BitmapUtils {
             op.inSampleSize = calculateInSampleSize(op, width, height)
             op.inJustDecodeBounds = false
             BitmapFactory.decodeFileDescriptor(fis.fd, null, op)
+        }
+    }
+
+    /**
+     * 解析点九图片
+     */
+    @Throws(IOException::class)
+    fun decodeNinePatchDrawable(path: String): Drawable? {
+        val fis = FileInputStream(path)
+        return fis.use {
+            NinePatchDrawable.createFromStream(fis, null)
         }
     }
 

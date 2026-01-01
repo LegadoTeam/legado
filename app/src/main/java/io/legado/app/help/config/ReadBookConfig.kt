@@ -772,8 +772,12 @@ object ReadBookConfig {
                             if (it.contains(File.separator)) it
                             else FileUtils.getPath(appCtx.externalFiles, "bg", curBgStr())
                         }
-                        val bitmap = BitmapUtils.decodeBitmap(path, width, height)
-                        bitmap?.resizeAndRecycle(width, height)?.toDrawable(resources)
+                        if (path.endsWith(".9.png")) {
+                            BitmapUtils.decodeNinePatchDrawable(path)
+                        } else {
+                            val bitmap = BitmapUtils.decodeBitmap(path, width, height)
+                            bitmap?.resizeAndRecycle(width, height)?.toDrawable(resources)
+                        }
                     }
                 }
             } catch (e: OutOfMemoryError) {

@@ -76,6 +76,9 @@ val Context.bottomBackground: Int
 val Context.primaryTextColor: Int
     get() = getPrimaryTextColor(isDarkTheme)
 
+val Context.transparentNavBar: Boolean
+    get() = ThemeStore.transparentNavBar(this)
+
 val Context.secondaryTextColor: Int
     get() = getSecondaryTextColor(isDarkTheme)
 
