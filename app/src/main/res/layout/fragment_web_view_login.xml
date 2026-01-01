@@ -11,7 +11,8 @@
         android:layout_height="wrap_content"
         app:attachToActivity="false"
         app:title="@string/login"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent"
+        app:opaque="true" />
 
     <WebView
         android:id="@+id/web_view"

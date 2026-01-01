@@ -84,6 +84,8 @@ internal interface ThemeStoreInterface {
 
     fun bottomBackground(@ColorInt color: Int): ThemeStore
 
+    fun transparentNavBar(transparent: Boolean): ThemeStore
+
     // Commit/apply
 
     fun apply()

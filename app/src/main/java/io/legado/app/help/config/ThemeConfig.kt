@@ -1,8 +1,8 @@
 package io.legado.app.help.config
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.drawable.Drawable
 import android.util.DisplayMetrics
 import androidx.annotation.Keep
 import androidx.appcompat.app.AppCompatDelegate
@@ -34,6 +34,9 @@ import io.legado.app.utils.putPrefString
 import io.legado.app.utils.stackBlur
 import splitties.init.appCtx
 import java.io.File
+import androidx.core.graphics.drawable.toDrawable
+import io.legado.app.utils.getPrefBoolean
+import io.legado.app.utils.putPrefBoolean
 
 @Keep
 object ThemeConfig {
@@ -77,7 +80,7 @@ object ThemeConfig {
         AppCompatDelegate.setDefaultNightMode(targetMode)
     }
 
-    fun getBgImage(context: Context, metrics: DisplayMetrics): Bitmap? {
+    fun getBgImage(context: Context, metrics: DisplayMetrics): Drawable? {
         val bgCfg = when (getTheme()) {
             Theme.Light -> Pair(
                 context.getPrefString(PreferKey.bgImage),
@@ -91,13 +94,18 @@ object ThemeConfig {
 
             else -> null
         } ?: return null
-        if (bgCfg.first.isNullOrBlank()) return null
-        val bgImage = BitmapUtils
-            .decodeBitmap(bgCfg.first!!, metrics.widthPixels, metrics.heightPixels)
-        if (bgCfg.second == 0) {
-            return bgImage
+        val path = bgCfg.first
+        if (path.isNullOrBlank()) return null
+        if (path.endsWith(".9.png")) {
+            val bgDrawable = BitmapUtils.decodeNinePatchDrawable(path)
+            return bgDrawable
         }
-        return bgImage?.stackBlur(bgCfg.second)
+        val bgImage = BitmapUtils
+            .decodeBitmap(path, metrics.widthPixels, metrics.heightPixels)
+        if (bgCfg.second == 0) {
+            return bgImage?.toDrawable(context.resources)
+        }
+        return bgImage?.stackBlur(bgCfg.second)?.toDrawable(context.resources)
     }
 
     fun upConfig() {
@@ -173,18 +181,21 @@ object ThemeConfig {
             val accent = config.accentColor.toColorInt()
             val background = config.backgroundColor.toColorInt()
             val bBackground = config.bottomBackground.toColorInt()
+            val transparentNavBar = config.transparentNavBar
             if (config.isNightTheme) {
                 context.putPrefString(PreferKey.dNThemeName, config.themeName)
                 context.putPrefInt(PreferKey.cNPrimary, primary)
                 context.putPrefInt(PreferKey.cNAccent, accent)
                 context.putPrefInt(PreferKey.cNBackground, background)
                 context.putPrefInt(PreferKey.cNBBackground, bBackground)
+                context.putPrefBoolean(PreferKey.tNavBarN, transparentNavBar)
             } else {
                 context.putPrefString(PreferKey.dThemeName, config.themeName)
                 context.putPrefInt(PreferKey.cPrimary, primary)
                 context.putPrefInt(PreferKey.cAccent, accent)
                 context.putPrefInt(PreferKey.cBackground, background)
                 context.putPrefInt(PreferKey.cBBackground, bBackground)
+                context.putPrefBoolean(PreferKey.tNavBar, transparentNavBar)
             }
             AppConfig.isNightTheme = config.isNightTheme
             applyDayNight(context)
@@ -216,13 +227,16 @@ object ThemeConfig {
             context.getPrefInt(PreferKey.cBackground, context.getCompatColor(R.color.md_grey_100))
         val bBackground =
             context.getPrefInt(PreferKey.cBBackground, context.getCompatColor(R.color.md_grey_200))
+        val transparentNavBar =
+            context.getPrefBoolean(PreferKey.tNavBar, false)
         return Config(
             themeName = name,
             isNightTheme = false,
             primaryColor = "#${primary.hexString}",
             accentColor = "#${accent.hexString}",
             backgroundColor = "#${background.hexString}",
-            bottomBackground = "#${bBackground.hexString}"
+            bottomBackground = "#${bBackground.hexString}",
+            transparentNavBar = transparentNavBar
         )
     }
 
@@ -246,13 +260,16 @@ object ThemeConfig {
             context.getPrefInt(PreferKey.cNBackground, context.getCompatColor(R.color.md_grey_900))
         val bBackground =
             context.getPrefInt(PreferKey.cNBBackground, context.getCompatColor(R.color.md_grey_850))
+        val transparentNavBar =
+            context.getPrefBoolean(PreferKey.tNavBarN, false)
         return Config(
             themeName = name,
             isNightTheme = true,
             primaryColor = "#${primary.hexString}",
             accentColor = "#${accent.hexString}",
             backgroundColor = "#${background.hexString}",
-            bottomBackground = "#${bBackground.hexString}"
+            bottomBackground = "#${bBackground.hexString}",
+            transparentNavBar = transparentNavBar
         )
     }
 
@@ -272,6 +289,7 @@ object ThemeConfig {
                     .accentColor(Color.BLACK)
                     .backgroundColor(Color.WHITE)
                     .bottomBackground(Color.WHITE)
+                    .transparentNavBar(false)
                     .apply()
             }
 
@@ -288,11 +306,14 @@ object ThemeConfig {
                 }
                 val bBackground =
                     getPrefInt(PreferKey.cNBBackground, getCompatColor(R.color.md_grey_850))
+                val transparentNavBar =
+                    getPrefBoolean(PreferKey.tNavBarN, false)
                 ThemeStore.editTheme(this)
                     .primaryColor(ColorUtils.withAlpha(primary, 1f))
                     .accentColor(ColorUtils.withAlpha(accent, 1f))
                     .backgroundColor(ColorUtils.withAlpha(background, 1f))
                     .bottomBackground(ColorUtils.withAlpha(bBackground, 1f))
+                    .transparentNavBar(transparentNavBar)
                     .apply()
             }
 
@@ -309,11 +330,14 @@ object ThemeConfig {
                 }
                 val bBackground =
                     getPrefInt(PreferKey.cBBackground, getCompatColor(R.color.md_grey_200))
+                val transparentNavBar =
+                    getPrefBoolean(PreferKey.tNavBar, false)
                 ThemeStore.editTheme(this)
                     .primaryColor(ColorUtils.withAlpha(primary, 1f))
                     .accentColor(ColorUtils.withAlpha(accent, 1f))
                     .backgroundColor(ColorUtils.withAlpha(background, 1f))
                     .bottomBackground(ColorUtils.withAlpha(bBackground, 1f))
+                    .transparentNavBar(transparentNavBar)
                     .apply()
             }
         }
@@ -341,7 +365,8 @@ object ThemeConfig {
         var primaryColor: String,
         var accentColor: String,
         var backgroundColor: String,
-        var bottomBackground: String
+        var bottomBackground: String,
+        var transparentNavBar: Boolean
     ) {
 
         override fun hashCode(): Int {
@@ -357,6 +382,7 @@ object ThemeConfig {
                         && other.accentColor == accentColor
                         && other.backgroundColor == backgroundColor
                         && other.bottomBackground == bottomBackground
+                        && other.transparentNavBar == transparentNavBar
             }
             return false
         }
@@ -367,7 +393,8 @@ object ThemeConfig {
             "primaryColor" to primaryColor,
             "accentColor" to accentColor,
             "backgroundColor" to backgroundColor,
-            "bottomBackground" to bottomBackground
+            "bottomBackground" to bottomBackground,
+            "transparentNavBar" to transparentNavBar
         )
 
     }

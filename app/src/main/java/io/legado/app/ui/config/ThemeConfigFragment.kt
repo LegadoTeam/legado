@@ -144,14 +144,16 @@ class ThemeConfigFragment : PreferenceFragment(),
             PreferKey.cPrimary,
             PreferKey.cAccent,
             PreferKey.cBackground,
-            PreferKey.cBBackground -> {
+            PreferKey.cBBackground,
+            PreferKey.tNavBar-> {
                 upTheme(false)
             }
 
             PreferKey.cNPrimary,
             PreferKey.cNAccent,
             PreferKey.cNBackground,
-            PreferKey.cNBBackground -> {
+            PreferKey.cNBBackground,
+            PreferKey.tNavBarN -> {
                 upTheme(true)
             }
 
@@ -340,9 +342,13 @@ class ThemeConfigFragment : PreferenceFragment(),
         readUri(uri) { fileDoc, inputStream ->
             kotlin.runCatching {
                 var file = requireContext().externalFiles
-                val suffix = fileDoc.name.substringAfterLast(".")
+                val suffix = if (fileDoc.name.endsWith(".9.png", true)) {
+                    ".9.png"
+                } else {
+                    "." + fileDoc.name.substringAfterLast(".")
+                }
                 val fileName = uri.inputStream(requireContext()).getOrThrow().use {
-                    MD5Utils.md5Encode(it) + ".$suffix"
+                    MD5Utils.md5Encode(it) + suffix
                 }
                 file = FileUtils.createFileIfNotExist(file, preferenceKey, fileName)
                 FileOutputStream(file).use {

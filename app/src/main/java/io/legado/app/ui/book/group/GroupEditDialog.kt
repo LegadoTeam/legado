@@ -41,9 +41,13 @@ class GroupEditDialog() : BaseDialogFragment(R.layout.dialog_book_group_edit) {
         readUri(it.uri) { fileDoc, inputStream ->
             try {
                 var file = requireContext().externalFiles
-                val suffix = fileDoc.name.substringAfterLast(".")
+                val suffix = if (fileDoc.name.endsWith(".9.png", true)) {
+                    ".9.png"
+                } else {
+                    "." + fileDoc.name.substringAfterLast(".")
+                }
                 val fileName = it.uri.inputStream(requireContext()).getOrThrow().use { tmp ->
-                    MD5Utils.md5Encode(tmp) + ".$suffix"
+                    MD5Utils.md5Encode(tmp) + suffix
                 }
                 file = FileUtils.createFileIfNotExist(file, "covers", fileName)
                 FileOutputStream(file).use { outputStream ->

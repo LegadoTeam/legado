@@ -89,12 +89,14 @@ object BackupConfig {
         PreferKey.cBBackground,
         PreferKey.bgImage,
         PreferKey.bgImageBlurring,
+        PreferKey.tNavBar,
         PreferKey.cNPrimary,
         PreferKey.cNAccent,
         PreferKey.cNBackground,
         PreferKey.cNBBackground,
         PreferKey.bgImageN,
-        PreferKey.bgImageNBlurring
+        PreferKey.bgImageNBlurring,
+        PreferKey.tNavBarN
     )
 
     private val coverPrefKeys = arrayOf(

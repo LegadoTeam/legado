@@ -171,9 +171,13 @@ class CoverConfigFragment : PreferenceFragment(),
         readUri(uri) { fileDoc, inputStream ->
             kotlin.runCatching {
                 var file = requireContext().externalFiles
-                val suffix = fileDoc.name.substringAfterLast(".")
+                val suffix = if (fileDoc.name.endsWith(".9.png", true)) {
+                    ".9.png"
+                } else {
+                    "." + fileDoc.name.substringAfterLast(".")
+                }
                 val fileName = uri.inputStream(requireContext()).getOrThrow().use {
-                    MD5Utils.md5Encode(it) + ".$suffix"
+                    MD5Utils.md5Encode(it) + suffix
                 }
                 file = FileUtils.createFileIfNotExist(file, "covers", fileName)
                 FileOutputStream(file).use {

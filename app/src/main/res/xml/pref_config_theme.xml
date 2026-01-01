@@ -105,6 +105,13 @@
             android:key="backgroundImage"
             android:title="@string/background_image" />
 
+        <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="false"
+            android:key="transparentNavBar"
+            android:summary="@string/day_nav_bar_immersion"
+            android:title="@string/immersion_nav_bar"
+            app:iconSpaceReserved="false" />
+
         <io.legado.app.lib.prefs.Preference
             android:key="saveDayTheme"
             android:summary="@string/save_day_theme_summary"
@@ -158,6 +165,13 @@
         <io.legado.app.lib.prefs.Preference
             android:key="backgroundImageNight"
             android:title="@string/background_image" />
+
+        <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="false"
+            android:key="transparentNavBarNight"
+            android:summary="@string/night_nav_bar_immersion"
+            android:title="@string/immersion_nav_bar"
+            app:iconSpaceReserved="false" />
 
         <io.legado.app.lib.prefs.Preference
             android:key="saveNightTheme"

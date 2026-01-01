@@ -2,7 +2,6 @@ package io.legado.app.lib.theme.view
 
 import android.content.Context
 import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.ViewGroup
@@ -14,26 +13,35 @@ import io.legado.app.lib.theme.Selector
 import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.getSecondaryTextColor
+import io.legado.app.lib.theme.transparentNavBar
 import io.legado.app.ui.widget.text.BadgeView
 import io.legado.app.utils.ColorUtils
+import androidx.core.graphics.drawable.toDrawable
+import io.legado.app.lib.theme.elevation
 
 class ThemeBottomNavigationVIew(context: Context, attrs: AttributeSet) :
     BottomNavigationView(context, attrs) {
 
     init {
+        val transparentNavBar = context.transparentNavBar
         val bgColor = context.bottomBackground
-        setBackgroundColor(bgColor)
+        if (transparentNavBar) {
+            setBackgroundColor(Color.TRANSPARENT)
+        } else {
+            setBackgroundColor(bgColor)
+            elevation = context.elevation
+        }
         val textIsDark = ColorUtils.isColorLight(bgColor)
         val textColor = context.getSecondaryTextColor(textIsDark)
         val colorStateList = Selector.colorBuild()
             .setDefaultColor(textColor)
-            .setSelectedColor(ThemeStore.accentColor(context)).create()
+            .setSelectedColor(ThemeStore.accentColor(context))
+            .create()
         itemIconTintList = colorStateList
         itemTextColor = colorStateList
-
-        if (AppConfig.isEInkMode) {
+        if (AppConfig.isEInkMode || transparentNavBar) {
             isItemHorizontalTranslationEnabled = false
-            itemBackground = ColorDrawable(Color.TRANSPARENT)
+            itemBackground = Color.TRANSPARENT.toDrawable()
         }
 
         ViewCompat.setOnApplyWindowInsetsListener(this, null)

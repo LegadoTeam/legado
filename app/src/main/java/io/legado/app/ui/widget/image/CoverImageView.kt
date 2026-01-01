@@ -39,13 +39,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import splitties.init.appCtx
-import java.lang.ref.SoftReference
 
 /**
  * 封面
@@ -56,38 +53,21 @@ class CoverImageView @JvmOverloads constructor(
     attrs: AttributeSet? = null
 ) : AppCompatImageView(context, attrs) {
     companion object {
-        private val nameBitmapCache by lazy { LruCache<String, Bitmap>(1024 * 1024 * 99) }
-        private val backgroundColor by lazy { appCtx.backgroundColor }
-        private val accentColor by lazy { appCtx.accentColor }
+        private val nameBitmapCache by lazy { LruCache<String, Bitmap>(1024 * 1024 * 33) }
+        private val needNameBitmap by lazy { LruCache<String, Boolean>(1024 * 1024 * 10) }
     }
-    private val cacheMutex = Mutex()
     private var viewWidth: Float = 0f
     private var viewHeight: Float = 0f
-    private var drawName = false
-    private var cachedBitmap: SoftReference<Bitmap>? = null
     private var currentJob: Job? = null
     private val triggerChannel = Channel<Unit>(Channel.CONFLATED)
     var bitmapPath: String? = null
         private set
-    private var isSaveBook = false
     private var name: String? = null
     private var author: String? = null
     private var nameHeight = 0f
     private var authorHeight = 0f
-    private val namePaint by lazy {
-        val textPaint = TextPaint()
-        textPaint.typeface = Typeface.DEFAULT_BOLD
-        textPaint.isAntiAlias = true
-        textPaint.textAlign = Paint.Align.CENTER
-        textPaint
-    }
-    private val authorPaint by lazy {
-        val textPaint = TextPaint()
-        textPaint.typeface = Typeface.DEFAULT
-        textPaint.isAntiAlias = true
-        textPaint.textAlign = Paint.Align.CENTER
-        textPaint
-    }
+    private val drawBookName = BookCover.drawBookName
+    private val drawBookAuthor by lazy { BookCover.drawBookAuthor }
 
     override fun setLayoutParams(params: ViewGroup.LayoutParams?) {
         if (params != null) {
@@ -122,58 +102,49 @@ class CoverImageView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        if (drawName && !isInEditMode) {
-            val cacheBitmap = cachedBitmap?.get()
+        if (!drawBookName) return
+        val currentName = this.name ?: return
+        if (AppConfig.useDefaultCover || needNameBitmap[bitmapPath.toString()] == true) {
+            val currentAuthor = this.author
+            val pathName = if (drawBookAuthor){
+                currentName + currentAuthor
+            } else {
+                currentName
+            }
+            val cacheBitmap =  nameBitmapCache[pathName + width]
             if (cacheBitmap != null) {
                 canvas.drawBitmap(cacheBitmap, 0f, 0f, null)
-            } else if (AppConfig.useDefaultCover) {
-                drawNameAuthor(false)
+                return
             }
+            drawNameAuthor(pathName, currentName, currentAuthor, false)
         }
     }
 
-    private fun drawNameAuthor(asyncAwait: Boolean = true) {
-        if (!BookCover.drawBookName) return
-        var pathName = name ?: return
-        if (cachedBitmap != null) {
-            invalidate()
-            return
-        }
-        if (BookCover.drawBookAuthor) {
-            pathName += author.toString()
-        }
-        generateCoverAsync(pathName, asyncAwait)
+    private fun drawNameAuthor(pathName: String, name: String, author: String?, asyncAwait: Boolean = true) {
+        generateCoverAsync(pathName, name, author, asyncAwait)
     }
-    private fun generateCoverAsync(pathName: String, asyncAwait: Boolean) {
+    private fun generateCoverAsync(pathName: String, name: String, author: String?, asyncAwait: Boolean) {
         currentJob?.cancel()
-        val executeTask: suspend () -> Unit = {
+        currentJob = CoroutineScope(Dispatchers.Default).launch {
+            if (asyncAwait) {
+                withTimeoutOrNull(2000) {
+                    triggerChannel.receive()
+                }
+            }
             try {
-                var bitmap: Bitmap? = null
-                if (isSaveBook && width != 0) {
-                    cacheMutex.withLock {
-                        bitmap = nameBitmapCache[pathName + width]
-                    }
+                if (width == 0) {
+                    var attempts = 0
+                    do {
+                        delay(1L)
+                        attempts++
+                    } while (width == 0 && attempts < 2000)
                 }
-                if (bitmap == null) {
-                    if (width == 0) {
-                        var attempts = 0
-                        do {
-                            delay(2L)
-                            attempts++
-                        } while (width == 0 && attempts < 100)
-                    }
-                    bitmap = generateCoverBitmap(pathName)
-                    if (isSaveBook) {
-                        cacheMutex.withLock {
-                            nameBitmapCache.put(pathName + width, bitmap)
-                        }
-                    }
-                }
-                drawName = true
-                cachedBitmap = SoftReference(bitmap)
-                withContext(Dispatchers.Main) {
-                    invalidate()
-                }
+                if (!isActive) return@launch
+                val bitmap = generateCoverBitmap(name, author)
+                if (!isActive) return@launch
+                nameBitmapCache.put(pathName + width, bitmap)
+                needNameBitmap.put(bitmapPath.toString(), true)
+                invalidate()
             } catch (e: CancellationException) {
                 // 正常取消处理
             } catch (e: Exception) {
@@ -182,23 +153,22 @@ class CoverImageView @JvmOverloads constructor(
                 currentJob = null
             }
         }
-        currentJob = CoroutineScope(Dispatchers.IO).launch {
-            if (asyncAwait) {
-                withTimeoutOrNull(1200) {
-                    triggerChannel.receive()
-                }
-            }
-            executeTask()
-        }
     }
 
-    fun generateCoverBitmap(pathName: String): Bitmap {
+    fun generateCoverBitmap(name: String?, author: String?): Bitmap {
         viewWidth = width.toFloat()
         viewHeight = height.toFloat()
         val bitmap = createBitmap(width, height)
         val bitmapCanvas = Canvas(bitmap)
         var startX = width * 0.2f
         var startY = viewHeight * 0.2f
+        val backgroundColor = appCtx.backgroundColor
+        val accentColor = appCtx.accentColor
+        val namePaint = TextPaint().apply {
+            typeface = Typeface.DEFAULT_BOLD
+            isAntiAlias = true
+            textAlign = Paint.Align.CENTER
+        }
         name?.toStringArray()?.let { name ->
             var line = 0
             namePaint.textSize = viewWidth / 7
@@ -230,8 +200,11 @@ class CoverImageView @JvmOverloads constructor(
                 }
             }
         }
-        if (!BookCover.drawBookAuthor){
+        if (!drawBookAuthor){
             return bitmap
+        }
+        val authorPaint = TextPaint(namePaint).apply {
+            typeface = Typeface.DEFAULT
         }
         author?.toStringArray()?.let { author ->
             authorPaint.textSize = viewWidth / 10
@@ -270,6 +243,7 @@ class CoverImageView @JvmOverloads constructor(
                 isFirstResource: Boolean
             ): Boolean {
                 triggerChannel.trySend(Unit)
+                needNameBitmap.put(bitmapPath.toString(), true)
                 return false
             }
 
@@ -282,8 +256,7 @@ class CoverImageView @JvmOverloads constructor(
             ): Boolean {
                 currentJob?.cancel()
                 currentJob = null
-                cachedBitmap = null
-                drawName = false
+                needNameBitmap.remove(bitmapPath.toString())
                 return false
             }
 
@@ -306,7 +279,6 @@ class CoverImageView @JvmOverloads constructor(
         lifecycle: Lifecycle? = null,
         onLoadFinish: (() -> Unit)? = null
     ) {
-        isSaveBook = true
        load(book.getDisplayCover(), book.name, book.author, loadOnlyWifi, book.origin, fragment, lifecycle, onLoadFinish)
     }
 
@@ -320,20 +292,26 @@ class CoverImageView @JvmOverloads constructor(
         lifecycle: Lifecycle? = null,
         onLoadFinish: (() -> Unit)? = null
     ) {
-        if (author != null) {
-            this.author = author.replace(AppPattern.bdRegex, "").trim()
+        val currentAuthor = author?.replace(AppPattern.bdRegex, "")?.trim()?.also {
+            this.author = it
         }
-        if (name != null) {
-            this.name = name.replace(AppPattern.bdRegex, "").trim()
+        val currentName = name?.replace(AppPattern.bdRegex, "")?.trim()?.also {
+            this.name = it
         }
         this.bitmapPath = path
         if (AppConfig.useDefaultCover) {
-            drawName = true
             ImageLoader.load(context, BookCover.defaultDrawable)
                 .centerCrop()
                 .into(this)
         } else {
-            drawNameAuthor()
+            if (currentName != null) {
+                val pathName = if (drawBookAuthor){
+                    currentName + currentAuthor
+                } else {
+                    currentName
+                }
+                drawNameAuthor(pathName, currentName, currentAuthor, true)
+            }
             var options = RequestOptions().set(OkHttpModelLoader.loadOnlyWifiOption, loadOnlyWifi)
             if (sourceOrigin != null) {
                 options = options.set(OkHttpModelLoader.sourceOriginOption, sourceOrigin)
@@ -378,10 +356,9 @@ class CoverImageView @JvmOverloads constructor(
     }
 
     override fun onDetachedFromWindow() {
-        super.onDetachedFromWindow()
         currentJob?.cancel()
         currentJob = null
-        cachedBitmap = null
+        super.onDetachedFromWindow()
     }
 
 }

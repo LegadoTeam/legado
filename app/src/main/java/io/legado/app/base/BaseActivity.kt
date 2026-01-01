@@ -3,7 +3,6 @@ package io.legado.app.base
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.Configuration
-import android.graphics.drawable.BitmapDrawable
 import android.os.Build
 import android.os.Bundle
 import android.util.AttributeSet
@@ -38,6 +37,7 @@ import io.legado.app.utils.setNavigationBarColorAuto
 import io.legado.app.utils.setStatusBarColorAuto
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.windowSize
+import androidx.core.graphics.drawable.toDrawable
 
 
 abstract class BaseActivity<VB : ViewBinding>(
@@ -141,12 +141,12 @@ abstract class BaseActivity<VB : ViewBinding>(
             Theme.Transparent -> setTheme(R.style.AppTheme_Transparent)
             Theme.Dark -> {
                 setTheme(R.style.AppTheme_Dark)
-                window.decorView.applyBackgroundTint(backgroundColor)
+               window.decorView.applyBackgroundTint(backgroundColor)
             }
 
             Theme.Light -> {
                 setTheme(R.style.AppTheme_Light)
-                window.decorView.applyBackgroundTint(backgroundColor)
+               window.decorView.applyBackgroundTint(backgroundColor)
             }
 
             else -> {
@@ -155,7 +155,7 @@ abstract class BaseActivity<VB : ViewBinding>(
                 } else {
                     setTheme(R.style.AppTheme_Dark)
                 }
-                window.decorView.applyBackgroundTint(backgroundColor)
+               window.decorView.applyBackgroundTint(backgroundColor)
             }
         }
     }
@@ -163,8 +163,8 @@ abstract class BaseActivity<VB : ViewBinding>(
     open fun upBackgroundImage() {
         if (imageBg) {
             try {
-                ThemeConfig.getBgImage(this, windowManager.windowSize)?.let {
-                    window.decorView.background = BitmapDrawable(resources, it)
+                ThemeConfig.getBgImage(this, windowManager.windowSize)?.let { drawable ->
+                   window.decorView.background = drawable
                 }
             } catch (e: OutOfMemoryError) {
                 toastOnUi("背景图片太大,内存溢出")
