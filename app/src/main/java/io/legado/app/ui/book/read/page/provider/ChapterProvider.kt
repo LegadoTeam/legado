@@ -1026,11 +1026,11 @@ object ChapterProvider {
             setFallbackLayout()
         }
 
-        visibleRect.set(
-            paddingLeft.toFloat(),
-            paddingTop.toFloat(),
-            visibleRight.toFloat(),
-            visibleBottom.toFloat()
+        visibleRect.set( //留余，让溢出时也显示
+            paddingLeft.toFloat() - 10,
+            paddingTop.toFloat() - 10,
+            visibleRight.toFloat() + 10,
+            visibleBottom.toFloat() + 10
         )
 
     }

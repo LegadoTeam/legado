@@ -1325,4 +1325,8 @@
     <string name="immersion_nav_bar">沉浸式操作栏</string>
     <string name="day_nav_bar_immersion">白天操作栏颜色透明</string>
     <string name="night_nav_bar_immersion">夜间操作栏颜色透明</string>
+    <string name="manual_input_img_src">手动输入图片链接</string>
+    <string name="enter_img_src_path">请输入图片链接</string>
+    <string name="empty_img_src_input">图片链接不能为空</string>
+    <string name="invalid_file_path">文件路径无效</string>
 </resources>
