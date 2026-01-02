@@ -608,6 +608,9 @@ class ReadView(context: Context, attrs: AttributeSet) :
         curPage.upStyle()
         prevPage.upStyle()
         nextPage.upStyle()
+        if (ReadBookConfig.isNineBgImg) {
+            upBg()
+        }
     }
 
     /**

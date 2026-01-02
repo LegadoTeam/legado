@@ -337,7 +337,7 @@ data class TextPage(
 
     fun render(view: ContentTextView): Boolean {
         if (!isCompleted) return false
-        return canvasRecorder.recordIfNeeded(view.width, renderHeight) {
+        return canvasRecorder.recordIfNeeded(view.width, renderHeight + 10) { //高度留余，避免图片过高时被截断
             drawPage(view, this)
         }
     }

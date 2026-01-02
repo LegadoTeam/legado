@@ -206,6 +206,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
             val type = rowUi.type
             val name = rowUi.name
             val viewName = rowUi.viewName
+            val action = rowUi.action
             rowUiName.add(name)
             when (type) {
                 Type.text -> ItemSourceEditBinding.inflate(
@@ -242,7 +243,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                         }
                     }
                     editText.setText(loginInfo[name])
-                    rowUi.action?.let {jsStr ->
+                    action?.let { jsStr ->
                         var content: String? = null
                         editText.onFocusChangeListener = View.OnFocusChangeListener { view, hasFocus ->
                             if (hasFocus) {
@@ -258,7 +259,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                                             hasChange = true
                                         }
                                     }.onError { e ->
-                                        AppLog.put("LoginUI Text ${rowUi.name} JavaScript error", e)
+                                        AppLog.put("LoginUI Text $name JavaScript error", e)
                                     }
                                 }
                             }
@@ -314,7 +315,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                     editText.inputType =
                         InputType.TYPE_TEXT_VARIATION_PASSWORD or InputType.TYPE_CLASS_TEXT
                     editText.setText(loginInfo[name])
-                    rowUi.action?.let {jsStr ->
+                    action?.let { jsStr ->
                         var content: String? = null
                         editText.onFocusChangeListener = View.OnFocusChangeListener { view, hasFocus ->
                             if (hasFocus) {
@@ -330,7 +331,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                                             hasChange = true
                                         }
                                     }.onError { e ->
-                                        AppLog.put("LoginUI Text ${rowUi.name} JavaScript error", e)
+                                        AppLog.put("LoginUI Text $name JavaScript error", e)
                                     }
                                 }
                             }
@@ -390,6 +391,13 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                         override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                             hasChange = true
                             loginInfo[name] = items[position]
+                            if (action != null) {
+                                execute {
+                                    evalUiJs(action)
+                                }.onError { e ->
+                                    AppLog.put("LoginUI Select $name JavaScript error", e)
+                                }
+                            }
                         }
                         override fun onNothingSelected(parent: AdapterView<*>?) {
                         }
@@ -452,7 +460,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                                     return@setOnTouchListener true
                                 }
                                 lastClickTime = upTime
-                                handleButtonClick(source, rowUi, rowUis, upTime > downTime + 666)
+                                handleButtonClick(source, action, name, rowUis, upTime > downTime + 666)
                             }
                             MotionEvent.ACTION_CANCEL -> {
                                 view.isSelected = false
@@ -526,7 +534,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                                 hasChange = true
                                 loginInfo[name] = char
                                 it.textView.text = if (left) char + newName else newName + char
-                                handleButtonClick(source, rowUi, rowUis, upTime > downTime + 666)
+                                handleButtonClick(source, action, name, rowUis, upTime > downTime + 666)
                             }
                             MotionEvent.ACTION_CANCEL -> {
                                 view.isSelected = false
@@ -588,13 +596,13 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
         binding.toolBar.menu.applyTint(requireContext())
     }
 
-    private fun handleButtonClick(source: BaseSource, rowUi: RowUi, rowUis: List<RowUi>, isLongClick: Boolean) {
+    private fun handleButtonClick(source: BaseSource, action: String?, name: String, rowUis: List<RowUi>, isLongClick: Boolean) {
         lifecycleScope.launch(IO) {
-            if (rowUi.action.isAbsUrl()) {
-                context?.openUrl(rowUi.action!!)
-            } else if (rowUi.action != null) {
+            if (action.isAbsUrl()) {
+                context?.openUrl(action!!)
+            } else if (action != null) {
                 // JavaScript
-                val buttonFunctionJS = rowUi.action!!
+                val buttonFunctionJS = action
                 val loginJS = source.getLoginJs() ?: return@launch
                 kotlin.runCatching {
                     runScriptWithContext {
@@ -608,7 +616,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                     }
                 }.onFailure { e ->
                     ensureActive()
-                    AppLog.put("LoginUI Button ${rowUi.name} JavaScript error", e)
+                    AppLog.put("LoginUI Button $name JavaScript error", e)
                 }
             }
         }

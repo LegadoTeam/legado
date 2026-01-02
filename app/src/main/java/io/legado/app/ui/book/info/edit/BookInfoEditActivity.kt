@@ -151,11 +151,15 @@ class BookInfoEditActivity :
     }
 
     private fun coverChangeTo(uri: Uri) {
+        if (uri.scheme?.lowercase() in listOf("http", "https")) {
+            coverChangeTo(uri.toString())
+            return
+        }
         readUri(uri) { fileDoc, inputStream ->
             runCatching {
                 inputStream.use {
                     var file = this.externalFiles
-                    val suffix = if (fileDoc.name.endsWith(".9.png", true)) {
+                    val suffix = if (fileDoc.name.contains(".9.png", true)) {
                         ".9.png"
                     } else {
                         "." + fileDoc.name.substringAfterLast(".")

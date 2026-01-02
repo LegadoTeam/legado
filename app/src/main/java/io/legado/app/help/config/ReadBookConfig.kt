@@ -60,6 +60,7 @@ object ReadBookConfig {
     var bgMeanColor: Int = 0
     val textColor: Int get() = durConfig.curTextColor()
     val textAccentColor: Int get() = durConfig.curTextAccentColor()
+    var isNineBgImg = false
 
     init {
         initConfigs()
@@ -753,6 +754,7 @@ object ReadBookConfig {
         }
 
         fun curBgDrawable(width: Int, height: Int): Drawable {
+            isNineBgImg = false
             if (width == 0 || height == 0) {
                 return appCtx.getCompatColor(R.color.background).toDrawable()
             }
@@ -773,6 +775,7 @@ object ReadBookConfig {
                             else FileUtils.getPath(appCtx.externalFiles, "bg", curBgStr())
                         }
                         if (path.endsWith(".9.png")) {
+                            isNineBgImg = true
                             BitmapUtils.decodeNinePatchDrawable(path)
                         } else {
                             val bitmap = BitmapUtils.decodeBitmap(path, width, height)

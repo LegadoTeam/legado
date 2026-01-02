@@ -66,6 +66,12 @@ import splitties.init.appCtx
 import java.io.File
 import java.io.FileOutputStream
 import androidx.core.graphics.toColorInt
+import androidx.lifecycle.lifecycleScope
+import io.legado.app.help.http.addHeaders
+import io.legado.app.help.http.newCallResponse
+import io.legado.app.model.analyzeRule.AnalyzeUrl
+import io.legado.app.utils.putPrefString
+import kotlinx.coroutines.launch
 
 class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
 
@@ -389,10 +395,50 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
     }
 
     private fun setBgFromUri(uri: Uri) {
+        if (uri.scheme?.lowercase() in listOf("http", "https")) {
+            lifecycleScope.launch {
+                kotlin.runCatching {
+                    appCtx.toastOnUi("下载图片中...")
+                    val analyzeUrl = AnalyzeUrl(uri.toString())
+                    val url = analyzeUrl.urlNoQuery
+                    var file = requireContext().externalFiles
+                    val res = okHttpClient.newCallResponse(0) {
+                        addHeaders(analyzeUrl.headerMap)
+                        url(url)
+                    }
+                    val contentType = res.header("Content-Type") ?: "image/jpeg"
+                    val imageType = when {
+                        contentType.contains("png", ignoreCase = true) -> "png"
+                        contentType.contains("gif", ignoreCase = true) -> "gif"
+                        contentType.contains("webp", ignoreCase = true) -> "webp"
+                        else -> "jpg"
+                    }
+                    val suffix = if (url.contains(".9.png", true)) {
+                        ".9.png"
+                    } else {
+                        ".$imageType"
+                    }
+                    val fileName = MD5Utils.md5Encode(url) + suffix
+                    file = FileUtils.createFileIfNotExist(file, "bg", fileName)
+                    res.body.byteStream().use { inputStream ->
+                        FileOutputStream(file).use { outputStream ->
+                            inputStream.copyTo(outputStream)
+                        }
+                    }
+                    ReadBookConfig.durConfig.setCurBg(2, fileName)
+                    postEvent(EventBus.UP_CONFIG, arrayListOf(1))
+                }.onSuccess {
+                    appCtx.toastOnUi("设定成功")
+                }.onFailure {
+                    appCtx.toastOnUi(it.localizedMessage)
+                }
+            }
+            return
+        }
         readUri(uri) { fileDoc, inputStream ->
             kotlin.runCatching {
                 var file = requireContext().externalFiles
-                val suffix = if (fileDoc.name.endsWith(".9.png", true)) {
+                val suffix = if (fileDoc.name.contains(".9.png", true)) {
                     ".9.png"
                 } else {
                     "." + fileDoc.name.substringAfterLast(".")

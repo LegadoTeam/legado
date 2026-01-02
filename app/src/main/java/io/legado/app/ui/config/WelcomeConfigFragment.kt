@@ -5,15 +5,21 @@ import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
+import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import io.legado.app.R
 import io.legado.app.constant.PreferKey
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.http.addHeaders
+import io.legado.app.help.http.get
+import io.legado.app.help.http.newCallResponse
+import io.legado.app.help.http.okHttpClient
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.prefs.SwitchPreference
 import io.legado.app.lib.prefs.fragment.PreferenceFragment
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.model.BookCover
+import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.MD5Utils
@@ -25,9 +31,10 @@ import io.legado.app.utils.readUri
 import io.legado.app.utils.removePref
 import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.toastOnUi
+import kotlinx.coroutines.launch
+import okhttp3.Request
 import splitties.init.appCtx
 import java.io.FileOutputStream
-
 class WelcomeConfigFragment : PreferenceFragment(),
     SharedPreferences.OnSharedPreferenceChangeListener {
 
@@ -192,10 +199,49 @@ class WelcomeConfigFragment : PreferenceFragment(),
     }
 
     private fun setCoverFromUri(preferenceKey: String, uri: Uri) {
+        if (uri.scheme?.lowercase() in listOf("http", "https")) {
+            lifecycleScope.launch {
+                kotlin.runCatching {
+                    appCtx.toastOnUi("下载图片中...")
+                    val analyzeUrl = AnalyzeUrl(uri.toString())
+                    val url = analyzeUrl.urlNoQuery
+                    var file = requireContext().externalFiles
+                    val res = okHttpClient.newCallResponse(0) {
+                        addHeaders(analyzeUrl.headerMap)
+                        url(url)
+                    }
+                    val contentType = res.header("Content-Type") ?: "image/jpeg"
+                    val imageType = when {
+                        contentType.contains("png", ignoreCase = true) -> "png"
+                        contentType.contains("gif", ignoreCase = true) -> "gif"
+                        contentType.contains("webp", ignoreCase = true) -> "webp"
+                        else -> "jpg"
+                    }
+                    val suffix = if (url.contains(".9.png", true)) {
+                        ".9.png"
+                    } else {
+                        ".$imageType"
+                    }
+                    val fileName = MD5Utils.md5Encode(url) + suffix
+                    file = FileUtils.createFileIfNotExist(file, "covers", fileName)
+                    res.body.byteStream().use { inputStream ->
+                        FileOutputStream(file).use { outputStream ->
+                            inputStream.copyTo(outputStream)
+                        }
+                    }
+                    putPrefString(preferenceKey, file.absolutePath)
+                }.onSuccess {
+                    appCtx.toastOnUi("设定成功")
+                }.onFailure {
+                    appCtx.toastOnUi(it.localizedMessage)
+                }
+            }
+            return
+        }
         readUri(uri) { fileDoc, inputStream ->
             kotlin.runCatching {
                 var file = requireContext().externalFiles
-                val suffix = if (fileDoc.name.endsWith(".9.png", true)) {
+                val suffix = if (fileDoc.name.contains(".9.png", true)) {
                     ".9.png"
                 } else {
                     "." + fileDoc.name.substringAfterLast(".")
