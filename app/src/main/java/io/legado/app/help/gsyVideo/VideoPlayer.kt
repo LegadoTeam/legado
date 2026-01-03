@@ -8,8 +8,11 @@ import android.view.Surface
 import android.view.SurfaceView
 import android.view.View
 import android.view.ViewGroup
+import android.view.Window
 import android.widget.ImageView
 import android.widget.TextView
+import com.shuyu.gsyvideoplayer.listener.LockClickListener
+import com.shuyu.gsyvideoplayer.utils.CommonUtil
 import com.shuyu.gsyvideoplayer.video.StandardGSYVideoPlayer
 import com.shuyu.gsyvideoplayer.video.base.GSYVideoPlayer
 import io.legado.app.R
@@ -53,6 +56,34 @@ class VideoPlayer: StandardGSYVideoPlayer {
         else R.layout.video_layout_controller
     }
 
+    override fun getFullWindowPlayer(): VideoPlayer? {
+        val activity = CommonUtil.scanForActivity(context) ?: return null
+        val vp = activity.findViewById<View?>(Window.ID_ANDROID_CONTENT) as ViewGroup
+        val full = vp.findViewById<View?>(fullId)
+        var gsyVideoPlayer: VideoPlayer? = null
+        if (full != null) {
+            gsyVideoPlayer = full as VideoPlayer
+        }
+        return gsyVideoPlayer
+    }
+    override fun getSmallWindowPlayer(): VideoPlayer? = null
+
+    override fun getCurrentPlayer(): VideoPlayer {
+        val fullVideoPlayer = getFullWindowPlayer()
+        if (fullVideoPlayer != null) {
+            return fullVideoPlayer
+        }
+        val smallVideoPlayer = getSmallWindowPlayer()
+        if (smallVideoPlayer != null) {
+            return smallVideoPlayer
+        }
+        return this
+    }
+
+    fun getLockCurScreen() = mLockCurScreen
+
+    public override fun lockTouchLogic() = super.lockTouchLogic()
+
     override fun init(context: Context) {
         super.init(context)
         initView()
@@ -84,6 +115,9 @@ class VideoPlayer: StandardGSYVideoPlayer {
                     }
                 }
             )
+            mLockClickListener = LockClickListener { view, lock ->
+                VideoPlay.lockCurScreen = lock
+            }
         }
     }
     override fun touchSurfaceUp(){
@@ -354,7 +388,7 @@ class VideoPlayer: StandardGSYVideoPlayer {
             override fun finishDialog() {
                 isChanging = false
             }
-        })
+        }, VideoPlay.chapterInVolumeIndex)
         choiceEpisodeDialog.show()
     }
 

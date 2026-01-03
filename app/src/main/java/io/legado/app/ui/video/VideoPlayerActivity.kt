@@ -64,7 +64,6 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     private var starMenuItem: MenuItem? = null
     private var isNew = true
     private var isFullScreen = false
-    private var isPortraitVideo = false
     private var orientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
     private var menuCustomBtn: MenuItem? = null
     private val bookSourceEditResult =
@@ -262,7 +261,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         toggleSystemBar(!isFullScreen)
         if (isFullScreen) {
             orientation = requestedOrientation
-            requestedOrientation = if (isPortraitVideo) {
+            requestedOrientation = if (VideoPlay.isPortraitVideo) {
                 ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT //竖屏
             } else {
                 ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE //横屏
@@ -280,7 +279,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             }
             playerView.postDelayed({
                 playerView.backFromFull(this)
-            }, if (isPortraitVideo) 300 else 0)
+            }, if (VideoPlay.isPortraitVideo) 300 else 0)
             upView()
         }
     }
@@ -298,12 +297,12 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             window.addFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN)
             when (newConfig.orientation) {
                 Configuration.ORIENTATION_LANDSCAPE -> {
-                    if (!isPortraitVideo) {
+                    if (!VideoPlay.isPortraitVideo) {
                         toggleFullScreen()
                     }
                 }
                 Configuration.ORIENTATION_PORTRAIT -> {
-                    if (isPortraitVideo) {
+                    if (VideoPlay.isPortraitVideo) {
                         toggleFullScreen()
                     }
                 }
@@ -331,6 +330,10 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             override fun onPrepared(url: String?, vararg objects: Any?) {
                 super.onPrepared(url, *objects)
                 playerView.post {
+                    val player = playerView.getCurrentPlayer()
+                    if (VideoPlay.lockCurScreen &&  !player.getLockCurScreen()) {
+                        player.lockTouchLogic()
+                    }
                     //根据实际视频比例再次调整
                     val videoWidth = playerView.currentVideoWidth
                     val videoHeight = playerView.currentVideoHeight
@@ -338,7 +341,8 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                         val layoutParams = playerView.layoutParams
                         val parentWidth = playerView.width
                         val aspectRatio = videoHeight.toFloat() / videoWidth.toFloat()
-                        isPortraitVideo = if (aspectRatio > 1.2) true else false
+                        val isPortraitVideo = if (aspectRatio > 1.2) true else false
+                        VideoPlay.isPortraitVideo = isPortraitVideo
                         if (isFullScreen && isPortraitVideo) {
                             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT //提前进入了全屏，并且默认横屏了，纠正回来
                             return@post

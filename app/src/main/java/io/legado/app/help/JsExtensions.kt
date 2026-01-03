@@ -1160,7 +1160,7 @@ interface JsExtensions : JsEncodeUtils {
         return GSON.toJson(themeConfig)
     }
 
-    fun getThemeConfigMap(): Map<String, Any> {
+    fun getThemeConfigMap(): Map<String, Any?> {
         return ThemeConfig.getDurConfig(appCtx).toMap()
     }
 

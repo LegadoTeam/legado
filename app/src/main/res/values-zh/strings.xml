@@ -839,7 +839,7 @@
     <string name="background_image">背景图片</string>
     <string name="background_image_blurring">背景图片虚化</string>
     <string name="background_image_blurring_radius">虚化半径</string>
-    <string name="background_image_hint">0 为停用，启用范围 1~25\n半径数值越大，虚化效果越高</string>
+    <string name="background_image_hint">0 为停用，启用范围 1~25\n半径数值越大，虚化效果越高\n.9.png背景图时此设置无效</string>
     <string name="export_folder">导出文件夹</string>
     <string name="export_charset">导出编码</string>
     <string name="export_no_chapter_name">TXT 不导出章节名</string>

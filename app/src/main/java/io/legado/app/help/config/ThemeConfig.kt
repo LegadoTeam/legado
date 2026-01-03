@@ -109,9 +109,7 @@ object ThemeConfig {
     }
 
     fun upConfig() {
-        getConfigs()?.forEach { config ->
-            addConfig(config)
-        }
+        addConfigs(getConfigs())
     }
 
     fun save() {
@@ -140,13 +138,35 @@ object ThemeConfig {
         if (!validateConfig(newConfig)) {
             return
         }
+        var hasTheme = false
         configList.forEachIndexed { index, config ->
             if (newConfig.themeName == config.themeName) {
                 configList[index] = newConfig
-                return
+                hasTheme = true
+                return@forEachIndexed
             }
         }
-        configList.add(newConfig)
+        if (!hasTheme) {
+            configList.add(newConfig)
+        }
+        save()
+    }
+
+    fun addConfigs(newConfigs: List<Config>?) {
+        val newConfigs = newConfigs?.filter{
+            validateConfig(it)
+        }
+        if (newConfigs.isNullOrEmpty()) {
+            return
+        }
+        newConfigs.forEach { newConfig ->
+            val existingIndex = configList.indexOfFirst { it.themeName == newConfig.themeName }
+            if (existingIndex != -1) {
+                configList[existingIndex] = newConfig
+            } else {
+                configList.add(newConfig)
+            }
+        }
         save()
     }
 
@@ -177,11 +197,14 @@ object ThemeConfig {
 
     fun applyConfig(context: Context, config: Config) {
         try {
+            clearBg()
             val primary = config.primaryColor.toColorInt()
             val accent = config.accentColor.toColorInt()
             val background = config.backgroundColor.toColorInt()
             val bBackground = config.bottomBackground.toColorInt()
             val transparentNavBar = config.transparentNavBar
+            val backgroundPath = config.backgroundImgPath
+            val backgroundBlur = config.backgroundImgBlur
             if (config.isNightTheme) {
                 context.putPrefString(PreferKey.dNThemeName, config.themeName)
                 context.putPrefInt(PreferKey.cNPrimary, primary)
@@ -189,6 +212,8 @@ object ThemeConfig {
                 context.putPrefInt(PreferKey.cNBackground, background)
                 context.putPrefInt(PreferKey.cNBBackground, bBackground)
                 context.putPrefBoolean(PreferKey.tNavBarN, transparentNavBar)
+                context.putPrefString(PreferKey.bgImageN, backgroundPath)
+                context.putPrefInt(PreferKey.bgImageNBlurring, backgroundBlur)
             } else {
                 context.putPrefString(PreferKey.dThemeName, config.themeName)
                 context.putPrefInt(PreferKey.cPrimary, primary)
@@ -196,6 +221,8 @@ object ThemeConfig {
                 context.putPrefInt(PreferKey.cBackground, background)
                 context.putPrefInt(PreferKey.cBBackground, bBackground)
                 context.putPrefBoolean(PreferKey.tNavBar, transparentNavBar)
+                context.putPrefString(PreferKey.bgImage, backgroundPath)
+                context.putPrefInt(PreferKey.bgImageBlurring, backgroundBlur)
             }
             AppConfig.isNightTheme = config.isNightTheme
             applyDayNight(context)
@@ -229,6 +256,11 @@ object ThemeConfig {
             context.getPrefInt(PreferKey.cBBackground, context.getCompatColor(R.color.md_grey_200))
         val transparentNavBar =
             context.getPrefBoolean(PreferKey.tNavBar, false)
+        val bgImgPath =
+            context.getPrefString(PreferKey.bgImage)
+        val bgImgBlur =
+            context.getPrefInt(PreferKey.bgImageBlurring, 0)
+
         return Config(
             themeName = name,
             isNightTheme = false,
@@ -236,7 +268,9 @@ object ThemeConfig {
             accentColor = "#${accent.hexString}",
             backgroundColor = "#${background.hexString}",
             bottomBackground = "#${bBackground.hexString}",
-            transparentNavBar = transparentNavBar
+            transparentNavBar = transparentNavBar,
+            backgroundImgPath = bgImgPath,
+            backgroundImgBlur = bgImgBlur
         )
     }
 
@@ -262,6 +296,10 @@ object ThemeConfig {
             context.getPrefInt(PreferKey.cNBBackground, context.getCompatColor(R.color.md_grey_850))
         val transparentNavBar =
             context.getPrefBoolean(PreferKey.tNavBarN, false)
+        val bgImgPath =
+            context.getPrefString(PreferKey.bgImageN)
+        val bgImgBlur =
+            context.getPrefInt(PreferKey.bgImageNBlurring, 0)
         return Config(
             themeName = name,
             isNightTheme = true,
@@ -269,7 +307,9 @@ object ThemeConfig {
             accentColor = "#${accent.hexString}",
             backgroundColor = "#${background.hexString}",
             bottomBackground = "#${bBackground.hexString}",
-            transparentNavBar = transparentNavBar
+            transparentNavBar = transparentNavBar,
+            backgroundImgPath = bgImgPath,
+            backgroundImgBlur = bgImgBlur
         )
     }
 
@@ -344,15 +384,16 @@ object ThemeConfig {
     }
 
     fun clearBg() {
-        val bgImagePath = appCtx.getPrefString(PreferKey.bgImage)
+        val (nightConfigs, dayConfigs) = configList.partition { it.isNightTheme }
+        val nightBackgroundImgPaths = nightConfigs.mapNotNull { it.backgroundImgPath }
+        val dayBackgroundImgPaths = dayConfigs.mapNotNull { it.backgroundImgPath }
         appCtx.externalFiles.getFile(PreferKey.bgImage).listFiles()?.forEach {
-            if (it.absolutePath != bgImagePath) {
+            if (!dayBackgroundImgPaths.contains(it.absolutePath)) {
                 it.delete()
             }
         }
-        val bgImageNPath = appCtx.getPrefString(PreferKey.bgImageN)
         appCtx.externalFiles.getFile(PreferKey.bgImageN).listFiles()?.forEach {
-            if (it.absolutePath != bgImageNPath) {
+            if (!nightBackgroundImgPaths.contains(it.absolutePath)) {
                 it.delete()
             }
         }
@@ -366,7 +407,9 @@ object ThemeConfig {
         var accentColor: String,
         var backgroundColor: String,
         var bottomBackground: String,
-        var transparentNavBar: Boolean
+        var transparentNavBar: Boolean,
+        var backgroundImgPath: String?,
+        var backgroundImgBlur: Int
     ) {
 
         override fun hashCode(): Int {
@@ -383,6 +426,8 @@ object ThemeConfig {
                         && other.backgroundColor == backgroundColor
                         && other.bottomBackground == bottomBackground
                         && other.transparentNavBar == transparentNavBar
+                        && other.backgroundImgPath == backgroundImgPath
+                        && other.backgroundImgBlur == backgroundImgBlur
             }
             return false
         }
@@ -394,7 +439,9 @@ object ThemeConfig {
             "accentColor" to accentColor,
             "backgroundColor" to backgroundColor,
             "bottomBackground" to bottomBackground,
-            "transparentNavBar" to transparentNavBar
+            "transparentNavBar" to transparentNavBar,
+            "backgroundImgPath" to backgroundImgPath,
+            "backgroundImgBlur" to backgroundImgBlur
         )
 
     }
