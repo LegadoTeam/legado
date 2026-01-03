@@ -146,16 +146,16 @@
         </LinearLayout>
 
         <LinearLayout
+            style="?android:attr/buttonBarStyle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
 
             <Button
                 android:id="@+id/btn_previous"
-                style="@style/Widget.Material3.Button.TonalButton"
+                style="?android:attr/buttonBarButtonStyle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="4dp"
                 android:layout_weight="1"
                 android:text="@string/btn_previous"
                 android:textColor="@color/primaryText"
@@ -163,11 +163,9 @@
 
             <Button
                 android:id="@+id/btn_next"
-                style="@style/Widget.Material3.Button.TonalButton"
+                style="?android:attr/buttonBarButtonStyle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="4dp"
                 android:layout_weight="1"
                 android:text="@string/btn_next"
                 android:textColor="@color/primaryText"
@@ -175,11 +173,9 @@
 
             <Button
                 android:id="@+id/btn_replace"
-                style="@style/Widget.Material3.Button.TonalButton"
+                style="?android:attr/buttonBarButtonStyle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="4dp"
                 android:layout_weight="1"
                 android:text="@string/replace"
                 android:textColor="@color/primaryText"
@@ -187,10 +183,9 @@
 
             <Button
                 android:id="@+id/btn_replace_all"
-                style="@style/Widget.Material3.Button.TonalButton"
+                style="?android:attr/buttonBarButtonStyle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
                 android:layout_weight="1"
                 android:enabled="false"
                 android:text="@string/replace_all"

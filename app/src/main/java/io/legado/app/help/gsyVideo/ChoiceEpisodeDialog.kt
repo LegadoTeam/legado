@@ -5,6 +5,7 @@ import android.app.Dialog
 import android.content.Context
 import android.widget.TextView
 import android.os.Bundle
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.AdapterView
@@ -41,7 +42,8 @@ class ChoiceEpisodeDialog(private val mContext: Context) : Dialog(
     @SuppressLint("SetTextI18n")
     fun initList(
         data: List<BookChapter>,
-        onItemClickListener: OnListItemClickListener
+        onItemClickListener: OnListItemClickListener,
+        initialSelection: Int = -1
     ) {
         this.onItemClickListener = onItemClickListener
         this.data = data
@@ -52,13 +54,16 @@ class ChoiceEpisodeDialog(private val mContext: Context) : Dialog(
         setContentView(view)
         adapter = SwitchVideoAdapter(mContext, data) { item -> item.title }
         listView!!.setAdapter(adapter)
+        if (initialSelection >= 0 && initialSelection < data.size) {
+            listView!!.setSelectionFromTop(initialSelection, 0)
+        }
         listView!!.onItemClickListener = this@ChoiceEpisodeDialog.OnItemClickListener()
         val dialogWindow = window
         val lp = dialogWindow!!.attributes
         val d = mContext.resources.displayMetrics // 获取屏幕宽、高用
         lp.width = (d.widthPixels * 0.4).toInt() // 宽度设置为屏幕的0.4
         lp.height = d.heightPixels
-        lp.gravity = android.view.Gravity.END // 设置靠右对齐
+        lp.gravity = Gravity.END // 设置靠右对齐
         dialogWindow.setAttributes(lp)
     }
 

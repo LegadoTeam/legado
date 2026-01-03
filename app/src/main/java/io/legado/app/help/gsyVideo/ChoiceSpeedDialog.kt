@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Dialog
 import android.content.Context
 import android.os.Bundle
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.AdapterView
@@ -53,9 +54,9 @@ class ChoiceSpeedDialog(private val mContext: Context) : Dialog(
         val dialogWindow = window
         val lp = dialogWindow!!.attributes
         val d = mContext.resources.displayMetrics // 获取屏幕宽、高用
-        lp.width = (d.widthPixels * 0.3).toInt() // 宽度设置为屏幕的0.4
+        lp.width = (d.widthPixels * 0.3).toInt() // 宽度设置为屏幕的0.3
         lp.height = d.heightPixels
-        lp.gravity = android.view.Gravity.END // 设置靠右对齐
+        lp.gravity = Gravity.END // 设置靠右对齐
         dialogWindow.setAttributes(lp)
     }
 

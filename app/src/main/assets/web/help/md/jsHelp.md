@@ -213,7 +213,7 @@ java.getReadBookConfigMap(): Map<String, Any>
 * 获取用户主题配置
 ```js
 java.getThemeConfig(): String
-java.getThemeConfigMap(): Map<String, Any>
+java.getThemeConfigMap(): Map<String, Any?>
 ```
 * 获取用户主题模式
 ```js

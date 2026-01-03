@@ -78,6 +78,10 @@ object VideoPlay : CoroutineScope by MainScope(){
         }
     /**  弹幕滚动速度  **/
     var danmakuSpeed = 1.2f
+    /**  锁屏  **/
+    var lockCurScreen = false
+    /**  竖屏视频  **/
+    var isPortraitVideo = false
 
     val videoManager by lazy { ExoVideoManager() }
     private var isLoading = false
@@ -229,7 +233,7 @@ object VideoPlay : CoroutineScope by MainScope(){
                     ruleData = book,
                     chapter = chapter
                 )
-                when (val danmaku = chapter!!.getDanmaku()) {
+                when (val danmaku = chapter.getDanmaku()) {
                     is String -> danmakuStr = danmaku
                     is File -> danmakuFile = danmaku
                 }
@@ -239,7 +243,7 @@ object VideoPlay : CoroutineScope by MainScope(){
                         player.overrideExtension = "mpd"
                     }
                     player.mapHeadData = analyzeUrl.headerMap
-                    player.setUp(playUrl, false, File(appCtx.externalCache, "exoplayer"), chapter!!.title)
+                    player.setUp(playUrl, false, File(appCtx.externalCache, "exoplayer"), chapter.title)
                     if (autoPlay) {
                         player.startPlayLogic()
                     }
@@ -297,6 +301,8 @@ object VideoPlay : CoroutineScope by MainScope(){
             rssRecord = null
             danmakuStr = null
             danmakuFile = null
+            lockCurScreen = false
+            isPortraitVideo = false
         }
     }
     /**

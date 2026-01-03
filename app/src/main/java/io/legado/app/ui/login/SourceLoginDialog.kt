@@ -387,8 +387,13 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                     loginInfo[name] = char
                     val i = items.indexOf(char)
                     selector.setSelectionSafely(i)
+                    var isInitializing = true
                     selector.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                         override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                            if (isInitializing) { //忽略初始化选择
+                                isInitializing = false
+                                return
+                            }
                             hasChange = true
                             loginInfo[name] = items[position]
                             if (action != null) {

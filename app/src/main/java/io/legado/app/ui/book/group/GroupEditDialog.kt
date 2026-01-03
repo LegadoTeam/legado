@@ -9,6 +9,7 @@ import io.legado.app.base.BaseDialogFragment
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.databinding.DialogBookGroupEditBinding
 import io.legado.app.lib.dialogs.alert
+import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.utils.FileUtils
@@ -17,6 +18,7 @@ import io.legado.app.utils.externalFiles
 import io.legado.app.utils.gone
 import io.legado.app.utils.inputStream
 import io.legado.app.utils.readUri
+import io.legado.app.utils.removePref
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
@@ -91,8 +93,23 @@ class GroupEditDialog() : BaseDialogFragment(R.layout.dialog_book_group_edit) {
         }
         binding.run {
             ivCover.onClick {
-                selectImage.launch {
-                    mode = HandleFileContract.IMAGE
+                if (!bookGroup?.cover.isNullOrEmpty()) {
+                    val actions = arrayListOf(
+                        getString(R.string.select_image),
+                        getString(R.string.delete)
+                    )
+                    context?.selector(items = actions) { _, i ->
+                        when (i) {
+                            0 -> selectImage.launch {
+                                mode = HandleFileContract.IMAGE
+                            }
+                            1 -> binding.ivCover.load()
+                        }
+                    }
+                } else {
+                    selectImage.launch {
+                        mode = HandleFileContract.IMAGE
+                    }
                 }
             }
             btnCancel.onClick {
