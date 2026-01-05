@@ -46,6 +46,7 @@ import io.legado.app.ui.rss.source.edit.RssSourceEditActivity
 import io.legado.app.ui.video.config.SettingsDialog
 import io.legado.app.utils.StartActivityContract
 import io.legado.app.utils.gone
+import io.legado.app.utils.observeEvent
 import io.legado.app.utils.observeEventSticky
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setTintMutate
@@ -196,7 +197,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                 VideoPlay.chapterInVolumeIndex = index
                 VideoPlay.durChapterPos = 0
                 VideoPlay.saveRead()
-                upView()
+                upEpisodesView()
                 VideoPlay.startPlay(playerView)
             }
         }
@@ -222,7 +223,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                     adapter?.updateData(VideoPlay.episodes)
                 }
                 VideoPlay.saveRead()
-                upView()
+                upVolumesView()
                 VideoPlay.startPlay(playerView)
             }
         }
@@ -248,9 +249,17 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     }
 
     private fun upView() {
+        upEpisodesView()
+        upVolumesView()
+    }
+
+    private fun upEpisodesView() {
         if (!VideoPlay.episodes.isNullOrEmpty()) {
             scrollToDurChapter(binding.chapters, VideoPlay.chapterInVolumeIndex)
         }
+    }
+
+    private fun upVolumesView() {
         if (!VideoPlay.volumes.isEmpty()) {
             scrollToDurChapter(binding.volumes, VideoPlay.durVolumeIndex)
         }
@@ -358,14 +367,6 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                         layoutParams.height = if (height < screenHeight / 2) height else screenHeight / 2
                         playerView.layoutParams = layoutParams
                     }
-                }
-            }
-            override fun onAutoComplete(url: String?, vararg objects: Any?) {
-                super.onAutoComplete(url, *objects)
-                if (VideoPlay.upDurIndex(1)) {
-                    VideoPlay.saveRead()
-                    upView()
-                    VideoPlay.startPlay(playerView)
                 }
             }
         })
@@ -495,9 +496,19 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     }
 
     override fun observeLiveBus() {
+
         observeEventSticky<String>(EventBus.VIDEO_SUB_TITLE) {
             binding.titleBar.title = it
         }
+
+        observeEvent<ArrayList<Int>>(EventBus.UP_VIDEO_INFO) {
+            it.forEach { value ->
+                when (value) {
+                    1 -> upEpisodesView()
+                }
+            }
+        }
+
     }
 
     override fun finish() {

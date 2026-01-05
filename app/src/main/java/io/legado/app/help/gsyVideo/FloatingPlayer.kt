@@ -44,7 +44,7 @@ class FloatingPlayer : StandardGSYVideoPlayer {
     }
 
 
-    override fun onAutoCompletion() {
+    override fun onAutoCompletion() { //自动播放完成
         setStateAndUi(CURRENT_STATE_AUTO_COMPLETE)
         mSaveChangeViewTIme = 0
         if (mTextureViewContainer.isNotEmpty()) {

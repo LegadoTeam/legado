@@ -181,6 +181,13 @@ class VideoPlayer: StandardGSYVideoPlayer {
         }
     }
 
+    override fun onAutoCompletion() { //播放完成
+        val success = VideoPlay.upDurIndex(1, this)
+        if (!success) {
+            super.onCompletion()
+        }
+    }
+
     override fun onCompletion() {
         super.onCompletion()
         releaseDanmaku(this)
@@ -247,10 +254,7 @@ class VideoPlayer: StandardGSYVideoPlayer {
             }
         }
         btnNext?.setOnClickListener {
-            if (VideoPlay.upDurIndex(1)) {
-                VideoPlay.saveRead()
-                VideoPlay.startPlay(this)
-            }
+            VideoPlay.upDurIndex(1,this)
         }
     }
 
@@ -406,6 +410,8 @@ class VideoPlayer: StandardGSYVideoPlayer {
                 if (playSpeed != 1.0f) {
                     playbackSpeed?.text = "${playSpeed}X"
                     showOverlayTip("${playSpeed}倍播放中", 2000)
+                } else {
+                    playbackSpeed?.text = "倍速"
                 }
             }
 

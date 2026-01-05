@@ -386,10 +386,7 @@ class VideoPlayService : BaseService() {
             }
             override fun onAutoComplete(url: String?, vararg objects: Any?) {
                 super.onAutoComplete(url, *objects)
-                if (VideoPlay.upDurIndex(1)) {
-                    VideoPlay.saveRead()
-                    VideoPlay.startPlay(playerView)
-                } else {
+                if (!VideoPlay.upDurIndex(1, playerView)) {
                     stopSelf()
                 }
             }
