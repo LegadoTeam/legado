@@ -80,6 +80,13 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_disable_manga_page_anim"
+        android:checkable="true"
+        android:checked="false"
+        android:title="@string/disable_manga_page_anim"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_manga_footer_config"
         android:title="@string/manga_footer_config"
         app:showAsAction="never" />

@@ -87,7 +87,6 @@ object CacheManager {
         }
         val cache = appDb.cacheDao.get(key)
         if (cache != null && (cache.deadline == 0L || cache.deadline > System.currentTimeMillis())) {
-            putMemory(key, cache.value ?: "")
             return cache.value
         }
         return null
