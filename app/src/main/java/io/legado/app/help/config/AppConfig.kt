@@ -703,6 +703,12 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefBoolean(PreferKey.disableMangaScale, value)
         }
 
+    var disableMangaPageAnim: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.disableMangaPageAnim, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.disableMangaPageAnim, value)
+        }
+
     //漫画预加载数量
     var mangaPreDownloadNum
         get() = appCtx.getPrefInt(PreferKey.mangaPreDownloadNum, 10)

@@ -25,7 +25,7 @@ import io.legado.app.utils.toastOnUi
 import org.apache.commons.text.StringEscapeUtils
 import java.util.Date
 import io.legado.app.data.entities.BaseSource
-import io.legado.app.help.WebJsExtensions.Companion.JS_INJECTION
+import io.legado.app.help.webView.WebJsExtensions.Companion.JS_INJECTION
 
 class WebViewModel(application: Application) : BaseViewModel(application) {
     var source: BaseSource? = null

@@ -210,6 +210,7 @@
     <string name="click_turn_page">Tap screen to turn page</string>
     <string name="page_anim">Flip animation</string>
     <string name="book_page_anim">Flip animation (book)</string>
+    <string name="disable_manga_page_anim">Disable flip animation</string>
     <string name="keep_light">Keep screen awake</string>
     <string name="back">Back</string>
     <string name="menu">Menu</string>
