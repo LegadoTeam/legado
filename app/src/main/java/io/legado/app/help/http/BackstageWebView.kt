@@ -16,6 +16,8 @@ import io.legado.app.constant.AppConst
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
+import io.legado.app.help.webView.PooledWebView
+import io.legado.app.help.webView.WebViewPool
 import io.legado.app.utils.runOnUI
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Runnable
@@ -49,6 +51,7 @@ class BackstageWebView(
     private val mHandler = Handler(Looper.getMainLooper())
     private var callback: Callback? = null
     private var mWebView: WebView? = null
+    private var pooledWebView: PooledWebView? = null
 
     suspend fun getStrResponse(): StrResponse = withTimeout(60000L) {
         suspendCancellableCoroutine { block ->
@@ -108,13 +111,14 @@ class BackstageWebView(
 
     @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
     private fun createWebView(): WebView {
-        val webView = WebView(appCtx)
+        val pooledWebView = WebViewPool.acquire(appCtx)
+        this.pooledWebView = pooledWebView
+        val webView = pooledWebView.realWebView
+        webView.resumeTimers()
+        webView.onResume()
         val settings = webView.settings
-        settings.javaScriptEnabled = true
-        settings.domStorageEnabled = true
         settings.blockNetworkImage = true
         settings.userAgentString = headerMap?.get(AppConst.UA_NAME) ?: AppConfig.userAgent
-        settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         settings.cacheMode = if(cacheFirst) WebSettings.LOAD_CACHE_ELSE_NETWORK else WebSettings.LOAD_DEFAULT
         if (sourceRegex.isNullOrBlank() && overrideUrlRegex.isNullOrBlank()) {
             webView.webViewClient = HtmlWebViewClient()
@@ -125,8 +129,9 @@ class BackstageWebView(
     }
 
     private fun destroy() {
-        mWebView?.destroy()
+        pooledWebView?.let { WebViewPool.release(it) }
         mWebView = null
+        pooledWebView = null
     }
 
     private fun getJs(): String {

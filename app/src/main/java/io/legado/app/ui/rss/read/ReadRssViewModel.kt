@@ -17,7 +17,7 @@ import io.legado.app.data.entities.RssSource
 import io.legado.app.data.entities.RssStar
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.TTS
-import io.legado.app.help.WebJsExtensions.Companion.JS_INJECTION
+import io.legado.app.help.webView.WebJsExtensions.Companion.JS_INJECTION
 import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.model.analyzeRule.AnalyzeUrl
@@ -49,9 +49,10 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
 
     fun initData(intent: Intent, success: (() -> Unit)? = null) {
         execute {
-            origin = intent.getStringExtra("origin") ?: return@execute
+            val origin = intent.getStringExtra("origin") ?: return@execute
+            this@ReadRssViewModel.origin = origin
             val link = intent.getStringExtra("link")
-            rssSource = appDb.rssSourceDao.getByKey(origin!!)?.also{
+            rssSource = appDb.rssSourceDao.getByKey(origin)?.also{
                 cacheFirst = it.cacheFirst
                 hasPreloadJs = !it.preloadJs.isNullOrBlank()
             }
@@ -59,13 +60,13 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
                 rssSource?.getHeaderMap() ?: emptyMap()
             }
             if (link != null) {
-                rssStar = appDb.rssStarDao.get(origin!!, link)
+                rssStar = appDb.rssStarDao.get(origin, link)
                 val sort = intent.getStringExtra("sort")
                 rssArticle = rssStar?.toRssArticle()
                     ?: if (sort == null) {
-                        appDb.rssArticleDao.getByLink(origin!!, link)
+                        appDb.rssArticleDao.getByLink(origin, link)
                     } else {
-                        appDb.rssArticleDao.get(origin!!, link, sort)
+                        appDb.rssArticleDao.get(origin, link, sort)
                     }
 
                 rssArticle?.let { article ->
@@ -90,16 +91,15 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
                     loadStartHtml()
                 }
                 else if (ruleContent.isNullOrBlank()) {
-                    loadUrl(openUrl ?: origin!!, origin!!)
+                    loadUrl(openUrl ?: origin, origin)
                 }
                 else if (rssSource!!.singleUrl) {
-                    loadUrl(origin!!, origin!!)
-//                    htmlLiveData.postValue(ruleContent)
+                    loadUrl(origin, origin)
                 }
                 else if (openUrl != null) {
                     val title = intent.getStringExtra("title") ?: rssSource!!.sourceName
-                    val rssArticle = appDb.rssArticleDao.getByLink(origin!!, openUrl) ?: RssArticle(
-                        origin!!, title, title, link = openUrl)
+                    val rssArticle = appDb.rssArticleDao.getByLink(origin, openUrl) ?: RssArticle(
+                        origin, title, title, link = openUrl)
                     loadContent(rssArticle, ruleContent)
                 }
             }

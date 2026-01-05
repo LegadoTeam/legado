@@ -19,7 +19,6 @@ import android.webkit.JavascriptInterface
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import android.webkit.SslErrorHandler
-import android.webkit.URLUtil
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -38,17 +37,15 @@ import io.legado.app.constant.AppConst.imagePathKey
 import io.legado.app.constant.AppLog
 import io.legado.app.databinding.ActivityRssReadBinding
 import io.legado.app.help.WebCacheManager
-import io.legado.app.help.WebJsExtensions
+import io.legado.app.help.webView.WebJsExtensions
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.CookieManager
-import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.http.text
 import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.primaryTextColor
-import io.legado.app.model.Download
 import io.legado.app.ui.association.OnLineImportActivity
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.login.SourceLoginActivity
@@ -61,7 +58,6 @@ import io.legado.app.utils.isTrue
 import io.legado.app.utils.keepScreenOn
 import io.legado.app.utils.longSnackbar
 import io.legado.app.utils.openUrl
-import io.legado.app.utils.setDarkeningAllowed
 import io.legado.app.utils.setOnApplyWindowInsetsListenerCompat
 import io.legado.app.utils.setTintMutate
 import io.legado.app.utils.share
@@ -77,7 +73,6 @@ import org.apache.commons.text.StringEscapeUtils
 import org.jsoup.Jsoup
 import splitties.views.bottomPadding
 import java.io.ByteArrayInputStream
-import java.net.URLDecoder
 import java.util.regex.PatternSyntaxException
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.rss.article.ReadRecordDialog
@@ -86,14 +81,17 @@ import io.legado.app.utils.StartActivityContract
 import kotlinx.coroutines.runBlocking
 import androidx.core.net.toUri
 import io.legado.app.constant.AppPattern
-import io.legado.app.help.WebJsExtensions.Companion.JS_INJECTION
-import io.legado.app.help.WebJsExtensions.Companion.basicJs
-import io.legado.app.help.WebJsExtensions.Companion.nameBasic
-import io.legado.app.help.WebJsExtensions.Companion.nameCache
-import io.legado.app.help.WebJsExtensions.Companion.nameJava
-import io.legado.app.help.WebJsExtensions.Companion.nameSource
-import io.legado.app.help.http.CookieStore
+import io.legado.app.help.webView.WebJsExtensions.Companion.JS_INJECTION
+import io.legado.app.help.webView.WebJsExtensions.Companion.basicJs
+import io.legado.app.help.webView.WebJsExtensions.Companion.nameBasic
+import io.legado.app.help.webView.WebJsExtensions.Companion.nameCache
+import io.legado.app.help.webView.WebJsExtensions.Companion.nameJava
+import io.legado.app.help.webView.WebJsExtensions.Companion.nameSource
 import io.legado.app.help.http.newCallResponse
+import io.legado.app.help.webView.PooledWebView
+import io.legado.app.help.webView.WebViewPool
+import io.legado.app.help.webView.WebViewPool.BLANK_HTML
+import io.legado.app.help.webView.WebViewPool.DATA_HTML
 
 /**
  * rss阅读界面
@@ -104,11 +102,15 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     override val binding by viewBinding(ActivityRssReadBinding::inflate)
     override val viewModel by viewModels<ReadRssViewModel>()
 
+    private lateinit var pooledWebView: PooledWebView
+    private lateinit var currentWebView: WebView
+
     private var starMenuItem: MenuItem? = null
     private var ttsMenuItem: MenuItem? = null
     private var isFullscreen = false
     private var customWebViewCallback: WebChromeClient.CustomViewCallback? = null
     private var isInterfaceInjected = false
+    private var needClearHistory = true
     private val selectImageDir = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
             ACache.get().put(imagePathKey, uri.toString())
@@ -116,17 +118,22 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
         }
     }
     private val rssJsExtensions by lazy { RssJsExtensions(this, viewModel.rssSource) }
+
+    private val refreshNameList: MutableList<String> by lazy { mutableListOf() }
     private fun refresh() {
         isInterfaceInjected = false
         if (viewModel.rssSource?.singleUrl == true) {
-            binding.webView.reload()
+            currentWebView.reload()
             return
+        }
+        currentWebView.title?.let {
+            refreshNameList.add(it)
         }
         viewModel.rssArticle?.let {
             start(this@ReadRssActivity, it.title, it.link, it.origin)
         } ?: run {
             viewModel.initData(intent) {
-                binding.webView.settings.cacheMode = if (viewModel.cacheFirst) WebSettings.LOAD_CACHE_ELSE_NETWORK else WebSettings.LOAD_DEFAULT
+                currentWebView.settings.cacheMode = if (viewModel.cacheFirst) WebSettings.LOAD_CACHE_ELSE_NETWORK else WebSettings.LOAD_DEFAULT
             }
         }
     }
@@ -139,6 +146,9 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        pooledWebView = WebViewPool.acquire(this)
+        currentWebView = pooledWebView.realWebView
+        binding.webViewContainer.addView(currentWebView)
         viewModel.upStarMenuData.observe(this) { upStarMenu() }
         viewModel.upTtsMenuData.observe(this) { upTtsMenu(it) }
         binding.titleBar.title = intent.getStringExtra("title")
@@ -146,34 +156,54 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
         initWebView()
         initLiveData()
         viewModel.initData(intent) {
-            binding.webView.settings.cacheMode = if (viewModel.cacheFirst) WebSettings.LOAD_CACHE_ELSE_NETWORK else WebSettings.LOAD_DEFAULT
+            currentWebView.settings.cacheMode = if (viewModel.cacheFirst) WebSettings.LOAD_CACHE_ELSE_NETWORK else WebSettings.LOAD_DEFAULT
         }
+        currentWebView.clearHistory()
         onBackPressedDispatcher.addCallback(this) {
             if (binding.customWebView.size > 0) { //关闭全屏
                 customWebViewCallback?.onCustomViewHidden()
                 return@addCallback
-            } else if (binding.webView.canGoBack()) {
-                val list = binding.webView.copyBackForwardList() //获取历史列表
-                if (list.size < 2) { //到底了
+            }
+            if (currentWebView.canGoBack()) {
+                val list = currentWebView.copyBackForwardList() //获取历史列表
+                val size = list.size
+                if (size == 1) {
                     finish()
                     return@addCallback
                 }
                 val currentIndex = list.currentIndex
-                val currentUrl = list.currentItem?.url ?: ""
+                val currentItem = list.currentItem
+                val currentUrl = currentItem?.originalUrl ?: BLANK_HTML
+                val currentTitle = currentItem?.title
                 //从后往前找，找到第一个不同链接的页面，计算需要回退多少步 避免刷新后导致返回不灵
                 var steps = 1
                 for (i in currentIndex - 1 downTo 0) {
                     val item = list.getItemAtIndex(i)
-                    if (item.url != currentUrl) {
+                    val itemTitle = item.title
+                    val index = refreshNameList.indexOf(itemTitle)
+                    if (index != -1) {
+                        refreshNameList.removeAt(index)
+                        steps++
+                        continue
+                    }
+                    val itemUrl = item.originalUrl
+                    if (itemUrl == BLANK_HTML) {
+                        finish()
+                        return@addCallback
+                    }
+                    if (itemUrl != currentUrl || itemTitle != currentTitle) {
+                        break
+                    }
+                    if (currentUrl == DATA_HTML) {
                         break
                     }
                     steps++
                 }
-                if (list.size == steps) { //重复到底
+                if (steps == size) {
                     finish()
                     return@addCallback
                 }
-                binding.webView.goBackOrForward(-steps) //可能会回退多步
+                currentWebView.goBackOrForward(-steps)
                 return@addCallback
             }
             finish()
@@ -234,7 +264,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             }
 
             R.id.menu_share_it -> {
-                binding.webView.url?.let {
+                currentWebView.url?.let {
                     share(it)
                 } ?: viewModel.rssArticle?.let {
                     share(it.link)
@@ -247,7 +277,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                 putExtra("key", viewModel.rssSource?.sourceUrl)
             }
 
-            R.id.menu_browser_open -> binding.webView.url?.let {
+            R.id.menu_browser_open -> currentWebView.url?.let {
                 openUrl(it)
             } ?: toastOnUi("url null")
             R.id.menu_edit_source -> viewModel.rssSource?.sourceUrl?.let {
@@ -289,22 +319,14 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
     private fun initWebView() {
         binding.progressBar.fontColor = accentColor
-        binding.webView.webChromeClient = CustomWebChromeClient()
+        currentWebView.webChromeClient = CustomWebChromeClient()
         //添加屏幕方向控制，网页关闭，openUI
-        binding.webView.addJavascriptInterface(JSInterface(), nameBasic)
-        binding.webView.webViewClient = CustomWebViewClient()
-        binding.webView.settings.apply {
-            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-            domStorageEnabled = true
-            mediaPlaybackRequiresUserGesture = false
-            allowContentAccess = true
-            builtInZoomControls = true
-            displayZoomControls = false
-            setDarkeningAllowed(AppConfig.isNightTheme)
-        }
-        binding.webView.setOnLongClickListener {
-            val hitTestResult = binding.webView.hitTestResult
-            if (hitTestResult.type == WebView.HitTestResult.IMAGE_TYPE || hitTestResult.type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE) {
+        currentWebView.addJavascriptInterface(JSInterface(), nameBasic)
+        currentWebView.webViewClient = CustomWebViewClient()
+        currentWebView.setOnLongClickListener {
+            val hitTestResult = currentWebView.hitTestResult
+            if (hitTestResult.type == WebView.HitTestResult.IMAGE_TYPE ||
+                hitTestResult.type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE) {
                 hitTestResult.extra?.let { webPic ->
                     selector(
                         arrayListOf(
@@ -322,14 +344,6 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             }
             return@setOnLongClickListener false
         }
-        binding.webView.setDownloadListener { url, _, contentDisposition, _, _ ->
-            var fileName = URLUtil.guessFileName(url, contentDisposition, null)
-            fileName = URLDecoder.decode(fileName, "UTF-8")
-            binding.llView.longSnackbar(fileName, getString(R.string.action_download)) {
-                Download.start(this, url, fileName)
-            }
-        }
-
     }
 
     inner class JSInterface {
@@ -385,10 +399,10 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                 initJavascriptInterface()
                 val url = NetworkUtils.getAbsoluteURL(it.origin, it.link).substringBefore("@js")
                 val html = viewModel.clHtml(content)
-                binding.webView.settings.userAgentString =
+                currentWebView.settings.userAgentString =
                     viewModel.headerMap[AppConst.UA_NAME] ?: AppConfig.userAgent
                 if (viewModel.rssSource?.loadWithBaseUrl == true) {
-                    binding.webView.loadDataWithBaseURL(
+                    currentWebView.loadDataWithBaseURL(
                         url,
                         html,
                         "text/html",
@@ -396,7 +410,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                         url
                     )//不想用baseUrl进else
                 } else {
-                    binding.webView.loadDataWithBaseURL(
+                    currentWebView.loadDataWithBaseURL(
                         null,
                         html,
                         "text/html;charset=utf-8",
@@ -407,33 +421,23 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             }
         }
         viewModel.urlLiveData.observe(this) { urlState ->
-            with(binding.webView) {
+            with(currentWebView) {
                 upJavaScriptEnable()
                 initJavascriptInterface()
                 CookieManager.applyToWebView(urlState.url)
                 settings.userAgentString = urlState.getUserAgent()
-                val processedHtml = viewModel.rssSource?.ruleContent?.takeIf { it.isNotEmpty() }
-                    ?.let(viewModel::clHtml)
-                if (processedHtml != null) {
-                    val baseUrl =
-                        if (viewModel.rssSource?.loadWithBaseUrl == true) urlState.url else null
-                    loadDataWithBaseURL(
-                        baseUrl, processedHtml, "text/html;charset=utf-8", "utf-8", urlState.url
-                    )
-                } else {
-                    loadUrl(urlState.url, urlState.headerMap)
-                }
+                loadUrl(urlState.url, urlState.headerMap)
             }
         }
         viewModel.htmlLiveData.observe(this) { html ->
             viewModel.rssSource?.let {
                 upJavaScriptEnable()
                 initJavascriptInterface()
-                binding.webView.settings.userAgentString =
+                currentWebView.settings.userAgentString =
                     viewModel.headerMap[AppConst.UA_NAME] ?: AppConfig.userAgent
                 val baseUrl =
                     if (viewModel.rssSource?.loadWithBaseUrl == true) it.sourceUrl else null
-                binding.webView.loadDataWithBaseURL(
+                currentWebView.loadDataWithBaseURL(
                     baseUrl, html, "text/html", "utf-8", it.sourceUrl
                 )
             }
@@ -442,8 +446,8 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun upJavaScriptEnable() {
-        if (viewModel.rssSource?.enableJs == true) {
-            binding.webView.settings.javaScriptEnabled = true
+        if (viewModel.rssSource?.enableJs == false) {
+            currentWebView.settings.javaScriptEnabled = false
         }
     }
 
@@ -452,10 +456,10 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             isInterfaceInjected = true
             if (!viewModel.hasPreloadJs) return
             viewModel.rssSource?.let {
-                val webJsExtensions = WebJsExtensions(it, this, binding.webView)
-                binding.webView.addJavascriptInterface(webJsExtensions, nameJava)
-                binding.webView.addJavascriptInterface(it, nameSource)
-                binding.webView.addJavascriptInterface(WebCacheManager, nameCache)
+                val webJsExtensions = WebJsExtensions(it, this, currentWebView)
+                currentWebView.addJavascriptInterface(webJsExtensions, nameJava)
+                currentWebView.addJavascriptInterface(it, nameSource)
+                currentWebView.addJavascriptInterface(WebCacheManager, nameCache)
             }
         }
     }
@@ -491,8 +495,8 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             viewModel.tts?.stop()
             upTtsMenu(false)
         } else {
-            binding.webView.settings.javaScriptEnabled = true
-            binding.webView.evaluateJavascript("document.documentElement.outerHTML") {
+            currentWebView.settings.javaScriptEnabled = true
+            currentWebView.evaluateJavascript("document.documentElement.outerHTML") {
                 val html = StringEscapeUtils.unescapeJson(it).replace("^\"|\"$".toRegex(), "")
                 viewModel.readAloud(
                     Jsoup.parse(html).textArray().joinToString("\n")
@@ -501,9 +505,21 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        currentWebView.pauseTimers()
+        currentWebView.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        currentWebView.resumeTimers()
+        currentWebView.onResume()
+    }
+
     override fun onDestroy() {
+        WebViewPool.release(pooledWebView)
         super.onDestroy()
-        binding.webView.destroy()
     }
 
     inner class CustomWebChromeClient : WebChromeClient() {
@@ -665,14 +681,18 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
         }
 
         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+            if (needClearHistory) {
+                needClearHistory = false
+                currentWebView.clearHistory() //清除历史
+            }
             super.onPageStarted(view, url, favicon)
-            binding.webView.evaluateJavascript(basicJs, null)
+            currentWebView.evaluateJavascript(basicJs, null)
         }
 
         override fun onPageFinished(view: WebView, url: String?) {
             super.onPageFinished(view, url)
             view.title?.let { title ->
-                if (title != url && title != view.url && title.isNotBlank() && url != "about:blank") {
+                if (title != url && title != view.url && title.isNotBlank() && url != BLANK_HTML) {
                     binding.titleBar.title = title
                 } else {
                     binding.titleBar.title = intent.getStringExtra("title")
