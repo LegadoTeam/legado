@@ -37,6 +37,7 @@ import io.legado.app.model.rss.Rss
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.ui.book.source.SourceCallBack
 import io.legado.app.utils.FileUtils
+import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.externalCache
 import io.legado.app.utils.postEvent
@@ -50,7 +51,12 @@ import splitties.init.appCtx
 import java.io.File
 
 object VideoPlay : CoroutineScope by MainScope(){
+    private var needClearTemp = true //需要清理缓存
+    const val VIDEO_TEMP_PATH = "video_temp"
+    private val videoTempFile by lazy { File(FileUtils.getCachePath(), VIDEO_TEMP_PATH) }
+
     const val VIDEO_PREF_NAME = "video_config"
+
     private val videoPrefs: SharedPreferences by lazy { appCtx.getSharedPreferences(VIDEO_PREF_NAME, MODE_PRIVATE) }
     /**  是否自动播放  **/
     var autoPlay
@@ -163,7 +169,8 @@ object VideoPlay : CoroutineScope by MainScope(){
                         videoUrl = if (content.isEmpty()) {
                             throw ContentEmptyException("正文为空")
                         } else if (content.startsWith("<")) { //当作mpd文本
-                            val file = File(FileUtils.getCachePath(), "temp.mpd")
+                            val name = MD5Utils.md5Encode(content) + ".mpd"
+                            val file = FileUtils.createFileIfNotExist(videoTempFile,name)
                             file.writeText(content)
                             Uri.fromFile(file).toString()
                         } else {
@@ -176,9 +183,6 @@ object VideoPlay : CoroutineScope by MainScope(){
                         )
                         val playUrl = analyzeUrl.url
                         withContext(Main) {
-                            if (playUrl.endsWith(".mpd")) {
-                                player.overrideExtension = "mpd"
-                            }
                             player.mapHeadData = analyzeUrl.headerMap
                             player.setUp(playUrl, false, File(appCtx.externalCache, "exoplayer"), rssArticle.title)
                             if (autoPlay) {
@@ -221,7 +225,8 @@ object VideoPlay : CoroutineScope by MainScope(){
                 videoUrl = if (content.isEmpty()) {
                     throw ContentEmptyException("正文为空")
                 } else if (content.startsWith("<")) { //当作mpd文本
-                    val file = File(FileUtils.getCachePath(), "temp.mpd")
+                    val name = MD5Utils.md5Encode(content) + ".mpd"
+                    val file = FileUtils.createFileIfNotExist(videoTempFile,name)
                     file.writeText(content)
                     Uri.fromFile(file).toString()
                 } else {
@@ -239,9 +244,6 @@ object VideoPlay : CoroutineScope by MainScope(){
                 }
                 val playUrl = analyzeUrl.url
                 withContext(Main) {
-                    if (playUrl.endsWith(".mpd")) {
-                        player.overrideExtension = "mpd"
-                    }
                     player.mapHeadData = analyzeUrl.headerMap
                     player.setUp(playUrl, false, File(appCtx.externalCache, "exoplayer"), chapter.title)
                     if (autoPlay) {
@@ -251,7 +253,7 @@ object VideoPlay : CoroutineScope by MainScope(){
             }.onError {
                 AppLog.put("获取资源链接出错\n$it", it, true)
             }
-        isLoading = true
+        isLoading = false
     }
 
     /**
@@ -303,6 +305,11 @@ object VideoPlay : CoroutineScope by MainScope(){
             danmakuFile = null
             lockCurScreen = false
             isPortraitVideo = false
+            release()
+            if (needClearTemp) {
+                needClearTemp = false
+                FileUtils.delete(videoTempFile)
+            }
         }
     }
     /**
@@ -354,8 +361,8 @@ object VideoPlay : CoroutineScope by MainScope(){
 
     fun release() {
         sMediaPlayerListener?.onAutoCompletion()
-        sSwitchVideo = null
         sMediaPlayerListener = null
+        sSwitchVideo = null
     }
 
     fun initSource(sourceKey: String?, sourceType: Int?, bookUrl: String?, record:String?): Boolean {
@@ -417,7 +424,7 @@ object VideoPlay : CoroutineScope by MainScope(){
         episodes = toc!!.subList(startInt + 1, endInt)
     }
 
-    fun upDurIndex(offset: Int): Boolean {
+    fun upDurIndex(offset: Int, player: StandardGSYVideoPlayer): Boolean {
         episodes ?: return false
         val index = chapterInVolumeIndex + offset
         if (index < 0 || index >= episodes!!.size) {
@@ -426,6 +433,9 @@ object VideoPlay : CoroutineScope by MainScope(){
         }
         chapterInVolumeIndex = index
         durChapterPos = 0
+        saveRead()
+        startPlay(player)
+        postEvent(EventBus.UP_VIDEO_INFO, arrayListOf(1)) //更新选集视图
         return true
     }
 
