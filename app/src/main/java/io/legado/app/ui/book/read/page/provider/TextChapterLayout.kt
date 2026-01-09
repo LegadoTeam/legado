@@ -317,25 +317,18 @@ class TextChapterLayout(
                         var imgSize: Size? = null
                         if (matchResult != null) {
                             val styleValue = matchResult.groupValues[1].trim()
-                            if (styleValue == "TEXT" && matcher.end() == text.length) {
-                                iStyle = "TEXT"
-                                wordCount--
-                            }
-                            else if (styleValue.equals("text", true)) {
-                                iStyle = "text"
-                            }
-                            else {
+                            if (styleValue.equals("text", true)) { //忽略大小写
+                                iStyle = styleValue
+                            } else {
                                 imgSize = ImageProvider.getImageSize(book, imgSrc, ReadBook.bookSource)
                                 iStyle = styleValue
                                 isSmallImage = false
                             }
-                        }
-                        else {
+                        } else {
                             imgSize = ImageProvider.getImageSize(book, imgSrc, ReadBook.bookSource)
                             if (imgSize.width < 80 && imgSize.height < 80) {
                                 iStyle = "text"
-                            }
-                            else {
+                            } else {
                                 isSmallImage = false
                             }
                         }
@@ -365,7 +358,7 @@ class TextChapterLayout(
                                     srcList = srcList
                                 )
                                 sb.setLength(0)
-                                isFirstLine=false
+                                isFirstLine = false
                             }
                             setTypeImage(
                                 book,
@@ -397,7 +390,7 @@ class TextChapterLayout(
                         contentPaintTextHeight,
                         contentPaintFontMetrics,
                         "TEXT",
-                        isFirstLine = start == 0,
+                        isFirstLine = isFirstLine,
                         srcList = srcList.ifEmpty { null }
                     )
                 }
@@ -801,16 +794,15 @@ class TextChapterLayout(
             val (words, widths) = measureTextSplit(lineText, widthsArray, lineStart)
             val desiredWidth = widths.fastSum()
             textLine.text = lineText
-            when {
-                lineIndex == 0 && layout.lineCount > 1 && !isTitle && isFirstLine -> {
+            when (lineIndex) {
+                0 if layout.lineCount > 1 && !isTitle && isFirstLine -> {
                     //多行的第一行 非标题
                     addCharsToLineFirst(
                         book, absStartX, textLine, words, textPaint,
                         desiredWidth, widths, srcList
                     )
                 }
-
-                lineIndex == layout.lineCount - 1 -> {
+                layout.lineCount - 1 -> {
                     //最后一行、单行
                     //标题x轴居中
                     val startX = if (
@@ -827,7 +819,6 @@ class TextChapterLayout(
                         startX, !isTitle && lineIndex == 0, widths, srcList
                     )
                 }
-
                 else -> {
                     if (
                         isTitle &&
@@ -1038,7 +1029,7 @@ class TextChapterLayout(
         srcList: LinkedList<String>?
     ) {
         val column = when {
-            !srcList.isNullOrEmpty() && (char == srcReplaceChar || char == reviewChar && isLineEnd) -> {
+            !srcList.isNullOrEmpty() && (char == srcReplaceChar || char == reviewChar) -> {
                 val src = srcList.removeFirst()
                 ImageProvider.cacheImage(book, src, ReadBook.bookSource)
                 ImageColumn(
@@ -1047,13 +1038,13 @@ class TextChapterLayout(
                     src = src
                 )
             }
-            /*isLineEnd && char == ChapterProvider.reviewChar -> {
-                ReviewColumn(
-                    start = absStartX + xStart,
-                    end = absStartX + xEnd,
-                    count = 10
-                )
-            }*/
+//            isLineEnd && char == ChapterProvider.reviewChar -> {
+//                ReviewColumn(
+//                    start = absStartX + xStart,
+//                    end = absStartX + xEnd,
+//                    count = 10
+//                )
+//            }
 
             else -> {
                 TextColumn(

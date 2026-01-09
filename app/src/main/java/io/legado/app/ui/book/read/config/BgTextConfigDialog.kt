@@ -9,6 +9,8 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.SeekBar
 import androidx.appcompat.widget.TooltipCompat
 import androidx.core.graphics.toColorInt
@@ -65,12 +67,11 @@ import io.legado.app.utils.viewbindingdelegate.viewBinding
 import splitties.init.appCtx
 import java.io.File
 import java.io.FileOutputStream
-import androidx.core.graphics.toColorInt
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.help.http.addHeaders
 import io.legado.app.help.http.newCallResponse
 import io.legado.app.model.analyzeRule.AnalyzeUrl
-import io.legado.app.utils.putPrefString
+import io.legado.app.utils.setSelectionSafely
 import kotlinx.coroutines.launch
 
 class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
@@ -145,13 +146,43 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
         ivEdit.setColorFilter(secondaryTextColor, PorterDuff.Mode.SRC_IN)
         tvRestore.setTextColor(primaryTextColor)
         swDarkStatusIcon.setTextColor(primaryTextColor)
-        swUnderline.setTextColor(primaryTextColor)
         ivImport.setColorFilter(primaryTextColor, PorterDuff.Mode.SRC_IN)
         ivExport.setColorFilter(primaryTextColor, PorterDuff.Mode.SRC_IN)
         ivDelete.setColorFilter(primaryTextColor, PorterDuff.Mode.SRC_IN)
         tvBgAlpha.setTextColor(primaryTextColor)
         tvBgImage.setTextColor(primaryTextColor)
-        swUnderline.isGone = ReadBook.book?.isImage == true
+        if (ReadBook.book?.isImage == true) {
+            spUnderline.isGone = true
+        } else {
+            val textStyles = arrayOf("关闭", "实线", "虚线")
+            val adapter = object : ArrayAdapter<String>(requireContext(), android.R.layout.simple_spinner_dropdown_item, textStyles) {
+                override fun getDropDownView(
+                    position: Int,
+                    convertView: View?,
+                    parent: ViewGroup
+                ): View {
+                    val view = super.getDropDownView(position, convertView, parent)
+                    if (view is android.widget.TextView) {
+                        view.setBackgroundColor(bg) // 设置下拉列表项的背景色
+                        view.setTextColor(primaryTextColor) // 设置下拉列表项的文本颜色
+                    }
+                    return view
+                }
+            }
+            spUnderline.adapter = adapter
+            spUnderline.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                var isInitializing = true
+                override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
+                    if (isInitializing) { //忽略初始化选择
+                        isInitializing = false
+                        return
+                    }
+                    ReadBookConfig.durConfig.underlineMode = position
+                    postEvent(EventBus.UP_CONFIG, arrayListOf(6, 9, 11))
+                }
+                override fun onNothingSelected(parent: AdapterView<*>) { }
+            }
+        }
         recyclerView.adapter = adapter
         adapter.addHeaderView {
             ItemBgImageBinding.inflate(layoutInflater, it, false).apply {
@@ -175,7 +206,7 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
     private fun initData() = with(ReadBookConfig.durConfig) {
         binding.tvName.text = name.ifBlank { "文字" }
         binding.swDarkStatusIcon.isChecked = curStatusIconDark()
-        binding.swUnderline.isChecked = underline
+        binding.spUnderline.setSelectionSafely(underlineMode)
         binding.sbBgAlpha.progress = bgAlpha
     }
 
@@ -211,10 +242,6 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
         binding.swDarkStatusIcon.setOnCheckedChangeListener { _, isChecked ->
             setCurStatusIconDark(isChecked)
             (activity as? ReadBookActivity)?.upSystemUiVisibility()
-        }
-        binding.swUnderline.setOnCheckedChangeListener { _, isChecked ->
-            underline = isChecked
-            postEvent(EventBus.UP_CONFIG, arrayListOf(6, 9, 11))
         }
         binding.tvTextColor.setOnClickListener {
             ColorPickerDialog.newBuilder()

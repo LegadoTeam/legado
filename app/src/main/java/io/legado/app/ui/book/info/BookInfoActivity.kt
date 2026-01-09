@@ -382,6 +382,8 @@ class BookInfoActivity :
         if (book.isWebFile) {
             llToc.gone()
             tvLasted.text = getString(R.string.lasted_show, "下载中...")
+        } else {
+            llToc.visible()
         }
         menuCustomBtn?.isVisible = viewModel.hasCustomBtn
         upTvBookshelf()

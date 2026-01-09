@@ -155,7 +155,7 @@ getResponse(): Response //返回访问结果,网络朗读引擎采用的是这�
 > 正确格式 User-Agent Referer  
 > 错误格式 user-agent referer
 ```
-socks5代理
+socks5代理    不支持需要验证的socks5代理
 { "proxy":"socks5://127.0.0.1:1080" }
 http代理
 { "proxy":"http://127.0.0.1:1080" }
@@ -330,7 +330,7 @@ window.run("java.toast('执行成功');'成功'")
 
 > "style"键值控制单个图片的样式  
 > 目前支持"text"、"full"、"single"、"left"、"right"  
-> "TEXT"且处于段尾时，占1.5个字符位  
+> 大写"TEXT"时，占1.5个字符位  
 
 ```js
 var url = `https://www.baidu.com/img/flexible/logo/pc/result.png,{"js": "if (book) java.toast('这是'+book.name+'正文的图被点击了');result", "style": "right"}`;

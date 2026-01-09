@@ -130,7 +130,7 @@ class WebViewModel(application: Application) : BaseViewModel(application) {
                 execute {
                     html = StringEscapeUtils.unescapeJson(it).trim('"')
                 }.onSuccess {
-                    SourceVerificationHelp.setResult(sourceOrigin, html ?: "",  webView.url?:"")
+                    SourceVerificationHelp.setResult(sourceOrigin, html ?: "",  webView.url ?: "")
                     success.invoke()
                 }
             }

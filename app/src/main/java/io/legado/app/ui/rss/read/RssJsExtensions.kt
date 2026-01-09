@@ -21,24 +21,28 @@ import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.lang.ref.WeakReference
 
 
 @Suppress("unused")
-open class RssJsExtensions(private val activity: AppCompatActivity, private val source: BaseSource?) : JsExtensions {
+open class RssJsExtensions(activity: AppCompatActivity, source: BaseSource?) : JsExtensions {
+
+    val activityRef: WeakReference<AppCompatActivity> = WeakReference(activity)
+    val sourceRef: WeakReference<BaseSource?> = WeakReference(source)
 
     override fun getSource(): BaseSource? {
-        return source
+        return sourceRef.get()
     }
 
     @JavascriptInterface
     fun put(key: String, value: String): String {
-        source?.put(key, value)
+        getSource()?.put(key, value)
         return value
     }
 
     @JavascriptInterface
     fun get(key: String): String {
-        return source?.get(key) ?: ""
+        return getSource()?.get(key) ?: ""
     }
 
     @JavascriptInterface
@@ -48,12 +52,14 @@ open class RssJsExtensions(private val activity: AppCompatActivity, private val 
 
     @JavascriptInterface
     fun searchBook(key: String, searchScope: String?) {
-        SearchActivity.start(activity, key, searchScope)
+        activityRef.get()?.let {
+            SearchActivity.start(it, key, searchScope)
+        }
     }
 
     @JavascriptInterface
     fun addBook(bookUrl: String) {
-        activity.showDialogFragment(AddToBookshelfDialog(bookUrl))
+        activityRef.get()?.showDialogFragment(AddToBookshelfDialog(bookUrl))
     }
 
     @JavascriptInterface
@@ -68,7 +74,7 @@ open class RssJsExtensions(private val activity: AppCompatActivity, private val 
 
     @JavascriptInterface
     fun open(name: String, url: String?, title: String?, origin: String?) {
-        activity.lifecycleScope.launch(IO) {
+        activityRef.get()?.lifecycleScope?.launch(IO) {
             val source = getSource() ?: return@launch
             when (name) {
                 "sort" -> {
@@ -84,7 +90,9 @@ open class RssJsExtensions(private val activity: AppCompatActivity, private val 
                     }
                     val sourceUrl = toSource.sourceUrl
                     withContext(Main) {
-                        RssSortActivity.start(activity, sortUrl, sourceUrl)
+                        activityRef.get()?.let {
+                            RssSortActivity.start(it, sortUrl, sourceUrl)
+                        }
                     }
                 }
 
@@ -104,7 +112,9 @@ open class RssJsExtensions(private val activity: AppCompatActivity, private val 
                     )
                     appDb.rssReadRecordDao.insertRecord(rssReadRecord) //留下历史记录
                     withContext(Main) {
-                        ReadRssActivity.start(activity, title, url, sourceUrl)
+                        activityRef.get()?.let {
+                            ReadRssActivity.start(it, title, url, sourceUrl)
+                        }
                     }
                 }
 
@@ -127,10 +137,12 @@ open class RssJsExtensions(private val activity: AppCompatActivity, private val 
                     } ?: (source as? BookSource) ?: return@launch
                     val sourceUrl = toSource.bookSourceUrl
                     withContext(Main) {
-                        activity.startActivity<ExploreShowActivity> {
-                            putExtra("exploreName", title)
-                            putExtra("sourceUrl", sourceUrl)
-                            putExtra("exploreUrl", url)
+                        activityRef.get()?.run {
+                            startActivity<ExploreShowActivity> {
+                                putExtra("exploreName", title)
+                                putExtra("sourceUrl", sourceUrl)
+                                putExtra("exploreUrl", url)
+                            }
                         }
                     }
                 }

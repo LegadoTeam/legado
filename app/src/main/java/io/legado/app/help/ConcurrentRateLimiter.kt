@@ -9,7 +9,7 @@ import java.util.concurrent.ConcurrentHashMap
 class ConcurrentRateLimiter(val source: BaseSource?) {
 
     companion object {
-        private val concurrentRecordMap = ConcurrentHashMap<String, ConcurrentRecord>()
+        val concurrentRecordMap = ConcurrentHashMap<String, ConcurrentRecord>()
         /**
          * 更新并发率
          */
@@ -19,7 +19,7 @@ class ConcurrentRateLimiter(val source: BaseSource?) {
                     val rateIndex = concurrentRate.indexOf("/")
                     when {
                         rateIndex > 0 -> {
-                            val accessLimit = concurrentRate.substring(0, rateIndex).toInt()
+                            val accessLimit = concurrentRate.take(rateIndex).toInt()
                             val interval = concurrentRate.substring(rateIndex + 1).toInt()
                             if (accessLimit <= 0 || interval <= 0) throw NumberFormatException()
                             ConcurrentRecord(
@@ -46,50 +46,46 @@ class ConcurrentRateLimiter(val source: BaseSource?) {
         }
     }
 
-    val concurrentRate = source?.concurrentRate
-    val key = source?.getKey()
+    private val concurrentRate = source?.concurrentRate
+    private val key = source?.getKey()
     /**
      * 开始访问,并发判断
      */
     @Throws(ConcurrentException::class)
     private fun fetchStart(): ConcurrentRecord? {
-        source ?: return null
         if (concurrentRate.isNullOrEmpty() || concurrentRate == "0") {
             return null
         }
+        val key = key ?: return null
         var isNewRecord = false
-        val fetchRecord = concurrentRecordMap.computeIfAbsent(key!!) {
+        val fetchRecord = concurrentRecordMap.computeIfAbsent(key) {
             isNewRecord = true
             val rateIndex = concurrentRate.indexOf("/")
             if (rateIndex > 0) {
-                val accessLimit = concurrentRate.substring(0, rateIndex).toInt()
-                val interval = concurrentRate.substring(rateIndex + 1).toInt()
+                val accessLimit = concurrentRate.take(rateIndex).toIntOrNull() ?: 1
+                val interval = concurrentRate.substring(rateIndex + 1).toIntOrNull() ?: 0
                 ConcurrentRecord(System.currentTimeMillis(), accessLimit, interval, 1)
             }
             else {
-                ConcurrentRecord(System.currentTimeMillis(),1,concurrentRate.toInt(), 1)
+                ConcurrentRecord(System.currentTimeMillis(),1,concurrentRate.toIntOrNull() ?: 0, 1)
             }
         }
         if (isNewRecord) return fetchRecord
         val waitTime: Long = synchronized(fetchRecord) {
-            try {
-                //并发控制为 次数/毫秒 , 非并发实际为1/毫秒
-                val nextTime = fetchRecord.time + fetchRecord.interval.toLong()
-                val nowTime = System.currentTimeMillis()
-                if (nowTime >= nextTime) {
-                    //已经过了限制时间,重置开始时间
-                    fetchRecord.time = nowTime
-                    fetchRecord.frequency = 1
-                    return@synchronized 0
-                }
-                if (fetchRecord.frequency < fetchRecord.accessLimit) {
-                    fetchRecord.frequency += 1
-                    return@synchronized 0
-                } else {
-                    return@synchronized nextTime - nowTime
-                }
-            } catch (_: Exception) {
+            //并发控制为 次数/毫秒 , 非并发实际为1/毫秒
+            val nextTime = fetchRecord.time + fetchRecord.interval.toLong()
+            val nowTime = System.currentTimeMillis()
+            if (nowTime >= nextTime) {
+                //已经过了限制时间,重置开始时间
+                fetchRecord.time = nowTime
+                fetchRecord.frequency = 1
                 return@synchronized 0
+            }
+            if (fetchRecord.frequency < fetchRecord.accessLimit) {
+                fetchRecord.frequency += 1
+                return@synchronized 0
+            } else {
+                return@synchronized nextTime - nowTime
             }
         }
         if (waitTime > 0) {

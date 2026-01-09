@@ -10,6 +10,10 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import io.legado.app.R
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.webView.WebJsExtensions.Companion.nameBasic
+import io.legado.app.help.webView.WebJsExtensions.Companion.nameCache
+import io.legado.app.help.webView.WebJsExtensions.Companion.nameJava
+import io.legado.app.help.webView.WebJsExtensions.Companion.nameSource
 import io.legado.app.model.Download
 import io.legado.app.ui.rss.read.VisibleWebView
 import io.legado.app.utils.longSnackbar
@@ -82,30 +86,31 @@ object WebViewPool {
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private fun resetWebView(webView: WebView) {
+    private fun resetWebView(webView: WebView) = with(webView) {
         try {
-            val parent = webView.parent
-            if (parent != null && parent is ViewGroup) {
-                parent.removeView(webView)
-            }
-            webView.stopLoading()
-            webView.clearFocus() //清除焦点
-            webView.setOnLongClickListener(null)
-            webView.webChromeClient = null
-            webView.webViewClient = WebViewClient()
+            (parent as? ViewGroup)?.removeView(webView)
+            stopLoading()
+            clearFocus() //清除焦点
+            setOnLongClickListener(null)
+            webChromeClient = null
+            webViewClient = WebViewClient()
 
-            webView.clearCache(false) //清除缓存,应该为true?
-            webView.clearHistory() //清除历史记录
-            webView.clearFormData() //清除表单数据
-            webView.clearMatches() //清除查找匹配项
-            webView.clearSslPreferences() //清除SSL首选项
-            webView.clearDisappearingChildren() //清除消失中的子视图
-            webView.clearAnimation() //清除动画
-            webView.settings.apply {
+//            webView.clearCache(false) //清除缓存
+//            webView.clearHistory() //清除历史记录
+            clearFormData() //清除表单数据
+            clearMatches() //清除查找匹配项
+//            webView.clearSslPreferences() //清除SSL首选项
+            clearDisappearingChildren() //清除消失中的子视图
+            clearAnimation() //清除动画
+            removeJavascriptInterface(nameBasic)
+            removeJavascriptInterface(nameJava)
+            removeJavascriptInterface(nameSource)
+            removeJavascriptInterface(nameCache)
+            settings.apply {
                 javaScriptEnabled = false
                 javaScriptEnabled = true // 禁用再启用来重置js环境，清理注入的接口，注意需要禁用的订阅源需要再次执行
             }
-            webView.loadUrl(BLANK_HTML)
+            loadUrl(BLANK_HTML)
         } catch (e: Exception) {
             e.printStackTrace()
         }

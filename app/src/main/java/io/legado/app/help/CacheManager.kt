@@ -61,8 +61,9 @@ object CacheManager {
         when (value) {
             is ByteArray -> ACache.get().put(key, value, saveTime)
             else -> {
-                val cache = Cache(key, value.toString(), deadline)
-                putMemory(key, value)
+                val valueStr = value.toString()
+                putMemory(key, valueStr)
+                val cache = Cache(key, valueStr, deadline)
                 appDb.cacheDao.insert(cache)
             }
         }
@@ -84,6 +85,19 @@ object CacheManager {
     fun get(key: String): String? {
         getFromMemory(key)?.let {
             if (it is String) return it
+        }
+        val cache = appDb.cacheDao.get(key)
+        if (cache != null && (cache.deadline == 0L || cache.deadline > System.currentTimeMillis())) {
+            return cache.value?.also {
+                putMemory(key, it)
+            }
+        }
+        return null
+    }
+
+    fun get(key: String, onlyDisk: Boolean): String? {
+        if (!onlyDisk) {
+            return get(key)
         }
         val cache = appDb.cacheDao.get(key)
         if (cache != null && (cache.deadline == 0L || cache.deadline > System.currentTimeMillis())) {
@@ -147,6 +161,10 @@ object WebCacheManager {
     @JavascriptInterface
     fun get(key: String): String? {
         return CacheManager.get(key)
+    }
+    @JavascriptInterface
+    fun get(key: String, onlyDisk: Boolean): String? {
+        return CacheManager.get(key, onlyDisk)
     }
     @JavascriptInterface
     fun putFile(key: String, value: String, saveTime: Int = 0) {
