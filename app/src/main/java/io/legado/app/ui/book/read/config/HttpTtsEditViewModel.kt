@@ -6,6 +6,7 @@ import io.legado.app.base.BaseViewModel
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.HttpTTS
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.ConcurrentRateLimiter.Companion.concurrentRecordMap
 import io.legado.app.model.ReadAloud
 import io.legado.app.utils.getClipText
 import io.legado.app.utils.isJsonArray
@@ -37,6 +38,7 @@ class HttpTtsEditViewModel(app: Application) : BaseViewModel(app) {
         id = httpTTS.id
         execute {
             appDb.httpTTSDao.insert(httpTTS)
+            concurrentRecordMap.remove(httpTTS.getKey()) //删除并发限制缓存
             if (ReadAloud.ttsEngine == httpTTS.id.toString()) ReadAloud.upReadAloudClass()
         }.onSuccess {
             success?.invoke()

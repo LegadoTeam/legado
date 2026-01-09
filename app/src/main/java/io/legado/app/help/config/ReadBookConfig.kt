@@ -330,10 +330,10 @@ object ReadBookConfig {
             config.paragraphIndent = value
         }
 
-    var underline: Boolean
-        get() = config.underline
+    var underlineMode: Int
+        get() = config.underlineMode
         set(value) {
-            config.underline = value
+            config.underlineMode = value
         }
 
     var paddingBottom: Int
@@ -563,7 +563,7 @@ object ReadBookConfig {
         var titleTopSpacing: Int = 0,
         var titleBottomSpacing: Int = 0,
         var paragraphIndent: String = "　　",//段落缩进
-        var underline: Boolean = false, //下划线
+        var underlineMode: Int = 0, //下划线
         var paddingBottom: Int = 6,
         var paddingLeft: Int = 16,
         var paddingRight: Int = 16,
@@ -852,7 +852,7 @@ object ReadBookConfig {
             "titleTopSpacing" to titleTopSpacing,
             "titleBottomSpacing" to titleBottomSpacing,
             "paragraphIndent" to paragraphIndent,
-            "underline" to underline,
+            "underlineMode" to underlineMode,
             "paddingBottom" to paddingBottom,
             "paddingLeft" to paddingLeft,
             "paddingRight" to paddingRight,

@@ -26,7 +26,7 @@ class RssArticlesAdapter3(context: Context, callBack: CallBack) :
     BaseRssArticlesAdapter<ItemRssArticle3Binding>(context, callBack) {
 
     companion object {
-        private val imageHigh = LruCache<String, Int>(9999)
+        private val imageHigh = LruCache<String, Int>(999)
         private const val PREF_NAME = "rss_image_heights"
         private val prefs: SharedPreferences by lazy {
             appCtx.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)

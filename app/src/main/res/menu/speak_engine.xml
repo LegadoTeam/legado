@@ -33,6 +33,11 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_export_all"
+        android:title="@string/export_all"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_export"
         android:title="@string/export"
         app:showAsAction="never" />

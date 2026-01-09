@@ -55,6 +55,7 @@ import io.legado.app.help.webView.PooledWebView
 import io.legado.app.help.webView.WebViewPool
 import io.legado.app.help.webView.WebViewPool.BLANK_HTML
 import io.legado.app.help.webView.WebViewPool.DATA_HTML
+import java.lang.ref.WeakReference
 
 class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
     companion object {
@@ -229,7 +230,7 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
         binding.progressBar.fontColor = accentColor
         currentWebView.webChromeClient = CustomWebChromeClient()
         // 添加 JavaScript 接口
-        currentWebView.addJavascriptInterface(JSInterface(), nameBasic)
+        currentWebView.addJavascriptInterface(JSInterface(this), nameBasic)
         currentWebView.webViewClient = CustomWebViewClient()
         currentWebView.settings.apply {
             useWideViewPort = true
@@ -259,31 +260,6 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
                 }
             }
             return@setOnLongClickListener false
-        }
-    }
-
-    inner class JSInterface {
-        @JavascriptInterface
-        fun lockOrientation(orientation: String) {
-            runOnUiThread {
-                if (isfullscreen) {
-                    requestedOrientation = when (orientation) {
-                        "portrait", "portrait-primary" -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                        "portrait-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
-                        "landscape", "landscape-primary" -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                        "landscape-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
-                        "any", "unspecified" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR
-                        else -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                    }
-                }
-            }
-        }
-
-        @JavascriptInterface
-        fun onCloseRequested() {
-            runOnUiThread {
-                close()
-            }
         }
     }
 
@@ -341,6 +317,39 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
     override fun onDestroy() {
         WebViewPool.release(pooledWebView)
         super.onDestroy()
+    }
+
+    class JSInterface(activity: WebViewActivity) {
+        private val activityRef: WeakReference<WebViewActivity> = WeakReference(activity)
+        @JavascriptInterface
+        fun lockOrientation(orientation: String) {
+            val ctx = activityRef.get()
+            if (ctx != null && !ctx.isFinishing && !ctx.isDestroyed) {
+                ctx.runOnUiThread {
+                    if (ctx.isfullscreen) {
+                        ctx.requestedOrientation = when (orientation) {
+                            "portrait", "portrait-primary" -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                            "portrait-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
+                            "landscape", "landscape-primary" -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                            "landscape-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+                            "any", "unspecified" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR
+                            else -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                        }
+                    }
+                }
+            }
+
+        }
+
+        @JavascriptInterface
+        fun onCloseRequested() {
+            val ctx = activityRef.get()
+            if (ctx != null && !ctx.isFinishing && !ctx.isDestroyed) {
+                ctx.runOnUiThread {
+                    ctx.close()
+                }
+            }
+        }
     }
 
     inner class CustomWebChromeClient : WebChromeClient() {

@@ -53,8 +53,8 @@ class CoverImageView @JvmOverloads constructor(
     attrs: AttributeSet? = null
 ) : AppCompatImageView(context, attrs) {
     companion object {
-        private val nameBitmapCache by lazy { LruCache<String, Bitmap>(1024 * 1024 * 33) }
-        private val needNameBitmap by lazy { LruCache<String, Boolean>(1024 * 1024 * 10) }
+        private val nameBitmapCache by lazy { LruCache<String, Bitmap>(33) }
+        private val needNameBitmap by lazy { LruCache<String, Boolean>(99) }
     }
     private var viewWidth: Float = 0f
     private var viewHeight: Float = 0f

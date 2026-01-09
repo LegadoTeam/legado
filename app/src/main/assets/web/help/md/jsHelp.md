@@ -75,8 +75,10 @@ java.open(name: String, url: String?, title: String?, origin: String?)
 java.copyText(text: String)
 //实时更新登录界面用户信息，upLoginData(null)会全部重置为默认值
 java.upLoginData(data: Map<String, String?>?)
-//刷新书籍详情页
+//刷新书籍详情页，仅限详情页的登录界面
 java.refreshBookInfo()
+//清除tts源的缓存，仅限tts源的登录界面
+java.clearTtsCache()
 ```
 
 ### [AnalyzeUrl](https://github.com/LegadoTeam/legado/blob/master/app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeUrl.kt) 部分函数
@@ -532,6 +534,8 @@ cookie.setWebCookie(url,cookie)
 cache.put(key: String, value: String, saveTime: Int)
 读取数据库
 cache.get(key: String): String?
+读取数据库,onlyDisk为true时只从磁盘读取
+cache.get(key: String, onlyDisk: Boolean): String?
 删除
 cache.delete(key: String)
 缓存文件内容

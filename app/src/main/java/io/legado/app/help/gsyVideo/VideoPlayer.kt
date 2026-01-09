@@ -1,5 +1,6 @@
 package io.legado.app.help.gsyVideo
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.util.AttributeSet
 import android.view.GestureDetector
@@ -184,7 +185,7 @@ class VideoPlayer: StandardGSYVideoPlayer {
     override fun onAutoCompletion() { //播放完成
         val success = VideoPlay.upDurIndex(1, this)
         if (!success) {
-            super.onCompletion()
+            super.onAutoCompletion()
         }
     }
 
@@ -404,6 +405,7 @@ class VideoPlayer: StandardGSYVideoPlayer {
         val choiceSpeedDialog = ChoiceSpeedDialog(mContext)
         choiceSpeedDialog.initList(listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f, 2.5f, 3.0f).reversed(), object :
             ChoiceSpeedDialog.OnListItemClickListener {
+            @SuppressLint("SetTextI18n")
             override fun onItemClick(value: Float) {
                 playSpeed = value
                 setSpeed(playSpeed, true)
@@ -489,6 +491,11 @@ class VideoPlayer: StandardGSYVideoPlayer {
                 releaseDanmaku(videoPlayer)
             }
         }
+    }
+
+    override fun release() {
+        super.release()
+        releaseDanmaku(this)
     }
 
     /**********以下重载GSYVideoPlayer的GSYVideoViewBridge相关实现***********/

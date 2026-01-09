@@ -49,13 +49,13 @@ import android.view.MotionEvent
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.LinearLayout
-import android.widget.Spinner
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatSpinner
 import io.legado.app.data.entities.rule.RowUi.Type
 import io.legado.app.ui.widget.text.TextInputLayout
 import io.legado.app.utils.isTrue
+import io.legado.app.utils.setSelectionSafely
 import kotlin.math.abs
 import kotlin.text.isNotEmpty
 
@@ -387,8 +387,8 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                     loginInfo[name] = char
                     val i = items.indexOf(char)
                     selector.setSelectionSafely(i)
-                    var isInitializing = true
                     selector.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                        var isInitializing = true
                         override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                             if (isInitializing) { //忽略初始化选择
                                 isInitializing = false
@@ -681,13 +681,6 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
         }
         super.onDismiss(dialog)
         activity?.finish()
-    }
-
-    private fun Spinner.setSelectionSafely(position: Int) {
-        val count = adapter?.count ?: 0
-        if (count > 0) {
-            setSelection(position.coerceIn(0, count - 1))
-        }
     }
 
 }

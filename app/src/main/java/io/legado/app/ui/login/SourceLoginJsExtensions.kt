@@ -1,11 +1,20 @@
 package io.legado.app.ui.login
 
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import io.legado.app.R
 import io.legado.app.constant.EventBus
 import io.legado.app.data.entities.BaseSource
+import io.legado.app.data.entities.HttpTTS
+import io.legado.app.model.ReadAloud
 import io.legado.app.ui.rss.read.RssJsExtensions
+import io.legado.app.utils.FileUtils
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.sendToClip
+import io.legado.app.utils.toastOnUi
+import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.launch
+import java.io.File
 
 class SourceLoginJsExtensions(
     private val activity: AppCompatActivity, source: BaseSource?,
@@ -26,5 +35,18 @@ class SourceLoginJsExtensions(
 
     fun copyText(text: String) {
         activity.sendToClip(text)
+    }
+
+    fun clearTtsCache() {
+        if (getSource() !is HttpTTS) return
+        val activity = activityRef.get() ?: return
+        activity.lifecycleScope.launch(IO) {
+            ReadAloud.upReadAloudClass()
+            val ttsFolderPath = "${activity.cacheDir.absolutePath}${File.separator}httpTTS${File.separator}"
+            FileUtils.listDirsAndFiles(ttsFolderPath)?.forEach {
+                FileUtils.delete(it.absolutePath)
+            }
+            activity.toastOnUi(R.string.clear_cache_success)
+        }
     }
 }

@@ -1331,4 +1331,5 @@
     <string name="enter_img_src_path">请输入图片链接</string>
     <string name="empty_img_src_input">图片链接不能为空</string>
     <string name="invalid_file_path">文件路径无效</string>
+    <string name="is_system_tts_no_export">无法导出系统tts</string>
 </resources>

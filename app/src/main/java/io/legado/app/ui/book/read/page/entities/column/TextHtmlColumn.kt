@@ -26,6 +26,12 @@ data class TextHtmlColumn(
 
     override var textLine: TextLine = emptyTextLine
 
+    private val textPaint: TextPaint by lazy {
+        TextPaint(ChapterProvider.contentPaint).apply {
+            textSize = mTextSize
+        }
+    }
+
     override var selected: Boolean = false
         set(value) {
             if (field != value) {
@@ -50,21 +56,20 @@ data class TextHtmlColumn(
     override fun draw(view: ContentTextView, canvas: Canvas) {
         val y = textLine.lineBase - textLine.lineTop
         if (linkUrl != null) {
-            val textPaint = TextPaint(ChapterProvider.contentPaint).apply {
-                textSize = mTextSize
+            textPaint.run {
                 color = ReadBookConfig.textAccentColor
                 isUnderlineText = true
             }
             drawText(view, canvas, y, textPaint)
             return
         }
-        val textPaint = TextPaint(ChapterProvider.contentPaint).apply {
-            textSize = mTextSize
+        textPaint.run {
             color = if (textLine.isReadAloud || isSearchResult) {
                 ReadBookConfig.textAccentColor
             } else {
                 mTextColor
             }
+            isUnderlineText = false
         }
         drawText(view, canvas, y, textPaint)
     }
