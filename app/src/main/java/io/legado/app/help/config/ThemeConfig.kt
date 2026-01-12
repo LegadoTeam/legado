@@ -54,6 +54,8 @@ object ThemeConfig {
         ArrayList(cList)
     }
 
+    private var needClearImg = true
+
     fun getTheme() = when {
         AppConfig.isEInkMode -> Theme.EInk
         AppConfig.isNightTheme -> Theme.Dark
@@ -86,6 +88,20 @@ object ThemeConfig {
         AppCompatDelegate.setDefaultNightMode(targetMode)
     }
 
+    /**
+     * 获取链接获取图片文件名
+     */
+    private fun getUrlToFile(url: String): String {
+        val suffix = when {
+            url.contains(".9.png", ignoreCase = true) -> ".9.png"
+            url.contains(".png", ignoreCase = true) -> ".png"
+            url.contains(".gif", ignoreCase = true) -> ".gif"
+            url.contains("webp", ignoreCase = true) -> ".webp"
+            else -> ".jpg"
+        }
+        return MD5Utils.md5Encode16(url) + suffix
+    }
+
     fun getBgImage(context: Context, metrics: DisplayMetrics): Drawable? {
         val themeMode = getTheme()
         val preferenceKey = when (themeMode) {
@@ -96,18 +112,11 @@ object ThemeConfig {
         var path = context.getPrefString(preferenceKey)
         if (path.isNullOrBlank()) return null
         if (path.startsWith("http")) {
-            val suffix = when {
-                path.contains(".9.png", ignoreCase = true) -> ".9.png"
-                path.contains(".png", ignoreCase = true) -> ".png"
-                path.contains(".gif", ignoreCase = true) -> ".gif"
-                path.contains("webp", ignoreCase = true) -> ".webp"
-                else -> ".jpg"
-            }
-            val name = MD5Utils.md5Encode16(path) + suffix
+            val name = getUrlToFile(path)
             val fileRoot = context.externalFiles
-            val filePath = File(fileRoot.absolutePath).resolve(preferenceKey).resolve(name).absolutePath
+            val filePath = FileUtils.getPath(fileRoot, preferenceKey, name)
             if (!FileUtils.exist(filePath)) {
-                appCtx.toastOnUi("未缓存在线背景图，请重新应用主题")
+                appCtx.toastOnUi("未缓存在线背景图\n请重新应用主题")
                 return null
             }
             path = filePath
@@ -218,7 +227,10 @@ object ThemeConfig {
 
     fun applyConfig(context: Context, config: Config) {
         try {
-            clearBg()
+            if (needClearImg) {
+                needClearImg = false
+                clearBg(context)
+            }
             val primary = config.primaryColor.toColorInt()
             val accent = config.accentColor.toColorInt()
             val background = config.backgroundColor.toColorInt()
@@ -227,28 +239,22 @@ object ThemeConfig {
             val transparentNavBar = config.transparentNavBar
             val backgroundPath = config.backgroundImgPath
             if (backgroundPath != null && backgroundPath.startsWith("http")) {
-                Coroutine.async {
-                    kotlin.runCatching {
-                        val fileRoot = context.externalFiles
-                        val preferenceKey = if (isNightTheme) {
-                            PreferKey.bgImageN
-                        } else {
-                            PreferKey.bgImage
-                        }
-                        val suffix = when {
-                            backgroundPath.contains(".9.png", ignoreCase = true) -> ".9.png"
-                            backgroundPath.contains(".png", ignoreCase = true) -> ".png"
-                            backgroundPath.contains(".gif", ignoreCase = true) -> ".gif"
-                            backgroundPath.contains("webp", ignoreCase = true) -> ".webp"
-                            else -> ".jpg"
-                        }
-                        val name = MD5Utils.md5Encode16(backgroundPath) + suffix
-                        val fileFold = File(fileRoot, preferenceKey)
-                        if (!fileFold.exists()) {
-                            fileFold.mkdirs()
-                        }
-                        val fileImg = File(fileFold, name)
-                        if (!fileImg.exists()) {
+                val fileRoot = context.externalFiles
+                val preferenceKey = if (isNightTheme) {
+                    PreferKey.bgImageN
+                } else {
+                    PreferKey.bgImage
+                }
+                val name = getUrlToFile(backgroundPath)
+                val fileFold = File(fileRoot, preferenceKey)
+                if (!fileFold.exists()) {
+                    fileFold.mkdirs()
+                }
+                val fileImg = File(fileFold, name)
+                if (!fileImg.exists()) {
+                    appCtx.toastOnUi("下载背景图片中...")
+                    Coroutine.async {
+                        kotlin.runCatching {
                             val res = okHttpClient.newCallResponse(0) {
                                 url(backgroundPath)
                             }
@@ -257,10 +263,13 @@ object ThemeConfig {
                                     inputStream.copyTo(outputStream)
                                 }
                             }
+                        }.onSuccess {
+                            appCtx.toastOnUi("背景图下载成功\n请重新应用主题")
+                        }.onFailure {
+                            appCtx.toastOnUi(it.localizedMessage)
                         }
-                    }.onFailure {
-                        appCtx.toastOnUi(it.localizedMessage)
                     }
+                    return
                 }
             }
             val backgroundBlur = config.backgroundImgBlur
@@ -442,10 +451,27 @@ object ThemeConfig {
         }
     }
 
-    fun clearBg() {
+    fun clearBg(context: Context) {
         val (nightConfigs, dayConfigs) = configList.partition { it.isNightTheme }
-        val nightBackgroundImgPaths = nightConfigs.mapNotNull { it.backgroundImgPath }
-        val dayBackgroundImgPaths = dayConfigs.mapNotNull { it.backgroundImgPath }
+        val fileRoot = context.externalFiles
+        val nightBackgroundImgPaths = nightConfigs.mapNotNull {
+            val path = it.backgroundImgPath ?: return@mapNotNull null
+            if (path.startsWith("http")) {
+                val name = getUrlToFile(path)
+                FileUtils.getPath(fileRoot, PreferKey.bgImageN, name)
+            } else {
+                path
+            }
+        }
+        val dayBackgroundImgPaths = dayConfigs.mapNotNull {
+            val path = it.backgroundImgPath ?: return@mapNotNull null
+            if (path.startsWith("http")) {
+                val name = getUrlToFile(path)
+                FileUtils.getPath(fileRoot, PreferKey.bgImage, name)
+            } else {
+                path
+            }
+        }
         appCtx.externalFiles.getFile(PreferKey.bgImage).listFiles()?.forEach {
             if (!dayBackgroundImgPaths.contains(it.absolutePath)) {
                 it.delete()

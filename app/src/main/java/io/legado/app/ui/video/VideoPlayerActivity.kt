@@ -488,11 +488,11 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     }
 
     override fun onDestroy() {
+        super.onDestroy()
         VideoPlay.durChapterPos = playerView.getCurrentPositionWhenPlaying().toInt()
         VideoPlay.saveRead()
         playerView.getCurrentPlayer().release()
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        super.onDestroy()
     }
 
     override fun observeLiveBus() {

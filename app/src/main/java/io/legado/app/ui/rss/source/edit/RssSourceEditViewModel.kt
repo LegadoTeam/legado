@@ -9,6 +9,7 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.RssSource
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppCacheManager
+import io.legado.app.help.ConcurrentRateLimiter.Companion.concurrentRecordMap
 import io.legado.app.help.RuleComplete
 import io.legado.app.help.http.CookieStore
 import io.legado.app.help.source.removeSortCache
@@ -66,6 +67,7 @@ class RssSourceEditViewModel(application: Application) : BaseViewModel(applicati
             }
             appDb.rssSourceDao.insert(source)
             rssSource = source
+            concurrentRecordMap.remove(source.sourceUrl) //删除并发限制缓存
             source
         }.onSuccess {
             success(it)

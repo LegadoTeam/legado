@@ -70,6 +70,11 @@ class HttpTtsEditDialog() : BaseDialogFragment(R.layout.dialog_http_tts_edit, tr
             addJsonPattern()
             addJsPattern()
         }
+        binding.tvJsLib.run {
+            addLegadoPattern()
+            addJsonPattern()
+            addJsPattern()
+        }
         viewModel.initData(arguments) {
             initView(httpTTS = it)
         }
@@ -91,6 +96,7 @@ class HttpTtsEditDialog() : BaseDialogFragment(R.layout.dialog_http_tts_edit, tr
         binding.tvLoginUi.setText(httpTTS.loginUi)
         binding.tvLoginCheckJs.setText(httpTTS.loginCheckJs)
         binding.tvHeaders.setText(httpTTS.header)
+        binding.tvJsLib.setText(httpTTS.jsLib)
     }
 
 
@@ -171,7 +177,8 @@ class HttpTtsEditDialog() : BaseDialogFragment(R.layout.dialog_http_tts_edit, tr
             loginUrl = binding.tvLoginUrl.text?.toString(),
             loginUi = binding.tvLoginUi.text?.toString(),
             loginCheckJs = binding.tvLoginCheckJs.text?.toString(),
-            header = binding.tvHeaders.text?.toString()
+            header = binding.tvHeaders.text?.toString(),
+            jsLib = binding.tvJsLib.text?.toString()
         )
     }
 

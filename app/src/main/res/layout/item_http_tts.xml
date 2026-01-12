@@ -36,7 +36,7 @@
         android:layout_height="36dp"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:padding="6dp"
-        android:src="@drawable/ic_clear_all"
+        android:src="@drawable/ic_outline_delete"
         android:tint="@color/primaryText"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintRight_toRightOf="parent"

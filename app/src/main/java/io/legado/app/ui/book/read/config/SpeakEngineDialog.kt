@@ -67,6 +67,7 @@ class SpeakEngineDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
     private var ttsEngine: String? = ReadAloud.ttsEngine
     private val sysTtsViews = arrayListOf<RadioButton>()
     private val callBack: CallBack? get() = parentFragment as? CallBack
+    private var currentSelect = -1
     private val importDocResult = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
             showDialogFragment(ImportHttpTtsDialog(uri.toString()))
@@ -190,13 +191,28 @@ class SpeakEngineDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
             }
 
             R.id.menu_import_onLine -> importAlert()
-            R.id.menu_export -> exportDirResult.launch {
+            R.id.menu_export_all -> exportDirResult.launch {
                 mode = HandleFileContract.EXPORT
                 fileData = HandleFileContract.FileData(
                     "httpTts.json",
                     GSON.toJson(adapter.getItems()).toByteArray(),
                     "application/json"
                 )
+            }
+            R.id.menu_export -> {
+                if (currentSelect == -1) {
+                    toastOnUi(R.string.is_system_tts_no_export)
+                    return true
+                }
+                val tts = adapter.getItem(currentSelect) ?: return true
+                exportDirResult.launch {
+                    mode = HandleFileContract.EXPORT
+                    fileData = HandleFileContract.FileData(
+                        "httpTts_${tts.name}.json",
+                        GSON.toJson(tts).toByteArray(),
+                        "application/json"
+                    )
+                }
             }
         }
         return true
@@ -211,7 +227,6 @@ class SpeakEngineDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
             }
             toastOnUi(R.string.clear_cache_success)
         }
-
     }
 
     private fun importAlert() {
@@ -245,8 +260,12 @@ class SpeakEngineDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
     private fun upTts(tts: String) {
         ttsEngine = tts
         sysTtsViews.forEach {
-            it.isChecked = GSON.fromJsonObject<SelectItem<String>>(ttsEngine)
+            val isChecked = GSON.fromJsonObject<SelectItem<String>>(ttsEngine)
                 .getOrNull()?.value == it.tag
+            if (isChecked) {
+                currentSelect = -1
+            }
+            it.isChecked = isChecked
         }
         adapter.notifyItemRangeChanged(adapter.getHeaderCount(), adapter.itemCount)
     }
@@ -266,7 +285,11 @@ class SpeakEngineDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
         ) {
             binding.apply {
                 cbName.text = item.name
-                cbName.isChecked = item.id.toString() == ttsEngine
+                val isChecked = item.id.toString() == ttsEngine
+                if (isChecked) {
+                    currentSelect = holder.layoutPosition - getHeaderCount()
+                }
+                cbName.isChecked = isChecked
             }
         }
 

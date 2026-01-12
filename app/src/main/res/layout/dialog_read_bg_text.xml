@@ -62,13 +62,23 @@
         android:text="@string/dark_status_icon"
         tools:ignore="TouchTargetSizeCheck" />
 
-    <io.legado.app.lib.theme.view.ThemeSwitch
-        android:id="@+id/sw_underline"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:padding="6dp"
-        android:text="@string/text_underline"
-        tools:ignore="TouchTargetSizeCheck" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/text_underline"
+            android:textColor="@color/primaryText" />
+        <Spinner
+            android:id="@+id/sp_underline"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"

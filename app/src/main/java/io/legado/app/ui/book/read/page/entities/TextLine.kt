@@ -2,14 +2,15 @@ package io.legado.app.ui.book.read.page.entities
 
 import android.annotation.SuppressLint
 import android.graphics.Canvas
+import android.graphics.DashPathEffect
 import android.graphics.Paint.FontMetrics
 import android.os.Build
+import android.text.TextPaint
 import androidx.annotation.Keep
 import io.legado.app.help.PaintPool
 import io.legado.app.help.book.isImage
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
-import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.page.ContentTextView
 import io.legado.app.ui.book.read.page.entities.TextPage.Companion.emptyTextPage
@@ -179,9 +180,11 @@ data class TextLine(
             canvas.drawLine(lineStart + indentWidth, lineY, lineEnd, lineY, underlinePaint)
             PaintPool.recycle(underlinePaint)
         }
-        
-        if (ReadBookConfig.underline && !isImage && !isHtml && ReadBook.book?.isImage != true) {
-            drawUnderline(canvas)
+
+        val underlineMode = ReadBookConfig.underlineMode
+        if (underlineMode == 0) return
+        if (!isImage && !isHtml && ReadBook.book?.isImage != true) {
+            drawUnderline(canvas, underlineMode)
         }
     }
 
@@ -224,15 +227,29 @@ data class TextLine(
     /**
      * 绘制下划线
      */
-    private fun drawUnderline(canvas: Canvas) {
+    private fun drawUnderline(canvas: Canvas, underlineMode: Int) {
+        val paint = ChapterProvider.contentPaint
         val lineY = height - 1.dpToPx()
-        canvas.drawLine(
-            lineStart + indentWidth,
-            lineY,
-            lineEnd,
-            lineY,
-            ChapterProvider.contentPaint
-        )
+        if (underlineMode == 1) {
+            canvas.drawLine(
+                lineStart + indentWidth,
+                lineY,
+                lineEnd,
+                lineY,
+                paint
+            )
+        } else if (underlineMode == 2) { // 虚线
+            val dashPathEffect = DashPathEffect(floatArrayOf(10f, 10f), 0f)
+            val dashPath = TextPaint(paint)
+            dashPath.pathEffect = dashPathEffect
+            canvas.drawLine(
+                lineStart + indentWidth,
+                lineY,
+                lineEnd,
+                lineY,
+                dashPath
+            )
+        }
     }
 
     fun checkFastDraw(): Boolean {

@@ -3,7 +3,6 @@ package io.legado.app.ui.book.read
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.res.Configuration
-import android.net.Uri
 import android.os.Bundle
 import android.os.Looper
 import android.view.Gravity
@@ -140,6 +139,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.core.net.toUri
 
 /**
  * 阅读界面
@@ -1461,7 +1461,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                             value = src
                         }
                     } else {
-                        viewModel.saveImage(src, Uri.parse(path))
+                        viewModel.saveImage(src, path.toUri())
                     }
                 }
 
@@ -1692,6 +1692,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         popupAction.dismiss()
         binding.readView.onDestroy()
         ReadBook.unregister(this)
+        handler.removeCallbacksAndMessages(null) // 清理Handler消息
         if (!ReadBook.inBookshelf && !isChangingConfigurations) {
             viewModel.removeFromBookshelf(null)
         }

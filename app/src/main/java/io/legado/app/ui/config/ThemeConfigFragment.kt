@@ -348,7 +348,7 @@ class ThemeConfigFragment : PreferenceFragment(),
         if (uri.scheme?.lowercase() in listOf("http", "https")) {
             lifecycleScope.launch {
                 kotlin.runCatching {
-                    appCtx.toastOnUi("下载图片中...")
+                    appCtx.toastOnUi("下载背景图片中...")
                     val analyzeUrl = AnalyzeUrl(uri.toString())
                     val url = analyzeUrl.urlNoQuery
                     var file = requireContext().externalFiles
