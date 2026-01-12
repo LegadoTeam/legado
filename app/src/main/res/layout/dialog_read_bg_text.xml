@@ -65,19 +65,22 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="6dp"
         android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:padding="6dp">
+
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="@string/text_underline"
             android:textColor="@color/primaryText" />
-        <Spinner
+
+        <androidx.appcompat.widget.AppCompatSpinner
             android:id="@+id/sp_underline"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:theme="@style/Spinner" />
     </LinearLayout>
 
     <LinearLayout

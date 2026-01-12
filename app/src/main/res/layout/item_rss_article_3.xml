@@ -7,7 +7,7 @@
     android:layout_height="wrap_content"
     app:cardCornerRadius="12dp"
     app:cardElevation="0dp"
-    app:cardUseCompatPadding="true"
+    app:cardUseCompatPadding="false"
     app:cardBackgroundColor="@android:color/transparent" >
 
     <androidx.constraintlayout.widget.ConstraintLayout
@@ -22,9 +22,9 @@
             android:contentDescription="@string/loading"
             android:scaleType="centerCrop"
             app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toTopOf="@+id/tv_title"
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintBottom_toTopOf="@+id/tv_title"
             tools:ignore="RtlHardcoded,RtlSymmetry"
             tools:srcCompat="@drawable/image_rss_article" />
 

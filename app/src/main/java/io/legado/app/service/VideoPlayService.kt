@@ -172,8 +172,8 @@ class VideoPlayService : BaseService() {
                 stopSelf()
                 return START_NOT_STICKY
             }
-            VideoPlay.saveRead()
             VideoPlay.startPlay(playerView)
+            VideoPlay.saveRead()
         } else {
             VideoPlay.clonePlayState(playerView)
             playerView.setSurfaceToPlay()
@@ -417,6 +417,7 @@ class VideoPlayService : BaseService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        VideoPlay.saveRead()
         try {
             if (::windowManager.isInitialized && floatingView.parent != null) {
                 windowManager.removeView(floatingView)

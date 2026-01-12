@@ -15,6 +15,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.TxtTocRule
 import io.legado.app.databinding.DialogTocRegexEditBinding
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.widget.code.addJsPattern
 import io.legado.app.ui.widget.code.addJsonPattern
@@ -23,6 +24,7 @@ import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers
 import java.util.regex.Pattern
 import java.util.regex.PatternSyntaxException
+import kotlin.toString
 
 class TxtTocRuleEditDialog() : BaseDialogFragment(R.layout.dialog_toc_regex_edit, true),
     Toolbar.OnMenuItemClickListener {
@@ -62,7 +64,7 @@ class TxtTocRuleEditDialog() : BaseDialogFragment(R.layout.dialog_toc_regex_edit
             R.id.menu_save -> {
                 val tocRule = getRuleFromView()
                 if (checkValid(tocRule)) {
-                    callback?.saveTxtTocRule(getRuleFromView())
+                    callback?.saveTxtTocRule(tocRule)
                     dismissAllowingStateLoss()
                 }
             }
@@ -112,6 +114,30 @@ class TxtTocRuleEditDialog() : BaseDialogFragment(R.layout.dialog_toc_regex_edit
             tocRule.example = tvRuleExample.text.toString()
         }
         return tocRule
+    }
+
+    private fun isSame(): Boolean{
+        val tocRule = viewModel.tocRule ?: return binding.tvRuleName.text.toString().isEmpty()
+        return binding.run {
+            tocRule.name == tvRuleName.text.toString() &&
+            tocRule.rule == tvRuleRegex.text.toString() &&
+            tocRule.replacement == tvRuleReplacement.text.toString() &&
+            tocRule.example == tvRuleExample.text.toString()
+        }
+    }
+
+    override fun dismiss() {
+        if (!isSame()) {
+            alert(R.string.exit) {
+                setMessage(R.string.exit_no_save)
+                positiveButton(R.string.yes)
+                negativeButton(R.string.no) {
+                    super.dismiss()
+                }
+            }
+        } else {
+            super.dismiss()
+        }
     }
 
     class ViewModel(application: Application) : BaseViewModel(application) {

@@ -38,7 +38,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.viewpager.widget.ViewPager
-import io.legado.app.ui.rss.article.RssArticlesAdapter3.Companion.clearImageHeight
 import io.legado.app.utils.startActivity
 
 class RssSortActivity : VMBaseActivity<ActivityRssArtivlesBinding, RssSortViewModel>(),
@@ -50,6 +49,7 @@ class RssSortActivity : VMBaseActivity<ActivityRssArtivlesBinding, RssSortViewMo
     private var sortUrls: List<Pair<String, String>>? = null
     private val sortList = mutableListOf<Pair<String, String>>()
     private val fragmentMap = hashMapOf<String, Fragment>()
+    private val orientation by lazy { resources.configuration.orientation }
     private val editSourceResult = registerForActivityResult(
         StartActivityContract(RssSourceEditActivity::class.java)
     ) {
@@ -81,7 +81,7 @@ class RssSortActivity : VMBaseActivity<ActivityRssArtivlesBinding, RssSortViewMo
             sortList.size <= 20 -> 2
             else -> 3
         }
-        if (rowCount > 1 && resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) rowCount-- //横屏最多2行
+        if (rowCount > 1 && orientation == Configuration.ORIENTATION_LANDSCAPE) rowCount-- //横屏最多2行
         maxTagsPerRow = (sortList.size + rowCount - 1) / rowCount
         sortList.chunked(maxTagsPerRow).forEachIndexed { rowIndex, rowItems ->
             // 创建横向滚动容器
@@ -325,9 +325,6 @@ class RssSortActivity : VMBaseActivity<ActivityRssArtivlesBinding, RssSortViewMo
             R.id.menu_clear -> {
                 viewModel.url?.let {
                     viewModel.clearArticles()
-                    if (viewModel.articleStyle == 3) {
-                        clearImageHeight()
-                    }
                 }
             }
 

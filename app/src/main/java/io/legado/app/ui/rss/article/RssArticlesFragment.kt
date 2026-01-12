@@ -1,5 +1,7 @@
 package io.legado.app.ui.rss.article
 
+import android.content.res.Configuration
+import android.graphics.Rect
 import android.os.Bundle
 import android.view.View
 import androidx.fragment.app.activityViewModels
@@ -51,6 +53,7 @@ class RssArticlesFragment() : VMBaseFragment<RssArticlesViewModel>(R.layout.frag
     private val activityViewModel by activityViewModels<RssSortViewModel>()
     override val viewModel by viewModels<RssArticlesViewModel>()
     private val isPreload by lazy { activityViewModel.rssSource?.preload ?: false }
+    private val orientation by lazy { resources.configuration.orientation }
     private val adapter: BaseRssArticlesAdapter<*> by lazy {
         when (activityViewModel.articleStyle) {
             1 -> RssArticlesAdapter1(requireContext(), this@RssArticlesFragment)
@@ -85,9 +88,23 @@ class RssArticlesFragment() : VMBaseFragment<RssArticlesViewModel>(R.layout.frag
         }
         val layoutManager = when (activityViewModel.articleStyle) {
             3 -> {
+                recyclerView.setPadding(20, 0, 20, 0)
+                recyclerView.addItemDecoration(object : RecyclerView.ItemDecoration() {
+                    override fun getItemOffsets(
+                        outRect: Rect,
+                        view: View,
+                        parent: RecyclerView,
+                        state: RecyclerView.State
+                    ) {
+                        outRect.set(20,30,20,30)
+                    }
+                })
                 recyclerView.itemAnimator = null
-                recyclerView.setPadding(4, 0, 4, 0)
-                StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)
+                if (orientation == Configuration.ORIENTATION_LANDSCAPE) { //横屏三列
+                    StaggeredGridLayoutManager(3, StaggeredGridLayoutManager.VERTICAL)
+                } else {
+                    StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)
+                }
             }
             2 -> {
                 recyclerView.setPadding(8, 0, 8, 0)

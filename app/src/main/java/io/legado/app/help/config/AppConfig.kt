@@ -616,6 +616,12 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefInt(PreferKey.pageTouchSlop, value)
         }
 
+    var pageTouchClick: Int
+        get() = appCtx.getPrefInt(PreferKey.pageTouchClick, 0)
+        set(value) {
+            appCtx.putPrefInt(PreferKey.pageTouchClick, value)
+        }
+
     var bookshelfSort: Int
         get() = appCtx.getPrefInt(PreferKey.bookshelfSort, 0)
         set(value) {

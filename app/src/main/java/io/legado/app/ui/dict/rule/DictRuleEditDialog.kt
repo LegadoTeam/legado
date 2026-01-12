@@ -17,6 +17,7 @@ import io.legado.app.base.BaseViewModel
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.DictRule
 import io.legado.app.databinding.DialogDictRuleEditBinding
+import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.code.CodeEditActivity
 import io.legado.app.ui.widget.code.addJsPattern
@@ -114,6 +115,27 @@ class DictRuleEditDialog() : BaseDialogFragment(R.layout.dialog_dict_rule_edit, 
         dictRule.urlRule = binding.tvUrlRule.text.toString()
         dictRule.showRule = binding.tvShowRule.text.toString()
         return dictRule
+    }
+
+    private fun isSame(): Boolean{
+        val dictRule = viewModel.dictRule ?: return binding.tvRuleName.text.toString().isEmpty()
+        return dictRule.name == binding.tvRuleName.text.toString() &&
+        dictRule.urlRule == binding.tvUrlRule.text.toString() &&
+        dictRule.showRule == binding.tvShowRule.text.toString()
+    }
+
+    override fun dismiss() {
+        if (!isSame()) {
+            alert(R.string.exit) {
+                setMessage(R.string.exit_no_save)
+                positiveButton(R.string.yes)
+                negativeButton(R.string.no) {
+                    super.dismiss()
+                }
+            }
+        } else {
+            super.dismiss()
+        }
     }
 
     class DictRuleEditViewModel(application: Application) : BaseViewModel(application) {

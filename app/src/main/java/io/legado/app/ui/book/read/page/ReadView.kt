@@ -99,6 +99,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
     private val slopSquare by lazy { ViewConfiguration.get(context).scaledTouchSlop }
     private var pageSlopSquare: Int = slopSquare
     var pageSlopSquare2: Int = pageSlopSquare * pageSlopSquare
+    private var pageTouchClick: Int = 0
     private val tlRect = RectF()
     private val tcRect = RectF()
     private val trRect = RectF()
@@ -114,30 +115,31 @@ class ReadView(context: Context, attrs: AttributeSet) :
     val isAutoPage get() = autoPager.isRunning
 
     init {
-        addView(nextPage)
-        addView(curPage)
-        addView(prevPage)
-        prevPage.invisible()
-        nextPage.invisible()
-        curPage.markAsMainView()
         if (!isInEditMode) {
             upBg()
             setWillNotDraw(false)
             upPageAnim()
             upPageSlopSquare()
         }
+        addView(nextPage)
+        addView(curPage)
+        addView(prevPage)
+        prevPage.invisible()
+        nextPage.invisible()
+        curPage.markAsMainView()
+        upPageTouchClick()
     }
 
     private fun setRect9x() {
-        tlRect.set(0f, 0f, width * 0.33f, height * 0.33f)
+        tlRect.set(0f + pageTouchClick, 0f, width * 0.33f, height * 0.33f)
         tcRect.set(width * 0.33f, 0f, width * 0.66f, height * 0.33f)
-        trRect.set(width * 0.36f, 0f, width.toFloat(), height * 0.33f)
-        mlRect.set(0f, height * 0.33f, width * 0.33f, height * 0.66f)
+        trRect.set(width * 0.36f, 0f, width.toFloat() - pageTouchClick, height * 0.33f)
+        mlRect.set(0f + pageTouchClick, height * 0.33f, width * 0.33f, height * 0.66f)
         mcRect.set(width * 0.33f, height * 0.33f, width * 0.66f, height * 0.66f)
-        mrRect.set(width * 0.66f, height * 0.33f, width.toFloat(), height * 0.66f)
-        blRect.set(0f, height * 0.66f, width * 0.33f, height.toFloat())
+        mrRect.set(width * 0.66f, height * 0.33f, width.toFloat() - pageTouchClick, height * 0.66f)
+        blRect.set(0f + pageTouchClick, height * 0.66f, width * 0.33f, height.toFloat())
         bcRect.set(width * 0.33f, height * 0.66f, width * 0.66f, height.toFloat())
-        brRect.set(width * 0.66f, height * 0.66f, width.toFloat(), height.toFloat())
+        brRect.set(width * 0.66f, height * 0.66f, width.toFloat() - pageTouchClick, height.toFloat())
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -598,6 +600,14 @@ class ReadView(context: Context, attrs: AttributeSet) :
         val pageTouchSlop = AppConfig.pageTouchSlop
         this.pageSlopSquare = if (pageTouchSlop == 0) slopSquare else pageTouchSlop
         pageSlopSquare2 = this.pageSlopSquare * this.pageSlopSquare
+    }
+
+    /**
+     * 更新边缘点击阈值
+     */
+    fun upPageTouchClick() {
+        this.pageTouchClick = AppConfig.pageTouchClick
+        setRect9x()
     }
 
     /**

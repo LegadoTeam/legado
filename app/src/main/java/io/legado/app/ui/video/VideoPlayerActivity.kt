@@ -85,11 +85,11 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         it?.let {
             if (it[2] as Boolean) {
                 VideoPlay.chapterInVolumeIndex = it[0] as Int
-                VideoPlay.durChapterPos = it[1] as Int
+                val durChapterPos = it[1] as Int
                 VideoPlay.durVolumeIndex = it[3] as Int
                 VideoPlay.chapterInVolumeIndex = it[4] as Int
                 VideoPlay.upEpisodes()
-                VideoPlay.saveRead()
+                VideoPlay.saveRead(durChapterPos)
                 if (VideoPlay.episodes.isNullOrEmpty()) {
                     binding.chapters.visibility = View.GONE
                 } else {
@@ -125,8 +125,8 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                 finish()
                 return
             }
-            VideoPlay.saveRead()
             VideoPlay.startPlay(playerView)
+            VideoPlay.saveRead()
         } else {
             VideoPlay.clonePlayState(playerView)
             playerView.setSurfaceToPlay()
@@ -195,8 +195,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         val adapter = ChapterAdapter(toc,VideoPlay.chapterInVolumeIndex, false) { chapter, index ->
             if (index != VideoPlay.chapterInVolumeIndex) {
                 VideoPlay.chapterInVolumeIndex = index
-                VideoPlay.durChapterPos = 0
-                VideoPlay.saveRead()
+                VideoPlay.saveRead(0)
                 upEpisodesView()
                 VideoPlay.startPlay(playerView)
             }
@@ -213,7 +212,6 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             if (index != VideoPlay.durVolumeIndex) {
                 VideoPlay.durVolumeIndex = index
                 VideoPlay.chapterInVolumeIndex = 0
-                VideoPlay.durChapterPos = 0
                 VideoPlay.upEpisodes()
                 if (VideoPlay.episodes.isNullOrEmpty()) {
                     binding.chapters.visibility = View.GONE
@@ -222,7 +220,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                     val adapter = binding.chapters.adapter as? ChapterAdapter
                     adapter?.updateData(VideoPlay.episodes)
                 }
-                VideoPlay.saveRead()
+                VideoPlay.saveRead(0)
                 upVolumesView()
                 VideoPlay.startPlay(playerView)
             }
@@ -489,7 +487,6 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
 
     override fun onDestroy() {
         super.onDestroy()
-        VideoPlay.durChapterPos = playerView.getCurrentPositionWhenPlaying().toInt()
         VideoPlay.saveRead()
         playerView.getCurrentPlayer().release()
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)

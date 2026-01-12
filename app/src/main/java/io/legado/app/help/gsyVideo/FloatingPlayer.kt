@@ -109,7 +109,6 @@ class FloatingPlayer : StandardGSYVideoPlayer {
 
     override fun onError(what: Int, extra: Int) {
         super.onError(what, extra)
-        VideoPlay.durChapterPos = VideoPlay.videoManager.getCurrentPosition().toInt()
         VideoPlay.saveRead()
         mSeekOnStart = VideoPlay.durChapterPos.toLong()
     }

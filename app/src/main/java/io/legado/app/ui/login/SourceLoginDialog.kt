@@ -57,7 +57,6 @@ import io.legado.app.ui.widget.text.TextInputLayout
 import io.legado.app.utils.isTrue
 import io.legado.app.utils.setSelectionSafely
 import kotlin.math.abs
-import kotlin.text.isNotEmpty
 
 
 class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
@@ -82,26 +81,28 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
 
     @SuppressLint("SetTextI18n")
     private fun handleUIDataUpdate(data: Map<String, String?>?) {
-        val loginInfo = viewModel.loginInfo
+        hasChange = true
         if (data == null) {
+            val newLoginInfo: MutableMap<String, String> = mutableMapOf()
             rowUis?.forEachIndexed { index, rowUi ->
                 val default = rowUi.default
                 when (val rowView = binding.root.findViewById<View>(index + 1000)) {
                     is TextInputLayout -> {
+                        newLoginInfo[rowUi.name] = default ?: ""
                         rowView.editText?.setText(default ?: "")
                     }
 
                     is TextView -> {
                         when (rowUi.type) {
                             Type.button -> {
-                                rowView.text = rowUi.name
+                                rowView.text = rowUi.viewName ?: rowUi.name
                             }
                             Type.toggle -> {
                                 val char = default ?: run{
                                     val chars = rowUi.chars?.filterNotNull() ?: listOf("chars is null")
                                     chars.getOrNull(0) ?: ""
                                 }
-                                loginInfo[rowUi.name] = char
+                                newLoginInfo[rowUi.name] = char
                                 val name =  rowUi.viewName ?: rowUi.name
                                 val left = rowUi.style?.layout_justifySelf != "right"
                                 rowView.text = if (left) char + name else name + char
@@ -112,19 +113,19 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                     is LinearLayout -> {
                         val items = rowUi.chars?.filterNotNull() ?: listOf("chars","is null")
                         val index = items.indexOf(default)
-                        loginInfo[rowUi.name] = default ?: run{
+                        newLoginInfo[rowUi.name] = default ?: run{
                             items.getOrNull(0) ?: ""
                         }
                         rowView.findViewById<AppCompatSpinner>(R.id.sp_type)?.setSelectionSafely(index)
                     }
                 }
             }
+            viewModel.loginInfo = newLoginInfo
             return
         }
-
+        val loginInfo = viewModel.loginInfo
         data.forEach { (key, value) ->
             val index = rowUiName.indexOf(key)
-            val value = value
             if (index != -1) {
                 when (val rowView = binding.root.findViewById<View>(index + 1000)) {
                     is TextInputLayout -> {
@@ -165,6 +166,8 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                         rowView.findViewById<AppCompatSpinner>(R.id.sp_type)?.setSelectionSafely(index)
                     }
                 }
+            } else {
+                loginInfo[key] = value ?: ""
             }
         }
     }
@@ -226,7 +229,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                     it.root.id = index + 1000
                     if (viewName == null) {
                         it.textInputLayout.hint = name
-                    } else if (viewName.length in 3..9 && viewName.first() == '\'' && viewName.last() == '\'') {
+                    } else if (viewName.length in 3..19 && viewName.first() == '\'' && viewName.last() == '\'') {
                         it.textInputLayout.hint = viewName.substring(1, viewName.length - 1)
                     } else {
                         it.textInputLayout.hint = name
@@ -245,7 +248,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                     editText.setText(loginInfo[name])
                     action?.let { jsStr ->
                         var content: String? = null
-                        editText.onFocusChangeListener = View.OnFocusChangeListener { view, hasFocus ->
+                        editText.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
                             if (hasFocus) {
                                 content = editText.text.toString()
                             } else {
@@ -296,7 +299,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                     it.root.id = index + 1000
                     if (viewName == null) {
                         it.textInputLayout.hint = name
-                    } else if (viewName.length in 3..9 && viewName.first() == '\'' && viewName.last() == '\'') {
+                    } else if (viewName.length in 3..19 && viewName.first() == '\'' && viewName.last() == '\'') {
                         it.textInputLayout.hint = viewName.substring(1, viewName.length - 1)
                     } else {
                         it.textInputLayout.hint = name
@@ -317,7 +320,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                     editText.setText(loginInfo[name])
                     action?.let { jsStr ->
                         var content: String? = null
-                        editText.onFocusChangeListener = View.OnFocusChangeListener { view, hasFocus ->
+                        editText.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
                             if (hasFocus) {
                                 content = editText.text.toString()
                             } else {
@@ -358,7 +361,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                 ).let {
                     if (viewName == null) {
                         it.spName.text = name
-                    } else if (viewName.length in 3..9 && viewName.first() == '\'' && viewName.last() == '\'') {
+                    } else if (viewName.length in 3..19 && viewName.first() == '\'' && viewName.last() == '\'') {
                         it.spName.text = viewName.substring(1, viewName.length - 1)
                     } else {
                         it.spName.text = name
@@ -380,10 +383,16 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                         R.layout.item_text_common,
                         items
                     )
-                    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                    adapter.setDropDownViewResource(R.layout.item_spinner_dropdown)
                     val selector = it.spType
                     selector.adapter = adapter
-                    val char = loginInfo[name]?.takeIf { c -> c.isNotEmpty() } ?: rowUi.default.toString()
+                    val infoV = loginInfo[name]
+                    val char = if (infoV.isNullOrEmpty()) {
+                        hasChange = true
+                        rowUi.default ?: items[0]
+                    } else {
+                        infoV
+                    }
                     loginInfo[name] = char
                     val i = items.indexOf(char)
                     selector.setSelectionSafely(i)
@@ -398,7 +407,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                             loginInfo[name] = items[position]
                             if (action != null) {
                                 execute {
-                                    evalUiJs(action)
+                                    handleButtonClick(source, action, name, rowUis, false)
                                 }.onError { e ->
                                     AppLog.put("LoginUI Select $name JavaScript error", e)
                                 }
@@ -434,8 +443,10 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                     it.root.id = index + 1000
                     if (viewName == null) {
                         it.textView.text = name
-                    } else if (viewName.length in 3..9 && viewName.first() == '\'' && viewName.last() == '\'') {
-                        it.textView.text = viewName.substring(1, viewName.length - 1)
+                    } else if (viewName.length in 3..19 && viewName.first() == '\'' && viewName.last() == '\'') {
+                        val n = viewName.substring(1, viewName.length - 1)
+                        rowUi.viewName = n
+                        it.textView.text = n
                     } else {
                         it.textView.text = name
                         execute {
@@ -444,6 +455,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                             if (n.isNullOrEmpty()) {
                                 it.textView.text = "null"
                             } else {
+                                rowUi.viewName = n //在回调handleUIDataUpdate用
                                 it.textView.text = n
                             }
                         }.onError{ _ ->
@@ -493,11 +505,17 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                     }
                     it.root.id = index + 1000
                     val chars = rowUi.chars?.filterNotNull() ?: listOf("chars is null")
-                    var char = loginInfo[name]?.takeIf { c -> c.isNotEmpty() } ?: rowUi.default ?: chars.getOrNull(0) ?: "chars is []"
+                    val infoV = loginInfo[name]
+                    var char = if (infoV.isNullOrEmpty()) {
+                        hasChange = true
+                        rowUi.default ?: chars[0]
+                    } else {
+                        infoV
+                    }
                     loginInfo[name] = char
                     if (viewName == null) {
                         it.textView.text = if (left) char + name else name + char
-                    } else if (viewName.length in 3..9 && viewName.first() == '\'' && viewName.last() == '\'') {
+                    } else if (viewName.length in 3..19 && viewName.first() == '\'' && viewName.last() == '\'') {
                         val n = viewName.substring(1, viewName.length - 1)
                         rowUi.viewName = n
                         newName = n
