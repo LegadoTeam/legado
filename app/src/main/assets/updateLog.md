@@ -1,8 +1,9 @@
 # 更新日志
 
-## cronet版本: 128.0.6613.40
+## cronet版本: 143.0.7499.193
 
 **2026/01/13**
+- 升级cronet版本至：143.0.7499.193
 - 软件自定义背景图支持.9.png格式
 - 背景图导入支持直接输入图片在线链接
 - 主题分享支持在线背景图链接
@@ -25,8 +26,6 @@
 - 视频播放器支持记录函数调用时的播放进度
 - 其余细节优化与bug修复
 
-| 2026 | 让我们 | 继续扬 | 帆起航 | 洛娅橙 |
-| :--- | ---: | :---: | :--- | ---: |
 
 ## **必读**
 【温馨提醒】 *更新前一定要做好备份，以免数据丢失！*
@@ -35,7 +34,7 @@
 * 正文出现缺字漏字、内容缺失、排版错乱等情况，有可能是净化规则或简繁转换出现问题。
 ----
 
-* [2025年日志](https://github.com/Luoyacheng/legado/blob/record2025/app/src/main/assets/updateLog.md)
-* [2023年日志](https://github.com/gedoor/legado/blob/record2023/app/src/main/assets/updateLog.md)
-* [2022年日志](https://github.com/gedoor/legado/blob/record2022/app/src/main/assets/updateLog.md)
-* [2021年日志](https://github.com/gedoor/legado/blob/record2021/app/src/main/assets/updateLog.md)
+* [2025年日志](https://github.com/LegadoTeam/legado/blob/record2025/app/src/main/assets/updateLog.md)
+* [2023年日志](https://github.com/LegadoTeam/legado/blob/record2023/app/src/main/assets/updateLog.md)
+* [2022年日志](https://github.com/LegadoTeam/legado/blob/record2022/app/src/main/assets/updateLog.md)
+* [2021年日志](https://github.com/LegadoTeam/legado/blob/record2021/app/src/main/assets/updateLog.md)
