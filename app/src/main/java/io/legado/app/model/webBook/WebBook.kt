@@ -17,16 +17,12 @@ import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.analyzeRule.RuleData
-import io.legado.app.utils.stackTraceStr
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Semaphore
-import okhttp3.Request
-import okhttp3.Response
-import okhttp3.ResponseBody.Companion.toResponseBody
 import kotlin.coroutines.CoroutineContext
 
 @Suppress("MemberVisibilityCanBePrivate")
@@ -75,14 +71,8 @@ object WebBook {
         } catch (e: Exception) {
             bookSource.loginCheckJs?.let { checkJs ->
                 if (checkJs.isNotBlank()) {
-                    val errResponse = Response.Builder()
-                        .request(Request.Builder().url("http://localhost").build())
-                        .protocol(okhttp3.Protocol.HTTP_1_1)
-                        .code(500)
-                        .message("Error Response")
-                        .body(e.stackTraceStr.toResponseBody(null))
-                        .build()
-                    analyzeUrl.evalJS(checkJs, errResponse) as StrResponse
+                    val errStrResponse = analyzeUrl.getErrStrResponse(e)
+                    analyzeUrl.evalJS(checkJs, errStrResponse) as StrResponse
                 }
             }
             throw e
@@ -141,14 +131,8 @@ object WebBook {
         } catch (e: Exception) {
             bookSource.loginCheckJs?.let { checkJs ->
                 if (checkJs.isNotBlank()) {
-                    val errResponse = Response.Builder()
-                        .request(Request.Builder().url("http://localhost").build())
-                        .protocol(okhttp3.Protocol.HTTP_1_1)
-                        .code(500)
-                        .message("Error Response")
-                        .body(e.stackTraceStr.toResponseBody(null))
-                        .build()
-                    analyzeUrl.evalJS(checkJs, errResponse) as StrResponse
+                    val errStrResponse = analyzeUrl.getErrStrResponse(e)
+                    analyzeUrl.evalJS(checkJs, errStrResponse) as StrResponse
                 }
             }
             throw e
@@ -214,14 +198,8 @@ object WebBook {
             } catch (e: Exception) {
                 bookSource.loginCheckJs?.let { checkJs ->
                     if (checkJs.isNotBlank()) {
-                        val errResponse = Response.Builder()
-                            .request(Request.Builder().url("http://localhost").build())
-                            .protocol(okhttp3.Protocol.HTTP_1_1)
-                            .code(500)
-                            .message("Error Response")
-                            .body(e.stackTraceStr.toResponseBody(null))
-                            .build()
-                        analyzeUrl.evalJS(checkJs, errResponse) as StrResponse
+                        val errStrResponse = analyzeUrl.getErrStrResponse(e)
+                        analyzeUrl.evalJS(checkJs, errStrResponse) as StrResponse
                     }
                 }
                 throw e
@@ -309,14 +287,8 @@ object WebBook {
                 } catch (e: Exception) {
                     bookSource.loginCheckJs?.let { checkJs ->
                         if (checkJs.isNotBlank()) {
-                            val errResponse = Response.Builder()
-                                .request(Request.Builder().url("http://localhost").build())
-                                .protocol(okhttp3.Protocol.HTTP_1_1)
-                                .code(500)
-                                .message("Error Response")
-                                .body(e.stackTraceStr.toResponseBody(null))
-                                .build()
-                            analyzeUrl.evalJS(checkJs, errResponse) as StrResponse
+                            val errStrResponse = analyzeUrl.getErrStrResponse(e)
+                            analyzeUrl.evalJS(checkJs, errStrResponse) as StrResponse
                         }
                     }
                     throw e
@@ -412,14 +384,8 @@ object WebBook {
             } catch (e: Exception) {
                 bookSource.loginCheckJs?.let { checkJs ->
                     if (checkJs.isNotBlank()) {
-                        val errResponse = Response.Builder()
-                            .request(Request.Builder().url("http://localhost").build())
-                            .protocol(okhttp3.Protocol.HTTP_1_1)
-                            .code(500)
-                            .message("Error Response")
-                            .body(e.stackTraceStr.toResponseBody(null))
-                            .build()
-                        analyzeUrl.evalJS(checkJs, errResponse) as StrResponse
+                        val errStrResponse = analyzeUrl.getErrStrResponse(e)
+                        analyzeUrl.evalJS(checkJs, errStrResponse) as StrResponse
                     }
                 }
                 throw e

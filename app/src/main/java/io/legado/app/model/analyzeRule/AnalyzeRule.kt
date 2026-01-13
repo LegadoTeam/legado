@@ -828,7 +828,7 @@ class AnalyzeRule(
             coroutineContext = coroutineContext
         )
         return kotlin.runCatching {
-            analyzeUrl.executeStrRequest().body
+            analyzeUrl.getStrResponse().body
         }.onFailure {
             coroutineContext.ensureActive()
             log("ajax(${urlStr}) error\n${it.stackTraceToString()}")

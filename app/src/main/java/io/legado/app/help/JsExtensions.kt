@@ -108,7 +108,7 @@ interface JsExtensions : JsEncodeUtils {
         }
         val analyzeUrl = AnalyzeUrl(urlStr, source = getSource(), callTimeout = callTimeout, coroutineContext = context)
         return kotlin.runCatching {
-            analyzeUrl.executeStrRequest().body
+            analyzeUrl.getStrResponse().body
         }.onFailure {
             rhinoContextOrNull?.ensureActive()
             AppLog.put("ajax(${urlStr}) error\n${it.localizedMessage}", it)
@@ -167,7 +167,7 @@ interface JsExtensions : JsEncodeUtils {
             coroutineContext = context
         )
         return kotlin.runCatching {
-            analyzeUrl.executeStrRequest()
+            analyzeUrl.getStrResponse()
         }.onFailure {
             rhinoContextOrNull?.ensureActive()
             AppLog.put("connect(${urlStr}) error\n${it.localizedMessage}", it)
@@ -190,7 +190,7 @@ interface JsExtensions : JsEncodeUtils {
             coroutineContext = context
         )
         return kotlin.runCatching {
-            analyzeUrl.executeStrRequest()
+            analyzeUrl.getStrResponse()
         }.onFailure {
             rhinoContextOrNull?.ensureActive()
             AppLog.put("connect($urlStr,$header) error\n${it.localizedMessage}", it)

@@ -49,12 +49,15 @@ import io.legado.app.utils.isJsonArray
 import io.legado.app.utils.isJsonObject
 import io.legado.app.utils.isXml
 import io.legado.app.utils.parseIpsFromString
+import io.legado.app.utils.stackTraceStr
 import kotlinx.coroutines.runBlocking
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okhttp3.Dns
+import okhttp3.Request
+import okhttp3.ResponseBody.Companion.toResponseBody
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.net.URLEncoder
@@ -188,9 +191,9 @@ class AnalyzeUrl(
             //替换所有内嵌{{js}}
             val url = analyze.innerRule("{{", "}}") {
                 val jsEval = evalJS(it) ?: ""
-                when {
-                    jsEval is String -> jsEval
-                    jsEval is Double && jsEval % 1.0 == 0.0 -> String.format("%.0f", jsEval)
+                when (jsEval) {
+                    is String -> jsEval
+                    is Double if jsEval % 1.0 == 0.0 -> String.format("%.0f", jsEval)
                     else -> jsEval.toString()
                 }
             }
@@ -518,7 +521,7 @@ class AnalyzeUrl(
     }
 
     @JvmOverloads
-    fun executeStrRequest(
+    fun getStrResponse(
         jsStr: String? = null,
         sourceRegex: String? = null,
         useWebView: Boolean = true,
@@ -557,6 +560,23 @@ class AnalyzeUrl(
             return response
         }
     }
+
+    /**
+     * 返回一个errResponse
+     */
+    fun getErrResponse(e: Exception): Response = Response.Builder()
+        .request(Request.Builder().url(url).build())
+        .protocol(okhttp3.Protocol.HTTP_1_1)
+        .code(500)
+        .message(e.message ?: "Error Response")
+        .body(e.stackTraceStr.toResponseBody(null))
+        .build()
+
+    /**
+     * 返回一个errStrResponse
+     */
+    fun getErrStrResponse(e: Exception): StrResponse =
+        StrResponse(getErrResponse(e), e.stackTraceStr)
 
     private fun getClient(): OkHttpClient {
         val client = getProxyClient(proxy)
