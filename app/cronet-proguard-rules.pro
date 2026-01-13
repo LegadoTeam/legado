@@ -127,6 +127,9 @@
     public <init>(android.content.Context);
 }
 
+# Fix for R8 missing class when NativeCronetProvider references HttpEngineNativeProvider.
+-keep class org.chromium.net.impl.HttpEngineNativeProvider { *; }
+
 # While Chrome doesn't need to keep these with their version of R8, some cronet
 # users may be on other optimizers which still require the annotation to be
 # kept in order for the keep rules to work.
