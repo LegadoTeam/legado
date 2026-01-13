@@ -246,6 +246,17 @@ dependencies {
     //网络
     implementation(libs.okhttp)
     implementation(fileTree(dir: 'cronetlib', include: ['*.jar', '*.aar']))
+
+    // HttpEngine provider (fixes R8 missing class: org.chromium.net.impl.HttpEngineNativeProvider)
+    def httpEngineNativeProviderVersion = project.findProperty("HttpEngineNativeProviderVersion") as String
+    if (httpEngineNativeProviderVersion) {
+        implementation("org.chromium.net:httpengine-native-provider:$httpEngineNativeProviderVersion") {
+            // Avoid pulling duplicate Cronet jars; this project bundles Cronet jars under app/cronetlib/
+            exclude group: "org.chromium.net", module: "cronet-common"
+            exclude group: "org.chromium.net", module: "cronet-shared"
+        }
+    }
+
     implementation(libs.protobuf.javalite)
 
     //Glide
