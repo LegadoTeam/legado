@@ -48,7 +48,9 @@ android {
     }
     defaultConfig {
         applicationId "com.legado.app"
-        minSdk 21
+        // httpengine-native-provider requires minSdkVersion >= 23
+        // (it declares minSdkVersion=23 in its own AndroidManifest.xml).
+        minSdk 23
         targetSdk 36
         versionCode 30000 + gitCommits
         versionName version
