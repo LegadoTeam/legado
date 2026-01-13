@@ -107,19 +107,31 @@ object CacheManager {
     }
 
     fun getInt(key: String): Int? {
-        return get(key)?.toIntOrNull()
+        getFromMemory(key)?.let {
+            if (it is Int) return it
+        }
+        return get(key, true)?.toIntOrNull()
     }
 
     fun getLong(key: String): Long? {
-        return get(key)?.toLongOrNull()
+        getFromMemory(key)?.let {
+            if (it is Long) return it
+        }
+        return get(key, true)?.toLongOrNull()
     }
 
     fun getDouble(key: String): Double? {
-        return get(key)?.toDoubleOrNull()
+        getFromMemory(key)?.let {
+            if (it is Double) return it
+        }
+        return get(key, true)?.toDoubleOrNull()
     }
 
     fun getFloat(key: String): Float? {
-        return get(key)?.toFloatOrNull()
+        getFromMemory(key)?.let {
+            if (it is Float) return it
+        }
+        return get(key, true)?.toFloatOrNull()
     }
 
     fun getByteArray(key: String): ByteArray? {
@@ -152,7 +164,7 @@ object WebCacheManager {
     }
     @JavascriptInterface
     fun getFromMemory(key: String): String? {
-        return memoryLruCache[key] as String?
+        return memoryLruCache[key] as? String
     }
     @JavascriptInterface
     fun deleteMemory(key: String) {

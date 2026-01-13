@@ -16,6 +16,7 @@ import io.legado.app.utils.toastOnUi
 class HttpTtsEditViewModel(app: Application) : BaseViewModel(app) {
 
     var id: Long? = null
+    var httpTTS: HttpTTS? = null
 
     fun initData(arguments: Bundle?, success: (httpTTS: HttpTTS) -> Unit) {
         execute {
@@ -23,7 +24,9 @@ class HttpTtsEditViewModel(app: Application) : BaseViewModel(app) {
                 val argumentId = arguments?.getLong("id")
                 if (argumentId != null && argumentId != 0L) {
                     id = argumentId
-                    return@execute appDb.httpTTSDao.get(argumentId)
+                    val source = appDb.httpTTSDao.get(argumentId)
+                    httpTTS = source
+                    return@execute source
                 }
             }
             return@execute null
@@ -36,6 +39,7 @@ class HttpTtsEditViewModel(app: Application) : BaseViewModel(app) {
 
     fun save(httpTTS: HttpTTS, success: (() -> Unit)? = null) {
         id = httpTTS.id
+        this.httpTTS = httpTTS
         execute {
             appDb.httpTTSDao.insert(httpTTS)
             concurrentRecordMap.remove(httpTTS.getKey()) //删除并发限制缓存

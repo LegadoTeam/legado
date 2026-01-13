@@ -13,9 +13,9 @@ import io.legado.app.utils.createFileReplace
 import io.legado.app.utils.externalCache
 import io.legado.app.utils.fromJsonArray
 import io.legado.app.utils.fromJsonObject
+import kotlinx.coroutines.currentCoroutineContext
 import splitties.init.appCtx
 import java.io.File
-import kotlin.coroutines.coroutineContext
 
 @Suppress("MemberVisibilityCanBePrivate")
 object DirectLinkUpload {
@@ -62,7 +62,7 @@ object DirectLinkUpload {
             mFile.delete()
         }
         val analyzeRule = AnalyzeRule().setContent(res.body, res.url)
-            .setCoroutineContext(coroutineContext)
+            .setCoroutineContext(currentCoroutineContext())
         val downloadUrl = analyzeRule.getString(downloadUrlRule)
         if (downloadUrl.isBlank()) {
             throw NoStackTraceException("上传失败,${res.body}")

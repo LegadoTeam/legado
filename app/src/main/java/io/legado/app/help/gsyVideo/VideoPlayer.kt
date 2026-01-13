@@ -385,8 +385,7 @@ class VideoPlayer: StandardGSYVideoPlayer {
             ChoiceEpisodeDialog.OnListItemClickListener {
             override fun onItemClick(position: Int) {
                 VideoPlay.chapterInVolumeIndex = position
-                VideoPlay.durChapterPos = 0
-                VideoPlay.saveRead()
+                VideoPlay.saveRead(0)
                 VideoPlay.startPlay(this@VideoPlayer)
             }
 
@@ -447,7 +446,6 @@ class VideoPlayer: StandardGSYVideoPlayer {
 
     override fun onError(what: Int, extra: Int) {
         super.onError(what, extra)
-        VideoPlay.durChapterPos = VideoPlay.videoManager.getCurrentPosition().toInt()
         VideoPlay.saveRead()
         mSeekOnStart = VideoPlay.durChapterPos.toLong()
     }

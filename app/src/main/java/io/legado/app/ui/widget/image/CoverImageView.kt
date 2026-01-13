@@ -340,7 +340,7 @@ class CoverImageView @JvmOverloads constructor(
                     override fun onResourceReady(
                         resource: Drawable,
                         model: Any,
-                        target: Target<Drawable?>?,
+                        target: Target<Drawable>?,
                         dataSource: DataSource,
                         isFirstResource: Boolean
                     ): Boolean {

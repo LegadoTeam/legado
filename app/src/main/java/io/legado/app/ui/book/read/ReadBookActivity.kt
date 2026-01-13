@@ -239,6 +239,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     override val pageFactory get() = binding.readView.pageFactory
     override val pageDelegate get() = binding.readView.pageDelegate
     override val headerHeight: Int get() = binding.readView.curPage.headerHeight
+    override val imgBgPaddingStart: Int get() = binding.readView.curPage.imgBgPaddingStart
     private val nextPageDebounce by lazy { Debounce { keyPage(PageDirection.NEXT) } }
     private val prevPageDebounce by lazy { Debounce { keyPage(PageDirection.PREV) } }
     private var bookChanged = false
@@ -1725,6 +1726,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                     9 -> readView.invalidateTextPage()
                     10 -> ChapterProvider.upLayout()
                     11 -> readView.submitRenderTask()
+                    12 -> readView.upPageTouchClick()
                 }
             }
         }

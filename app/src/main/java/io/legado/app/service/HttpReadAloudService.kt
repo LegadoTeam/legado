@@ -42,6 +42,7 @@ import io.legado.app.utils.FileUtils
 import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.printOnDebug
 import io.legado.app.utils.servicePendingIntent
+import io.legado.app.utils.stackTraceStr
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers.Main
@@ -54,7 +55,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import okhttp3.Request
 import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.mozilla.javascript.WrappedException
 import splitties.init.appCtx
 import java.io.File
@@ -335,9 +338,26 @@ class HttpReadAloudService : BaseReadAloudService(),
                     readTimeout = 300 * 1000L,
                     coroutineContext = currentCoroutineContext()
                 )
-                var response = analyzeUrl.getResponseAwait()
-                currentCoroutineContext().ensureActive()
                 val checkJs = httpTts.loginCheckJs
+                var response = try {
+                    analyzeUrl.getResponseAwait()
+                } catch (e: Exception) {
+                    currentCoroutineContext().ensureActive()
+                    if (checkJs?.isNotBlank() == true) {
+                        val errResponse = Response.Builder()
+                            .request(Request.Builder().url("http://localhost").build())
+                            .protocol(okhttp3.Protocol.HTTP_1_1)
+                            .code(500)
+                            .message("Error Response")
+                            .body(e.stackTraceStr.toResponseBody(null))
+                            .build()
+                        try {
+                            analyzeUrl.evalJS(checkJs, errResponse)
+                        } catch (_: Exception) { }
+                    }
+                    throw e
+                }
+                currentCoroutineContext().ensureActive()
                 if (checkJs?.isNotBlank() == true) {
                     response = analyzeUrl.evalJS(checkJs, response) as Response
                 }

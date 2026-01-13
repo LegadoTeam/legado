@@ -585,13 +585,13 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
 
     private fun upSelectedStart(x: Float, y: Float, top: Float) {
         callBack.run {
-            upSelectedStart(x, y + headerHeight, top + headerHeight)
+            upSelectedStart(x + imgBgPaddingStart, y + headerHeight, top + headerHeight)
         }
     }
 
     private fun upSelectedEnd(x: Float, y: Float) {
         callBack.run {
-            upSelectedEnd(x, y + headerHeight)
+            upSelectedEnd(x + imgBgPaddingStart, y + headerHeight)
         }
     }
 
@@ -735,6 +735,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
 
     interface CallBack {
         val headerHeight: Int
+        val imgBgPaddingStart: Int
         val pageFactory: TextPageFactory
         val pageDelegate: PageDelegate?
         val isScroll: Boolean

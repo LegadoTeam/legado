@@ -109,6 +109,8 @@ object WebViewPool {
             settings.apply {
                 javaScriptEnabled = false
                 javaScriptEnabled = true // 禁用再启用来重置js环境，清理注入的接口，注意需要禁用的订阅源需要再次执行
+                blockNetworkImage = false // 确保允许加载网络图片
+                cacheMode = WebSettings.LOAD_DEFAULT // 重置缓存模式
             }
             loadUrl(BLANK_HTML)
         } catch (e: Exception) {

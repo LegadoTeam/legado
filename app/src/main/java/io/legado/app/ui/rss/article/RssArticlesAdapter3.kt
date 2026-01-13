@@ -2,7 +2,7 @@ package io.legado.app.ui.rss.article
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.SharedPreferences
+import android.content.res.Configuration
 import android.view.ViewGroup
 import com.bumptech.glide.request.RequestOptions
 import io.legado.app.R
@@ -17,43 +17,44 @@ import com.bumptech.glide.load.DataSource
 import com.bumptech.glide.load.engine.GlideException
 import android.graphics.drawable.Drawable
 import androidx.collection.LruCache
-import com.bumptech.glide.request.target.ImageViewTarget
 import com.bumptech.glide.request.target.Target
-import androidx.core.content.edit
-import splitties.init.appCtx
+import io.legado.app.help.CacheManager
 
 class RssArticlesAdapter3(context: Context, callBack: CallBack) :
     BaseRssArticlesAdapter<ItemRssArticle3Binding>(context, callBack) {
 
     companion object {
-        private val imageHigh = LruCache<String, Int>(999)
-        private const val PREF_NAME = "rss_image_heights"
-        private val prefs: SharedPreferences by lazy {
-            appCtx.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-        }
-        private fun getImageHeight(url: String): Int {
-            var height = imageHigh[url] ?: 0
-            if (height == 0) {
-                if (prefs.contains(url)) {
-                    height = prefs.getInt(url, 0)
-                    if (height > 0) {
-                        imageHigh.put(url, height)
-                    }
-                }
+        private val imageAspectRatio = LruCache<String, Float>(399)
+        private const val KEY_NAME = "img_ar_"
+        private const val SAVE_TIME = 60 * 60 * 24 * 20 //20天
+        private fun getImageAspectRatio(url: String): Float {
+            imageAspectRatio[url]?.let {
+                return it
             }
-            return height
+            CacheManager.getFloat(KEY_NAME + url)?.let {
+                imageAspectRatio.put(url, it)
+                return it
+            }
+            return 0f
         }
-        private fun putImageHeight(url: String, height: Int) {
-            if (height <= 0) return
-            imageHigh.put(url, height)
-            prefs.edit { putInt(url, height) }
+        private fun putImageAspectRatio(url: String, aspectRatio: Float) {
+            if (aspectRatio <= 0f) return
+            imageAspectRatio.put(url, aspectRatio)
+            CacheManager.put(KEY_NAME + url, aspectRatio, SAVE_TIME)
         }
-        fun clearImageHeight() {
-            imageHigh.evictAll()
-            prefs.edit { clear() }
+        fun clearImageAspectRatio() {
+            imageAspectRatio.evictAll()
         }
     }
+
+    private val orientation = context.resources.configuration.orientation
+    private val columnCount = if (orientation ==Configuration.ORIENTATION_LANDSCAPE) 3 else 2
+    private var cardWidth = 0
     override fun getViewBinding(parent: ViewGroup): ItemRssArticle3Binding {
+        if (cardWidth == 0) {
+            val parentWith = parent.width
+            cardWidth = (parentWith - (columnCount + 1) * 40) / columnCount
+        }
         return ItemRssArticle3Binding.inflate(inflater, parent, false)
     }
 
@@ -90,18 +91,18 @@ class RssArticlesAdapter3(context: Context, callBack: CallBack) :
             }
             tvPubDate.text = item.pubDate
             val imageUrl = item.image
+            if (imageUrl.isNullOrEmpty()) {
+                return
+            }
             val options = RequestOptions()
                 .set(OkHttpModelLoader.sourceOriginOption, item.origin)
             val imageRequest = ImageLoader.load(context, imageUrl)
                 .apply(options)
                 .placeholder(R.drawable.transparent_placeholder) //svg图会依靠这个进行尺寸约束
-            if (imageUrl.isNullOrEmpty()) {
-                return
-            }
             val layoutParams = imageView.layoutParams
             layoutParams.width = ViewGroup.LayoutParams.MATCH_PARENT
-            val height = getImageHeight(imageUrl)
-            if (height == 0) {
+            val aspectRatio = getImageAspectRatio(imageUrl)
+            if (aspectRatio == 0f) {
                 layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT
                 imageRequest.addListener(object : RequestListener<Drawable> {
                     override fun onLoadFailed(
@@ -123,15 +124,13 @@ class RssArticlesAdapter3(context: Context, callBack: CallBack) :
                         val height = resource.intrinsicHeight
                         if (width > 0 && height > 0) {
                             val aspectRatio = height.toFloat() / width.toFloat()
-                            if (target is ImageViewTarget) {
-                                putImageHeight(imageUrl, (target.view.width * aspectRatio).toInt())
-                            }
+                            putImageAspectRatio(imageUrl, aspectRatio)
                         }
                         return false
                     }
                 })
             } else {
-                layoutParams.height = height
+                layoutParams.height = (cardWidth * aspectRatio).toInt()
             }
             imageView.layoutParams = layoutParams
             imageView.adjustViewBounds = true //自动调整ImageView的边界来适应图片的宽高比

@@ -141,24 +141,25 @@ java.getWebViewUA(): String
 ```
 * 网络请求
 ```js
-java.ajax(urlStr): String
-java.ajax(urlStr, callTimeout): String
-java.ajaxAll(urlList: Array<String>): Array<StrResponse>
-java.ajaxTestAll(urlList: Array<String>, timeout: Int): Array<StrResponse> //仅支持get连接
-//仅ajaxTestAll支持callTime()获取响应时间，对应的错误码值（-1超过设定时间，-2超时，-3域名错误，-4连接被拒绝，-5连接被重置，-6SSL证书错误，-7其它错误）
-//返回StrResponse 方法body() code() message() headers() raw() toString() 
-java.connect(urlStr): StrResponse
-java.connect(urlStr, header): StrResponse
-java.connect(urlStr, header, callTimeout): StrResponse
+//带有默认值的参数可不填
 
-java.post(url: String, body: String, headerMap: Map<String, String>): Connection.Response
-java.post(url: String, body: String, headerMap: Map<String, String>, timeout: Int?): Connection.Response
+java.ajax(urlStr, callTimeout: Int? = null): String
 
-java.get(url: String, headerMap: Map<String, String>): Connection.Response
-java.get(url: String, headerMap: Map<String, String>, timeout: Int?): Connection.Response
+* 并发访问网络
+* @param skipRateLimit 为true时不受源并发率限制
+java.ajaxAll(urlList: Array<String>, skipRateLimit: Boolean = false): Array<StrResponse>
 
-java.head(url: String, headerMap: Map<String, String>): Connection.Response
-java.head(url: String, headerMap: Map<String, String>, timeout: Int?): Connection.Response
+//ajaxTestAll会忽略网络访问错误，错误类型由callTime()获取，对应的错误码值（-1超过设定时间，-2超时，-3域名错误，-4连接被拒绝，-5连接被重置，-6SSL证书错误，-7其它错误），无错误时callTime()为响应时间
+java.ajaxTestAll(urlList: Array<String>, timeout: Int, skipRateLimit: Boolean = false): Array<StrResponse>
+
+java.connect(urlStr, header = null, callTimeout: Int? = null): StrResponse
+//返回的StrResponse对象具有的方法 body() code() message() headers() raw() toString() callTime()
+
+java.post(url: String, body: String, headerMap: Map<String, String>, timeout: Int? = null): Connection.Response
+
+java.get(url: String, headerMap: Map<String, String>, timeout: Int? = null): Connection.Response
+
+java.head(url: String, headerMap: Map<String, String>, timeout: Int? = null): Connection.Response
 
 * 使用webView访问网络
 * @param html 直接用webView载入的html, 如果html为空直接访问url
@@ -166,32 +167,23 @@ java.head(url: String, headerMap: Map<String, String>, timeout: Int?): Connectio
 * @param js 用来取返回值的js语句, 没有就返回整个源代码
 * @param cacheFirst 优先使用缓存,为true能提高访问速度
 * @return 返回js获取的内容
-java.webView(html: String?, url: String?, js: String?): String?
-java.webView(html: String?, url: String?, js: String?, cacheFirst: Boolean): String?
+java.webView(html: String?, url: String?, js: String?, cacheFirst: Boolean = false): String?
 
 * 使用webView获取跳转url
-java.webViewGetOverrideUrl(html: String?, url: String?, js: String?, overrideUrlRegex: String): String?
-java.webViewGetOverrideUrl(html: String?, url: String?, js: String?, overrideUrlRegex: String, cacheFirst: Boolean): String?
+java.webViewGetOverrideUrl(html: String?, url: String?, js: String?, overrideUrlRegex: String, cacheFirst: Boolean = false): String?
 
 * 使用webView获取资源url
-java.webViewGetSource(html: String?, url: String?, js: String?, sourceRegex: String): String?
-java.webViewGetOverrideUrl(html: String?, url: String?, js: String?, overrideUrlRegex: String, cacheFirst: Boolean): String?
+java.webViewGetOverrideUrl(html: String?, url: String?, js: String?, overrideUrlRegex: String, cacheFirst: Boolean = false): String?
 
 * 使用内置浏览器打开链接，可用于获取验证码 手动验证网站防爬
 * @param url 要打开的链接
 * @param title 浏览器的标题
 * @param html 本地html代码
-java.startBrowser(url: String, title: String)
-
-java.startBrowser(url: String, title: String, html: String?)
+java.startBrowser(url: String, title: String, html: String? = null)
 
 * 使用内置浏览器打开链接，并等待网页结果 .body()获取网页内容
 * @param refetchAfterSuccess 为false时获取最终展示界面的源码
-java.startBrowserAwait(url: String, title: String): StrResponse
-
-java.startBrowserAwait(url: String, title: String, refetchAfterSuccess: Boolean): StrResponse
-
-java.startBrowserAwait(url: String, title: String, refetchAfterSuccess: Boolean, html: String?): StrResponse
+java.startBrowserAwait(url: String, title: String, refetchAfterSuccess: Boolean = false, html: String? = null): StrResponse
 ```
 * 调试
 ```js

@@ -10,7 +10,6 @@ import android.widget.EditText
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.widget.Toolbar
 import androidx.fragment.app.viewModels
-import com.google.android.material.textfield.TextInputLayout
 import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.data.entities.HttpTTS
@@ -134,6 +133,7 @@ class HttpTtsEditDialog() : BaseDialogFragment(R.layout.dialog_http_tts_edit, tr
         when (item?.itemId) {
             R.id.menu_fullscreen_edit -> onFullEditClicked()
             R.id.menu_save -> viewModel.save(dataFromView()) {
+                dismissAllowingStateLoss()
                 toastOnUi("保存成功")
             }
             R.id.menu_login -> dataFromView().let { httpTts ->
@@ -180,6 +180,25 @@ class HttpTtsEditDialog() : BaseDialogFragment(R.layout.dialog_http_tts_edit, tr
             header = binding.tvHeaders.text?.toString(),
             jsLib = binding.tvJsLib.text?.toString()
         )
+    }
+
+    private fun isSame(): Boolean{
+        val httpTTS = viewModel.httpTTS ?: return binding.tvName.text.toString().isEmpty()
+        return dataFromView().equal(httpTTS)
+    }
+
+    override fun dismiss() {
+        if (!isSame()) {
+            alert(R.string.exit) {
+                setMessage(R.string.exit_no_save)
+                positiveButton(R.string.yes)
+                negativeButton(R.string.no) {
+                    super.dismiss()
+                }
+            }
+        } else {
+            super.dismiss()
+        }
     }
 
 }

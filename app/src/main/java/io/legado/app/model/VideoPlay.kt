@@ -25,6 +25,7 @@ import io.legado.app.data.entities.RssReadRecord
 import io.legado.app.data.entities.RssSource
 import io.legado.app.data.entities.RssStar
 import io.legado.app.exception.ContentEmptyException
+import io.legado.app.help.CacheManager
 import io.legado.app.help.book.getDanmaku
 import io.legado.app.help.book.update
 import io.legado.app.help.coroutine.Coroutine
@@ -51,8 +52,10 @@ import splitties.init.appCtx
 import java.io.File
 
 object VideoPlay : CoroutineScope by MainScope(){
+    private const val VIDEO_POS_NAME = "video_pos_" //单链接播放进度
+    private const val VIDEO_POS_SAVE_TIME = 60 * 60 * 24 * 20 //20天
     private var needClearTemp = true //需要清理缓存
-    const val VIDEO_TEMP_PATH = "video_temp"
+    private const val VIDEO_TEMP_PATH = "video_temp"
     private val videoTempFile by lazy { File(FileUtils.getCachePath(), VIDEO_TEMP_PATH) }
 
     const val VIDEO_PREF_NAME = "video_config"
@@ -126,23 +129,27 @@ object VideoPlay : CoroutineScope by MainScope(){
         danmakuStr = null
         danmakuFile = null
         val player = player.getCurrentPlayer()
-        durChapterPos.takeIf { it > 0 }?.toLong()?.let { player.seekOnStart = it }
         if (singleUrl) {
-            if (videoUrl == null) return
+            val mUrl = videoUrl ?: return
+            CacheManager.getLong(VIDEO_POS_NAME + mUrl)?.let {
+                player.seekOnStart = it
+            }
             inBookshelf = true
             val analyzeUrl = AnalyzeUrl(
-                videoUrl!!,
+                mUrl,
                 source = source,
                 ruleData = book,
                 chapter = null
             )
             player.mapHeadData = analyzeUrl.headerMap
-            player.setUp(analyzeUrl.url, false, File(appCtx.externalCache, "exoplayer"), videoTitle)
+            val url = analyzeUrl.url
+            player.setUp(url, false, File(appCtx.externalCache, "exoplayer"), videoTitle)
             if (autoPlay) {
                 player.startPlayLogic()
             }
             return
         }
+        durChapterPos.takeIf { it > 0 }?.toLong()?.let { player.seekOnStart = it }
         (source as? RssSource)?.let { s ->
             val rssArticle = rssStar?.toRssArticle() ?: rssRecord?.toRssArticle()
             if (rssArticle == null) {
@@ -151,9 +158,10 @@ object VideoPlay : CoroutineScope by MainScope(){
             }
             val ruleContent = s.ruleContent
             if (ruleContent.isNullOrBlank()) {
-                videoUrl = rssArticle.link
+                val mUrl = rssArticle.link
+                videoUrl = mUrl
                 val analyzeUrl = AnalyzeUrl(
-                    videoUrl!!,
+                    mUrl,
                     source = source,
                     ruleData = rssArticle
                 )
@@ -166,7 +174,7 @@ object VideoPlay : CoroutineScope by MainScope(){
                 Rss.getContent(this, rssArticle, ruleContent, s)
                     .onSuccess(IO) { content ->
                         val content = content.trim()
-                        videoUrl = if (content.isEmpty()) {
+                        val mUrl = if (content.isEmpty()) {
                             throw ContentEmptyException("正文为空")
                         } else if (content.startsWith("<")) { //当作mpd文本
                             val name = MD5Utils.md5Encode(content) + ".mpd"
@@ -176,8 +184,9 @@ object VideoPlay : CoroutineScope by MainScope(){
                         } else {
                             NetworkUtils.getAbsoluteURL(rssArticle.link, content)
                         }
+                        videoUrl = mUrl
                         val analyzeUrl = AnalyzeUrl(
-                            videoUrl!!,
+                            mUrl,
                             source = source,
                             ruleData = rssArticle
                         )
@@ -202,9 +211,10 @@ object VideoPlay : CoroutineScope by MainScope(){
         }
         chapter = if (episodes.isNullOrEmpty()) {
             //没有卷目录，那么卷就是播放的章节（适合电影类，没有剧集，全是线路卷章节，如果全是章节没有卷的写法，播放完后会继续下一个线路重复播放）
+            val durVolume = durVolume
             when {
                 durVolume == null -> null
-                durVolume!!.url.startsWith(durVolume!!.title) -> null //卷章节没获取到链接（链接以标题开头）则返回null
+                durVolume.url.startsWith(durVolume.title) -> null //卷章节没获取到链接（链接以标题开头）则返回null
                 else -> durVolume
             }
         } else {
@@ -222,7 +232,7 @@ object VideoPlay : CoroutineScope by MainScope(){
         WebBook.getContent(this, source as BookSource, book, chapter)
             .onSuccess(IO) { content ->
                 val content = content.trim()
-                videoUrl = if (content.isEmpty()) {
+                val mUrl = if (content.isEmpty()) {
                     throw ContentEmptyException("正文为空")
                 } else if (content.startsWith("<")) { //当作mpd文本
                     val name = MD5Utils.md5Encode(content) + ".mpd"
@@ -232,8 +242,9 @@ object VideoPlay : CoroutineScope by MainScope(){
                 } else {
                     content
                 }
+                videoUrl = mUrl
                 val analyzeUrl = AnalyzeUrl(
-                    videoUrl!!,
+                    mUrl,
                     source = source,
                     ruleData = book,
                     chapter = chapter
@@ -396,7 +407,8 @@ object VideoPlay : CoroutineScope by MainScope(){
             return false
         }
         record?.let{ //订阅源
-            rssStar =appDb.rssStarDao.get(sourceKey!!, it)?.also{ r ->
+            val sourceKey = sourceKey ?: return@let
+            rssStar =appDb.rssStarDao.get(sourceKey, it)?.also{ r ->
                 durChapterPos = r.durPos
             }
             if (rssStar == null) {
@@ -409,40 +421,54 @@ object VideoPlay : CoroutineScope by MainScope(){
     }
 
     fun upEpisodes() {
+        val volumes = volumes
         if (volumes.isEmpty()) {
             durVolume = null
             episodes = toc
             return
         }
+        val toc = toc ?: return
         durVolume = volumes.getOrNull(durVolumeIndex)
         if (durVolume == null) {
             durVolumeIndex = 0
             durVolume = volumes.getOrNull(durVolumeIndex)
         }
         val startInt = durVolume?.index ?: 0
-        val endInt = volumes.getOrNull(durVolumeIndex + 1)?.index ?: toc!!.size
-        episodes = toc!!.subList(startInt + 1, endInt)
+        val endInt = volumes.getOrNull(durVolumeIndex + 1)?.index ?: toc.size
+        episodes = toc.subList(startInt + 1, endInt)
     }
 
     fun upDurIndex(offset: Int, player: StandardGSYVideoPlayer): Boolean {
-        episodes ?: return false
+        val episodes = episodes ?: return false
         val index = chapterInVolumeIndex + offset
-        if (index < 0 || index >= episodes!!.size) {
+        if (index < 0 || index >= episodes.size) {
             appCtx.toastOnUi("已播放完")
             return false
         }
         chapterInVolumeIndex = index
-        durChapterPos = 0
-        saveRead()
+        saveRead(0)
         startPlay(player)
         postEvent(EventBus.UP_VIDEO_INFO, arrayListOf(1)) //更新选集视图
         return true
     }
 
-    fun saveRead() {
+    fun saveRead(durPos: Int? = null) {
+        val book = book
+        val rssStar = rssStar
+        val rssRecord = rssRecord
+        val durPos = durPos ?: videoManager.currentPosition.toInt()
+        durChapterPos = durPos
         if (book == null && rssStar == null && rssRecord == null) {
+            videoUrl?.let { videoUrl ->
+                CacheManager.put(VIDEO_POS_NAME + videoUrl, durPos, VIDEO_POS_SAVE_TIME)
+            }
             return
         }
+        val durVolumeIndex = durVolumeIndex
+        val chapterInVolumeIndex = chapterInVolumeIndex
+        val source = source
+        val volumes = volumes
+        val durVolume = durVolume
         Coroutine.async {
             book?.let { book ->
                 book.lastCheckCount = 0
@@ -452,7 +478,7 @@ object VideoPlay : CoroutineScope by MainScope(){
                 val durChapterIndex = if (volumes.isEmpty()) chapterInVolumeIndex else
                     (durVolume?.index ?: 0) + chapterInVolumeIndex + 1
                 book.durChapterIndex = durChapterIndex
-                book.durChapterPos = durChapterPos
+                book.durChapterPos = durPos
                 val chapter = toc?.getOrNull(durChapterIndex)
                 videoTitle = chapter?.title
                 book.durChapterTitle = chapter?.title
@@ -460,12 +486,12 @@ object VideoPlay : CoroutineScope by MainScope(){
                 book.update()
             }
             rssStar?.let {
-                it.durPos = durChapterPos
+                it.durPos = durPos
                 videoTitle = it.title
                 appDb.rssStarDao.update(it)
             }
             rssRecord?.let {
-                it.durPos = durChapterPos
+                it.durPos = durPos
                 videoTitle = it.title
                 appDb.rssReadRecordDao.update(it)
             }
