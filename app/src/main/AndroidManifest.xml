@@ -2,6 +2,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!--
+      httpengine-native-provider declares minSdkVersion=23 in its own manifest.
+      This project keeps minSdkVersion=21, so we explicitly override the library
+      requirement to allow manifest merging.
+
+      IMPORTANT: This only affects manifest merging. If Cronet/HttpEngine is
+      actually used on API 21/22 devices, runtime failures are possible.
+    -->
+    <uses-sdk tools:overrideLibrary="org.chromium.net.httpengine_native_provider" />
+
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
