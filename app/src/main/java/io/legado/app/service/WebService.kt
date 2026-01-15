@@ -32,6 +32,8 @@ import splitties.init.appCtx
 import splitties.systemservices.powerManager
 import splitties.systemservices.wifiManager
 import java.io.IOException
+// 【新增引用】保存配置需要
+import io.legado.app.utils.putPrefBoolean
 
 class WebService : BaseService() {
 
@@ -40,6 +42,8 @@ class WebService : BaseService() {
         var hostAddress = ""
 
         fun start(context: Context) {
+            // 【修改点1】启动时记录状态为 true (开启)
+            appCtx.putPrefBoolean("web_service_auto", true)
             context.startService<WebService>()
         }
 
@@ -49,6 +53,8 @@ class WebService : BaseService() {
         }
 
         fun stop(context: Context) {
+            // 【修改点2】停止时记录状态为 false (关闭)
+            appCtx.putPrefBoolean("web_service_auto", false)
             context.stopService<WebService>()
         }
 
@@ -114,7 +120,11 @@ class WebService : BaseService() {
     @SuppressLint("WakelockTimeout")
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            IntentAction.stop -> stopSelf()
+            IntentAction.stop -> {
+                // 【修改点3】点击通知栏停止按钮时，也要记录状态为 false
+                appCtx.putPrefBoolean("web_service_auto", false)
+                stopSelf()
+            }
             "copyHostAddress" -> sendToClip(hostAddress)
             "serve" -> if (useWakeLock) {
                 wakeLock.acquire()
