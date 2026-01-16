@@ -86,22 +86,15 @@ class ReadAloudConfigDialog : BasePrefDialogFragment() {
                 it.isEnabled = AppConfig.ignoreAudioFocus
             }
 
-            // 自动更新“听书预加载数量”和“缓存保留时间”的显示
             bindSummaryToValue("audioPreDownloadNum", "10")
             bindSummaryToValue("audioCacheCleanTime", "10")
         }
 
-        /**
-         * 辅助方法：将设置的值绑定到 Summary 显示
-         */
         private fun bindSummaryToValue(key: String, defaultVal: String) {
             val pref = findPreference<EditTextPreference>(key)
             pref?.let {
-                // 1. 初始化显示
                 val currentVal = preferenceManager.sharedPreferences?.getString(key, defaultVal)
                 it.summary = currentVal
-                
-                // 2. 监听变化
                 it.setOnPreferenceChangeListener { _, newValue ->
                     it.summary = newValue.toString()
                     true
@@ -126,11 +119,19 @@ class ReadAloudConfigDialog : BasePrefDialogFragment() {
 
         override fun onPreferenceTreeClick(preference: Preference): Boolean {
             when (preference.key) {
-                PreferKey.ttsEngine -> showDialogFragment(SpeakEngineDialog())
-                "sysTtsConfig" -> IntentHelp.openTTSSetting()
-                
-                // 【核心新增】背景音乐设置点击逻辑
-                "bgmSetting" -> showDialogFragment(BgmConfigDialog())
+                PreferKey.ttsEngine -> {
+                    showDialogFragment(SpeakEngineDialog())
+                    return true
+                }
+                "sysTtsConfig" -> {
+                    IntentHelp.openTTSSetting()
+                    return true
+                }
+                // 【关键修复】BGM 设置点击跳转并返回 true
+                "bgmSetting" -> {
+                    showDialogFragment(BgmConfigDialog())
+                    return true
+                }
             }
             return super.onPreferenceTreeClick(preference)
         }
@@ -160,7 +161,6 @@ class ReadAloudConfigDialog : BasePrefDialogFragment() {
                     val index = preference.findIndexOfValue(value)
                     preference.summary = if (index >= 0) preference.entries[index] else null
                 }
-
                 else -> {
                     preference?.summary = value
                 }
