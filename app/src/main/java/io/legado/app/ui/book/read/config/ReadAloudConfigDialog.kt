@@ -30,8 +30,6 @@ import io.legado.app.utils.postEvent
 import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.showDialogFragment
-// 【新增引用】
-import io.legado.app.utils.toastOnUi
 
 class ReadAloudConfigDialog : BasePrefDialogFragment() {
     private val readAloudPreferTag = "readAloudPreferTag"
@@ -88,18 +86,25 @@ class ReadAloudConfigDialog : BasePrefDialogFragment() {
                 it.isEnabled = AppConfig.ignoreAudioFocus
             }
 
-            // 【新增逻辑】让“预加载数量”和“缓存时间”显示当前数值
-            listOf("audioPreDownloadNum", "audioCacheCleanTime").forEach { key ->
-                val pref = findPreference<EditTextPreference>(key)
-                pref?.let {
-                    // 初始化显示：如果为空则显示默认值 "10"
-                    val currentVal = preferenceManager.sharedPreferences?.getString(key, "10")
-                    it.summary = currentVal
-                    // 监听变化：修改后立即更新显示
-                    it.setOnPreferenceChangeListener { p, newValue ->
-                        p.summary = newValue.toString()
-                        true
-                    }
+            // 自动更新“听书预加载数量”和“缓存保留时间”的显示
+            bindSummaryToValue("audioPreDownloadNum", "10")
+            bindSummaryToValue("audioCacheCleanTime", "10")
+        }
+
+        /**
+         * 辅助方法：将设置的值绑定到 Summary 显示
+         */
+        private fun bindSummaryToValue(key: String, defaultVal: String) {
+            val pref = findPreference<EditTextPreference>(key)
+            pref?.let {
+                // 1. 初始化显示
+                val currentVal = preferenceManager.sharedPreferences?.getString(key, defaultVal)
+                it.summary = currentVal
+                
+                // 2. 监听变化
+                it.setOnPreferenceChangeListener { _, newValue ->
+                    it.summary = newValue.toString()
+                    true
                 }
             }
         }
@@ -123,12 +128,7 @@ class ReadAloudConfigDialog : BasePrefDialogFragment() {
             when (preference.key) {
                 PreferKey.ttsEngine -> showDialogFragment(SpeakEngineDialog())
                 "sysTtsConfig" -> IntentHelp.openTTSSetting()
-                // 【新增逻辑】拦截清理缓存按钮点击
-                "clear_cache" -> {
-                    AppConfig.clearTtsCache()
-                    toastOnUi("音频缓存已清理")
-                    return true
-                }
+                // 【已删除】移除了多余的 clear_cache 判断
             }
             return super.onPreferenceTreeClick(preference)
         }
