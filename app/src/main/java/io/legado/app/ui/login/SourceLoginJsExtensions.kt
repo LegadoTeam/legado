@@ -17,16 +17,26 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 class SourceLoginJsExtensions(
-    private val activity: AppCompatActivity, source: BaseSource?,
+    activity: AppCompatActivity?, source: BaseSource?,
     private val callback: Callback? = null
 ) : RssJsExtensions(activity, source) {
 
     interface Callback {
         fun upUiData(data: Map<String, String?>?)
+        fun reUiView()
+        fun reExploreView()
     }
 
     fun upLoginData(data: Map<String, String?>?) {
         callback?.upUiData(data)
+    }
+
+    fun reLoginView() {
+        callback?.reUiView()
+    }
+
+    fun refreshExplore() {
+        callback?.reExploreView()
     }
 
     fun refreshBookInfo() {
@@ -34,7 +44,7 @@ class SourceLoginJsExtensions(
     }
 
     fun copyText(text: String) {
-        activity.sendToClip(text)
+        activityRef.get()?.sendToClip(text)
     }
 
     fun clearTtsCache() {

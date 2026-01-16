@@ -49,21 +49,29 @@ object Rss {
             coroutineContext = currentCoroutineContext(),
             hasLoginHeader = false
         )
-        var res = try {
-            analyzeUrl.getStrResponseAwait()
-        } catch (e: Exception) {
-            rssSource.loginCheckJs?.let { checkJs ->
-                if (checkJs.isNotBlank()) {
-                    val errStrResponse = analyzeUrl.getErrStrResponse(e)
-                    analyzeUrl.evalJS(checkJs, errStrResponse) as StrResponse
+        val checkJs = rssSource.loginCheckJs
+        val res = kotlin.runCatching {
+            analyzeUrl.getStrResponseAwait().let {
+                if (!checkJs.isNullOrBlank()) { //检测源是否已登录
+                    analyzeUrl.evalJS(checkJs, it) as StrResponse
+                } else {
+                    it
                 }
             }
-            throw e
-        }
-        //检测源是否已登录
-        rssSource.loginCheckJs?.let { checkJs ->
-            if (checkJs.isNotBlank()) {
-                res = analyzeUrl.evalJS(checkJs, res) as StrResponse
+        }.getOrElse { throwable ->
+            if (!checkJs.isNullOrBlank()) {
+                val errResponse = analyzeUrl.getErrStrResponse(throwable)
+                try {
+                    (analyzeUrl.evalJS(checkJs, errResponse) as StrResponse).also {
+                        if (it.code() == 500) {
+                            throw throwable
+                        }
+                    }
+                } catch (_: Throwable) {
+                    throw throwable
+                }
+            } else {
+                throw throwable
             }
         }
         checkRedirect(rssSource, res)
@@ -95,21 +103,29 @@ object Rss {
             coroutineContext = currentCoroutineContext(),
             hasLoginHeader = false
         )
-        var res = try {
-            analyzeUrl.getStrResponseAwait()
-        } catch (e: Exception) {
-            rssSource.loginCheckJs?.let { checkJs ->
-                if (checkJs.isNotBlank()) {
-                    val errStrResponse = analyzeUrl.getErrStrResponse(e)
-                    analyzeUrl.evalJS(checkJs, errStrResponse) as StrResponse
+        val checkJs = rssSource.loginCheckJs
+        val res = kotlin.runCatching {
+            analyzeUrl.getStrResponseAwait().let {
+                if (!checkJs.isNullOrBlank()) { //检测源是否已登录
+                    analyzeUrl.evalJS(checkJs, it) as StrResponse
+                } else {
+                    it
                 }
             }
-            throw e
-        }
-        //检测源是否已登录
-        rssSource.loginCheckJs?.let { checkJs ->
-            if (checkJs.isNotBlank()) {
-                res = analyzeUrl.evalJS(checkJs, res) as StrResponse
+        }.getOrElse { throwable ->
+            if (!checkJs.isNullOrBlank()) {
+                val errResponse = analyzeUrl.getErrStrResponse(throwable)
+                try {
+                    (analyzeUrl.evalJS(checkJs, errResponse) as StrResponse).also {
+                        if (it.code() == 500) {
+                            throw throwable
+                        }
+                    }
+                } catch (_: Throwable) {
+                    throw throwable
+                }
+            } else {
+                throw throwable
             }
         }
         checkRedirect(rssSource, res)

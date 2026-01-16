@@ -12,10 +12,12 @@ import io.legado.app.help.JsExtensions
 import io.legado.app.ui.association.AddToBookshelfDialog
 import io.legado.app.ui.book.explore.ExploreShowActivity
 import io.legado.app.ui.book.search.SearchActivity
+import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.rss.article.RssSortActivity
 import io.legado.app.utils.isJsonObject
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.startActivity
+import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.launch
@@ -25,7 +27,7 @@ import java.lang.ref.WeakReference
 
 
 @Suppress("unused")
-open class RssJsExtensions(activity: AppCompatActivity, source: BaseSource?) : JsExtensions {
+open class RssJsExtensions(activity: AppCompatActivity?, source: BaseSource?) : JsExtensions {
 
     val activityRef: WeakReference<AppCompatActivity> = WeakReference(activity)
     val sourceRef: WeakReference<BaseSource?> = WeakReference(source)
@@ -63,20 +65,45 @@ open class RssJsExtensions(activity: AppCompatActivity, source: BaseSource?) : J
     }
 
     @JavascriptInterface
-    fun open(name: String, url: String) {
-        return open(name, url, null)
-    }
-
-    @JavascriptInterface
-    fun open(name: String, url: String?, title: String?) {
-        return open(name, url, title, null)
-    }
-
-    @JavascriptInterface
-    fun open(name: String, url: String?, title: String?, origin: String?) {
-        activityRef.get()?.lifecycleScope?.launch(IO) {
+    @JvmOverloads
+    fun open(name: String, url: String? = null, title: String? = null, origin: String? = null) {
+        val activity = activityRef.get() ?: return
+        activity.lifecycleScope.launch(IO) {
             val source = getSource() ?: return@launch
             when (name) {
+                "login" -> {
+                    if (activity is SourceLoginActivity) {
+                        activity.toastOnUi("已在登录界面")
+                        return@launch
+                    }
+                    val toSource = origin?.let { o ->
+                        appDb.bookSourceDao.getBookSource(o)
+                    } ?: source
+                    if (toSource.loginUrl.isNullOrBlank()) {
+                        activity.toastOnUi("源未配置登录")
+                        return@launch
+                    }
+                    when (toSource) {
+                        is BookSource -> {
+                            withContext(Main) {
+                                activity.startActivity<SourceLoginActivity> {
+                                    putExtra("type", "bookSource")
+                                    putExtra("key", toSource.bookSourceUrl)
+                                }
+                            }
+                        }
+
+                        is RssSource -> {
+                            withContext(Main) {
+                                activity.startActivity<SourceLoginActivity> {
+                                    putExtra("type", "rssSource")
+                                    putExtra("key", toSource.sourceUrl)
+                                }
+                            }
+                        }
+                    }
+                }
+
                 "sort" -> {
                     val toSource = origin?.let { o ->
                         appDb.rssSourceDao.getByKey(o)
@@ -90,9 +117,7 @@ open class RssJsExtensions(activity: AppCompatActivity, source: BaseSource?) : J
                     }
                     val sourceUrl = toSource.sourceUrl
                     withContext(Main) {
-                        activityRef.get()?.let {
-                            RssSortActivity.start(it, sortUrl, sourceUrl)
-                        }
+                        RssSortActivity.start(activity, sortUrl, sourceUrl)
                     }
                 }
 
@@ -112,9 +137,7 @@ open class RssJsExtensions(activity: AppCompatActivity, source: BaseSource?) : J
                     )
                     appDb.rssReadRecordDao.insertRecord(rssReadRecord) //留下历史记录
                     withContext(Main) {
-                        activityRef.get()?.let {
-                            ReadRssActivity.start(it, title, url, sourceUrl)
-                        }
+                        ReadRssActivity.start(activity, title, url, sourceUrl)
                     }
                 }
 
@@ -137,12 +160,10 @@ open class RssJsExtensions(activity: AppCompatActivity, source: BaseSource?) : J
                     } ?: (source as? BookSource) ?: return@launch
                     val sourceUrl = toSource.bookSourceUrl
                     withContext(Main) {
-                        activityRef.get()?.run {
-                            startActivity<ExploreShowActivity> {
-                                putExtra("exploreName", title)
-                                putExtra("sourceUrl", sourceUrl)
-                                putExtra("exploreUrl", url)
-                            }
+                        activity.startActivity<ExploreShowActivity> {
+                            putExtra("exploreName", title)
+                            putExtra("sourceUrl", sourceUrl)
+                            putExtra("exploreUrl", url)
                         }
                     }
                 }

@@ -2,15 +2,18 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
+    android:layout_margin="3dp"
+    android:background="@drawable/selector_fillet_btn_bg"
     android:orientation="horizontal"
-    android:padding="4dp">
+    android:paddingLeft="12dp"
+    android:paddingRight="12dp">
 
     <io.legado.app.ui.widget.text.AccentTextView
         android:id="@+id/sp_name"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:padding="3dp"
-        android:text="@string/book_type" />
+        android:text="@string/book_type"
+        android:textSize="14sp" />
 
     <androidx.appcompat.widget.AppCompatSpinner
         android:id="@+id/sp_type"

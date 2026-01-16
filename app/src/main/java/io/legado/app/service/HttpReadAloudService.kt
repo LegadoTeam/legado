@@ -336,21 +336,31 @@ class HttpReadAloudService : BaseReadAloudService(),
                     coroutineContext = currentCoroutineContext()
                 )
                 val checkJs = httpTts.loginCheckJs
-                var response = try {
-                    analyzeUrl.getResponseAwait()
-                } catch (e: Exception) {
-                    currentCoroutineContext().ensureActive()
-                    if (checkJs?.isNotBlank() == true) {
-                        val errResponse = analyzeUrl.getErrResponse(e)
-                        try {
-                            analyzeUrl.evalJS(checkJs, errResponse)
-                        } catch (_: Exception) { }
+                val response = kotlin.runCatching {
+                    analyzeUrl.getResponseAwait().let {
+                        currentCoroutineContext().ensureActive()
+                        if (!checkJs.isNullOrBlank()) {
+                            analyzeUrl.evalJS(checkJs, it) as Response
+                        } else {
+                            it
+                        }
                     }
-                    throw e
-                }
-                currentCoroutineContext().ensureActive()
-                if (checkJs?.isNotBlank() == true) {
-                    response = analyzeUrl.evalJS(checkJs, response) as Response
+                }.getOrElse { throwable ->
+                    currentCoroutineContext().ensureActive()
+                    if (!checkJs.isNullOrBlank()) {
+                        val errResponse = analyzeUrl.getErrResponse(throwable)
+                        try {
+                            (analyzeUrl.evalJS(checkJs, errResponse) as Response).also {
+                                if (it.code == 500) {
+                                    throw throwable
+                                }
+                            }
+                        } catch (_: Throwable) {
+                            throw throwable
+                        }
+                    } else {
+                        throw throwable
+                    }
                 }
                 response.headers["Content-Type"]?.let { contentType ->
                     val contentType = contentType.substringBefore(";")

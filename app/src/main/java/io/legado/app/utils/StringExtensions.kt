@@ -16,6 +16,7 @@ import java.lang.Character.offsetByCodePoints
 import java.net.InetAddress
 import java.util.Locale
 import java.util.regex.Pattern
+import androidx.core.net.toUri
 
 fun String?.safeTrim() = if (this.isNullOrBlank()) null else this.trim()
 
@@ -24,7 +25,7 @@ fun String?.isContentScheme(): Boolean = this?.startsWith("content://") == true
 fun String.toEditable(): Editable = Editable.Factory.getInstance().newEditable(this)
 
 fun String.parseToUri(): Uri {
-    return if (isUri()) Uri.parse(this) else {
+    return if (isUri()) this.toUri() else {
         Uri.fromFile(File(this))
     }
 }

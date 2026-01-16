@@ -6,6 +6,7 @@ import io.legado.app.constant.BookType
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.rule.ExploreKind
+import io.legado.app.ui.main.explore.ExploreAdapter.Companion.exploreInfoMapList
 import io.legado.app.utils.ACache
 import io.legado.app.utils.GSON
 import io.legado.app.utils.MD5Utils
@@ -51,22 +52,33 @@ suspend fun BookSource.exploreKinds(): List<ExploreKind> {
         val kinds = arrayListOf<ExploreKind>()
         withContext(Dispatchers.IO) {
             kotlin.runCatching {
-                var ruleStr = exploreUrl
-                if (exploreUrl.startsWith("<js>", true)
-                    || exploreUrl.startsWith("@js:", true)
-                ) {
-                    ruleStr = aCache.getAsString(exploreKindsKey)
-                    if (ruleStr.isNullOrBlank()) {
-                        val jsStr = if (exploreUrl.startsWith("@")) {
-                            exploreUrl.substring(4)
-                        } else {
-                            exploreUrl.substring(4, exploreUrl.lastIndexOf("<"))
+                val ruleStr = when {
+                    exploreUrl.startsWith("@js:", true) -> {
+                        aCache.getAsString(exploreKindsKey)?.takeIf { it.isNotBlank() } ?: run {
+                            val exploreInfoMap = exploreInfoMapList[bookSourceUrl]
+                            runScriptWithContext {
+                                evalJS(exploreUrl.substring(4)) {
+                                    put("infoMap", exploreInfoMap)
+                                }.toString().trim()
+                            }.also {
+                                aCache.put(exploreKindsKey, it)
+                            }
                         }
-                        ruleStr = runScriptWithContext {
-                            evalJS(jsStr).toString().trim()
-                        }
-                        aCache.put(exploreKindsKey, ruleStr)
                     }
+                    exploreUrl.startsWith("<js>", true) -> {
+                        aCache.getAsString(exploreKindsKey)?.takeIf { it.isNotBlank() } ?: run {
+                            val exploreInfoMap = exploreInfoMapList[bookSourceUrl]
+                            runScriptWithContext {
+                                evalJS(exploreUrl.substring(4, exploreUrl.lastIndexOf("<"))) {
+                                    put("infoMap", exploreInfoMap)
+                                }.toString().trim()
+                            }.also {
+                                aCache.put(exploreKindsKey, it)
+                            }
+
+                        }
+                    }
+                    else -> exploreUrl
                 }
                 if (ruleStr.isJsonArray()) {
                     GSON.fromJsonArray<ExploreKind>(ruleStr).getOrThrow().let {

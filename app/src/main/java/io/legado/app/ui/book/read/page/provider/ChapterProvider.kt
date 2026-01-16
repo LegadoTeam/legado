@@ -1030,7 +1030,7 @@ object ChapterProvider {
             paddingLeft.toFloat() - 10,
             paddingTop.toFloat() - 10,
             visibleRight.toFloat() + 10,
-            visibleBottom.toFloat() + 10
+            visibleBottom.toFloat() + 10f.dpToPx() //下划线最远10dp
         )
 
     }

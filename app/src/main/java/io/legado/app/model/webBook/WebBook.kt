@@ -17,6 +17,7 @@ import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.analyzeRule.RuleData
+import io.legado.app.ui.main.explore.ExploreAdapter.Companion.exploreInfoMapList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -66,21 +67,29 @@ object WebBook {
             ruleData = ruleData,
             coroutineContext = currentCoroutineContext()
         )
-        var res = try {
-            analyzeUrl.getStrResponseAwait()
-        } catch (e: Exception) {
-            bookSource.loginCheckJs?.let { checkJs ->
-                if (checkJs.isNotBlank()) {
-                    val errStrResponse = analyzeUrl.getErrStrResponse(e)
-                    analyzeUrl.evalJS(checkJs, errStrResponse) as StrResponse
+        val checkJs = bookSource.loginCheckJs
+        val res = kotlin.runCatching {
+            analyzeUrl.getStrResponseAwait().let {
+                if (!checkJs.isNullOrBlank()) { //检测书源是否已登录
+                    analyzeUrl.evalJS(checkJs, it) as StrResponse
+                } else {
+                    it
                 }
             }
-            throw e
-        }
-        //检测书源是否已登录
-        bookSource.loginCheckJs?.let { checkJs ->
-            if (checkJs.isNotBlank()) {
-                res = analyzeUrl.evalJS(checkJs, res) as StrResponse
+        }.getOrElse { throwable ->
+            if (!checkJs.isNullOrBlank()) {
+                val errResponse = analyzeUrl.getErrStrResponse(throwable)
+                try {
+                    (analyzeUrl.evalJS(checkJs, errResponse) as StrResponse).also {
+                        if (it.code() == 500) {
+                            throw throwable
+                        }
+                    }
+                } catch (_: Throwable) {
+                    throw throwable
+                }
+            } else {
+                throw throwable
             }
         }
         checkRedirect(bookSource, res)
@@ -118,29 +127,40 @@ object WebBook {
         page: Int? = 1,
     ): ArrayList<SearchBook> {
         val ruleData = RuleData()
+        val sourceUrl = bookSource.bookSourceUrl
+        val exploreInfoMap = exploreInfoMapList[sourceUrl]
         val analyzeUrl = AnalyzeUrl(
             mUrl = url,
             page = page,
-            baseUrl = bookSource.bookSourceUrl,
+            baseUrl = sourceUrl,
             source = bookSource,
             ruleData = ruleData,
-            coroutineContext = currentCoroutineContext()
+            coroutineContext = currentCoroutineContext(),
+            infoMap = exploreInfoMap
         )
-        var res = try {
-            analyzeUrl.getStrResponseAwait()
-        } catch (e: Exception) {
-            bookSource.loginCheckJs?.let { checkJs ->
-                if (checkJs.isNotBlank()) {
-                    val errStrResponse = analyzeUrl.getErrStrResponse(e)
-                    analyzeUrl.evalJS(checkJs, errStrResponse) as StrResponse
+        val checkJs = bookSource.loginCheckJs
+        val res = kotlin.runCatching {
+            analyzeUrl.getStrResponseAwait().let {
+                if (!checkJs.isNullOrBlank()) { //检测书源是否已登录
+                    analyzeUrl.evalJS(checkJs, it) as StrResponse
+                } else {
+                    it
                 }
             }
-            throw e
-        }
-        //检测书源是否已登录
-        bookSource.loginCheckJs?.let { checkJs ->
-            if (checkJs.isNotBlank()) {
-                res = analyzeUrl.evalJS(checkJs, result = res) as StrResponse
+        }.getOrElse { throwable ->
+            if (!checkJs.isNullOrBlank()) {
+                val errResponse = analyzeUrl.getErrStrResponse(throwable)
+                try {
+                    (analyzeUrl.evalJS(checkJs, errResponse) as StrResponse).also {
+                        if (it.code() == 500) {
+                            throw throwable
+                        }
+                    }
+                } catch (_: Throwable) {
+                    throw throwable
+                }
+            } else {
+                throw throwable
             }
         }
         checkRedirect(bookSource, res)
@@ -193,21 +213,29 @@ object WebBook {
                 ruleData = book,
                 coroutineContext = currentCoroutineContext()
             )
-            var res = try {
-                analyzeUrl.getStrResponseAwait()
-            } catch (e: Exception) {
-                bookSource.loginCheckJs?.let { checkJs ->
-                    if (checkJs.isNotBlank()) {
-                        val errStrResponse = analyzeUrl.getErrStrResponse(e)
-                        analyzeUrl.evalJS(checkJs, errStrResponse) as StrResponse
+            val checkJs = bookSource.loginCheckJs
+            val res = kotlin.runCatching {
+                analyzeUrl.getStrResponseAwait().let {
+                    if (!checkJs.isNullOrBlank()) { //检测书源是否已登录
+                        analyzeUrl.evalJS(checkJs, it) as StrResponse
+                    } else {
+                        it
                     }
                 }
-                throw e
-            }
-            //检测书源是否已登录
-            bookSource.loginCheckJs?.let { checkJs ->
-                if (checkJs.isNotBlank()) {
-                    res = analyzeUrl.evalJS(checkJs, result = res) as StrResponse
+            }.getOrElse { throwable ->
+                if (!checkJs.isNullOrBlank()) {
+                    val errResponse = analyzeUrl.getErrStrResponse(throwable)
+                    try {
+                        (analyzeUrl.evalJS(checkJs, errResponse) as StrResponse).also {
+                            if (it.code() == 500) {
+                                throw throwable
+                            }
+                        }
+                    } catch (_: Throwable) {
+                        throw throwable
+                    }
+                } else {
+                    throw throwable
                 }
             }
             checkRedirect(bookSource, res)
@@ -282,21 +310,29 @@ object WebBook {
                     ruleData = book,
                     coroutineContext = currentCoroutineContext()
                 )
-                var res = try {
-                    analyzeUrl.getStrResponseAwait()
-                } catch (e: Exception) {
-                    bookSource.loginCheckJs?.let { checkJs ->
-                        if (checkJs.isNotBlank()) {
-                            val errStrResponse = analyzeUrl.getErrStrResponse(e)
-                            analyzeUrl.evalJS(checkJs, errStrResponse) as StrResponse
+                val checkJs = bookSource.loginCheckJs
+                val res = kotlin.runCatching {
+                    analyzeUrl.getStrResponseAwait().let {
+                        if (!checkJs.isNullOrBlank()) { //检测书源是否已登录
+                            analyzeUrl.evalJS(checkJs, it) as StrResponse
+                        } else {
+                            it
                         }
                     }
-                    throw e
-                }
-                //检测书源是否已登录
-                bookSource.loginCheckJs?.let { checkJs ->
-                    if (checkJs.isNotBlank()) {
-                        res = analyzeUrl.evalJS(checkJs, result = res) as StrResponse
+                }.getOrElse { throwable ->
+                    if (!checkJs.isNullOrBlank()) {
+                        val errResponse = analyzeUrl.getErrStrResponse(throwable)
+                        try {
+                            (analyzeUrl.evalJS(checkJs, errResponse) as StrResponse).also {
+                                if (it.code() == 500) {
+                                    throw throwable
+                                }
+                            }
+                        } catch (_: Throwable) {
+                            throw throwable
+                        }
+                    } else {
+                        throw throwable
                     }
                 }
                 checkRedirect(bookSource, res)
@@ -376,24 +412,29 @@ object WebBook {
                 chapter = bookChapter,
                 coroutineContext = currentCoroutineContext()
             )
-            var res = try {
-                analyzeUrl.getStrResponseAwait(
-                    jsStr = contentRule.webJs,
-                    sourceRegex = contentRule.sourceRegex
-                )
-            } catch (e: Exception) {
-                bookSource.loginCheckJs?.let { checkJs ->
-                    if (checkJs.isNotBlank()) {
-                        val errStrResponse = analyzeUrl.getErrStrResponse(e)
-                        analyzeUrl.evalJS(checkJs, errStrResponse) as StrResponse
+            val checkJs = bookSource.loginCheckJs
+            val res = kotlin.runCatching {
+                analyzeUrl.getStrResponseAwait().let {
+                    if (!checkJs.isNullOrBlank()) { //检测书源是否已登录
+                        analyzeUrl.evalJS(checkJs, it) as StrResponse
+                    } else {
+                        it
                     }
                 }
-                throw e
-            }
-            //检测书源是否已登录
-            bookSource.loginCheckJs?.let { checkJs ->
-                if (checkJs.isNotBlank()) {
-                    res = analyzeUrl.evalJS(checkJs, result = res) as StrResponse
+            }.getOrElse { throwable ->
+                if (!checkJs.isNullOrBlank()) {
+                    val errResponse = analyzeUrl.getErrStrResponse(throwable)
+                    try {
+                        (analyzeUrl.evalJS(checkJs, errResponse) as StrResponse).also {
+                            if (it.code() == 500) {
+                                throw throwable
+                            }
+                        }
+                    } catch (_: Throwable) {
+                        throw throwable
+                    }
+                } else {
+                    throw throwable
                 }
             }
             checkRedirect(bookSource, res)
