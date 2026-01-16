@@ -23,7 +23,6 @@ import io.legado.app.utils.removePref
 import io.legado.app.utils.sysConfiguration
 import io.legado.app.utils.toastOnUi
 import splitties.init.appCtx
-// 【新增引用】文件操作所需
 import java.io.File
 import io.legado.app.utils.FileUtils
 import java.net.InetAddress
@@ -257,7 +256,6 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefString(PreferKey.bookExportFileName, value)
         }
 
-    // 保存 自定义导出章节模式 文件名js表达式
     var episodeExportFileName: String?
         get() = appCtx.getPrefString(PreferKey.episodeExportFileName, "")
         set(value) {
@@ -280,7 +278,6 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             }
         }
 
-    // 书籍保存位置
     var defaultBookTreeUri: String?
         get() = appCtx.getPrefString(PreferKey.defaultBookTreeUri)
         set(value) {
@@ -321,7 +318,6 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefLong(PreferKey.remoteServerId, value)
         }
 
-    // 添加本地选择的目录
     var importBookPath: String?
         get() = appCtx.getPrefString("importBookPath")
         set(value) {
@@ -413,7 +409,6 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefBoolean(PreferKey.exportNoChapterName, value)
         }
 
-    // 是否启用自定义导出 default->false
     var enableCustomExport: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.enableCustomExport, false)
         set(value) {
@@ -701,11 +696,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         }
     }
 
-    //跳转到漫画界面不使用富文本模式
     val showMangaUi: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.showMangaUi, true)
 
-    //禁用漫画缩放
     var disableMangaScale: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.disableMangaScale, true)
         set(value) {
@@ -718,35 +711,30 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefBoolean(PreferKey.disableMangaPageAnim, value)
         }
 
-    //漫画预加载数量
     var mangaPreDownloadNum
         get() = appCtx.getPrefInt(PreferKey.mangaPreDownloadNum, 10)
         set(value) {
             appCtx.putPrefInt(PreferKey.mangaPreDownloadNum, value)
         }
 
-    //点击翻页
     var disableClickScroll
         get() = appCtx.getPrefBoolean(PreferKey.disableClickScroll, false)
         set(value) {
             appCtx.putPrefBoolean(PreferKey.disableClickScroll, value)
         }
 
-    //漫画滚动速度
     var mangaAutoPageSpeed
         get() = appCtx.getPrefInt(PreferKey.mangaAutoPageSpeed, 3)
         set(value) {
             appCtx.putPrefInt(PreferKey.mangaAutoPageSpeed, value)
         }
 
-    //漫画页脚配置
     var mangaFooterConfig
         get() = appCtx.getPrefString(PreferKey.mangaFooterConfig, "")
         set(value) {
             appCtx.putPrefString(PreferKey.mangaFooterConfig, value)
         }
 
-    //漫画水平滚动
     var enableMangaHorizontalScroll
         get() = appCtx.getPrefBoolean(PreferKey.enableMangaHorizontalScroll, false)
         set(value) {
@@ -759,14 +747,12 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefString(PreferKey.mangaColorFilter, value)
         }
 
-    //禁用漫画内标题
     var hideMangaTitle
         get() = appCtx.getPrefBoolean(PreferKey.hideMangaTitle, false)
         set(value) {
             appCtx.putPrefBoolean(PreferKey.hideMangaTitle, value)
         }
 
-    //开启墨水屏模式
     var enableMangaEInk
         get() = appCtx.getPrefBoolean(PreferKey.enableMangaEInk, false)
         set(value) {
@@ -830,35 +816,47 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     // ================= 自定义功能区域 Start =================
 
     // 1. 听书预加载数量
-    // 逻辑：从设置里读取字符串，转成数字。如果读不到，默认返回 10。
     val audioPreDownloadNum: Int
         get() {
-            // 注意：EditTextPreference 保存的是 String
             val str = appCtx.getPrefString("audioPreDownloadNum")
             return str?.toIntOrNull() ?: 10
         }
 
     // 2. 音频缓存保留时间 (返回毫秒)
-    // 逻辑：用户输入的是“分钟”，我们在这里把它乘以 60000 变成“毫秒”。
     val audioCacheCleanTime: Long
         get() {
             val str = appCtx.getPrefString("audioCacheCleanTime")
-            val minutes = str?.toLongOrNull() ?: 10L // 默认 10 分钟
+            val minutes = str?.toLongOrNull() ?: 10L
             return minutes * 60 * 1000L
         }
 
+    // 3. 朗读标题开关 (修复预缓存 bug 用)
+    var readAloudTitle: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.readAloudTitle, true)
+        set(value) = appCtx.putPrefBoolean(PreferKey.readAloudTitle, value)
+
     /**
-     * 【新增】手动清理 TTS 缓存
-     * 这个方法会自动寻找 externalCacheDir（外部存储），如果找不到再找内部。
-     * 确保和 Service 里的逻辑保持一致。
+     * 手动清理 TTS 缓存
      */
     fun clearTtsCache() {
         val baseDir = appCtx.externalCacheDir ?: appCtx.cacheDir
-        // 清理音频文件
         FileUtils.delete(baseDir.absolutePath + File.separator + "httpTTS")
-        // 清理数据库索引 (可选，建议一起清，防止索引还在但文件没了)
         FileUtils.delete(baseDir.absolutePath + File.separator + "httpTTS_cache")
     }
+
+    // --- 背景音乐 (BGM) 配置 ---
+    
+    var isBgmEnabled: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.bgmEnabled, false)
+        set(value) = appCtx.putPrefBoolean(PreferKey.bgmEnabled, value)
+
+    var bgmPath: String?
+        get() = appCtx.getPrefString(PreferKey.bgmPath)
+        set(value) = appCtx.putPrefString(PreferKey.bgmPath, value)
+
+    var bgmVolume: Int
+        get() = appCtx.getPrefInt(PreferKey.bgmVolume, 30)
+        set(value) = appCtx.putPrefInt(PreferKey.bgmVolume, value)
 
     // ================= 自定义功能区域 End =================
 
