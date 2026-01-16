@@ -128,7 +128,9 @@ class ReadAloudConfigDialog : BasePrefDialogFragment() {
             when (preference.key) {
                 PreferKey.ttsEngine -> showDialogFragment(SpeakEngineDialog())
                 "sysTtsConfig" -> IntentHelp.openTTSSetting()
-                // 【已删除】移除了多余的 clear_cache 判断
+                
+                // 【核心新增】背景音乐设置点击逻辑
+                "bgmSetting" -> showDialogFragment(BgmConfigDialog())
             }
             return super.onPreferenceTreeClick(preference)
         }
