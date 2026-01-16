@@ -209,4 +209,10 @@ object PreferKey {
     const val editAutoWrap = "editAutoWrap"
     const val editAutoComplete = "editAutoComplete"
     const val showBoardLine = "showBoardLine"
+
+    // --- 背景音乐 (BGM) 与 标题朗读 相关新增 ---
+    const val bgmEnabled = "bgmEnabled"
+    const val bgmPath = "bgmPath"
+    const val bgmVolume = "bgmVolume"
+    const val readAloudTitle = "readAloudTitle"
 }
