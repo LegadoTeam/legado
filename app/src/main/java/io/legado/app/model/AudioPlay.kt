@@ -31,6 +31,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancelChildren
 import splitties.init.appCtx
+import kotlin.text.trim
 
 @SuppressLint("StaticFieldLeak")
 @Suppress("unused")
@@ -187,6 +188,7 @@ object AudioPlay : CoroutineScope by MainScope() {
                 upLoading(true)
                 WebBook.getContent(this, bookSource, book, chapter)
                     .onSuccess { content ->
+                        val content = content.trim()
                         if (content.isEmpty()) {
                             appCtx.toastOnUi("未获取到资源链接")
                         } else {

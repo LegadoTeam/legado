@@ -6,6 +6,5 @@
     android:ellipsize="end"
     android:gravity="center"
     android:maxLines="1"
-    android:padding="5dp"
     android:textColor="@color/primaryText"
     android:textSize="14sp" />

@@ -100,7 +100,7 @@ object WebViewPool {
             clearFormData() //清除表单数据
             clearMatches() //清除查找匹配项
 //            webView.clearSslPreferences() //清除SSL首选项
-            clearDisappearingChildren() //清除消失中的子视图
+//            clearDisappearingChildren() //清除消失中的子视图
             clearAnimation() //清除动画
             removeJavascriptInterface(nameBasic)
             removeJavascriptInterface(nameJava)
@@ -108,7 +108,7 @@ object WebViewPool {
             removeJavascriptInterface(nameCache)
             settings.apply {
                 javaScriptEnabled = false
-                javaScriptEnabled = true // 禁用再启用来重置js环境，清理注入的接口，注意需要禁用的订阅源需要再次执行
+                javaScriptEnabled = true // 禁用再启用来重置js环境，注意需要禁用的订阅源需要再次执行
                 blockNetworkImage = false // 确保允许加载网络图片
                 cacheMode = WebSettings.LOAD_DEFAULT // 重置缓存模式
             }

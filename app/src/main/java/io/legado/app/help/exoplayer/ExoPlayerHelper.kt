@@ -22,6 +22,7 @@ import androidx.media3.exoplayer.source.ConcatenatingMediaSource2
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.extractor.DefaultExtractorsFactory
 import com.google.gson.reflect.TypeToken
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.utils.GSON
@@ -58,14 +59,13 @@ object ExoPlayerHelper {
                 DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS / 10
             ).build()
         ).setMediaSourceFactory(
-            DefaultMediaSourceFactory(context)
-                .setDataSourceFactory(resolvingDataSource)
+            DefaultMediaSourceFactory(
+                context,
+                DefaultExtractorsFactory().setConstantBitrateSeekingEnabled(true)
+            ).setDataSourceFactory(resolvingDataSource)
                 .setLiveTargetOffsetMs(5000)
         ).build()
     }
-
-
-
 
 
     private val resolvingDataSource: ResolvingDataSource.Factory by lazy {
@@ -94,7 +94,7 @@ object ExoPlayerHelper {
      */
     val cacheDataSourceFactory by lazy {
         //使用自定义的CacheDataSource以支持设置UA
-        return@lazy CacheDataSource.Factory()
+        CacheDataSource.Factory()
             .setCache(cache)
             .setUpstreamDataSourceFactory(okhttpDataFactory)
             .setCacheReadDataSourceFactory(FileDataSource.Factory())

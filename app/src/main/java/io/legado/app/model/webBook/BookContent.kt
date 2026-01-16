@@ -169,7 +169,9 @@ object BookContent {
         if (!replaceRegex.isNullOrEmpty()) {
             contentStr = contentStr.split(AppPattern.LFRegex).joinToString("\n") { it.trim() }
             contentStr = analyzeRule.getString(replaceRegex, contentStr)
-            contentStr = contentStr.split(AppPattern.LFRegex).joinToString("\n") { "　　$it" }
+            if (book.isOnLineTxt) {
+                contentStr = contentStr.split(AppPattern.LFRegex).joinToString("\n") { "　　$it" }
+            }
         }
         val titleRule = contentRule.title //先正文再章节名称
         if (!titleRule.isNullOrBlank()) {

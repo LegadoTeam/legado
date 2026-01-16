@@ -91,7 +91,8 @@ class AnalyzeUrl(
     private val callTimeout: Long? = null,
     private var coroutineContext: CoroutineContext = EmptyCoroutineContext,
     headerMapF: Map<String, String>? = null,
-    hasLoginHeader: Boolean = true
+    hasLoginHeader: Boolean = true,
+    private val infoMap: MutableMap<String, String>? = null
 ) : JsExtensions {
 
     var ruleUrl = ""
@@ -367,6 +368,7 @@ class AnalyzeUrl(
             bindings["book"] = ruleData as? Book
             bindings["source"] = source
             bindings["result"] = result
+            bindings["infoMap"] = infoMap
         }
         val sharedScope = source?.getShareScope(coroutineContext)
         val scope = if (sharedScope == null) {
@@ -564,7 +566,7 @@ class AnalyzeUrl(
     /**
      * 返回一个errResponse
      */
-    fun getErrResponse(e: Exception): Response = Response.Builder()
+    fun getErrResponse(e: Throwable): Response = Response.Builder()
         .request(Request.Builder().url(url).build())
         .protocol(okhttp3.Protocol.HTTP_1_1)
         .code(500)
@@ -575,7 +577,7 @@ class AnalyzeUrl(
     /**
      * 返回一个errStrResponse
      */
-    fun getErrStrResponse(e: Exception): StrResponse =
+    fun getErrStrResponse(e: Throwable): StrResponse =
         StrResponse(getErrResponse(e), e.stackTraceStr)
 
     private fun getClient(): OkHttpClient {

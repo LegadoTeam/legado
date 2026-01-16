@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoCompleteTextView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/text_view"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_margin="3dp"
+    android:background="@drawable/selector_fillet_btn_bg"
+    android:ellipsize="end"
+    android:gravity="start"
+    android:maxLines="1"
+    android:paddingLeft="12dp"
+    android:paddingTop="4dp"
+    android:paddingRight="12dp"
+    android:paddingBottom="4dp"
+    android:textColor="@color/primaryText"
+    android:textSize="14sp"
+    tools:ignore="LabelFor" />
