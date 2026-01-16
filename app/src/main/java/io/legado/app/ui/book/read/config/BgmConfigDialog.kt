@@ -25,6 +25,7 @@ class BgmConfigDialog : BaseDialogFragment(R.layout.dialog_bgm_config) {
 
     private val binding by viewBinding(DialogBgmConfigBinding::bind)
 
+    // SAF 目录选择
     private val selectDir = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
             AppConfig.bgmPath = uri.toString()
@@ -41,7 +42,7 @@ class BgmConfigDialog : BaseDialogFragment(R.layout.dialog_bgm_config) {
         super.onStart()
         dialog?.window?.run {
             clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            setBackgroundDrawableResource(R.color.transparent) // 确保透明背景
+            setBackgroundDrawableResource(R.color.transparent)
             decorView.setPadding(0, 0, 0, 0)
             val attr = attributes
             attr.dimAmount = 0.0f
@@ -51,18 +52,28 @@ class BgmConfigDialog : BaseDialogFragment(R.layout.dialog_bgm_config) {
         }
     }
 
+    override fun onDismiss(dialog: DialogInterface) {
+        super.onDismiss(dialog)
+        // 安全减少底栏计数器
+        (activity as? ReadBookActivity)?.let {
+            if (it.bottomDialog > 0) it.bottomDialog--
+        }
+    }
+
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
-        // 【关键修改】移除了 bottomDialog > 0 则 dismiss 的限制，允许在设置页叠加弹出
+        // 【核心修复】这里只增加计数，不进行 dismiss() 判断，允许它在朗读设置上层弹出
         if (activity is ReadBookActivity) {
             (activity as ReadBookActivity).bottomDialog++
         }
 
+        // 动态配色：跟随阅读菜单主题
         val bg = requireContext().bottomBackground
         val isLight = ColorUtils.isColorLight(bg)
         val textColor = requireContext().getPrimaryTextColor(isLight)
 
         binding.run {
             rootView.setBackgroundColor(bg)
+            switchBgm.setTextColor(textColor)
             tvTitle.setTextColor(textColor)
             tvPathLabel.setTextColor(textColor)
             tvPath.setTextColor(textColor)
@@ -72,19 +83,10 @@ class BgmConfigDialog : BaseDialogFragment(R.layout.dialog_bgm_config) {
             ivPrev.setColorFilter(textColor)
             ivPlayPause.setColorFilter(textColor)
             ivNext.setColorFilter(textColor)
-            switchBgm.setTextColor(textColor)
         }
 
         initData()
         initEvent()
-    }
-
-    override fun onDismiss(dialog: DialogInterface) {
-        super.onDismiss(dialog)
-        if (activity is ReadBookActivity) {
-            val act = activity as ReadBookActivity
-            if (act.bottomDialog > 0) act.bottomDialog--
-        }
     }
 
     private fun initData() = binding.run {
