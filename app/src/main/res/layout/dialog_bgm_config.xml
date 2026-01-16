@@ -8,41 +8,63 @@
     android:background="@color/background_menu"
     android:orientation="vertical"
     android:paddingLeft="16dp"
-    android:paddingTop="10dp"
+    android:paddingTop="12dp"
     android:paddingRight="16dp"
-    android:paddingBottom="10dp">
+    android:paddingBottom="12dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:padding="4dp">
+        android:orientation="horizontal">
 
-        <io.legado.app.lib.theme.view.ThemeSwitch
-            android:id="@+id/switch_bgm"
+        <TextView
+            android:id="@+id/tv_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="启用背景音乐"
-            android:textSize="14sp"
-            tools:ignore="TouchTargetSizeCheck" />
+            android:text="背景音乐联动"
+            android:textColor="@color/primaryText"
+            android:textSize="16sp"
+            android:textStyle="bold" />
 
         <Space
             android:layout_width="0dp"
             android:layout_height="1dp"
             android:layout_weight="1" />
 
-        <TextView
-            android:id="@+id/tv_path"
+        <io.legado.app.lib.theme.view.ThemeSwitch
+            android:id="@+id/switch_bgm"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
+            tools:ignore="TouchTargetSizeCheck" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp">
+
+        <TextView
+            android:id="@+id/tv_path_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="文件夹："
+            android:textColor="@color/primaryText"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/tv_path"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:ellipsize="middle"
-            android:maxWidth="150dp"
             android:singleLine="true"
-            android:text="未选择文件夹"
+            android:text="未选择"
+            android:textColor="@color/primaryText"
             android:textSize="12sp"
-            android:alpha="0.8"/>
+            android:alpha="0.7" />
 
         <TextView
             android:id="@+id/btn_select_folder"
@@ -53,24 +75,25 @@
             android:focusable="true"
             android:padding="8dp"
             android:text="选择目录"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:textColor="@color/primaryText"
+            android:textSize="14sp" />
     </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp">
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
 
-        <androidx.appcompat.widget.AppCompatImageView
-            android:id="@+id/iv_volume_icon"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:src="@drawable/ic_volume_up"
-            tools:ignore="UnusedAttribute" />
+        <TextView
+            android:id="@+id/tv_vol_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="音量"
+            android:textColor="@color/primaryText"
+            android:textSize="14sp" />
 
         <io.legado.app.lib.theme.view.ThemeSeekBar
             android:id="@+id/seek_volume"
@@ -83,9 +106,10 @@
             android:id="@+id/tv_volume_value"
             android:layout_width="40dp"
             android:layout_height="wrap_content"
-            android:gravity="center"
+            android:gravity="end"
             android:text="30%"
-            android:textSize="12sp" />
+            android:textColor="@color/primaryText"
+            android:textSize="14sp" />
     </LinearLayout>
 
     <LinearLayout
@@ -93,34 +117,33 @@
         android:layout_height="wrap_content"
         android:gravity="center"
         android:orientation="horizontal"
-        android:paddingTop="8dp"
-        android:paddingBottom="4dp">
+        android:paddingTop="10dp">
 
         <ImageView
             android:id="@+id/iv_prev"
             android:layout_width="32dp"
             android:layout_height="32dp"
-            android:layout_marginEnd="30dp"
+            android:layout_marginEnd="24dp"
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_skip_previous"
-            tools:ignore="UnusedAttribute" />
+            app:tint="@color/primaryText" />
 
         <ImageView
             android:id="@+id/iv_play_pause"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_play_24dp"
-            tools:ignore="UnusedAttribute" />
+            app:tint="@color/primaryText" />
 
         <ImageView
             android:id="@+id/iv_next"
             android:layout_width="32dp"
             android:layout_height="32dp"
-            android:layout_marginStart="30dp"
+            android:layout_marginStart="24dp"
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_skip_next"
-            tools:ignore="UnusedAttribute" />
+            app:tint="@color/primaryText" />
     </LinearLayout>
 
 </LinearLayout>
