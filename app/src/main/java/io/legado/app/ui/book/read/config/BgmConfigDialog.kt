@@ -21,6 +21,10 @@ import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 
+/**
+ * 背景音乐设置对话框
+ * 修改点：位置居中、标题文案更新、样式优化
+ */
 class BgmConfigDialog : BaseDialogFragment(R.layout.dialog_bgm_config) {
 
     private val binding by viewBinding(DialogBgmConfigBinding::bind)
@@ -41,38 +45,42 @@ class BgmConfigDialog : BaseDialogFragment(R.layout.dialog_bgm_config) {
     override fun onStart() {
         super.onStart()
         dialog?.window?.run {
-            clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            setBackgroundDrawableResource(R.color.transparent)
-            decorView.setPadding(0, 0, 0, 0)
+            // 居中弹窗通常需要背景变暗，这里设置暗度
             val attr = attributes
-            attr.dimAmount = 0.0f
-            attr.gravity = Gravity.BOTTOM
+            attr.dimAmount = 0.5f  
+            attr.gravity = Gravity.CENTER // 【修改】从 BOTTOM 改为 CENTER
             attributes = attr
-            setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            
+            // 设置透明背景，以支持 XML 中定义的圆角
+            setBackgroundDrawableResource(R.color.transparent)
+            
+            // 【修改】居中弹窗宽度不建议 MATCH_PARENT，改为屏幕宽度的 90%
+            setLayout(0.9f, ViewGroup.LayoutParams.WRAP_CONTENT)
         }
     }
 
     override fun onDismiss(dialog: DialogInterface) {
         super.onDismiss(dialog)
-        // 安全减少底栏计数器
         (activity as? ReadBookActivity)?.let {
             if (it.bottomDialog > 0) it.bottomDialog--
         }
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
-        // 【核心修复】这里只增加计数，不进行 dismiss() 判断，允许它在朗读设置上层弹出
         if (activity is ReadBookActivity) {
             (activity as ReadBookActivity).bottomDialog++
         }
 
-        // 动态配色：跟随阅读菜单主题
+        // 动态配色
         val bg = requireContext().bottomBackground
         val isLight = ColorUtils.isColorLight(bg)
         val textColor = requireContext().getPrimaryTextColor(isLight)
 
         binding.run {
             rootView.setBackgroundColor(bg)
+            // 【修改】显式设置标题文字
+            tvTitle.text = "背景音乐设置" 
+            
             switchBgm.setTextColor(textColor)
             tvTitle.setTextColor(textColor)
             tvPathLabel.setTextColor(textColor)
@@ -83,6 +91,7 @@ class BgmConfigDialog : BaseDialogFragment(R.layout.dialog_bgm_config) {
             ivPrev.setColorFilter(textColor)
             ivPlayPause.setColorFilter(textColor)
             ivNext.setColorFilter(textColor)
+            switchBgm.setTextColor(textColor)
         }
 
         initData()
