@@ -69,7 +69,7 @@ import kotlin.coroutines.coroutineContext
 
 /**
  * 在线朗读服务
- * 已集成：BGM 联动控制、章节标题预下载修复、Action 编译强力修复版
+ * 已集成：BGM 联动控制、章节标题预下载修复、全文件显式变量名重构（彻底解决 Unresolved reference 'it'）
  */
 @SuppressLint("UnsafeOptInUsageError")
 class HttpReadAloudService : BaseReadAloudService(),
@@ -190,8 +190,8 @@ class HttpReadAloudService : BaseReadAloudService(),
                             } else {
                                 createSilentSound(fileName)
                             }
-                        }.onFailure {
-                            when (it) {
+                        }.onFailure { e ->
+                            when (e) {
                                 is CancellationException -> Unit
                                 else -> pauseReadAloud()
                             }
@@ -206,8 +206,8 @@ class HttpReadAloudService : BaseReadAloudService(),
                 }
                 preDownloadAudios(httpTts)
             }
-        }.onError {
-            AppLog.put("朗读下载出错\n${it.localizedMessage}", it, true)
+        }.onError { e ->
+            AppLog.put("朗读下载出错\n${e.localizedMessage}", e, true)
         }
     }
 
@@ -234,7 +234,7 @@ class HttpReadAloudService : BaseReadAloudService(),
                 }
 
                 if (!contentString.isNullOrEmpty()) {
-                    segments.addAll(contentString.split("\n").filter { it.isNotEmpty() })
+                    segments.addAll(contentString.split("\n").filter { text -> text.isNotEmpty() })
                 }
 
                 segments.forEach { text ->
@@ -296,8 +296,8 @@ class HttpReadAloudService : BaseReadAloudService(),
                 }
                 preDownloadAudiosStream(httpTts, downloaderChannel)
             }
-        }.onError {
-            AppLog.put("朗读下载出错\n${it.localizedMessage}", it, true)
+        }.onError { e ->
+            AppLog.put("朗读下载出错\n${e.localizedMessage}", e, true)
         }
     }
 
@@ -323,7 +323,7 @@ class HttpReadAloudService : BaseReadAloudService(),
                 }
 
                 if (!contentString.isNullOrEmpty()) {
-                    segments.addAll(contentString.split("\n").filter { it.isNotEmpty() })
+                    segments.addAll(contentString.split("\n").filter { text -> text.isNotEmpty() })
                 }
                 
                 segments.forEach { text ->
@@ -354,8 +354,8 @@ class HttpReadAloudService : BaseReadAloudService(),
                         runBlocking(lifecycleScope.coroutineContext[Job]!!) {
                             getSpeakStream(httpTts, speakText)
                         }
-                    }.onFailure {
-                        when (it) {
+                    }.onFailure { e ->
+                        when (e) {
                             is InterruptedException,
                             is CancellationException -> Unit
                             else -> pauseReadAloud()
@@ -405,8 +405,8 @@ class HttpReadAloudService : BaseReadAloudService(),
                 if (checkJs?.isNotBlank() == true) {
                     response = analyzeUrl.evalJS(checkJs, response) as Response
                 }
-                response.headers["Content-Type"]?.let { contentType ->
-                    val contentType = contentType.substringBefore(";")
+                response.headers["Content-Type"]?.let { contentTypeHeader ->
+                    val contentType = contentTypeHeader.substringBefore(";")
                     val ct = httpTts.contentType
                     if (contentType == "application/json" || contentType.startsWith("text/")) {
                         throw NoStackTraceException(response.body.string())
@@ -441,7 +441,7 @@ class HttpReadAloudService : BaseReadAloudService(),
                     }
                     else -> {
                         downloadErrorNo++
-                        val msg = "tts下载错误\n${it.localizedMessage}"
+                        val msg = "tts下载错误\n${e.localizedMessage}"
                         AppLog.put(msg, e)
                         e.printOnDebug()
                         if (downloadErrorNo > 5) {
@@ -487,36 +487,32 @@ class HttpReadAloudService : BaseReadAloudService(),
 
     private fun createSpeakFile(name: String, inputStream: InputStream) {
         FileUtils.createFileIfNotExist("${ttsFolderPath}$name.mp3").outputStream().use { out ->
-            inputStream.use {
-                it.copyTo(out)
+            inputStream.use { input ->
+                input.copyTo(out)
             }
         }
     }
 
-    /**
-     * 【终极修复】移除缓存文件
-     * 使用显式 Lambda 参数命名 'file'，并确保所有引用一致，彻底解决编译错误
-     */
     private fun removeCacheFile() {
         val keepTime = AppConfig.audioCacheCleanTime
         val protectCurrentChapter = keepTime > 0
         val currentTitle = this.textChapter?.chapter?.title ?: ""
         val titleMd5 = if (protectCurrentChapter) MD5Utils.md5Encode16(currentTitle) else ""
 
-        val files = FileUtils.listDirsAndFiles(ttsFolderPath)
-        files?.forEach { file ->
-            val fileName = file.name
-            val fileSize = file.length()
-            val isSilentSound = fileSize == 2160L
+        val fileList = FileUtils.listDirsAndFiles(ttsFolderPath)
+        fileList?.forEach { fileItem ->
+            val fName = fileItem.name
+            val fSize = fileItem.length()
+            val isSilent = fSize == 2160L
             
             val shouldDelete = if (keepTime == 0L) {
                 true
             } else {
-                !fileName.startsWith(titleMd5) && (System.currentTimeMillis() - file.lastModified() > keepTime)
+                !fName.startsWith(titleMd5) && (System.currentTimeMillis() - fileItem.lastModified() > keepTime)
             }
 
-            if (shouldDelete || isSilentSound) {
-                FileUtils.delete(file.absolutePath)
+            if (shouldDelete || isSilent) {
+                FileUtils.delete(fileItem.absolutePath)
             }
         }
     }
