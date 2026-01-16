@@ -218,13 +218,14 @@ class SpeakEngineDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
         return true
     }
 
+    /**
+     * 【核心修改】
+     * 这里调用了 AppConfig.clearTtsCache()，确保能清理外部存储的音频文件。
+     */
     fun clearCache() {
         execute {
             ReadAloud.upReadAloudClass()
-            val ttsFolderPath = "${requireContext().cacheDir.absolutePath}${File.separator}httpTTS${File.separator}"
-            FileUtils.listDirsAndFiles(ttsFolderPath)?.forEach {
-                FileUtils.delete(it.absolutePath)
-            }
+            AppConfig.clearTtsCache()
             toastOnUi(R.string.clear_cache_success)
         }
     }
