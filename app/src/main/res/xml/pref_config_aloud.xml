@@ -83,6 +83,12 @@
             android:inputType="number"
             app:iconSpaceReserved="false" />
 
+        <io.legado.app.lib.prefs.Preference
+            android:key="bgmSetting"
+            android:title="背景音乐 (BGM) 设置"
+            android:summary="配置听书时的背景音乐文件夹、独立音量及切歌控制"
+            app:iconSpaceReserved="false" />
+
     </io.legado.app.lib.prefs.PreferenceCategory>
 
 </androidx.preference.PreferenceScreen>
