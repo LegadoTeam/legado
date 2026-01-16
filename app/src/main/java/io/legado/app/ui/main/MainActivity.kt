@@ -57,6 +57,9 @@ import kotlinx.coroutines.withContext
 import splitties.views.bottomPadding
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+// 【新增引用】Web服务和配置读取
+import io.legado.app.service.WebService
+import io.legado.app.utils.getPrefBoolean
 
 /**
  * 主界面
@@ -90,6 +93,12 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        // 【新增逻辑】智能自启 Web 服务
+        // 读取 web_service_auto 状态，如果是 true 则启动，否则不启动
+        if (getPrefBoolean("web_service_auto", false)) {
+            WebService.startForeground(this)
+        }
+
         upBottomMenu()
         initView()
         upHomePage()
