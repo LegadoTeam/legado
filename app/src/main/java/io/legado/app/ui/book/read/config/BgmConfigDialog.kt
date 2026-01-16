@@ -25,7 +25,6 @@ class BgmConfigDialog : BaseDialogFragment(R.layout.dialog_bgm_config) {
 
     private val binding by viewBinding(DialogBgmConfigBinding::bind)
 
-    // 标准目录选择器
     private val selectDir = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
             AppConfig.bgmPath = uri.toString()
@@ -42,7 +41,7 @@ class BgmConfigDialog : BaseDialogFragment(R.layout.dialog_bgm_config) {
         super.onStart()
         dialog?.window?.run {
             clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            setBackgroundDrawableResource(R.color.background)
+            setBackgroundDrawableResource(R.color.transparent) // 确保透明背景
             decorView.setPadding(0, 0, 0, 0)
             val attr = attributes
             attr.dimAmount = 0.0f
@@ -52,25 +51,12 @@ class BgmConfigDialog : BaseDialogFragment(R.layout.dialog_bgm_config) {
         }
     }
 
-    override fun onDismiss(dialog: DialogInterface) {
-        super.onDismiss(dialog)
-        // 安全减少底栏计数
-        (activity as? ReadBookActivity)?.bottomDialog?.let {
-            if (it > 0) (activity as ReadBookActivity).bottomDialog--
-        }
-    }
-
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
-        // 防止弹窗重叠 (参考 ReadAloudDialog)
+        // 【关键修改】移除了 bottomDialog > 0 则 dismiss 的限制，允许在设置页叠加弹出
         if (activity is ReadBookActivity) {
-            val bottomDialog = (activity as ReadBookActivity).bottomDialog++
-            if (bottomDialog > 0) {
-                dismiss()
-                return
-            }
+            (activity as ReadBookActivity).bottomDialog++
         }
 
-        // 动态配色系统 (参考 ReadAloudDialog)
         val bg = requireContext().bottomBackground
         val isLight = ColorUtils.isColorLight(bg)
         val textColor = requireContext().getPrimaryTextColor(isLight)
@@ -91,6 +77,14 @@ class BgmConfigDialog : BaseDialogFragment(R.layout.dialog_bgm_config) {
 
         initData()
         initEvent()
+    }
+
+    override fun onDismiss(dialog: DialogInterface) {
+        super.onDismiss(dialog)
+        if (activity is ReadBookActivity) {
+            val act = activity as ReadBookActivity
+            if (act.bottomDialog > 0) act.bottomDialog--
+        }
     }
 
     private fun initData() = binding.run {
