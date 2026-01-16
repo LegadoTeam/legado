@@ -69,7 +69,7 @@ import kotlin.coroutines.coroutineContext
 
 /**
  * 在线朗读服务
- * 已集成：BGM 联动控制、章节标题预下载修复版、Action 编译兼容修复
+ * 已集成：BGM 联动控制、章节标题预下载修复、Action 编译强力修复版
  */
 @SuppressLint("UnsafeOptInUsageError")
 class HttpReadAloudService : BaseReadAloudService(),
@@ -494,20 +494,25 @@ class HttpReadAloudService : BaseReadAloudService(),
     }
 
     /**
-     * 【修复】移除缓存文件
-     * 改为显式命名 Lambda 参数，解决 'it' 未解析的编译错误
+     * 【终极修复】移除缓存文件
+     * 使用显式 Lambda 参数命名 'file'，并确保所有引用一致，彻底解决编译错误
      */
     private fun removeCacheFile() {
         val keepTime = AppConfig.audioCacheCleanTime
         val protectCurrentChapter = keepTime > 0
-        val titleMd5 = if (protectCurrentChapter) MD5Utils.md5Encode16(this.textChapter?.chapter?.title ?: "") else ""
+        val currentTitle = this.textChapter?.chapter?.title ?: ""
+        val titleMd5 = if (protectCurrentChapter) MD5Utils.md5Encode16(currentTitle) else ""
 
-        FileUtils.listDirsAndFiles(ttsFolderPath)?.forEach { file ->
-            val isSilentSound = file.length() == 2160L
+        val files = FileUtils.listDirsAndFiles(ttsFolderPath)
+        files?.forEach { file ->
+            val fileName = file.name
+            val fileSize = file.length()
+            val isSilentSound = fileSize == 2160L
+            
             val shouldDelete = if (keepTime == 0L) {
                 true
             } else {
-                !file.name.startsWith(titleMd5) && (System.currentTimeMillis() - file.lastModified() > keepTime)
+                !fileName.startsWith(titleMd5) && (System.currentTimeMillis() - file.lastModified() > keepTime)
             }
 
             if (shouldDelete || isSilentSound) {
