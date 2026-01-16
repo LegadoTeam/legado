@@ -21,15 +21,11 @@ import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 
-/**
- * 背景音乐 (BGM) 设置对话框
- * 风格完全对齐 ktouls-legado-new
- */
 class BgmConfigDialog : BaseDialogFragment(R.layout.dialog_bgm_config) {
 
     private val binding by viewBinding(DialogBgmConfigBinding::bind)
 
-    // 标准 SAF 目录选择器
+    // 标准目录选择器
     private val selectDir = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
             AppConfig.bgmPath = uri.toString()
@@ -58,34 +54,39 @@ class BgmConfigDialog : BaseDialogFragment(R.layout.dialog_bgm_config) {
 
     override fun onDismiss(dialog: DialogInterface) {
         super.onDismiss(dialog)
-        (activity as? ReadBookActivity)?.bottomDialog?.let { if (it > 0) (activity as ReadBookActivity).bottomDialog-- }
+        // 安全减少底栏计数
+        (activity as? ReadBookActivity)?.bottomDialog?.let {
+            if (it > 0) (activity as ReadBookActivity).bottomDialog--
+        }
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
-        val activity = activity as? ReadBookActivity
-        if (activity != null) {
-            val bottomDialog = activity.bottomDialog++
+        // 防止弹窗重叠 (参考 ReadAloudDialog)
+        if (activity is ReadBookActivity) {
+            val bottomDialog = (activity as ReadBookActivity).bottomDialog++
             if (bottomDialog > 0) {
                 dismiss()
                 return
             }
         }
 
-        // 动态配色逻辑：与 ReadAloudDialog 风格完全一致
+        // 动态配色系统 (参考 ReadAloudDialog)
         val bg = requireContext().bottomBackground
         val isLight = ColorUtils.isColorLight(bg)
         val textColor = requireContext().getPrimaryTextColor(isLight)
 
         binding.run {
             rootView.setBackgroundColor(bg)
-            switchBgm.setTextColor(textColor)
+            tvTitle.setTextColor(textColor)
+            tvPathLabel.setTextColor(textColor)
             tvPath.setTextColor(textColor)
             btnSelectFolder.setTextColor(textColor)
-            ivVolumeIcon.setColorFilter(textColor)
+            tvVolLabel.setTextColor(textColor)
             tvVolumeValue.setTextColor(textColor)
             ivPrev.setColorFilter(textColor)
             ivPlayPause.setColorFilter(textColor)
             ivNext.setColorFilter(textColor)
+            switchBgm.setTextColor(textColor)
         }
 
         initData()
@@ -94,7 +95,7 @@ class BgmConfigDialog : BaseDialogFragment(R.layout.dialog_bgm_config) {
 
     private fun initData() = binding.run {
         switchBgm.isChecked = AppConfig.isBgmEnabled
-        tvPath.text = AppConfig.bgmPath?.substringAfterLast("/") ?: "未选择文件夹"
+        tvPath.text = AppConfig.bgmPath?.substringAfterLast("/") ?: "未选择"
         seekVolume.progress = AppConfig.bgmVolume
         tvVolumeValue.text = "${AppConfig.bgmVolume}%"
         upPlayState()
@@ -120,16 +121,8 @@ class BgmConfigDialog : BaseDialogFragment(R.layout.dialog_bgm_config) {
             }
         })
 
-        ivPrev.setOnClickListener {
-            BgmManager.prev()
-            upPlayState()
-        }
-
-        ivNext.setOnClickListener {
-            BgmManager.next()
-            upPlayState()
-        }
-
+        ivPrev.setOnClickListener { BgmManager.prev(); upPlayState() }
+        ivNext.setOnClickListener { BgmManager.next(); upPlayState() }
         ivPlayPause.setOnClickListener {
             if (BgmManager.isPlaying()) {
                 BgmManager.pause()
