@@ -6,6 +6,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
+import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
 import io.legado.app.R
@@ -29,6 +30,8 @@ import io.legado.app.utils.postEvent
 import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.showDialogFragment
+// 【新增引用】
+import io.legado.app.utils.toastOnUi
 
 class ReadAloudConfigDialog : BasePrefDialogFragment() {
     private val readAloudPreferTag = "readAloudPreferTag"
@@ -84,6 +87,21 @@ class ReadAloudConfigDialog : BasePrefDialogFragment() {
             findPreference<SwitchPreference>(PreferKey.pauseReadAloudWhilePhoneCalls)?.let {
                 it.isEnabled = AppConfig.ignoreAudioFocus
             }
+
+            // 【新增逻辑】让“预加载数量”和“缓存时间”显示当前数值
+            listOf("audioPreDownloadNum", "audioCacheCleanTime").forEach { key ->
+                val pref = findPreference<EditTextPreference>(key)
+                pref?.let {
+                    // 初始化显示：如果为空则显示默认值 "10"
+                    val currentVal = preferenceManager.sharedPreferences?.getString(key, "10")
+                    it.summary = currentVal
+                    // 监听变化：修改后立即更新显示
+                    it.setOnPreferenceChangeListener { p, newValue ->
+                        p.summary = newValue.toString()
+                        true
+                    }
+                }
+            }
         }
 
         override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -105,6 +123,12 @@ class ReadAloudConfigDialog : BasePrefDialogFragment() {
             when (preference.key) {
                 PreferKey.ttsEngine -> showDialogFragment(SpeakEngineDialog())
                 "sysTtsConfig" -> IntentHelp.openTTSSetting()
+                // 【新增逻辑】拦截清理缓存按钮点击
+                "clear_cache" -> {
+                    AppConfig.clearTtsCache()
+                    toastOnUi("音频缓存已清理")
+                    return true
+                }
             }
             return super.onPreferenceTreeClick(preference)
         }
