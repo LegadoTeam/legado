@@ -69,7 +69,9 @@ import java.net.SocketTimeoutException
 import kotlin.coroutines.coroutineContext
 
 /**
- * 在线朗读服务 - 修复构建错误与预缓存逻辑
+ * 在线朗读服务 - 修复版
+ * 1. 解决预缓存内容 MD5 不匹配导致的重复下载问题
+ * 2. 修正 Lambda 表达式中的类型推断与变量引用，确保构建成功
  */
 @SuppressLint("UnsafeOptInUsageError")
 class HttpReadAloudService : BaseReadAloudService(),
@@ -171,7 +173,7 @@ class HttpReadAloudService : BaseReadAloudService(),
                 contentList.forEachIndexed { index, content ->
                     ensureActive()
                     if (index < nowSpeak) return@forEachIndexed
-                    var text = content.trim() 
+                    var text = content.trim() // 对播放内容进行 trim
                     if (paragraphStartPos > 0 && index == nowSpeak) {
                         text = text.substring(paragraphStartPos)
                     }
@@ -211,16 +213,19 @@ class HttpReadAloudService : BaseReadAloudService(),
         }
     }
 
+    /**
+     * 获取应用了“替换规则”后的章节内容，确保预下载与播放内容 MD5 绝对一致
+     */
     private fun getProcessedChapterContent(book: Book, chapter: BookChapter): List<String> {
         val content = BookHelp.getContent(book, chapter) ?: return emptyList()
-        val processedContent = ContentProcessor.get(book.name, book.origin)
+        // 调用内容处理器，应用用户的替换规则和简繁转换
+        val bookContent = ContentProcessor.get(book.name, book.origin)
             .getContent(book, chapter, content)
         
-        // 显式声明返回类型，确保 split 能够被正确解析
-        val segments: String = processedContent
+        val segments: String = bookContent.content
         return segments.split("\n")
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
+            .map { segment -> segment.trim() }
+            .filter { segment -> segment.isNotEmpty() }
     }
 
     private suspend fun preDownloadAudios(httpTts: HttpTTS) {
@@ -241,6 +246,7 @@ class HttpReadAloudService : BaseReadAloudService(),
                     segments.add(chapterTitle)
                 }
 
+                // 使用处理后的内容，解决重复缓存问题
                 segments.addAll(getProcessedChapterContent(book, chapter))
 
                 segments.forEach { text ->
@@ -445,7 +451,7 @@ class HttpReadAloudService : BaseReadAloudService(),
                     }
                     else -> {
                         downloadErrorNo++
-                        // 【修复】修正这里的 it 为 e，解决 Unresolved reference 'it'
+                        // 【已修复】修正变量引用 e
                         val msg = "tts下载错误\n${e.localizedMessage}" 
                         AppLog.put(msg, e)
                         e.printOnDebug()
@@ -626,7 +632,6 @@ class HttpReadAloudService : BaseReadAloudService(),
         deleteCurrentSpeakFile()
         playErrorNo++
         if (playErrorNo >= 5) {
-            AppLog.put("朗读连续5次错误, 已暂停", error)
             pauseReadAloud()
         } else {
             if (exoPlayer.hasNextMediaItem()) {
