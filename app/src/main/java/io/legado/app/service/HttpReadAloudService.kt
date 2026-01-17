@@ -34,6 +34,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.HttpTTS
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.book.BookHelp
+import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.exoplayer.InputStreamDataSource
@@ -68,8 +69,7 @@ import java.net.SocketTimeoutException
 import kotlin.coroutines.coroutineContext
 
 /**
- * 在线朗读服务
- * 已集成：BGM 联动控制、章节标题预下载修复、全文件显式变量名重构（彻底解决 Unresolved reference 'it'）
+ * 在线朗读服务 - 修复预缓存失效版
  */
 @SuppressLint("UnsafeOptInUsageError")
 class HttpReadAloudService : BaseReadAloudService(),
@@ -171,12 +171,12 @@ class HttpReadAloudService : BaseReadAloudService(),
                 contentList.forEachIndexed { index, content ->
                     ensureActive()
                     if (index < nowSpeak) return@forEachIndexed
-                    var text = content
+                    var text = content.trim() // 统一去除空白符
                     if (paragraphStartPos > 0 && index == nowSpeak) {
                         text = text.substring(paragraphStartPos)
                     }
                     
-                    val currentTitle = textChapter?.chapter?.title ?: ""
+                    val currentTitle = (textChapter?.chapter?.title ?: "").trim()
                     val fileName = getFileNameHelper(currentTitle, text)
                     
                     val speakText = text.replace(AppPattern.notReadAloudRegex, "")
@@ -211,8 +211,18 @@ class HttpReadAloudService : BaseReadAloudService(),
         }
     }
 
-    private fun getChapterContent(book: Book, chapter: BookChapter): String? {
-        return BookHelp.getContent(book, chapter)
+    /**
+     * 【修复】获取经过“替换规则”处理后的内容
+     */
+    private fun getProcessedChapterContent(book: Book, chapter: BookChapter): List<String> {
+        val content = BookHelp.getContent(book, chapter) ?: return emptyList()
+        // 应用替换规则
+        val processedContent = ContentProcessor.get(book.name, book.origin)
+            .getContent(book, chapter, content)
+        
+        return processedContent.split("\n")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
     }
 
     private suspend fun preDownloadAudios(httpTts: HttpTTS) {
@@ -226,20 +236,19 @@ class HttpReadAloudService : BaseReadAloudService(),
                 val targetIndex = currentIdx + i
                 val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, targetIndex) ?: break
                 
-                val contentString = getChapterContent(book, chapter)
+                val chapterTitle = chapter.title.trim()
                 val segments = mutableListOf<String>()
 
                 if (AppConfig.readAloudTitle) {
-                    segments.add(chapter.title)
+                    segments.add(chapterTitle)
                 }
 
-                if (!contentString.isNullOrEmpty()) {
-                    segments.addAll(contentString.split("\n").filter { text -> text.isNotEmpty() })
-                }
+                // 获取应用了替换规则的正文
+                segments.addAll(getProcessedChapterContent(book, chapter))
 
                 segments.forEach { text ->
                     currentCoroutineContext().ensureActive()
-                    val fileName = getFileNameHelper(chapter.title, text)
+                    val fileName = getFileNameHelper(chapterTitle, text)
                     
                     val speakText = text.replace(AppPattern.notReadAloudRegex, "")
                     if (speakText.isEmpty()) {
@@ -261,6 +270,7 @@ class HttpReadAloudService : BaseReadAloudService(),
         }
     }
 
+    // 流式下载部分同步应用上述逻辑
     private fun downloadAndPlayAudiosStream() {
         exoPlayer.clearMediaItems()
         downloadTask?.cancel()
@@ -277,13 +287,13 @@ class HttpReadAloudService : BaseReadAloudService(),
                 contentList.forEachIndexed { index, content ->
                     ensureActive()
                     if (index < nowSpeak) return@forEachIndexed
-                    var text = content
+                    var text = content.trim()
                     if (paragraphStartPos > 0 && index == nowSpeak) {
                         text = text.substring(paragraphStartPos)
                     }
                     val speakText = text.replace(AppPattern.notReadAloudRegex, "")
                     
-                    val currentTitle = textChapter?.chapter?.title ?: ""
+                    val currentTitle = (textChapter?.chapter?.title ?: "").trim()
                     val fileName = getFileNameHelper(currentTitle, text)
                     
                     val dataSourceFactory = createDataSourceFactory(httpTts, speakText)
@@ -315,21 +325,19 @@ class HttpReadAloudService : BaseReadAloudService(),
                 val targetIndex = currentIdx + i
                 val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, targetIndex) ?: break
                 
-                val contentString = getChapterContent(book, chapter)
+                val chapterTitle = chapter.title.trim()
                 val segments = mutableListOf<String>()
 
                 if (AppConfig.readAloudTitle) {
-                    segments.add(chapter.title)
+                    segments.add(chapterTitle)
                 }
 
-                if (!contentString.isNullOrEmpty()) {
-                    segments.addAll(contentString.split("\n").filter { text -> text.isNotEmpty() })
-                }
+                segments.addAll(getProcessedChapterContent(book, chapter))
                 
                 segments.forEach { text ->
                     currentCoroutineContext().ensureActive()
                     
-                    val fileName = getFileNameHelper(chapter.title, text)
+                    val fileName = getFileNameHelper(chapterTitle, text)
                     val speakText = text.replace(AppPattern.notReadAloudRegex, "")
                     val dataSourceFactory = createDataSourceFactory(httpTts, speakText)
                     val downloader = createDownloader(dataSourceFactory, fileName)
@@ -341,6 +349,7 @@ class HttpReadAloudService : BaseReadAloudService(),
         }
     }
 
+    // 保持原有辅助函数不变
     private fun createDataSourceFactory(
         httpTts: HttpTTS,
         speakText: String
@@ -460,8 +469,10 @@ class HttpReadAloudService : BaseReadAloudService(),
     }
 
     private fun getFileNameHelper(title: String, content: String): String {
-        return MD5Utils.md5Encode16(title) + "_" +
-                MD5Utils.md5Encode16("${ReadAloud.httpTTS?.url}-|-$speechRate-|-$content")
+        val safeTitle = title.trim()
+        val safeContent = content.trim()
+        return MD5Utils.md5Encode16(safeTitle) + "_" +
+                MD5Utils.md5Encode16("${ReadAloud.httpTTS?.url}-|-$speechRate-|-$safeContent")
     }
 
     private fun md5SpeakFileName(content: String, textChapter: TextChapter? = this.textChapter): String {
@@ -496,7 +507,7 @@ class HttpReadAloudService : BaseReadAloudService(),
     private fun removeCacheFile() {
         val keepTime = AppConfig.audioCacheCleanTime
         val protectCurrentChapter = keepTime > 0
-        val currentTitle = this.textChapter?.chapter?.title ?: ""
+        val currentTitle = (this.textChapter?.chapter?.title ?: "").trim()
         val titleMd5 = if (protectCurrentChapter) MD5Utils.md5Encode16(currentTitle) else ""
 
         val fileList = FileUtils.listDirsAndFiles(ttsFolderPath)
@@ -517,7 +528,7 @@ class HttpReadAloudService : BaseReadAloudService(),
         }
     }
 
-
+    // 播放逻辑保持不变
     override fun pauseReadAloud(abandonFocus: Boolean) {
         super.pauseReadAloud(abandonFocus)
         kotlin.runCatching {
