@@ -69,7 +69,7 @@ import java.net.SocketTimeoutException
 import kotlin.coroutines.coroutineContext
 
 /**
- * 在线朗读服务 - 修复预缓存失效版
+ * 在线朗读服务 - 修复构建错误与预缓存逻辑
  */
 @SuppressLint("UnsafeOptInUsageError")
 class HttpReadAloudService : BaseReadAloudService(),
@@ -171,7 +171,7 @@ class HttpReadAloudService : BaseReadAloudService(),
                 contentList.forEachIndexed { index, content ->
                     ensureActive()
                     if (index < nowSpeak) return@forEachIndexed
-                    var text = content.trim() // 统一去除空白符
+                    var text = content.trim() 
                     if (paragraphStartPos > 0 && index == nowSpeak) {
                         text = text.substring(paragraphStartPos)
                     }
@@ -211,16 +211,14 @@ class HttpReadAloudService : BaseReadAloudService(),
         }
     }
 
-    /**
-     * 【修复】获取经过“替换规则”处理后的内容
-     */
     private fun getProcessedChapterContent(book: Book, chapter: BookChapter): List<String> {
         val content = BookHelp.getContent(book, chapter) ?: return emptyList()
-        // 应用替换规则
         val processedContent = ContentProcessor.get(book.name, book.origin)
             .getContent(book, chapter, content)
         
-        return processedContent.split("\n")
+        // 显式声明返回类型，确保 split 能够被正确解析
+        val segments: String = processedContent
+        return segments.split("\n")
             .map { it.trim() }
             .filter { it.isNotEmpty() }
     }
@@ -243,7 +241,6 @@ class HttpReadAloudService : BaseReadAloudService(),
                     segments.add(chapterTitle)
                 }
 
-                // 获取应用了替换规则的正文
                 segments.addAll(getProcessedChapterContent(book, chapter))
 
                 segments.forEach { text ->
@@ -270,7 +267,6 @@ class HttpReadAloudService : BaseReadAloudService(),
         }
     }
 
-    // 流式下载部分同步应用上述逻辑
     private fun downloadAndPlayAudiosStream() {
         exoPlayer.clearMediaItems()
         downloadTask?.cancel()
@@ -349,7 +345,6 @@ class HttpReadAloudService : BaseReadAloudService(),
         }
     }
 
-    // 保持原有辅助函数不变
     private fun createDataSourceFactory(
         httpTts: HttpTTS,
         speakText: String
@@ -450,7 +445,8 @@ class HttpReadAloudService : BaseReadAloudService(),
                     }
                     else -> {
                         downloadErrorNo++
-                        val msg = "tts下载错误\n${e.localizedMessage}"
+                        // 【修复】修正这里的 it 为 e，解决 Unresolved reference 'it'
+                        val msg = "tts下载错误\n${e.localizedMessage}" 
                         AppLog.put(msg, e)
                         e.printOnDebug()
                         if (downloadErrorNo > 5) {
@@ -528,7 +524,6 @@ class HttpReadAloudService : BaseReadAloudService(),
         }
     }
 
-    // 播放逻辑保持不变
     override fun pauseReadAloud(abandonFocus: Boolean) {
         super.pauseReadAloud(abandonFocus)
         kotlin.runCatching {
@@ -631,6 +626,7 @@ class HttpReadAloudService : BaseReadAloudService(),
         deleteCurrentSpeakFile()
         playErrorNo++
         if (playErrorNo >= 5) {
+            AppLog.put("朗读连续5次错误, 已暂停", error)
             pauseReadAloud()
         } else {
             if (exoPlayer.hasNextMediaItem()) {
