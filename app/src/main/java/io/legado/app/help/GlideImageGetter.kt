@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.ColorFilter
 import android.graphics.PixelFormat
+import android.graphics.Rect
 import android.graphics.drawable.Drawable
 import android.text.Html
 import android.util.LruCache
@@ -15,9 +16,16 @@ import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
 import io.legado.app.model.analyzeRule.AnalyzeUrl.Companion.paramPattern
 import io.legado.app.utils.GSON
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.fromJsonObject
 import java.lang.ref.WeakReference
 import io.legado.app.utils.lifecycle
+import java.io.ByteArrayInputStream
+import kotlin.io.encoding.Base64
+import io.legado.app.utils.SvgUtils
+import kotlin.text.dropLast
+import kotlin.text.endsWith
+import kotlin.text.toIntOrNull
 
 class GlideImageGetter(
     context: Context,
@@ -41,11 +49,56 @@ class GlideImageGetter(
             override fun getIntrinsicHeight(): Int = 0
         }
     }
+    private val availableWidth by lazy {
+        val textView = textViewRef.get() ?: return@lazy 0
+        textView.width - textView.paddingLeft - textView.paddingRight - 8.dpToPx() //8是为了文字对齐额外的右边距
+    }
 
     override fun getDrawable(source: String?): Drawable {
         val context = contextRef.get()
         if (context == null || source.isNullOrBlank()) {
             return emptyDrawable
+        }
+        if (source.startsWith("data:image/svg")) {
+            var data:String? = null
+            var style:String? = null
+            var width:String? = null
+            val urlMatcher = paramPattern.matcher(source)
+            if (urlMatcher.find()) {
+                val urlOptionStr = source.substring(urlMatcher.end())
+                GSON.fromJsonObject<Map<String, String>>(urlOptionStr).getOrNull()?.let { map ->
+                    map.forEach { (key, value) ->
+                        when (key) {
+                            "style" -> style = value
+                            "width" -> width = value
+                        }
+                    }
+                }
+                data = source.take(urlMatcher.start())
+            }
+            val inputStream = ByteArrayInputStream(Base64.decode((data ?: source).substringAfter(",")))
+            val (pictureDrawable, size) = SvgUtils.createDrawable(inputStream) ?: return emptyDrawable
+            val imgWidth = if (width?.endsWith("%")  == true) {
+                val sWidth = width.dropLast(1).toIntOrNull() ?: 80
+                val displayMetrics = context.resources.displayMetrics
+                displayMetrics.widthPixels * sWidth / 100
+            } else {
+                val sWidth = width?.toIntOrNull() ?: 0
+                if (sWidth > 0) {
+                    sWidth
+                } else {
+                    size.width
+                }
+            }
+            val showWidth = availableWidth.takeIf { it in 1..<imgWidth } ?: imgWidth
+            val showHeight = (size.height * showWidth / size.width.toFloat()).toInt()
+            val left = when (style) {
+                "center" -> (availableWidth - showWidth) / 2
+                "right" -> availableWidth - showWidth
+                else -> 0
+            }
+            pictureDrawable.setBounds(left, 0, left + showWidth, showHeight)
+            return pictureDrawable
         }
         urlStyleCache[source] ?: run {
             val urlMatcher = paramPattern.matcher(source)
@@ -85,6 +138,8 @@ class GlideImageGetter(
 
     private inner class GlideUrlDrawable(): Drawable(), Drawable.Callback {
         private var mDrawable: Drawable? = null
+        private var mBounds = Rect()
+
         fun setDrawable(drawable: Drawable?) {
             mDrawable?.callback = null
             drawable?.callback = this
@@ -104,6 +159,12 @@ class GlideImageGetter(
             mDrawable?.draw(canvas)
         }
 
+        override fun onBoundsChange(bounds: Rect) {
+            super.onBoundsChange(bounds)
+            mBounds.set(bounds)
+            mDrawable?.bounds = bounds
+        }
+
         @Deprecated("Deprecated in Java")
         override fun getOpacity(): Int {
             return mDrawable?.opacity ?: PixelFormat.TRANSLUCENT
@@ -115,6 +176,14 @@ class GlideImageGetter(
 
         override fun setColorFilter(colorFilter: ColorFilter?) {
             mDrawable?.colorFilter = colorFilter
+        }
+
+        override fun getIntrinsicWidth(): Int {
+            return mDrawable?.intrinsicWidth ?: 0
+        }
+
+        override fun getIntrinsicHeight(): Int {
+            return mDrawable?.intrinsicHeight ?: 0
         }
 
         override fun invalidateDrawable(who: Drawable) {
@@ -164,7 +233,6 @@ class GlideImageGetter(
                     drawableWidth
                 }
             }
-            val availableWidth = textView.width - textView.paddingLeft - textView.paddingRight
             val showWidth = availableWidth.takeIf { it in 1..<imgWidth } ?: imgWidth
             val showHeight = (drawableHeight * showWidth / drawableWidth.toFloat()).toInt()
             val styleType = style?.get("style")
@@ -173,16 +241,14 @@ class GlideImageGetter(
                 "right" -> availableWidth - showWidth
                 else -> 0
             }
-            drawable.setBounds(left, 0, left + showWidth, showHeight)
-            urlDrawable.setBounds(left, 0, left + showWidth, showHeight)
             urlDrawable.setDrawable(drawable)
+            urlDrawable.setBounds(left, 0, left + showWidth, showHeight)
             if (drawable is GifDrawable) {
                 urlDrawable.callback = this@GlideImageGetter
                 drawable.start()
                 gifDrawables.add(urlDrawable)
             }
             textView.text = textView.text
-            textView.invalidate()
         }
 
         override fun onLoadCleared(placeholder: Drawable?) {

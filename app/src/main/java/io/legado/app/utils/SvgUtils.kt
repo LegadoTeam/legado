@@ -3,6 +3,7 @@ package io.legado.app.utils
 import android.graphics.Canvas
 import android.graphics.Bitmap
 import android.graphics.RectF
+import android.graphics.drawable.PictureDrawable
 import android.util.Size
 import java.io.FileInputStream
 import java.io.InputStream
@@ -27,6 +28,15 @@ object SvgUtils {
         return kotlin.runCatching {
             val svg = SVG.getFromInputStream(inputStream)
             createBitmap(svg, width, height)
+        }.getOrNull()
+    }
+
+    fun createDrawable(inputStream: InputStream): Pair<PictureDrawable, Size>? {
+        return kotlin.runCatching {
+            val svg = SVG.getFromInputStream(inputStream)
+            val size = getSize(svg)
+            val picture = svg.renderToPicture()
+            Pair(PictureDrawable(picture), size)
         }.getOrNull()
     }
 

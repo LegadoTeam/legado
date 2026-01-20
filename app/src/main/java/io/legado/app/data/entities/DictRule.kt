@@ -50,8 +50,8 @@ data class DictRule(
 
     suspend fun buttonClick(name: String, click: String) {
         val analyzeRule = AnalyzeRule().setCoroutineContext(currentCoroutineContext())
-        analyzeRule.setRuleName(name)
-        analyzeRule.evalJS(name, click)
+        analyzeRule.setRuleName(this.name)
+        analyzeRule.evalJS(click , name)
     }
 
 }

@@ -701,10 +701,14 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             currentWebView.evaluateJavascript(basicJs, null)
         }
 
-        override fun onPageFinished(view: WebView, url: String?) {
+        override fun onPageFinished(view: WebView, url: String) {
             super.onPageFinished(view, url)
             view.title?.let { title ->
-                if (title != url && title != view.url && title.isNotBlank() && url != BLANK_HTML) {
+                if (title != url
+                    && title != view.url
+                    && title.isNotBlank()
+                    && url != BLANK_HTML
+                    && !url.contains(title)) {
                     binding.titleBar.title = title
                 } else {
                     binding.titleBar.title = intent.getStringExtra("title")
