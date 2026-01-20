@@ -25,8 +25,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.flow
 import org.mozilla.javascript.Context
 import splitties.init.appCtx
-import kotlin.coroutines.coroutineContext
 import io.legado.app.constant.AppPattern
+import kotlinx.coroutines.currentCoroutineContext
 
 /**
  * 获取目录
@@ -75,7 +75,7 @@ object BookChapterList {
                         mUrl = nextUrl,
                         source = bookSource,
                         ruleData = book,
-                        coroutineContext = coroutineContext
+                        coroutineContext = currentCoroutineContext()
                     )
                     val res = analyzeUrl.getStrResponseAwait() //控制并发访问
                     res.body?.let { nextBody ->
@@ -105,7 +105,7 @@ object BookChapterList {
                         mUrl = urlStr,
                         source = bookSource,
                         ruleData = book,
-                        coroutineContext = coroutineContext
+                        coroutineContext = currentCoroutineContext()
                     )
                     val res = analyzeUrl.getStrResponseAwait() //控制并发访问
                     analyzeChapterList(
@@ -124,7 +124,7 @@ object BookChapterList {
         if (!reverse) {
             chapterList.reverse()
         }
-        coroutineContext.ensureActive()
+        currentCoroutineContext().ensureActive()
         //去重
         val lh = LinkedHashSet(chapterList)
         val list = ArrayList(lh)
@@ -132,7 +132,7 @@ object BookChapterList {
             list.reverse()
         }
         Debug.log(book.origin, "◇目录总数:${list.size}")
-        coroutineContext.ensureActive()
+        currentCoroutineContext().ensureActive()
         list.forEachIndexed { index, bookChapter ->
             bookChapter.index = index
         }
@@ -167,7 +167,7 @@ object BookChapterList {
         book.latestChapterTitle =
             list.getOrElse(book.simulatedTotalChapterNum() - 1) { list.last() }
                 .getDisplayTitle(replaceRules, book.getUseReplaceRule())
-        coroutineContext.ensureActive()
+        currentCoroutineContext().ensureActive()
         upChapterInfo(list, book)
         return list
     }
@@ -187,7 +187,7 @@ object BookChapterList {
         val analyzeRule = AnalyzeRule(book, bookSource, false, isFromBookInfo)
         analyzeRule.setContent(body).setBaseUrl(baseUrl)
         analyzeRule.setRedirectUrl(redirectUrl)
-        analyzeRule.setCoroutineContext(coroutineContext)
+        analyzeRule.setCoroutineContext(currentCoroutineContext())
         //获取目录列表
         val chapterList = arrayListOf<BookChapter>()
         Debug.log(bookSource.bookSourceUrl, "┌获取目录列表", log)
@@ -211,7 +211,7 @@ object BookChapterList {
                 log
             )
         }
-        coroutineContext.ensureActive()
+        currentCoroutineContext().ensureActive()
         if (elements.isNotEmpty()) {
             Debug.log(bookSource.bookSourceUrl, "┌解析目录列表", log)
             val nameRule = analyzeRule.splitSourceRule(tocRule.chapterName)
@@ -221,7 +221,7 @@ object BookChapterList {
             val upTimeRule = analyzeRule.splitSourceRule(tocRule.updateTime)
             val isVolumeRule = analyzeRule.splitSourceRule(tocRule.isVolume)
             elements.forEachIndexed { index, item ->
-                coroutineContext.ensureActive()
+                currentCoroutineContext().ensureActive()
                 analyzeRule.setContent(item)
                 val bookChapter = BookChapter(bookUrl = book.bookUrl, baseUrl = redirectUrl)
                 analyzeRule.setChapter(bookChapter)

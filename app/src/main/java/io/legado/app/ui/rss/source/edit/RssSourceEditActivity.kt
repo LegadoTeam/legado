@@ -11,7 +11,6 @@ import android.widget.EditText
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
-import androidx.core.view.indices
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -223,7 +222,7 @@ class RssSourceEditActivity :
             text = "WEB_VIEW"
         })
         binding.recyclerView.setEdgeEffectColor(primaryColor)
-        fun createSpanSizeLookup() = object : GridLayoutManager.SpanSizeLookup() {
+        val createSpanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
             override fun getSpanSize(position: Int): Int = when (adapter.getItemViewType(position)) {
                 EditEntity.ViewType.checkBox -> 1 //CheckBox 占1个span
                 else -> 2 //占2个span（整行）
@@ -232,19 +231,19 @@ class RssSourceEditActivity :
         val gridLayoutManager = if (adapter.editEntityMaxLine < 999) {
             object : GridLayoutManager(this, 2) {
                 init {
-                    spanSizeLookup = createSpanSizeLookup()
+                    spanSizeLookup = createSpanSizeLookup
                 }
                 override fun requestChildRectangleOnScreen(parent: RecyclerView, child: View, rect: Rect, immediate: Boolean, focusedChildVisible: Boolean) = false
                 override fun requestChildRectangleOnScreen(parent: RecyclerView, child: View, rect: Rect, immediate: Boolean) = false
             }
         } else {
             GridLayoutManager(this, 2).apply {
-                spanSizeLookup = createSpanSizeLookup()
+                spanSizeLookup = createSpanSizeLookup
             }
         }
         binding.recyclerView.layoutManager = gridLayoutManager
         binding.recyclerView.adapter = adapter
-        binding.recyclerView.viewTreeObserver.addOnGlobalFocusChangeListener { oldFocus, newFocus ->
+        binding.recyclerView.viewTreeObserver.addOnGlobalFocusChangeListener { _, newFocus ->
             if (newFocus is EditText) {
                 newFocus.postDelayed({ sendText("") }, 120)
             }
@@ -531,7 +530,7 @@ class RssSourceEditActivity :
                     edit.replace(start, end, text)//光标所在位置插入文字
                 }
             }
-            if (adapter.editEntityMaxLine > 9999) {
+            if (adapter.editEntityMaxLine >= 999) {
                 view.post {
                     val editTextLocation = IntArray(2)
                     view.getLocationOnScreen(editTextLocation)
@@ -547,7 +546,7 @@ class RssSourceEditActivity :
                         val cursorYInRecyclerView = cursorYOnScreen - recyclerViewLocation[1]
                         val recyclerViewBottom = binding.recyclerView.height - 120 //考虑键盘的经验值
                         // 如果光标不在可见范围内，则滚动到光标位置
-                        if (cursorYInRecyclerView < 0 || cursorYInRecyclerView > recyclerViewBottom) {
+                        if (cursorYInRecyclerView !in 0..recyclerViewBottom) {
                             val scrollDistance = cursorYInRecyclerView - recyclerViewBottom / 3
                             if (scrollDistance > 0 && binding.recyclerView.canScrollVertically(1) || scrollDistance < 0 && binding.recyclerView.canScrollVertically(-1)) {
                                 binding.recyclerView.smoothScrollBy(0, scrollDistance)

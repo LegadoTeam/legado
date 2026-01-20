@@ -21,8 +21,6 @@ object AppPattern {
     val dataUriRegex = Regex("^data:.*?;base64,(.*)")
     //提取标题中的段评
     val imgRegex = Regex("(.*)((?:data|https?):[\\s\\S]+)$")
-    //自定义图片样式
-    val imgStyRegex = Regex("style[\"'\\s]*:\\s*[\"']([^\"']*)[\"']")
     //匹配章节信息中的字数
     val wordCountRegex = Regex("(?:^|字数[：:、]?|\\s+)([0-9万千百\\.]{1,6}字)")
 

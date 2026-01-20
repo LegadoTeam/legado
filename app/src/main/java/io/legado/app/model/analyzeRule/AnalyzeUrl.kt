@@ -94,6 +94,7 @@ class AnalyzeUrl(
     hasLoginHeader: Boolean = true,
     private val infoMap: MutableMap<String, String>? = null
 ) : JsExtensions {
+    constructor(mUrl: String) : this(mUrl, null)
 
     var ruleUrl = ""
         private set
@@ -744,6 +745,10 @@ class AnalyzeUrl(
 
     override fun getSource(): BaseSource? {
         return source
+    }
+
+    override fun getTag(): String? {
+        return source?.getTag()
     }
 
     companion object {

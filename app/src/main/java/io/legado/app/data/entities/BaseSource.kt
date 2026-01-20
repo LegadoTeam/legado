@@ -61,7 +61,7 @@ interface BaseSource : JsExtensions {
      */
     var jsLib: String?
 
-    fun getTag(): String
+    override fun getTag(): String
 
     fun getKey(): String
 

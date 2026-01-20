@@ -89,6 +89,7 @@ import io.legado.app.help.config.ThemeConfig
 interface JsExtensions : JsEncodeUtils {
 
     fun getSource(): BaseSource?
+    fun getTag(): String?
 
     private val context: CoroutineContext
         get() = rhinoContextOrNull?.coroutineContext ?: EmptyCoroutineContext
@@ -1065,7 +1066,7 @@ interface JsExtensions : JsEncodeUtils {
      */
     fun toast(msg: Any?) {
         rhinoContextOrNull?.ensureActive()
-        appCtx.toastOnUi("${getSource()?.getTag()}: ${msg.toString()}")
+        appCtx.toastOnUi("${getTag()}: ${msg.toString()}")
     }
 
     /**
@@ -1073,7 +1074,7 @@ interface JsExtensions : JsEncodeUtils {
      */
     fun longToast(msg: Any?) {
         rhinoContextOrNull?.ensureActive()
-        appCtx.longToastOnUi("${getSource()?.getTag()}: ${msg.toString()}")
+        appCtx.longToastOnUi("${getTag()}: ${msg.toString()}")
     }
 
     /**
@@ -1084,7 +1085,7 @@ interface JsExtensions : JsEncodeUtils {
         getSource()?.let {
             Debug.log(it.getKey(), msg.toString())
         } ?: Debug.log(msg.toString())
-        AppLog.putDebug("${getSource()?.getTag() ?: "源"}调试输出: $msg")
+        AppLog.putDebug("${getTag() ?: "源"}调试输出: $msg")
         return msg
     }
 

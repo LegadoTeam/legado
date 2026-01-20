@@ -135,8 +135,18 @@ getResponse(): Response //返回访问结果,网络朗读引擎采用的是这�
 ```
 
 * 发现url格式
-> 对比登录ui，name换成了title，url用来打开发现页面，其余相同
-> 变量`infoMap: Map<String, String>?`可读取按钮的切换值
+> 对比登录ui，name换成了title，url用来打开发现页面，其余相同  
+> 额外的变量[infoMap](https://github.com/Luoyacheng/legado/blob/main/app/src/main/java/io/legado/app/utils/InfoMap.kt)可读取按钮的切换值
+```js
+//读取值
+var input = infoMap["关键词"];
+//修改值
+infoMap["关键词"]="系统";
+//替换infoMap
+infoMap.set({"键":"值"});
+//保存infoMap
+infoMap.save();
+```
 ```
 //所有按钮类型："url"、"text"、"button"、"toggle"、"select"
 规则填写示范
@@ -157,7 +167,6 @@ getResponse(): Response //返回访问结果,网络朗读引擎采用的是这�
     "type": "text"
   }
 ]
-// var input = infoMap["关键词"];
 ```
 
 * 请求头,支持http代理,socks4 socks5代理设置
@@ -334,15 +343,28 @@ window.run("java.toast('执行成功');'成功'")
 .catch(e=>alert("执行出错:"+e));
 ```
 
-* 书源控制正文图片
+* 图片链接控制样式
+> 在书源正文  
 > 图片链接中含有"js"键时，点击图片会执行一次键值的函数  
 > 加载图片时，执行结果作为图片链接  
+```js
+var url = `https://www.baidu.com/img/flexible/logo/pc/result.png,{"js": "if (book) java.toast('这是'+book.name+'正文的图被点击了');result", "style": "TEXT"}`;
+result = `<img src = "${url}">`;
+```
+
+> "width"键值控制图片宽度  
+> 键值为数字时为像素宽度，带`%`时为最大宽度百分比  
 
 > "style"键值控制单个图片的样式  
 > 目前支持"text"、"full"、"single"、"left"、"right"  
-> 大写"TEXT"时，占1.5个字符位  
+> 在书源正文样式为大写"TEXT"时，占1.5个字符位(text样式大小与汉字保存一致，无法再受width控制)  
 
-```js
-var url = `https://www.baidu.com/img/flexible/logo/pc/result.png,{"js": "if (book) java.toast('这是'+book.name+'正文的图被点击了');result", "style": "right"}`;
-result = `<img src = "${url}">`;
 ```
+<img src = "https://m.baidu.com/result.png,{'style': 'center','width':'50%'}">
+<img src = "https://m.baidu.com/result.png,{'style': 'right','width':'300'}">
+```
+
+* 详情页html
+> 书籍详情页支持轻度显示html字符串样式（同字典规则）  
+> 获取到的简介字符串需要用<usehtml></usehtml>包裹起来才能识别  
+> 支持按钮 `<button>点我@onclick:java.toast("Hello World")</button>`  

@@ -80,6 +80,12 @@ class AnalyzeRule(
     private var coroutineContext: CoroutineContext = EmptyCoroutineContext
 
     private var loggedNonStandardJSON = false
+    private var ruleName: String? = null
+    fun setRuleName(name: String) {
+        if (name.isNotBlank()) {
+            ruleName = name
+        }
+    }
 
     @JvmOverloads
     fun setContent(content: Any?, baseUrl: String? = null): AnalyzeRule {
@@ -810,6 +816,10 @@ class AnalyzeRule(
 
     override fun getSource(): BaseSource? {
         return source
+    }
+
+    override fun getTag(): String? {
+        return source?.getTag() ?: ruleName
     }
 
     /**
