@@ -53,6 +53,11 @@ import io.legado.app.ui.book.read.page.provider.ChapterProvider.srcReplaceCharC
 import io.legado.app.ui.book.read.page.provider.ChapterProvider.srcReplaceCharD
 import io.legado.app.utils.StringUtils
 import androidx.core.text.parseAsHtml
+import androidx.core.util.component1
+import androidx.core.util.component2
+import io.legado.app.model.analyzeRule.AnalyzeUrl.Companion.paramPattern
+import io.legado.app.utils.GSON
+import io.legado.app.utils.fromJsonObject
 
 class TextChapterLayout(
     scope: CoroutineScope,
@@ -312,62 +317,75 @@ class TextChapterLayout(
                         currentCoroutineContext().ensureActive()
                         val imgSrc = matcher.group(1)!!
                         var iStyle = imageStyle
-                        var isSmallImage = true
-                        val matchResult = AppPattern.imgStyRegex.find(imgSrc)
-                        var imgSize: Size? = null
-                        if (matchResult != null) {
-                            val styleValue = matchResult.groupValues[1].trim()
-                            if (styleValue.equals("text", true)) { //忽略大小写
-                                iStyle = styleValue
-                            } else {
-                                imgSize = ImageProvider.getImageSize(book, imgSrc, ReadBook.bookSource)
-                                iStyle = styleValue
-                                isSmallImage = false
+                        var imgSize = ImageProvider.getImageSize(book, imgSrc, ReadBook.bookSource)
+                        val urlMatcher = paramPattern.matcher(imgSrc)
+                        if (urlMatcher.find()) {
+                            var width: String? = null
+                            val urlOptionStr = imgSrc.substring(urlMatcher.end())
+                            GSON.fromJsonObject<Map<String, String>>(urlOptionStr).getOrNull()?.let { map ->
+                                map.forEach { (key, value) ->
+                                    when (key) {
+                                        "style" -> iStyle = value
+                                        "width" -> width = value
+                                    }
+                                }
                             }
-                        } else {
-                            imgSize = ImageProvider.getImageSize(book, imgSrc, ReadBook.bookSource)
-                            if (imgSize.width < 80 && imgSize.height < 80) {
-                                iStyle = "text"
-                            } else {
-                                isSmallImage = false
+                            width?.let {
+                                if (width.endsWith("%")) {
+                                    width.dropLast(1).toIntOrNull()?.let { percentage ->
+                                        val imgWidth = visibleWidth * percentage / 100
+                                        val (sizeHeight, sizeWidth) = imgSize
+                                        imgSize = Size(imgWidth, sizeHeight * imgWidth / sizeWidth)
+                                    }
+                                } else {
+                                    width.toIntOrNull()?.let { width ->
+                                        val (sizeHeight, sizeWidth) = imgSize
+                                        imgSize = Size(width, sizeHeight * width / sizeWidth)
+                                    }
+                                }
                             }
+                        }
+                        if (imgSize.width < 80 && imgSize.height < 80) {
+                            iStyle = "text"
                         }
                         if (start < matcher.start()) {
                             sb.append(text.substring(start, matcher.start()))
                         }
-                        if (isSmallImage) {
-                            sb.append(
-                                if (iStyle == "TEXT")
-                                    reviewChar
-                                else
-                                    srcReplaceChar
-                            )
-                            srcList.add(imgSrc)
-                        } else {
-                            val textBefore = sb.toString()
-                            if (textBefore.isNotBlank()) {
-                                wordCount += textBefore.replace(noWordCountRegex,"").length
-                                setTypeText(
-                                    book,
-                                    sb.toString(),
-                                    contentPaint,
-                                    contentPaintTextHeight,
-                                    contentPaintFontMetrics,
-                                    "TEXT",
-                                    isFirstLine = isFirstLine,
-                                    srcList = srcList
-                                )
-                                sb.setLength(0)
-                                isFirstLine = false
+                        when (iStyle) {
+                            "TEXT" -> {
+                                sb.append(reviewChar)
+                                srcList.add(imgSrc)
                             }
-                            setTypeImage(
-                                book,
-                                imgSrc,
-                                contentPaintTextHeight,
-                                iStyle,
-                                imgSize!!
-                            )
-                            isSetTypedImage = true
+                            "text" -> {
+                                sb.append(srcReplaceChar)
+                                srcList.add(imgSrc)
+                            }
+                            else -> {
+                                val textBefore = sb.toString()
+                                if (textBefore.isNotBlank()) {
+                                    wordCount += textBefore.replace(noWordCountRegex, "").length
+                                    setTypeText(
+                                        book,
+                                        sb.toString(),
+                                        contentPaint,
+                                        contentPaintTextHeight,
+                                        contentPaintFontMetrics,
+                                        "TEXT",
+                                        isFirstLine = isFirstLine,
+                                        srcList = srcList
+                                    )
+                                    sb.setLength(0)
+                                    isFirstLine = false
+                                }
+                                setTypeImage(
+                                    book,
+                                    imgSrc,
+                                    contentPaintTextHeight,
+                                    iStyle,
+                                    imgSize
+                                )
+                                isSetTypedImage = true
+                            }
                         }
                         start = matcher.end()
                     }

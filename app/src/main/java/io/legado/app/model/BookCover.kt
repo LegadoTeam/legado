@@ -224,7 +224,7 @@ object BookCover {
             hasLoginHeader = false
         )
         val res = analyzeUrl.getStrResponseAwait()
-        val analyzeRule = AnalyzeRule(book)
+        val analyzeRule = AnalyzeRule(book, config)
         analyzeRule.setCoroutineContext(currentCoroutineContext())
         analyzeRule.setContent(res.body)
         analyzeRule.setRedirectUrl(res.url)
@@ -258,7 +258,7 @@ object BookCover {
     ) : BaseSource {
 
         override fun getTag(): String {
-            return searchUrl
+            return "CoverRule"
         }
 
         override fun getKey(): String {

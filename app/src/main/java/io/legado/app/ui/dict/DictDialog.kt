@@ -11,6 +11,7 @@ import io.legado.app.base.BaseDialogFragment
 import io.legado.app.data.entities.DictRule
 import io.legado.app.databinding.DialogDictBinding
 import io.legado.app.help.GlideImageGetter
+import io.legado.app.help.TextViewTagHandler
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.utils.setHtml
@@ -62,8 +63,13 @@ class DictDialog() : BaseDialogFragment(R.layout.dialog_dict) {
                 viewModel.dict(dictRule, word!!) {
                     binding.rotateLoading.inVisible()
                     glideImageGetter?.clear()
-                    glideImageGetter = GlideImageGetter.create(requireContext(), binding.tvDict, it)
-                    binding.tvDict.setHtml(it, glideImageGetter)
+                    glideImageGetter = GlideImageGetter(requireContext(), binding.tvDict, this@DictDialog.lifecycle)
+                    val textViewTagHandler = TextViewTagHandler(object : TextViewTagHandler.OnButtonClickListener {
+                        override fun onButtonClick(name: String, click: String?) {
+                            viewModel.onButtonClick(dictRule, name, click)
+                        }
+                    })
+                    binding.tvDict.setHtml(it, glideImageGetter, textViewTagHandler)
                 }
             }
         })
@@ -90,8 +96,7 @@ class DictDialog() : BaseDialogFragment(R.layout.dialog_dict) {
     }
 
     override fun onDestroyView() {
-        glideImageGetter?.clear()
-        glideImageGetter = null
         super.onDestroyView()
+        glideImageGetter?.clear()
     }
 }

@@ -229,7 +229,7 @@ class BookSourceEditActivity :
             binding.recyclerView.layoutManager = NoChildScrollLinearLayoutManager(this) //启用后会阻止RecyclerView跟随光标滚动,行数少时,用的TextView跟随
         }
         binding.recyclerView.adapter = adapter
-        binding.recyclerView.viewTreeObserver.addOnGlobalFocusChangeListener { oldFocus, newFocus ->
+        binding.recyclerView.viewTreeObserver.addOnGlobalFocusChangeListener { _, newFocus ->
             if (newFocus is EditText) {
                 newFocus.postDelayed({ sendText("") }, 120)
             }
@@ -716,7 +716,7 @@ class BookSourceEditActivity :
                         val cursorYInRecyclerView = cursorYOnScreen - recyclerViewLocation[1]
                         val recyclerViewBottom = binding.recyclerView.height - 120 //考虑键盘的经验值
                         // 如果光标不在可见范围内，则滚动到光标位置
-                        if (cursorYInRecyclerView < 0 || cursorYInRecyclerView > recyclerViewBottom) {
+                        if (cursorYInRecyclerView !in 0..recyclerViewBottom) {
                             val scrollDistance = cursorYInRecyclerView - recyclerViewBottom / 3
                             if (scrollDistance > 0 && binding.recyclerView.canScrollVertically(1) || scrollDistance < 0 && binding.recyclerView.canScrollVertically(-1)) {
                                 binding.recyclerView.smoothScrollBy(0, scrollDistance)

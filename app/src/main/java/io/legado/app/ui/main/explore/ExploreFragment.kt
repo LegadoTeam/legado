@@ -36,10 +36,12 @@ import io.legado.app.utils.transaction
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
@@ -142,6 +144,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         }
     }
 
+    @OptIn(FlowPreview::class)
     private fun upExploreData(searchKey: String? = null) {
         exploreFlowJob?.cancel()
         exploreFlowJob = viewLifecycleOwner.lifecycleScope.launch {
@@ -158,7 +161,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 else -> {
                     appDb.bookSourceDao.flowExplore(searchKey)
                 }
-            }.flowWithLifecycleAndDatabaseChange(
+            }.debounce(500L).flowWithLifecycleAndDatabaseChange(
                 viewLifecycleOwner.lifecycle,
                 Lifecycle.State.RESUMED,
                 AppDatabase.BOOK_SOURCE_TABLE_NAME
@@ -167,7 +170,6 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             }.conflate().flowOn(IO).collect {
                 binding.tvEmptyMsg.isGone = it.isNotEmpty() || searchView.query.isNotEmpty()
                 adapter.setItems(it, diffItemCallBack)
-                delay(500)
             }
         }
     }

@@ -36,8 +36,8 @@ class BiliDanmukuParser : BaseDanmakuParser() {
             val source = mDataSource as AndroidFileSource
             try {
                 val xmlReader = XMLReaderFactory.createXMLReader()
-                val contentHandler =XmlContentHandler()
-                xmlReader.setContentHandler(contentHandler)
+                val contentHandler = XmlContentHandler()
+                xmlReader.contentHandler = contentHandler
                 xmlReader.parse(InputSource(source.data()))
                 return contentHandler.result
             } catch (e: SAXException) {

@@ -82,8 +82,6 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                         handleReUiView()
                     }
                 }
-
-                override fun reExploreView() {}
             })
     }
 
@@ -234,7 +232,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
         }.getOrNull()
     }
 
-    @SuppressLint("ClickableViewAccessibility", "SetTextI18n")
+    @SuppressLint("SetTextI18n")
     private fun rowUiBuilder(source: BaseSource, rowUis: List<RowUi>?) {
         val loginInfo = viewModel.loginInfo
         rowUiName.clear()
@@ -497,6 +495,9 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                     }
                     it.textView.setPadding(16.dpToPx())
                     var downTime = 0L
+                    it.root.setOnClickListener { //无障碍点击
+                        handleButtonClick(source, action, name, rowUis, false)
+                    }
                     it.root.setOnTouchListener { view, event ->
                         when (event.action) {
                             MotionEvent.ACTION_DOWN -> {
@@ -571,6 +572,15 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                     }
                     it.textView.setPadding(16.dpToPx())
                     var downTime = 0L
+                    it.root.setOnClickListener { _ ->
+                        val currentIndex = chars.indexOf(char)
+                        val nextIndex = (currentIndex + 1) % chars.size
+                        char = chars.getOrNull(nextIndex) ?: ""
+                        hasChange = true
+                        loginInfo[name] = char
+                        it.textView.text = if (left) char + newName else newName + char
+                        handleButtonClick(source, action, name, rowUis, false)
+                    }
                     it.root.setOnTouchListener { view, event ->
                         when (event.action) {
                             MotionEvent.ACTION_DOWN -> {

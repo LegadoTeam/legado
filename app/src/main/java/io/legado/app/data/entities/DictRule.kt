@@ -44,7 +44,14 @@ data class DictRule(
             return body!!
         }
         val analyzeRule = AnalyzeRule().setCoroutineContext(currentCoroutineContext())
+        analyzeRule.setRuleName(name)
         return analyzeRule.getString(showRule, mContent = body)
+    }
+
+    suspend fun buttonClick(name: String, click: String) {
+        val analyzeRule = AnalyzeRule().setCoroutineContext(currentCoroutineContext())
+        analyzeRule.setRuleName(name)
+        analyzeRule.evalJS(name, click)
     }
 
 }

@@ -36,6 +36,10 @@ open class RssJsExtensions(activity: AppCompatActivity?, source: BaseSource?) : 
         return sourceRef.get()
     }
 
+    override fun getTag(): String? {
+        return sourceRef.get()?.getTag()
+    }
+
     @JavascriptInterface
     fun put(key: String, value: String): String {
         getSource()?.put(key, value)

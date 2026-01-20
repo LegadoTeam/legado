@@ -183,10 +183,8 @@ class VideoPlayer: StandardGSYVideoPlayer {
     }
 
     override fun onAutoCompletion() { //播放完成
-        val success = VideoPlay.upDurIndex(1, this)
-        if (!success) {
-            super.onAutoCompletion()
-        }
+        super.onAutoCompletion()
+        VideoPlay.upDurIndex(1, this)
     }
 
     override fun onCompletion() {

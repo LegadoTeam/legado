@@ -2,6 +2,7 @@ package io.legado.app.ui.dict
 
 import android.app.Application
 import io.legado.app.base.BaseViewModel
+import io.legado.app.constant.AppLog
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.DictRule
 import io.legado.app.help.coroutine.Coroutine
@@ -33,5 +34,19 @@ class DictViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
+    fun onButtonClick(
+        dictRule: DictRule,
+        name: String,
+        click: String?
+    ) {
+        if (click.isNullOrBlank()) {
+            return
+        }
+        execute {
+            dictRule.buttonClick(name, click)
+        }.onError {
+            AppLog.put("$name button click error\n${it.localizedMessage}", it)
+        }
+    }
 
 }

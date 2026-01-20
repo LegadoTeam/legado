@@ -6,9 +6,11 @@ import io.legado.app.constant.BookType
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.rule.ExploreKind
+import io.legado.app.help.CacheManager
 import io.legado.app.ui.main.explore.ExploreAdapter.Companion.exploreInfoMapList
 import io.legado.app.utils.ACache
 import io.legado.app.utils.GSON
+import io.legado.app.utils.InfoMap
 import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.fromJsonArray
 import io.legado.app.utils.isJsonArray
@@ -55,7 +57,9 @@ suspend fun BookSource.exploreKinds(): List<ExploreKind> {
                 val ruleStr = when {
                     exploreUrl.startsWith("@js:", true) -> {
                         aCache.getAsString(exploreKindsKey)?.takeIf { it.isNotBlank() } ?: run {
-                            val exploreInfoMap = exploreInfoMapList[bookSourceUrl]
+                            val exploreInfoMap = exploreInfoMapList[bookSourceUrl] ?: InfoMap(bookSourceUrl).also {
+                                exploreInfoMapList.put(bookSourceUrl, it)
+                            }
                             runScriptWithContext {
                                 evalJS(exploreUrl.substring(4)) {
                                     put("infoMap", exploreInfoMap)
@@ -67,7 +71,9 @@ suspend fun BookSource.exploreKinds(): List<ExploreKind> {
                     }
                     exploreUrl.startsWith("<js>", true) -> {
                         aCache.getAsString(exploreKindsKey)?.takeIf { it.isNotBlank() } ?: run {
-                            val exploreInfoMap = exploreInfoMapList[bookSourceUrl]
+                            val exploreInfoMap = exploreInfoMapList[bookSourceUrl] ?: InfoMap(bookSourceUrl).also {
+                                exploreInfoMapList.put(bookSourceUrl, it)
+                            }
                             runScriptWithContext {
                                 evalJS(exploreUrl.substring(4, exploreUrl.lastIndexOf("<"))) {
                                     put("infoMap", exploreInfoMap)
@@ -75,7 +81,6 @@ suspend fun BookSource.exploreKinds(): List<ExploreKind> {
                             }.also {
                                 aCache.put(exploreKindsKey, it)
                             }
-
                         }
                     }
                     else -> exploreUrl
