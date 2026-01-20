@@ -121,9 +121,10 @@ object BookInfo {
         Debug.log(bookSource.bookSourceUrl, "┌获取简介")
         try {
             val intro = analyzeRule.getString(infoRule.intro)
-            if (intro.startsWith("<usehtml>")) {
-                book.intro = intro
-                Debug.log(bookSource.bookSourceUrl, "└${intro}")
+            val introTrimS = intro.trimStart()
+            if (introTrimS.startsWith("<usehtml>") || introTrimS.startsWith("<usemark>")) {
+                book.intro = introTrimS
+                Debug.log(bookSource.bookSourceUrl, "└${introTrimS}")
             } else {
                 HtmlFormatter.format(intro).let {
                     if (it.isNotEmpty()) book.intro = it

@@ -67,7 +67,6 @@ class TextViewTagHandler(private val onButtonClickListener: OnButtonClickListene
                             }
                         }
                     )
-
                     output.setSpan(
                         buttonSpan,
                         start,
