@@ -367,7 +367,7 @@ result = `<img src = "${url}">`;
 
 * 详情页html
 > 书籍详情页支持轻度显示html字符串样式（同字典规则）  
-> 获取到的简介字符串需要用<usehtml></usehtml>包裹起来才能识别  
+> 获取到的简介字符串需要用`<usehtml></usehtml>`包裹起来才能识别  
 > 支持按钮 `<button>点我@onclick:java.toast("Hello World")</button>`  
 
-> 支持Markdown语法需要用<usemark></usemark>包裹起来 
+> 支持Markdown语法需要用`<md></md>`包裹起来 

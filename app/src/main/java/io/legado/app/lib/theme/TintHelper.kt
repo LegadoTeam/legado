@@ -480,7 +480,7 @@ object TintHelper {
             drawables[1] = ContextCompat.getDrawable(editText.context, mCursorDrawableRes)
             drawables[1] = createTintedDrawable(drawables[1], color)
             fCursorDrawable.set(editor, drawables)
-        } catch (ignored: Exception) {
+        } catch (_: Exception) {
         }
 
     }

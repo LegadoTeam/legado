@@ -5,9 +5,10 @@ import android.graphics.Canvas
 import android.graphics.ColorFilter
 import android.graphics.PixelFormat
 import android.graphics.Rect
+import android.graphics.drawable.Animatable
 import android.graphics.drawable.Drawable
 import android.text.Html
-import android.util.LruCache
+import android.util.Size
 import android.widget.TextView
 import androidx.lifecycle.Lifecycle
 import com.bumptech.glide.Glide
@@ -23,6 +24,7 @@ import io.legado.app.utils.lifecycle
 import java.io.ByteArrayInputStream
 import kotlin.io.encoding.Base64
 import io.legado.app.utils.SvgUtils
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.text.dropLast
 import kotlin.text.endsWith
 import kotlin.text.toIntOrNull
@@ -32,12 +34,10 @@ class GlideImageGetter(
     textView: TextView,
     private  val lifecycle: Lifecycle
 ) : Html.ImageGetter, Drawable.Callback {
-    companion object {
-        private val urlStyleCache = LruCache<String, Map<String, String>>(99)
-    }
     private val textViewRef = WeakReference(textView)
     private val contextRef = WeakReference(context)
-    private val gifDrawables = mutableSetOf<GlideUrlDrawable>()
+    private val cacheDrawable = ConcurrentHashMap<String, GlideUrlDrawable>()
+    private val pendingImages = mutableSetOf<String>()
     private val emptyDrawable by lazy {
         object : Drawable() {
             override fun draw(canvas: Canvas) = Unit
@@ -50,7 +50,7 @@ class GlideImageGetter(
         }
     }
     private val availableWidth by lazy {
-        val textView = textViewRef.get() ?: return@lazy 0
+        val textView = textViewRef.get() ?: return@lazy 800
         textView.width - textView.paddingLeft - textView.paddingRight - 8.dpToPx() //8是为了文字对齐额外的右边距
     }
 
@@ -59,64 +59,77 @@ class GlideImageGetter(
         if (context == null || source.isNullOrBlank()) {
             return emptyDrawable
         }
+        var style: Map<String, String>? = null
         if (source.startsWith("data:image/svg")) {
             var data:String? = null
-            var style:String? = null
-            var width:String? = null
             val urlMatcher = paramPattern.matcher(source)
             if (urlMatcher.find()) {
                 val urlOptionStr = source.substring(urlMatcher.end())
-                GSON.fromJsonObject<Map<String, String>>(urlOptionStr).getOrNull()?.let { map ->
-                    map.forEach { (key, value) ->
-                        when (key) {
-                            "style" -> style = value
-                            "width" -> width = value
-                        }
-                    }
-                }
+                style = GSON.fromJsonObject<Map<String, String>>(urlOptionStr).getOrNull()
                 data = source.take(urlMatcher.start())
             }
             val inputStream = ByteArrayInputStream(Base64.decode((data ?: source).substringAfter(",")))
             val (pictureDrawable, size) = SvgUtils.createDrawable(inputStream) ?: return emptyDrawable
-            val imgWidth = if (width?.endsWith("%")  == true) {
-                val sWidth = width.dropLast(1).toIntOrNull() ?: 80
-                val displayMetrics = context.resources.displayMetrics
-                displayMetrics.widthPixels * sWidth / 100
-            } else {
-                val sWidth = width?.toIntOrNull() ?: 0
-                if (sWidth > 0) {
-                    sWidth
-                } else {
-                    size.width
-                }
-            }
-            val showWidth = availableWidth.takeIf { it in 1..<imgWidth } ?: imgWidth
-            val showHeight = (size.height * showWidth / size.width.toFloat()).toInt()
-            val left = when (style) {
-                "center" -> (availableWidth - showWidth) / 2
-                "right" -> availableWidth - showWidth
-                else -> 0
-            }
-            pictureDrawable.setBounds(left, 0, left + showWidth, showHeight)
+            val rect = getDrawableRect(size, style)
+            pictureDrawable.bounds = rect
             return pictureDrawable
         }
-        urlStyleCache[source] ?: run {
-            val urlMatcher = paramPattern.matcher(source)
-            if (urlMatcher.find()) {
-                val urlOptionStr = source.substring(urlMatcher.end())
-                GSON.fromJsonObject<Map<String, String>>(urlOptionStr).getOrNull()?.let { map ->
-                    urlStyleCache.put(source, map.filterKeys { it in listOf("style", "width") })
-                    return@run
-                }
-            }
-            urlStyleCache.put(source, emptyMap())
+        cacheDrawable[source]?.let {
+            return it
         }
         val urlDrawable = GlideUrlDrawable()
-        val target = ImageTarget(urlDrawable, source)
+        cacheDrawable[source] = urlDrawable
+        pendingImages.add(source)
+        val urlMatcher = paramPattern.matcher(source)
+        if (urlMatcher.find()) {
+            val urlOptionStr = source.substring(urlMatcher.end())
+            style = GSON.fromJsonObject<Map<String, String>>(urlOptionStr).getOrNull()
+        }
+        val target = ImageTarget(urlDrawable, source, style)
         Glide.with(context).lifecycle(lifecycle)
             .load(source)
             .into(target)
         return urlDrawable
+    }
+
+    private fun getDrawableRect(size: Size, style: Map<String, String>?): Rect {
+        val drawableWidth = size.width.coerceAtLeast(1)
+        val drawableHeight = size.height.coerceAtLeast(1)
+        if (style == null) {
+            return Rect(0, 0, drawableWidth, drawableHeight)
+        }
+        val styleWidth = style["width"]
+        val styleType = style["style"]
+        if (styleWidth == null && styleType == null) {
+            return Rect(0, 0, drawableWidth, drawableHeight)
+        }
+        val imgWidth = if (styleWidth?.endsWith("%")  == true) {
+            val sWidth = styleWidth.dropLast(1).toIntOrNull() ?: 80
+            availableWidth * sWidth / 100
+        } else {
+            val sWidth = styleWidth?.toIntOrNull() ?: 0
+            if (sWidth > 0) {
+                sWidth
+            } else {
+                drawableWidth
+            }
+        }
+        val showWidth = availableWidth.takeIf { it in 1..<imgWidth } ?: imgWidth
+        val showHeight = (drawableHeight * showWidth / drawableWidth.toFloat()).toInt()
+        val left = when (styleType) {
+            "center" -> (availableWidth - showWidth) / 2
+            "right" -> availableWidth - showWidth
+            else -> 0
+        }
+        return Rect(left, 0, left + showWidth, showHeight)
+     }
+
+    private fun notifyImageLoaded(source: String) {
+        pendingImages.remove(source)
+        if (pendingImages.isEmpty()) {
+            val textView = textViewRef.get() ?: return
+            textView.text = textView.text
+        }
     }
 
     override fun invalidateDrawable(who: Drawable) {
@@ -136,38 +149,54 @@ class GlideImageGetter(
     ) {
     }
 
-    private inner class GlideUrlDrawable(): Drawable(), Drawable.Callback {
+    private inner class GlideUrlDrawable(): Drawable(), Animatable {
         private var mDrawable: Drawable? = null
-        private var mBounds = Rect()
+        private var gDrawable: GifDrawable? = null
 
         fun setDrawable(drawable: Drawable?) {
-            mDrawable?.callback = null
-            drawable?.callback = this
-            mDrawable = drawable
+            if (drawable is GifDrawable) {
+                gDrawable?.apply{
+                    callback = null
+                    stop()
+                }
+                gDrawable = drawable.apply{
+                    if (!isRunning) {
+                        callback = this@GlideImageGetter
+                        start()
+                    }
+                }
+                mDrawable = null
+            } else {
+                gDrawable?.apply{
+                    callback = null
+                    stop()
+                }
+                gDrawable = null
+                mDrawable = drawable
+            }
         }
 
         fun clear() {
-            (mDrawable as? GifDrawable)?.apply{
+            gDrawable?.apply{
+                callback = null
                 stop()
-                clearAnimationCallbacks()
             }
-            mDrawable?.callback = null
+            gDrawable = null
             mDrawable = null
         }
 
         override fun draw(canvas: Canvas) {
-            mDrawable?.draw(canvas)
+            (mDrawable ?: gDrawable)?.draw(canvas)
         }
 
         override fun onBoundsChange(bounds: Rect) {
             super.onBoundsChange(bounds)
-            mBounds.set(bounds)
-            mDrawable?.bounds = bounds
+            (mDrawable ?: gDrawable)?.bounds = bounds
         }
 
         @Deprecated("Deprecated in Java")
         override fun getOpacity(): Int {
-            return mDrawable?.opacity ?: PixelFormat.TRANSLUCENT
+            return (mDrawable ?: gDrawable)?.opacity ?: PixelFormat.TRANSLUCENT
         }
 
         override fun setAlpha(alpha: Int) {
@@ -179,92 +208,70 @@ class GlideImageGetter(
         }
 
         override fun getIntrinsicWidth(): Int {
-            return mDrawable?.intrinsicWidth ?: 0
+            return (mDrawable ?: gDrawable)?.intrinsicWidth ?: 0
         }
 
         override fun getIntrinsicHeight(): Int {
-            return mDrawable?.intrinsicHeight ?: 0
+            return (mDrawable ?: gDrawable)?.intrinsicHeight ?: 0
         }
 
-        override fun invalidateDrawable(who: Drawable) {
-            callback?.invalidateDrawable(who)
+        override fun isRunning(): Boolean {
+            return gDrawable?.isRunning == true
         }
 
-        override fun scheduleDrawable(
-            who: Drawable,
-            what: Runnable,
-            `when`: Long
-        ) {
-            callback?.scheduleDrawable(who, what, `when`)
+        override fun start() {
+            gDrawable?.start()
         }
 
-        override fun unscheduleDrawable(
-            who: Drawable,
-            what: Runnable
-        ) {
-            callback?.unscheduleDrawable(who, what)
+        override fun stop() {
+            gDrawable?.stop()
         }
     }
 
     private inner class ImageTarget(
         private val urlDrawable: GlideUrlDrawable,
-        private val source: String
+        private val source: String,
+        private val style: Map<String, String>?
     ) : CustomTarget<Drawable>() {
 
         override fun onResourceReady(
             drawable: Drawable,
             transition: Transition<in Drawable>?
         ) {
-            val textView = textViewRef.get() ?: return
-            val context = contextRef.get() ?: return
-            val drawableWidth = drawable.intrinsicWidth.coerceAtLeast(1)
-            val drawableHeight = drawable.intrinsicHeight.coerceAtLeast(1)
-            val style = urlStyleCache[source]
-            val styleWidth = style?.get("width")
-            val imgWidth = if (styleWidth?.endsWith("%")  == true) {
-                val sWidth = styleWidth.dropLast(1).toIntOrNull() ?: 80
-                val displayMetrics = context.resources.displayMetrics
-                displayMetrics.widthPixels * sWidth / 100
-            } else {
-                val sWidth = styleWidth?.toIntOrNull() ?: 0
-                if (sWidth > 0) {
-                    sWidth
-                } else {
-                    drawableWidth
-                }
-            }
-            val showWidth = availableWidth.takeIf { it in 1..<imgWidth } ?: imgWidth
-            val showHeight = (drawableHeight * showWidth / drawableWidth.toFloat()).toInt()
-            val styleType = style?.get("style")
-            val left = when (styleType) {
-                "center" -> (availableWidth - showWidth) / 2
-                "right" -> availableWidth - showWidth
-                else -> 0
-            }
             urlDrawable.setDrawable(drawable)
-            urlDrawable.setBounds(left, 0, left + showWidth, showHeight)
-            if (drawable is GifDrawable) {
-                urlDrawable.callback = this@GlideImageGetter
-                drawable.start()
-                gifDrawables.add(urlDrawable)
-            }
-            textView.text = textView.text
+            val rect = getDrawableRect(Size(drawable.intrinsicWidth, drawable.intrinsicHeight), style)
+            urlDrawable.bounds = rect
+            notifyImageLoaded(source)
         }
 
         override fun onLoadCleared(placeholder: Drawable?) {
-            urlDrawable.setDrawable(placeholder)
+            urlDrawable.clear()
+            cacheDrawable.remove(source)
         }
 
         override fun onLoadFailed(errorDrawable: Drawable?) {
             urlDrawable.setDrawable(errorDrawable)
+            notifyImageLoaded(source)
+        }
+    }
+
+    fun start() {
+        cacheDrawable.values.forEach { drawable ->
+            drawable.start()
+        }
+    }
+
+    fun stop() {
+        cacheDrawable.values.forEach { drawable ->
+            drawable.stop()
         }
     }
 
     fun clear() {
-        gifDrawables.forEach {
-            it.clear()
+        cacheDrawable.values.forEach { drawable ->
+            drawable.clear()
         }
-        gifDrawables.clear()
+        cacheDrawable.clear()
         contextRef.clear()
         textViewRef.clear()
     }

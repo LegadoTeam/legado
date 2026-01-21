@@ -1,4 +1,4 @@
-package io.legado.app.ui.book.source
+package io.legado.app.model
 
 import androidx.appcompat.app.AppCompatActivity
 import io.legado.app.constant.AppLog

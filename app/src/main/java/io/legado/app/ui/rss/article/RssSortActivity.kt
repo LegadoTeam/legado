@@ -359,7 +359,7 @@ class RssSortActivity : VMBaseActivity<ActivityRssArtivlesBinding, RssSortViewMo
                     } else {
                         listOf(Pair("", url))
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     listOf(Pair("", url))
                 }
                 sortList.apply {

@@ -122,7 +122,7 @@ object BookInfo {
         try {
             val intro = analyzeRule.getString(infoRule.intro)
             val introTrimS = intro.trimStart()
-            if (introTrimS.startsWith("<usehtml>") || introTrimS.startsWith("<usemark>")) {
+            if (introTrimS.startsWith("<usehtml>") || introTrimS.startsWith("<md>")) {
                 book.intro = introTrimS
                 Debug.log(bookSource.bookSourceUrl, "└${introTrimS}")
             } else {

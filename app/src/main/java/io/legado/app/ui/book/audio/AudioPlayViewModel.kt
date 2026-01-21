@@ -86,7 +86,7 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
             AudioPlay.simulatedChapterSize = book.simulatedTotalChapterNum()
             AudioPlay.upDurChapter()
             return true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             context.toastOnUi(R.string.error_load_toc)
             return false
         }

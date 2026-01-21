@@ -11,9 +11,9 @@ import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setRuleData
 import io.legado.app.model.analyzeRule.RuleData
 import io.legado.app.utils.NetworkUtils
+import kotlinx.coroutines.currentCoroutineContext
 import splitties.init.appCtx
 import java.util.Locale
-import kotlin.coroutines.coroutineContext
 
 @Keep
 object RssParserByRule {
@@ -43,7 +43,7 @@ object RssParserByRule {
         } else {
             val articleList = mutableListOf<RssArticle>()
             val analyzeRule = AnalyzeRule(ruleData, rssSource)
-            analyzeRule.setCoroutineContext(coroutineContext)
+            analyzeRule.setCoroutineContext(currentCoroutineContext())
             analyzeRule.setContent(body).setBaseUrl(sortUrl)
             analyzeRule.setRedirectUrl(redirectUrl)
             var reverse = false

@@ -91,7 +91,9 @@ object WebViewPool {
             (parent as? ViewGroup)?.removeView(webView)
             stopLoading()
             clearFocus() //清除焦点
-            setOnLongClickListener(null)
+            webView.setOnLongClickListener { _ ->
+                return@setOnLongClickListener false
+            }
             webChromeClient = null
             webViewClient = WebViewClient()
 
@@ -131,6 +133,10 @@ object WebViewPool {
     // 初始化
     @SuppressLint("SetJavaScriptEnabled")
     private fun preInitWebView(webView: WebView) {
+        webView.layoutParams = ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        )
         webView.settings.apply {
             javaScriptEnabled = true
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
@@ -140,6 +146,7 @@ object WebViewPool {
             builtInZoomControls = true
             displayZoomControls = false
             setDarkeningAllowed(AppConfig.isNightTheme)
+            textZoom = 100
         }
         webView.setDownloadListener { url, _, contentDisposition, _, _ ->
             var fileName = URLUtil.guessFileName(url, contentDisposition, null)
@@ -147,6 +154,9 @@ object WebViewPool {
             webView.longSnackbar(fileName, appCtx.getString(R.string.action_download)) {
                 Download.start(appCtx, url, fileName)
             }
+        }
+        webView.setOnLongClickListener { _ ->
+            return@setOnLongClickListener false
         }
     }
 

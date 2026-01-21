@@ -40,7 +40,7 @@ class PermissionActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val rationale = intent.getStringExtra(KEY_RATIONALE)
-        val requestCode = intent.getIntExtra(KEY_INPUT_PERMISSIONS_CODE, 1000)
+//        val requestCode = intent.getIntExtra(KEY_INPUT_PERMISSIONS_CODE, 1000)
         val permissions = intent.getStringArrayExtra(KEY_INPUT_PERMISSIONS)!!
         when (intent.getIntExtra(KEY_INPUT_REQUEST_TYPE, Request.TYPE_REQUEST_PERMISSION)) {
             //权限请求
@@ -213,7 +213,7 @@ class PermissionActivity : AppCompatActivity() {
             return
         }
         permissions.forEach {
-            if (getDenyCount(it) > 5){
+            if (getDenyCount(it) > 5) {
                 finish()
                 return
             }

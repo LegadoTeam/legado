@@ -6,7 +6,6 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.util.AttributeSet
-import android.view.View
 import android.widget.RelativeLayout
 import io.legado.app.R
 import io.legado.app.utils.getCompatColor
@@ -57,7 +56,7 @@ class ShadowLayout @JvmOverloads constructor(
 
 
     init {
-        setLayerType(View.LAYER_TYPE_SOFTWARE, null) // 关闭硬件加速
+        setLayerType(LAYER_TYPE_SOFTWARE, null) // 关闭硬件加速
         setWillNotDraw(false) // 调用此方法后，才会执行 onDraw(Canvas) 方法
         val typedArray =
             context.obtainStyledAttributes(attrs, R.styleable.ShadowLayout)

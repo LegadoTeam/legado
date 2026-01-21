@@ -47,6 +47,7 @@ import io.legado.app.utils.writeFile
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.collectIndexed
 import kotlinx.coroutines.flow.flow
@@ -68,7 +69,6 @@ import splitties.init.appCtx
 import splitties.systemservices.notificationManager
 import java.nio.charset.Charset
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.coroutines.coroutineContext
 import kotlin.math.min
 
 /**
@@ -728,7 +728,7 @@ class ExportBookService : BaseService() {
                 min(scope.size, (epubBookIndex + 1) * size)
             )
             chapterList.forEachIndexed { index, chapter ->
-                coroutineContext.ensureActive()
+                currentCoroutineContext().ensureActive()
                 updateProgress(chapterList, index)
                 BookHelp.getContent(book, chapter).let { content ->
                     val (contentFix, resources) = fixPic(

@@ -319,6 +319,7 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
         super.onDestroy()
     }
 
+    @Suppress("unused")
     class JSInterface(activity: WebViewActivity) {
         private val activityRef: WeakReference<WebViewActivity> = WeakReference(activity)
         @JavascriptInterface

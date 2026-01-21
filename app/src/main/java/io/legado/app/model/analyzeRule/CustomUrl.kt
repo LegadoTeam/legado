@@ -16,7 +16,7 @@ class CustomUrl(url: String) {
             GSON.fromJsonObject<Map<String, Any>>(attr).getOrNull()?.let {
                 attribute.putAll(it)
             }
-            url.substring(0, urlMatcher.start())
+            url.take(urlMatcher.start())
         } else {
             url
         }

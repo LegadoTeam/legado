@@ -46,7 +46,7 @@ import java.util.concurrent.Executors
 import kotlin.collections.forEach
 import kotlin.math.min
 import io.legado.app.model.RuleUpdate
-import io.legado.app.ui.book.source.SourceCallBack
+import io.legado.app.model.SourceCallBack
 
 class MainViewModel(application: Application) : BaseViewModel(application) {
     private var threadCount = AppConfig.threadCount

@@ -18,7 +18,6 @@ import io.legado.app.utils.externalFiles
 import io.legado.app.utils.gone
 import io.legado.app.utils.inputStream
 import io.legado.app.utils.readUri
-import io.legado.app.utils.removePref
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding

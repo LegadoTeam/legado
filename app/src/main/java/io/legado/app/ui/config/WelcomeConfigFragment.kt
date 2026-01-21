@@ -11,7 +11,6 @@ import io.legado.app.R
 import io.legado.app.constant.PreferKey
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.addHeaders
-import io.legado.app.help.http.get
 import io.legado.app.help.http.newCallResponse
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.lib.dialogs.selector
@@ -32,7 +31,6 @@ import io.legado.app.utils.removePref
 import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.launch
-import okhttp3.Request
 import splitties.init.appCtx
 import java.io.FileOutputStream
 class WelcomeConfigFragment : PreferenceFragment(),
@@ -49,24 +47,25 @@ class WelcomeConfigFragment : PreferenceFragment(),
         }
     }
 
+    // 虽然启动页文字和图标都不显示不太好看，但仍然应该吧权力交给用户，故注释相关代码
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         addPreferencesFromResource(R.xml.pref_config_welcome)
         val welcomeImage = AppConfig.welcomeImage
         val welcomeImageDark = AppConfig.welcomeImageDark
         upPreferenceSummary(PreferKey.welcomeImage, welcomeImage)
         upPreferenceSummary(PreferKey.welcomeImageDark, welcomeImageDark)
-        findPreference<SwitchPreference>(PreferKey.welcomeShowText)?.let {
-            it.isEnabled = !welcomeImage.isNullOrEmpty()
-        }
-        findPreference<SwitchPreference>(PreferKey.welcomeShowIcon)?.let {
-            it.isEnabled = !welcomeImage.isNullOrEmpty()
-        }
-        findPreference<SwitchPreference>(PreferKey.welcomeShowTextDark)?.let {
-            it.isEnabled = !welcomeImageDark.isNullOrEmpty()
-        }
-        findPreference<SwitchPreference>(PreferKey.welcomeShowIconDark)?.let {
-            it.isEnabled = !welcomeImageDark.isNullOrEmpty()
-        }
+//        findPreference<SwitchPreference>(PreferKey.welcomeShowText)?.let {
+//            it.isEnabled = !welcomeImage.isNullOrEmpty()
+//        }
+//        findPreference<SwitchPreference>(PreferKey.welcomeShowIcon)?.let {
+//            it.isEnabled = !welcomeImage.isNullOrEmpty()
+//        }
+//        findPreference<SwitchPreference>(PreferKey.welcomeShowTextDark)?.let {
+//            it.isEnabled = !welcomeImageDark.isNullOrEmpty()
+//        }
+//        findPreference<SwitchPreference>(PreferKey.welcomeShowIconDark)?.let {
+//            it.isEnabled = !welcomeImageDark.isNullOrEmpty()
+//        }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -91,23 +90,23 @@ class WelcomeConfigFragment : PreferenceFragment(),
             PreferKey.welcomeImage -> {
                 val welcomeImage = getPrefString(key)
                 upPreferenceSummary(key, welcomeImage)
-                findPreference<SwitchPreference>(PreferKey.welcomeShowText)?.let {
-                    it.isEnabled = !welcomeImage.isNullOrEmpty()
-                }
-                findPreference<SwitchPreference>(PreferKey.welcomeShowIcon)?.let {
-                    it.isEnabled = !welcomeImage.isNullOrEmpty()
-                }
+//                findPreference<SwitchPreference>(PreferKey.welcomeShowText)?.let {
+//                    it.isEnabled = !welcomeImage.isNullOrEmpty()
+//                }
+//                findPreference<SwitchPreference>(PreferKey.welcomeShowIcon)?.let {
+//                    it.isEnabled = !welcomeImage.isNullOrEmpty()
+//                }
             }
 
             PreferKey.welcomeImageDark -> {
                 val welcomeImageDark = getPrefString(key)
                 upPreferenceSummary(key, welcomeImageDark)
-                findPreference<SwitchPreference>(PreferKey.welcomeShowTextDark)?.let {
-                    it.isEnabled = !welcomeImageDark.isNullOrEmpty()
-                }
-                findPreference<SwitchPreference>(PreferKey.welcomeShowIconDark)?.let {
-                    it.isEnabled = !welcomeImageDark.isNullOrEmpty()
-                }
+//                findPreference<SwitchPreference>(PreferKey.welcomeShowTextDark)?.let {
+//                    it.isEnabled = !welcomeImageDark.isNullOrEmpty()
+//                }
+//                findPreference<SwitchPreference>(PreferKey.welcomeShowIconDark)?.let {
+//                    it.isEnabled = !welcomeImageDark.isNullOrEmpty()
+//                }
             }
         }
     }
@@ -130,14 +129,14 @@ class WelcomeConfigFragment : PreferenceFragment(),
                     ) { _, i ->
                         if (i == 0) {
                             removePref(preference.key)
-                            AppConfig.welcomeShowText = true
-                            AppConfig.welcomeShowIcon = true
-                            findPreference<SwitchPreference>(PreferKey.welcomeShowText)?.let {
-                                it.isChecked = true
-                            }
-                            findPreference<SwitchPreference>(PreferKey.welcomeShowIcon)?.let {
-                                it.isChecked = true
-                            }
+//                            AppConfig.welcomeShowText = true
+//                            AppConfig.welcomeShowIcon = true
+//                            findPreference<SwitchPreference>(PreferKey.welcomeShowText)?.let {
+//                                it.isChecked = true
+//                            }
+//                            findPreference<SwitchPreference>(PreferKey.welcomeShowIcon)?.let {
+//                                it.isChecked = true
+//                            }
                             BookCover.upDefaultCover()
                         } else {
                             selectImage.launch {
@@ -163,14 +162,14 @@ class WelcomeConfigFragment : PreferenceFragment(),
                     ) { _, i ->
                         if (i == 0) {
                             removePref(preference.key)
-                            AppConfig.welcomeShowTextDark = true
-                            AppConfig.welcomeShowIconDark = true
-                            findPreference<SwitchPreference>(PreferKey.welcomeShowTextDark)?.let {
-                                it.isChecked = true
-                            }
-                            findPreference<SwitchPreference>(PreferKey.welcomeShowIconDark)?.let {
-                                it.isChecked = true
-                            }
+//                            AppConfig.welcomeShowTextDark = true
+//                            AppConfig.welcomeShowIconDark = true
+//                            findPreference<SwitchPreference>(PreferKey.welcomeShowTextDark)?.let {
+//                                it.isChecked = true
+//                            }
+//                            findPreference<SwitchPreference>(PreferKey.welcomeShowIconDark)?.let {
+//                                it.isChecked = true
+//                            }
                             BookCover.upDefaultCover()
                         } else {
                             selectImage.launch {

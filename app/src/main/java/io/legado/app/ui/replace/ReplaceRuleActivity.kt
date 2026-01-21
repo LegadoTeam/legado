@@ -1,7 +1,6 @@
 package io.legado.app.ui.replace
 
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
@@ -89,13 +88,13 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
         }
     private val importDoc = registerForActivityResult(HandleFileContract()) {
         kotlin.runCatching {
-            it.uri?.readText(this)?.let {
+            it.uri?.readText(this)?.let { source ->
                 showDialogFragment(
-                    ImportReplaceRuleDialog(it)
+                    ImportReplaceRuleDialog(source)
                 )
             }
-        }.onFailure {
-            toastOnUi("readTextError:${it.localizedMessage}")
+        }.onFailure { e ->
+            toastOnUi("readTextError:${e.localizedMessage}")
         }
     }
     private val exportResult = registerForActivityResult(HandleFileContract()) {
@@ -216,7 +215,7 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
                 AppLog.put("替换规则管理界面更新数据出错", it)
             }.flowOn(IO).conflate().collect {
                 if (dataInit) {
-                    setResult(Activity.RESULT_OK)
+                    setResult(RESULT_OK)
                 }
                 adapter.setItems(it, adapter.diffItemCallBack)
                 dataInit = true
