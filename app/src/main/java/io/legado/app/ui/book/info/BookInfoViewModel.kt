@@ -38,7 +38,7 @@ import io.legado.app.model.ReadManga
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.webBook.WebBook
-import io.legado.app.ui.book.source.SourceCallBack
+import io.legado.app.model.SourceCallBack
 import io.legado.app.ui.login.SourceLoginJsExtensions
 import io.legado.app.utils.ArchiveUtils
 import io.legado.app.utils.UrlUtil

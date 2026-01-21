@@ -5,7 +5,6 @@ import android.text.Layout
 import android.text.Spanned
 import android.text.StaticLayout
 import android.text.TextPaint
-import android.text.style.AbsoluteSizeSpan
 import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
 import android.text.style.URLSpan

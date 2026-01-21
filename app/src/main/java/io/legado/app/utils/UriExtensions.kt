@@ -106,12 +106,11 @@ fun Fragment.readUri(uri: Uri?, success: (fileDoc: FileDoc, inputStream: InputSt
 @Throws(Exception::class)
 fun Uri.readBytes(context: Context): ByteArray {
     return if (this.isContentScheme()) {
-        context.contentResolver.openInputStream(this)?.let {
+        context.contentResolver.openInputStream(this)?.use {
             val len: Int = it.available()
             val buffer = ByteArray(len)
             it.read(buffer)
-            it.close()
-            return buffer
+            buffer
         } ?: throw NoStackTraceException("打开文件失败\n${this}")
     } else {
         val path = RealPathUtil.getPath(context, this)

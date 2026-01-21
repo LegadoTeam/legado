@@ -42,9 +42,6 @@ class RssArticlesAdapter3(context: Context, callBack: CallBack) :
             imageAspectRatio.put(url, aspectRatio)
             CacheManager.put(KEY_NAME + url, aspectRatio, SAVE_TIME)
         }
-        fun clearImageAspectRatio() {
-            imageAspectRatio.evictAll()
-        }
     }
 
     private val orientation = context.resources.configuration.orientation

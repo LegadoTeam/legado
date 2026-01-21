@@ -44,7 +44,11 @@ class DictDialog() : BaseDialogFragment(R.layout.dialog_dict) {
     private val viewModel by viewModels<DictViewModel>()
     private val binding by viewBinding(DialogDictBinding::bind)
     private var word: String? = null
-    private var glideImageGetter: GlideImageGetter? = null
+    private var initGetter = false
+    private val glideImageGetter by lazy {
+        initGetter = true
+        GlideImageGetter(requireContext(), binding.tvDict, this@DictDialog.lifecycle)
+    }
 
     override fun onStart() {
         super.onStart()
@@ -74,13 +78,13 @@ class DictDialog() : BaseDialogFragment(R.layout.dialog_dict) {
                 viewModel.dict(dictRule, word!!) {
                     binding.rotateLoading.inVisible()
                     val contentTrimS = it.trimStart()
-                    if (contentTrimS.startsWith("<usemark>")) {
+                    if (contentTrimS.startsWith("<md>")) {
                         val lastIndex = contentTrimS.lastIndexOf("<")
-                        if (lastIndex < 9) {
+                        if (lastIndex < 4) {
                             binding.tvDict.text = contentTrimS
                             return@dict
                         }
-                        val mark = contentTrimS.substring(9, lastIndex)
+                        val mark = contentTrimS.substring(4, lastIndex)
                         viewLifecycleOwner.lifecycleScope.launch {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                 binding.tvDict.setTextClassifier(TextClassifier.NO_OP)
@@ -98,8 +102,6 @@ class DictDialog() : BaseDialogFragment(R.layout.dialog_dict) {
                         }
                         return@dict
                     }
-                    glideImageGetter?.clear()
-                    glideImageGetter = GlideImageGetter(requireContext(), binding.tvDict, this@DictDialog.lifecycle)
                     val textViewTagHandler = TextViewTagHandler(object : TextViewTagHandler.OnButtonClickListener {
                         override fun onButtonClick(name: String, click: String?) {
                             viewModel.onButtonClick(dictRule, name, click)
@@ -133,6 +135,8 @@ class DictDialog() : BaseDialogFragment(R.layout.dialog_dict) {
 
     override fun onDestroyView() {
         super.onDestroyView()
-        glideImageGetter?.clear()
+        if (initGetter) {
+            glideImageGetter.clear()
+        }
     }
 }

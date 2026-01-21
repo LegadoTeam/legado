@@ -168,3 +168,19 @@ fun String.parseIpsFromString(): List<InetAddress>? =
         .filter { it.isNotEmpty() }
         .mapNotNull { it.runCatching { InetAddress.getByName(this) }.getOrNull() }
         .takeIf { it.isNotEmpty() }
+
+
+fun String.quoteReplacementJs(): String {
+    if (!this.contains('\\')) {
+        return this
+    }
+    val sb = StringBuilder()
+    for (c in this) {
+        if (c == '\\') {
+            sb.append("\\\\")
+        } else {
+            sb.append(c)
+        }
+    }
+    return sb.toString()
+}

@@ -6,7 +6,7 @@ import io.legado.app.model.analyzeRule.AnalyzeUrl.ConcurrentRecord
 import kotlinx.coroutines.delay
 import java.util.concurrent.ConcurrentHashMap
 
-class ConcurrentRateLimiter(val source: BaseSource?) {
+class ConcurrentRateLimiter(source: BaseSource?) {
 
     companion object {
         val concurrentRecordMap = ConcurrentHashMap<String, ConcurrentRecord>()
@@ -39,7 +39,7 @@ class ConcurrentRateLimiter(val source: BaseSource?) {
                         }
                         else -> record
                     }
-                } catch (e: NumberFormatException) {
+                } catch (_: NumberFormatException) {
                     record
                 }
             }
@@ -82,7 +82,7 @@ class ConcurrentRateLimiter(val source: BaseSource?) {
                 return@synchronized 0
             }
             if (fetchRecord.frequency < fetchRecord.accessLimit) {
-                fetchRecord.frequency += 1
+                fetchRecord.frequency ++
                 return@synchronized 0
             } else {
                 return@synchronized nextTime - nowTime

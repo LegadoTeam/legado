@@ -14,6 +14,7 @@ import io.legado.app.utils.escapeForJs
 import io.legado.app.utils.fromJsonObject
 import java.util.UUID
 
+@Suppress("unused")
 class WebJsExtensions(private val source: BaseSource, activity: AppCompatActivity, private val webView: WebView): RssJsExtensions(activity, source) {
 
     /**

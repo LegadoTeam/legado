@@ -61,11 +61,11 @@ class TxtTocRuleActivity : VMBaseActivity<ActivityTxtTocRuleBinding, TxtTocRuleV
     }
     private val importDoc = registerForActivityResult(HandleFileContract()) {
         kotlin.runCatching {
-            it.uri?.readText(this)?.let {
-                showDialogFragment(ImportTxtTocRuleDialog(it))
+            it.uri?.readText(this)?.let { source ->
+                showDialogFragment(ImportTxtTocRuleDialog(source))
             }
-        }.onFailure {
-            toastOnUi("readTextError:${it.localizedMessage}")
+        }.onFailure {e ->
+            toastOnUi("readTextError:${e.localizedMessage}")
         }
     }
     private val exportResult = registerForActivityResult(HandleFileContract()) {

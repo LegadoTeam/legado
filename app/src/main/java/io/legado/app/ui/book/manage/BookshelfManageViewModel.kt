@@ -16,14 +16,13 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.webBook.WebBook
-import io.legado.app.ui.book.source.SourceCallBack
+import io.legado.app.model.SourceCallBack
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.stackTraceStr
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.writeToOutputStream
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
 import java.io.File
 
 

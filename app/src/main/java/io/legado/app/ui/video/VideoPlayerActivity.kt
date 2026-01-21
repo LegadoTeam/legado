@@ -37,7 +37,7 @@ import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.model.VideoPlay
 import io.legado.app.service.VideoPlayService
 import io.legado.app.ui.about.AppLogDialog
-import io.legado.app.ui.book.source.SourceCallBack
+import io.legado.app.model.SourceCallBack
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
 import io.legado.app.ui.book.toc.TocActivityResult
 import io.legado.app.ui.login.SourceLoginActivity

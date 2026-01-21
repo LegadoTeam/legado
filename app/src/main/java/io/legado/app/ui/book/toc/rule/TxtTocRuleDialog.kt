@@ -74,11 +74,11 @@ class TxtTocRuleDialog() : BaseDialogFragment(R.layout.dialog_toc_regex),
     }
     private val importDoc = registerForActivityResult(HandleFileContract()) {
         kotlin.runCatching {
-            it.uri?.readText(requireContext())?.let {
-                showDialogFragment(ImportTxtTocRuleDialog(it))
+            it.uri?.readText(requireContext())?.let { source ->
+                showDialogFragment(ImportTxtTocRuleDialog(source))
             }
-        }.onFailure {
-            toastOnUi("readTextError:${it.localizedMessage}")
+        }.onFailure { e ->
+            toastOnUi("readTextError:${e.localizedMessage}")
         }
     }
 

@@ -269,7 +269,7 @@ class CodeEditActivity :
         if (txt.isNotEmpty()) {
             try {
                 editorSearcher.search(txt, options)
-            } catch (e: java.util.regex.PatternSyntaxException) {
+            } catch (_: java.util.regex.PatternSyntaxException) {
                 // 忽略正则表达式语法错误
                 editorSearcher.stopSearch()
                 editor.invalidate()

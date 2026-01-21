@@ -34,7 +34,6 @@ import io.legado.app.utils.putPrefString
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
-import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.launch
 import java.io.File
 

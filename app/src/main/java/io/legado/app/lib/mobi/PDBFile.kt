@@ -32,7 +32,7 @@ class PDBFile(private val pfd: ParcelFileDescriptor) {
     }
 
     fun getRecordData(index: Int): ByteBuffer {
-        if (index < 0 || index >= recordCount) {
+        if (index !in 0..<recordCount) {
             throw IndexOutOfBoundsException("Record index out of bounds")
         }
         val len = offsets.getOrElse(index + 1) { fc.size().toInt() } - offsets[index]

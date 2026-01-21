@@ -5,7 +5,6 @@ import android.content.Intent
 import io.legado.app.R
 import io.legado.app.base.BaseViewModel
 import io.legado.app.data.appDb
-import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.RssSource
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppCacheManager

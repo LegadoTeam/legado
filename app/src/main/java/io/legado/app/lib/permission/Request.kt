@@ -79,9 +79,7 @@ internal class Request : OnRequestPermissionsResultCallback {
             } else if (deniedPermissions.contains(Permissions.POST_NOTIFICATIONS)) {
                 toNotificationSetting(deniedPermissions)
             } else if (deniedPermissions.contains(Permissions.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    toIgnoreBatterySetting(deniedPermissions)
-                }
+                toIgnoreBatterySetting(deniedPermissions)
             } else if (deniedPermissions.isNotEmpty()) {
                 appCtx.startActivity<PermissionActivity> {
                     putExtra(PermissionActivity.KEY_RATIONALE, rationale)

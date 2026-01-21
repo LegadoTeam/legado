@@ -16,6 +16,7 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch
 import java.io.File
 
+@Suppress("unused")
 class SourceLoginJsExtensions(
     activity: AppCompatActivity?, source: BaseSource?,
     private val callback: Callback? = null

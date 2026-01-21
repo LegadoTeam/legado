@@ -79,13 +79,13 @@ class RssSourceActivity : VMBaseActivity<ActivityRssSourceBinding, RssSourceView
     }
     private val importDoc = registerForActivityResult(HandleFileContract()) {
         kotlin.runCatching {
-            it.uri?.readText(this)?.let {
+            it.uri?.readText(this)?.let { source ->
                 showDialogFragment(
-                    ImportRssSourceDialog(it)
+                    ImportRssSourceDialog(source)
                 )
             }
-        }.onFailure {
-            toastOnUi("readTextError:${it.localizedMessage}")
+        }.onFailure { e ->
+            toastOnUi("readTextError:${e.localizedMessage}")
         }
     }
     private val exportResult = registerForActivityResult(HandleFileContract()) {

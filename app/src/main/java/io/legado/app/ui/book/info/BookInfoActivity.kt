@@ -58,7 +58,7 @@ import io.legado.app.ui.book.manga.ReadMangaActivity
 import io.legado.app.ui.book.read.ReadBookActivity
 import io.legado.app.ui.book.read.ReadBookActivity.Companion.RESULT_DELETED
 import io.legado.app.ui.book.search.SearchActivity
-import io.legado.app.ui.book.source.SourceCallBack
+import io.legado.app.model.SourceCallBack
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
 import io.legado.app.ui.book.toc.TocActivityResult
 import io.legado.app.ui.file.HandleFileContract
@@ -174,8 +174,18 @@ class BookInfoActivity :
 
     override val binding by viewBinding(ActivityBookInfoBinding::inflate)
     override val viewModel by viewModels<BookInfoViewModel>()
-    private var glideImageGetter: GlideImageGetter? = null
-    private var oldIntro: String? = null
+    private var initGetter = false
+    private val glideImageGetter by lazy {
+        initGetter = true
+        GlideImageGetter(this, binding.tvIntro, lifecycle)
+    }
+    private val textViewTagHandler by lazy {
+        TextViewTagHandler(object : TextViewTagHandler.OnButtonClickListener {
+            override fun onButtonClick(name: String, click: String?) {
+                viewModel.onButtonClick(this@BookInfoActivity, name, click)
+            }
+        })
+    }
 
     @SuppressLint("PrivateResource")
     override fun onActivityCreated(savedInstanceState: Bundle?) {
@@ -404,8 +414,6 @@ class BookInfoActivity :
     }
 
     private fun showBookIntro(intro: String?) {
-        if (oldIntro == intro) return
-        oldIntro = intro
         val tvIntro = binding.tvIntro
         if (intro.isNullOrBlank()) {
             tvIntro.visible()
@@ -416,21 +424,14 @@ class BookInfoActivity :
                 return
             }
             val html = intro.substring(9, lastIndex)
-            glideImageGetter?.clear()
-            glideImageGetter = GlideImageGetter(this@BookInfoActivity, tvIntro, lifecycle)
-            val textViewTagHandler = TextViewTagHandler(object : TextViewTagHandler.OnButtonClickListener {
-                override fun onButtonClick(name: String, click: String?) {
-                    viewModel.onButtonClick(this@BookInfoActivity, name, click)
-                }
-            })
             tvIntro.setHtml(html, glideImageGetter, textViewTagHandler)
-        } else if (intro.startsWith("<usemark>")) {
+        } else if (intro.startsWith("<md>")) {
             val lastIndex = intro.lastIndexOf("<")
-            if (lastIndex < 9) {
+            if (lastIndex < 4) {
                 tvIntro.text = intro
                 return
             }
-            val mark = intro.substring(9, lastIndex)
+            val mark = intro.substring(4, lastIndex)
             lifecycleScope.launch {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     tvIntro.setTextClassifier(TextClassifier.NO_OP)
@@ -907,9 +908,25 @@ class BookInfoActivity :
         }
     }
 
+     override fun onStart() {
+         super.onStart()
+         if (initGetter) {
+             glideImageGetter.start()
+         }
+     }
+
+     override fun onStop() {
+         super.onStop()
+         if (initGetter) {
+             glideImageGetter.stop()
+         }
+     }
+
     override fun onDestroy() {
         super.onDestroy()
-        glideImageGetter?.clear()
+        if (initGetter) {
+            glideImageGetter.clear()
+        }
     }
 
 }

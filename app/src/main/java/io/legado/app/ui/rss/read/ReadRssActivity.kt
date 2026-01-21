@@ -500,6 +500,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     }
 
 
+    @Suppress("unused")
     class JSInterface(activity: ReadRssActivity) {
         private val activityRef: WeakReference<ReadRssActivity> = WeakReference(activity)
         @JavascriptInterface

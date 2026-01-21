@@ -184,7 +184,7 @@ class WebService : BaseService() {
 
     private fun getPort(): Int {
         var port = getPrefInt(PreferKey.webPort, 1122)
-        if (port > 65530 || port < 1024) {
+        if (port !in 1024..65530) {
             port = 1122
         }
         return port

@@ -30,11 +30,10 @@ import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 
@@ -161,13 +160,11 @@ class RssArticlesFragment() : VMBaseFragment<RssArticlesViewModel>(R.layout.frag
         } //只刷新可见页面,非预加载时使用
     }
 
-    @OptIn(FlowPreview::class)
     private fun initData() {
         val rssUrl = activityViewModel.url ?: return
         articlesFlowJob?.cancel()
         articlesFlowJob = viewLifecycleOwner.lifecycleScope.launch {
             appDb.rssArticleDao.flowByOriginSort(rssUrl, viewModel.sortName)
-                .debounce(200L) // 200毫秒防抖
                 .catch {
                     AppLog.put("订阅文章界面获取数据失败\n${it.localizedMessage}", it)
                 }.flowOn(IO).collect { newList ->
@@ -198,6 +195,7 @@ class RssArticlesFragment() : VMBaseFragment<RssArticlesViewModel>(R.layout.frag
                             }
                         }, true)
                     }
+                    delay(200) // 200毫秒防抖
                 }
         }
     }

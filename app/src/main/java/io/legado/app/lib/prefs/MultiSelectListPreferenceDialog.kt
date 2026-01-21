@@ -7,7 +7,6 @@ import android.view.WindowManager
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.forEach
 import androidx.preference.MultiSelectListPreferenceDialogFragmentCompat
-import androidx.preference.PreferenceDialogFragmentCompat
 import io.legado.app.R
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.accentColor
@@ -23,7 +22,7 @@ class MultiSelectListPreferenceDialog : MultiSelectListPreferenceDialogFragmentC
             val fragment =
                 MultiSelectListPreferenceDialog()
             val b = Bundle(1)
-            b.putString(PreferenceDialogFragmentCompat.ARG_KEY, key)
+            b.putString(ARG_KEY, key)
             fragment.arguments = b
             return fragment
         }

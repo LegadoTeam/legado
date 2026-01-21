@@ -11,7 +11,6 @@ import io.github.rosemoe.sora.langs.textmate.registry.provider.AssetsFileResolve
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppPattern.JS_PATTERN
-import io.legado.app.constant.Theme
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.BackstageWebView
@@ -165,7 +164,7 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
                 });""".trimIndent(),
                 cacheFirst = true
             ).getStrResponse().body
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             context.toastOnUi("格式化失败")
             jsCode
         }
@@ -178,7 +177,7 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
                 .indentAmount(4)
                 .prettyPrint(true)
             doc.outerHtml()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             context.toastOnUi("格式化失败")
             html
         }

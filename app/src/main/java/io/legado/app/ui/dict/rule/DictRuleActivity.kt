@@ -60,13 +60,13 @@ class DictRuleActivity : VMBaseActivity<ActivityDictRuleBinding, DictRuleViewMod
     }
     private val importDoc = registerForActivityResult(HandleFileContract()) {
         kotlin.runCatching {
-            it.uri?.readText(this)?.let {
+            it.uri?.readText(this)?.let { source ->
                 showDialogFragment(
-                    ImportDictRuleDialog(it)
+                    ImportDictRuleDialog(source)
                 )
             }
-        }.onFailure {
-            toastOnUi("readTextError:${it.localizedMessage}")
+        }.onFailure { e  ->
+            toastOnUi("readTextError:${e.localizedMessage}")
         }
     }
     private val exportResult = registerForActivityResult(HandleFileContract()) {

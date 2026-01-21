@@ -56,7 +56,7 @@ import com.dirror.lyricviewx.OnPlayClickListener
 import io.legado.app.lib.theme.ThemeStore.Companion.accentColor
 import io.legado.app.ui.book.audio.SliderPopup.Companion.SPEED
 import io.legado.app.ui.book.audio.SliderPopup.Companion.TIMER
-import io.legado.app.ui.book.source.SourceCallBack
+import io.legado.app.model.SourceCallBack
 import io.legado.app.utils.gone
 
 /**

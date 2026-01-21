@@ -59,7 +59,7 @@ object RuleUpdate {
                                 upRules = true
                             }
                             else {
-                                cacheBookSourceMap.put(url, lists)
+                                cacheBookSourceMap[url] = lists
                                 return true
                             }
                         }
@@ -80,7 +80,7 @@ object RuleUpdate {
                                 SourceHelp.insertRssSource(list)
                             }
                             else {
-                                cacheRssSourceMap.put(url, lists)
+                                cacheRssSourceMap[url] = lists
                                 return true
                             }
                         }
@@ -95,7 +95,7 @@ object RuleUpdate {
                                 upRules = true
                             }
                             else {
-                                cacheReplaceRuleMap.put(url, lists)
+                                cacheReplaceRuleMap[url] = lists
                                 return true
                             }
                         }

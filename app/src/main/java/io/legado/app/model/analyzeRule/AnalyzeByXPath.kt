@@ -70,7 +70,7 @@ class AnalyzeByXPath(doc: Any) {
                     }
                 }
             }
-            if (results.size > 0) {
+            if (results.isNotEmpty()) {
                 if ("%%" == ruleAnalyzes.elementsType) {
                     for (i in results[0].indices) {
                         for (temp in results) {

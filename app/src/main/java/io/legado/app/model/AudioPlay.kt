@@ -23,7 +23,7 @@ import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.globalExecutor
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.AudioPlayService
-import io.legado.app.ui.book.source.SourceCallBack
+import io.legado.app.model.SourceCallBack
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.startService
 import io.legado.app.utils.toastOnUi
