@@ -93,6 +93,7 @@ import io.legado.app.help.webView.WebViewPool
 import io.legado.app.help.webView.WebViewPool.BLANK_HTML
 import io.legado.app.help.webView.WebViewPool.DATA_HTML
 import java.lang.ref.WeakReference
+import splitties.systemservices.powerManager
 
 /**
  * rss阅读界面
@@ -109,6 +110,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     private var starMenuItem: MenuItem? = null
     private var ttsMenuItem: MenuItem? = null
     private var isFullscreen = false
+    private var wasScreenOff = false
     private var customWebViewCallback: WebChromeClient.CustomViewCallback? = null
     private var isInterfaceInjected = false
     private var needClearHistory = true
@@ -484,14 +486,21 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
 
     override fun onPause() {
         super.onPause()
-        currentWebView.pauseTimers()
-        currentWebView.onPause()
+        if (powerManager.isInteractive) {
+            wasScreenOff = false
+            currentWebView.pauseTimers()
+            currentWebView.onPause()
+        } else {
+            wasScreenOff = true
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        currentWebView.resumeTimers()
-        currentWebView.onResume()
+        if (!wasScreenOff) {
+            currentWebView.resumeTimers()
+            currentWebView.onResume()
+        }
     }
 
     override fun onDestroy() {
@@ -501,27 +510,24 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
 
 
     @Suppress("unused")
-    class JSInterface(activity: ReadRssActivity) {
+    private class JSInterface(activity: ReadRssActivity) {
         private val activityRef: WeakReference<ReadRssActivity> = WeakReference(activity)
         @JavascriptInterface
         fun lockOrientation(orientation: String) {
             val ctx = activityRef.get()
-            if (ctx != null && !ctx.isFinishing && !ctx.isDestroyed) {
+            if (ctx != null && ctx.isFullscreen && !ctx.isFinishing && !ctx.isDestroyed) {
                 ctx.runOnUiThread {
-                    if (ctx.isFullscreen) {
-                        ctx.requestedOrientation = when (orientation) {
-                            "portrait", "portrait-primary" -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                            "portrait-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
-                            "landscape", "landscape-primary" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE //横屏的时候受重力正反控制
-                            //ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                            "landscape-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
-                            "any", "unspecified" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR
-                            else -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                        }
+                    ctx.requestedOrientation = when (orientation) {
+                        "portrait", "portrait-primary" -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                        "portrait-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
+                        "landscape", "landscape-primary" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE //横屏的时候受重力正反控制
+                        //ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                        "landscape-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+                        "any", "unspecified" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR
+                        else -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                     }
                 }
             }
-
         }
 
         @JavascriptInterface
@@ -679,7 +685,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                     AppPattern.htmlHeadRegex.find(originalText)?.let { match ->
                         originalText.replaceRange(
                             match.range,
-                            "${match.value}<script>(() => {$JS_INJECTION$preloadJs\n})();</script>"
+                            "${match.value}<script>(() => {$JS_INJECTION\n$preloadJs\n})();</script>"
                         )
                     } ?: originalText
                 }

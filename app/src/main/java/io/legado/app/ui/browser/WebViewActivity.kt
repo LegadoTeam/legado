@@ -55,6 +55,7 @@ import io.legado.app.help.webView.PooledWebView
 import io.legado.app.help.webView.WebViewPool
 import io.legado.app.help.webView.WebViewPool.BLANK_HTML
 import io.legado.app.help.webView.WebViewPool.DATA_HTML
+import splitties.systemservices.powerManager
 import java.lang.ref.WeakReference
 
 class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
@@ -73,6 +74,7 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
     private var isCloudflareChallenge = false
     private var isFullScreen = false
     private var isfullscreen = false
+    private var wasScreenOff = false
     private var needClearHistory = true
     private val saveImage = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
@@ -304,14 +306,21 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
 
     override fun onPause() {
         super.onPause()
-        currentWebView.pauseTimers()
-        currentWebView.onPause()
+        if (powerManager.isInteractive) {
+            wasScreenOff = false
+            currentWebView.pauseTimers()
+            currentWebView.onPause()
+        } else {
+            wasScreenOff = true
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        currentWebView.resumeTimers()
-        currentWebView.onResume()
+        if (!wasScreenOff) {
+            currentWebView.resumeTimers()
+            currentWebView.onResume()
+        }
     }
 
     override fun onDestroy() {
@@ -320,26 +329,23 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
     }
 
     @Suppress("unused")
-    class JSInterface(activity: WebViewActivity) {
+    private class JSInterface(activity: WebViewActivity) {
         private val activityRef: WeakReference<WebViewActivity> = WeakReference(activity)
         @JavascriptInterface
         fun lockOrientation(orientation: String) {
             val ctx = activityRef.get()
-            if (ctx != null && !ctx.isFinishing && !ctx.isDestroyed) {
+            if (ctx != null && ctx.isfullscreen  && !ctx.isFinishing && !ctx.isDestroyed) {
                 ctx.runOnUiThread {
-                    if (ctx.isfullscreen) {
-                        ctx.requestedOrientation = when (orientation) {
-                            "portrait", "portrait-primary" -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                            "portrait-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
-                            "landscape", "landscape-primary" -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                            "landscape-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
-                            "any", "unspecified" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR
-                            else -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                        }
+                    ctx.requestedOrientation = when (orientation) {
+                        "portrait", "portrait-primary" -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                        "portrait-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
+                        "landscape", "landscape-primary" -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                        "landscape-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+                        "any", "unspecified" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR
+                        else -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                     }
                 }
             }
-
         }
 
         @JavascriptInterface

@@ -20,7 +20,7 @@ data class TextHtmlColumn(
     override var end: Float,
     override val charData: String,
     val mTextSize: Float,
-    val mTextColor: Int,
+    val mTextColor: Int?,
     val linkUrl: String?
 ) : TextBaseColumn {
 
@@ -67,7 +67,7 @@ data class TextHtmlColumn(
             color = if (textLine.isReadAloud || isSearchResult) {
                 ReadBookConfig.textAccentColor
             } else {
-                mTextColor
+                mTextColor ?: ReadBookConfig.textColor
             }
             isUnderlineText = false
         }

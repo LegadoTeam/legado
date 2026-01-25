@@ -345,9 +345,15 @@ window.run("java.toast('执行成功');'成功'")
 
 * 图片链接控制样式
 > 在书源正文  
-> 图片链接中含有"js"键时，点击图片会执行一次键值的函数  
-> 加载图片时，执行结果作为图片链接  
+> 图片链接含有"click"键时，图片被点击就会执行  
+> 点击图片执行js键为兼容性保留,需要用户主动开启兼容设置，或者手动刷新图片  
 ```js
+//建议使用
+var url = `https://www.baidu.com/img/flexible/logo/pc/result.png,{"click": "java.toast('这是'+book.name+'正文的图被点击了');"}`;
+result = `<img src = "${url}">`;
+```
+```js
+//不建议使用
 var url = `https://www.baidu.com/img/flexible/logo/pc/result.png,{"js": "if (book) java.toast('这是'+book.name+'正文的图被点击了');result", "style": "TEXT"}`;
 result = `<img src = "${url}">`;
 ```
@@ -368,6 +374,11 @@ result = `<img src = "${url}">`;
 * 详情页html
 > 书籍详情页支持轻度显示html字符串样式（同字典规则）  
 > 获取到的简介字符串需要用`<usehtml></usehtml>`包裹起来才能识别  
-> 支持按钮 `<button>点我@onclick:java.toast("Hello World")</button>`  
-
-> 支持Markdown语法需要用`<md></md>`包裹起来 
+> 按钮文本需要含有@onclick:执行内容才能被识别  
+```xml
+<usehtml>
+<p style="text-align:end">右对齐文本</p>
+<button>点我@onclick:java.toast("Hello World")</button>
+</usehtml>
+```
+> 支持Markdown语法，需要用`<md></md>`包裹起来  

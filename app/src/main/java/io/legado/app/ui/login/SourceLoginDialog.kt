@@ -69,8 +69,11 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
     private var rowUiName = arrayListOf<String>()
     private var hasChange = false
     private val sourceLoginJsExtensions by lazy {
-        SourceLoginJsExtensions(activity as AppCompatActivity, viewModel.source,
-            object : SourceLoginJsExtensions.Callback {
+        SourceLoginJsExtensions(
+            activity as AppCompatActivity,
+            viewModel.source,
+            viewModel.bookType,
+            callback = object : SourceLoginJsExtensions.Callback {
                 override fun upUiData(data: Map<String, String?>?) {
                     activity?.runOnUiThread { // 在主线程中更新 UI
                         handleUpUiData(data)
@@ -215,11 +218,13 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
             getLoginData(it)
         } ?: viewModel.loginInfo.toMutableMap()
         try {
-            source.evalJS("$loginJS\n$jsStr") {
-                put("result", result)
-                put("book", viewModel.book)
-                put("chapter", viewModel.chapter)
-            }.toString()
+            runScriptWithContext {
+                source.evalJS("$loginJS\n$jsStr") {
+                    put("result", result)
+                    put("book", viewModel.book)
+                    put("chapter", viewModel.chapter)
+                }.toString()
+            }
         } catch (e: Exception) {
             AppLog.put(source.getTag() + " loginUi err:" + (e.localizedMessage ?: e.toString()), e)
             null
@@ -232,7 +237,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
         }.getOrNull()
     }
 
-    @SuppressLint("SetTextI18n")
+    @SuppressLint("SetTextI18n", "ClickableViewAccessibility")
     private fun rowUiBuilder(source: BaseSource, rowUis: List<RowUi>?) {
         val loginInfo = viewModel.loginInfo
         rowUiName.clear()

@@ -32,22 +32,19 @@ data class ExploreKind(
     override fun equals(other: Any?): Boolean {
         if (other is ExploreKind) {
             return other.title == title
-                    && other.url == url
                     && other.type == type
+                    && other.url == url
                     && other.action == action
                     && other.default == default
-                    && other.style == style
         }
         return false
     }
 
     override fun hashCode(): Int {
-        var result = title.hashCode()
+        var result = title.hashCode() + type.hashCode()
         result = 31 * result + (url?.hashCode() ?: 0)
-        result = 31 * result + type.hashCode()
         result = 31 * result + (action?.hashCode() ?: 0)
         result = 31 * result + (default?.hashCode() ?: 0)
-        result = 31 * result + (style?.hashCode() ?: 0)
         return result
     }
 

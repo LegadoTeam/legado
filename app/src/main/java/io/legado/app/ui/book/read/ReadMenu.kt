@@ -375,15 +375,17 @@ class ReadMenu @JvmOverloads constructor(
         tvChapterUrl.setOnLongClickListener(chapterViewLongClickListener)
         tvCustomBtn.setOnClickListener {
             val book = ReadBook.book ?: return@setOnClickListener
-            if (activity == null) return@setOnClickListener
             val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, ReadBook.durChapterIndex)
-            SourceCallBack.callBackBtn(activity!!, SourceCallBack.CLICK_CUSTOM_BUTTON, ReadBook.bookSource, book, chapter)
+            activity?.let { activity ->
+                SourceCallBack.callBackBtn(activity, SourceCallBack.CLICK_CUSTOM_BUTTON, ReadBook.bookSource, book, chapter)
+            }
         }
         tvCustomBtn.setOnLongClickListener {
             val book = ReadBook.book ?: return@setOnLongClickListener true
-            if (activity == null) return@setOnLongClickListener true
             val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, ReadBook.durChapterIndex)
-            SourceCallBack.callBackBtn(activity!!, SourceCallBack.LONG_CLICK_CUSTOM_BUTTON, ReadBook.bookSource, book, chapter)
+            activity?.let { activity ->
+                SourceCallBack.callBackBtn(activity, SourceCallBack.LONG_CLICK_CUSTOM_BUTTON, ReadBook.bookSource, book, chapter)
+            }
             true
         }
         //书源操作

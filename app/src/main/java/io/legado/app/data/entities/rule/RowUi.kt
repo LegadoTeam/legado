@@ -31,17 +31,14 @@ data class RowUi(
                     && other.type == type
                     && other.action == action
                     && other.default == default
-                    && other.style == style
         }
         return false
     }
 
     override fun hashCode(): Int {
-        var result = name.hashCode()
-        result = 31 * result + type.hashCode()
+        var result = name.hashCode() + type.hashCode()
         result = 31 * result + (action?.hashCode() ?: 0)
         result = 31 * result + (default?.hashCode() ?: 0)
-        result = 31 * result + (style?.hashCode() ?: 0)
         return result
     }
 
