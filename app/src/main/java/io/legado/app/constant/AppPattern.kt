@@ -14,9 +14,6 @@ object AppPattern {
     //匹配自定义html格式字符串
     val useHtmlRegex = Regex("<usehtml>.*?</usehtml>", RegexOption.DOT_MATCHES_ALL) //.包含换行
 
-    //匹配html字符串中的head
-    val htmlHeadRegex = Regex("<head[^>]*>",RegexOption.IGNORE_CASE)
-
     //dataURL图片类型
     val dataUriRegex = Regex("^data:.*?;base64,(.*)")
     //提取标题中的段评

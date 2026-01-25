@@ -51,6 +51,7 @@ import io.legado.app.help.webView.WebJsExtensions.Companion.nameBasic
 import io.legado.app.help.webView.WebJsExtensions.Companion.nameJava
 import io.legado.app.help.http.CookieManager as AppCookieManager
 import androidx.core.net.toUri
+import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.webView.PooledWebView
 import io.legado.app.help.webView.WebViewPool
 import io.legado.app.help.webView.WebViewPool.BLANK_HTML
@@ -339,8 +340,9 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
                     ctx.requestedOrientation = when (orientation) {
                         "portrait", "portrait-primary" -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                         "portrait-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
-                        "landscape", "landscape-primary" -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                        "landscape-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+                        "landscape" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE //横屏且受重力控制正反
+                        "landscape-primary" -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE //正向横屏
+                        "landscape-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE //反向横屏
                         "any", "unspecified" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR
                         else -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                     }
@@ -392,18 +394,12 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
 
         /* 监听网页日志 */
         override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
-            viewModel.source?.let {
+            viewModel.source?.let { source ->
                 if (sessionShowWebLog) {
-                    val consoleException = Exception("${consoleMessage.messageLevel().name}: \n${consoleMessage.message()}\n-Line ${consoleMessage.lineNumber()} of ${consoleMessage.sourceId()}")
-                    val message = viewModel.sourceName + ": ${consoleMessage.message()}"
-                    when (consoleMessage.messageLevel()) {
-                        ConsoleMessage.MessageLevel.LOG -> AppLog.put(message)
-                        ConsoleMessage.MessageLevel.DEBUG -> AppLog.put(message, consoleException)
-                        ConsoleMessage.MessageLevel.WARNING -> AppLog.put(message, consoleException)
-                        ConsoleMessage.MessageLevel.ERROR -> AppLog.put(message, consoleException)
-                        ConsoleMessage.MessageLevel.TIP -> AppLog.put(message)
-                        else -> AppLog.put(message)
-                    }
+                    val messageLevel = consoleMessage.messageLevel().name
+                    val message = consoleMessage.message()
+                    AppLog.put("${source.getTag()}${messageLevel}: $message",
+                        NoStackTraceException("\n${message}\n- Line ${consoleMessage.lineNumber()} of ${consoleMessage.sourceId()}"))
                     return true
                 }
             }

@@ -1,5 +1,5 @@
 # js变量和函数
-> 阅读使用[Rhino v1.8.0](https://github.com/mozilla/rhino) 作为JavaScript引擎以便于[调用Java类和方法](https://m.jb51.net/article/92138.htm)，查看[ECMAScript兼容性表格](https://mozilla.github.io/rhino/compat/engines.html)
+> 阅读使用[Rhino v1.8.0](https://github.com/mozilla/rhino) 作为JavaScript引擎以便于[调用Java类和方法](https://m.jb51.net/article/92138.htm)，查看[ECMAScript兼容性表格](https://mozilla.github.io/rhino/compat/engines.html)　
 
 > [Rhino运行时](https://github.com/mozilla/rhino/blob/master/rhino/src/main/java/org/mozilla/javascript/ScriptRuntime.java)懒加载导入的Java类和方法
 
@@ -13,7 +13,7 @@
 
 > 在书源规则中使用`@js` `<js>` `{{}}`可使用JavaScript调用阅读部分内置的类和方法
 
-> 注意为了安全，阅读会屏蔽部分java类调用，见[RhinoClassShutter](https://github.com/LegadoTeam/legado/blob/master/modules/rhino/src/main/java/com/script/rhino/RhinoClassShutter.kt)
+> 注意为了安全，阅读会屏蔽部分java类调用，见[RhinoClassShutter](https://github.com/LegadoTeam/legado/blob/master/modules/rhino/src/main/java/com/script/rhino/RhinoClassShutter.kt)　
 
 > 不同的书源规则中支持的调用的Java类和方法可能有所不同
 
@@ -67,13 +67,14 @@ java.open(name: String, url: String? = null, title: String? = null, origin: Stri
 ```
 
 ### [SourceLoginJsExtensions](https://github.com/LegadoTeam/legado/blob/main/app/src/main/java/io/legado/app/ui/login/SourceLoginJsExtensions.kt)独有函数
-> 只在`登录界面按钮`被触发、`按钮的回调`事件、`发现按钮`函数、`图片链接click键`中有效
+> 只在`登录界面按钮`被触发、`界面按钮的回调`事件、`发现按钮`函数、`图片链接click键`中有效
 ```js
 //用内置浏览器打开本地html
 * @param url 指定网页的基础URL，解决本地网页跨越问题
 * @param html 加载的内容
 * @param preloadJs 预注入js，用法同订阅源预注入js规则
-java.showBrowser(url: String, html: String, preloadJs: String? = null)
+* @param config 界面配置，json字符串，
+java.showBrowser(url: String, html: String, preloadJs: String? = null, config: String? = null)
 //复制文本到剪贴板
 java.copyText(text: String)
 //实时更新登录界面用户信息，upLoginData(null)会全部重置为默认值
@@ -87,6 +88,7 @@ java.clearTtsCache()
 //刷新发现，仅限发现按钮
 java.refreshExplore()
 ```
+[showBrowser](https://github.com/Luoyacheng/legado/wiki/java.showBrowser%E5%87%BD%E6%95%B0%E4%BB%8B%E7%BB%8D)函数介绍
 
 ### [AnalyzeUrl](https://github.com/LegadoTeam/legado/blob/master/app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeUrl.kt) 部分函数
 > js中通过java.调用,只在`登录检查JS`规则中有效
@@ -137,7 +139,7 @@ java.put(key, value)
 
 ### [js扩展类](https://github.com/LegadoTeam/legado/blob/master/app/src/main/java/io/legado/app/help/JsExtensions.kt) 部分函数
 
-* 链接解析[JsURL](https://github.com/LegadoTeam/legado/blob/master/app/src/main/java/io/legado/app/utils/JsURL.kt)
+* 链接解析[JsURL](https://github.com/LegadoTeam/legado/blob/master/app/src/main/java/io/legado/app/utils/JsURL.kt)　
 ```js
 java.toURL(url): JsURL
 java.toURL(url, baseUrl): JsURL
@@ -253,7 +255,7 @@ java.encodeURI(str: String) //默认enc="UTF-8"
 java.encodeURI(str: String, enc: String)
 ```
 * base64
-> flags参数可省略，默认Base64.NO_WRAP，查看[flags参数说明](https://blog.csdn.net/zcmain/article/details/97051870)
+> flags参数可省略，默认Base64.NO_WRAP，查看[flags参数说明](https://blog.csdn.net/zcmain/article/details/97051870)　
 ```js
 java.base64Decode(str: String)
 java.base64Decode(str: String, charset: String)

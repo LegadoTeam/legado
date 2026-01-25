@@ -26,7 +26,7 @@ interface CacheDao {
         or `key` = 'userInfo_' || :key
         or `key` = 'loginHeader_' || :key
         or `key` = 'sourceVariable_' || :key
-        or `key` = 'infoMap' || :key"""
+        or `key` = 'infoMap_' || :key"""
     )
     fun deleteSourceVariables(key: String)
 

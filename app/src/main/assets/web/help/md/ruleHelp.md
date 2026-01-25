@@ -1,8 +1,8 @@
 # 源规则帮助
 
-* [阅读3.0(Legado)规则说明](https://mgz0227.github.io/The-tutorial-of-Legado/)
-* [书源帮助文档](https://mgz0227.github.io/The-tutorial-of-Legado/Rule/source.html)
-* [订阅源帮助文档](https://mgz0227.github.io/The-tutorial-of-Legado/Rule/rss.html)
+* [阅读3.0(Legado)规则说明](https://mgz0227.github.io/The-tutorial-of-Legado/)　
+* [书源帮助文档](https://mgz0227.github.io/The-tutorial-of-Legado/Rule/source.html)　
+* [订阅源帮助文档](https://mgz0227.github.io/The-tutorial-of-Legado/Rule/rss.html)　
 * 辅助键盘❓中可插入URL参数模板,打开帮助,js教程,正则教程,选择文件
 * 规则标志, {{......}}内使用规则必须有明显的规则标志,没有规则标志当作js执行
 ```
@@ -12,7 +12,7 @@
 : regex规则,不可省略,只可以用在书籍列表和目录列表
 ```
 * jsLib
-> 注入JavaScript到RhinoJs引擎中，支持两种格式，可实现[函数共用](https://github.com/LegadoTeam/legado/wiki/JavaScript%E5%87%BD%E6%95%B0%E5%85%B1%E7%94%A8)
+> 注入JavaScript到RhinoJs引擎中，支持两种格式，可实现[函数共用](https://github.com/LegadoTeam/legado/wiki/JavaScript%E5%87%BD%E6%95%B0%E5%85%B1%E7%94%A8)　
 
 > `JavaScript Code` 直接填写JavaScript片段  
 > `{"example":"https://www.example.com/js/example.js", ...}` 自动复用已经下载的js文件
@@ -333,6 +333,7 @@ decodeImage(result, key)
 * 网页JS
 > `window.close()` 关闭浏览器界面  
 > `screen.orientation.lock()` 全屏后可控制屏幕方向  
+> lock参数"landscape"->横屏且受重力控制正反、"landscape-primary"->正向横屏、"landscape-secondary"->反向横屏  
 
 > 本地html中的额外支持的js函数  
 

@@ -64,7 +64,7 @@ class SourceLoginJsExtensions(
     }
 
     @JvmOverloads
-    fun showBrowser(url: String, html: String, preloadJs: String? = null) {
+    fun showBrowser(url: String, html: String? = null, preloadJs: String? = null, config: String? = null) {
         val activity = activityRef.get() ?: return
         val source = getSource() ?: return
         activity.showDialogFragment(
@@ -73,7 +73,8 @@ class SourceLoginJsExtensions(
                 bookType,
                 url,
                 html,
-                preloadJs
+                preloadJs,
+                config
             )
         )
     }

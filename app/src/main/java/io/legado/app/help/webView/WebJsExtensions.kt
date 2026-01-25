@@ -183,16 +183,20 @@ class WebJsExtensions(source: BaseSource, activity: AppCompatActivity, private v
 
     companion object{
         private fun getRandomLetter(): Char {
-            val letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
+            val letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
             return letters.random()
         }
         val uuid by lazy { UUID.randomUUID().toString().split("-") }
         val uuid2 by lazy { UUID.randomUUID().toString().split("-") }
+        val nameUrl by lazy { getRandomLetter() + uuid[0] + uuid2[0] }
         val nameJava by lazy { getRandomLetter() + uuid[0] + uuid[1] }
         val nameCache by lazy { getRandomLetter() + uuid[2] + uuid[3] }
         val nameSource by lazy { getRandomLetter() + uuid[4] }
         val nameBasic by lazy { getRandomLetter() + uuid2[1] + uuid2[2] }
         val JSBridgeResult by lazy { getRandomLetter() + uuid2[3] + uuid2[4] }
+        val JS_URL by lazy {
+            """<link rel="preload" href="$nameUrl" as="script"><script src="$nameUrl"></script>"""
+        }
         val JS_INJECTION by lazy { """
             const requestId = n => 'req_' + n + '_' + Date.now() + '_' + Math.random().toString(36).slice(-3);
             const JSBridgeCallbacks = {};
@@ -313,30 +317,29 @@ class WebJsExtensions(source: BaseSource, activity: AppCompatActivity, private v
                     }
                     delete JSBridgeCallbacks[requestId];
                 }
-            };"""
+            };""".trimIndent()
         }
 
         val basicJs by lazy { """
             (function() {
-            if (screen.orientation && !screen.orientation.__patched) {
+            if (screen.orientation) {
                 screen.orientation.lock = function(orientation) {
                     return new Promise((resolve, reject) => {
-                        window.$nameBasic?.lockOrientation(orientation) 
+                        window.$nameBasic?.lockOrientation(orientation);
                         resolve()
                     });
                 };
                 screen.orientation.unlock = function() {
                     return new Promise((resolve, reject) => {
-                        window.$nameBasic?.lockOrientation('unlock') 
+                        window.$nameBasic?.lockOrientation('unlock');
                         resolve()
                     });
                 };
-                screen.orientation.__patched = true;
             };
             window.close = function() {
                 window.$nameBasic?.onCloseRequested();
             };
-            })();"""
+            })();""".trimIndent()
         }
     }
 }

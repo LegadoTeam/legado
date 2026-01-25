@@ -17,9 +17,9 @@ import io.legado.app.data.entities.RssSource
 import io.legado.app.data.entities.RssStar
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.TTS
-import io.legado.app.help.webView.WebJsExtensions.Companion.JS_INJECTION
 import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
+import io.legado.app.help.webView.WebJsExtensions.Companion.JS_URL
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.rss.Rss
 import io.legado.app.utils.ACache
@@ -223,12 +223,11 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
     }
 
     fun clHtml(content: String, style: String? = rssSource?.style): String {
-        val preloadJs = rssSource?.preloadJs ?: ""
         var processedHtml = content
         processedHtml = if (processedHtml.contains("<head>")) {
-            processedHtml.replaceFirst("<head>", "<head><script>(() => {$JS_INJECTION\n$preloadJs\n})();</script>")
+            processedHtml.replaceFirst("<head>", "<head>$JS_URL")
         } else {
-            "<head><script>(() => {$JS_INJECTION\n$preloadJs\n})();</script></head>$processedHtml"
+            "<head>$JS_URL</head>$processedHtml"
         }
         if (processedHtml.contains("<style>")) {
             if (!style.isNullOrBlank()) {
