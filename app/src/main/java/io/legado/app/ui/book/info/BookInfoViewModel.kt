@@ -7,6 +7,7 @@ import android.view.MenuItem
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import com.script.rhino.runScriptWithContext
 import io.legado.app.R
 import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppLog
@@ -531,10 +532,12 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         val jsStr = click ?: return
         execute {
             val java = SourceLoginJsExtensions(activity, source)
-            source.evalJS(jsStr) {
-                put("result", null)
-                put("java", java)
-                put("book", book)
+            runScriptWithContext {
+                source.evalJS(jsStr) {
+                    put("result", null)
+                    put("java", java)
+                    put("book", book)
+                }
             }
         }.onError {
             AppLog.put("${source.bookSourceName}: ${it.localizedMessage}", it)

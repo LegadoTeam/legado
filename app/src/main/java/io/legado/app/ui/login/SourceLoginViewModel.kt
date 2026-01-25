@@ -21,12 +21,13 @@ class SourceLoginViewModel(application: Application) : BaseViewModel(application
     var source: BaseSource? = null
     var headerMap: Map<String, String> = emptyMap()
     var book: Book? = null
+    var bookType: Int = 0
     var chapter: BookChapter? = null
     var loginInfo: MutableMap<String, String> = mutableMapOf()
 
     fun initData(intent: Intent, success: (bookSource: BaseSource) -> Unit, error: () -> Unit) {
         execute {
-            val bookType = intent.getIntExtra("bookType", 0)
+            bookType = intent.getIntExtra("bookType", 0)
             when (bookType) {
                 BookType.text -> {
                     source = ReadBook.bookSource
@@ -66,7 +67,7 @@ class SourceLoginViewModel(application: Application) : BaseViewModel(application
             headerMap = runScriptWithContext {
                 source?.getHeaderMap(true) ?: emptyMap()
             }
-            source?.let{ loginInfo =it.getLoginInfoMap() }
+            source?.let{ loginInfo = it.getLoginInfoMap() }
             source
         }.onSuccess {
             if (it != null) {

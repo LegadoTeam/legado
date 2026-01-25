@@ -51,11 +51,11 @@ class TextViewTagHandler(private val onButtonClickListener: OnButtonClickListene
                     val start = buttonTagStack.removeAt(buttonTagStack.size - 1)
                     val buttonText = output.substring(start, output.length)
                     val parts = buttonText.split(BUTTON_SPLIT, limit = 2)
-                    val name = parts[0]
-                    val click = if (parts.size == 2) {
-                        output.replace(start, output.length, name)
-                        parts[1]
-                    } else null
+                    if (parts.size != 2) {
+                        return
+                    }
+                    val (name, click) = parts
+                    output.replace(start, output.length, name)
                     val buttonSpan = RoundedButtonSpan(
                         accentColor = accentColor,
                         textColor = textColor,

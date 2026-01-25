@@ -1335,4 +1335,5 @@
     <string name="empty_img_src_input">图片链接不能为空</string>
     <string name="invalid_file_path">文件路径无效</string>
     <string name="is_system_tts_no_export">无法导出系统tts</string>
+    <string name="click_image_way">点击图片方式</string>
 </resources>

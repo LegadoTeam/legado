@@ -435,7 +435,7 @@ object AudioPlay : CoroutineScope by MainScope() {
         Coroutine.async {
             durAudioSize = audioSize.toInt()
             chapter.end = audioSize
-            appDb.bookChapterDao.update(chapter)
+            chapter.update()
         }
     }
 

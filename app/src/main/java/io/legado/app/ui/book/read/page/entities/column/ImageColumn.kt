@@ -19,7 +19,8 @@ import splitties.init.appCtx
 data class ImageColumn(
     override var start: Float,
     override var end: Float,
-    var src: String
+    var src: String,
+    var click: String? = null
 ) : BaseColumn {
 
     override var textLine: TextLine = emptyTextLine
@@ -49,7 +50,7 @@ data class ImageColumn(
             appCtx.toastOnUi(e.localizedMessage)
         }
     }
-    override  fun isTouch(x: Float): Boolean {
+    override fun isTouch(x: Float): Boolean {
         return x > start && x < end + 20.dpToPx()
     }
 

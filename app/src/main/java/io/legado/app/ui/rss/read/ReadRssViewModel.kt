@@ -22,7 +22,6 @@ import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.rss.Rss
-import io.legado.app.utils.printOnDebug
 import io.legado.app.utils.ACache
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.writeBytes
@@ -89,14 +88,11 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
                 val openUrl = intent.getStringExtra("openUrl")
                 if (startHtml) {
                     loadStartHtml()
-                }
-                else if (ruleContent.isNullOrBlank()) {
+                } else if (ruleContent.isNullOrBlank()) {
                     loadUrl(openUrl ?: origin, origin)
-                }
-                else if (rssSource!!.singleUrl) {
+                } else if (rssSource!!.singleUrl) {
                     loadUrl(origin, origin)
-                }
-                else if (openUrl != null) {
+                } else if (openUrl != null) {
                     val title = intent.getStringExtra("title") ?: rssSource!!.sourceName
                     val rssArticle = appDb.rssArticleDao.getByLink(origin, openUrl) ?: RssArticle(
                         origin, title, title, link = openUrl)
@@ -230,9 +226,9 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
         val preloadJs = rssSource?.preloadJs ?: ""
         var processedHtml = content
         processedHtml = if (processedHtml.contains("<head>")) {
-            processedHtml.replaceFirst("<head>", "<head><script>(() => {$JS_INJECTION$preloadJs\n})();</script>")
+            processedHtml.replaceFirst("<head>", "<head><script>(() => {$JS_INJECTION\n$preloadJs\n})();</script>")
         } else {
-            "<head><script>(() => {$JS_INJECTION$preloadJs\n})();</script></head>$processedHtml"
+            "<head><script>(() => {$JS_INJECTION\n$preloadJs\n})();</script></head>$processedHtml"
         }
         if (processedHtml.contains("<style>")) {
             if (!style.isNullOrBlank()) {
@@ -253,28 +249,39 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
             htmlLiveData.postValue("<body>rssSource is null</body>")
             return
         }
-        var processedHtml = source.startHtml?.let{ html  ->
-            try {
+        val startHtml = source.startHtml ?: return
+        execute {
+            var processedHtml = try {
                 when {
-                    html.startsWith("@js:") -> source.evalJS( html.substring(4)).toString()
-                    html.startsWith("<js>") -> source.evalJS(html.substring(4, html.lastIndexOf("<"))).toString()
-                    else -> html
+                    startHtml.startsWith("@js:") -> runScriptWithContext {
+                        source.evalJS(startHtml.substring(4)).toString()
+                    }
+
+                    startHtml.startsWith("<js>") -> runScriptWithContext {
+                        source.evalJS(
+                            startHtml.substring(
+                                4,
+                                startHtml.lastIndexOf("<")
+                            )
+                        ).toString()
+                    }
+
+                    else -> startHtml
                 }
             } catch (e: Throwable) {
-                e.printOnDebug()
-                html
+                e.localizedMessage
             }
-        } ?: return
-        val javascript = rssSource?.startJs
-        if (!javascript.isNullOrBlank()) {
-            processedHtml = if (processedHtml.contains("</body>")) {
-                processedHtml.replaceFirst("</body>", "<script>$javascript</script></body>")
-            } else {
-                "<body>$processedHtml<script>$javascript</script></body>"
+            val javascript = rssSource?.startJs
+            if (!javascript.isNullOrBlank()) {
+                processedHtml = if (processedHtml.contains("</body>")) {
+                    processedHtml.replaceFirst("</body>", "<script>$javascript</script></body>")
+                } else {
+                    "<body>$processedHtml<script>$javascript</script></body>"
+                }
             }
+            processedHtml = clHtml(processedHtml, source.startStyle ?: source.style)
+            htmlLiveData.postValue(processedHtml)
         }
-        processedHtml = clHtml(processedHtml, source.startStyle ?: source.style)
-        htmlLiveData.postValue(processedHtml)
     }
 
     @Synchronized

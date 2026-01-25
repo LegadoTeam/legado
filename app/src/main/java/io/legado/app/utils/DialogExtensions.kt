@@ -1,8 +1,16 @@
 package io.legado.app.utils
 
+import android.app.Activity
 import android.app.Dialog
+import android.os.Build
+import android.view.View
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.view.WindowManager
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 import androidx.core.view.forEach
 import androidx.fragment.app.DialogFragment
 import io.legado.app.lib.theme.Selector
@@ -80,4 +88,32 @@ fun DialogFragment.setLayout(width: Int, height: Int) {
 
 fun Dialog.setLayout(width: Int, height: Int) {
     window?.setLayout(width, height)
+}
+
+fun Dialog.toggleSystemBar(show: Boolean) {
+    window?.let { window ->
+        WindowCompat.getInsetsController(window, window.decorView).run {
+            if (show) {
+                show(WindowInsetsCompat.Type.systemBars())
+                window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+            } else {
+                hide(WindowInsetsCompat.Type.systemBars())
+                systemBarsBehavior = BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+            }
+        }
+    }
+}
+
+fun Dialog.keepScreenOn(on: Boolean) {
+    window?.let { window ->
+        val isScreenOn =
+            (window.attributes.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) != 0
+        if (on == isScreenOn) return
+        if (on) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
 }

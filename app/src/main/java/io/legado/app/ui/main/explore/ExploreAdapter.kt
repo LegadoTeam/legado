@@ -19,6 +19,7 @@ import androidx.appcompat.widget.AppCompatSpinner
 import androidx.collection.LruCache
 import androidx.core.view.children
 import com.google.android.flexbox.FlexboxLayout
+import com.script.rhino.runScriptWithContext
 import io.legado.app.R
 import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.base.adapter.RecyclerAdapter
@@ -125,11 +126,14 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
         }
     }
 
-    @SuppressLint("SetTextI18n")
+    @SuppressLint("SetTextI18n", "ClickableViewAccessibility")
     private fun upKindList(binding: ItemFindBookBinding, item: BookSourcePart, kinds: List<ExploreKind>, exIndex: Int) {
+        if (kinds.isEmpty()) {
+            return
+        }
         val flexbox = binding.flexbox
         val sourceUrl = item.bookSourceUrl
-        if (kinds.isNotEmpty()) kotlin.runCatching {
+        kotlin.runCatching {
             recyclerFlexbox(flexbox)
             flexbox.visible()
             val source by lazy { appDb.bookSourceDao.getBookSource(sourceUrl) }
@@ -140,7 +144,7 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
             }
             val sourceJsExtensions by lazy {
                 SourceLoginJsExtensions(context as? AppCompatActivity, source,
-                    object : SourceLoginJsExtensions.Callback {
+                    callback = object : SourceLoginJsExtensions.Callback {
                         override fun upUiData(data: Map<String, String?>?) {
                         }
 
@@ -172,7 +176,7 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                             tv.text = n
                         } else {
                             tv.text = title
-                            Coroutine.async(callBack.scope) {
+                            Coroutine.async(callBack.scope, IO) {
                                 evalUiJs(viewName, source, infoMap)
                             }.onSuccess { n ->
                                 if (n.isNullOrEmpty()) {
@@ -237,7 +241,7 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                             tv.text = n
                         } else {
                             tv.text = title
-                            Coroutine.async(callBack.scope) {
+                            Coroutine.async(callBack.scope, IO) {
                                 evalUiJs(viewName, source, infoMap)
                             }.onSuccess { n ->
                                 if (n.isNullOrEmpty()) {
@@ -251,7 +255,7 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                         }
                         tv.setOnClickListener {
                             val action = kind.action?.takeIf { it.isNotBlank() } ?: return@setOnClickListener
-                            callBack.scope.launch {
+                            callBack.scope.launch(IO) {
                                 evalButtonClick(action, source, infoMap, title, sourceJsExtensions)
                             }
                         }
@@ -268,7 +272,7 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                                     }
                                     lastClickTime = upTime
                                     val action = kind.action?.takeIf { it.isNotBlank() } ?: return@setOnTouchListener true
-                                    callBack.scope.launch {
+                                    callBack.scope.launch(IO) {
                                         evalButtonClick(action, source, infoMap, title, sourceJsExtensions)
                                     }
                                 }
@@ -298,7 +302,7 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                             ti.hint = n
                         } else {
                             ti.hint = title
-                            Coroutine.async(callBack.scope) {
+                            Coroutine.async(callBack.scope, IO) {
                                 evalUiJs(viewName, source, infoMap)
                             }.onSuccess { n ->
                                 if (n.isNullOrEmpty()) {
@@ -325,7 +329,7 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                                 infoMap[title] = reContent
                                 if (reContent != content && kind.action != null) {
                                     actionJob?.cancel()
-                                    actionJob = callBack.scope.launch {
+                                    actionJob = callBack.scope.launch(IO) {
                                         delay(500) //防抖
                                         evalButtonClick(kind.action, source, infoMap, title, sourceJsExtensions)
                                         content = reContent
@@ -368,7 +372,7 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                             tv.text = if (left) char + n else n + char
                         } else {
                             tv.text = if (left) char + title else title + char
-                            Coroutine.async(callBack.scope) {
+                            Coroutine.async(callBack.scope, IO) {
                                 evalUiJs(viewName, source, infoMap)
                             }.onSuccess { n ->
                                 if (n.isNullOrEmpty()) {
@@ -388,7 +392,7 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                             infoMap[title] = char
                             tv.text = if (left) char + newName else newName + char
                             val action = kind.action?.takeIf { it.isNotBlank() } ?: return@setOnClickListener
-                            callBack.scope.launch {
+                            callBack.scope.launch(IO) {
                                 evalButtonClick(action, source, infoMap, title, sourceJsExtensions)
                             }
                         }
@@ -410,7 +414,7 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                                     infoMap[title] = char
                                     tv.text = if (left) char + newName else newName + char
                                     val action = kind.action?.takeIf { it.isNotBlank() } ?: return@setOnTouchListener true
-                                    callBack.scope.launch {
+                                    callBack.scope.launch(IO) {
                                         evalButtonClick(action, source, infoMap, title, sourceJsExtensions)
                                     }
                                 }
@@ -441,7 +445,7 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                             spName.text = n
                         } else {
                             spName.text = title
-                            Coroutine.async(callBack.scope) {
+                            Coroutine.async(callBack.scope, IO) {
                                 evalUiJs(viewName, source, infoMap)
                             }.onSuccess { n ->
                                 if (n.isNullOrEmpty()) {
@@ -481,7 +485,7 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                                 }
                                 infoMap[title] = chars[position]
                                 if (kind.action != null) {
-                                    callBack.scope.launch {
+                                    callBack.scope.launch(IO) {
                                         evalButtonClick(kind.action, source, infoMap, title, sourceJsExtensions)
                                     }
                                 }
@@ -495,24 +499,28 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
         }
     }
 
-    private suspend fun evalUiJs(jsStr: String, source: BookSource?, infoMap: InfoMap): String? = withContext(IO) {
-        val source = source ?: return@withContext null
-        try {
-            source.evalJS(jsStr) {
-                put("infoMap", infoMap)
-            }.toString()
+    private suspend fun evalUiJs(jsStr: String, source: BookSource?, infoMap: InfoMap): String? {
+        val source = source ?: return null
+        return try {
+            runScriptWithContext {
+                source.evalJS(jsStr) {
+                    put("infoMap", infoMap)
+                }.toString()
+            }
         } catch (e: Exception) {
             AppLog.put(source.getTag() + " exploreUi err:" + (e.localizedMessage ?: e.toString()), e)
             null
         }
     }
 
-    private suspend fun evalButtonClick(jsStr: String, source: BaseSource?, infoMap: InfoMap, name: String, java: SourceLoginJsExtensions) = withContext(IO) {
-        val source = source ?: return@withContext null
+    private suspend fun evalButtonClick(jsStr: String, source: BaseSource?, infoMap: InfoMap, name: String, java: SourceLoginJsExtensions) {
+        val source = source ?: return
         try {
-            source.evalJS(jsStr) {
-                put("java", java)
-                put("infoMap", infoMap)
+            runScriptWithContext {
+                source.evalJS(jsStr) {
+                    put("java", java)
+                    put("infoMap", infoMap)
+                }
             }
         } catch (e: Exception) {
             AppLog.put("ExploreUI Button $name JavaScript error", e)

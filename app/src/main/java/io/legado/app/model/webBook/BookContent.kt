@@ -194,7 +194,7 @@ object BookContent {
                 }
                 bookChapter.title = title
                 bookChapter.titleMD5 = null
-                appDb.bookChapterDao.update(bookChapter)
+                bookChapter.update()
             }
         }
         Debug.log(bookSource.bookSourceUrl, "┌获取章节名称")

@@ -68,21 +68,25 @@ data class BookChapter(
 
     fun putImgUrl(value: String?) {
         imgUrl =value
-        appDb.bookChapterDao.update(this)
+        update()
     }
 
     fun putLyric(value: String?) { //存入歌词文本
         if (super.putVariable("lyric", value)) {
             variable = GSON.toJson(variableMap)
-            appDb.bookChapterDao.update(this)
+            update()
         }
     }
 
     fun putDanmaku(value: String?) { //存入弹幕文本
         if (super.putVariable("danmaku", value)) {
             variable = GSON.toJson(variableMap)
-            appDb.bookChapterDao.update(this)
+            update()
         }
+    }
+
+    fun update() {
+        appDb.bookChapterDao.update(this)
     }
 
     @Ignore

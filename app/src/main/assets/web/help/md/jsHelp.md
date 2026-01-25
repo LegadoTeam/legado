@@ -67,8 +67,13 @@ java.open(name: String, url: String? = null, title: String? = null, origin: Stri
 ```
 
 ### [SourceLoginJsExtensions](https://github.com/LegadoTeam/legado/blob/main/app/src/main/java/io/legado/app/ui/login/SourceLoginJsExtensions.kt)独有函数
-> 只在`登录界面按钮`被触发、`按钮的回调`事件、`发现按钮`函数中有效  
+> 只在`登录界面按钮`被触发、`按钮的回调`事件、`发现按钮`函数、`图片链接click键`中有效
 ```js
+//用内置浏览器打开本地html
+* @param url 指定网页的基础URL，解决本地网页跨越问题
+* @param html 加载的内容
+* @param preloadJs 预注入js，用法同订阅源预注入js规则
+java.showBrowser(url: String, html: String, preloadJs: String? = null)
 //复制文本到剪贴板
 java.copyText(text: String)
 //实时更新登录界面用户信息，upLoginData(null)会全部重置为默认值
@@ -451,6 +456,7 @@ book.getVariable(key: String): String?
 ```js
 chapter.putVariable(key: String, variable: String?)
 chapter.getVariable(key: String): String?
+//在函数回调或登录界面等地方调用，chapter自身不会进行保存，需要调用chapter.update()
 ```
  * 章节信息存储
 ```js
