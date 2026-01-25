@@ -1,4 +1,4 @@
-name: Test Build
+name: Beta Release
 
 on:
   push:
@@ -8,9 +8,6 @@ on:
       - '**'
       - '!**/ISSUE_TEMPLATE/**'
       - '!**/modules/web/**'
-  pull_request:
-    paths-ignore:
-      - '**/modules/web/**'
   workflow_run:
     workflows: [Build Web]
     branches: [master]
@@ -92,12 +89,13 @@ jobs:
       - name: Release APK Sign
         run: |
           echo "设置签名文件"
-          echo "给apk增加签名"
-          cp $GITHUB_WORKSPACE/.github/workflows/legado.jks $GITHUB_WORKSPACE/app/legado.jks
-          sed '$a\RELEASE_STORE_FILE=./legado.jks'          $GITHUB_WORKSPACE/gradle.properties -i
-          sed '$a\RELEASE_KEY_ALIAS=legado'                 $GITHUB_WORKSPACE/gradle.properties -i
-          sed '$a\RELEASE_STORE_PASSWORD=gedoor_legado'     $GITHUB_WORKSPACE/gradle.properties -i
-          sed '$a\RELEASE_KEY_PASSWORD=gedoor_legado'       $GITHUB_WORKSPACE/gradle.properties -i
+          echo "${{ secrets.RELEASE_KEY_STORE }}" | base64 --decode > $GITHUB_WORKSPACE/app/legado.jks
+          {
+            echo "RELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}"
+            echo "RELEASE_STORE_PASSWORD=${{ secrets.RELEASE_STORE_PASSWORD }}"
+            echo "RELEASE_STORE_FILE=./legado.jks"
+            echo "RELEASE_KEY_ALIAS=legado"
+          } >> $GITHUB_WORKSPACE/gradle.properties
 
       - name: Build With Gradle
         run: |
@@ -217,7 +215,6 @@ jobs:
           artifacts: ${{ github.workspace }}/apk/*.apk
   CDN:
     needs: [prepare, build]
-    if: github.event_name != 'pull_request' && github.repository == 'LegadoTeam/legado'
     runs-on: ubuntu-latest
     env:
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
