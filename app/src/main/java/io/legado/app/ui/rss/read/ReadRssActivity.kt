@@ -80,8 +80,7 @@ import io.legado.app.ui.rss.source.edit.RssSourceEditActivity
 import io.legado.app.utils.StartActivityContract
 import kotlinx.coroutines.runBlocking
 import androidx.core.net.toUri
-import io.legado.app.constant.AppPattern
-import io.legado.app.help.webView.WebJsExtensions.Companion.JS_INJECTION
+import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.webView.WebJsExtensions.Companion.basicJs
 import io.legado.app.help.webView.WebJsExtensions.Companion.nameBasic
 import io.legado.app.help.webView.WebJsExtensions.Companion.nameCache
@@ -89,6 +88,9 @@ import io.legado.app.help.webView.WebJsExtensions.Companion.nameJava
 import io.legado.app.help.webView.WebJsExtensions.Companion.nameSource
 import io.legado.app.help.http.newCallResponse
 import io.legado.app.help.webView.PooledWebView
+import io.legado.app.help.webView.WebJsExtensions.Companion.JS_INJECTION
+import io.legado.app.help.webView.WebJsExtensions.Companion.JS_URL
+import io.legado.app.help.webView.WebJsExtensions.Companion.nameUrl
 import io.legado.app.help.webView.WebViewPool
 import io.legado.app.help.webView.WebViewPool.BLANK_HTML
 import io.legado.app.help.webView.WebViewPool.DATA_HTML
@@ -520,9 +522,9 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                     ctx.requestedOrientation = when (orientation) {
                         "portrait", "portrait-primary" -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                         "portrait-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
-                        "landscape", "landscape-primary" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE //横屏的时候受重力正反控制
-                        //ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                        "landscape-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+                        "landscape" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE //横屏且受重力控制正反
+                        "landscape-primary" -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE //正向横屏
+                        "landscape-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE //反向横屏
                         "any", "unspecified" -> ActivityInfo.SCREEN_ORIENTATION_SENSOR
                         else -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                     }
@@ -577,18 +579,12 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
 
         /* 监听网页日志 */
         override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
-            viewModel.rssSource?.let {
-                if (it.showWebLog) {
-                    val consoleException = Exception("${consoleMessage.messageLevel().name}: \n${consoleMessage.message()}\n-Line ${consoleMessage.lineNumber()} of ${consoleMessage.sourceId()}")
-                    val message = it.sourceName + ": ${consoleMessage.message()}"
-                    when (consoleMessage.messageLevel()) {
-                        ConsoleMessage.MessageLevel.LOG -> AppLog.put(message)
-                        ConsoleMessage.MessageLevel.DEBUG -> AppLog.put(message, consoleException)
-                        ConsoleMessage.MessageLevel.WARNING -> AppLog.put(message, consoleException)
-                        ConsoleMessage.MessageLevel.ERROR -> AppLog.put(message, consoleException)
-                        ConsoleMessage.MessageLevel.TIP -> AppLog.put(message)
-                        else -> AppLog.put(message)
-                    }
+            viewModel.rssSource?.let { source ->
+                if (source.showWebLog) {
+                    val messageLevel = consoleMessage.messageLevel().name
+                    val message = consoleMessage.message()
+                    AppLog.put("${source.getTag()}${messageLevel}: $message",
+                        NoStackTraceException("\n${message}\n- Line ${consoleMessage.lineNumber()} of ${consoleMessage.sourceId()}"))
                     return true
                 }
             }
@@ -620,15 +616,21 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             val url = request.url.toString()
             val source = viewModel.rssSource ?: return super.shouldInterceptRequest(view, request)
             if (request.isForMainFrame) {
-                if (viewModel.hasPreloadJs || request.method == "POST") {
-                    if (url.startsWith("data:text/html;")) {
+                if (viewModel.hasPreloadJs) {
+                    if (url.startsWith("data:text/html;") || request.method == "POST") {
                         return super.shouldInterceptRequest(view, request)
                     }
-                    val preloadJs = source.preloadJs
                     return runBlocking {
-                        getModifiedContentWithJs(url, preloadJs, request) ?: super.shouldInterceptRequest(view, request)
+                        getModifiedContentWithJs(url, request) ?: super.shouldInterceptRequest(view, request)
                     }
                 }
+            } else if (url.endsWith(nameUrl)) {
+                val preloadJs = source.preloadJs ?: ""
+                return WebResourceResponse(
+                    "application/javascript",
+                    "utf-8",
+                    ByteArrayInputStream("(() => {$JS_INJECTION\n$preloadJs\n})();".toByteArray())
+                )
             }
             val blacklist = source.contentBlacklist?.splitNotBlank(",")
             if (!blacklist.isNullOrEmpty()) {
@@ -660,7 +662,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             return super.shouldInterceptRequest(view, request)
         }
 
-        private suspend fun getModifiedContentWithJs(url: String, preloadJs: String?, request: WebResourceRequest): WebResourceResponse? {
+        private suspend fun getModifiedContentWithJs(url: String, request: WebResourceRequest): WebResourceResponse? {
             try {
                 val cookie = webCookieManager.getCookie(url)
                 val res = okHttpClient.newCallResponse {
@@ -682,12 +684,18 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                 val charset = contentType?.charset() ?: Charsets.UTF_8
                 val charsetSre = charset.name()
                 val bodyText = body.text().let { originalText ->
-                    AppPattern.htmlHeadRegex.find(originalText)?.let { match ->
-                        originalText.replaceRange(
-                            match.range,
-                            "${match.value}<script>(() => {$JS_INJECTION\n$preloadJs\n})();</script>"
-                        )
-                    } ?: originalText
+                    val headIndex = originalText.indexOf("<head", ignoreCase = true)
+                    if (headIndex >= 0) {
+                        val closingHeadIndex = originalText.indexOf('>', startIndex = headIndex)
+                        if (closingHeadIndex >= 0) {
+                            val insertPos = closingHeadIndex + 1
+                            StringBuilder(originalText).insert(insertPos, JS_URL).toString()
+                        } else {
+                            originalText
+                        }
+                    } else {
+                        originalText
+                    }
                 }
                 return WebResourceResponse(
                     mimeType,
