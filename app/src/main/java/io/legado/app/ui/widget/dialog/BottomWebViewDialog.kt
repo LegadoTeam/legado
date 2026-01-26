@@ -77,7 +77,6 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.runBlocking
 import java.io.ByteArrayInputStream
 import java.lang.ref.WeakReference
-import com.google.android.material.R as materialR
 
 class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view) {
 
@@ -101,7 +100,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
 
     private val binding by viewBinding(DialogWebViewBinding::bind)
     private val bottomSheet by lazy {
-        dialog?.findViewById<View>(materialR.id.design_bottom_sheet)
+        dialog?.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
     }
     private val behavior by lazy {
         bottomSheet?.let { sheet ->
@@ -144,9 +143,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT
             sheet.layoutParams = layoutParams
         }
-        if (!AppConfig.isEInkMode) {
-            view.setBackgroundColor(ThemeStore.backgroundColor())
-        }
+        view.setBackgroundColor(0)
         binding.webViewContainer.addView(currentWebView)
         lifecycleScope.launch(IO) {
             val args = arguments
@@ -203,9 +200,6 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                         config.isGestureInsetBottomIgnored?.let {
                             behavior?.isGestureInsetBottomIgnored = it
                         }
-//                        config.isShouldRemoveExpandedCorners?.let {
-//                            behavior?.isShouldRemoveExpandedCorners = it
-//                        }
                         config.expandedCornersRadius?.let {
                             try {
                                 val radius = TypedValue.applyDimension(
@@ -215,6 +209,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                                     sheet.backgroundTintList = null
                                     val shapeDrawable =
                                         android.graphics.drawable.GradientDrawable().apply {
+                                            cornerRadius = 0f
                                             cornerRadii = floatArrayOf(
                                                 radius, radius,
                                                 radius, radius,
@@ -226,6 +221,14 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                                     sheet.clipToOutline = true
                                     binding.webViewContainer.background = shapeDrawable
                                     binding.webViewContainer.clipToOutline = true
+                                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                                        currentWebView.outlineProvider = object : android.view.ViewOutlineProvider() {
+                                            override fun getOutline(view: View, outline: android.graphics.Outline) {
+                                                outline.setRoundRect(0, 0, view.width, view.height, radius)
+                                            }
+                                        }
+                                        currentWebView.clipToOutline = true
+                                    }
                                 }
                             } catch (e: Exception) {
                                 AppLog.put("设置圆角失败", e)
@@ -247,9 +250,6 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                                     dialog?.window?.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
                                 }
                             }
-                        }
-                        config.backgroundColor?.let {
-                            bottomSheet?.setBackgroundColor(it)
                         }
 
                         config.dismissOnTouchOutside?.let {
@@ -521,7 +521,6 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         var maxWidth: Int? = null, // 设置弹窗的最大宽度（像素）
         var maxHeight: Int? = null, // 设置弹窗的最大高度（像素）
         var isGestureInsetBottomIgnored: Boolean? = null, // 是否忽略系统手势区域（如下方的导航条）
-//        var isShouldRemoveExpandedCorners: Boolean? = null, // 展开时是否移除圆角
         var expandedCornersRadius: Float? = null, // 展开状态的圆角半径
 
         // 无障碍功能相关配置
@@ -530,7 +529,6 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         // 背景相关配置
         var backgroundDimAmount: Float? = null, // 背景遮罩透明度（0.0-1.0）
         var shouldDimBackground: Boolean? = null, // 是否显示背景遮罩
-        var backgroundColor: Int? = null, // 弹窗背景颜色（ARGB格式）
 
         // WebView特定配置
         var webViewInitialScale: Int? = null, // WebView初始缩放比例 默认100
@@ -611,7 +609,9 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             return true
         }
 
+        private var jsInjected = false
         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+            jsInjected = false
             if (needClearHistory) {
                 needClearHistory = false
                 currentWebView.clearHistory() //清除历史
@@ -659,13 +659,16 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                         getModifiedContentWithJs(url, request) ?: super.shouldInterceptRequest(view, request)
                     }
                 }
-            } else if (url.endsWith(nameUrl)) {
-                val preloadJs = preloadJs ?: ""
-                return WebResourceResponse(
-                    "application/javascript",
-                    "utf-8",
-                    ByteArrayInputStream("(() => {$JS_INJECTION\n$preloadJs\n})();".toByteArray())
-                )
+            } else if (!jsInjected) {
+                if (url == nameUrl) {
+                    jsInjected = true
+                    val preloadJs = preloadJs ?: ""
+                    return WebResourceResponse(
+                        "application/javascript",
+                        "utf-8",
+                        ByteArrayInputStream("(() => {$JS_INJECTION\n$preloadJs\n})();".toByteArray())
+                    )
+                }
             }
             return super.shouldInterceptRequest(view, request)
         }

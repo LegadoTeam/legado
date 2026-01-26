@@ -25,7 +25,7 @@ import io.legado.app.utils.toastOnUi
 import org.apache.commons.text.StringEscapeUtils
 import java.util.Date
 import io.legado.app.data.entities.BaseSource
-import io.legado.app.help.webView.WebJsExtensions.Companion.JS_INJECTION
+import io.legado.app.help.webView.WebJsExtensions.Companion.JS_INJECTION2
 
 class WebViewModel(application: Application) : BaseViewModel(application) {
     var source: BaseSource? = null
@@ -56,9 +56,9 @@ class WebViewModel(application: Application) : BaseViewModel(application) {
             html = intent.getStringExtra("html")?.let{
                 localHtml = true
                 if (it.contains("<head>")) {
-                    it.replaceFirst("<head>", "<head><script>$JS_INJECTION</script>")
+                    it.replaceFirst("<head>", "<head><script>$JS_INJECTION2</script>")
                 } else {
-                    "<head><script>$JS_INJECTION</script></head>$it"
+                    "<head><script>$JS_INJECTION2</script></head>$it"
                 }
             }
             source = SourceHelp.getSource(sourceOrigin, sourceType)

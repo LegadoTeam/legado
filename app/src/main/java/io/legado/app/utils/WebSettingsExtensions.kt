@@ -35,5 +35,13 @@ fun WebSettings.setDarkeningAllowed(allow: Boolean) {
                 WebSettingsCompat.FORCE_DARK_ON
             )
         }
+    } else {
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
+            @Suppress("DEPRECATION")
+            WebSettingsCompat.setForceDark(
+                this,
+                WebSettingsCompat.FORCE_DARK_OFF
+            )
+        }
     }
 }
