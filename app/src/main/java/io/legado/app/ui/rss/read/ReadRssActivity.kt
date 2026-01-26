@@ -605,6 +605,17 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             return shouldOverrideUrlLoading(url.toUri())
         }
 
+        private var jsInjected = false
+        override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+            jsInjected = false
+            if (needClearHistory) {
+                needClearHistory = false
+                currentWebView.clearHistory() //清除历史
+            }
+            super.onPageStarted(view, url, favicon)
+            currentWebView.evaluateJavascript(basicJs, null)
+        }
+
         /**
          * 如果有黑名单,黑名单匹配返回空白,
          * 没有黑名单再判断白名单,在白名单中的才通过,
@@ -624,13 +635,16 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                         getModifiedContentWithJs(url, request) ?: super.shouldInterceptRequest(view, request)
                     }
                 }
-            } else if (url.endsWith(nameUrl)) {
-                val preloadJs = source.preloadJs ?: ""
-                return WebResourceResponse(
-                    "application/javascript",
-                    "utf-8",
-                    ByteArrayInputStream("(() => {$JS_INJECTION\n$preloadJs\n})();".toByteArray())
-                )
+            } else if (!jsInjected) {
+                if (url == nameUrl) {
+                    jsInjected = true
+                    val preloadJs = source.preloadJs ?: ""
+                    return WebResourceResponse(
+                        "application/javascript",
+                        "utf-8",
+                        ByteArrayInputStream("(() => {$JS_INJECTION\n$preloadJs\n})();".toByteArray())
+                    )
+                }
             }
             val blacklist = source.contentBlacklist?.splitNotBlank(",")
             if (!blacklist.isNullOrEmpty()) {
@@ -705,15 +719,6 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             } catch (_: Exception) {
                 return null
             }
-        }
-
-        override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-            if (needClearHistory) {
-                needClearHistory = false
-                currentWebView.clearHistory() //清除历史
-            }
-            super.onPageStarted(view, url, favicon)
-            currentWebView.evaluateJavascript(basicJs, null)
         }
 
         override fun onPageFinished(view: WebView, url: String) {

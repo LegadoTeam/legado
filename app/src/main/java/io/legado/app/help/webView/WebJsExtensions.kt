@@ -183,129 +183,161 @@ class WebJsExtensions(source: BaseSource, activity: AppCompatActivity, private v
 
     companion object{
         private fun getRandomLetter(): Char {
-            val letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+            val letters = "abcdefghijklmnopqrstuvwxyz"
             return letters.random()
         }
-        val uuid by lazy { UUID.randomUUID().toString().split("-") }
-        val uuid2 by lazy { UUID.randomUUID().toString().split("-") }
-        val nameUrl by lazy { getRandomLetter() + uuid[0] + uuid2[0] }
-        val nameJava by lazy { getRandomLetter() + uuid[0] + uuid[1] }
-        val nameCache by lazy { getRandomLetter() + uuid[2] + uuid[3] }
-        val nameSource by lazy { getRandomLetter() + uuid[4] }
-        val nameBasic by lazy { getRandomLetter() + uuid2[1] + uuid2[2] }
-        val JSBridgeResult by lazy { getRandomLetter() + uuid2[3] + uuid2[4] }
-        val JS_URL by lazy {
-            """<link rel="preload" href="$nameUrl" as="script"><script src="$nameUrl"></script>"""
+        val uuid by lazy {
+            UUID.randomUUID().toString().replace('-', getRandomLetter()).chunked(6)
         }
+        val uuid2 by lazy {
+            UUID.randomUUID().toString().replace('-', getRandomLetter()).chunked(6)
+        }
+        val nameUrl by lazy { "https://" + uuid[0] + ".com/" + uuid2[0] + ".js" }
+        val nameJava by lazy { getRandomLetter() + uuid[1] + uuid2[1] }
+        val nameCache by lazy { getRandomLetter() + uuid[2] + uuid2[2] }
+        val nameSource by lazy { getRandomLetter() + uuid[3] + uuid2[3] }
+        val nameBasic by lazy { getRandomLetter() + uuid[4] + uuid2[4] }
+        val JSBridgeResult by lazy { getRandomLetter() + uuid[5] + uuid2[5] }
+        val JS_URL by lazy {
+            "<script src=\"$nameUrl\"></script>"
+        }
+
         val JS_INJECTION by lazy { """
             const requestId = n => 'req_' + n + '_' + Date.now() + '_' + Math.random().toString(36).slice(-3);
             const JSBridgeCallbacks = {};
             const java = window.$nameJava;
+            delete window.$nameJava;
             const source = window.$nameSource;
+            delete window.$nameSource;
             const cache = window.$nameCache;
+            delete window.$nameCache;
             function run(jsCode) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("run");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    window.$nameJava?.request("run", [String(jsCode)], id);
+                    java?.request("run", [String(jsCode)], id);
                 });
             };
             function ajaxAwait(url, callTimeout) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("ajaxAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    window.$nameJava?.request("ajaxAwait", [String(url), String(callTimeout)], id);
+                    java?.request("ajaxAwait", [String(url), String(callTimeout)], id);
                 });
             };
             function connectAwait(url, header, callTimeout) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("connectAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    window.$nameJava?.request("connectAwait", [String(url), String(header), String(callTimeout)], id);
+                    java?.request("connectAwait", [String(url), String(header), String(callTimeout)], id);
                 });
             };
             function getAwait(url, header, callTimeout) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("getAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    window.$nameJava?.request("getAwait", [String(url), String(header), String(callTimeout)], id);
+                    java?.request("getAwait", [String(url), String(header), String(callTimeout)], id);
                 });
             };
             function headAwait(url, header, callTimeout) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("headAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    window.$nameJava?.request("headAwait", [String(url), String(header), String(callTimeout)], id);
+                    java?.request("headAwait", [String(url), String(header), String(callTimeout)], id);
                 });
             };
             function postAwait(url, body, header, callTimeout) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("postAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    window.$nameJava?.request("postAwait", [String(url), String(body), String(header), String(callTimeout)], id);
+                    java?.request("postAwait", [String(url), String(body), String(header), String(callTimeout)], id);
                 });
             };
             function webViewAwait(html, url, js, cacheFirst) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("webViewAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    window.$nameJava?.request("webViewAwait", [String(html), String(url), String(js), String(cacheFirst)], id);
+                    java?.request("webViewAwait", [String(html), String(url), String(js), String(cacheFirst)], id);
                 });
             };
             function decryptStrAwait(transformation, key, iv, data) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("decryptStrAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    window.$nameJava?.request("decryptStrAwait", [String(transformation), String(key), String(iv), String(data)], id);
+                    java?.request("decryptStrAwait", [String(transformation), String(key), String(iv), String(data)], id);
                 });
             };
             function encryptBase64Await(transformation, key, iv, data) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("encryptBase64Await");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    window.$nameJava?.request("encryptBase64Await", [String(transformation), String(key), String(iv), String(data)], id);
+                    java?.request("encryptBase64Await", [String(transformation), String(key), String(iv), String(data)], id);
                 });
             };
             function encryptHexAwait(transformation, key, iv, data) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("encryptHexAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    window.$nameJava?.request("encryptHexAwait", [String(transformation), String(key), String(iv), String(data)], id);
+                    java?.request("encryptHexAwait", [String(transformation), String(key), String(iv), String(data)], id);
                 });
             };
             function createSignHexAwait(algorithm, publicKey, privateKey, data) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("createSignHexAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    window.$nameJava?.request("createSignHexAwait", [String(algorithm), String(publicKey), String(privateKey), String(data)], id);
+                    java?.request("createSignHexAwait", [String(algorithm), String(publicKey), String(privateKey), String(data)], id);
                 });
             };
             function downloadFileAwait(url) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("downloadFileAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    window.$nameJava?.request("downloadFileAwait", [String(url)], id);
+                    java?.request("downloadFileAwait", [String(url)], id);
                 });
             };
             function readTxtFileAwait(path) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("readTxtFileAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    window.$nameJava?.request("readTxtFileAwait", [String(path)], id);
+                    java?.request("readTxtFileAwait", [String(path)], id);
                 });
             };
             function importScriptAwait(url) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("importScriptAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    window.$nameJava?.request("importScriptAwait", [String(url)], id);
+                    java?.request("importScriptAwait", [String(url)], id);
                 });
             };
             function getStringAwait(ruleStr, mContent) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("getStringAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    window.$nameJava?.request("getStringAwait", [String(ruleStr), String(mContent)], id);
+                    java?.request("getStringAwait", [String(ruleStr), String(mContent)], id);
+                });
+            };
+            window.$JSBridgeResult = function(requestId, result, error) {
+                if (JSBridgeCallbacks[requestId]) {
+                    if (error) {
+                        JSBridgeCallbacks[requestId].reject(error);
+                    } else {
+                        JSBridgeCallbacks[requestId].resolve(result);
+                    }
+                    delete JSBridgeCallbacks[requestId];
+                }
+            };""".trimIndent()
+        }
+
+        val JS_INJECTION2 by lazy { """
+            const requestId = n => 'req_' + n + '_' + Date.now() + '_' + Math.random().toString(36).slice(-3);
+            const JSBridgeCallbacks = {};
+            const java = window.$nameJava;
+            delete window.$nameJava;
+            function run(jsCode) {
+                return new Promise((resolve, reject) => {
+                    const id = requestId("run");
+                    JSBridgeCallbacks[id] = { resolve, reject };
+                    java?.request("run", [String(jsCode)], id);
                 });
             };
             window.$JSBridgeResult = function(requestId, result, error) {

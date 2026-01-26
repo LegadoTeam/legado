@@ -11,6 +11,7 @@ import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.ui.login.SourceLoginJsExtensions
 import io.legado.app.utils.isTrue
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -45,7 +46,7 @@ object SourceCallBack {
             noCall?.invoke()
             return
         }
-        activity.lifecycleScope.launch {
+        activity.lifecycleScope.launch(IO) {
             val java = SourceLoginJsExtensions(activity, source)
             kotlin.runCatching {
                 val result = runScriptWithContext {
