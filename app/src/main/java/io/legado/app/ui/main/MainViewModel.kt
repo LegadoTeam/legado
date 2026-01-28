@@ -184,7 +184,7 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
             // 使用 putIfAbsent 确保只添加一次
             if (eventListenerSource.putIfAbsent(source, true) == null) {
                 // 通知监听事件的书源，书架刷新开始
-                SourceCallBack.callBackSource(SourceCallBack.START_SHELF_REFRESH, source)
+                SourceCallBack.callBackSource(viewModelScope, SourceCallBack.START_SHELF_REFRESH, source)
             }
         }
         kotlin.runCatching {
@@ -249,7 +249,7 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
     private fun cacheBook() {
         //开始缓存前，通知监听事件的书源，书架刷新已完成
         eventListenerSource.toList().forEach {
-            SourceCallBack.callBackSource(SourceCallBack.END_SHELF_REFRESH, it.first)
+            SourceCallBack.callBackSource(viewModelScope, SourceCallBack.END_SHELF_REFRESH, it.first)
         }
         eventListenerSource.clear()
         if (AppConfig.preDownloadNum == 0) return

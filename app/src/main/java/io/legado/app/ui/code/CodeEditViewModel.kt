@@ -147,9 +147,9 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
         return try {
             BackstageWebView(
                 url = null,
-                html = "<body><script src=\"https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.15.4/beautify.min.js\"></script></body>",
-                javaScript = """
-                js_beautify("${jsCode.escapeForJs()}", {
+                html = """<html><body><script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.15.4/beautify.min.js"></script>
+                <script>
+                window.result = js_beautify("${jsCode.escapeForJs()}", {
                 indent_size: 4,
                 indent_char: ' ',
                 preserve_newlines: true,
@@ -161,8 +161,11 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
                 end_with_newline: false,
                 wrap_line_length: 0,
                 comma_first: false
-                });""".trimIndent(),
-                cacheFirst = true
+                });
+                </script></body></html>""".trimIndent(),
+                javaScript = "window.result",
+                cacheFirst = true,
+                timeout = 5000
             ).getStrResponse().body
         } catch (_: Exception) {
             context.toastOnUi("格式化失败")

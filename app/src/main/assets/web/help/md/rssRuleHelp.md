@@ -42,38 +42,41 @@ java.toast("调用java函数");
 
 > 异步函数，函数参数和返回结果类型均为字符串    
 ```js
+//执行阅读函数代码字符串，并返回字符串结果
 run("java.toast('执行成功');'成功'")
 .then(r=>alert(r))
 .catch(e=>alert("执行出错:"+e));
-//执行阅读函数代码字符串，并返回字符串结果
-ajaxAwait(url, callTimeout)
 //用java.ajax异步访问
-connectAwait(url, header, callTimeout)
+ajaxAwait(url, callTimeout)
 //用java.connect异步访问，返回序列化后的响应
+connectAwait(url, header, callTimeout)
+//返回响应体结果
 getAwait(url, header, callTimeout)
-//返回响应体
-headAwait(url, header, callTimeout)
 //返回序列化后的响应头
+headAwait(url, header, callTimeout)
+//返回响应体结果
 postAwait(url, body, header, callTimeout)
-//返回响应体
-webViewAwait(html, url, js, cacheFirst)
 //用java.webView异步访问
-decryptStrAwait(transformation, key, iv, data)
+webViewAwait(html, url, js, cacheFirst)
+//用java.webViewGetSourceAwait异步访问
+webViewGetSourceAwait(html, url, js, sourceRegex, cacheFirst, delayTime)
 //同java.createSymmetricCrypto(transformation, key, iv).decryptStr(data)
-encryptBase64Await(transformation, key, iv, data)
+decryptStrAwait(transformation, key, iv, data)
 //同java.createSymmetricCrypto(transformation, key, iv).encryptBase64(data)
-encryptHexAwait(transformation, key, iv, data)
+encryptBase64Await(transformation, key, iv, data)
 //同java.createSymmetricCrypto(transformation, key, iv).encryptHex(data)
-createSignHexAwait(algorithm, publicKey, privateKey, data)
+encryptHexAwait(transformation, key, iv, data)
 //同java.createSign(algorithm).setPublicKey(publicKey).setPrivateKey(privateKey).signHex(data)
-downloadFileAwait(url)
+createSignHexAwait(algorithm, publicKey, privateKey, data)
 //同java.downloadFile(url)
-readTxtFileAwait(path)
+downloadFileAwait(url)
 //同java.readTxtFile(url)
-importScriptAwait(url)
+readTxtFileAwait(path)
 //同java.importScript(url)
-getStringAwait(ruleStr, mContent)
+importScriptAwait(url)
 //同java.getString(ruleStr, mContent)
+getStringAwait(ruleStr, mContent)
+
 ```
 > 同步调用  
 
