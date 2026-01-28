@@ -229,23 +229,13 @@ interface JsExtensions : JsEncodeUtils {
     }
 
     fun webViewGetSource(html: String?, url: String?, js: String?, sourceRegex: String): String? {
-        return webViewGetSource(html, url, js, sourceRegex, false, 0)
-    }
-    fun webViewGetSource(html: String?, url: String?, js: String?, sourceRegex: String, cacheFirst: Boolean): String? {
-        return webViewGetSource(html, url, js, sourceRegex, cacheFirst, 0)
+        return webViewGetSource(html, url, js, sourceRegex, false)
     }
 
     /**
      * 使用webView获取资源url
      */
-    fun webViewGetSource(
-        html: String?,
-        url: String?,
-        js: String?,
-        sourceRegex: String,
-        cacheFirst: Boolean,
-        delayTime:Long
-    ): String? {
+    fun webViewGetSource(html: String?, url: String?, js: String?, sourceRegex: String, cacheFirst: Boolean): String? {
         if (isMainThread) {
             error("webViewGetSource must be called on a background thread")
         }
@@ -257,17 +247,13 @@ interface JsExtensions : JsEncodeUtils {
                 headerMap = getSource()?.getHeaderMap(true),
                 tag = getSource()?.getKey(),
                 sourceRegex = sourceRegex,
-                cacheFirst = cacheFirst,
-                delayTime = delayTime
+                cacheFirst = cacheFirst
             ).getStrResponse().body
         }
     }
 
     fun webViewGetOverrideUrl(html: String?, url: String?, js: String?, overrideUrlRegex: String): String? {
-        return webViewGetOverrideUrl(html, url, js, overrideUrlRegex, false, 0)
-    }
-    fun webViewGetOverrideUrl(html: String?, url: String?, js: String?, overrideUrlRegex: String, cacheFirst: Boolean): String? {
-        return webViewGetOverrideUrl(html, url, js, overrideUrlRegex, cacheFirst, 0)
+        return webViewGetOverrideUrl(html, url, js, overrideUrlRegex, false)
     }
 
     /**
@@ -278,8 +264,7 @@ interface JsExtensions : JsEncodeUtils {
         url: String?,
         js: String?,
         overrideUrlRegex: String,
-        cacheFirst: Boolean,
-        delayTime:Long
+        cacheFirst: Boolean
     ): String? {
         if (isMainThread) {
             error("webViewGetOverrideUrl must be called on a background thread")
@@ -292,8 +277,7 @@ interface JsExtensions : JsEncodeUtils {
                 headerMap = getSource()?.getHeaderMap(true),
                 tag = getSource()?.getKey(),
                 overrideUrlRegex = overrideUrlRegex,
-                cacheFirst = cacheFirst,
-                delayTime = delayTime
+                cacheFirst = cacheFirst
             ).getStrResponse().body
         }
     }

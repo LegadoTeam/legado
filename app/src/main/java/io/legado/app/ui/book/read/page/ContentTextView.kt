@@ -65,8 +65,6 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
     private var autoPager: AutoPager? = null
     private var isScroll = false
     private val renderRunnable by lazy { Runnable { preRenderPage() } }
-    private var lastClickTime = 0L
-    private var doubleClick = false
 
     //绘制图片的paint
     val imagePaint by lazy {
@@ -243,14 +241,6 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
      */
     @Suppress("UNUSED_ANONYMOUS_PARAMETER")
     fun click(x: Float, y: Float): Boolean {
-        val currentTime = System.currentTimeMillis()
-        val debounceClick = currentTime - lastClickTime < 300L //300毫秒防抖和双击
-        lastClickTime = currentTime
-        doubleClick = if (debounceClick) {
-            !doubleClick
-        } else {
-            false
-        }
         var handled = false
         touch(x, y) { _, textPos, textPage, textLine, column ->
             when (column) {
@@ -270,40 +260,25 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                         handled = true
                     }
                     "2" -> { //兼容处理
-                        if (!debounceClick) {
-                            if (ReadBook.book?.isOnLineTxt == true) {
-                                val click = column.click
-                                val src = column.src
-                                if (!click.isNullOrBlank()) {
-                                    callBack.clickImg(click, src)
-                                    handled = true
-                                } else {
-                                    handled = callBack.oldClickImg(src)
-                                }
+                        if (ReadBook.book?.isOnLineTxt == true) {
+                            val click = column.click
+                            val src = column.src
+                            if (!click.isNullOrBlank()) {
+                                callBack.clickImg(click, src)
+                                handled = true
+                            } else {
+                                handled = callBack.oldClickImg(src)
                             }
                         }
                     }
                     "3" -> { //关闭
                         handled = false
                     }
-                    "4" -> { //双击
-                        if (doubleClick) {
-                            val click = column.click
-                            if (!click.isNullOrBlank()) {
-                                callBack.clickImg(click, column.src)
-                                handled = true
-                            }
-                        } else {
-                            handled = true
-                        }
-                    }
                     else -> { //默认点击
-                        if (!debounceClick) {
-                            val click = column.click
-                            if (!click.isNullOrBlank()) {
-                                callBack.clickImg(click, column.src)
-                                handled = true
-                            }
+                        val click = column.click
+                        if (!click.isNullOrBlank()) {
+                            callBack.clickImg(click, column.src)
+                            handled = true
                         }
                     }
                 }
@@ -311,9 +286,14 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                     column.linkUrl?.let {
                         activity?.startActivity<OpenUrlConfirmActivity> {
                             putExtra("uri", it)
+//                            putExtra("mimeType", mimeType)
+//                            putExtra("sourceOrigin", source.getKey())
+//                            putExtra("sourceName", source.getTag())
+//                            putExtra("sourceType", source.getSourceType())
                         }
                         handled = true
                     }
+
                 }
             }
         }

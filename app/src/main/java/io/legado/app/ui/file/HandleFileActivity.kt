@@ -55,9 +55,7 @@ class HandleFileActivity :
             if (it.isContentScheme()) {
                 val modeFlags =
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                try {
-                    contentResolver.takePersistableUriPermission(it, modeFlags)
-                } catch (_: SecurityException) { }
+                contentResolver.takePersistableUriPermission(it, modeFlags)
             }
             onResult(Intent().setData(it))
         } ?: finish()

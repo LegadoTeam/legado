@@ -64,12 +64,10 @@ class RssAdapter(
     private fun showMenu(view: View, rssSource: RssSource) {
         val popupMenu = PopupMenu(context, view)
         popupMenu.inflate(R.menu.rss_main_item)
-        popupMenu.menu.findItem(R.id.menu_login).isVisible = !rssSource.loginUrl.isNullOrBlank()
         popupMenu.setOnMenuItemClickListener {
             when (it.itemId) {
-                R.id.menu_edit -> callBack.edit(rssSource)
                 R.id.menu_top -> callBack.toTop(rssSource)
-                R.id.menu_login -> callBack.login(rssSource)
+                R.id.menu_edit -> callBack.edit(rssSource)
                 R.id.menu_del -> callBack.del(rssSource)
                 R.id.menu_disable -> callBack.disable(rssSource)
             }
@@ -80,9 +78,8 @@ class RssAdapter(
 
     interface CallBack {
         fun openRss(rssSource: RssSource)
-        fun edit(rssSource: RssSource)
         fun toTop(rssSource: RssSource)
-        fun login(rssSource: RssSource)
+        fun edit(rssSource: RssSource)
         fun del(rssSource: RssSource)
         fun disable(rssSource: RssSource)
     }

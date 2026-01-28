@@ -17,30 +17,29 @@ import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch
 import java.io.File
-import java.lang.ref.WeakReference
 
 @Suppress("unused")
 class SourceLoginJsExtensions(
     activity: AppCompatActivity?, source: BaseSource?,
     private val bookType: Int = 0,
-    callback: Callback? = null
+    private val callback: Callback? = null
 ) : RssJsExtensions(activity, source) {
-    private val callbackRef: WeakReference<Callback> = WeakReference(callback)
+
     interface Callback {
         fun upUiData(data: Map<String, String?>?)
         fun reUiView()
     }
 
     fun upLoginData(data: Map<String, String?>?) {
-        callbackRef.get()?.upUiData(data)
+        callback?.upUiData(data)
     }
 
     fun reLoginView() {
-        callbackRef.get()?.reUiView()
+        callback?.reUiView()
     }
 
     fun refreshExplore() {
-        callbackRef.get()?.reUiView()
+        callback?.reUiView()
     }
 
     fun refreshBookInfo() {

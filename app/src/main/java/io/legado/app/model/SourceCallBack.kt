@@ -10,13 +10,11 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.ui.login.SourceLoginJsExtensions
 import io.legado.app.utils.isTrue
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import kotlin.onFailure
 
 object SourceCallBack {
     const val CLICK_AUTHOR = "clickAuthor"
@@ -77,7 +75,7 @@ object SourceCallBack {
         if (jsStr.isNullOrEmpty()) return
         Coroutine.async {
             withTimeout(60000L) {
-                runScriptWithContext(coroutineContext) {
+                runScriptWithContext {
                     source.evalJS(jsStr) {
                         put("event", event)
                         put("result", null)
@@ -91,24 +89,22 @@ object SourceCallBack {
         }
     }
 
-    fun callBackSource(scope: CoroutineScope, event: String, source: BookSource) {
+    fun callBackSource(event: String, source: BookSource) {
         val jsStr = source.getContentRule().callBackJs
         if (jsStr.isNullOrEmpty()) return
-        scope.launch(IO) {
-            kotlin.runCatching {
-                withTimeout(30000L) {
-                    runScriptWithContext {
-                        source.evalJS(jsStr) {
-                            put("event", event)
-                            put("result", null)
-                            put("book", null)
-                            put("chapter", null)
-                        }
+        Coroutine.async {
+            withTimeout(30000L) {
+                runScriptWithContext {
+                    source.evalJS(jsStr) {
+                        put("event", event)
+                        put("result", null)
+                        put("book", null)
+                        put("chapter", null)
                     }
                 }
-            }.onFailure {
-                AppLog.put("${source.bookSourceName}\n书源执行回调事件${event}出错\n${it.localizedMessage}", it, true)
             }
+        }.onError {
+            AppLog.put("${source.bookSourceName}\n书源执行回调事件${event}出错\n${it.localizedMessage}", it, true)
         }
     }
 

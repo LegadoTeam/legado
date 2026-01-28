@@ -42,12 +42,13 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
-import io.legado.app.ui.login.SourceLoginActivity
+
 
 /**
  * 订阅界面
  */
-class RssFragment() : VMBaseFragment<RssViewModel>(R.layout.fragment_rss), MainFragmentInterface,
+class RssFragment() : VMBaseFragment<RssViewModel>(R.layout.fragment_rss),
+    MainFragmentInterface,
     RssAdapter.CallBack {
 
     constructor(position: Int) : this() {
@@ -191,30 +192,22 @@ class RssFragment() : VMBaseFragment<RssViewModel>(R.layout.fragment_rss), MainF
                     context?.openUrl(url)
                 }
             }
+        }
+        else if(rssSource.startHtml.isNullOrBlank()) {
+            startActivity<RssSortActivity> {
+                putExtra("sourceUrl", rssSource.sourceUrl)
+            }
         } else {
-            viewModel.launchRssWithHtml(rssSource, {
-                startActivity<RssSortActivity> {
-                    putExtra("sourceUrl", rssSource.sourceUrl)
-                }
-            }) { html ->
-                startActivity<ReadRssActivity> {
-                    putExtra("title", rssSource.sourceName)
-                    putExtra("origin", rssSource.sourceUrl)
-                    putExtra("startHtml", html)
-                }
+            startActivity<ReadRssActivity> {
+                putExtra("title", rssSource.sourceName)
+                putExtra("origin", rssSource.sourceUrl)
+                putExtra("startHtml", true)
             }
         }
     }
 
     override fun toTop(rssSource: RssSource) {
         viewModel.topSource(rssSource)
-    }
-
-    override fun login(rssSource: RssSource) {
-        startActivity<SourceLoginActivity> {
-            putExtra("type", "rssSource")
-            putExtra("key", rssSource.sourceUrl)
-        }
     }
 
     override fun edit(rssSource: RssSource) {

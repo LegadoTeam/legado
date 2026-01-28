@@ -220,7 +220,6 @@ object BookChapterList {
             val payRule = analyzeRule.splitSourceRule(tocRule.isPay)
             val upTimeRule = analyzeRule.splitSourceRule(tocRule.updateTime)
             val isVolumeRule = analyzeRule.splitSourceRule(tocRule.isVolume)
-            val tocCountWords = AppConfig.tocCountWords
             elements.forEachIndexed { index, item ->
                 currentCoroutineContext().ensureActive()
                 analyzeRule.setContent(item)
@@ -234,8 +233,9 @@ object BookChapterList {
                 if (isVolume.isTrue()) {
                     bookChapter.isVolume = true
                     bookChapter.tag = info
-                } else {
-                    if (tocCountWords) {
+                }
+                else {
+                    if (AppConfig.tocCountWords) {
                         AppPattern.wordCountRegex.find(info)?.let { match ->
                             bookChapter.apply {
                                 wordCount = match.groupValues[1].trim()
@@ -299,15 +299,12 @@ object BookChapterList {
         }
         val chapterList = appDb.bookChapterDao.getChapterList(book.bookUrl)
         if (chapterList.isNotEmpty()) {
-            val map = HashMap<String, Triple<String?, String?, String?>>(chapterList.size)
-            for (chapter in chapterList) {
-                map["${chapter.index}_${chapter.title}"] = Triple(chapter.wordCount, chapter.variable, chapter.imgUrl)
-            }
-            for (chapter in list) {
-                map["${chapter.index}_${chapter.title}"]?.let { info ->
-                    chapter.wordCount = info.first
-                    chapter.variable = info.second
-                    chapter.imgUrl = info.third
+            val map = chapterList.associateBy({ it.getFileName() }, {Triple(it.wordCount, it.variable, it.imgUrl)})
+            for (bookChapter in list) {
+                map[bookChapter.getFileName()]?.let { info ->
+                    bookChapter.wordCount = info.first
+                    bookChapter.variable = info.second
+                    bookChapter.imgUrl = info.third
                 }
             }
         }
