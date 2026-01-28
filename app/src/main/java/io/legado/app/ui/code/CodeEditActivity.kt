@@ -62,14 +62,6 @@ class CodeEditActivity :
         get() = AppConfig.editTemeAuto && ThemeConfig.isDarkTheme()
     private var themeIndex = -1
 
-
-    private fun initView() {
-        binding.root.setOnApplyWindowInsetsListenerCompat { _, windowInsets ->
-            softKeyboardTool.initialPadding = windowInsets.imeHeight
-            windowInsets
-        }
-    }
-
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         softKeyboardTool.attachToWindow(window)
         editor.colorScheme = TextMateColorScheme2.create(ThemeRegistry.getInstance()) //先设置颜色,避免一开始的白屏
@@ -94,6 +86,13 @@ class CodeEditActivity :
         initView()
     }
 
+    private fun initView() {
+        binding.root.setOnApplyWindowInsetsListenerCompat { _, windowInsets ->
+            softKeyboardTool.initialPadding = windowInsets.imeHeight
+            windowInsets
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         editorSearcher.stopSearch()
@@ -106,23 +105,40 @@ class CodeEditActivity :
     private fun save(check: Boolean) {
         if (!viewModel.writable) return super.finish()
         val text = editor.text.toString()
-        if (text == viewModel.initialText) {
-            return super.finish()
-        } else if (check) {
-            alert(R.string.exit) {
-                setMessage(R.string.exit_no_save)
-                positiveButton(R.string.yes)
-                negativeButton(R.string.no) {
-                    super.finish()
+        val cursorPos = editor.cursor?.left ?: 0
+        when {
+            text == viewModel.initialText -> {
+                if (cursorPos > 0) {
+                    val result = Intent().apply {
+                        putExtra("cursorPosition", cursorPos)
+                    }
+                    setResult(RESULT_OK, result)
+                }
+                super.finish()
+            }
+            check -> {
+                alert(R.string.exit) {
+                    setMessage(R.string.exit_no_save)
+                    positiveButton(R.string.yes)
+                    negativeButton(R.string.no) {
+                        if (cursorPos > 0) {
+                            val result = Intent().apply {
+                                putExtra("cursorPosition", cursorPos)
+                            }
+                            setResult(RESULT_OK, result)
+                        }
+                        super.finish()
+                    }
                 }
             }
-        } else {
-            val result = Intent().apply {
-                putExtra("text", text)
-                putExtra("cursorPosition", editor.cursor?.left ?: 0)
+            else -> {
+                val result = Intent().apply {
+                    putExtra("text", text)
+                    putExtra("cursorPosition", cursorPos)
+                }
+                setResult(RESULT_OK, result)
+                super.finish()
             }
-            setResult(RESULT_OK, result)
-            super.finish()
         }
     }
 

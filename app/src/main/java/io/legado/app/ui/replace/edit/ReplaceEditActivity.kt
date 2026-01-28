@@ -74,15 +74,16 @@ class ReplaceEditActivity :
 
     private val textEditLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) {
-            val editedText = result.data?.getStringExtra("text")
-            editedText?.let {
-                val view = window.decorView.findFocus()
-                if (view is EditText) {
+            val view = window.decorView.findFocus()
+            if (view is EditText) {
+                result.data?.getStringExtra("text")?.let {
                     view.setText(it)
-                    view.setSelection(result.data!!.getIntExtra("cursorPosition", 0))
-                } else {
-                    toastOnUi(R.string.focus_lost_on_textbox)
                 }
+                result.data?.getIntExtra("cursorPosition", -1)?.takeIf { it >= 0 }?.let {
+                    view.setSelection(it)
+                }
+            } else {
+                toastOnUi(R.string.focus_lost_on_textbox)
             }
         }
     }

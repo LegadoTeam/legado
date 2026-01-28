@@ -2,6 +2,26 @@
 
 ## cronet版本: 143.0.7499.193
 
+**2026/01/28**
+- 新增java.reLoginView()函数，刷新登录界面
+- 书源发现支持更多丰富的按钮类型
+- 新增java.refreshExplore()函数
+- java.open函数支持打开登录界面
+- 书源简介支持html标签包裹，显示html样式
+- 书籍简介和字典支持gif动态图和svg图data链接
+- 书籍简介和字典支持button按钮
+- 支持源控制图片显示尺寸
+- 书籍简介支持maekdown语法编写
+- 新增java.showBrowser函数，能进行半屏显示段评
+- 支持图片链接click键，不推荐继续使用旧方式
+- 支持双击响应段评图
+- 新增chapter.update()函数
+- 新增java.showPhoto函数
+- 新增java.refreshContent()函数
+- 支持订阅源启动页html用js返回空
+- 提升webview函数获取js结果速度
+- 其余优化与修复
+
 **2026/01/13**
 - 升级cronet版本至：143.0.7499.193
 - 软件自定义背景图支持.9.png格式

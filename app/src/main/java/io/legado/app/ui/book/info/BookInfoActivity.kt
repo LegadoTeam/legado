@@ -539,7 +539,7 @@ class BookInfoActivity :
         }
         ivCover.setOnLongClickListener {
             viewModel.getBook()?.getDisplayCover()?.let { path ->
-                showDialogFragment(PhotoDialog(path))
+                showDialogFragment(PhotoDialog(path, isBook = true))
             }
             true
         }

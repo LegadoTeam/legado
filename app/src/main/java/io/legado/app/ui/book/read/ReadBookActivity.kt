@@ -1477,7 +1477,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         )
         popupAction.onActionClick = {
             when (it) {
-                "show" -> showDialogFragment(PhotoDialog(src))
+                "show" -> showDialogFragment(PhotoDialog(src, isBook = true))
                 "refresh" -> viewModel.refreshImage(src)
                 "save" -> {
                     val path = ACache.get().getAsString(AppConst.imagePathKey)
@@ -1796,6 +1796,13 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
         observeEvent<Boolean>(EventBus.UP_SEEK_BAR) {
             readMenu.upSeekBar()
+        }
+        observeEvent<Boolean>(EventBus.REFRESH_BOOK_CONTENT) { //书源js函数触发刷新
+            ReadBook.book?.let {
+                ReadBook.curTextChapter = null
+                binding.readView.upContent()
+                viewModel.refreshContentDur(it)
+            }
         }
     }
 

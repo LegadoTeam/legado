@@ -101,7 +101,7 @@ class WebJsExtensions(
                     webView(jsParam[0], jsParam[1], jsParam[2], jsParam[3].toBoolean()).toString()
                 }
                 "webViewGetSourceAwait" -> {
-                    webViewGetSource(jsParam[0], jsParam[1], jsParam[2], jsParam[3], jsParam[4].toBoolean(), jsParam[5].toLongOrNull() ?: 0)
+                    webViewGetSource(jsParam[0], jsParam[1], jsParam[2], jsParam[3], jsParam[4].toBoolean(), jsParam[5].toLongOrNull() ?: 0).toString()
                 }
                 "decryptStrAwait" -> {
                     createSymmetricCrypto(jsParam[0], jsParam[1], jsParam[2]).decryptStr(jsParam[3])

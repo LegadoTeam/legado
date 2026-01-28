@@ -10,6 +10,7 @@ import io.github.rosemoe.sora.langs.textmate.registry.model.ThemeModel
 import io.github.rosemoe.sora.langs.textmate.registry.provider.AssetsFileResolver
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.legado.app.base.BaseViewModel
+import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern.JS_PATTERN
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.config.AppConfig
@@ -22,24 +23,22 @@ import org.jsoup.Jsoup
 import splitties.init.appCtx
 
 class CodeEditViewModel(application: Application) : BaseViewModel(application) {
-    companion object {
-        val themeFileNames = arrayOf(
-            "d_monokai_dimmed",
-            "d_monokai",
-            "d_modern",
-            "l_modern",
-            "d_solarized",
-            "l_solarized",
-            "d_abyss",
-            "l_quiet"
-        )
-    }
+    private val themeFileNames = arrayOf(
+        "d_monokai_dimmed",
+        "d_monokai",
+        "d_modern",
+        "l_modern",
+        "d_solarized",
+        "l_solarized",
+        "d_abyss",
+        "l_quiet"
+    )
 
     var initialText = ""
     var cursorPosition = 0
     var language: TextMateLanguage? = null
-    var languageName = "source.js"
-    val themeRegistry: ThemeRegistry = ThemeRegistry.getInstance()
+    private var languageName = "source.js"
+    private val themeRegistry: ThemeRegistry = ThemeRegistry.getInstance()
     var writable = true
     var title: String? = null
 
@@ -139,15 +138,14 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
         }.onSuccess {
             editor.setText(it)
         }.onError {
-            context.toastOnUi("格式化失败")
+            AppLog.put("格式化失败",it, true)
         }
     }
 
     private suspend fun webFormatCode(jsCode: String): String? {
-        return try {
-            BackstageWebView(
-                url = null,
-                html = """<html><body><script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.15.4/beautify.min.js"></script>
+        return BackstageWebView(
+            url = null,
+            html = """<html><body><script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.15.4/beautify.min.js"></script>
                 <script>
                 window.result = js_beautify("${jsCode.escapeForJs()}", {
                 indent_size: 4,
@@ -163,27 +161,18 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
                 comma_first: false
                 });
                 </script></body></html>""".trimIndent(),
-                javaScript = "window.result",
-                cacheFirst = true,
-                timeout = 5000
-            ).getStrResponse().body
-        } catch (_: Exception) {
-            context.toastOnUi("格式化失败")
-            jsCode
-        }
+            javaScript = "window.result",
+            cacheFirst = true,
+            timeout = 5000
+        ).getStrResponse().body
     }
 
     private fun formatCodeHtml(html: String): String? {
-        return try {
-            val doc = Jsoup.parse(html)
-            doc.outputSettings()
-                .indentAmount(4)
-                .prettyPrint(true)
-            doc.outerHtml()
-        } catch (_: Exception) {
-            context.toastOnUi("格式化失败")
-            html
-        }
+        val doc = Jsoup.parse(html)
+        doc.outputSettings()
+            .indentAmount(4)
+            .prettyPrint(true)
+        return doc.outerHtml()
     }
 
 }

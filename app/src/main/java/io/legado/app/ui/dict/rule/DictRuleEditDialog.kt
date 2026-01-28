@@ -56,14 +56,17 @@ class DictRuleEditDialog() : BaseDialogFragment(R.layout.dialog_dict_rule_edit, 
 
     private val textEditLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) {
-            result.data?.getStringExtra("text")?.let { editedText ->
-                focusedEditText?.let { editText ->
-                    editText.setText(editedText)
-                    editText.setSelection(result.data!!.getIntExtra("cursorPosition", 0))
-                    editText.requestFocus()
-                } ?: run {
-                    toastOnUi(R.string.focus_lost_on_textbox)
-                }
+            val view = focusedEditText
+            if (view == null) {
+                toastOnUi(R.string.focus_lost_on_textbox)
+                return@registerForActivityResult
+            }
+            view.requestFocus()
+            result.data?.getStringExtra("text")?.let {
+                view.setText(it)
+            }
+            result.data?.getIntExtra("cursorPosition", -1)?.takeIf { it >= 0 }?.let {
+                view.setSelection(it)
             }
         }
     }

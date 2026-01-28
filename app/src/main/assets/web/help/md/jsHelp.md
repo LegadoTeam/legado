@@ -89,6 +89,8 @@ java.upLoginData(data: Map<String, String?>?)
 java.reLoginView()
 //刷新书籍详情页
 java.refreshBookInfo()
+//刷新书籍正文内容
+java.refreshContent()
 //清除tts源的缓存，仅限tts源的登录界面
 java.clearTtsCache()
 //刷新发现，仅限发现按钮
