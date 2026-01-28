@@ -123,6 +123,7 @@ object WebViewPool {
                 cacheMode = WebSettings.LOAD_DEFAULT // 重置缓存模式
                 useWideViewPort = false // 恢复默认关闭宽视模式
                 loadWithOverviewMode = false // 恢复默认
+                textZoom = 100
             }
             loadUrl(BLANK_HTML)
         } catch (e: Exception) {

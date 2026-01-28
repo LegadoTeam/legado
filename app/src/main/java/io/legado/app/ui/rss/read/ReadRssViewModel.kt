@@ -67,7 +67,6 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
                     } else {
                         appDb.rssArticleDao.get(origin, link, sort)
                     }
-
                 rssArticle?.let { article ->
                     if (!article.description.isNullOrBlank()) {
                         contentLiveData.postValue(article.description!!)
@@ -84,10 +83,10 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
                 } ?: return@execute
             } else {
                 val ruleContent = rssSource?.ruleContent
-                val startHtml = intent.getBooleanExtra("startHtml", false)
+                val startHtml = intent.getStringExtra("startHtml")
                 val openUrl = intent.getStringExtra("openUrl")
-                if (startHtml) {
-                    loadStartHtml()
+                if (startHtml != null) {
+                    loadStartHtml(startHtml)
                 } else if (ruleContent.isNullOrBlank()) {
                     loadUrl(openUrl ?: origin, origin)
                 } else if (rssSource!!.singleUrl) {
@@ -242,41 +241,22 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
         return processedHtml
     }
 
-    private fun loadStartHtml() {
+    private fun loadStartHtml(startHtml: String) {
         val source = rssSource
         if (source == null) {
             htmlLiveData.postValue("<body>rssSource is null</body>")
             return
         }
-        val startHtml = source.startHtml ?: return
         execute {
-            var processedHtml = try {
-                when {
-                    startHtml.startsWith("@js:") -> runScriptWithContext {
-                        source.evalJS(startHtml.substring(4)).toString()
-                    }
-
-                    startHtml.startsWith("<js>") -> runScriptWithContext {
-                        source.evalJS(
-                            startHtml.substring(
-                                4,
-                                startHtml.lastIndexOf("<")
-                            )
-                        ).toString()
-                    }
-
-                    else -> startHtml
-                }
-            } catch (e: Throwable) {
-                e.localizedMessage
-            }
             val javascript = rssSource?.startJs
-            if (!javascript.isNullOrBlank()) {
-                processedHtml = if (processedHtml.contains("</body>")) {
-                    processedHtml.replaceFirst("</body>", "<script>$javascript</script></body>")
+            var processedHtml = if (!javascript.isNullOrBlank()) {
+                if (startHtml.contains("</body>")) {
+                    startHtml.replaceFirst("</body>", "<script>$javascript</script></body>")
                 } else {
-                    "<body>$processedHtml<script>$javascript</script></body>"
+                    "<body>$startHtml<script>$javascript</script></body>"
                 }
+            } else {
+                startHtml
             }
             processedHtml = clHtml(processedHtml, source.startStyle ?: source.style)
             htmlLiveData.postValue(processedHtml)
