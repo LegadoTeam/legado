@@ -20,27 +20,10 @@ import io.legado.app.ui.rss.read.RssJsExtensions
 import io.legado.app.utils.GSON
 import io.legado.app.utils.escapeForJs
 import io.legado.app.utils.fromJsonObject
-import java.lang.ref.WeakReference
 import java.util.UUID
 
 @Suppress("unused")
-class WebJsExtensions(
-    source: BaseSource, activity: AppCompatActivity,
-    private val webView: WebView,
-    private val bookType: Int = 0,
-    callback: Callback? = null
-): RssJsExtensions(activity, source) {
-    private val callbackRef: WeakReference<Callback> = WeakReference(callback)
-
-    interface Callback {
-        fun upConfig(config: String)
-    }
-
-    @JavascriptInterface
-    fun upConfig(config: String) {
-        callbackRef.get()?.upConfig(config)
-    }
-
+class WebJsExtensions(source: BaseSource, activity: AppCompatActivity, private val webView: WebView, private val bookType: Int = 0): RssJsExtensions(activity, source) {
     private val bookAndChapter by lazy {
         var book: Book? = null
         var chapter: BookChapter? = null
@@ -99,9 +82,6 @@ class WebJsExtensions(
                 }
                 "webViewAwait" -> {
                     webView(jsParam[0], jsParam[1], jsParam[2], jsParam[3].toBoolean()).toString()
-                }
-                "webViewGetSourceAwait" -> {
-                    webViewGetSource(jsParam[0], jsParam[1], jsParam[2], jsParam[3], jsParam[4].toBoolean(), jsParam[5].toLongOrNull() ?: 0)
                 }
                 "decryptStrAwait" -> {
                     createSymmetricCrypto(jsParam[0], jsParam[1], jsParam[2]).decryptStr(jsParam[3])
@@ -280,13 +260,6 @@ class WebJsExtensions(
                     java?.request("webViewAwait", [String(html), String(url), String(js), String(cacheFirst)], id);
                 });
             };
-            function webViewGetSourceAwait(html, url, js, sourceRegex, cacheFirst, delayTime) {
-                return new Promise((resolve, reject) => {
-                    const id = requestId("webViewGetSourceAwait");
-                    JSBridgeCallbacks[id] = { resolve, reject };
-                    java?.request("webViewGetSourceAwait", [String(html), String(url), String(js), String(sourceRegex), String(cacheFirst), String(delayTime)], id);
-                });
-            }
             function decryptStrAwait(transformation, key, iv, data) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("decryptStrAwait");

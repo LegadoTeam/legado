@@ -14,7 +14,6 @@ import io.legado.app.ui.book.explore.ExploreShowActivity
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.rss.article.RssSortActivity
-import io.legado.app.ui.widget.dialog.PhotoDialog
 import io.legado.app.utils.isJsonObject
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.startActivity
@@ -38,7 +37,7 @@ open class RssJsExtensions(activity: AppCompatActivity?, source: BaseSource?) : 
     }
 
     override fun getTag(): String? {
-        return getSource()?.getTag()
+        return sourceRef.get()?.getTag()
     }
 
     @JavascriptInterface
@@ -68,11 +67,6 @@ open class RssJsExtensions(activity: AppCompatActivity?, source: BaseSource?) : 
     fun addBook(bookUrl: String) {
         activityRef.get()?.showDialogFragment(AddToBookshelfDialog(bookUrl))
     }
-
-    fun showPhoto(src: String) {
-        activityRef.get()?.showDialogFragment(PhotoDialog(src, getSource()?.getKey()))
-    }
-
 
     @JavascriptInterface
     @JvmOverloads

@@ -46,8 +46,7 @@ class BackstageWebView(
     private val overrideUrlRegex: String? = null,
     private val javaScript: String? = null,
     private val delayTime: Long = 0,
-    private val cacheFirst: Boolean = false,
-    private val timeout: Long? = null
+    private val cacheFirst: Boolean = false
 ) {
 
     private val mHandler = Handler(Looper.getMainLooper())
@@ -55,7 +54,7 @@ class BackstageWebView(
     private var mWebView: WebView? = null
     private var pooledWebView: PooledWebView? = null
 
-    suspend fun getStrResponse(): StrResponse = withTimeout(timeout ?: 60000L) {
+    suspend fun getStrResponse(): StrResponse = withTimeout(60000L) {
         suspendCancellableCoroutine { block ->
             block.invokeOnCancellation {
                 runOnUI {
@@ -178,7 +177,7 @@ class BackstageWebView(
                 runnable = EvalJsRunnable(view, url, getJs())
             }
             mHandler.removeCallbacks(runnable!!)
-            mHandler.postDelayed(runnable!!, 100L + delayTime)
+            mHandler.postDelayed(runnable!!, 1000 + delayTime)
         }
 
         @SuppressLint("WebViewClientOnReceivedSslError")
@@ -195,8 +194,7 @@ class BackstageWebView(
             private val url: String,
             private val mJavaScript: String
         ) : Runnable {
-            private var retry = 0
-            private val intervals = listOf(200L, 400L, 600L, 800L, 1000L)
+            var retry = 0
             private val mWebView: WeakReference<WebView> = WeakReference(webView)
             override fun run() {
                 mWebView.get()?.evaluateJavascript(mJavaScript) {
@@ -226,13 +224,8 @@ class BackstageWebView(
                     }
                     return@async
                 }
-                val nextDelay = if (retry < intervals.size) {
-                    intervals[retry]
-                } else {
-                    intervals.last()
-                }
                 retry++
-                mHandler.postDelayed(this@EvalJsRunnable, nextDelay)
+                mHandler.postDelayed(this@EvalJsRunnable, 1000)
             }
 
             private fun buildStrResponse(content: String): StrResponse {
@@ -313,7 +306,7 @@ class BackstageWebView(
             setCookie(url)
             if (!javaScript.isNullOrEmpty()) {
                 val runnable = LoadJsRunnable(webView, javaScript)
-                mHandler.postDelayed(runnable, 100L + delayTime)
+                mHandler.postDelayed(runnable, 1000L + delayTime)
             }
         }
 

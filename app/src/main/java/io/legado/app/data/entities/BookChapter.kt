@@ -150,10 +150,10 @@ data class BookChapter(
                         if (mDisplayTitle.isNotBlank()) {
                             displayTitle = mDisplayTitle
                         }
-                    } catch (_: RegexTimeoutException) {
+                    } catch (e: RegexTimeoutException) {
                         item.isEnabled = false
                         appDb.replaceRuleDao.update(item)
-                    } catch (_: CancellationException) {
+                    } catch (e: CancellationException) {
                         return@run
                     } catch (e: Exception) {
                         AppLog.put("${item.name}替换出错\n替换内容\n${displayTitle}", e)

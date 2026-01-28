@@ -79,31 +79,5 @@ class RssViewModel(application: Application) : BaseViewModel(application) {
             }
     }
 
-    fun  launchRssWithHtml(rssSource: RssSource, noStartHtml: () -> Unit, isStartHtml: (html: String) -> Unit) {
-        execute {
-            val startHtml = rssSource.startHtml ?: return@execute null
-            return@execute when {
-                startHtml.startsWith("@js:") -> runScriptWithContext {
-                    rssSource.evalJS(startHtml.substring(4)).toString()
-                }
-
-                startHtml.startsWith("<js>") -> runScriptWithContext {
-                    rssSource.evalJS(startHtml.substring(4, startHtml.lastIndexOf("<"))).toString()
-                }
-
-                else -> startHtml
-            }
-        }.timeout(10000)
-            .onSuccess {
-                if (it.isNullOrBlank()) {
-                    noStartHtml.invoke()
-                } else {
-                    isStartHtml.invoke(it)
-                }
-            }.onError {
-                context.toastOnUi(it.localizedMessage)
-            }
-    }
-
 
 }
