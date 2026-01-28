@@ -1,13 +1,13 @@
 name: Test Build
 
 on:
-  push:
-    branches:
-      - master
-    paths:
-      - '**'
-      - '!**/ISSUE_TEMPLATE/**'
-      - '!**/modules/web/**'
+  #push:
+  #  branches:
+  #    - master
+ #   paths:
+ #     - '**'
+ #     - '!**/ISSUE_TEMPLATE/**'
+ #     - '!**/modules/web/**'
   pull_request:
     paths-ignore:
       - '**/modules/web/**'
