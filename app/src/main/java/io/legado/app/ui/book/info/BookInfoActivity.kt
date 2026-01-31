@@ -310,7 +310,11 @@ class BookInfoActivity :
                 }
             }
 
-            R.id.menu_clear_cache -> viewModel.clearCache()
+            R.id.menu_clear_cache -> viewModel.getBook()?.let {
+                    SourceCallBack.callBackBtn(this, SourceCallBack.CLICK_CLEAR_CACHE, viewModel.bookSource, it, null) {
+                        viewModel.clearCache(it)
+                    }
+                }
             R.id.menu_log -> showDialogFragment<AppLogDialog>()
             R.id.menu_split_long_chapter -> {
                 upLoading(true)

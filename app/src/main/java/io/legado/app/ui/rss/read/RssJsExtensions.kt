@@ -69,6 +69,7 @@ open class RssJsExtensions(activity: AppCompatActivity?, source: BaseSource?) : 
         activityRef.get()?.showDialogFragment(AddToBookshelfDialog(bookUrl))
     }
 
+    @JavascriptInterface
     fun showPhoto(src: String) {
         activityRef.get()?.showDialogFragment(PhotoDialog(src, getSource()?.getKey()))
     }

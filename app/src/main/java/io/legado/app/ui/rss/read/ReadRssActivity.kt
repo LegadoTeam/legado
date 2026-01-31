@@ -94,6 +94,7 @@ import io.legado.app.help.webView.WebJsExtensions.Companion.nameUrl
 import io.legado.app.help.webView.WebViewPool
 import io.legado.app.help.webView.WebViewPool.BLANK_HTML
 import io.legado.app.help.webView.WebViewPool.DATA_HTML
+import kotlinx.coroutines.Dispatchers.IO
 import java.lang.ref.WeakReference
 import splitties.systemservices.powerManager
 
@@ -378,11 +379,12 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             viewModel.rssArticle?.let {
                 upJavaScriptEnable()
                 initJavascriptInterface()
+                val rssSource = viewModel.rssSource
                 val url = NetworkUtils.getAbsoluteURL(it.origin, it.link).substringBefore("@js")
-                val html = viewModel.clHtml(content)
+                val html = viewModel.clHtml(content, rssSource?.style)
                 currentWebView.settings.userAgentString =
                     viewModel.headerMap[AppConst.UA_NAME] ?: AppConfig.userAgent
-                if (viewModel.rssSource?.loadWithBaseUrl == true) {
+                if (rssSource?.loadWithBaseUrl == true) {
                     currentWebView.loadDataWithBaseURL(
                         url,
                         html,
@@ -417,7 +419,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                 currentWebView.settings.userAgentString =
                     viewModel.headerMap[AppConst.UA_NAME] ?: AppConfig.userAgent
                 val baseUrl =
-                    if (viewModel.rssSource?.loadWithBaseUrl == true) it.sourceUrl else null
+                    if (it.loadWithBaseUrl) it.sourceUrl else null
                 currentWebView.loadDataWithBaseURL(
                     baseUrl, html, "text/html", "utf-8", it.sourceUrl
                 )
@@ -631,20 +633,18 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                     if (url.startsWith("data:text/html;") || request.method == "POST") {
                         return super.shouldInterceptRequest(view, request)
                     }
-                    return runBlocking {
+                    return runBlocking(IO) {
                         getModifiedContentWithJs(url, request) ?: super.shouldInterceptRequest(view, request)
                     }
                 }
-            } else if (!jsInjected) {
-                if (url == nameUrl) {
-                    jsInjected = true
-                    val preloadJs = source.preloadJs ?: ""
-                    return WebResourceResponse(
-                        "application/javascript",
-                        "utf-8",
-                        ByteArrayInputStream("(() => {$JS_INJECTION\n$preloadJs\n})();".toByteArray())
-                    )
-                }
+            } else if (!jsInjected && url == nameUrl) {
+                jsInjected = true
+                val preloadJs = source.preloadJs ?: ""
+                return WebResourceResponse(
+                    "text/javascript",
+                    "utf-8",
+                    ByteArrayInputStream("(() => {$JS_INJECTION\n$preloadJs\n})();".toByteArray())
+                )
             }
             val blacklist = source.contentBlacklist?.splitNotBlank(",")
             if (!blacklist.isNullOrEmpty()) {

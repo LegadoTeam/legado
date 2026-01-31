@@ -54,12 +54,12 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatSpinner
 import io.legado.app.data.entities.rule.RowUi.Type
 import io.legado.app.ui.widget.text.TextInputLayout
-import io.legado.app.utils.isTrue
 import io.legado.app.utils.setSelectionSafely
 import kotlin.math.abs
 
 
-class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
+class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
+    SourceLoginJsExtensions.Callback {
 
     private val binding by viewBinding(DialogLoginBinding::bind)
     private val viewModel by activityViewModels<SourceLoginViewModel>()
@@ -73,19 +73,20 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
             activity as AppCompatActivity,
             viewModel.source,
             viewModel.bookType,
-            callback = object : SourceLoginJsExtensions.Callback {
-                override fun upUiData(data: Map<String, String?>?) {
-                    activity?.runOnUiThread { // 在主线程中更新 UI
-                        handleUpUiData(data)
-                    }
-                }
+            this
+        )
+    }
 
-                override fun reUiView() {
-                    activity?.runOnUiThread {
-                        handleReUiView()
-                    }
-                }
-            })
+    override fun upUiData(data: Map<String, String?>?) {
+        activity?.runOnUiThread { // 在主线程中更新 UI
+            handleUpUiData(data)
+        }
+    }
+
+    override fun reUiView() {
+        activity?.runOnUiThread {
+            handleReUiView()
+        }
     }
 
     private fun handleReUiView() {
@@ -101,8 +102,10 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
         if (codeStr != null) {
             hasChange = true
             lifecycleScope.launch(Main) {
-                val loginUiJson = evalUiJs(codeStr)
-                rowUis = loginUi(loginUiJson)
+                withContext(IO) {
+                    val loginUiJson = evalUiJs(codeStr)
+                    rowUis = loginUi(loginUiJson)
+                }
                 binding.flexbox.removeAllViews()
                 rowUiBuilder(source, rowUis)
             }
@@ -122,8 +125,9 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                 val default = rowUi.default
                 when (val rowView = binding.root.findViewById<View>(index + 1000)) {
                     is TextInputLayout -> {
-                        newLoginInfo[rowUi.name] = default ?: ""
-                        rowView.editText?.setText(default ?: "")
+                        val value = default ?: ""
+                        newLoginInfo[rowUi.name] = value
+                        rowView.editText?.setText(value)
                     }
 
                     is TextView -> {
@@ -161,20 +165,19 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
         data.forEach { (key, value) ->
             val index = rowUiName.indexOf(key)
             if (index != -1) {
+                val rowUi = rowUis?.getOrNull(index) ?: return@forEach
+                val value = value ?: rowUi.default
                 when (val rowView = binding.root.findViewById<View>(index + 1000)) {
                     is TextInputLayout -> {
-                        val value = value ?: run {
-                            val rowUi = rowUis?.getOrNull(index) ?: return@forEach
-                            rowUi.default ?: ""
-                        }
+                        val value = value ?: ""
+                        loginInfo[rowUi.name] = value
                         rowView.editText?.setText(value)
                     }
 
                     is TextView -> {
-                        val rowUi = rowUis?.getOrNull(index) ?: return@forEach
                         when (rowUi.type) {
                             Type.button -> {
-                                rowView.text = value ?: key
+                                rowView.text = value ?: rowUi.viewName ?: key
                             }
 
                             Type.toggle -> {
@@ -191,12 +194,8 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                     }
 
                     is LinearLayout -> {
-                        val rowUi = rowUis?.getOrNull(index) ?: return@forEach
                         val items = rowUi.chars?.filterNotNull() ?: listOf("chars","is null")
                         val index = items.indexOf(value)
-                        loginInfo[rowUi.name] = value ?: run{
-                            items.getOrNull(0) ?: ""
-                        }
                         rowView.findViewById<AppCompatSpinner>(R.id.sp_type)?.setSelectionSafely(index)
                     }
                 }
@@ -211,13 +210,13 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
         setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
     }
 
-    suspend fun evalUiJs(jsStr: String): String? = withContext(IO) {
-        val source = viewModel.source ?: return@withContext null
+    suspend fun evalUiJs(jsStr: String): String? {
+        val source = viewModel.source ?: return null
         val loginJS = source.getLoginJs() ?: ""
         val result = rowUis?.let {
             getLoginData(it)
         } ?: viewModel.loginInfo.toMutableMap()
-        try {
+        return try {
             runScriptWithContext {
                 source.evalJS("$loginJS\n$jsStr") {
                     put("result", result)
@@ -233,7 +232,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
 
     fun loginUi(json: String?): List<RowUi>? {
         return GSON.fromJsonArray<RowUi>(json).onFailure {
-            it.printOnDebug()
+            AppLog.put("loginUi json parse err:" + it.localizedMessage, it)
         }.getOrNull()
     }
 
@@ -289,17 +288,8 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                                 content = editText.text.toString()
                             } else {
                                 val reContent = editText.text.toString()
-                                if (content != reContent) {
-                                    execute {
-                                        evalUiJs(jsStr)
-                                    }.onSuccess { result ->
-                                        if (result.isTrue()) {
-                                            loginInfo[name] = reContent
-                                            hasChange = true
-                                        }
-                                    }.onError { e ->
-                                        AppLog.put("LoginUI Text $name JavaScript error", e)
-                                    }
+                                if (content != null && content != reContent) {
+                                    handleButtonClick(source, jsStr, name, rowUis, false)
                                 }
                             }
                         }
@@ -361,17 +351,8 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                                 content = editText.text.toString()
                             } else {
                                 val reContent = editText.text.toString()
-                                if (content != reContent) {
-                                    execute {
-                                        evalUiJs(jsStr)
-                                    }.onSuccess { result ->
-                                        if (result.isTrue()) {
-                                            loginInfo[name] = reContent
-                                            hasChange = true
-                                        }
-                                    }.onError { e ->
-                                        AppLog.put("LoginUI Text $name JavaScript error", e)
-                                    }
+                                if (content != null && content != reContent) {
+                                    handleButtonClick(source, jsStr, name, rowUis, false)
                                 }
                             }
                         }
@@ -442,11 +423,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
                             hasChange = true
                             loginInfo[name] = chars[position]
                             if (action != null) {
-                                execute {
-                                    handleButtonClick(source, action, name, rowUis, false)
-                                }.onError { e ->
-                                    AppLog.put("LoginUI Select $name JavaScript error", e)
-                                }
+                                handleButtonClick(source, action, name, rowUis, false)
                             }
                         }
                         override fun onNothingSelected(parent: AdapterView<*>?) {
@@ -624,8 +601,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
             when (item.itemId) {
                 R.id.menu_ok -> {
                     oKToClose = true
-                    val loginData = getLoginData(rowUis, true)
-                    login(source, loginData)
+                    login(source)
                 }
 
                 R.id.menu_show_login_header -> alert {
@@ -657,8 +633,10 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
         }
         if (codeStr != null) {
             lifecycleScope.launch(Main) {
-                val loginUiJson = evalUiJs(codeStr)
-                rowUis = loginUi(loginUiJson)
+                withContext(IO) {
+                    val loginUiJson = evalUiJs(codeStr)
+                    rowUis = loginUi(loginUiJson)
+                }
                 buttonUi(source, rowUis)
             }
         } else {
@@ -715,7 +693,8 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true) {
         return viewModel.loginInfo.toMutableMap().apply { putAll(loginData) }
     }
 
-    private fun login(source: BaseSource, loginData: MutableMap<String, String>) {
+    private fun login(source: BaseSource) {
+        val loginData = getLoginData(rowUis, true)
         lifecycleScope.launch(IO) {
             if (loginData.isEmpty()) {
                 source.removeLoginInfo()

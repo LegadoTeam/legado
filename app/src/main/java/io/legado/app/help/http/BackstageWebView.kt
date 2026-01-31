@@ -78,6 +78,7 @@ class BackstageWebView(
                 try {
                     load()
                 } catch (error: Throwable) {
+                    destroy()
                     block.resumeWithException(error)
                 }
             }
@@ -104,6 +105,7 @@ class BackstageWebView(
             }
         } catch (e: Exception) {
             callback?.onError(e)
+            destroy()
         }
     }
 

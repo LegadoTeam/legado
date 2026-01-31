@@ -37,8 +37,6 @@ import io.legado.app.utils.setNavigationBarColorAuto
 import io.legado.app.utils.setStatusBarColorAuto
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.windowSize
-import androidx.core.graphics.drawable.toDrawable
-
 
 abstract class BaseActivity<VB : ViewBinding>(
     val fullScreen: Boolean = true,
@@ -166,7 +164,7 @@ abstract class BaseActivity<VB : ViewBinding>(
                 ThemeConfig.getBgImage(this, windowManager.windowSize)?.let { drawable ->
                    window.decorView.background = drawable
                 }
-            } catch (e: OutOfMemoryError) {
+            } catch (_: OutOfMemoryError) {
                 toastOnUi("背景图片太大,内存溢出")
             } catch (e: Exception) {
                 AppLog.put("加载背景出错\n${e.localizedMessage}", e)
