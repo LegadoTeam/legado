@@ -82,13 +82,14 @@ import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.get
 import io.legado.app.utils.writeBytes
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.runBlocking
 import java.io.ByteArrayInputStream
 import java.lang.ref.WeakReference
 import java.util.Date
 
-class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view) {
+class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view), WebJsExtensions.Callback {
 
     constructor(
         sourceKey: String,
@@ -142,8 +143,9 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     @Suppress("DEPRECATION")
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val dialog = super.onCreateDialog(savedInstanceState)
-        activity?.window?.decorView?.systemUiVisibility?.also {
-            dialog.window?.decorView?.systemUiVisibility = it
+        dialog.window?.let { window ->
+            window.decorView.systemUiVisibility = activity?.window?.decorView?.systemUiVisibility ?: 0
+            window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
         }
         return dialog
     }
@@ -202,7 +204,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                         }
                     sheet.background = shapeDrawable
                     sheet.clipToOutline = true
-                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                    if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2) {
                         currentWebView.outlineProvider =
                             object : android.view.ViewOutlineProvider() {
                                 override fun getOutline(
@@ -228,7 +230,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                     sheet.backgroundTintList = null
                     sheet.background = null
                     sheet.clipToOutline = false
-                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                    if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2) {
                         currentWebView.outlineProvider = null
                         currentWebView.clipToOutline = false
                         binding.customWebView.outlineProvider = null
@@ -283,6 +285,12 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                     hasChanged = true
                 }
             }
+
+            val dialogHeight = config.dialogHeight ?: if (first) -1 else null
+            dialogHeight?.let { height ->
+                params.height = height
+                hasChanged = true
+            }
             config.heightPercentage?.let { percentage ->
                 if (percentage in 0.0..1.0) {
                     val height = (displayMetrics.heightPixels * percentage).toInt()
@@ -296,10 +304,6 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                     }
                     hasChanged = true
                 }
-            }
-            config.dialogHeight?.let { height ->
-                params.height = height
-                hasChanged = true
             }
             if (hasChanged) {
                 sheet.layoutParams = params
@@ -382,11 +386,6 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        bottomSheet?.let { sheet ->
-            val layoutParams = sheet.layoutParams
-            layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT
-            sheet.layoutParams = layoutParams
-        }
         view.setBackgroundColor(0)
         binding.webViewContainer.addView(currentWebView)
         lifecycleScope.launch(IO) {
@@ -411,10 +410,17 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                         null
                     }
                 } ?: run {
-                    setLongClickSaveImg()
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        currentWebView.setOnScrollChangeListener { _, _, scrollY, _, _ ->
-                            behavior?.isDraggable = scrollY == 0
+                    activity?.runOnUiThread {
+                        bottomSheet?.let { sheet ->
+                            val layoutParams = sheet.layoutParams
+                            layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT
+                            sheet.layoutParams = layoutParams
+                        }
+                        setLongClickSaveImg()
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            currentWebView.setOnScrollChangeListener { _, _, scrollY, _, _ ->
+                                behavior?.isDraggable = scrollY == 0
+                            }
                         }
                     }
                 }
@@ -435,10 +441,10 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                             val insertPos = closingHeadIndex + 1
                             StringBuilder(html).insert(insertPos, JS_URL).toString()
                         } else {
-                            html
+                            JS_URL + html
                         }
                     } else {
-                        html
+                        JS_URL + html
                     }
                 }
                 appDb.bookSourceDao.getBookSource(sourceKey).let {
@@ -531,19 +537,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         source?.let { source ->
             (activity as? AppCompatActivity)?.let { currentActivity ->
                 val webJsExtensions =
-                    WebJsExtensions(source, currentActivity, currentWebView, bookType, callback = object : WebJsExtensions.Callback {
-                        override fun upConfig(config: String) {
-                            try {
-                                GSON.fromJsonObject<Config>(config).getOrThrow().let { config ->
-                                    activity?.runOnUiThread {
-                                        setConfig(config)
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                AppLog.put("config err", e)
-                            }
-                        }
-                    })
+                    WebJsExtensions(source, currentActivity, currentWebView, bookType, callback = this)
                 currentWebView.addJavascriptInterface(webJsExtensions, nameJava)
             }
             currentWebView.addJavascriptInterface(source, nameSource)
@@ -606,6 +600,18 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         super.onDestroyView()
     }
 
+    override fun upConfig(config: String) {
+        try {
+            lifecycleScope.launch(Dispatchers.Main) {
+                GSON.fromJsonObject<Config>(config).getOrThrow().let { config ->
+                    setConfig(config)
+                }
+            }
+        } catch (e: Exception) {
+            AppLog.put("config err", e)
+        }
+    }
+
     @Suppress("unused")
     private class JSInterface(dialog: BottomWebViewDialog) {
         private val dialogRef: WeakReference<BottomWebViewDialog> = WeakReference(dialog)
@@ -615,7 +621,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             val fra = dialogRef.get() ?: return
             val ctx = fra.requireActivity()
             if (fra.isFullScreen && fra.dialog?.isShowing == true) {
-                ctx.runOnUiThread {
+                fra.lifecycleScope.launch(Dispatchers.Main) {
                     ctx.requestedOrientation = when (orientation) {
                         "portrait", "portrait-primary" -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                         "portrait-secondary" -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
@@ -633,7 +639,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         fun onCloseRequested() {
             val fra = dialogRef.get() ?: return
             if (fra.dialog?.isShowing == true) {
-                fra.requireActivity().runOnUiThread {
+                fra.lifecycleScope.launch(Dispatchers.Main) {
                     fra.dismiss()
                 }
             }
@@ -707,6 +713,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         override fun onHideCustomView() {
             originOrientation?.let {
                 activity?.requestedOrientation = it
+                originOrientation = null
             }
             isFullScreen = false
             binding.webViewContainer.visible()
@@ -798,20 +805,18 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                     if (url.startsWith("data:text/html;") || request.method == "POST") {
                         return super.shouldInterceptRequest(view, request)
                     }
-                    return runBlocking {
+                    return runBlocking(IO) {
                         getModifiedContentWithJs(url, request) ?: super.shouldInterceptRequest(view, request)
                     }
                 }
-            } else if (!jsInjected) {
-                if (url == nameUrl) {
-                    jsInjected = true
-                    val preloadJs = preloadJs ?: ""
-                    return WebResourceResponse(
-                        "application/javascript",
-                        "utf-8",
-                        ByteArrayInputStream("(() => {$JS_INJECTION\n$preloadJs\n})();".toByteArray())
-                    )
-                }
+            } else if (!jsInjected && url == nameUrl) {
+                jsInjected = true
+                val preloadJs = preloadJs ?: ""
+                return WebResourceResponse(
+                    "text/javascript",
+                    "utf-8",
+                    ByteArrayInputStream("(() => {$JS_INJECTION\n$preloadJs\n})();".toByteArray())
+                )
             }
             return super.shouldInterceptRequest(view, request)
         }

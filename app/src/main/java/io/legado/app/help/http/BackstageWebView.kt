@@ -78,6 +78,7 @@ class BackstageWebView(
                 try {
                     load()
                 } catch (error: Throwable) {
+                    destroy()
                     block.resumeWithException(error)
                 }
             }
@@ -94,11 +95,7 @@ class BackstageWebView(
         mWebView = webView
         try {
             when {
-                !html.isNullOrEmpty() -> if (url.isNullOrEmpty()) {
-                    webView.loadData(html, "text/html", getEncoding())
-                } else {
-                    webView.loadDataWithBaseURL(url, html, "text/html", getEncoding(), url)
-                }
+                !html.isNullOrEmpty() -> webView.loadDataWithBaseURL(url, html, "text/html", getEncoding(), url)
 
                 else -> if (headerMap == null) {
                     webView.loadUrl(url!!)
@@ -108,6 +105,7 @@ class BackstageWebView(
             }
         } catch (e: Exception) {
             callback?.onError(e)
+            destroy()
         }
     }
 

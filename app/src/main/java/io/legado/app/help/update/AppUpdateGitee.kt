@@ -27,7 +27,7 @@ object AppUpdateGitee : AppUpdate.AppUpdateInterface {
 
     private suspend fun getLatestRelease(): List<AppReleaseInfo> {
         val lastReleaseUrl = if (checkVariant.isBeta()) {
-            "https://gitee.com/api/v5/repos/lyc486/legado/releases/tags/beta"
+            "https://gitee.com/api/v5/repos/lyc486/legado/releases/latest"
         } else {
             "https://gitee.com/api/v5/repos/lyc486/legado/releases?page=1&per_page=3&direction=desc"
         }

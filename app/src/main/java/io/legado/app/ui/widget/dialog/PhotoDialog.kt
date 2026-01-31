@@ -24,10 +24,11 @@ import io.legado.app.utils.viewbindingdelegate.viewBinding
  */
 class PhotoDialog() : BaseDialogFragment(R.layout.dialog_photo_view) {
 
-    constructor(src: String, sourceOrigin: String? = null) : this() {
+    constructor(src: String, sourceOrigin: String? = null, isBook: Boolean = false) : this() {
         arguments = Bundle().apply {
             putString("src", src)
             putString("sourceOrigin", sourceOrigin)
+            putBoolean("isBook", isBook)
         }
     }
 
@@ -46,9 +47,10 @@ class PhotoDialog() : BaseDialogFragment(R.layout.dialog_photo_view) {
             binding.photoView.setImageBitmap(it)
             return
         }
-        val file = ReadBook.book?.let { book ->
+        val isBook = arguments.getBoolean("isBook")
+        val file = if (isBook) ReadBook.book?.let { book ->
             BookHelp.getImage(book, src)
-        }
+        } else null
         if (file?.exists() == true) {
             ImageLoader.load(requireContext(), file)
                 .error(R.drawable.image_loading_error)
@@ -61,7 +63,7 @@ class PhotoDialog() : BaseDialogFragment(R.layout.dialog_photo_view) {
                 arguments.getString("sourceOrigin")?.let { sourceOrigin ->
                     apply(RequestOptions().set(OkHttpModelLoader.sourceOriginOption, sourceOrigin))
                 }
-            }.error(BookCover.defaultDrawable)
+            }.error(if (isBook) BookCover.defaultDrawable else R.drawable.image_loading_error)
                 .dontTransform()
                 .downsample(DownsampleStrategy.NONE)
                 .into(binding.photoView)
