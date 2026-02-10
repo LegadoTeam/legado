@@ -168,7 +168,7 @@
                 android:layout_height="wrap_content"
                 android:background="?android:attr/selectableItemBackgroundBorderless"
                 android:clickable="true"
-                android:contentDescription="@string/read_aloud"
+                android:contentDescription="@string/main_menu"
                 android:focusable="true"
                 android:orientation="vertical"
                 android:paddingBottom="7dp">
