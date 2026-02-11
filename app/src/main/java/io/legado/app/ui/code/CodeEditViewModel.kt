@@ -13,9 +13,10 @@ import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern.JS_PATTERN
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.CacheManager
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.BackstageWebView
-import io.legado.app.utils.escapeForJs
+import io.legado.app.help.webView.WebJsExtensions.Companion.nameCache
 import io.legado.app.utils.printOnDebug
 import io.legado.app.utils.toastOnUi
 import org.eclipse.tm4e.core.registry.IThemeSource
@@ -143,11 +144,12 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
     }
 
     private suspend fun webFormatCode(jsCode: String): String? {
+        CacheManager.putMemory("web_format_code", jsCode)
         return BackstageWebView(
             url = null,
             html = """<html><body><script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.15.4/beautify.min.js"></script>
                 <script>
-                window.result = js_beautify("${jsCode.escapeForJs()}", {
+                window.result = js_beautify($nameCache?.getFromMemory('web_format_code'), {
                 indent_size: 4,
                 indent_char: ' ',
                 preserve_newlines: true,

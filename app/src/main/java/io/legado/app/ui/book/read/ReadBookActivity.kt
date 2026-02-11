@@ -140,6 +140,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
 import com.script.rhino.runScriptWithContext
 import io.legado.app.model.analyzeRule.AnalyzeUrl.Companion.paramPattern
 import io.legado.app.ui.login.SourceLoginJsExtensions
@@ -1798,10 +1799,12 @@ class ReadBookActivity : BaseReadBookActivity(),
             readMenu.upSeekBar()
         }
         observeEvent<Boolean>(EventBus.REFRESH_BOOK_CONTENT) { //书源js函数触发刷新
-            ReadBook.book?.let {
-                ReadBook.curTextChapter = null
-                binding.readView.upContent()
-                viewModel.refreshContentDur(it)
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                ReadBook.book?.let {
+                    ReadBook.curTextChapter = null
+                    binding.readView.upContent()
+                    viewModel.refreshContentDur(it)
+                }
             }
         }
     }

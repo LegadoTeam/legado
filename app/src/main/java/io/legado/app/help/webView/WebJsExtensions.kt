@@ -9,6 +9,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.BaseSource
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
+import io.legado.app.help.CacheManager
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.AudioPlay
 import io.legado.app.model.ReadBook
@@ -18,7 +19,6 @@ import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setChapter
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
 import io.legado.app.ui.rss.read.RssJsExtensions
 import io.legado.app.utils.GSON
-import io.legado.app.utils.escapeForJs
 import io.legado.app.utils.fromJsonObject
 import java.lang.ref.WeakReference
 import java.util.UUID
@@ -132,9 +132,11 @@ class WebJsExtensions(
                 else -> "error funName"
             }
         }.onSuccess { data ->
-            webView.evaluateJavascript("window.$JSBridgeResult('$id', '${data.escapeForJs()}', null);", null)
+            CacheManager.putMemory(id, data)
+            webView.evaluateJavascript("window.$JSBridgeResult('$id', true);", null)
         }.onError {
-            webView.evaluateJavascript("window.$JSBridgeResult('$id', null, '${it.localizedMessage?.escapeForJs()}');", null)
+            CacheManager.putMemory(id, it.localizedMessage ?: "err")
+            webView.evaluateJavascript("window.$JSBridgeResult('$id', false);", null)
         }
     }
     @JavascriptInterface
@@ -343,14 +345,15 @@ class WebJsExtensions(
                     java?.request("getStringAwait", [String(ruleStr), String(mContent)], id);
                 });
             };
-            window.$JSBridgeResult = function(requestId, result, error) {
-                if (JSBridgeCallbacks[requestId]) {
-                    if (error) {
-                        JSBridgeCallbacks[requestId].reject(error);
+            window.$JSBridgeResult = function(id, success) {
+                if (JSBridgeCallbacks[id]) {
+                    const result = cache?.getFromMemory(id);
+                    if (success) {
+                        JSBridgeCallbacks[id].resolve(result);
                     } else {
-                        JSBridgeCallbacks[requestId].resolve(result);
+                        JSBridgeCallbacks[id].reject(result);
                     }
-                    delete JSBridgeCallbacks[requestId];
+                    delete JSBridgeCallbacks[id];
                 }
             };""".trimIndent()
         }
@@ -367,14 +370,15 @@ class WebJsExtensions(
                     java?.request("run", [String(jsCode)], id);
                 });
             };
-            window.$JSBridgeResult = function(requestId, result, error) {
-                if (JSBridgeCallbacks[requestId]) {
-                    if (error) {
-                        JSBridgeCallbacks[requestId].reject(error);
+            window.$JSBridgeResult = function(id, success) {
+                if (JSBridgeCallbacks[id]) {
+                    const result = cache?.getFromMemory(id);
+                    if (success) {
+                        JSBridgeCallbacks[id].resolve(result);
                     } else {
-                        JSBridgeCallbacks[requestId].resolve(result);
+                        JSBridgeCallbacks[id].reject(result);
                     }
-                    delete JSBridgeCallbacks[requestId];
+                    delete JSBridgeCallbacks[id];
                 }
             };""".trimIndent()
         }

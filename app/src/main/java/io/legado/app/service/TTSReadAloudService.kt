@@ -35,7 +35,11 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
 
     override fun onCreate() {
         super.onCreate()
-        initTts()
+        kotlin.runCatching {
+            initTts()
+        }.onFailure {
+            AppLog.put("${getString(R.string.tts_init_failed)}\n$it", it, true)
+        }
     }
 
     override fun onDestroy() {

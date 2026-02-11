@@ -148,18 +148,6 @@ fun String.normalizeFileName(): String {
 }
 
 /**
- * 将字符串加上转义,方便传递字符串到浏览器
- */
-fun String.escapeForJs(): String {
-    return this.replace("\\", "\\\\")
-        .replace("\"", "\\\"").replace("'", "\\'")
-        .replace("\n", "\\n").replace("\r", "\\r")
-        .replace("\t", "\\t")
-        .replace("\u2028", "\\u2028")
-        .replace("\u2029", "\\u2029")
-}
-
-/**
  * 将ip字符串转为InetAddress
  */
 fun String.parseIpsFromString(): List<InetAddress>? =

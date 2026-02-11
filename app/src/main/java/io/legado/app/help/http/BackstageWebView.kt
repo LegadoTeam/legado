@@ -14,9 +14,11 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import io.legado.app.constant.AppConst
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.WebCacheManager
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.webView.PooledWebView
+import io.legado.app.help.webView.WebJsExtensions.Companion.nameCache
 import io.legado.app.help.webView.WebViewPool
 import io.legado.app.utils.get
 import io.legado.app.utils.runOnUI
@@ -52,7 +54,6 @@ class BackstageWebView(
 
     private val mHandler = Handler(Looper.getMainLooper())
     private var callback: Callback? = null
-    private var mWebView: WebView? = null
     private var pooledWebView: PooledWebView? = null
 
     suspend fun getStrResponse(): StrResponse = withTimeout(timeout ?: 60000L) {
@@ -92,10 +93,12 @@ class BackstageWebView(
     @Throws(AndroidRuntimeException::class)
     private fun load() {
         val webView = createWebView()
-        mWebView = webView
         try {
             when {
-                !html.isNullOrEmpty() -> webView.loadDataWithBaseURL(url, html, "text/html", getEncoding(), url)
+                !html.isNullOrEmpty() -> {
+                    webView.addJavascriptInterface(WebCacheManager, nameCache)
+                    webView.loadDataWithBaseURL(url, html, "text/html", getEncoding(), url)
+                }
 
                 else -> if (headerMap == null) {
                     webView.loadUrl(url!!)
@@ -113,10 +116,9 @@ class BackstageWebView(
     private fun createWebView(): WebView {
         val pooledWebView = WebViewPool.acquire(appCtx)
         this.pooledWebView = pooledWebView
-        val webView = pooledWebView.realWebView.apply {
-            resumeTimers()
-            onResume()
-        }
+        val webView = pooledWebView.realWebView
+        webView.resumeTimers()
+        webView.onResume() //缓存库拿的需要激活
         val settings = webView.settings
         settings.blockNetworkImage = true
         settings.userAgentString = headerMap?.get(AppConst.UA_NAME, true) ?: AppConfig.userAgent
@@ -131,7 +133,6 @@ class BackstageWebView(
 
     private fun destroy() {
         pooledWebView?.let { WebViewPool.release(it) }
-        mWebView = null
         pooledWebView = null
     }
 
@@ -172,11 +173,11 @@ class BackstageWebView(
 
         override fun onPageFinished(view: WebView, url: String) {
             setCookie(url)
-            if (runnable == null) {
-                runnable = EvalJsRunnable(view, url, getJs())
+            val runnable = runnable ?: EvalJsRunnable(view, url, getJs()).also {
+                runnable = it
             }
-            mHandler.removeCallbacks(runnable!!)
-            mHandler.postDelayed(runnable!!, 100L + delayTime)
+            mHandler.removeCallbacks(runnable)
+            mHandler.postDelayed(runnable, 100L + delayTime)
         }
 
         @SuppressLint("WebViewClientOnReceivedSslError")

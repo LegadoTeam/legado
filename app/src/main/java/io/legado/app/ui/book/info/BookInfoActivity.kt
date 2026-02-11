@@ -13,6 +13,7 @@ import android.widget.CheckBox
 import android.widget.LinearLayout
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import io.legado.app.R
@@ -353,7 +354,9 @@ class BookInfoActivity :
         }
 
         observeEvent<Boolean>(EventBus.REFRESH_BOOK_INFO) { //书源js函数触发刷新
-            refreshBook()
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                refreshBook()
+            }
         }
     }
 
