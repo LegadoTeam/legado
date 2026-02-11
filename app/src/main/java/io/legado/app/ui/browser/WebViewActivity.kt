@@ -44,6 +44,7 @@ import io.legado.app.utils.toggleSystemBar
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.legado.app.utils.visible
 import android.webkit.JavascriptInterface
+import android.webkit.URLUtil
 import io.legado.app.constant.AppLog
 import io.legado.app.help.webView.WebJsExtensions
 import io.legado.app.help.webView.WebJsExtensions.Companion.basicJs
@@ -56,8 +57,10 @@ import io.legado.app.help.webView.PooledWebView
 import io.legado.app.help.webView.WebViewPool
 import io.legado.app.help.webView.WebViewPool.BLANK_HTML
 import io.legado.app.help.webView.WebViewPool.DATA_HTML
+import io.legado.app.model.Download
 import splitties.systemservices.powerManager
 import java.lang.ref.WeakReference
+import java.net.URLDecoder
 
 class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
     companion object {
@@ -263,6 +266,13 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
                 }
             }
             return@setOnLongClickListener false
+        }
+        currentWebView.setDownloadListener { url, _, contentDisposition, _, _ ->
+            var fileName = URLUtil.guessFileName(url, contentDisposition, null)
+            fileName = URLDecoder.decode(fileName, "UTF-8")
+            currentWebView.longSnackbar(fileName, getString(R.string.action_download)) {
+                Download.start(this, url, fileName)
+            }
         }
     }
 

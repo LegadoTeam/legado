@@ -28,15 +28,16 @@ class SourceLoginJsExtensions(
     private val callbackRef: WeakReference<Callback> = WeakReference(callback)
     interface Callback {
         fun upUiData(data: Map<String, String?>?)
-        fun reUiView()
+        fun reUiView(deltaUp: Boolean = false)
     }
 
     fun upLoginData(data: Map<String, String?>?) {
         callbackRef.get()?.upUiData(data)
     }
 
-    fun reLoginView() {
-        callbackRef.get()?.reUiView()
+    @JvmOverloads
+    fun reLoginView(deltaUp: Boolean = false) {
+        callbackRef.get()?.reUiView(deltaUp)
     }
 
     fun refreshExplore() {

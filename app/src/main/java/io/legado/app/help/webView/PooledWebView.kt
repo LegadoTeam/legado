@@ -12,8 +12,11 @@ class PooledWebView(
     var lastUseTime: Long = 0 // 最后一次被使用的时间戳
 
     fun upContext(context: Context): PooledWebView {
-        val contextWrapper = realWebView.context as MutableContextWrapper
-        contextWrapper.baseContext = context
+        (realWebView.context as? MutableContextWrapper)?.let {
+            if (it.baseContext != context) {
+                it.baseContext = context
+            }
+        }
         return this
     }
 }

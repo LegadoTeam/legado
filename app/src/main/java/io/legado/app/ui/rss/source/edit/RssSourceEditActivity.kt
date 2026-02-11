@@ -143,7 +143,7 @@ class RssSourceEditActivity :
                 result.data?.getStringExtra("text")?.let {
                     view.setText(it)
                 }
-                result.data?.getIntExtra("cursorPosition", -1)?.takeIf { it >= 0 }?.let {
+                result.data?.getIntExtra("cursorPosition", -1)?.takeIf { it in 0 ..< view.text.length }?.let {
                     view.setSelection(it)
                 }
             } else {

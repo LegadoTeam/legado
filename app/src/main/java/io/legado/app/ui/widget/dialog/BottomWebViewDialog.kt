@@ -76,6 +76,7 @@ import io.legado.app.help.webView.WebViewPool.BLANK_HTML
 import io.legado.app.help.webView.WebViewPool.DATA_HTML
 import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.dialogs.selector
+import io.legado.app.model.Download
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.utils.ACache
 import io.legado.app.utils.GSON
@@ -87,6 +88,7 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.runBlocking
 import java.io.ByteArrayInputStream
 import java.lang.ref.WeakReference
+import java.net.URLDecoder
 import java.util.Date
 
 class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view), WebJsExtensions.Callback {
@@ -165,6 +167,9 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     }
 
     private fun setConfig(config: Config, first: Boolean = false) {
+        if (!isAdded || context == null) {
+            return
+        }
         behavior?.let { behavior ->
             config.state?.let { behavior.state = it }
             config.peekHeight?.let { behavior.peekHeight = it }
@@ -381,6 +386,13 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                 }
             }
             return@setOnLongClickListener false
+        }
+        currentWebView.setDownloadListener { url, _, contentDisposition, _, _ ->
+            var fileName = URLUtil.guessFileName(url, contentDisposition, null)
+            fileName = URLDecoder.decode(fileName, "UTF-8")
+            currentWebView.longSnackbar(fileName, getString(R.string.action_download)) {
+                Download.start(requireContext(), url, fileName)
+            }
         }
     }
 

@@ -75,7 +75,7 @@ object WebViewPool {
         }
         // 重置WebView状态
         resetWebView(pooledWebView.realWebView)
-        pooledWebView.upContext(MutableContextWrapper(appCtx))
+        pooledWebView.upContext(appCtx)
         pooledWebView.isInUse = false
         if (idlePool.size < CACHED_WEB_VIEW_MAX_NUM - inUsePool.size) {
             pooledWebView.lastUseTime = System.currentTimeMillis()
@@ -100,6 +100,7 @@ object WebViewPool {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 setOnScrollChangeListener(null)
             }
+            setDownloadListener(null)
             outlineProvider = null
             clipToOutline = false
             webChromeClient = null
@@ -158,13 +159,6 @@ object WebViewPool {
             displayZoomControls = false
             setDarkeningAllowed(AppConfig.isNightTheme)
             textZoom = 100
-        }
-        webView.setDownloadListener { url, _, contentDisposition, _, _ ->
-            var fileName = URLUtil.guessFileName(url, contentDisposition, null)
-            fileName = URLDecoder.decode(fileName, "UTF-8")
-            webView.longSnackbar(fileName, appCtx.getString(R.string.action_download)) {
-                Download.start(appCtx, url, fileName)
-            }
         }
     }
 

@@ -115,7 +115,9 @@ class AudioPlayService : BaseService(),
     private val exoPlayer: ExoPlayer by lazy {
         ExoPlayerHelper.createHttpExoPlayer(this)
     }
-    private var mediaSessionCompat: MediaSessionCompat? = null
+    private val mediaSessionCompat by lazy {
+        MediaSessionCompat(this, "readAloud")
+    }
     private var broadcastReceiver: BroadcastReceiver? = null
     private var needResumeOnAudioFocusGain = false
     private var position = AudioPlay.book?.durChapterPos ?: 0
@@ -203,7 +205,7 @@ class AudioPlayService : BaseService(),
         isRun = false
         abandonFocus()
         exoPlayer.release()
-        mediaSessionCompat?.release()
+        mediaSessionCompat.release()
         unregisterReceiver(broadcastReceiver)
         upMediaSessionPlaybackState(PlaybackStateCompat.STATE_STOPPED)
         AudioPlay.status = Status.STOP
@@ -394,7 +396,7 @@ class AudioPlayService : BaseService(),
             .putText(MediaMetadataCompat.METADATA_KEY_ALBUM, AudioPlay.book?.author ?: "null")
             .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, exoPlayer.duration)
             .build()
-        mediaSessionCompat?.setMetadata(metadata)
+        mediaSessionCompat.setMetadata(metadata)
     }
 
     /**
@@ -491,7 +493,7 @@ class AudioPlayService : BaseService(),
      * 更新媒体状态
      */
     private fun upMediaSessionPlaybackState(state: Int) {
-        mediaSessionCompat?.setPlaybackState(
+        mediaSessionCompat.setPlaybackState(
             PlaybackStateCompat.Builder()
                 .setActions(MEDIA_SESSION_ACTIONS)
                 .setState(state, exoPlayer.currentPosition, 1f)
@@ -515,12 +517,11 @@ class AudioPlayService : BaseService(),
      */
     @SuppressLint("UnspecifiedImmutableFlag")
     private fun initMediaSession() {
-        mediaSessionCompat = MediaSessionCompat(this, "readAloud")
-        mediaSessionCompat?.setFlags(
+        mediaSessionCompat.setFlags(
             MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
                     MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
         )
-        mediaSessionCompat?.setCallback(object : MediaSessionCompat.Callback() {
+        mediaSessionCompat.setCallback(object : MediaSessionCompat.Callback() {
             override fun onSeekTo(pos: Long) {
                 position = pos.toInt()
                 exoPlayer.seekTo(pos)
@@ -554,10 +555,10 @@ class AudioPlayService : BaseService(),
             }
 
         })
-        mediaSessionCompat?.setMediaButtonReceiver(
+        mediaSessionCompat.setMediaButtonReceiver(
             broadcastPendingIntent<MediaButtonReceiver>(Intent.ACTION_MEDIA_BUTTON)
         )
-        mediaSessionCompat?.isActive = true
+        mediaSessionCompat.isActive = true
     }
 
     /**
@@ -676,7 +677,7 @@ class AudioPlayService : BaseService(),
         builder.setStyle(
             androidx.media.app.NotificationCompat.MediaStyle()
                 .setShowActionsInCompactView(0, 1, 2)
-                .setMediaSession(mediaSessionCompat?.sessionToken)
+                .setMediaSession(mediaSessionCompat.sessionToken)
         )
         builder.setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
         return builder

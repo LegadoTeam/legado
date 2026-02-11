@@ -19,6 +19,7 @@ import android.webkit.JavascriptInterface
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import android.webkit.SslErrorHandler
+import android.webkit.URLUtil
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -94,9 +95,12 @@ import io.legado.app.help.webView.WebJsExtensions.Companion.nameUrl
 import io.legado.app.help.webView.WebViewPool
 import io.legado.app.help.webView.WebViewPool.BLANK_HTML
 import io.legado.app.help.webView.WebViewPool.DATA_HTML
+import io.legado.app.model.Download
 import kotlinx.coroutines.Dispatchers.IO
+import splitties.init.appCtx
 import java.lang.ref.WeakReference
 import splitties.systemservices.powerManager
+import java.net.URLDecoder
 
 /**
  * rss阅读界面
@@ -349,6 +353,13 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                 }
             }
             return@setOnLongClickListener false
+        }
+        currentWebView.setDownloadListener { url, _, contentDisposition, _, _ ->
+            var fileName = URLUtil.guessFileName(url, contentDisposition, null)
+            fileName = URLDecoder.decode(fileName, "UTF-8")
+            currentWebView.longSnackbar(fileName, getString(R.string.action_download)) {
+                Download.start(this, url, fileName)
+            }
         }
     }
 
