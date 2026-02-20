@@ -135,11 +135,9 @@ class GroupManageDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
                         )
                     }
                 }
-                swShow.setOnCheckedChangeListener { buttonView, isChecked ->
-                    if (buttonView.isPressed) {
-                        getItem(holder.layoutPosition)?.let {
-                            viewModel.upGroup(it.copy(show = isChecked))
-                        }
+                swShow.setOnUserCheckedChangeListener { isChecked ->
+                    getItem(holder.layoutPosition)?.let {
+                        viewModel.upGroup(it.copy(show = isChecked))
                     }
                 }
             }

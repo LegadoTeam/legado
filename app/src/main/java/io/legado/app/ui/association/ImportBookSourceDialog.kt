@@ -25,8 +25,14 @@ import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.widget.dialog.CodeDialog
 import io.legado.app.ui.widget.dialog.WaitDialog
-import io.legado.app.utils.*
+import io.legado.app.utils.GSON
+import io.legado.app.utils.dpToPx
+import io.legado.app.utils.fromJsonObject
+import io.legado.app.utils.putPrefBoolean
+import io.legado.app.utils.setLayout
+import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.viewbindingdelegate.viewBinding
+import io.legado.app.utils.visible
 import splitties.views.onClick
 
 
@@ -282,11 +288,9 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
 
         override fun registerListener(holder: ItemViewHolder, binding: ItemSourceImportBinding) {
             binding.apply {
-                cbSourceName.setOnCheckedChangeListener { buttonView, isChecked ->
-                    if (buttonView.isPressed) {
-                        viewModel.selectStatus[holder.layoutPosition] = isChecked
-                        upSelectText()
-                    }
+                cbSourceName.setOnUserCheckedChangeListener { isChecked ->
+                    viewModel.selectStatus[holder.layoutPosition] = isChecked
+                    upSelectText()
                 }
                 root.onClick {
                     cbSourceName.isChecked = !cbSourceName.isChecked

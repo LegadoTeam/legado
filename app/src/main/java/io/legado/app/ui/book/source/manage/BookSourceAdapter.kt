@@ -125,24 +125,20 @@ class BookSourceAdapter(
 
     override fun registerListener(holder: ItemViewHolder, binding: ItemBookSourceBinding) {
         binding.apply {
-            swtEnabled.setOnCheckedChangeListener { view, checked ->
+            swtEnabled.setOnUserCheckedChangeListener { checked ->
                 getItem(holder.layoutPosition)?.let {
-                    if (view.isPressed) {
-                        it.enabled = checked
-                        callBack.enable(checked, it)
-                    }
+                    it.enabled = checked
+                    callBack.enable(checked, it)
                 }
             }
-            cbBookSource.setOnCheckedChangeListener { view, checked ->
+            cbBookSource.setOnUserCheckedChangeListener { checked ->
                 getItem(holder.layoutPosition)?.let {
-                    if (view.isPressed) {
-                        if (checked) {
-                            selected.add(it)
-                        } else {
-                            selected.remove(it)
-                        }
-                        callBack.upCountView()
+                    if (checked) {
+                        selected.add(it)
+                    } else {
+                        selected.remove(it)
                     }
+                    callBack.upCountView()
                 }
             }
             ivEdit.setOnClickListener {

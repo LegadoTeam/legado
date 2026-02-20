@@ -51,10 +51,8 @@ class SelectActionBar @JvmOverloads constructor(
             binding.cbSelectedAll.setTextColor(primaryTextColor)
             TintHelper.setTint(binding.cbSelectedAll, context.accentColor, !bgIsLight)
             binding.ivMenuMore.setColorFilter(disabledColor, PorterDuff.Mode.SRC_IN)
-            binding.cbSelectedAll.setOnCheckedChangeListener { buttonView, isChecked ->
-                if (buttonView.isPressed) {
-                    callBack?.selectAll(isChecked)
-                }
+            binding.cbSelectedAll.setOnUserCheckedChangeListener { isChecked ->
+                callBack?.selectAll(isChecked)
             }
             binding.btnRevertSelection.setOnClickListener { callBack?.revertSelection() }
             binding.btnSelectActionMain.setOnClickListener { callBack?.onClickSelectBarMainAction() }
