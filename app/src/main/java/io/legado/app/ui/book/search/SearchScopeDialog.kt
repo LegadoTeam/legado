@@ -203,16 +203,14 @@ class SearchScopeDialog : BaseDialogFragment(R.layout.dialog_search_scope) {
                     groups.getOrNull(position)?.let {
                         holder.binding.checkBox.isChecked = selectGroups.contains(it)
                         holder.binding.checkBox.text = it
-                        holder.binding.checkBox.setOnCheckedChangeListener { buttonView, isChecked ->
-                            if (buttonView.isPressed) {
-                                if (isChecked) {
-                                    selectGroups.add(it)
-                                } else {
-                                    selectGroups.remove(it)
-                                }
-                                buttonView.post {
-                                    notifyItemRangeChanged(0, itemCount, "up")
-                                }
+                        holder.binding.checkBox.setOnUserCheckedChangeListener { isChecked ->
+                            if (isChecked) {
+                                selectGroups.add(it)
+                            } else {
+                                selectGroups.remove(it)
+                            }
+                            holder.itemView.post {
+                                notifyItemRangeChanged(0, itemCount, "up")
                             }
                         }
                     }
@@ -222,14 +220,12 @@ class SearchScopeDialog : BaseDialogFragment(R.layout.dialog_search_scope) {
                     screenSources.getOrNull(position)?.let {
                         holder.binding.radioButton.isChecked = selectSource == it
                         holder.binding.radioButton.text = it.bookSourceName
-                        holder.binding.radioButton.setOnCheckedChangeListener { buttonView, isChecked ->
-                            if (buttonView.isPressed) {
-                                if (isChecked) {
-                                    selectSource = it
-                                }
-                                buttonView.post {
-                                    notifyItemRangeChanged(0, itemCount, "up")
-                                }
+                        holder.binding.radioButton.setOnUserCheckedChangeListener { isChecked ->
+                            if (isChecked) {
+                                selectSource = it
+                            }
+                            holder.itemView.post {
+                                notifyItemRangeChanged(0, itemCount, "up")
                             }
                         }
                     }

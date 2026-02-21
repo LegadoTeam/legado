@@ -48,6 +48,7 @@ import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.model.BookCover
+import io.legado.app.model.ReadBook
 import io.legado.app.model.remote.RemoteBookWebDav
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.book.audio.AudioPlayActivity
@@ -358,6 +359,12 @@ class BookInfoActivity :
                 refreshBook()
             }
         }
+
+        observeEvent<Boolean>(EventBus.REFRESH_BOOK_TOC) { //书源js函数触发刷新
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                refreshToc()
+            }
+        }
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
@@ -375,6 +382,13 @@ class BookInfoActivity :
         upLoading(true)
         viewModel.getBook()?.let {
             viewModel.refreshBook(it)
+        }
+    }
+
+    private fun refreshToc() {
+        upLoading(true)
+        viewModel.getBook()?.let {
+            viewModel.loadChapter(it, true, isFromBookInfo = true)
         }
     }
 

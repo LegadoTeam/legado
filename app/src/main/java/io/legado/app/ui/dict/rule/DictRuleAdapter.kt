@@ -117,12 +117,10 @@ class DictRuleAdapter(context: Context, var callBack: CallBack) :
 
     override fun registerListener(holder: ItemViewHolder, binding: ItemDictRuleBinding) {
         binding.apply {
-            swtEnabled.setOnCheckedChangeListener { buttonView, isChecked ->
-                if (buttonView.isPressed) {
-                    getItem(holder.layoutPosition)?.let {
-                        it.enabled = isChecked
-                        callBack.update(it)
-                    }
+            swtEnabled.setOnUserCheckedChangeListener { isChecked ->
+                getItem(holder.layoutPosition)?.let {
+                    it.enabled = isChecked
+                    callBack.update(it)
                 }
             }
             cbName.setOnClickListener {

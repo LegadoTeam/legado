@@ -127,14 +127,12 @@ class GroupSelectDialog() : BaseDialogFragment(R.layout.dialog_book_group_picker
 
         override fun registerListener(holder: ItemViewHolder, binding: ItemGroupSelectBinding) {
             binding.run {
-                cbGroup.setOnCheckedChangeListener { buttonView, isChecked ->
-                    if (buttonView.isPressed) {
-                        getItem(holder.layoutPosition)?.let {
-                            groupId = if (isChecked) {
-                                groupId + it.groupId
-                            } else {
-                                groupId - it.groupId
-                            }
+                cbGroup.setOnUserCheckedChangeListener { isChecked ->
+                    getItem(holder.layoutPosition)?.let {
+                        groupId = if (isChecked) {
+                            groupId + it.groupId
+                        } else {
+                            groupId - it.groupId
                         }
                     }
                 }

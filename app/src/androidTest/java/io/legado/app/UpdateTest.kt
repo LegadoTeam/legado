@@ -20,7 +20,7 @@ class UpdateTest {
     @Test
     fun updateApp_beta() {
         val body = okHttpClient.newCall(Request.Builder().url(lastBetaReleaseUrl).build()).execute()
-            .body!!.string()
+            .body.string()
 
         val releaseList = Gson().fromJsonObject<GithubRelease>(body)
             .getOrElse {
@@ -37,7 +37,7 @@ class UpdateTest {
     @Test
     fun updateApp() {
         val body = okHttpClient.newCall(Request.Builder().url(lastReleaseUrl).build()).execute()
-            .body!!.string()
+            .body.string()
 
         val releaseList = Gson().fromJsonObject<GithubRelease>(body)
             .getOrElse {

@@ -116,8 +116,8 @@ class ServersDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
         }
 
         override fun registerListener(holder: ItemViewHolder, binding: ItemServerSelectBinding) {
-            binding.rbServer.setOnCheckedChangeListener { buttonView, isChecked ->
-                if (buttonView.isPressed && isChecked) {
+            binding.rbServer.setOnUserCheckedChangeListener { isChecked ->
+                if (isChecked) {
                     selectServerId = getItemByLayoutPosition(holder.layoutPosition)!!.id
                     adapter.updateItems(0, itemCount - 1, "upSelect")
                 }

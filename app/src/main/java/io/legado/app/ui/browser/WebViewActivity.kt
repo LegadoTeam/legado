@@ -61,6 +61,7 @@ import io.legado.app.model.Download
 import splitties.systemservices.powerManager
 import java.lang.ref.WeakReference
 import java.net.URLDecoder
+import androidx.core.graphics.createBitmap
 
 class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
     companion object {
@@ -319,7 +320,6 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
         super.onPause()
         if (powerManager.isInteractive) {
             wasScreenOff = false
-            currentWebView.pauseTimers()
             currentWebView.onPause()
         } else {
             wasScreenOff = true
@@ -329,7 +329,6 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
     override fun onResume() {
         super.onResume()
         if (!wasScreenOff) {
-            currentWebView.resumeTimers()
             currentWebView.onResume()
         }
     }
@@ -372,6 +371,9 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
     }
 
     inner class CustomWebChromeClient : WebChromeClient() {
+        override fun getDefaultVideoPoster(): Bitmap {
+            return super.getDefaultVideoPoster() ?: createBitmap(100, 100)
+        }
 
         override fun onProgressChanged(view: WebView?, newProgress: Int) {
             super.onProgressChanged(view, newProgress)

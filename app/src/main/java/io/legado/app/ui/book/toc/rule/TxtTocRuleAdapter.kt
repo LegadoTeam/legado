@@ -100,24 +100,20 @@ class TxtTocRuleAdapter(context: Context, private val callBack: CallBack) :
     }
 
     override fun registerListener(holder: ItemViewHolder, binding: ItemTxtTocRuleBinding) {
-        binding.cbSource.setOnCheckedChangeListener { buttonView, isChecked ->
+        binding.cbSource.setOnUserCheckedChangeListener { isChecked ->
             getItem(holder.layoutPosition)?.let {
-                if (buttonView.isPressed) {
-                    if (isChecked) {
-                        selected.add(it)
-                    } else {
-                        selected.remove(it)
-                    }
-                    callBack.upCountView()
+                if (isChecked) {
+                    selected.add(it)
+                } else {
+                    selected.remove(it)
                 }
+                callBack.upCountView()
             }
         }
-        binding.swtEnabled.setOnCheckedChangeListener { buttonView, isChecked ->
+        binding.swtEnabled.setOnUserCheckedChangeListener { isChecked ->
             getItem(holder.layoutPosition)?.let {
-                if (buttonView.isPressed) {
-                    it.enable = isChecked
-                    callBack.update(it)
-                }
+                it.enable = isChecked
+                callBack.update(it)
             }
         }
         binding.ivEdit.setOnClickListener {
@@ -142,7 +138,7 @@ class TxtTocRuleAdapter(context: Context, private val callBack: CallBack) :
             when (menuItem.itemId) {
                 R.id.menu_top -> callBack.toTop(source)
                 R.id.menu_bottom -> callBack.toBottom(source)
-                R.id.menu_del ->  {
+                R.id.menu_del -> {
                     callBack.del(source)
                     selected.remove(source)
                 }

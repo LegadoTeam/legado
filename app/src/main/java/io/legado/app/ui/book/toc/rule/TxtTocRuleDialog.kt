@@ -151,6 +151,7 @@ class TxtTocRuleDialog() : BaseDialogFragment(R.layout.dialog_toc_regex),
                 mode = HandleFileContract.FILE
                 allowExtensions = arrayOf("txt", "json")
             }
+
             R.id.menu_import_onLine -> showImportDialog()
             R.id.menu_import_qr -> qrCodeResult.launch()
             R.id.menu_import_default -> viewModel.importDefault()
@@ -275,18 +276,16 @@ class TxtTocRuleDialog() : BaseDialogFragment(R.layout.dialog_toc_regex),
 
         override fun registerListener(holder: ItemViewHolder, binding: ItemTocRegexBinding) {
             binding.apply {
-                rbRegexName.setOnCheckedChangeListener { buttonView, isChecked ->
-                    if (buttonView.isPressed && isChecked) {
+                rbRegexName.setOnUserCheckedChangeListener { isChecked ->
+                    if (isChecked) {
                         selectedName = getItem(holder.layoutPosition)?.name
                         updateItems(0, itemCount - 1, bundleOf("upSelect" to null))
                     }
                 }
-                swtEnabled.setOnCheckedChangeListener { buttonView, isChecked ->
-                    if (buttonView.isPressed) {
-                        getItem(holder.layoutPosition)?.let {
-                            it.enable = isChecked
-                            viewModel.update(it)
-                        }
+                swtEnabled.setOnUserCheckedChangeListener { isChecked ->
+                    getItem(holder.layoutPosition)?.let {
+                        it.enable = isChecked
+                        viewModel.update(it)
                     }
                 }
                 ivEdit.setOnClickListener {

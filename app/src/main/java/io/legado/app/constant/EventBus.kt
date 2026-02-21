@@ -37,5 +37,6 @@ object EventBus {
     const val PLAY_MODE_CHANGED = "playModeChanged"
     const val REFRESH_BOOK_INFO = "refreshBookInfo"
     const val REFRESH_BOOK_CONTENT = "refreshBookContent"
+    const val REFRESH_BOOK_TOC = "refreshBookToc"
     const val UP_VIDEO_INFO = "upVideoInfo"
 }

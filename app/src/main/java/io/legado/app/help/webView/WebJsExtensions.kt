@@ -25,7 +25,7 @@ import java.util.UUID
 
 @Suppress("unused")
 class WebJsExtensions(
-    source: BaseSource, activity: AppCompatActivity,
+    source: BaseSource, activity: AppCompatActivity?,
     private val webView: WebView,
     private val bookType: Int = 0,
     callback: Callback? = null
@@ -69,6 +69,10 @@ class WebJsExtensions(
     private val book: Book? get() = bookAndChapter.first
     private val chapter: BookChapter? get() = bookAndChapter.second
 
+    override val analyzeRule by lazy {
+        AnalyzeRule(book, source = getSource()).setChapter(chapter)
+    }
+
     /**
      * 由软件主动注入的js函数调用
      */
@@ -77,9 +81,8 @@ class WebJsExtensions(
         val activity = activityRef.get() ?: return
         Coroutine.async(activity.lifecycleScope) {
             when (funName) {
-                "run" -> AnalyzeRule(book, getSource()).run {
+                "run" -> analyzeRule.run {
                     setCoroutineContext(coroutineContext)
-                    setChapter(chapter)
                     evalJS(jsParam[0]).toString()
                 }
                 "ajaxAwait" -> {
@@ -124,9 +127,8 @@ class WebJsExtensions(
                 "importScriptAwait" -> {
                     importScript(jsParam[0])
                 }
-                "getStringAwait" -> AnalyzeRule(book, getSource()).run {
+                "getStringAwait" -> analyzeRule.run {
                     setCoroutineContext(coroutineContext)
-                    setChapter(chapter)
                     getString(jsParam[0], jsParam[1])
                 }
                 else -> "error funName"
@@ -202,6 +204,14 @@ class WebJsExtensions(
         val headerMap = GSON.fromJsonObject<Map<String, String>>(headers).getOrNull() ?: emptyMap()
         return GSON.toJson(super.head(urlStr, headerMap, timeout).headers())
     }
+    @JavascriptInterface
+    fun getStringList(rule: String?, mContent: String? = null, isUrl: Boolean = false): List<String>? {
+        return super.getStringList(rule, mContent, isUrl)
+    }
+    @JavascriptInterface
+    fun getString(ruleStr: String?, mContent: String? = null, isUrl: Boolean = false): String {
+        return super.getString(ruleStr, mContent, isUrl)
+    }
 
     companion object{
         private fun getRandomLetter(): Char {
@@ -237,117 +247,117 @@ class WebJsExtensions(
                 return new Promise((resolve, reject) => {
                     const id = requestId("run");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    java?.request("run", [String(jsCode)], id);
+                    java.request("run", [String(jsCode)], id);
                 });
             };
             function ajaxAwait(url, callTimeout) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("ajaxAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    java?.request("ajaxAwait", [String(url), String(callTimeout)], id);
+                    java.request("ajaxAwait", [String(url), String(callTimeout)], id);
                 });
             };
             function connectAwait(url, header, callTimeout) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("connectAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    java?.request("connectAwait", [String(url), String(header), String(callTimeout)], id);
+                    java.request("connectAwait", [String(url), String(header), String(callTimeout)], id);
                 });
             };
             function getAwait(url, header, callTimeout) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("getAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    java?.request("getAwait", [String(url), String(header), String(callTimeout)], id);
+                    java.request("getAwait", [String(url), String(header), String(callTimeout)], id);
                 });
             };
             function headAwait(url, header, callTimeout) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("headAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    java?.request("headAwait", [String(url), String(header), String(callTimeout)], id);
+                    java.request("headAwait", [String(url), String(header), String(callTimeout)], id);
                 });
             };
             function postAwait(url, body, header, callTimeout) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("postAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    java?.request("postAwait", [String(url), String(body), String(header), String(callTimeout)], id);
+                    java.request("postAwait", [String(url), String(body), String(header), String(callTimeout)], id);
                 });
             };
             function webViewAwait(html, url, js, cacheFirst) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("webViewAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    java?.request("webViewAwait", [String(html), String(url), String(js), String(cacheFirst)], id);
+                    java.request("webViewAwait", [String(html), String(url), String(js), String(cacheFirst)], id);
                 });
             };
             function webViewGetSourceAwait(html, url, js, sourceRegex, cacheFirst, delayTime) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("webViewGetSourceAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    java?.request("webViewGetSourceAwait", [String(html), String(url), String(js), String(sourceRegex), String(cacheFirst), String(delayTime)], id);
+                    java.request("webViewGetSourceAwait", [String(html), String(url), String(js), String(sourceRegex), String(cacheFirst), String(delayTime)], id);
                 });
             }
             function decryptStrAwait(transformation, key, iv, data) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("decryptStrAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    java?.request("decryptStrAwait", [String(transformation), String(key), String(iv), String(data)], id);
+                    java.request("decryptStrAwait", [String(transformation), String(key), String(iv), String(data)], id);
                 });
             };
             function encryptBase64Await(transformation, key, iv, data) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("encryptBase64Await");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    java?.request("encryptBase64Await", [String(transformation), String(key), String(iv), String(data)], id);
+                    java.request("encryptBase64Await", [String(transformation), String(key), String(iv), String(data)], id);
                 });
             };
             function encryptHexAwait(transformation, key, iv, data) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("encryptHexAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    java?.request("encryptHexAwait", [String(transformation), String(key), String(iv), String(data)], id);
+                    java.request("encryptHexAwait", [String(transformation), String(key), String(iv), String(data)], id);
                 });
             };
             function createSignHexAwait(algorithm, publicKey, privateKey, data) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("createSignHexAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    java?.request("createSignHexAwait", [String(algorithm), String(publicKey), String(privateKey), String(data)], id);
+                    java.request("createSignHexAwait", [String(algorithm), String(publicKey), String(privateKey), String(data)], id);
                 });
             };
             function downloadFileAwait(url) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("downloadFileAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    java?.request("downloadFileAwait", [String(url)], id);
+                    java.request("downloadFileAwait", [String(url)], id);
                 });
             };
             function readTxtFileAwait(path) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("readTxtFileAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    java?.request("readTxtFileAwait", [String(path)], id);
+                    java.request("readTxtFileAwait", [String(path)], id);
                 });
             };
             function importScriptAwait(url) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("importScriptAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    java?.request("importScriptAwait", [String(url)], id);
+                    java.request("importScriptAwait", [String(url)], id);
                 });
             };
             function getStringAwait(ruleStr, mContent) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("getStringAwait");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    java?.request("getStringAwait", [String(ruleStr), String(mContent)], id);
+                    java.request("getStringAwait", [String(ruleStr), String(mContent)], id);
                 });
             };
             window.$JSBridgeResult = function(id, success) {
                 if (JSBridgeCallbacks[id]) {
-                    const result = cache?.getFromMemory(id);
+                    const result = cache.getFromMemory(id);
                     if (success) {
                         JSBridgeCallbacks[id].resolve(result);
                     } else {
@@ -363,16 +373,18 @@ class WebJsExtensions(
             const JSBridgeCallbacks = {};
             const java = window.$nameJava;
             delete window.$nameJava;
+            const cache = window.$nameCache;
+            delete window.$nameCache;
             function run(jsCode) {
                 return new Promise((resolve, reject) => {
                     const id = requestId("run");
                     JSBridgeCallbacks[id] = { resolve, reject };
-                    java?.request("run", [String(jsCode)], id);
+                    java.request("run", [String(jsCode)], id);
                 });
             };
             window.$JSBridgeResult = function(id, success) {
                 if (JSBridgeCallbacks[id]) {
-                    const result = cache?.getFromMemory(id);
+                    const result = cache.getFromMemory(id);
                     if (success) {
                         JSBridgeCallbacks[id].resolve(result);
                     } else {
@@ -388,19 +400,19 @@ class WebJsExtensions(
             if (screen.orientation) {
                 screen.orientation.lock = function(orientation) {
                     return new Promise((resolve, reject) => {
-                        window.$nameBasic?.lockOrientation(orientation);
+                        window.$nameBasic.lockOrientation(orientation);
                         resolve()
                     });
                 };
                 screen.orientation.unlock = function() {
                     return new Promise((resolve, reject) => {
-                        window.$nameBasic?.lockOrientation('unlock');
+                        window.$nameBasic.lockOrientation('unlock');
                         resolve()
                     });
                 };
             };
             window.close = function() {
-                window.$nameBasic?.onCloseRequested();
+                window.$nameBasic.onCloseRequested();
             };
             })();""".trimIndent()
         }

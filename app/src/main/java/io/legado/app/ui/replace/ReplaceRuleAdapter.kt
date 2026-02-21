@@ -125,12 +125,10 @@ class ReplaceRuleAdapter(context: Context, var callBack: CallBack) :
 
     override fun registerListener(holder: ItemViewHolder, binding: ItemReplaceRuleBinding) {
         binding.apply {
-            swtEnabled.setOnCheckedChangeListener { buttonView, isChecked ->
-                if (buttonView.isPressed) {
-                    getItem(holder.layoutPosition)?.let {
-                        it.isEnabled = isChecked
-                        callBack.update(it)
-                    }
+            swtEnabled.setOnUserCheckedChangeListener { isChecked ->
+                getItem(holder.layoutPosition)?.let {
+                    it.isEnabled = isChecked
+                    callBack.update(it)
                 }
             }
             ivEdit.setOnClickListener {

@@ -1303,11 +1303,18 @@ class ReadBookActivity : BaseReadBookActivity(),
                     if (payAction.isNullOrBlank()) {
                         throw NoStackTraceException("no pay action")
                     }
-                    val analyzeRule = AnalyzeRule(book, source)
-                    analyzeRule.setCoroutineContext(coroutineContext)
-                    analyzeRule.setBaseUrl(chapter.url)
-                    analyzeRule.setChapter(chapter)
-                    analyzeRule.evalJS(payAction).toString()
+                    val java = SourceLoginJsExtensions(this@ReadBookActivity, source, BookType.text)
+                    runScriptWithContext {
+                        source.evalJS(payAction) {
+                            put("java", java)
+                            put("book", book)
+                            put("chapter", chapter)
+                            put("title", chapter.title)
+                            put("baseUrl", chapter.url)
+                            put("result", null)
+                            put("src", null)
+                        }.toString()
+                    }
                 }.onSuccess(IO) {
                     if (it.isAbsUrl()) {
                         startActivity<WebViewActivity> {
@@ -1804,6 +1811,13 @@ class ReadBookActivity : BaseReadBookActivity(),
                     ReadBook.curTextChapter = null
                     binding.readView.upContent()
                     viewModel.refreshContentDur(it)
+                }
+            }
+        }
+        observeEvent<Boolean>(EventBus.REFRESH_BOOK_TOC) { //书源js函数触发刷新
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                ReadBook.book?.let {
+                    loadChapterList(it)
                 }
             }
         }
