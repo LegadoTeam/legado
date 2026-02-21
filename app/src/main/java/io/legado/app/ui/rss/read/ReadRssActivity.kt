@@ -97,10 +97,10 @@ import io.legado.app.help.webView.WebViewPool.BLANK_HTML
 import io.legado.app.help.webView.WebViewPool.DATA_HTML
 import io.legado.app.model.Download
 import kotlinx.coroutines.Dispatchers.IO
-import splitties.init.appCtx
 import java.lang.ref.WeakReference
 import splitties.systemservices.powerManager
 import java.net.URLDecoder
+import androidx.core.graphics.createBitmap
 
 /**
  * rss阅读界面
@@ -326,7 +326,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
         }
     }
 
-    @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
+    @SuppressLint("SetJavaScriptEnabled")
     private fun initWebView() {
         binding.progressBar.fontColor = accentColor
         currentWebView.webChromeClient = CustomWebChromeClient()
@@ -503,7 +503,6 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
         super.onPause()
         if (powerManager.isInteractive) {
             wasScreenOff = false
-            currentWebView.pauseTimers()
             currentWebView.onPause()
         } else {
             wasScreenOff = true
@@ -513,7 +512,6 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     override fun onResume() {
         super.onResume()
         if (!wasScreenOff) {
-            currentWebView.resumeTimers()
             currentWebView.onResume()
         }
     }
@@ -557,6 +555,9 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     }
 
     inner class CustomWebChromeClient : WebChromeClient() {
+        override fun getDefaultVideoPoster(): Bitmap {
+            return super.getDefaultVideoPoster() ?: createBitmap(100, 100)
+        }
 
         override fun onProgressChanged(view: WebView?, newProgress: Int) {
             super.onProgressChanged(view, newProgress)

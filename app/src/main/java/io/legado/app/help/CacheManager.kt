@@ -153,7 +153,10 @@ object CacheManager {
     }
 }
 
+@Keep
+@Suppress("unused")
 object WebCacheManager {
+    @JvmOverloads
     @JavascriptInterface
     fun put(key: String, value: String, saveTime: Int = 0) {
         CacheManager.put(key, value, saveTime)
@@ -164,7 +167,7 @@ object WebCacheManager {
     }
     @JavascriptInterface
     fun getFromMemory(key: String): String? {
-        return memoryLruCache[key] as? String
+        return memoryLruCache[key]?.toString()
     }
     @JavascriptInterface
     fun deleteMemory(key: String) {

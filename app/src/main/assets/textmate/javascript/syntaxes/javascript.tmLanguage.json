@@ -10,7 +10,7 @@
   "patterns": [
     {
       "name": "comment.block.js",
-      "match": "@js:|<\\/?js>"
+      "match": "@js:|@webjs:|<\\/?js>"
     },
     {
       "include": "#directives"

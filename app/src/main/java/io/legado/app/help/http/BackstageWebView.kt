@@ -6,20 +6,29 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.AndroidRuntimeException
+import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
 import android.webkit.SslErrorHandler
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import io.legado.app.constant.AppConst
+import io.legado.app.data.appDb
+import io.legado.app.data.entities.BaseSource
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.CacheManager
 import io.legado.app.help.WebCacheManager
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.webView.PooledWebView
+import io.legado.app.help.webView.WebJsExtensions
 import io.legado.app.help.webView.WebJsExtensions.Companion.nameCache
+import io.legado.app.help.webView.WebJsExtensions.Companion.nameJava
+import io.legado.app.help.webView.WebJsExtensions.Companion.nameSource
 import io.legado.app.help.webView.WebViewPool
+import io.legado.app.model.Debug
 import io.legado.app.utils.get
 import io.legado.app.utils.runOnUI
 import kotlinx.coroutines.Dispatchers.IO
@@ -49,7 +58,9 @@ class BackstageWebView(
     private val javaScript: String? = null,
     private val delayTime: Long = 0,
     private val cacheFirst: Boolean = false,
-    private val timeout: Long? = null
+    private val timeout: Long? = null,
+    private val result: String? = null,
+    private val isRule: Boolean = false
 ) {
 
     private val mHandler = Handler(Looper.getMainLooper())
@@ -96,7 +107,28 @@ class BackstageWebView(
         try {
             when {
                 !html.isNullOrEmpty() -> {
-                    webView.addJavascriptInterface(WebCacheManager, nameCache)
+                    if (isRule) {
+                        webView.addJavascriptInterface(WebCacheManager, nameCache)
+                        tag?.let { key ->
+                           appDb.bookSourceDao.getBookSource(key)?.let {
+                               webView.webChromeClient = object : WebChromeClient() {
+                                   /* 监听网页日志 */
+                                   override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
+                                       val messageLevel = consoleMessage.messageLevel().name
+                                       val message = consoleMessage.message()
+                                       Debug.log(it.bookSourceUrl, "${messageLevel}: $message", true)
+                                       return true
+                                   }
+                               }
+                               webView.addJavascriptInterface(it as BaseSource, nameSource)
+                               val webJsExtensions = WebJsExtensions(it, null, webView)
+                               webView.addJavascriptInterface(webJsExtensions, nameJava)
+                            }
+                        }
+                    }
+                    result?.let {
+                        CacheManager.put("webview_result", it)
+                    }
                     webView.loadDataWithBaseURL(url, html, "text/html", getEncoding(), url)
                 }
 
@@ -112,12 +144,11 @@ class BackstageWebView(
         }
     }
 
-    @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
+    @SuppressLint("SetJavaScriptEnabled")
     private fun createWebView(): WebView {
         val pooledWebView = WebViewPool.acquire(appCtx)
         this.pooledWebView = pooledWebView
         val webView = pooledWebView.realWebView
-        webView.resumeTimers()
         webView.onResume() //缓存库拿的需要激活
         val settings = webView.settings
         settings.blockNetworkImage = true
@@ -173,6 +204,9 @@ class BackstageWebView(
 
         override fun onPageFinished(view: WebView, url: String) {
             setCookie(url)
+            result?.let {
+                view.evaluateJavascript("window.result = $nameCache.getFromMemory('webview_result')", null)
+            }
             val runnable = runnable ?: EvalJsRunnable(view, url, getJs()).also {
                 runnable = it
             }
@@ -192,13 +226,16 @@ class BackstageWebView(
         private inner class EvalJsRunnable(
             webView: WebView,
             private val url: String,
-            private val mJavaScript: String
+            mJavaScript: String
         ) : Runnable {
             private var retry = 0
             private val intervals = listOf(200L, 400L, 600L, 800L, 1000L)
             private val mWebView: WeakReference<WebView> = WeakReference(webView)
+            private val jsStr = if (isRule) {
+                "try{var cache=$nameCache,source=$nameSource,java=$nameJava;}catch(e){}\n$mJavaScript"
+            } else mJavaScript
             override fun run() {
-                mWebView.get()?.evaluateJavascript(mJavaScript) {
+                mWebView.get()?.evaluateJavascript(jsStr) {
                     handleResult(it)
                 }
             }

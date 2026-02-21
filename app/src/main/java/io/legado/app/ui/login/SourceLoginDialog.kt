@@ -56,6 +56,7 @@ import androidx.appcompat.widget.AppCompatSpinner
 import io.legado.app.data.entities.rule.RowUi.Type
 import io.legado.app.ui.widget.text.TextInputLayout
 import io.legado.app.utils.buildMainHandler
+import io.legado.app.utils.indexOf
 import io.legado.app.utils.setSelectionSafely
 
 class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
@@ -78,9 +79,19 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
         )
     }
 
-    override fun upUiData(data: Map<String, String?>?) {
-        activity?.runOnUiThread { // 在主线程中更新 UI
-            handleUpUiData(data)
+    private var initHandler = false
+    private val handler by lazy {
+        initHandler = true
+        buildMainHandler()
+    }
+
+    override fun upUiData(data: Map<String, Any?>?) {
+        try {
+            activity?.runOnUiThread { // 在主线程中更新 UI
+                handleUpUiData(data)
+            }
+        } catch (e: Exception) {
+            AppLog.put("upLoginData Error: " + e.localizedMessage, e)
         }
     }
 
@@ -116,7 +127,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
     }
 
     @SuppressLint("SetTextI18n")
-    private fun handleUpUiData(data: Map<String, String?>?) {
+    private fun handleUpUiData(data: Map<String, Any?>?) {
         hasChange = true
         if (data == null) {
             val newLoginInfo: MutableMap<String, String> = mutableMapOf()
@@ -162,6 +173,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
         }
         val loginInfo = viewModel.loginInfo
         data.forEach { (key, value) ->
+            val value = value?.toString()
             val index = rowUiName.indexOf(key)
             if (index != -1) {
                 val rowUi = rowUis?.getOrNull(index) ?: return@forEach
@@ -247,19 +259,30 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
             val name = rowUi.name
             val viewName = rowUi.viewName
             val action = rowUi.action
+            val default = rowUi.default
+            var insertIndex = -1
             if (deltaUp) {
-                val oldName = rowUiName.getOrNull(index)
-                when (oldName) {
-                    name -> {
+                val oldIndex = rowUiName.indexOf(name, index)
+                if (oldIndex == index) {
+                    binding.flexbox.getChildAt(oldIndex)?.let {
+                        it.id = index + 1000
                         return@forEachIndexed
                     }
-                    null -> {
-                        rowUiName.add(name)
+                } else if (oldIndex >= 0) {
+                    binding.flexbox.getChildAt(oldIndex)?.let {
+                        binding.flexbox.removeView(it)
+                        rowUiName.removeAt(oldIndex)
+                        binding.flexbox.addView(it, index)
+                        rowUiName.add(index, name)
+                        it.id = index + 1000
+                        return@forEachIndexed
                     }
-                    else -> {
-                        rowUiName[index] = name
-                        binding.flexbox.removeViewAt(index)
-                    }
+                }
+                if (oldIndex == -2) {
+                    rowUiName.add(name)
+                } else {
+                    rowUiName.add(index, name)
+                    insertIndex = index
                 }
             } else {
                 rowUiName.add(name)
@@ -271,7 +294,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
                     false
                 ).let {
                     val editText = it.editText
-                    binding.flexbox.addView(it.root)
+                    binding.flexbox.addView(it.root, insertIndex)
                     rowUi.style().apply {
                         when (this.layout_justifySelf) {
                             "center" -> editText.gravity = Gravity.CENTER
@@ -298,11 +321,10 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
                             it.textInputLayout.hint = "err"
                         }
                     }
-                    editText.setText(loginInfo[name])
+                    editText.setText(loginInfo[name] ?: default)
                     action?.let { jsStr ->
                         val watcher = object : TextWatcher {
                             private var content: String? = null
-                            private val handler = buildMainHandler()
                             private val runnable = Runnable {
                                 handleButtonClick(source, jsStr, name, false)
                             }
@@ -330,7 +352,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
                     false
                 ).let {
                     val editText = it.editText
-                    binding.flexbox.addView(it.root)
+                    binding.flexbox.addView(it.root, insertIndex)
                     rowUi.style().apply {
                         when (this.layout_justifySelf) {
                             "center" -> editText.gravity = Gravity.CENTER
@@ -359,11 +381,10 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
                     }
                     editText.inputType =
                         InputType.TYPE_TEXT_VARIATION_PASSWORD or InputType.TYPE_CLASS_TEXT
-                    editText.setText(loginInfo[name])
+                    editText.setText(loginInfo[name] ?: default)
                     action?.let { jsStr ->
                         val watcher = object : TextWatcher {
                             private var content: String? = null
-                            private val handler = buildMainHandler()
                             private val runnable = Runnable {
                                 handleButtonClick(source, jsStr, name, false)
                             }
@@ -420,7 +441,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
                     val infoV = loginInfo[name]
                     val char = if (infoV.isNullOrEmpty()) {
                         hasChange = true
-                        rowUi.default ?: chars[0]
+                        default ?: chars[0]
                     } else {
                         infoV
                     }
@@ -443,7 +464,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
                         override fun onNothingSelected(parent: AdapterView<*>?) {
                         }
                     }
-                    binding.flexbox.addView(it.root)
+                    binding.flexbox.addView(it.root, insertIndex)
                     rowUi.style().apply {
                         when (this.layout_justifySelf) {
                             "flex_start" -> selector.gravity = Gravity.START
@@ -459,7 +480,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
                     binding.root,
                     false
                 ).let {
-                    binding.flexbox.addView(it.root)
+                    binding.flexbox.addView(it.root, insertIndex)
                     rowUi.style().apply {
                         when (this.layout_justifySelf) {
                             "flex_start" -> it.textView.gravity = Gravity.START
@@ -524,7 +545,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
                 ).let {
                     var newName = name
                     var left = true
-                    binding.flexbox.addView(it.root)
+                    binding.flexbox.addView(it.root, insertIndex)
                     rowUi.style().apply {
                         when (this.layout_justifySelf) {
                             "flex_start" -> it.textView.gravity = Gravity.START
@@ -538,7 +559,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
                     val infoV = loginInfo[name]
                     var char = if (infoV.isNullOrEmpty()) {
                         hasChange = true
-                        rowUi.default ?: chars[0]
+                        default ?: chars[0]
                     } else {
                         infoV
                     }
@@ -756,6 +777,9 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
             } else {
                 viewModel.source?.putLoginInfo(GSON.toJson(loginInfo))
             }
+        }
+        if (initHandler) {
+            handler.removeCallbacksAndMessages(null)
         }
         super.onDismiss(dialog)
         activity?.finish()

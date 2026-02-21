@@ -9,7 +9,7 @@ import splitties.init.appCtx
 import splitties.resources.color
 import java.util.regex.Pattern
 
-val legadoPattern: Pattern = Pattern.compile("\\|\\||&&|%%|@js:|@Json:|@css:|@@|@XPath:")
+val legadoPattern: Pattern = Pattern.compile("\\|\\||&&|%%|@js:|@Json:|@css:|@@|@XPath:|@webjs:")
 val jsonPattern: Pattern = Pattern.compile("\"[A-Za-z0-9]*?\"\\:|\"|\\{|\\}|\\[|\\]")
 val wrapPattern: Pattern = Pattern.compile("\\\\n")
 val operationPattern: Pattern =

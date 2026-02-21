@@ -220,7 +220,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
-    private fun loadChapter(
+    fun loadChapter(
         book: Book,
         runPreUpdateJs: Boolean = true,
         scope: CoroutineScope = viewModelScope,
@@ -290,8 +290,11 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     it, source = bookSource,
                     coroutineContext = coroutineContext
                 )
-                val mFileName = UrlUtil.getFileName(analyzeUrl)
-                    ?: "${fileNameNoExtension}.${analyzeUrl.type}"
+                var mFileName = UrlUtil.getFileName(analyzeUrl)
+                    ?: fileNameNoExtension
+                analyzeUrl.type?.let { suffix ->
+                    mFileName += ".${suffix}"
+                }
                 WebFile(it, mFileName)
             }
         }.onError {
