@@ -1,0 +1,317 @@
+name: Beta Release
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '**'
+      - '!**/ISSUE_TEMPLATE/**'
+      - '!**/modules/web/**'
+  workflow_run:
+    workflows: [Build Web]
+    branches: [master]
+    types: [completed]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  prepare:
+    runs-on: ubuntu-latest
+    if: ${{ !startsWith(github.event.head_commit.message, 'Merge pull request') }}
+    outputs:
+      version: ${{ steps.set-ver.outputs.version }}
+      versionL: ${{ steps.set-ver.outputs.versionL }}
+      lanzou: ${{ steps.check.outputs.lanzou }}
+      telegram: ${{ steps.check.outputs.telegram }}
+    steps:
+      - id: set-ver
+        run: |
+          echo "version=3.$(TZ=Asia/Shanghai date +%y.%m%d%H)" >> $GITHUB_OUTPUT
+          echo "versionL=3.$(TZ=Asia/Shanghai date +%y.%m%d%H%M)" >> $GITHUB_OUTPUT
+
+      - id: check
+        run: |
+          if [ -n "${{ secrets.LANZOU_ID }}" ]; then
+            echo "lanzou=yes" >> $GITHUB_OUTPUT
+          fi
+          if [ -n "${{ secrets.BOT_TOKEN }}" ]; then
+            echo "telegram=yes" >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    needs: prepare
+    strategy:
+      matrix:
+        product: [app]
+        type: [release, releaseA]
+      fail-fast: false
+    runs-on: ubuntu-latest
+    env:
+      product: ${{ matrix.product }}
+      type: ${{ matrix.type }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      VERSIONL: ${{ needs.prepare.outputs.versionL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Cache Gradle Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Prepare Assets
+        run: |
+          echo "清空 18PlusList.txt"
+          echo "" > $GITHUB_WORKSPACE/app/src/main/assets/18PlusList.txt
+
+      - name: Release APK Sign
+        run: |
+          echo "设置签名文件"
+          echo "${{ secrets.RELEASE_KEY_STORE }}" | base64 --decode > $GITHUB_WORKSPACE/app/legado.jks
+          {
+            echo "RELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}"
+            echo "RELEASE_STORE_PASSWORD=${{ secrets.RELEASE_STORE_PASSWORD }}"
+            echo "RELEASE_STORE_FILE=./legado.jks"
+            echo "RELEASE_KEY_ALIAS=legado"
+          } >> $GITHUB_WORKSPACE/gradle.properties
+
+      - name: Build With Gradle
+        run: |
+          echo "当前版本号: $VERSION"
+          sed -i "/def version/c\def version = \"$VERSION\"" "$GITHUB_WORKSPACE/app/build.gradle"
+
+          if [ "$type" == "release" ]; then
+            typeName="新包名"
+          else
+            typeName="新共存"
+            # 替换 releaseA 相关包名（防止冲突）
+            sed -i "s/'.release'/'.releaseA'/" "$GITHUB_WORKSPACE/app/build.gradle"
+            if [ -f "$GITHUB_WORKSPACE/app/google-services.json" ]; then
+              sed -i 's/.release/.releaseA/' "$GITHUB_WORKSPACE/app/google-services.json"
+            fi
+          fi
+
+          chmod +x gradlew
+          echo "开始构建: $product - $typeName"
+          ./gradlew :$product:assembleRelease --build-cache --parallel --daemon --warning-mode all
+
+          echo "处理APK文件"
+          mkdir -p ${{ github.workspace }}/apk/
+          for file in $(find ${{ github.workspace }}/app/build/outputs/apk -name "*.apk"); do
+            mv "$file" ${{ github.workspace }}/apk/legado_${{ env.product }}_${{ env.VERSIONL }}_$typeName.apk
+          done
+
+          echo "移动mapping文件"
+          mkdir -p ${{ github.workspace }}/mapping/
+          for file in $(find ${{ github.workspace }}/app/build/outputs/mapping -name "mapping.txt"); do
+            mv "$file" ${{ github.workspace }}/mapping/mapping.txt
+          done
+
+      - name: Move Missing Rules Files
+        run: |
+          echo "移动 missing_rules.txt"
+          mkdir -p ${{ github.workspace }}/mapping/
+          find ${{ github.workspace }}/app/build/outputs/mapping -name "missing_rules.txt" -exec mv {} ${{ github.workspace }}/mapping/missing_rules.txt \; || true
+
+      - name: Upload Missing Rules File
+        uses: actions/upload-artifact@v5
+        with:
+          name: legado.${{ env.product }}.${{ env.type }}.mapping.missing_rules
+          if-no-files-found: ignore
+          path: ${{ github.workspace }}/mapping/missing_rules.txt
+
+      - name: Check Build Result
+        run: |
+          if [ ! -d ${{ github.workspace }}/apk ]; then
+            echo "❌ 未生成APK，请检查Gradle日志"
+            exit 1
+          fi
+          if [ ! -e ${{ github.workspace }}/apk/legado_*.apk ]; then
+            echo "❌ 未找到APK文件，请检查构建输出"
+            exit 1
+          fi
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: legado.${{ env.product }}.${{ env.type }}
+          if-no-files-found: ignore
+          path: ${{ github.workspace }}/apk/*.apk
+
+      - name: Upload Mapping Artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: legado.${{ env.product }}.${{ env.type }}.mapping
+          if-no-files-found: ignore
+          path: ${{ github.workspace }}/mapping/mapping.txt
+
+  prerelease:
+    needs: [prepare, build]
+    if: github.event_name != 'pull_request' && github.repository == 'LegadoTeam/legado'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          path: apk/
+      - working-directory: apk/
+        run: |
+          mv */*.apk . || true
+          rm -rf */
+          for file in *.apk; do
+            if [[ "$file" == *新包名* ]]; then
+              mv "$file" "${file/新包名/release}"
+            else
+              mv "$file" "${file/新共存/releaseA}"
+            fi
+          done
+
+      - name: Delete Pre-Release
+        run: |
+          if gh release view beta &>/dev/null; then
+            gh release delete beta -y
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Create or update beta tag
+        uses: richardsimko/update-tag@v1
+        with:
+          tag_name: beta
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish Pre-Release
+        uses: ncipollo/release-action@v1
+        with:
+          name: legado_app_${{ env.VERSION }}
+          tag: "beta"
+          body: "此版本为测试版，签名与正式版不同，可能存在不稳定情况，升级前请务必备份好数据。"
+          prerelease: true
+          artifacts: ${{ github.workspace }}/apk/*.apk
+  CDN:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    env:
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          path: apk/
+      - working-directory: apk/
+        run: |
+          mv */*.apk . || true
+          rm -rf */
+          for file in *.apk; do
+            if [[ "$file" == *新包名* ]]; then
+              mv "$file" "${file/新包名/release}"
+            else
+              mv "$file" "${file/新共存/releaseA}"
+            fi
+          done
+      - name: Deploy apk to server
+        uses: easingthemes/ssh-deploy@main
+        continue-on-error: true
+        if: env.SSH_PRIVATE_KEY && ! contains(github.event.action, 'noser')
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          ARGS: "-avzr"
+          SOURCE: apk/
+          REMOTE_HOST: ${{ secrets.SERVER_HOST }}
+          REMOTE_PORT: ${{ secrets.SERVER_PORT }}
+          REMOTE_USER: ${{ secrets.SERVER_USERNAME }}
+          TARGET: "/www/wwwroot/cdn.mgz.la/app"
+
+  lanzou:
+    needs: [prepare, build]
+    if: ${{ github.event_name != 'pull_request' && needs.prepare.outputs.lanzou == 'yes' }}
+    runs-on: ubuntu-latest
+    env:
+      ylogin: ${{ secrets.LANZOU_ID }}
+      phpdisk_info: ${{ secrets.LANZOU_PSD }}
+      LANZOU_FOLDER_ID: ${{ secrets.LANZOU_FOLDER_ID }}
+      LANZOU_URL: ${{ secrets.LANZOU_URL }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          path: apk/
+      - working-directory: apk/
+        run: mv */*.apk . || true && rm -rf */
+      - name: Upload To Lanzou
+        continue-on-error: true
+        run: |
+          path="$GITHUB_WORKSPACE/apk/"
+          python3 $GITHUB_WORKSPACE/.github/scripts/lzy_web.py "$path" "$LANZOU_FOLDER_ID"
+          echo "[$(TZ=Asia/Shanghai date '+%Y.%m.%d %H:%M:%S')] 分享链接: $LANZOU_URL"
+  test_Branch:
+    needs: [ prepare, build ]
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' && github.actor == 'LegadoTeam' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          path: apk/
+      - working-directory: apk/
+        run: mv */*.apk . ;rm -rf */
+      - name: Push To "test" Branch
+        run: |
+          cd $GITHUB_WORKSPACE/apk/
+          git init
+          git checkout -b test
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/LegadoTeam/release"
+          git add *.apk
+          git commit -m "${{ needs.prepare.outputs.versionL }}"
+          git push -f -u origin test
+  telegram:
+    needs: [prepare, build]
+    if: ${{ github.event_name != 'pull_request' && needs.prepare.outputs.telegram == 'yes' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          path: apk/
+      - working-directory: apk/
+        run: |
+          for file in */*.apk; do
+            newName=$(echo "$file" | sed -e 's#.*\/##g' -e "s/_/ /g" -e 's/legado/阅读/')
+            mv "$file" "$newName"
+          done
+          rm -rf */
+      - name: Post to Telegram Channel
+        uses: xireiki/channel-post@v1
+        with:
+          chat_id: ${{ secrets.CHANNEL_ID }}
+          bot_token: ${{ secrets.BOT_TOKEN }}
+          context: "#阅读 #Legado #Beta #新包名 ${{ needs.prepare.outputs.versionL }}"
+          path: apk/*
+          method: sendFile
