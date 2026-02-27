@@ -119,7 +119,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     private var isFullscreen = false
     private var wasScreenOff = false
     private var customWebViewCallback: WebChromeClient.CustomViewCallback? = null
-    private var isInterfaceInjected = false
+    private var interfaceInjected: String? = null
     private var needClearHistory = true
     private val selectImageDir = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
@@ -131,7 +131,6 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
 
     private val refreshNameList: MutableList<String> by lazy { mutableListOf() }
     private fun refresh() {
-        isInterfaceInjected = false
         if (viewModel.rssSource?.singleUrl == true) {
             currentWebView.reload()
             return
@@ -140,11 +139,9 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             refreshNameList.add(it)
         }
         viewModel.rssArticle?.let {
-            start(this@ReadRssActivity, it.title, it.link, it.origin)
+            start(this@ReadRssActivity,true, it.origin, it.title, it.link)
         } ?: run {
-            viewModel.initData(intent) {
-                currentWebView.settings.cacheMode = if (viewModel.cacheFirst) WebSettings.LOAD_CACHE_ELSE_NETWORK else WebSettings.LOAD_DEFAULT
-            }
+            viewModel.initData(intent)
         }
     }
     private val editSourceResult = registerForActivityResult(
@@ -161,13 +158,11 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
         binding.webViewContainer.addView(currentWebView)
         viewModel.upStarMenuData.observe(this) { upStarMenu() }
         viewModel.upTtsMenuData.observe(this) { upTtsMenu(it) }
-        binding.titleBar.title = intent.getStringExtra("title")
+        viewModel.upTitleData.observe(this) { binding.titleBar.title = it }
         initView()
         initWebView()
         initLiveData()
-        viewModel.initData(intent) {
-            currentWebView.settings.cacheMode = if (viewModel.cacheFirst) WebSettings.LOAD_CACHE_ELSE_NETWORK else WebSettings.LOAD_DEFAULT
-        }
+        viewModel.initData(intent)
         currentWebView.clearHistory()
         onBackPressedDispatcher.addCallback(this) {
             if (binding.customWebView.size > 0) { //关闭全屏
@@ -221,9 +216,9 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     }
 
     override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
         binding.progressBar.visible()
         binding.progressBar.setDurProgress(30)
-        super.onNewIntent(intent)
         setIntent(intent)
         viewModel.initData(intent)
     }
@@ -388,49 +383,28 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     private fun initLiveData() {
         viewModel.contentLiveData.observe(this) { content ->
             viewModel.rssArticle?.let {
-                upJavaScriptEnable()
+                upWebviewSettings()
                 initJavascriptInterface()
                 val rssSource = viewModel.rssSource
-                val url = NetworkUtils.getAbsoluteURL(it.origin, it.link).substringBefore("@js")
                 val html = viewModel.clHtml(content, rssSource?.style)
-                currentWebView.settings.userAgentString =
-                    viewModel.headerMap[AppConst.UA_NAME] ?: AppConfig.userAgent
-                if (rssSource?.loadWithBaseUrl == true) {
-                    currentWebView.loadDataWithBaseURL(
-                        url,
-                        html,
-                        "text/html",
-                        "utf-8",
-                        url
-                    )//不想用baseUrl进else
-                } else {
-                    currentWebView.loadDataWithBaseURL(
-                        null,
-                        html,
-                        "text/html;charset=utf-8",
-                        "utf-8",
-                        url
-                    )
-                }
+                val url = NetworkUtils.getAbsoluteURL(it.origin, it.link).substringBefore("@js")
+                val baseUrl = if (rssSource?.loadWithBaseUrl == false) null else url
+                currentWebView.loadDataWithBaseURL(
+                    baseUrl, html, "text/html", "utf-8", url
+                )
             }
         }
         viewModel.urlLiveData.observe(this) { urlState ->
-            with(currentWebView) {
-                upJavaScriptEnable()
-                initJavascriptInterface()
-                CookieManager.applyToWebView(urlState.url)
-                settings.userAgentString = urlState.getUserAgent()
-                loadUrl(urlState.url, urlState.headerMap)
-            }
+            upWebviewSettings(urlState.getUserAgent())
+            initJavascriptInterface()
+            CookieManager.applyToWebView(urlState.url)
+            currentWebView.loadUrl(urlState.url, urlState.headerMap)
         }
         viewModel.htmlLiveData.observe(this) { html ->
             viewModel.rssSource?.let {
-                upJavaScriptEnable()
+                upWebviewSettings()
                 initJavascriptInterface()
-                currentWebView.settings.userAgentString =
-                    viewModel.headerMap[AppConst.UA_NAME] ?: AppConfig.userAgent
-                val baseUrl =
-                    if (it.loadWithBaseUrl) it.sourceUrl else null
+                val baseUrl = if (it.loadWithBaseUrl) it.sourceUrl else null
                 currentWebView.loadDataWithBaseURL(
                     baseUrl, html, "text/html", "utf-8", it.sourceUrl
                 )
@@ -439,17 +413,21 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private fun upJavaScriptEnable() {
-        if (viewModel.rssSource?.enableJs == false) {
-            currentWebView.settings.javaScriptEnabled = false
+    private fun upWebviewSettings(userAgent: String? = null) {
+        viewModel.rssSource?.let { s ->
+            currentWebView.settings.run {
+                userAgentString = userAgent ?: viewModel.headerMap[AppConst.UA_NAME] ?: AppConfig.userAgent
+                javaScriptEnabled = s.enableJs
+                cacheMode = if (s.cacheFirst) WebSettings.LOAD_CACHE_ELSE_NETWORK else WebSettings.LOAD_DEFAULT
+            }
         }
     }
 
     private fun initJavascriptInterface() {
-        if (!isInterfaceInjected) {
-            isInterfaceInjected = true
-            if (!viewModel.hasPreloadJs) return
-            viewModel.rssSource?.let {
+        viewModel.rssSource?.let {
+            if (interfaceInjected != it.sourceUrl) {
+                interfaceInjected = it.sourceUrl
+                if (!viewModel.hasPreloadJs) return
                 val webJsExtensions = WebJsExtensions(it, this, currentWebView)
                 currentWebView.addJavascriptInterface(webJsExtensions, nameJava)
                 currentWebView.addJavascriptInterface(it, nameSource)
@@ -619,9 +597,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             return shouldOverrideUrlLoading(url.toUri())
         }
 
-        private var jsInjected = false
         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-            jsInjected = false
             if (needClearHistory) {
                 needClearHistory = false
                 currentWebView.clearHistory() //清除历史
@@ -630,6 +606,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             currentWebView.evaluateJavascript(basicJs, null)
         }
 
+        private var jsInjected = false
         /**
          * 如果有黑名单,黑名单匹配返回空白,
          * 没有黑名单再判断白名单,在白名单中的才通过,
@@ -642,6 +619,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             val source = viewModel.rssSource ?: return super.shouldInterceptRequest(view, request)
             if (request.isForMainFrame) {
                 if (viewModel.hasPreloadJs) {
+                    jsInjected = false
                     if (url.startsWith("data:text/html;") || request.method == "POST") {
                         return super.shouldInterceptRequest(view, request)
                     }
@@ -743,7 +721,7 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                     && !url.contains(title)) {
                     binding.titleBar.title = title
                 } else {
-                    binding.titleBar.title = intent.getStringExtra("title")
+                    binding.titleBar.title = viewModel.upTitleData.value
                 }
             }
             viewModel.rssSource?.injectJs?.let {
@@ -809,13 +787,31 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     }
 
     companion object {
-        fun start(context: Context, title: String?, url: String, origin: String) {
+        fun start(context: Context, singleTop: Boolean, origin: String, title: String? = null, url: String? = null, startHtml: String? = null) {
             context.startActivity<ReadRssActivity> {
-                putExtra("title", title ?: "")
                 putExtra("origin", origin)
+                putExtra("title", title)
                 putExtra("openUrl", url)
+                putExtra("startHtml", startHtml)
+                if (singleTop) {
+                    addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                }
             }
         }
+
+        /**
+         * 知晓rssArticle的打开
+         */
+        fun start(context: Context, origin: String, title: String?, link: String, sort: String) {
+            context.startActivity<ReadRssActivity> {
+                putExtra("origin", origin)
+                putExtra("title", title)
+                putExtra("link", link)
+                putExtra("sort", sort)
+                addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP) //栈顶复用
+            }
+        }
+
         private val webCookieManager by lazy { android.webkit.CookieManager.getInstance() }
     }
 

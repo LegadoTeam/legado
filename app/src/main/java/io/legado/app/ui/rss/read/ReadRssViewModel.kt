@@ -41,18 +41,19 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
     var rssStar: RssStar? = null
     val upTtsMenuData = MutableLiveData<Boolean>()
     val upStarMenuData = MutableLiveData<Boolean>()
+    val upTitleData = MutableLiveData<String>()
     var headerMap: Map<String, String> = emptyMap()
     var origin: String? = null
-    var cacheFirst = false
     var hasPreloadJs = false
 
     fun initData(intent: Intent, success: (() -> Unit)? = null) {
         execute {
             val origin = intent.getStringExtra("origin") ?: return@execute
             this@ReadRssViewModel.origin = origin
+            val title = intent.getStringExtra("title") ?: rssSource!!.sourceName
+            upTitleData.postValue(title)
             val link = intent.getStringExtra("link")
-            rssSource = appDb.rssSourceDao.getByKey(origin)?.also{
-                cacheFirst = it.cacheFirst
+            rssSource = appDb.rssSourceDao.getByKey(origin)?.also {
                 hasPreloadJs = !it.preloadJs.isNullOrBlank()
             }
             headerMap = runScriptWithContext {
@@ -87,12 +88,9 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
                 val openUrl = intent.getStringExtra("openUrl")
                 if (startHtml != null) {
                     loadStartHtml(startHtml)
-                } else if (ruleContent.isNullOrBlank()) {
-                    loadUrl(openUrl ?: origin, origin)
-                } else if (rssSource!!.singleUrl) {
-                    loadUrl(origin, origin)
+                } else if (ruleContent.isNullOrBlank() || rssSource!!.singleUrl) {
+                    loadUrl(openUrl, origin)
                 } else if (openUrl != null) {
-                    val title = intent.getStringExtra("title") ?: rssSource!!.sourceName
                     val rssArticle = appDb.rssArticleDao.getByLink(origin, openUrl) ?: RssArticle(
                         origin, title, title, link = openUrl)
                     loadContent(rssArticle, ruleContent)
@@ -105,9 +103,9 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
-    private suspend fun loadUrl(url: String, baseUrl: String) {
+    private suspend fun loadUrl(url: String?, baseUrl: String) {
         val analyzeUrl = AnalyzeUrl(
-            mUrl = url,
+            mUrl = url ?: baseUrl,
             baseUrl = baseUrl,
             source = rssSource,
             coroutineContext = currentCoroutineContext(),
@@ -256,11 +254,7 @@ class ReadRssViewModel(application: Application) : BaseViewModel(application) {
     }
 
     private fun loadStartHtml(startHtml: String) {
-        val source = rssSource
-        if (source == null) {
-            htmlLiveData.postValue("<body>rssSource is null</body>")
-            return
-        }
+        val source = rssSource ?: return
         execute {
             val javascript = rssSource?.startJs
             var processedHtml = if (!javascript.isNullOrBlank()) {
