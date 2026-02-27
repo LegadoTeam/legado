@@ -168,7 +168,7 @@ class RssArticlesFragment() : VMBaseFragment<RssArticlesViewModel>(R.layout.frag
                 .catch {
                     AppLog.put("订阅文章界面获取数据失败\n${it.localizedMessage}", it)
                 }.flowOn(IO).collect { newList ->
-                    if (fullRefresh || newList.isEmpty()) {
+                    if (fullRefresh || newList.isEmpty() || adapter.getActualItemCount() < 1) {
                         adapter.setItems(newList)
                     } else {
                         //用DiffUtil只对差异数据进行更新
@@ -231,7 +231,7 @@ class RssArticlesFragment() : VMBaseFragment<RssArticlesViewModel>(R.layout.frag
     }
 
     override fun readRss(rssArticle: RssArticle) {
-        fullRefresh = false //activityViewModel.read会触发数据库更新,此时进行差异化更新
+        fullRefresh = false //read会触发数据库更新,此时进行差异化更新
         ReadRss.readRss(this, rssArticle, activityViewModel.rssSource)
     }
 }

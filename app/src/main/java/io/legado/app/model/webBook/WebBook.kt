@@ -50,7 +50,7 @@ object WebBook {
         bookSource: BookSource,
         key: String,
         page: Int? = 1,
-        filter: ((name: String, author: String) -> Boolean)? = null,
+        filter: ((name: String, author: String, kind: String?) -> Boolean)? = null,
         shouldBreak: ((size: Int) -> Boolean)? = null
     ): ArrayList<SearchBook> {
         val searchUrl = bookSource.searchUrl
@@ -414,7 +414,10 @@ object WebBook {
             )
             val checkJs = bookSource.loginCheckJs
             val res = kotlin.runCatching {
-                analyzeUrl.getStrResponseAwait().let {
+                analyzeUrl.getStrResponseAwait(
+                    jsStr = contentRule.webJs,
+                    sourceRegex = contentRule.sourceRegex
+                ).let {
                     if (!checkJs.isNullOrBlank()) { //检测书源是否已登录
                         analyzeUrl.evalJS(checkJs, it) as StrResponse
                     } else {
@@ -483,7 +486,7 @@ object WebBook {
             currentCoroutineContext().ensureActive()
             searchBookAwait(
                 bookSource, name,
-                filter = { fName, fAuthor -> fName == name && fAuthor == author },
+                filter = { fName, fAuthor, _ -> fName == name && fAuthor == author },
                 shouldBreak = { it > 0 }
             ).firstOrNull()?.let { searchBook ->
                 currentCoroutineContext().ensureActive()

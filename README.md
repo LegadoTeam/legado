@@ -97,6 +97,8 @@ https://gedoor.github.io/Disclaimer
 > * io.noties.markwon:image-glide
 > * com.hankcs:hanlp
 > * com.positiondev.epublib:epublib-core
+> * com.github.Moriafly:LyricViewX
+> * io.github.rosemoe:editor
 <a href="#readme">
     <img src="https://img.shields.io/badge/-返回顶部-orange.svg" alt="#" align="right">
 </a>
