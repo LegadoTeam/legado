@@ -96,6 +96,7 @@ object ReadBook : CoroutineScope by MainScope() {
     val executor = globalExecutor
 
     fun resetData(book: Book) {
+        releaseAndCancel()
         ReadBook.book = book
         readRecord.bookName = book.name
         readRecord.readTime = appDb.readRecordDao.getReadTime(book.name) ?: 0
@@ -125,6 +126,7 @@ object ReadBook : CoroutineScope by MainScope() {
     }
 
     fun upData(book: Book) {
+        releaseAndCancel()
         ReadBook.book = book
         chapterSize = appDb.bookChapterDao.getChapterCount(book.bookUrl)
         simulatedChapterSize = if (book.readSimulating()) {
@@ -164,7 +166,6 @@ object ReadBook : CoroutineScope by MainScope() {
         } else {
             appDb.bookSourceDao.getBookSource(book.origin)?.let {
                 bookSource = it
-                SourceCallBack.callBackBook(SourceCallBack.START_READ, it, book, curTextChapter?.chapter)
                 if (book.getImageStyle().isNullOrBlank()) {
                     var imageStyle = it.getContentRule().imageStyle
                     if (imageStyle.isNullOrBlank() && (book.isImage || book.isPdf)) {
@@ -541,9 +542,11 @@ object ReadBook : CoroutineScope by MainScope() {
         loadContent(durChapterIndex - 1, resetPageOffset = resetPageOffset)
     }
 
-    fun loadOrUpContent() {
+    fun loadOrUpContent(success: (() -> Unit)? = null) {
         if (curTextChapter == null) {
-            loadContent(durChapterIndex)
+            loadContent(durChapterIndex) {
+                success?.invoke()
+            }
         } else {
             callBack?.upContent()
         }
@@ -705,7 +708,8 @@ object ReadBook : CoroutineScope by MainScope() {
             val contentProcessor = ContentProcessor.get(book.name, book.origin)
             val displayTitle = chapter.getDisplayTitle(
                 contentProcessor.getTitleReplaceRules(),
-                book.getUseReplaceRule()
+                book.getUseReplaceRule(),
+                replaceBook = book.toReplaceBook()
             )
             val contents = contentProcessor
                 .getContent(book, chapter, content, includeTitle = false)
@@ -793,7 +797,8 @@ object ReadBook : CoroutineScope by MainScope() {
             val contentProcessor = ContentProcessor.get(book.name, book.origin)
             val displayTitle = chapter.getDisplayTitle(
                 contentProcessor.getTitleReplaceRules(),
-                book.getUseReplaceRule()
+                book.getUseReplaceRule(),
+                replaceBook = book.toReplaceBook()
             )
             val contents = contentProcessor
                 .getContent(book, chapter, content, includeTitle = false)
@@ -859,22 +864,30 @@ object ReadBook : CoroutineScope by MainScope() {
         }
     }
 
+    /**
+     * 预下载时，章节已完，更新目录
+     */
     @Synchronized
     fun upToc() {
         val bookSource = bookSource ?: return
         val book = book ?: return
         if (!book.canUpdate) return
+        if (chapterSize - durChapterIndex - 1 >= 3) return
         if (System.currentTimeMillis() - book.lastCheckTime < 600000) return
         book.lastCheckTime = System.currentTimeMillis()
+        val oldBook = book.copy()
         WebBook.getChapterList(this, bookSource, book).onSuccess(IO) { cList ->
-            if (book.bookUrl == ReadBook.book?.bookUrl
-                && cList.size > chapterSize
-            ) {
-                appDb.bookChapterDao.delByBook(book.bookUrl)
+            ensureActive()
+            if (cList.size > chapterSize) {
+                if (oldBook.bookUrl == book.bookUrl) {
+                    appDb.bookDao.update(book)
+                } else {
+                    appDb.bookDao.replace(oldBook, book)
+                    BookHelp.updateCacheFolder(oldBook, book)
+                }
+                appDb.bookChapterDao.delByBook(oldBook.bookUrl)
                 appDb.bookChapterDao.insert(*cList.toTypedArray())
-                saveRead()
-                chapterSize = cList.size
-                simulatedChapterSize = book.simulatedTotalChapterNum()
+                onChapterListUpdated(book, false)
                 nextTextChapter ?: loadContent(durChapterIndex + 1)
             }
         }
@@ -905,7 +918,8 @@ object ReadBook : CoroutineScope by MainScope() {
                     appDb.bookChapterDao.getChapter(book.bookUrl, durChapterIndex)?.let {
                         book.durChapterTitle = it.getDisplayTitle(
                             ContentProcessor.get(book.name, book.origin).getTitleReplaceRules(),
-                            book.getUseReplaceRule()
+                            book.getUseReplaceRule(),
+                            replaceBook = book.toReplaceBook()
                         )
                         SourceCallBack.callBackBook(SourceCallBack.SAVE_READ, bookSource, book, it)
                     }
@@ -924,6 +938,7 @@ object ReadBook : CoroutineScope by MainScope() {
         if (book?.isLocal == true) return
         executor.execute {
             if (AppConfig.preDownloadNum < 2) {
+                upToc()
                 return@execute
             }
             preDownloadTask?.cancel()
@@ -957,7 +972,7 @@ object ReadBook : CoroutineScope by MainScope() {
         }
     }
 
-    fun onChapterListUpdated(newBook: Book) {
+    fun onChapterListUpdated(newBook: Book, loadContent: Boolean = true) {
         if (newBook.isSameNameAuthor(book)) {
             book = newBook
             chapterSize = newBook.totalChapterNum
@@ -965,9 +980,10 @@ object ReadBook : CoroutineScope by MainScope() {
             if (simulatedChapterSize > 0 && durChapterIndex > simulatedChapterSize - 1) {
                 durChapterIndex = simulatedChapterSize - 1
             }
+            callBack?.upMenuView()
             if (callBack == null) {
                 clearTextChapter()
-            } else {
+            } else if (loadContent) {
                 loadContent(true)
             }
         }
@@ -999,6 +1015,10 @@ object ReadBook : CoroutineScope by MainScope() {
         if (callBack === cb) {
             callBack = null
         }
+        releaseAndCancel()
+    }
+
+    private fun releaseAndCancel() {
         msg = null
         preDownloadTask?.cancel()
         downloadScope.coroutineContext.cancelChildren()

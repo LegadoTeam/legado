@@ -127,8 +127,7 @@ class HttpTtsEditDialog() : BaseDialogFragment(R.layout.dialog_http_tts_edit, tr
                 putExtra("cursorPosition", view.selectionStart)
             }
             textEditLauncher.launch(intent)
-        }
-        else {
+        } else {
             toastOnUi(R.string.please_focus_cursor_on_textbox)
         }
     }

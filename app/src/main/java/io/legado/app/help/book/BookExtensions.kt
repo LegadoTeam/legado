@@ -246,7 +246,11 @@ fun Book.sync(oldBook: Book) {
         durChapterIndex = curBook.durChapterIndex
         val replaceRules = ContentProcessor.get(this).getTitleReplaceRules()
         appDb.bookChapterDao.getChapter(bookUrl, durChapterIndex)?.let {
-            durChapterTitle = it.getDisplayTitle(replaceRules, getUseReplaceRule())
+            durChapterTitle = it.getDisplayTitle(
+                replaceRules,
+                getUseReplaceRule(),
+                replaceBook = toReplaceBook()
+            )
         }
     }
     canUpdate = curBook.canUpdate

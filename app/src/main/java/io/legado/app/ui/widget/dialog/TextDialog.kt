@@ -10,6 +10,7 @@ import com.bumptech.glide.Glide
 import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.databinding.DialogTextViewBinding
+import io.legado.app.help.CacheManager
 import io.legado.app.help.IntentData
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.code.CodeEditActivity
@@ -101,10 +102,11 @@ class TextDialog() : BaseDialogFragment(R.layout.dialog_text_view) {
                 when (menu.itemId) {
                     R.id.menu_close -> dismissAllowingStateLoss()
                     R.id.menu_fullscreen_edit -> {
+                        val cacheKey = "code_text_${System.currentTimeMillis()}"
+                        CacheManager.putMemory(cacheKey, content)
                         startActivity<CodeEditActivity> {
-                            putExtra("text", content)
+                            putExtra("cacheKey", cacheKey)
                             putExtra("title", title)
-                            putExtra("writable", false)
                             putExtra("languageName", if (mode == Mode.MD.name) "text.html.markdown" else "text.html.basic")
                         }
                     }

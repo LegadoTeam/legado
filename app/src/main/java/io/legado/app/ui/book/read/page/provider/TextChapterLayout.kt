@@ -47,10 +47,10 @@ import io.legado.app.constant.AppPattern.noWordCountRegex
 import io.legado.app.data.appDb
 import io.legado.app.ui.book.read.page.entities.TextLine.Companion.atLeastApi28
 import io.legado.app.ui.book.read.page.entities.column.TextHtmlColumn
-import io.legado.app.ui.book.read.page.provider.ChapterProvider.reviewChar
+import io.legado.app.ui.book.read.page.provider.ChapterProvider.reviewStr
+import io.legado.app.ui.book.read.page.provider.ChapterProvider.srcReplaceStr
 import io.legado.app.ui.book.read.page.provider.ChapterProvider.srcReplaceChar
-import io.legado.app.ui.book.read.page.provider.ChapterProvider.srcReplaceCharC
-import io.legado.app.ui.book.read.page.provider.ChapterProvider.srcReplaceCharD
+import io.legado.app.ui.book.read.page.provider.ChapterProvider.srcReplacementChar
 import io.legado.app.utils.StringUtils
 import androidx.core.text.parseAsHtml
 import androidx.core.util.component1
@@ -58,6 +58,7 @@ import androidx.core.util.component2
 import io.legado.app.model.analyzeRule.AnalyzeUrl.Companion.paramPattern
 import io.legado.app.ui.book.read.page.entities.column.BaseColumn
 import io.legado.app.ui.book.read.page.entities.column.TextBaseColumn
+import io.legado.app.ui.book.read.page.provider.ChapterProvider.reviewChar
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 
@@ -80,6 +81,7 @@ class TextChapterLayout(
     private val titlePaintFontMetrics = ChapterProvider.titlePaintFontMetrics
 
     private val contentPaint = ChapterProvider.contentPaint
+    private val reviewCharWidth by lazy { contentPaint.measureText(srcReplaceStr) * 1.5556f }
     private val contentPaintTextHeight = ChapterProvider.contentPaintTextHeight
     private val contentPaintFontMetrics = ChapterProvider.contentPaintFontMetrics
 
@@ -345,7 +347,7 @@ class TextChapterLayout(
                     return@forEach
                 }
             }
-            var text = content.replace(srcReplaceCharC, srcReplaceCharD)
+            var text = content.replace(srcReplaceChar, srcReplacementChar)
             if (isTextImageStyle) {
                 //图片样式为文字嵌入类型
                 val srcList = LinkedList<String>()
@@ -354,7 +356,7 @@ class TextChapterLayout(
                 while (matcher.find()) {
                     matcher.group(1)?.let { src ->
                         srcList.add(src)
-                        matcher.appendReplacement(sb, srcReplaceChar)
+                        matcher.appendReplacement(sb, srcReplaceStr)
                     }
                 }
                 matcher.appendTail(sb)
@@ -424,7 +426,7 @@ class TextChapterLayout(
                             }
                         }
                         if (start < matcher.start()) {
-                            sb.append(text.substring(start, matcher.start()))
+                            sb.append(text.subSequence(start, matcher.start()))
                         }
                         when (iStyle) {
                             "TEXT" -> {
@@ -474,7 +476,7 @@ class TextChapterLayout(
                         isSetTypedImage = false
                         prepareNextPageIfNeed()
                     }
-                    val textAfter = content.substring(start, content.length)
+                    val textAfter = content.subSequence(start, content.length)
                     sb.append(textAfter)
                 }
                 text = sb.toString()
@@ -482,7 +484,7 @@ class TextChapterLayout(
                     wordCount += text.replace(noWordCountRegex,"").length
                     setTypeText(
                         book,
-                        if (AppConfig.enableReview) text + reviewChar else text,
+                        text,
                         contentPaint,
                         contentPaintTextHeight,
                         contentPaintFontMetrics,
@@ -900,7 +902,7 @@ class TextChapterLayout(
         clickList: LinkedList<String?>?
     ) {
         val widthsArray = allocateFloatArray(text.length)
-        textPaint.getTextWidthsCompat(text, widthsArray)
+        textPaint.getTextWidthsCompat(text, widthsArray, reviewCharWidth)
         val layout = if (useZhLayout) {
             val (words, widths) = measureTextSplit(text, widthsArray)
             val indentSize = if (isFirstLine) paragraphIndent.length else 0
@@ -1194,7 +1196,7 @@ class TextChapterLayout(
         clickList: LinkedList<String?>?
     ) {
         val column = when {
-            !srcList.isNullOrEmpty() && (char == srcReplaceChar || char == reviewChar) -> {
+            !srcList.isNullOrEmpty() && (char == srcReplaceStr || char == reviewStr) -> {
                 val src = srcList.removeFirst()
                 val click = clickList?.removeFirst()
                 ImageProvider.cacheImage(book, src, ReadBook.bookSource)

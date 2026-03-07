@@ -11,8 +11,6 @@ import io.github.rosemoe.sora.langs.textmate.registry.provider.AssetsFileResolve
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppLog
-import io.legado.app.constant.AppPattern.JS_PATTERN
-import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.CacheManager
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.BackstageWebView
@@ -55,8 +53,14 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
         intent: Intent, success: () -> Unit
     ) {
         execute {
-            initialText =
-                intent.getStringExtra("text") ?: throw NoStackTraceException("未获取到待编辑文本")
+            val cacheKey = intent.getStringExtra("cacheKey")
+            if (cacheKey != null) {
+                val cacheText = CacheManager.getFromMemory(cacheKey) as? String ?: throw Exception("未获取到查看文本")
+                writable = false
+                initialText = cacheText
+            } else {
+                initialText = intent.getStringExtra("text") ?: throw Exception("未获取到待编辑文本")
+            }
             if (isHtmlStr(initialText)) {
                 languageName = "text.html.basic"
             } else {
@@ -64,7 +68,6 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
             }
             language = TextMateLanguage.create(languageName, AppConfig.editAutoComplete)
             cursorPosition = intent.getIntExtra("cursorPosition", 0)
-            writable = intent.getBooleanExtra("writable", true)
             title = intent.getStringExtra("title")
         }.onSuccess {
             success.invoke()

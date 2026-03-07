@@ -2,6 +2,7 @@ package io.legado.app.utils
 
 import android.os.Build
 import android.text.TextPaint
+import io.legado.app.ui.book.read.page.provider.ChapterProvider.reviewChar
 
 val TextPaint.textHeight: Float
     get() = fontMetrics.run { descent - ascent + leading }
@@ -16,8 +17,9 @@ val TextPaint.textHeight: Float
  * @param text 要测量的文本
  * @param widths 存储每个字符宽度的数组，长度与文本长度一致
  */
-fun TextPaint.getTextWidthsCompat(text: String, widths: FloatArray) {
+fun TextPaint.getTextWidthsCompat(text: String, widths: FloatArray, reviewCharWidth: Float) {
     getTextWidths(text, widths)
+    val lastReview = text.lastOrNull() == reviewChar
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
         val letterSpacing = letterSpacing * textSize
         val letterSpacingHalf = letterSpacing * 0.5f
@@ -27,11 +29,17 @@ fun TextPaint.getTextWidthsCompat(text: String, widths: FloatArray) {
                 break
             }
         }
+        if (lastReview) {
+            widths[text.lastIndex] += letterSpacing
+            return
+        }
         for (i in text.lastIndex downTo 0) {
             if (widths[i] > 0) {
                 widths[i] += letterSpacingHalf
                 break
             }
         }
+    } else if (lastReview) {
+        widths[text.lastIndex] = reviewCharWidth
     }
 }

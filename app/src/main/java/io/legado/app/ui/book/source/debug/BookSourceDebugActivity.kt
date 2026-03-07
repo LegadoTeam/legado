@@ -121,6 +121,7 @@ class BookSourceDebugActivity : VMBaseActivity<ActivitySourceDebugBinding, BookS
         initExploreKinds()
     }
 
+    @SuppressLint("SetTextI18n")
     private fun initExploreKinds() {
         lifecycleScope.launch {
             val exploreKinds = viewModel.bookSource?.exploreKinds()?.filter {

@@ -524,6 +524,7 @@ class ExportBookService : BaseService() {
         //正文
         val useReplace = AppConfig.exportUseReplace && book.getUseReplaceRule()
         val contentProcessor = ContentProcessor.get(book.name, book.origin)
+        val replaceBook = book.toReplaceBook()
         val threads = if (AppConfig.parallelExportBook) {
             AppConst.MAX_THREAD
         } else {
@@ -558,7 +559,8 @@ class ExportBookService : BaseService() {
                 isVip = false
                 getDisplayTitle(
                     contentProcessor.getTitleReplaceRules(),
-                    useReplace = useReplace
+                    useReplace = useReplace,
+                    replaceBook = replaceBook
                 )
             }
             val chapterResource = ResourceUtil.createChapterResource(
@@ -710,6 +712,7 @@ class ExportBookService : BaseService() {
             //正文
             val useReplace = AppConfig.exportUseReplace && book.getUseReplaceRule()
             val contentProcessor = ContentProcessor.get(book.name, book.origin)
+            val replaceBook = book.toReplaceBook()
             var chapterList: MutableList<BookChapter> = ArrayList()
             appDb.bookChapterDao.getChapterList(book.bookUrl).forEachIndexed { index, chapter ->
                 if (scope.contains(index)) {
@@ -752,7 +755,8 @@ class ExportBookService : BaseService() {
                         isVip = false
                         getDisplayTitle(
                             contentProcessor.getTitleReplaceRules(),
-                            useReplace = useReplace
+                            useReplace = useReplace,
+                            replaceBook = replaceBook
                         )
                     }
                     epubBook.addSection(

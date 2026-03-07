@@ -1,5 +1,5 @@
 # js变量和函数
-> 阅读使用[Rhino v1.8.0](https://github.com/mozilla/rhino) 作为JavaScript引擎以便于[调用Java类和方法](https://m.jb51.net/article/92138.htm)，查看[ECMAScript兼容性表格](https://mozilla.github.io/rhino/compat/engines.html)　
+> 阅读使用[Rhino v1.8.1](https://github.com/mozilla/rhino) 作为JavaScript引擎以便于[调用Java类和方法](https://m.jb51.net/article/92138.htm)，查看[ECMAScript兼容性表格](https://mozilla.github.io/rhino/compat/engines.html)　
 
 > [Rhino运行时](https://github.com/mozilla/rhino/blob/master/rhino/src/main/java/org/mozilla/javascript/ScriptRuntime.java)懒加载导入的Java类和方法
 
@@ -36,6 +36,7 @@
 |isFromBookInfo|是否为详情页刷新|
 
 ## 当前类对象的可使用的部分方法
+函数带有默认值的函数会自动重载，可以不填。  
 
 ### [RssJsExtensions](https://github.com/LegadoTeam/legado/blob/main/app/src/main/java/io/legado/app/ui/rss/read/RssJsExtensions.kt)独有函数
 > 在订阅源`shouldOverrideUrlLoading`规则中使用  
@@ -48,8 +49,7 @@
 * @param key 搜索关键词
 * @param searchScope 搜索作用域
 //searchScope作用域,单个源为`源名称::源地址`的形式；分组为源分组名称和`,`符号隔开的形式
-java.searchBook(key: String)
-java.searchBook(key: String, searchScope: String)
+java.searchBook(key: String, searchScope: String? = null)
 ```
 
 * 添加书架  
@@ -73,7 +73,7 @@ java.showPhoto(src: String)
 ```
 
 ### [SourceLoginJsExtensions](https://github.com/LegadoTeam/legado/blob/main/app/src/main/java/io/legado/app/ui/login/SourceLoginJsExtensions.kt)独有函数
-> 只在`登录界面按钮`被触发、`界面按钮的回调`事件、`发现按钮`函数、`图片链接click键`中有效
+> 只在`登录界面按钮`被触发、`界面按钮的回调`事件、`发现按钮`函数、`图片链接click键`、`购买规则`中有效
 ```js
 //用内置浏览器打开本地html
 * @param url 指定网页的基础URL，解决本地网页跨越问题
@@ -151,8 +151,7 @@ java.put(key, value)
 
 * 链接解析[JsURL](https://github.com/LegadoTeam/legado/blob/master/app/src/main/java/io/legado/app/utils/JsURL.kt)　
 ```js
-java.toURL(url): JsURL
-java.toURL(url, baseUrl): JsURL
+java.toURL(url: String, baseUrl: String? = null): JsURL
 ```
 * 获取SystemWebView User-Agent
 ```js
@@ -160,7 +159,6 @@ java.getWebViewUA(): String
 ```
 * 网络请求
 ```js
-//带有默认值的参数可不填
 
 java.ajax(urlStr, callTimeout: Int? = null): String
 
@@ -262,8 +260,7 @@ java.get*ByteArrayContent(url: String, path: String): ByteArray?
 ```
 * URI编码
 ```js
-java.encodeURI(str: String) //默认enc="UTF-8"
-java.encodeURI(str: String, enc: String)
+java.encodeURI(str: String, enc: String = "UTF-8")
 ```
 * base64
 > flags参数可省略，默认Base64.NO_WRAP，查看[flags参数说明](https://blog.csdn.net/zcmain/article/details/97051870)　
@@ -365,17 +362,12 @@ java.createAsymmetricCrypto(transformation)
 > 解密加密参数 data支持ByteArray|Base64String|HexString|InputStream  
 ```js
 //解密为ByteArray String
-cipher.decrypt(data,  usePublicKey: Boolean? = true
-)
-cipher.decryptStr(data, usePublicKey: Boolean? = true
-)
+cipher.decrypt(data,  usePublicKey: Boolean? = true)
+cipher.decryptStr(data, usePublicKey: Boolean? = true)
 //加密为ByteArray Base64字符 HEX字符
-cipher.encrypt(data,  usePublicKey: Boolean? = true
-)
-cipher.encryptBase64(data,  usePublicKey: Boolean? = true
-)
-cipher.encryptHex(data,  usePublicKey: Boolean? = true
-)
+cipher.encrypt(data,  usePublicKey: Boolean? = true)
+cipher.encryptBase64(data,  usePublicKey: Boolean? = true)
+cipher.encryptHex(data,  usePublicKey: Boolean? = true)
 ```
 * 签名
 > 输入参数 key 支持ByteArray|**Utf8String**
@@ -400,8 +392,8 @@ java.digestBase64Str(data: String, algorithm: String,): String?
 ```
 * md5
 ```js
-java.md5Encode(str)
-java.md5Encode16(str)
+java.md5Encode(str: String)
+java.md5Encode16(str: String)
 ```
 * HMac
 ```js
@@ -526,29 +518,27 @@ source.refreshJSLib()
 ## cookie对象的部分可用函数
 ```js
 获取全部cookie
-cookie.getCookie(url)
+cookie.getCookie(url: String)
 获取cookie某一键值
-cookie.getKey(url,key)
+cookie.getKey(url: String, key: String)
 设置cookie
-cookie.setCookie(url,cookie)
+cookie.setCookie(url: String, cookie: String)
 替换cookie
-cookie.replaceCookie(url,cookie)
+cookie.replaceCookie(url: String, cookie: String)
 删除cookie
-cookie.removeCookie(url)
+cookie.removeCookie(url: String)
 设置内置浏览器cookie
-cookie.setWebCookie(url,cookie)
+cookie.setWebCookie(url: String, cookie: String)
 ```
 
 ## cache对象的部分可用函数
 > saveTime单位:秒，可省略  
 > 保存至数据库和缓存文件(50M)，保存的内容较大时请使用`getFile putFile`
 ```js
-保存
-cache.put(key: String, value: String, saveTime: Int)
-读取数据库
-cache.get(key: String): String?
+保存,saveTime为0时无过期时间
+cache.put(key: String, value: String, saveTime: Int = 0)
 读取数据库,onlyDisk为true时只从磁盘读取
-cache.get(key: String, onlyDisk: Boolean): String?
+cache.get(key: String, onlyDisk: Boolean = false): String?
 删除
 cache.delete(key: String)
 缓存文件内容
@@ -566,14 +556,13 @@ cache.deleteMemory(key: String)
 ## 跳转外部链接/应用函数
 ```js
 // 跳转外部链接，传入http链接或者scheme跳转到浏览器或其他应用
-java.openUrl(url:String)
 // 指定mimeType，可以跳转指定类型应用，例如（video/*）
-java.openUrl(url:String,mimeType:String)
+java.openUrl(url: String, mimeType: String = null)
 ```
 ## 视频播放器函数
 ```js
 * @param url 视频播放链接
 * @param title 视频的标题
-* @param float 是否悬浮窗打开
-java.openVideoPlayer(url: String, title: String, float: Boolean)
+* @param isFloat 是否悬浮窗打开
+java.openVideoPlayer(url: String, title: String, isFloat: Boolean = false)
 ```

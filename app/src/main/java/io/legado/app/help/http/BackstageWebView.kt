@@ -56,7 +56,7 @@ class BackstageWebView(
     private val sourceRegex: String? = null,
     private val overrideUrlRegex: String? = null,
     private val javaScript: String? = null,
-    private val delayTime: Long = 0,
+    private var delayTime: Long = 0,
     private val cacheFirst: Boolean = false,
     private val timeout: Long? = null,
     private val result: String? = null,
@@ -85,6 +85,9 @@ class BackstageWebView(
                     if (!block.isCompleted)
                         block.resumeWithException(error)
                 }
+            }
+            if (javaScript == null && delayTime == 0L) {
+                delayTime = 900L
             }
             runOnUI {
                 try {

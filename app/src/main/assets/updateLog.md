@@ -2,6 +2,18 @@
 
 ## cronet版本: 143.0.7499.194
 
+**2026/03/07**
+- 优化代码，修复问题
+
+**2026/03/03**
+- 优化代码，修复问题
+- 视频悬浮窗播放时进行系统媒体播放通知
+- 净化规则使用js时支持调用java.log
+- 代码编辑器搜索替换内容支持$符号
+- 优化书架滚动位置记忆
+- 增加搜索结果排序时对书籍分类信息进行判断
+- 增加自动检查app更新功能
+
 **2026/02/16**
 - 优化代码，修复问题
 - 让小说朗读走系统媒体播放通道
@@ -25,7 +37,7 @@
 - 书籍简介和字典支持gif动态图和svg图data链接
 - 书籍简介和字典支持button按钮
 - 支持源控制图片显示尺寸
-- 书籍简介支持maekdown语法编写
+- 书籍简介支持markdown语法编写
 - 新增java.showBrowser函数，能进行半屏显示段评
 - 支持图片链接click键，不推荐继续使用旧方式
 - 支持双击响应段评图
@@ -68,7 +80,7 @@
 * 正文出现缺字漏字、内容缺失、排版错乱等情况，有可能是净化规则或简繁转换出现问题。
 ----
 
-* [2025年日志](https://github.com/LegadoTeam/legado/blob/record2025/app/src/main/assets/updateLog.md)
-* [2023年日志](https://github.com/LegadoTeam/legado/blob/record2023/app/src/main/assets/updateLog.md)
-* [2022年日志](https://github.com/LegadoTeam/legado/blob/record2022/app/src/main/assets/updateLog.md)
-* [2021年日志](https://github.com/LegadoTeam/legado/blob/record2021/app/src/main/assets/updateLog.md)
+* [2025年日志](https://github.com/LegadoTeam/legado/blob/record2025/app/src/main/assets/updateLog.md)　
+* [2023年日志](https://github.com/LegadoTeam/legado/blob/record2023/app/src/main/assets/updateLog.md)　
+* [2022年日志](https://github.com/LegadoTeam/legado/blob/record2022/app/src/main/assets/updateLog.md)　
+* [2021年日志](https://github.com/LegadoTeam/legado/blob/record2021/app/src/main/assets/updateLog.md)　

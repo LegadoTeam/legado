@@ -376,6 +376,22 @@ data class Book(
         this.tocHtml = this@Book.tocHtml
     }
 
+    fun toReplaceBook() = ReplaceBook(
+        name = name,
+        author = author,
+        kind = kind,
+        bookUrl = bookUrl,
+        origin = origin,
+        originName = originName,
+        type = type,
+        wordCount = wordCount,
+        latestChapterTitle = latestChapterTitle,
+        coverUrl = coverUrl,
+        intro = intro,
+        tocUrl = tocUrl,
+        originOrder = originOrder
+    )
+
     /**
      * 迁移旧的书籍的一些信息到新的书籍中
      */
@@ -385,7 +401,8 @@ data class Book(
                 .getDurChapter(durChapterIndex, durChapterTitle, toc, totalChapterNum)
             newBook.durChapterTitle = toc[newBook.durChapterIndex].getDisplayTitle(
                 ContentProcessor.get(newBook.name, newBook.origin).getTitleReplaceRules(),
-                getUseReplaceRule()
+                getUseReplaceRule(),
+                replaceBook = toReplaceBook()
             )
             newBook.durChapterPos = durChapterPos
         }

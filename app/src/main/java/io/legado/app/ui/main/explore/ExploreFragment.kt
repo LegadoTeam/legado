@@ -86,12 +86,6 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         upGroupsMenu()
     }
 
-    override fun onPause() {
-        super.onPause()
-        searchView.clearFocus()
-        adapter.onPause()
-    }
-
     private fun initSearchView() {
         searchView.applyTint(primaryTextColor)
         searchView.isSubmitButtonEnabled = true
@@ -170,6 +164,18 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 delay(500)
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        adapter.upResumed(true)
+    }
+
+    override fun onPause() {
+        adapter.upResumed(false)
+        searchView.clearFocus()
+        adapter.onPause()
+        super.onPause()
     }
 
     private fun upGroupsMenu() = groupsMenu?.transaction { subMenu ->
