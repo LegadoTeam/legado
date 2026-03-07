@@ -224,6 +224,16 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        adapter.upResumed(true)
+    }
+
+    override fun onPause() {
+        adapter.upResumed(false)
+        super.onPause()
+    }
+
     private fun observeGroupData() {
         lifecycleScope.launch {
             appDb.replaceRuleDao.flowGroups().collect {

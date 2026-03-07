@@ -38,7 +38,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
@@ -132,7 +131,7 @@ class CoverImageView @JvmOverloads constructor(
                     withTimeoutOrNull(1200) {
                         triggerChannel.receive()
                     }
-                    currentCoroutineContext().ensureActive()
+                    ensureActive()
                 }
                 if (width == 0) {
                     var attempts = 0
@@ -141,22 +140,20 @@ class CoverImageView @JvmOverloads constructor(
                         attempts++
                     } while (width == 0 && attempts < 2000)
                 }
-                currentCoroutineContext().ensureActive()
+                ensureActive()
                 val bitmap = generateCoverBitmap(name, author)
-                currentCoroutineContext().ensureActive()
-                nameBitmapCache.put(pathName + width, bitmap)
+                ensureActive()
                 needNameBitmap.put(bitmapPath.toString(), true)
+                nameBitmapCache.put(pathName + width, bitmap)
                 invalidate()
             } catch (_: CancellationException) {
             } catch (e: Exception) {
                 e.printStackTrace()
-            } finally {
-                currentJob = null
             }
         }
     }
 
-    fun generateCoverBitmap(name: String?, author: String?): Bitmap {
+    private fun generateCoverBitmap(name: String?, author: String?): Bitmap {
         viewWidth = width.toFloat()
         viewHeight = height.toFloat()
         val bitmap = createBitmap(width, height)
@@ -258,6 +255,7 @@ class CoverImageView @JvmOverloads constructor(
                 currentJob?.cancel()
                 currentJob = null
                 needNameBitmap.remove(bitmapPath.toString())
+                invalidate()
                 return false
             }
 
@@ -305,7 +303,7 @@ class CoverImageView @JvmOverloads constructor(
                 .centerCrop()
                 .into(this)
         } else {
-            if (currentName != null) {
+            if (drawBookName && currentName != null) {
                 val pathName = if (drawBookAuthor){
                     currentName + currentAuthor
                 } else {

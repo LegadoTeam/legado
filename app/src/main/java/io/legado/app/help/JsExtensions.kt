@@ -298,15 +298,20 @@ interface JsExtensions : JsEncodeUtils {
         }
     }
 
+    @JavascriptInterface
+    fun openVideoPlayer(url: String, title: String) {
+        openVideoPlayer(url, title, false)
+    }
+
     /**
      * 打开内置视频播放器
      * @param url 视频播放链接
      * @param title 视频的标题
-     * @param float 是否悬浮窗打开
+     * @param isFloat 是否悬浮窗打开
      */
     @JavascriptInterface
-    fun openVideoPlayer(url: String, title: String, float: Boolean) {
-        SourceHelp.openVideoPlayer(getSource(), url, title, float)
+    fun openVideoPlayer(url: String, title: String, isFloat: Boolean) {
+        SourceHelp.openVideoPlayer(getSource(), url, title, isFloat)
     }
 
     /**
@@ -1134,7 +1139,10 @@ interface JsExtensions : JsEncodeUtils {
         openUrl(url, null)
     }
 
-    // 新增 mimeType 参数，默认为 null（保持兼容性）
+    /**
+     * 打开应用跳转或者网页
+     * @param mimeType 指定应用类型
+     */
     @JavascriptInterface
     fun openUrl(url: String, mimeType: String? = null) {
         require(url.length < 64 * 1024) { "openUrl parameter url too long" }

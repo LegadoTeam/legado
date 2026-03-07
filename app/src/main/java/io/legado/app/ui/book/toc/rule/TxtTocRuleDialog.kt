@@ -130,6 +130,16 @@ class TxtTocRuleDialog() : BaseDialogFragment(R.layout.dialog_toc_regex),
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        adapter.upResumed(true)
+    }
+
+    override fun onPause() {
+        adapter.upResumed(false)
+        super.onPause()
+    }
+
     private fun initSelectedName(tocRules: List<TxtTocRule>) {
         if (selectedName == null && durRegex != null) {
             tocRules.forEach {

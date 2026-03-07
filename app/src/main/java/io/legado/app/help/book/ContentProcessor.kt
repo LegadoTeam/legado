@@ -101,6 +101,7 @@ class ContentProcessor private constructor(
         var mContent = content
         var sameTitleRemoved = false
         var effectiveReplaceRules: ArrayList<ReplaceRule>? = null
+        val replaceBook by lazy { book.toReplaceBook() }
         if (content != "null") {
             //去除重复标题
             val fileName = chapter.getFileName("nr")
@@ -116,7 +117,8 @@ class ContentProcessor private constructor(
                     title = Pattern.quote(
                         chapter.getDisplayTitle(
                             contentReplaceRules,
-                            chineseConvert = false
+                            chineseConvert = false,
+                            replaceBook = replaceBook
                         )
                     )
                     matcher = Pattern.compile("^(\\s|\\p{P}|${name})*${title}(\\s)*")
@@ -153,7 +155,6 @@ class ContentProcessor private constructor(
                 }
             }
             if (useReplace && book.getUseReplaceRule()) {
-                val replaceBook = book.toSearchBook()
                 //替换
                 effectiveReplaceRules = arrayListOf()
                 mContent = mContent.lines().joinToString("\n") { it.trim() }
@@ -197,7 +198,8 @@ class ContentProcessor private constructor(
             //重新添加标题
             mContent = chapter.getDisplayTitle(
                 getTitleReplaceRules(),
-                useReplace = useReplace && book.getUseReplaceRule()
+                useReplace = useReplace && book.getUseReplaceRule(),
+                replaceBook = replaceBook
             ) + "\n" + mContent
         }
         if (isAndroid8) {

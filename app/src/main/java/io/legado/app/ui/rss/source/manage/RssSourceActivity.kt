@@ -349,6 +349,16 @@ class RssSourceActivity : VMBaseActivity<ActivityRssSourceBinding, RssSourceView
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        adapter.upResumed(true)
+    }
+
+    override fun onPause() {
+        adapter.upResumed(false)
+        super.onPause()
+    }
+
     override fun upCountView() {
         binding.selectActionBar.upCountView(
             adapter.selection.size,

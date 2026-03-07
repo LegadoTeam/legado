@@ -1,5 +1,6 @@
 package io.legado.app.model.localBook
 
+import androidx.annotation.Keep
 import com.script.ScriptBindings
 import com.script.rhino.RhinoScriptEngine
 import io.legado.app.constant.AppLog
@@ -77,7 +78,7 @@ class TextFile(private var book: Book) {
 
     //选中更好的目录规则判断阈值
     private val overRuleCount = 2
-    private val toSearchBook = book.toSearchBook()
+    private val replaceBook = book.toReplaceBook()
     class MutableRef<String>(var value: String)
     private val lastVolumeTitle = MutableRef("")
 
@@ -418,10 +419,12 @@ class TextFile(private var book: Book) {
                 bufferStart = 0
             }
             //获取文件中的数据到buffer，直到没有数据为止
-            while (fileEnd - curOffset - bufferStart > 0 && bis.read(
-                    buffer, bufferStart, min(
-                        (bufferSize - bufferStart).toLong(), fileEnd - curOffset - bufferStart
-                    ).toInt()
+            while (
+                fileEnd - curOffset - bufferStart > 0 &&
+                bis.read(
+                    buffer,
+                    bufferStart,
+                    min((bufferSize - bufferStart).toLong(), fileEnd - curOffset - bufferStart).toInt()
                 ).also { length = it } > 0
             ) {
                 blockPos++
@@ -493,7 +496,7 @@ class TextFile(private var book: Book) {
      */
     private fun getTocRule(content: String): TxtTocRule? {
         val rules = getTocRules() //.reversed() 改动num >= maxNum条件，不需要再反转
-        var maxNum = 1
+        var maxNum = -1
         var mTocRule: TxtTocRule? = null
         for (tocRule in rules) {
             val pattern = try {
@@ -517,10 +520,10 @@ class TextFile(private var book: Book) {
                     }
                     start = matcher.end()
                 } else if (contentLength < 100) {
-                    numE++ //这种不住100字的一般被识别为卷，即错误识别，正常章节数不大于卷3倍的不选
+                    numE++ //这种不足100字的一般被识别为卷，即错误识别，正常章节数小于卷3倍的不选
                 }
             }
-            if (csNum > numE * 3 && (csNum > maxNum + overRuleCount)) { //后面的规则匹配数量没超过最大值2个，那么依旧用前面那个
+            if (csNum >= numE * 3 && (csNum > maxNum + overRuleCount)) { //后面的规则匹配数量没超过最大值2个，那么依旧用前面那个
                 maxNum = csNum
                 mTocRule = tocRule
                 if (maxNum > 70) {
@@ -531,6 +534,8 @@ class TextFile(private var book: Book) {
         return mTocRule
     }
 
+    @Keep
+    @Suppress("unused")
     class JsExtensions(val lastVolumeTitle: MutableRef<String>, val toc: ArrayList<BookChapter>? = null) {
         fun putVolume(title: String) {
             lastVolumeTitle.value = title
@@ -540,6 +545,7 @@ class TextFile(private var book: Book) {
             }
         }
     }
+
     /**
      * 净化标题
      */
@@ -553,17 +559,7 @@ class TextFile(private var book: Book) {
         if (jsStr.isNullOrBlank()) {
             return content
         }
-        return RhinoScriptEngine.run {
-            val bindings = ScriptBindings()
-            bindings["result"] = content
-            bindings["book"] = toSearchBook
-            bindings["index"] = toc.size + 1
-            bindings["prevTitle"] = prevTitle
-            bindings["prevLength"] = prevLength
-            bindings["lastVolumeTitle"] = lastVolumeTitle.value
-            bindings["java"] = JsExtensions(lastVolumeTitle, toc)
-            eval(jsStr, bindings)
-        }.toString()
+        return evalJs(content, jsStr, toc.size + 1, prevTitle, prevLength, toc)
     }
 
     private fun replacement(
@@ -576,21 +572,25 @@ class TextFile(private var book: Book) {
         if (jsStr.isNullOrBlank()) {
             return content
         }
+        return evalJs(content, jsStr, index + 1, prevTitle, prevLength)
+    }
+
+    private fun evalJs(content: String, jsStr: String, index: Int, prevTitle: String?, prevLength: Int = -1, toc: ArrayList<BookChapter>? = null):String {
         return RhinoScriptEngine.run {
             val bindings = ScriptBindings()
             bindings["result"] = content
-            bindings["book"] = toSearchBook
-            bindings["index"] = index + 1
+            bindings["book"] = replaceBook
+            bindings["index"] = index
             bindings["prevTitle"] = prevTitle
             bindings["prevLength"] = prevLength
             bindings["lastVolumeTitle"] = lastVolumeTitle.value
-            bindings["java"] = JsExtensions(lastVolumeTitle)
+            bindings["java"] = JsExtensions(lastVolumeTitle, toc)
             eval(jsStr, bindings)
         }.toString()
     }
 
 
-    /**
+            /**
      * 获取启用的目录规则
      */
     private fun getTocRules(): List<TxtTocRule> {

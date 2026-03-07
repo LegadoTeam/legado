@@ -59,7 +59,8 @@ import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.util.regex.Pattern
-import kotlin.coroutines.coroutineContext
+import androidx.core.net.toUri
+import kotlinx.coroutines.currentCoroutineContext
 
 /**
  * 书籍文件导入 目录正文解析
@@ -103,7 +104,7 @@ object LocalBook {
 
     fun getLastModified(book: Book): Result<Long> {
         return kotlin.runCatching {
-            val uri = Uri.parse(book.bookUrl)
+            val uri = book.bookUrl.toUri()
             if (uri.isContentScheme()) {
                 return@runCatching DocumentFile.fromSingleUri(appCtx, uri)!!.lastModified()
             }
@@ -149,11 +150,20 @@ object LocalBook {
             }
         }
         val replaceRules = ContentProcessor.get(book).getTitleReplaceRules()
+        val replaceBook = book.toReplaceBook()
         book.durChapterTitle = list.getOrElse(book.durChapterIndex) { list.last() }
-            .getDisplayTitle(replaceRules, book.getUseReplaceRule())
+            .getDisplayTitle(
+                replaceRules,
+                book.getUseReplaceRule(),
+                replaceBook = replaceBook
+            )
         book.latestChapterTitle =
             list.getOrElse(book.simulatedTotalChapterNum() - 1) { list.last() }
-                .getDisplayTitle(replaceRules, book.getUseReplaceRule())
+                .getDisplayTitle(
+                    replaceRules,
+                    book.getUseReplaceRule(),
+                    replaceBook = replaceBook
+                )
         book.totalChapterNum = list.size
         book.latestChapterTime = System.currentTimeMillis()
         return list
@@ -382,7 +392,7 @@ object LocalBook {
             }
             if (deleteOriginal) {
                 if (book.bookUrl.isContentScheme()) {
-                    val uri = Uri.parse(book.bookUrl)
+                    val uri = book.bookUrl.toUri()
                     DocumentFile.fromSingleUri(appCtx, uri)?.delete()
                 } else {
                     FileUtils.delete(book.bookUrl)
@@ -404,7 +414,7 @@ object LocalBook {
         val inputStream = when {
             str.isAbsUrl() -> AnalyzeUrl(
                 str, source = source, callTimeout = 0,
-                coroutineContext = coroutineContext
+                coroutineContext = currentCoroutineContext()
             ).getInputStreamAwait()
 
             str.isDataUrl() -> ByteArrayInputStream(
@@ -427,7 +437,7 @@ object LocalBook {
         inputStream.use {
             val defaultBookTreeUri = AppConfig.defaultBookTreeUri
             if (defaultBookTreeUri.isNullOrBlank()) throw NoBooksDirException()
-            val treeUri = Uri.parse(defaultBookTreeUri)
+            val treeUri = defaultBookTreeUri.toUri()
             return if (treeUri.isContentScheme()) {
                 val treeDoc = DocumentFile.fromTreeUri(appCtx, treeUri)
                 var doc = treeDoc!!.findFile(fileName)
@@ -459,7 +469,7 @@ object LocalBook {
     fun isOnBookShelf(
         fileName: String
     ): Boolean {
-        return appDb.bookDao.hasFile(fileName) == true
+        return appDb.bookDao.hasFile(fileName)
     }
 
     //文件类书源 合并在线书籍信息 在线 > 本地

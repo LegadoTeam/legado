@@ -185,8 +185,8 @@ object SourceHelp {
         }
     }
 
-    fun openVideoPlayer(source: BaseSource?, url: String, title: String, float: Boolean) {
-        if (float) {
+    fun openVideoPlayer(source: BaseSource?, url: String, title: String, isFloat: Boolean) {
+        if (isFloat) {
             val intent = Intent(appCtx, VideoPlayService::class.java).apply {
                 putExtra("videoUrl", url)
                 putExtra("videoTitle", title)

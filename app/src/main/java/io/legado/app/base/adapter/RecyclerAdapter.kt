@@ -38,6 +38,8 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
 
     private var diffJob: Coroutine<*>? = null
 
+    private var isResumed = false
+
     var itemAnimation: ItemAnimation? = null
 
     fun setOnItemClickListener(listener: (holder: ItemViewHolder, item: ITEM) -> Unit) {
@@ -114,6 +116,10 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
         skipDiff: Boolean = false
     ) {
         kotlin.runCatching {
+            if (!isResumed) { //全量标记更新
+                setItems(items)
+                return@runCatching
+            }
             val oldItems = this.items.toList()
             val itemsSize = items?.size ?: 0
             val headerCount = getHeaderCount()
@@ -154,6 +160,10 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
                     return itemCallback.getChangePayload(oldItem, newItem)
                 }
             }
+            if (!isResumed) {
+                setItems(items)
+                return@runCatching
+            }
             diffJob?.cancel()
             diffJob = Coroutine.async {
                 val diffResult = if (skipDiff) withTimeoutOrNullAsync(500L) {
@@ -163,7 +173,7 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
                 }
                 ensureActive()
                 handler.post {
-                    if (diffResult == null) {
+                    if (isResumed || diffResult == null) {
                         setItems(items)
                         return@post
                     }
@@ -173,6 +183,10 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
                     if (items != null) {
                         this@RecyclerAdapter.items.addAll(items)
                     }
+                    if (!isResumed) {
+                        return@post
+                    }
+                    ensureActive()
                     diffResult.dispatchUpdatesTo(this@RecyclerAdapter)
                     onCurrentListChanged()
                 }
@@ -430,6 +444,15 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
                 }
             }
         }
+    }
+
+    fun upResumed(isResumed : Boolean) {
+        if (!isResumed) {
+            diffJob?.cancel()
+            diffJob = null
+            handler.removeCallbacksAndMessages(null)
+        }
+        this.isResumed = isResumed
     }
 
     private fun isHeader(position: Int) = position < getHeaderCount()

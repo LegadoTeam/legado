@@ -75,6 +75,7 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
         upDisplayTileJob = Coroutine.async(callback.scope) {
             val book = callback.book ?: return@async
             val replaceRules = ContentProcessor.get(book.name, book.origin).getTitleReplaceRules()
+            val replaceBook = book.toReplaceBook()
             val useReplace = AppConfig.tocUiUseReplace && book.getUseReplaceRule()
             val items = getItems()
             launch {
@@ -82,7 +83,7 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
                     val item = items[i]
                     if (displayTitleMap[item.title] == null) {
                         ensureActive()
-                        val displayTitle = item.getDisplayTitle(replaceRules, useReplace)
+                        val displayTitle = item.getDisplayTitle(replaceRules, useReplace, replaceBook = replaceBook)
                         ensureActive()
                         displayTitleMap[item.title] = displayTitle
                         handler.post {
@@ -96,7 +97,7 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
                     val item = items[i]
                     if (displayTitleMap[item.title] == null) {
                         ensureActive()
-                        val displayTitle = item.getDisplayTitle(replaceRules, useReplace)
+                        val displayTitle = item.getDisplayTitle(replaceRules, useReplace, replaceBook = replaceBook)
                         ensureActive()
                         displayTitleMap[item.title] = displayTitle
                         handler.post {
