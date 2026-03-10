@@ -36,12 +36,10 @@ import io.legado.app.utils.ACache
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.launch
-import io.legado.app.utils.readText
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.showHelp
 import io.legado.app.utils.splitNotBlank
-import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.flow.catch
@@ -73,12 +71,8 @@ class TxtTocRuleDialog() : BaseDialogFragment(R.layout.dialog_toc_regex),
         showDialogFragment(ImportTxtTocRuleDialog(it))
     }
     private val importDoc = registerForActivityResult(HandleFileContract()) {
-        kotlin.runCatching {
-            it.uri?.readText(requireContext())?.let { source ->
-                showDialogFragment(ImportTxtTocRuleDialog(source))
-            }
-        }.onFailure { e ->
-            toastOnUi("readTextError:${e.localizedMessage}")
+        it.uri?.let { uri ->
+            showDialogFragment(ImportTxtTocRuleDialog(uri.toString()))
         }
     }
 
