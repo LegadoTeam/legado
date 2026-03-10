@@ -5,7 +5,7 @@ import kotlinx.coroutines.CoroutineScope
 
 object AppUpdate {
 
-    val gitHubUpdate: AppUpdateInterface? by lazy {
+    val gitHubUpdate: AppUpdateInterface by lazy {
         AppUpdateGitHub
     }
     val giteeUpdate: AppUpdateInterface by lazy {

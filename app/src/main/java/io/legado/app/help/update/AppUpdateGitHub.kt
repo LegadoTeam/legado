@@ -63,7 +63,7 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
                         it.name
                     )
                 }
-                ?: throw NoStackTraceException("已是最新版本")
+            throw NoStackTraceException("已是最新版本")
         }.timeout(10000)
     }
 }
