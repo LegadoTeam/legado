@@ -30,13 +30,11 @@ import io.legado.app.utils.ACache
 import io.legado.app.utils.GSON
 import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.launch
-import io.legado.app.utils.readText
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.showHelp
 import io.legado.app.utils.splitNotBlank
-import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.flow.catch
@@ -54,19 +52,11 @@ class DictRuleActivity : VMBaseActivity<ActivityDictRuleBinding, DictRuleViewMod
     private val adapter by lazy { DictRuleAdapter(this, this) }
     private val qrCodeResult = registerForActivityResult(QrCodeResult()) {
         it ?: return@registerForActivityResult
-        showDialogFragment(
-            ImportDictRuleDialog(it)
-        )
+        showDialogFragment(ImportDictRuleDialog(it))
     }
     private val importDoc = registerForActivityResult(HandleFileContract()) {
-        kotlin.runCatching {
-            it.uri?.readText(this)?.let { source ->
-                showDialogFragment(
-                    ImportDictRuleDialog(source)
-                )
-            }
-        }.onFailure { e  ->
-            toastOnUi("readTextError:${e.localizedMessage}")
+        it.uri?.let { uri ->
+            showDialogFragment(ImportDictRuleDialog(uri.toString()))
         }
     }
     private val exportResult = registerForActivityResult(HandleFileContract()) {

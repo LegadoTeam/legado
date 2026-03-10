@@ -29,13 +29,11 @@ import io.legado.app.utils.ACache
 import io.legado.app.utils.GSON
 import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.launch
-import io.legado.app.utils.readText
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.showHelp
 import io.legado.app.utils.splitNotBlank
-import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.flow.catch
@@ -49,8 +47,8 @@ class TxtTocRuleActivity : VMBaseActivity<ActivityTxtTocRuleBinding, TxtTocRuleV
     TxtTocRuleEditDialog.Callback,
     PopupMenu.OnMenuItemClickListener {
 
-    override val viewModel: TxtTocRuleViewModel by viewModels()
-    override val binding: ActivityTxtTocRuleBinding by viewBinding(ActivityTxtTocRuleBinding::inflate)
+    override val viewModel by viewModels<TxtTocRuleViewModel>()
+    override val binding by viewBinding(ActivityTxtTocRuleBinding::inflate)
     private val adapter: TxtTocRuleAdapter by lazy {
         TxtTocRuleAdapter(this, this)
     }
@@ -60,12 +58,8 @@ class TxtTocRuleActivity : VMBaseActivity<ActivityTxtTocRuleBinding, TxtTocRuleV
         showDialogFragment(ImportTxtTocRuleDialog(it))
     }
     private val importDoc = registerForActivityResult(HandleFileContract()) {
-        kotlin.runCatching {
-            it.uri?.readText(this)?.let { source ->
-                showDialogFragment(ImportTxtTocRuleDialog(source))
-            }
-        }.onFailure {e ->
-            toastOnUi("readTextError:${e.localizedMessage}")
+        it.uri?.let { uri ->
+            showDialogFragment(ImportTxtTocRuleDialog(uri.toString()))
         }
     }
     private val exportResult = registerForActivityResult(HandleFileContract()) {
@@ -146,6 +140,7 @@ class TxtTocRuleActivity : VMBaseActivity<ActivityTxtTocRuleBinding, TxtTocRuleV
                 mode = HandleFileContract.FILE
                 allowExtensions = arrayOf("txt", "json")
             }
+
             R.id.menu_import_onLine -> showImportDialog()
             R.id.menu_import_qr -> qrCodeResult.launch()
             R.id.menu_import_default -> viewModel.importDefault()
@@ -255,8 +250,14 @@ class TxtTocRuleActivity : VMBaseActivity<ActivityTxtTocRuleBinding, TxtTocRuleV
 
     override fun onMenuItemClick(item: MenuItem): Boolean {
         when (item.itemId) {
-            R.id.menu_enable_selection -> viewModel.enableSelection(*adapter.selection.toTypedArray())
-            R.id.menu_disable_selection -> viewModel.disableSelection(*adapter.selection.toTypedArray())
+            R.id.menu_enable_selection -> viewModel.enableSelection(
+                *adapter.selection.toTypedArray()
+            )
+
+            R.id.menu_disable_selection -> viewModel.disableSelection(
+                *adapter.selection.toTypedArray()
+            )
+
             R.id.menu_export_selection -> exportResult.launch {
                 mode = HandleFileContract.EXPORT
                 fileData = HandleFileContract.FileData(
