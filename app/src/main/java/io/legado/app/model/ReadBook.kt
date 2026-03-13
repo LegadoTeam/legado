@@ -910,7 +910,8 @@ object ReadBook : CoroutineScope by MainScope() {
         executor.execute {
             kotlin.runCatching {
                 book.lastCheckCount = 0
-                book.durChapterTime = System.currentTimeMillis()
+                val durTime = System.currentTimeMillis()
+                book.durChapterTime = durTime
                 val chapterChanged = book.durChapterIndex != durChapterIndex
                 book.durChapterIndex = durChapterIndex
                 book.durChapterPos = durChapterPos
@@ -921,7 +922,7 @@ object ReadBook : CoroutineScope by MainScope() {
                             book.getUseReplaceRule(),
                             replaceBook = book.toReplaceBook()
                         )
-                        SourceCallBack.callBackBook(SourceCallBack.SAVE_READ, bookSource, book, it)
+                        SourceCallBack.callBackBook(SourceCallBack.SAVE_READ, bookSource, book, it, durTime.toString())
                     }
                 }
                 book.update()

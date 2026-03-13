@@ -156,15 +156,17 @@ class AudioPlayActivity :
             R.id.menu_wake_lock -> AppConfig.audioPlayUseWakeLock = !AppConfig.audioPlayUseWakeLock
             R.id.menu_copy_audio_url -> {
                 AudioPlay.book?.let {
+                    val url = AudioPlayService.url
                     SourceCallBack.callBackBtn(
                         this,
                         SourceCallBack.CLICK_COPY_PLAY_URL,
                         AudioPlay.bookSource,
                         it,
                         AudioPlay.durChapter,
-                        BookType.audio
+                        BookType.audio,
+                        url
                     ) {
-                        sendToClip(AudioPlayService.url)
+                        sendToClip(url)
                     }
                 }
             }

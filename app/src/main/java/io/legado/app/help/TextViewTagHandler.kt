@@ -23,7 +23,7 @@ class TextViewTagHandler(private val onButtonClickListener: OnButtonClickListene
         private const val BUTTON_SPLIT = "@onclick:"
     }
     interface OnButtonClickListener {
-        fun onButtonClick(name: String, click: String?)
+        fun onButtonClick(name: String, click: String)
     }
 
     private val accentColor by lazy { ThemeStore.accentColor(appCtx) }
@@ -62,7 +62,7 @@ class TextViewTagHandler(private val onButtonClickListener: OnButtonClickListene
                         name = name,
                         click = click,
                         onClickListener = object : RoundedButtonSpan.OnClickListener {
-                            override fun onClick(name: String, click: String?) {
+                            override fun onClick(name: String, click: String) {
                                 onButtonClickListener?.onButtonClick(name, click)
                             }
                         }
@@ -95,18 +95,16 @@ class TextViewTagHandler(private val onButtonClickListener: OnButtonClickListene
         private val verticalMargin: Int = 8.dpToPx(),
         private val cornerRadius: Float = 8f.dpToPx(),
         private val name: String,
-        private val click: String? = null,
+        private val click: String,
         private val onClickListener: OnClickListener? = null
     ) : ReplacementSpan() {
         interface OnClickListener {
-            fun onClick(name: String, click: String?)
+            fun onClick(name: String, click: String)
         }
         private var width = 0
         val clickableSpan = object : ClickableSpan() {
             override fun onClick(widget: View) {
-                if (click != null) {
-                    onClickListener?.onClick(name, click)
-                }
+                click.takeIf { it.isNotBlank() }?.let { onClickListener?.onClick(name, it) }
             }
 
             override fun updateDrawState(ds: TextPaint) {

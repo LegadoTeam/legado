@@ -37,15 +37,15 @@ class DictViewModel(application: Application) : BaseViewModel(application) {
     fun onButtonClick(
         dictRule: DictRule,
         name: String,
-        click: String?
+        click: String
     ) {
-        if (click.isNullOrBlank()) {
+        if (click.isBlank()) {
             return
         }
         execute {
             dictRule.buttonClick(name, click)
         }.onError {
-            AppLog.put("$name button click error\n${it.localizedMessage}", it)
+            AppLog.put("$name click error\n${it.localizedMessage}", it)
         }
     }
 
