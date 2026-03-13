@@ -16,6 +16,7 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlin.String
 import kotlin.onFailure
 
 object SourceCallBack {
@@ -30,6 +31,8 @@ object SourceCallBack {
     const val CLICK_COPY_BOOK_URL = "clickCopyBookUrl"
     const val CLICK_COPY_TOC_URL = "clickCopyTocUrl"
     const val CLICK_COPY_PLAY_URL = "clickCopyPlayUrl"
+    const val CLICK_BOOK_LABEL = "clickBookLabel"
+    const val LONG_CLICK_BOOK_LABEL = "longClickBookLabel"
 
     const val ADD_BOOK_SHELF = "addBookShelf"
     const val DEL_BOOK_SHELF = "delBookShelf"
@@ -45,6 +48,7 @@ object SourceCallBack {
         book: Book,
         chapter: BookChapter?,
         bookType: Int = 0,
+        result: String? = null,
         noCall: (() -> Unit)? = null
     ) {
         if (source == null || !source.eventListener) {
@@ -63,7 +67,7 @@ object SourceCallBack {
                     source.evalJS(jsStr) {
                         put("event", event)
                         put("java", java)
-                        put("result", null)
+                        put("result", result)
                         put("book", book)
                         put("chapter", chapter)
                     }.toString()
@@ -79,7 +83,13 @@ object SourceCallBack {
         }
     }
 
-    fun callBackBook(event: String, source: BookSource?, book: Book?, chapter: BookChapter? = null) {
+    fun callBackBook(
+        event: String,
+        source: BookSource?,
+        book: Book?,
+        chapter: BookChapter? = null,
+        result: String? = null
+    ) {
         if (source == null || book == null || !source.eventListener) return
         val jsStr = source.getContentRule().callBackJs
         if (jsStr.isNullOrEmpty()) return
@@ -88,7 +98,7 @@ object SourceCallBack {
                 runScriptWithContext(coroutineContext) {
                     source.evalJS(jsStr) {
                         put("event", event)
-                        put("result", null)
+                        put("result", result)
                         put("book", book)
                         put("chapter", chapter)
                     }

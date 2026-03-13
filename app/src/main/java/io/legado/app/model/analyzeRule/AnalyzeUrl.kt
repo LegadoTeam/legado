@@ -239,7 +239,11 @@ class AnalyzeUrl(
             }
             urlOption?.let { option ->
                 option.getMethod()?.let {
-                    if (it.equals("POST", true)) method = RequestMethod.POST
+                    method = when (it.uppercase()) {
+                        "POST" -> RequestMethod.POST
+                        "HEAD" -> RequestMethod.HEAD
+                        else -> RequestMethod.GET
+                    }
                 }
                 option.getHeaderMap()?.forEach { entry ->
                     headerMap[entry.key.toString()] = entry.value.toString()
@@ -265,17 +269,17 @@ class AnalyzeUrl(
         }
         urlNoQuery = url
         when (method) {
-            RequestMethod.GET -> {
+            RequestMethod.POST -> body?.let {
+                if (!it.isJson() && !it.isXml() && headerMap["Content-Type"].isNullOrEmpty()) {
+                    analyzeFields(it)
+                }
+            }
+
+            else -> {
                 val pos = url.indexOf('?')
                 if (pos != -1) {
                     analyzeQuery(url.substring(pos + 1))
                     urlNoQuery = url.substring(0, pos)
-                }
-            }
-
-            RequestMethod.POST -> body?.let {
-                if (!it.isJson() && !it.isXml() && headerMap["Content-Type"].isNullOrEmpty()) {
-                    analyzeFields(it)
                 }
             }
         }
@@ -486,6 +490,11 @@ class AnalyzeUrl(
                             } else {
                                 postJson(body)
                             }
+                        }
+
+                        RequestMethod.HEAD -> {
+                            get(urlNoQuery, encodedQuery)
+                            head()
                         }
 
                         else -> get(urlNoQuery, encodedQuery)

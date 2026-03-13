@@ -41,7 +41,7 @@ class SliderPopup(private val context: Context, private val name: Int) :
                 val speed = (progress / 10f).roundToInt() / 10f
                 setProcessSpeedText(speed)
                 if (fromUser) {
-                    // 设置播放速度 (转换为0.5-2.0范围)
+                    // 设置播放速度 (转换为0.5-3.0范围)
                     AudioPlay.setSpeed(speed)
                 }
             }
@@ -52,8 +52,7 @@ class SliderPopup(private val context: Context, private val name: Int) :
         super.showAsDropDown(anchor, xoff, yoff, gravity)
         if (name == TIMER) {
             binding.seekBar.progress = AudioPlayService.timeMinute
-        }
-        else {
+        } else {
             binding.seekBar.progress = (AudioPlayService.playSpeed * 100).toInt()
         }
     }
@@ -62,8 +61,7 @@ class SliderPopup(private val context: Context, private val name: Int) :
         super.showAtLocation(parent, gravity, x, y)
         if (name == TIMER) {
             binding.seekBar.progress = AudioPlayService.timeMinute
-        }
-        else {
+        } else {
             binding.seekBar.progress = (AudioPlayService.playSpeed * 100).toInt()
         }
     }
@@ -86,7 +84,7 @@ class SliderPopup(private val context: Context, private val name: Int) :
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             binding.seekBar.min = 50
         }
-        binding.seekBar.max = 200
+        binding.seekBar.max = 300
         binding.seekBar.progress = (AudioPlayService.playSpeed * 100).toInt()
         setProcessSpeedText(AudioPlayService.playSpeed)
     }

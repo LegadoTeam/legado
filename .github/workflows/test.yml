@@ -138,7 +138,7 @@ jobs:
           find ${{ github.workspace }}/app/build/outputs/mapping -name "missing_rules.txt" -exec mv {} ${{ github.workspace }}/mapping/missing_rules.txt \; || true
 
       - name: Upload Missing Rules File
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: legado.${{ env.product }}.${{ env.type }}.mapping.missing_rules
           if-no-files-found: ignore
@@ -156,14 +156,14 @@ jobs:
           fi
 
       - name: Upload APK Artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: legado.${{ env.product }}.${{ env.type }}
           if-no-files-found: ignore
           path: ${{ github.workspace }}/apk/*.apk
 
       - name: Upload Mapping Artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: legado.${{ env.product }}.${{ env.type }}.mapping
           if-no-files-found: ignore

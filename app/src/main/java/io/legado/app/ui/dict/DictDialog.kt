@@ -9,6 +9,7 @@ import android.view.textclassifier.TextClassifier
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
+import com.bumptech.glide.request.RequestOptions
 import com.google.android.material.tabs.TabLayout
 import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
@@ -18,8 +19,12 @@ import io.legado.app.help.GlideImageGetter
 import io.legado.app.help.TextViewTagHandler
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.backgroundColor
+import io.legado.app.ui.widget.dialog.PhotoDialog
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.setHtml
 import io.legado.app.utils.setLayout
+import io.legado.app.utils.setMarkdown
+import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.noties.markwon.Markwon
@@ -44,10 +49,19 @@ class DictDialog() : BaseDialogFragment(R.layout.dialog_dict) {
     private val viewModel by viewModels<DictViewModel>()
     private val binding by viewBinding(DialogDictBinding::bind)
     private var word: String? = null
+    private val imgAvailableWidth by lazy {
+        val textView = binding.tvDict
+        textView.width - textView.paddingLeft - textView.paddingRight
+    }
     private var initGetter = false
     private val glideImageGetter by lazy {
         initGetter = true
-        GlideImageGetter(requireContext(), binding.tvDict, this@DictDialog.lifecycle)
+        GlideImageGetter(
+            requireContext(),
+            binding.tvDict,
+            this@DictDialog.lifecycle,
+            imgAvailableWidth
+        )
     }
 
     override fun onStart() {
@@ -92,22 +106,47 @@ class DictDialog() : BaseDialogFragment(R.layout.dialog_dict) {
                             val markwon: Markwon
                             val markdown = withContext(IO) {
                                 markwon = Markwon.builder(requireContext())
-                                    .usePlugin(GlideImagesPlugin.create(Glide.with(requireContext())))
+                                    .usePlugin(
+                                        GlideImagesPlugin.create(
+                                            Glide.with(requireContext())
+                                                .applyDefaultRequestOptions(
+                                                    RequestOptions()
+                                                        .override(imgAvailableWidth)
+                                                        .encodeQuality(88)
+                                                )
+                                        )
+                                    )
                                     .usePlugin(HtmlPlugin.create())
                                     .usePlugin(TablePlugin.create(requireContext()))
                                     .build()
                                 markwon.toMarkdown(mark)
                             }
-                            markwon.setParsedMarkdown(binding.tvDict, markdown)
+                            binding.tvDict.setMarkdown(
+                                markwon,
+                                markdown,
+                                imgOnLongClickListener = { source ->
+                                    showDialogFragment(PhotoDialog(source))
+                                }
+                            )
                         }
                         return@dict
                     }
                     val textViewTagHandler = TextViewTagHandler(object : TextViewTagHandler.OnButtonClickListener {
-                        override fun onButtonClick(name: String, click: String?) {
-                            viewModel.onButtonClick(dictRule, name, click)
+                        override fun onButtonClick(name: String, click: String) {
+                            viewModel.onButtonClick(dictRule, "button $name", click)
                         }
                     })
-                    binding.tvDict.setHtml(it, glideImageGetter, textViewTagHandler)
+                    binding.tvDict.setHtml(
+                        it,
+                        glideImageGetter,
+                        textViewTagHandler,
+                        imgOnLongClickListener = { source ->
+                            showDialogFragment(PhotoDialog(source))
+                        },
+                        imgOnClickListener = { click  ->
+                            viewModel.onButtonClick(dictRule, "image", click)
+                        }
+                    )
                 }
             }
         })

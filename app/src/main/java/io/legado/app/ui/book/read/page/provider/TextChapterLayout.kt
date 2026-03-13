@@ -146,21 +146,6 @@ class TextChapterLayout(
         job.start()
     }
 
-    fun setProgressListener(l: LayoutProgressListener?) {
-        try {
-            if (isCompleted) {
-                // no op
-            } else if (exception != null) {
-                l?.onLayoutException(exception!!)
-            } else {
-                listener = l
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            AppLog.put("调用布局进度监听回调出错\n${e.localizedMessage}", e)
-        }
-    }
-
     fun cancel() {
         job.cancel()
         listener = null
@@ -228,7 +213,6 @@ class TextChapterLayout(
         val contents = bookContent.textList
         val imageStyle = book.getImageStyle()
         val isSingleImageStyle = imageStyle.equals(Book.imgStyleSingle, true)
-        val isTextImageStyle = imageStyle.equals(Book.imgStyleText, true)
 
         if (titleMode != 2 || bookChapter.isVolume || contents.isEmpty()) {
             var firstLine = true
@@ -247,7 +231,7 @@ class TextChapterLayout(
                 } else {
                     val urlMatcher = paramPattern.matcher(titleImg)
                     var click: String? = null
-                    var iStyle: String? = null
+                    var style: String? = null
                     var imgSize = ImageProvider.getImageSize(book, titleImg, ReadBook.bookSource)
                     if (urlMatcher.find()) {
                         var width: String? = null
@@ -256,7 +240,7 @@ class TextChapterLayout(
                             ?.let { map ->
                                 map.forEach { (key, value) ->
                                     when (key) {
-                                        "style" -> iStyle = value
+                                        "style" -> style = value
                                         "width" -> width = value
                                         "click" -> click = value
                                     }
@@ -277,14 +261,14 @@ class TextChapterLayout(
                             }
                         }
                     }
-                    if (iStyle == null) {
-                        iStyle = if (imgSize.width < 80 && imgSize.height < 80) {
+                    if (style == null) {
+                        style = if (imgSize.width < 80 && imgSize.height < 80) {
                             "text"
                         } else {
                             imageStyle
                         }
                     }
-                    when (iStyle) {
+                    when (style) {
                         "text" -> {
                             srcList.add(titleImg)
                             clickList.add(click)
@@ -300,7 +284,7 @@ class TextChapterLayout(
                                 book,
                                 titleImg,
                                 contentPaintTextHeight,
-                                iStyle,
+                                style,
                                 imgSize,
                                 click
                             )
@@ -331,6 +315,8 @@ class TextChapterLayout(
                 prepareNextPageIfNeed()
             }
         }
+
+        val isTextImageStyle = imageStyle.equals(Book.imgStyleText, true)
 
         val sb = StringBuffer()
         var isSetTypedImage = false
@@ -387,7 +373,7 @@ class TextChapterLayout(
                     while (matcher.find()) {
                         currentCoroutineContext().ensureActive()
                         val imgSrc = matcher.group(1)!!
-                        var iStyle: String? = null
+                        var style: String? = null
                         var click: String? = null
                         var imgSize = ImageProvider.getImageSize(book, imgSrc, ReadBook.bookSource)
                         val urlMatcher = paramPattern.matcher(imgSrc)
@@ -397,7 +383,7 @@ class TextChapterLayout(
                             GSON.fromJsonObject<Map<String, String>>(urlOptionStr).getOrNull()?.let { map ->
                                 map.forEach { (key, value) ->
                                     when (key) {
-                                        "style" -> iStyle = value
+                                        "style" -> style = value
                                         "width" -> width = value
                                         "click" -> click = value
                                     }
@@ -418,8 +404,8 @@ class TextChapterLayout(
                                 }
                             }
                         }
-                        if (iStyle == null) {
-                            iStyle = if (imgSize.width < 80 && imgSize.height < 80) {
+                        if (style == null) {
+                            style = if (imgSize.width < 80 && imgSize.height < 80) {
                                 "text"
                             } else {
                                 imageStyle
@@ -428,7 +414,7 @@ class TextChapterLayout(
                         if (start < matcher.start()) {
                             sb.append(text.subSequence(start, matcher.start()))
                         }
-                        when (iStyle) {
+                        when (style) {
                             "TEXT" -> {
                                 sb.append(reviewChar)
                                 srcList.add(imgSrc)
@@ -461,7 +447,7 @@ class TextChapterLayout(
                                     book,
                                     imgSrc,
                                     contentPaintTextHeight,
-                                    iStyle,
+                                    style,
                                     imgSize,
                                     click
                                 )
@@ -677,10 +663,10 @@ class TextChapterLayout(
                     val urlMatcher = paramPattern.matcher(source)
                     if (urlMatcher.find()) {
                         val urlOptionStr = source.substring(urlMatcher.end())
-                        val style = GSON.fromJsonObject<Map<String, String>>(urlOptionStr).getOrNull() ?: return@let
-                        var iStyle = style["style"]
-                        val width = style["width"]
-                        val click = style["click"]
+                        val urlOption = GSON.fromJsonObject<Map<String, String>>(urlOptionStr).getOrNull() ?: return@let
+                        var iStyle = urlOption["style"]
+                        val width = urlOption["width"]
+                        val click = urlOption["click"]
                         var imgSize = ImageProvider.getImageSize(book, source, ReadBook.bookSource)
                         width?.let {
                             if (width.endsWith("%")) {

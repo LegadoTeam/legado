@@ -3,7 +3,6 @@ package io.legado.app.ui.book.info
 import android.app.Application
 import android.content.Intent
 import android.net.Uri
-import android.view.MenuItem
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
@@ -528,14 +527,13 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
-    fun onButtonClick(activity: AppCompatActivity, name: String, click: String?) {
+    fun onButtonClick(activity: AppCompatActivity, name: String, click: String) {
         val source = bookSource ?: return
         val book = bookData.value ?: return
-        val jsStr = click ?: return
         execute {
             val java = SourceLoginJsExtensions(activity, source)
             runScriptWithContext {
-                source.evalJS(jsStr) {
+                source.evalJS(click) {
                     put("result", null)
                     put("java", java)
                     put("book", book)
@@ -543,7 +541,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             }
         }.onError {
             AppLog.put("${source.bookSourceName}: ${it.localizedMessage}", it)
-            context.toastOnUi("$name button click error\n${it.localizedMessage}")
+            context.toastOnUi("$name click error\n${it.localizedMessage}")
         }
     }
 

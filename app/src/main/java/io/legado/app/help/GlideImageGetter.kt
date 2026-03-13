@@ -17,7 +17,6 @@ import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
 import io.legado.app.model.analyzeRule.AnalyzeUrl.Companion.paramPattern
 import io.legado.app.utils.GSON
-import io.legado.app.utils.dpToPx
 import io.legado.app.utils.fromJsonObject
 import java.lang.ref.WeakReference
 import io.legado.app.utils.lifecycle
@@ -30,11 +29,17 @@ import kotlin.text.endsWith
 import kotlin.text.toIntOrNull
 import androidx.core.graphics.drawable.toDrawable
 import android.graphics.Color
+import com.bumptech.glide.request.RequestOptions
+import io.legado.app.data.appDb
+import io.legado.app.help.glide.OkHttpModelLoader
+import io.legado.app.model.analyzeRule.AnalyzeUrl
 
 class GlideImageGetter(
     context: Context,
     textView: TextView,
-    private val lifecycle: Lifecycle
+    private val lifecycle: Lifecycle,
+    private val availableWidth: Int,
+    private val sourceOrigin: String? = null
 ) : Html.ImageGetter, Drawable.Callback {
     private val textViewRef = WeakReference(textView)
     private val contextRef = WeakReference(context)
@@ -43,9 +48,8 @@ class GlideImageGetter(
     private val emptyDrawable by lazy {
         Color.TRANSPARENT.toDrawable()
     }
-    private val availableWidth by lazy {
-        val textView = textViewRef.get() ?: return@lazy 800
-        textView.width - textView.paddingLeft - textView.paddingRight - 8.dpToPx() //8是为了文字对齐额外的右边距
+    private val bookSource by lazy {
+        sourceOrigin?.let { appDb.bookSourceDao.getBookSource(it) }
     }
 
     override fun getDrawable(source: String?): Drawable {
@@ -53,20 +57,27 @@ class GlideImageGetter(
         if (context == null || source.isNullOrBlank()) {
             return emptyDrawable
         }
-        var style: Map<String, String>? = null
-        if (source.startsWith("data:image/svg")) {
+        var urlOption: Map<String, String>? = null
+        if (source.startsWith("data")) {
             var data: String? = null
             val urlMatcher = paramPattern.matcher(source)
             if (urlMatcher.find()) {
                 val urlOptionStr = source.substring(urlMatcher.end())
-                style = GSON.fromJsonObject<Map<String, String>>(urlOptionStr).getOrNull()
-                data = source.take(urlMatcher.start())
+                urlOption = GSON.fromJsonObject<Map<String, String>>(urlOptionStr).getOrNull()
+                data = if (source.startsWith("data:image/svg")) {
+                    source.take(urlMatcher.start())
+                } else {
+                    AnalyzeUrl(
+                        source,
+                        source = bookSource
+                    ).url
+                }
             }
             val inputStream =
                 ByteArrayInputStream(Base64.decode((data ?: source).substringAfter(",")))
             val (pictureDrawable, size) = SvgUtils.createDrawable(inputStream)
                 ?: return emptyDrawable
-            val rect = getDrawableRect(size, style)
+            val rect = getDrawableRect(size, urlOption)
             pictureDrawable.bounds = rect
             return pictureDrawable
         }
@@ -79,23 +90,28 @@ class GlideImageGetter(
         val urlMatcher = paramPattern.matcher(source)
         if (urlMatcher.find()) {
             val urlOptionStr = source.substring(urlMatcher.end())
-            style = GSON.fromJsonObject<Map<String, String>>(urlOptionStr).getOrNull()
+            urlOption = GSON.fromJsonObject<Map<String, String>>(urlOptionStr).getOrNull()
         }
-        val target = ImageTarget(urlDrawable, source, style)
+        val target = ImageTarget(urlDrawable, source, urlOption)
+        var options = RequestOptions()
+        if (sourceOrigin != null) {
+            options = options.set(OkHttpModelLoader.sourceOriginOption, sourceOrigin)
+        }
         Glide.with(context).lifecycle(lifecycle)
             .load(source)
+            .apply(options)
             .into(target)
         return urlDrawable
     }
 
-    private fun getDrawableRect(size: Size, style: Map<String, String>?): Rect {
+    private fun getDrawableRect(size: Size, urlOption: Map<String, String>?): Rect {
         val drawableWidth = size.width.coerceAtLeast(1)
         val drawableHeight = size.height.coerceAtLeast(1)
-        if (style == null) {
+        if (urlOption == null) {
             return Rect(0, 0, drawableWidth, drawableHeight)
         }
-        val styleWidth = style["width"]
-        val styleType = style["style"]
+        val styleWidth = urlOption["width"]
+        val styleType = urlOption["style"]
         if (styleWidth == null && styleType == null) {
             return Rect(0, 0, drawableWidth, drawableHeight)
         }
@@ -236,7 +252,7 @@ class GlideImageGetter(
     private inner class ImageTarget(
         private val urlDrawable: GlideUrlDrawable,
         private val source: String,
-        private val style: Map<String, String>?
+        private val urlOption: Map<String, String>?
     ) : CustomTarget<Drawable>() {
 
         override fun onResourceReady(
@@ -245,7 +261,7 @@ class GlideImageGetter(
         ) {
             urlDrawable.setDrawable(drawable)
             val rect =
-                getDrawableRect(Size(drawable.intrinsicWidth, drawable.intrinsicHeight), style)
+                getDrawableRect(Size(drawable.intrinsicWidth, drawable.intrinsicHeight), urlOption)
             urlDrawable.bounds = rect
             notifyImageLoaded(source)
         }

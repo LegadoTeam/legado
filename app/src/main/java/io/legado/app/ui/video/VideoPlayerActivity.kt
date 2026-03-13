@@ -455,7 +455,8 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                         VideoPlay.source as? BookSource,
                         it,
                         VideoPlay.chapter,
-                        BookType.video
+                        BookType.video,
+                        url
                     ) {
                         sendToClip(url)
                     }

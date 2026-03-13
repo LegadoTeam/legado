@@ -264,6 +264,7 @@ let options = {
 
 * 回调操作
 > 先启用事件监听按钮，然后软件触发事件时会执行回调规则的js代码。  
+可空字符串变量`result`的值为事件对应内容。  
 字符串变量`event`的值对应事件名称，目前的事件有
 ```js
 "clickBookName" //点击详情页书名
@@ -277,6 +278,8 @@ let options = {
 "clickCopyBookUrl" //点击详情页拷贝书籍URl按钮
 "clickCopyTocUrl" //点击详情页拷贝目录URl按钮
 "clickCopyPlayUrl" //音频、视频界面点击拷贝播放URL按钮
+"clickBookLabel" //点击详情页标签
+"longClickBookLabel" //长按详情页标签
 //上面的事件回调执行结果返回true会消费事件，原本的软件操作不会再执行
 
 //下面的事件无法被回调结果消费

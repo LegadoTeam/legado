@@ -288,7 +288,7 @@ object AudioPlay : CoroutineScope by MainScope() {
     fun setSpeed(speed: Float) {
         if (AudioPlayService.isRun) {
             book?.setPlaySpeed(speed)
-            val clampedSpeed = speed.coerceIn(0.5f, 2.0f)
+            val clampedSpeed = speed.coerceIn(0.5f, 3.0f)
             context.startService<AudioPlayService> {
                 action = IntentAction.setSpeed
                 putExtra("speed", clampedSpeed)
@@ -410,7 +410,8 @@ object AudioPlay : CoroutineScope by MainScope() {
         val book = book ?: return
         Coroutine.async {
             book.lastCheckCount = 0
-            book.durChapterTime = System.currentTimeMillis()
+            val durTime = System.currentTimeMillis()
+            book.durChapterTime = durTime
             val chapterChanged = book.durChapterIndex != durChapterIndex
             book.durChapterIndex = durChapterIndex
             book.durChapterPos = durChapterPos
@@ -421,7 +422,7 @@ object AudioPlay : CoroutineScope by MainScope() {
                         book.getUseReplaceRule(),
                         replaceBook = book.toReplaceBook()
                     )
-                    SourceCallBack.callBackBook(SourceCallBack.SAVE_READ, bookSource, book, it)
+                    SourceCallBack.callBackBook(SourceCallBack.SAVE_READ, bookSource, book, it,durTime.toString())
                 }
             }
             book.update()
