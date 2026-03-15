@@ -53,3 +53,16 @@ export const dateFormat = (/** @type {number} */ t: number) => {
   }
   return str
 }
+
+/**
+ * 懒加载正则
+ */
+export const lazyRegex = (pattern: string, flags?: string) => {
+  let instance: RegExp | null = null
+  return () => {
+    if (!instance) {
+      instance = new RegExp(pattern, flags)
+    }
+    return instance
+  }
+}
