@@ -329,8 +329,11 @@ class TextChapterLayout(
                     prepareNextPageIfNeed()
                     return@forEach
                 } else if (text.startsWith("<usehtml>")) {
-                    setTypeHtml(imageStyle, book, text.substring(9, text.lastIndexOf("<")))
-                    return@forEach
+                    val endInt = text.lastIndexOf("<")
+                    if (endInt > 9) {
+                        setTypeHtml(imageStyle, book, text.substring(9, endInt))
+                        return@forEach
+                    }
                 }
             }
             var text = content.replace(srcReplaceChar, srcReplacementChar)
