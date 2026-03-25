@@ -9,9 +9,6 @@
 <img width="125" height="125" src="https://github.com/gedoor/legado/raw/master/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" alt="legado"/>  
   
 Legado / 开源阅读
-<br>
-<a href="https://gedoor.github.io" target="_blank">gedoor.github.io</a> / <a href="www.legado.top/" target="_blank">www.legado.top</a>
-<br>
 Legado 是一款免费的 Android 平台开源小说阅读器。
 </div>
 
