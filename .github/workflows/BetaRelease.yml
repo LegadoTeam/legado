@@ -58,7 +58,7 @@ jobs:
       VERSIONL: ${{ needs.prepare.outputs.versionL }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -174,7 +174,7 @@ jobs:
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/download-artifact@v8
         with:
           path: apk/
@@ -219,7 +219,7 @@ jobs:
     env:
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/download-artifact@v8
         with:
           path: apk/
@@ -257,7 +257,7 @@ jobs:
       LANZOU_FOLDER_ID: ${{ secrets.LANZOU_FOLDER_ID }}
       LANZOU_URL: ${{ secrets.LANZOU_URL }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/download-artifact@v8
         with:
           path: apk/
@@ -274,7 +274,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event_name != 'pull_request' && github.actor == 'LegadoTeam' }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/download-artifact@v8
         with:
           path: apk/
@@ -296,7 +296,7 @@ jobs:
     if: ${{ github.event_name != 'pull_request' && needs.prepare.outputs.telegram == 'yes' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/download-artifact@v8
         with:
           path: apk/
