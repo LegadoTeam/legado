@@ -199,7 +199,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Create or update beta tag
-        uses: richardsimko/update-tag@v1
+        uses: richardsimko/update-tag@v2
         with:
           tag_name: beta
         env:
