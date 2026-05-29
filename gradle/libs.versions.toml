@@ -1,7 +1,7 @@
 [versions]
 
 kotlin = "2.3.21"
-ksp = "2.3.4"
+ksp = "2.3.9"
 agp = "8.13.2"
 appcompat = "1.7.1"
 colorpicker = "1.1.0"
@@ -22,7 +22,7 @@ coroutines = "1.10.2"
 liveeventbus = "1.8.14"
 markwon = "4.6.2"
 material = "1.13.0"
-media = "1.7.1"
+media = "1.8.0"
 danmaku = "0.9.25"
 nanoHttpd = "2.3.1"
 okhttp = "5.3.2"
