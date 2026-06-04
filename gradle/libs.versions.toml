@@ -64,7 +64,7 @@ media3 = "1.10.1"
 gsyvideoplayer = "13.0.0"
 
 #noinspection GradleDependency
-webkit = "1.14.0"
+webkit = "1.16.0"
 #noinspection GradleDependency
 activity = "1.13.0"
 #noinspection GradleDependency
