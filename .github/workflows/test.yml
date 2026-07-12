@@ -65,6 +65,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Verify Beta Release Notes
+        if: ${{ matrix.type == 'release' }}
+        run: bash .github/scripts/test-extract-latest-update.sh
+
       - name: Setup JDK 17
         uses: actions/setup-java@v5
         with:
