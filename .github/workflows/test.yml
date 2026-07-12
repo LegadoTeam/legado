@@ -126,10 +126,8 @@ jobs:
           fi
 
           chmod +x gradlew
-          echo "开始构建: $product - $typeName"
-          ./gradlew :$product:assembleRelease --build-cache --parallel --daemon --warning-mode all
-
-          echo "处理APK文件"
+          echo "开始构建 ARM APK: $product - $typeName"
+          ./gradlew :$product:assembleRelease -ParmOnly=true --build-cache --parallel --daemon --warning-mode all
           mkdir -p ${{ github.workspace }}/apk/
           bash $GITHUB_WORKSPACE/.github/scripts/collect-apks.sh \
             $GITHUB_WORKSPACE/app/build/outputs/apk \
@@ -137,7 +135,17 @@ jobs:
             ${{ env.product }} \
             ${{ env.VERSIONL }} \
             "$typeName" \
-            true
+            arm
+
+          echo "开始构建通用 APK: $product - $typeName"
+          ./gradlew :$product:assembleRelease --build-cache --parallel --daemon --warning-mode all
+          bash $GITHUB_WORKSPACE/.github/scripts/collect-apks.sh \
+            $GITHUB_WORKSPACE/app/build/outputs/apk \
+            $GITHUB_WORKSPACE/apk \
+            ${{ env.product }} \
+            ${{ env.VERSIONL }} \
+            "$typeName" \
+            universal
 
           echo "移动mapping文件"
           mkdir -p ${{ github.workspace }}/mapping/
@@ -160,11 +168,11 @@ jobs:
 
       - name: Check Build Result
         run: |
-          expected_abis=(arm64-v8a armeabi-v7a x86 x86_64 universal)
+          expected_packages=(arm universal)
           mapfile -d '' apks < <(find ${{ github.workspace }}/apk -maxdepth 1 \
             -type f -name 'legado_*.apk' -print0)
-          if [[ ${#apks[@]} -ne ${#expected_abis[@]} ]]; then
-            echo "Expected ${#expected_abis[@]} APKs, found ${#apks[@]}"
+          if [[ ${#apks[@]} -ne ${#expected_packages[@]} ]]; then
+            echo "Expected ${#expected_packages[@]} APKs, found ${#apks[@]}"
             exit 1
           fi
 
@@ -172,18 +180,11 @@ jobs:
           for apk in "${apks[@]}"; do
             file_name=$(basename "$apk")
             case "$file_name" in
-              *arm64-v8a*) abi=arm64-v8a ;;
-              *armeabi-v7a*) abi=armeabi-v7a ;;
-              *x86_64*) abi=x86_64 ;;
-              *x86*) abi=x86 ;;
-              *universal*) abi=universal ;;
-              *)
-                echo "Cannot determine ABI from $file_name"
-                exit 1
-                ;;
+              *通用*) package_kind=universal ;;
+              *) package_kind=arm ;;
             esac
-            if [[ -n "${verified[$abi]:-}" ]]; then
-              echo "Multiple APKs detected for $abi"
+            if [[ -n "${verified[$package_kind]:-}" ]]; then
+              echo "Multiple APKs detected for $package_kind"
               exit 1
             fi
 
@@ -191,21 +192,21 @@ jobs:
               | sed -n 's#^lib/\([^/]*\)/.*#\1#p' \
               | sort -u \
               | paste -sd ' ' -)
-            if [[ "$abi" == "universal" ]]; then
+            if [[ "$package_kind" == "universal" ]]; then
               expected_native_abis="arm64-v8a armeabi-v7a x86 x86_64"
             else
-              expected_native_abis="$abi"
+              expected_native_abis="arm64-v8a armeabi-v7a"
             fi
             if [[ "$packaged_abis" != "$expected_native_abis" ]]; then
-              echo "$abi APK contains unexpected native ABIs: $packaged_abis"
+              echo "$package_kind APK contains unexpected native ABIs: $packaged_abis"
               exit 1
             fi
-            verified[$abi]=$apk
+            verified[$package_kind]=$apk
           done
 
-          for abi in "${expected_abis[@]}"; do
-            if [[ -z "${verified[$abi]:-}" ]]; then
-              echo "Missing APK for $abi"
+          for package_kind in "${expected_packages[@]}"; do
+            if [[ -z "${verified[$package_kind]:-}" ]]; then
+              echo "Missing APK for $package_kind"
               exit 1
             fi
           done

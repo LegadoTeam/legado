@@ -22,6 +22,7 @@ static def releaseTime() {
 def name = "legado"
 def version = "3." + releaseTime()
 def gitCommits = Integer.parseInt('git rev-list HEAD --count'.execute().text.trim())
+def armOnly = project.findProperty("armOnly")?.toBoolean() ?: false
 
 android {
     compileSdk = compile_sdk_version
@@ -54,6 +55,12 @@ android {
         versionName version
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         project.ext.set("archivesBaseName", name + "_" + version)
+
+        if (armOnly) {
+            ndk {
+                abiFilters 'arm64-v8a', 'armeabi-v7a'
+            }
+        }
 
         buildConfigField "String", "Cronet_Version", "\"$CronetVersion\""
         buildConfigField "String", "Cronet_Main_Version", "\"$CronetMainVersion\""
@@ -108,16 +115,6 @@ android {
             manifestPlaceholders.put("APP_CHANNEL_VALUE", "app")
         }
     }
-
-    splits {
-        abi {
-            enable = true
-            reset()
-            include 'arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64'
-            universalApk = true
-        }
-    }
-
 
     room {
         schemaDirectory "$projectDir/schemas"

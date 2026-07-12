@@ -105,10 +105,8 @@ jobs:
           fi
 
           chmod +x gradlew
-          echo "开始构建: $product - $typeName"
-          ./gradlew :$product:assembleRelease --build-cache --parallel --daemon --warning-mode all
-
-          echo "处理APK文件"
+          echo "开始构建 ARM APK: $product - $typeName"
+          ./gradlew :$product:assembleRelease -ParmOnly=true --build-cache --parallel --daemon --warning-mode all
           mkdir -p ${{ github.workspace }}/apk/
           bash $GITHUB_WORKSPACE/.github/scripts/collect-apks.sh \
             $GITHUB_WORKSPACE/app/build/outputs/apk \
@@ -116,7 +114,17 @@ jobs:
             ${{ env.product }} \
             ${{ env.VERSIONL }} \
             "$typeName" \
-            true
+            arm
+
+          echo "开始构建通用 APK: $product - $typeName"
+          ./gradlew :$product:assembleRelease --build-cache --parallel --daemon --warning-mode all
+          bash $GITHUB_WORKSPACE/.github/scripts/collect-apks.sh \
+            $GITHUB_WORKSPACE/app/build/outputs/apk \
+            $GITHUB_WORKSPACE/apk \
+            ${{ env.product }} \
+            ${{ env.VERSIONL }} \
+            "$typeName" \
+            universal
 
           echo "移动mapping文件"
           mkdir -p ${{ github.workspace }}/mapping/
