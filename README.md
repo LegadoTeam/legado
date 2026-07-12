@@ -4,7 +4,6 @@
 </a>
 
 <div align="center">
-<img width="125" height="125" src="https://github.com/gedoor/legado/raw/master/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" alt="legado"/>  
   
 Legado
 Legado 是一款免费的 Android 平台开源小说阅读器。
@@ -28,4 +27,3 @@ Legado 是一款免费的 Android 平台开源小说阅读器。
 > * com.positiondev.epublib:epublib-core
 > * com.github.Moriafly:LyricViewX
 > * io.github.rosemoe:editor
-

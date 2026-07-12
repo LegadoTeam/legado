@@ -307,7 +307,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         }
 
     var threadCount: Int
-        get() = appCtx.getPrefInt(PreferKey.threadCount, 16)
+        get() = appCtx.getPrefInt(PreferKey.threadCount, 32)
         set(value) {
             appCtx.putPrefInt(PreferKey.threadCount, value)
         }
@@ -532,7 +532,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefString(PreferKey.clickImgWay)
 
     var preDownloadNum
-        get() = appCtx.getPrefInt(PreferKey.preDownloadNum, 10)
+        get() = appCtx.getPrefInt(PreferKey.preDownloadNum, 2)
         set(value) {
             appCtx.putPrefInt(PreferKey.preDownloadNum, value)
         }

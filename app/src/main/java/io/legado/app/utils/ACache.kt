@@ -377,9 +377,8 @@ class ACache private constructor(cacheDir: File, max_size: Long, max_count: Int)
      * @return bitmap 数据
      */
     fun getAsBitmap(key: String): Bitmap? {
-        return if (getAsBinary(key) == null) {
-            null
-        } else Utils.bytes2Bitmap(getAsBinary(key)!!)
+        val bytes = getAsBinary(key) ?: return null
+        return Utils.bytes2Bitmap(bytes)
     }
 
     // =======================================
@@ -413,13 +412,7 @@ class ACache private constructor(cacheDir: File, max_size: Long, max_count: Int)
      * @return Drawable 数据
      */
     fun getAsDrawable(key: String): Drawable? {
-        return if (getAsBinary(key) == null) {
-            null
-        } else Utils.bitmap2Drawable(
-            Utils.bytes2Bitmap(
-                getAsBinary(key)!!
-            )
-        )
+        return Utils.bitmap2Drawable(getAsBitmap(key))
     }
 
     /**

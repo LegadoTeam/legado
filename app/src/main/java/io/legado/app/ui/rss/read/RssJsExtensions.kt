@@ -75,6 +75,12 @@ open class RssJsExtensions(
         }
     }
 
+    fun searchBook(key: String, source: BookSource) {
+        activityRef.get()?.let {
+            SearchActivity.start(it, source, key)
+        }
+    }
+
     @JavascriptInterface
     fun addBook(bookUrl: String) {
         activityRef.get()?.showDialogFragment(AddToBookshelfDialog(bookUrl))
@@ -139,9 +145,7 @@ open class RssJsExtensions(
                         } ?: url
                     }
                     val sourceUrl = toSource.sourceUrl
-                    withContext(Main) {
-                        RssSortActivity.start(activity, sortUrl, sourceUrl)
-                    }
+                    RssSortActivity.start(activity, sortUrl, sourceUrl)
                 }
 
                 "rss" -> {
@@ -154,14 +158,12 @@ open class RssJsExtensions(
                     if (url.isNullOrBlank()) {
                         if (toSource.singleUrl) {
                             if (sourceUrl.startsWith("http", true)) {
-                                withContext(Main) {
-                                    ReadRssActivity.start(
-                                        activity,
-                                        singleTop,
-                                        sourceUrl,
-                                        title
-                                    )
-                                }
+                                ReadRssActivity.start(
+                                    activity,
+                                    singleTop,
+                                    sourceUrl,
+                                    title
+                                )
                             } else {
                                 activity.openUrl(sourceUrl)
                             }
@@ -180,20 +182,16 @@ open class RssJsExtensions(
                                 else -> it
                             }
                         }
-                        withContext(Main) {
-                            if (startHtml.isNullOrBlank()) {
-                                activity.startActivity<RssSortActivity> {
-                                    putExtra("sourceUrl", sourceUrl)
-                                }
-                            } else {
-                                ReadRssActivity.start(
-                                    activity,
-                                    singleTop,
-                                    sourceUrl,
-                                    title,
-                                    startHtml = startHtml
-                                )
-                            }
+                        if (startHtml.isNullOrBlank()) {
+                            RssSortActivity.start(activity, null, sourceUrl)
+                        } else {
+                            ReadRssActivity.start(
+                                activity,
+                                singleTop,
+                                sourceUrl,
+                                title,
+                                startHtml = startHtml
+                            )
                         }
                         return@launch
                     }
@@ -218,14 +216,13 @@ open class RssJsExtensions(
 
                 "search" -> {
                     title?.let {
-                        val searchScope = origin?.let { o  ->
+                        origin?.let { o  ->
                             appDb.bookSourceDao.getBookSource(o)?.let { s ->
-                                "${s.bookSourceName.replace(":", "")}::${o}"
+                                searchBook(it, s)
+                                return@launch
                             }
                         }
-                        withContext(Main) {
-                            searchBook(it, searchScope)
-                        }
+                        searchBook(it)
                     }
                 }
 

@@ -35,30 +35,31 @@ object WebViewPool {
     private val CACHED_WEB_VIEW_MAX_NUM = max(AppConfig.threadCount / 10, 5) // 池子总容量（闲置+使用）
     private const val IDLE_TIME_OUT: Long = 5 * 60 * 1000 // 闲置5分钟后销毁
     private const val IDLE_TIME_OUT_LAST: Long = 30 * 60 * 1000 // 最后一个闲置30分钟后销毁
-    private val cleanupScope by lazy { CoroutineScope(Dispatchers.IO + SupervisorJob()) }
+    private val cleanupScope by lazy {
+        CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
+    }
     private var cleanupJob: Job? = null
 
     // 获取一个WebView
     @Synchronized
     fun acquire(context: Context): PooledWebView {
         val pooledWebView = if (idlePool.isNotEmpty()) {
-            idlePool.pop().upContext(context).apply { // 复用闲置实例
-                realWebView.settings.setDarkeningAllowed(AppConfig.isNightTheme) //重新设置一次是否夜间
-            }
+            idlePool.pop() // 复用闲置实例
         } else {
             if (needInitialize) {
                 needInitialize = false
                 startCleanupTimer()
             }
-            createNewWebView(context) // 创建新实例
+            createNewWebView() // 创建新实例
         }
-        if (inUsePool.isEmpty()) {
-            pooledWebView.realWebView.resumeTimers()
+        pooledWebView.upContext(context).apply {
+            realWebView.settings.setDarkeningAllowed(AppConfig.isNightTheme) //设置是否夜间
+            if (inUsePool.isEmpty()) {
+                realWebView.resumeTimers()
+            }
+            isInUse = true
         }
-        pooledWebView.let {
-            it.isInUse = true
-            inUsePool[it.id] = it
-        }
+        inUsePool[pooledWebView.id] = pooledWebView
         return pooledWebView
     }
 
@@ -124,8 +125,8 @@ object WebViewPool {
         }
     }
 
-    private fun createNewWebView(context: Context = appCtx): PooledWebView {
-        val webView = VisibleWebView(MutableContextWrapper(context))
+    private fun createNewWebView(): PooledWebView {
+        val webView = VisibleWebView(MutableContextWrapper(appCtx))
         preInitWebView(webView)
         return PooledWebView(webView, generateId())
     }
@@ -149,7 +150,6 @@ object WebViewPool {
             allowContentAccess = true
             builtInZoomControls = true
             displayZoomControls = false
-            setDarkeningAllowed(AppConfig.isNightTheme)
             textZoom = 100
         }
     }

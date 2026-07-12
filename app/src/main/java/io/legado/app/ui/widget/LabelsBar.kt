@@ -17,13 +17,6 @@ class LabelsBar @JvmOverloads constructor(
     private val usedViews = arrayListOf<TextView>()
     var textSize = 12f
 
-//    fun setLabels(labels: Array<String>) {
-//        clear()
-//        labels.forEach {
-//            addLabel(it)
-//        }
-//    }
-
     fun setLabels(labels: List<String>, onClick: ((String) -> Unit)? = null, onLongClick: ((String) -> Boolean)? = null) {
         clear()
         labels.forEach {
@@ -57,8 +50,12 @@ class LabelsBar @JvmOverloads constructor(
         }
         tv.textSize = textSize
         tv.text = label
-        tv.setOnClickListener { onClick?.invoke(label) }
-        tv.setOnLongClickListener { onLongClick?.invoke(label) == true }
+        if (onClick != null) {
+            tv.setOnClickListener { onClick.invoke(label) }
+        }
+        if (onLongClick != null) {
+            tv.setOnLongClickListener { onLongClick.invoke(label) }
+        }
         addView(tv)
     }
 }

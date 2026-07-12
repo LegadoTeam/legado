@@ -28,46 +28,19 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
         if: ${{ env.cronet == 'ok' }}
 
-      - name: Download Cronet + Verify HttpEngineNativeProvider (AAR)
+      - name: Download and verify Cronet bundle
         if: ${{ env.cronet == 'ok' }}
         run: |
           set -euo pipefail
 
           chmod +x gradlew
           ./gradlew app:downloadCronet
-
-          echo "CRONET_VERSION=${CRONET_VERSION:-}"
-          echo "HTTPENGINE_PROVIDER_VERSION=${HTTPENGINE_PROVIDER_VERSION:-}"
-
-          if [[ -z "${HTTPENGINE_PROVIDER_VERSION:-}" ]]; then
-            echo "ERROR: HTTPENGINE_PROVIDER_VERSION is empty. Did cronet.sh write it to GITHUB_ENV?"
-            exit 1
-          fi
-
-          ver="$HTTPENGINE_PROVIDER_VERSION"
-          base="https://dl.google.com/dl/android/maven2/org/chromium/net/httpengine-native-provider/$ver"
-          aar_url="$base/httpengine-native-provider-$ver.aar"
-
-          echo "Downloading $aar_url"
-          curl -fsSL "$aar_url" -o /tmp/httpengine-native-provider.aar
-
-          echo "Extracting classes.jar from AAR"
-          unzip -p /tmp/httpengine-native-provider.aar classes.jar > /tmp/classes.jar
-
-          echo "=== Verify HttpEngineNativeProvider exists in AAR ==="
-          if jar tf /tmp/classes.jar | grep -F "org/chromium/net/impl/HttpEngineNativeProvider" >/dev/null; then
-            echo "OK: HttpEngineNativeProvider found in httpengine-native-provider-$ver.aar"
-          else
-            echo "FAIL: HttpEngineNativeProvider NOT found in httpengine-native-provider-$ver.aar"
-            exit 1
-          fi
-
-          echo "OK"
+          chmod +x .github/scripts/verify-cronet.sh
+          .github/scripts/verify-cronet.sh
 
       - name: Create Pull Request
         if: ${{ env.cronet == 'ok' }}
         uses: peter-evans/create-pull-request@v8
-        continue-on-error: true
         with:
           token: ${{ secrets.TOKEN_MGZ }}
           title: ${{ env.PR_TITLE }}
@@ -78,8 +51,8 @@ jobs:
           branch: cronet
           delete-branch: true
           add-paths: |
-            *cronet*jar
-            *cronet.json
-            *updateLog.md
-            *gradle.properties
-            *cronet-proguard-rules.pro
+            app/cronetlib/*.jar
+            app/src/main/assets/cronet.json
+            app/src/main/assets/updateLog.md
+            gradle.properties
+            app/cronet-proguard-rules.pro

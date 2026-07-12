@@ -20,6 +20,7 @@ import io.legado.app.help.AppFreezeMonitor
 import io.legado.app.help.DispatchersMonitor
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
+import io.legado.app.help.http.Cronet
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.prefs.fragment.PreferenceFragment
 import io.legado.app.lib.theme.primaryColor
@@ -202,6 +203,10 @@ class OtherConfigFragment : PreferenceFragment(),
                 LiveEventBus.config().enableLogger(AppConfig.recordLog)
                 AppFreezeMonitor.init(appCtx)
                 DispatchersMonitor.init()
+            }
+
+            PreferKey.cronet -> if (appCtx.getPrefBoolean(PreferKey.cronet)) {
+                Cronet.preDownload()
             }
 
             PreferKey.processText -> sharedPreferences?.let {

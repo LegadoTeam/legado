@@ -65,24 +65,24 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Verify Beta Release Notes
+        if: ${{ matrix.type == 'release' }}
+        run: bash .github/scripts/test-extract-latest-update.sh
+
       - name: Setup JDK 17
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: 17
 
+      - name: Verify Cronet Bundle
+        if: ${{ matrix.type == 'release' }}
+        run: |
+          chmod +x .github/scripts/verify-cronet.sh
+          .github/scripts/verify-cronet.sh
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
-
-      - name: Cache Gradle Dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
 
       - name: Prepare Assets
         run: |

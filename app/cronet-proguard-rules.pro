@@ -127,6 +127,9 @@
     public <init>(android.content.Context);
 }
 
+# Used by reflection from NativeCronetProvider#isEnabled.
+-keep class org.chromium.net.impl.NativeCronetProviderSentinel
+
 # While Chrome doesn't need to keep these with their version of R8, some cronet
 # users may be on other optimizers which still require the annotation to be
 # kept in order for the keep rules to work.
@@ -148,7 +151,6 @@
 # Generated for chrome apk and not included into cronet.
 -dontwarn org.chromium.base.library_loader.LibraryLoader
 -dontwarn org.chromium.base.SysUtils
--dontwarn org.chromium.build.NativeLibraries
 
 # Objects of this type are passed around by native code, but the class
 # is never used directly by native code. Since the class is not loaded, it does
@@ -185,6 +187,15 @@
 # Part of the Android System SDK; false positive when pointing ProGuard to the
 # public SDK.
 -dontwarn android.os.SystemProperties
+
+# These references are missing, but that's fine because they are dead code. See
+# https://crbug.com/447361039.
+# TODO(https://crbug.com/447361039): -dontwarn rules are dangeous, because if
+# Cronet starts using these classes we will not be warned that they are missing.
+# We should either ship these classes or refactor the code to stop referencing
+# them.
+-dontwarn internal.org.chromium.build.NativeLibraries
+-dontwarn org.chromium.base.version_info.VersionConstantsBridgeJni
 # -------- Config Path: components/cronet/android/cronet_shared_proguard.cfg --------
 # Proguard config for apps that depend on cronet_shared_java.jar (which should
 # be all apps that depend on any part of Cronet)
@@ -248,6 +259,19 @@
 -keepclasseswithmembers class !cr_allowunused,**J.N {
   public long *_HASH;
 }
-# -------- Config Path: obj/third_party/androidx/androidx_annotation_annotation_experimental_java/proguard.txt --------
-# Intentionally empty proguard rules to indicate this library is safe to shrink
 
+# -------- Config Path: components/cronet/android/cronet_impl_platform_proguard.cfg --------
+# Proguard config for apps that depend on cronet_impl_platform_java.jar.
+
+# This constructor is called using the reflection from Cronet API (cronet_api.jar).
+-keep class org.chromium.net.impl.JavaCronetProvider {
+    public <init>(android.content.Context);
+}
+
+# -------- Config Path: components/cronet/android/httpengine_native_provider_proguard.cfg --------
+# Proguard config for apps that depend on httpengine_native_provider_java.jar.
+
+# This constructor is called using the reflection from Cronet API (cronet_api.jar).
+-keep class org.chromium.net.impl.HttpEngineNativeProvider {
+    public <init>(android.content.Context);
+}

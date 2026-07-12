@@ -48,8 +48,6 @@ android {
     }
     defaultConfig {
         applicationId "com.legado.app"
-        // httpengine-native-provider requires minSdkVersion >= 23
-        // (it declares minSdkVersion=23 in its own AndroidManifest.xml).
         minSdk 23
         targetSdk 36
         versionCode 30000 + gitCommits
@@ -248,16 +246,6 @@ dependencies {
     //网络
     implementation(libs.okhttp)
     implementation(fileTree(dir: 'cronetlib', include: ['*.jar', '*.aar']))
-
-    // HttpEngine provider (fixes R8 missing class: org.chromium.net.impl.HttpEngineNativeProvider)
-    def httpEngineNativeProviderVersion = project.findProperty("HttpEngineNativeProviderVersion") as String
-    if (httpEngineNativeProviderVersion) {
-        implementation("org.chromium.net:httpengine-native-provider:$httpEngineNativeProviderVersion") {
-            // Avoid pulling duplicate Cronet jars; this project bundles Cronet jars under app/cronetlib/
-            exclude group: "org.chromium.net", module: "cronet-common"
-            exclude group: "org.chromium.net", module: "cronet-shared"
-        }
-    }
 
     implementation(libs.protobuf.javalite)
 
