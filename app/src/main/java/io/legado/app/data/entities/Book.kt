@@ -22,6 +22,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.model.ReadBook
 import io.legado.app.utils.GSON
+import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.fromJsonObject
 import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
@@ -169,6 +170,14 @@ data class Book(
     fun getUnreadChapterNum() = max(simulatedTotalChapterNum() - durChapterIndex - 1, 0)
 
     fun getDisplayCover() = if (customCoverUrl.isNullOrEmpty()) coverUrl else customCoverUrl
+
+    /** Source credentials are only reused for custom covers on the same network origin. */
+    fun getCoverSourceOrigin(): String? {
+        val customUrl = customCoverUrl?.takeIf { it.isNotEmpty() } ?: return origin
+        val sourceOrigin = NetworkUtils.getBaseUrl(origin) ?: return null
+        val coverOrigin = NetworkUtils.getBaseUrl(customUrl) ?: return null
+        return origin.takeIf { sourceOrigin.equals(coverOrigin, ignoreCase = true) }
+    }
 
     fun getDisplayIntro() = if (customIntro.isNullOrEmpty()) intro else customIntro
 
