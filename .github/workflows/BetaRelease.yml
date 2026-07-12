@@ -297,27 +297,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
       - uses: actions/download-artifact@v8
         with:
           path: apk/
-      - working-directory: apk/
+
+      - name: Rename apk
+        working-directory: apk/
         run: |
           for file in */*.apk; do
             newName=$(echo "$file" | sed -e 's#.*\/##g' -e "s/_/ /g" -e 's/legado/阅读/')
             mv "$file" "$newName"
           done
           rm -rf */
-          
+
       - name: Check apk size
         working-directory: apk/
         run: |
           ls -lh
           du -h *
+
       - name: Post to Telegram Channel
-        uses: xireiki/channel-post@main
+        uses: xireiki/channel-post@v2
         with:
           chat_id: ${{ secrets.CHANNEL_ID }}
           bot_token: ${{ secrets.BOT_TOKEN }}
           context: "#阅读 #Legado #Beta #新包名 ${{ needs.prepare.outputs.versionL }}"
           path: apk/*
           method: sendFile
+          large_file: true
+          api_id: ${{ secrets.API_ID }}
+          api_hash: ${{ secrets.API_HASH }}
+          cache_session: true
