@@ -48,6 +48,33 @@ import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers.IO
 
+private val webFileSuffixPattern = Regex("[A-Za-z0-9][A-Za-z0-9._-]{0,31}")
+
+internal fun normalizeWebFileName(
+    fileName: String,
+    rawSuffix: String?,
+    replaceExistingSuffix: Boolean = true,
+): String {
+    val suffix = rawSuffix
+        ?.trim()
+        ?.trimStart('.')
+        ?.takeIf { webFileSuffixPattern.matches(it) }
+        ?: return fileName
+    val baseName = fileName.trimEnd('.')
+    if (baseName.isEmpty()) return fileName
+    val dotIndex = baseName.lastIndexOf('.')
+    if (dotIndex <= 0) {
+        return "$baseName.$suffix"
+    }
+    val currentSuffix = baseName.substring(dotIndex + 1)
+    if (currentSuffix.equals(suffix, ignoreCase = true)) return baseName
+    return if (replaceExistingSuffix) {
+        "${baseName.substring(0, dotIndex)}.$suffix"
+    } else {
+        "$baseName.$suffix"
+    }
+}
+
 class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     val bookData = MutableLiveData<Book>()
     val chapterListData = MutableLiveData<List<BookChapter>>()
@@ -289,12 +316,16 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     it, source = bookSource,
                     coroutineContext = coroutineContext
                 )
-                var mFileName = UrlUtil.getFileName(analyzeUrl)
-                    ?: fileNameNoExtension
-                analyzeUrl.type?.let { suffix ->
-                    mFileName += ".${suffix}"
-                }
-                WebFile(it, mFileName)
+                val urlFileName = UrlUtil.getFileName(analyzeUrl)
+                val fileName = urlFileName ?: fileNameNoExtension
+                WebFile(
+                    it,
+                    normalizeWebFileName(
+                        fileName,
+                        analyzeUrl.type,
+                        replaceExistingSuffix = urlFileName != null,
+                    )
+                )
             }
         }.onError {
             context.toastOnUi("LoadWebFileError\n${it.localizedMessage}")

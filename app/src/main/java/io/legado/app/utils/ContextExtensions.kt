@@ -155,9 +155,23 @@ inline fun <reified T : BroadcastReceiver> Context.broadcastPendingIntent(
 fun Context.startForegroundServiceCompat(intent: Intent) {
     try {
         startService(intent)
-    } catch (e: IllegalStateException) {
+    } catch (error: IllegalStateException) {
         ContextCompat.startForegroundService(this, intent)
     }
+}
+
+internal fun Throwable.isForegroundServiceStartDenied(): Boolean {
+    var current: Throwable? = this
+    while (current != null) {
+        if (current.javaClass.name == "android.app.ForegroundServiceStartNotAllowedException" ||
+            current.javaClass.simpleName == "ForegroundServiceStartNotAllowedException"
+        ) {
+            return true
+        }
+        val cause = current.cause
+        current = cause?.takeUnless { it === current }
+    }
+    return false
 }
 
 val Context.defaultSharedPreferences: SharedPreferences

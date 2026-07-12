@@ -12,6 +12,7 @@ import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.lib.permission.Permissions
 import io.legado.app.lib.permission.PermissionsCompat
 import io.legado.app.utils.LogUtils
+import io.legado.app.utils.isForegroundServiceStartDenied
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -48,7 +49,10 @@ abstract class BaseService : LifecycleService() {
             "onStartCommand $intent ${intent?.toUri(0)}"
         }
         if (!isForeground) {
-            startForegroundNotification()
+            if (!tryStartForegroundNotification()) {
+                stopSelfResult(startId)
+                return START_NOT_STICKY
+            }
             isForeground = true
         }
         return super.onStartCommand(intent, flags, startId)
@@ -94,8 +98,12 @@ abstract class BaseService : LifecycleService() {
             .addPermissions(Permissions.POST_NOTIFICATIONS)
             .rationale(R.string.notification_permission_rationale)
             .onGranted {
-                if (lifecycleScope.isActive) {
-                    startForegroundNotification()
+                if (lifecycleScope.isActive && !isForeground) {
+                    if (tryStartForegroundNotification()) {
+                        isForeground = true
+                    } else {
+                        stopSelf()
+                    }
                 }
             }
             .request()
@@ -106,6 +114,23 @@ abstract class BaseService : LifecycleService() {
                 .request()
         }
     }
+
+    private fun tryStartForegroundNotification(): Boolean {
+        return runCatching {
+            startForegroundNotification()
+        }.fold(
+            onSuccess = { true },
+            onFailure = { error ->
+                if (!error.isForegroundServiceStartDenied()) throw error
+                LogUtils.e(
+                    simpleName,
+                    "Foreground notification start denied: ${error.localizedMessage}"
+                )
+                false
+            }
+        )
+    }
+
     /**
      * 检测悬浮窗权限
      */

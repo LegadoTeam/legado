@@ -278,7 +278,16 @@ class CoverImageView @JvmOverloads constructor(
         lifecycle: Lifecycle? = null,
         onLoadFinish: (() -> Unit)? = null
     ) {
-       load(book.getDisplayCover(), book.name, book.author, loadOnlyWifi, book.origin, fragment, lifecycle, onLoadFinish)
+        load(
+            book.getDisplayCover(),
+            book.name,
+            book.author,
+            loadOnlyWifi,
+            book.getCoverSourceOrigin(),
+            fragment,
+            lifecycle,
+            onLoadFinish
+        )
     }
 
     fun load(

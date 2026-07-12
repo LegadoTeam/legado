@@ -99,6 +99,12 @@ jobs:
           sed '$a\RELEASE_STORE_PASSWORD=gedoor_legado'     $GITHUB_WORKSPACE/gradle.properties -i
           sed '$a\RELEASE_KEY_PASSWORD=gedoor_legado'       $GITHUB_WORKSPACE/gradle.properties -i
 
+      - name: Run Unit Tests
+        if: ${{ matrix.type == 'release' }}
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:testAppReleaseUnitTest --build-cache --parallel --daemon --warning-mode all
+
       - name: Build With Gradle
         run: |
           echo "当前版本号: $VERSION"

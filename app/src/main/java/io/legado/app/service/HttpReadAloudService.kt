@@ -62,6 +62,30 @@ import java.io.InputStream
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 
+internal fun buildHttpTtsCacheFileName(
+    chapterTitle: String,
+    sourceUrl: String?,
+    speechRate: Int,
+    sourceVariable: String,
+    loginHeader: String,
+    content: String,
+): String {
+    val chapterKey = MD5Utils.md5Encode16(chapterTitle)
+    val cacheIdentity = buildString {
+        arrayOf(
+            sourceUrl.orEmpty(),
+            speechRate.toString(),
+            sourceVariable,
+            loginHeader,
+            content,
+        ).forEach { value ->
+            append(value.length).append(':').append(value)
+        }
+    }
+    val audioKey = MD5Utils.md5Encode16(cacheIdentity)
+    return "${chapterKey}_$audioKey"
+}
+
 /**
  * 在线朗读
  */
@@ -419,8 +443,15 @@ class HttpReadAloudService : BaseReadAloudService(),
     }
 
     private fun md5SpeakFileName(content: String, textChapter: TextChapter? = this.textChapter): String {
-        return MD5Utils.md5Encode16(textChapter?.title ?: "") + "_" +
-                MD5Utils.md5Encode16("${ReadAloud.httpTTS?.url}-|-$speechRate-|-$content")
+        val httpTts = ReadAloud.httpTTS
+        return buildHttpTtsCacheFileName(
+            textChapter?.title.orEmpty(),
+            httpTts?.url,
+            speechRate,
+            httpTts?.getVariable().orEmpty(),
+            httpTts?.getLoginHeader().orEmpty(),
+            content,
+        )
     }
 
     private fun createSilentSound(fileName: String) {
