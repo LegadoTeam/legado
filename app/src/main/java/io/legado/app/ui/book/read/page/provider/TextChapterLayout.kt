@@ -8,6 +8,7 @@ import android.text.TextPaint
 import android.text.style.ForegroundColorSpan
 import android.text.style.ImageSpan
 import android.text.style.RelativeSizeSpan
+import android.text.style.ReplacementSpan
 import android.text.style.URLSpan
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern
@@ -55,6 +56,9 @@ import io.legado.app.utils.StringUtils
 import androidx.core.text.parseAsHtml
 import androidx.core.util.component1
 import androidx.core.util.component2
+import io.legado.app.help.TextViewTagHandler
+import io.legado.app.help.TextViewTagHandler.Companion.HR_PLACE_CHAR
+import io.legado.app.help.TextViewTagHandler.Companion.HR_PLACE_STR
 import io.legado.app.model.analyzeRule.AnalyzeUrl.Companion.paramPattern
 import io.legado.app.ui.book.read.page.entities.column.BaseColumn
 import io.legado.app.ui.book.read.page.entities.column.TextBaseColumn
@@ -74,6 +78,7 @@ class TextChapterLayout(
     private var listener: LayoutProgressListener? = textChapter
 
     private val paddingLeft = ChapterProvider.paddingLeft
+    private val paddingRight = ChapterProvider.paddingRight
     private val paddingTop = ChapterProvider.paddingTop
 
     private val titlePaint = ChapterProvider.titlePaint
@@ -597,7 +602,8 @@ class TextChapterLayout(
         book: Book,
         htmlContent: String,
     ) {
-        val spanned = htmlContent.parseAsHtml(HtmlCompat.FROM_HTML_MODE_COMPACT)
+        val textViewTagHandler = TextViewTagHandler()
+        val spanned = htmlContent.parseAsHtml(HtmlCompat.FROM_HTML_MODE_COMPACT, tagHandler = textViewTagHandler)
         val width = visibleWidth
         val textPaint = contentPaint
         val textColor = ReadBookConfig.textColor
@@ -660,7 +666,7 @@ class TextChapterLayout(
                     val charWidth = tempPaint.measureText(char)
                     charX + charWidth
                 }
-                var addedImage = false
+                var needAddText = true
                 spanned.getSpans(charIndex, charIndex + 1, ImageSpan::class.java).firstOrNull()?.let { span -> //处理图片
                     val source = span.source ?: return@let
                     val urlMatcher = paramPattern.matcher(source)
@@ -726,9 +732,24 @@ class TextChapterLayout(
                             null
                         )
                     }
-                    addedImage = true
+                    needAddText = false
                 }
-                if (!addedImage) {
+                spanned.getSpans(charIndex, charIndex + 1, ReplacementSpan::class.java).firstOrNull()?.let { _ -> //自定义标签
+                    if (char == HR_PLACE_CHAR) {
+                        columns.add(
+                            TextHtmlColumn(
+                                absStartX.toFloat(),
+                                (absStartX + width - paddingRight).toFloat(),
+                                HR_PLACE_STR,
+                                textSize,
+                                textColor,
+                                linkUrl
+                            )
+                        )
+                        needAddText = false
+                    }
+                }
+                if (needAddText) {
                     columns.add(
                         TextHtmlColumn(
                             absStartX + charX,
@@ -790,12 +811,12 @@ class TextChapterLayout(
         }
 
         if (spaceCount > 1) {
-            // 多个空格：调整单词间距
+            // 多个空格：调整空格间距
             val spaceIncrement = residualWidth / spaceCount
             textLine.wordSpacing = spaceIncrement
 
             // 重新计算字符位置
-            var currentX = columns[0].start
+            var currentX = firstCol.start
             for (i in columns.indices) {
                 val col = columns[i]
                 val width = col.end - col.start
@@ -804,12 +825,12 @@ class TextChapterLayout(
                     // 空格，增加额外的间距
                     col.start = currentX
                     col.end = currentX + width + spaceIncrement
-                    currentX = col.start
+                    currentX = col.end
                 } else {
                     // 非空格或最后一个字符
                     col.start = currentX
                     col.end = currentX + width
-                    currentX = col.start
+                    currentX = col.end
                 }
 
                 textLine.addColumn(col)
@@ -819,7 +840,7 @@ class TextChapterLayout(
             val gapCount = columns.lastIndex
             if (gapCount > 0) {
                 val charIncrement = residualWidth / gapCount
-                var currentX = columns[0].start
+                var currentX = firstCol.start
                 for (i in columns.indices) {
                     val col = columns[i]
                     val width = col.end - col.start

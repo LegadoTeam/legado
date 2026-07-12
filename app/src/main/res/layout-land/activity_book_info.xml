@@ -313,19 +313,11 @@
                     android:layout_weight="1"
                     tools:ignore="NestedWeights">
 
-                    <io.legado.app.ui.widget.text.ScrollTextView
-                        android:id="@+id/tv_intro"
+                    <FrameLayout
+                        android:id="@+id/tv_intro_container"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:paddingStart="16dp"
-                        android:paddingTop="8dp"
-                        android:paddingEnd="8dp"
-                        android:text="@string/book_intro"
-                        android:textColor="@color/secondaryText"
-                        android:textIsSelectable="true"
-                        android:textSize="14sp" />
+                        android:layout_height="wrap_content" />
+
                 </androidx.core.widget.NestedScrollView>
 
                 <LinearLayout

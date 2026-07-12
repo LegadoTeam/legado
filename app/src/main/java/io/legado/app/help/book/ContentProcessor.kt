@@ -116,7 +116,7 @@ class ContentProcessor private constructor(
                 } else if (useReplace && book.getUseReplaceRule()) {
                     title = Pattern.quote(
                         chapter.getDisplayTitle(
-                            contentReplaceRules,
+                            titleReplaceRules,
                             chineseConvert = false,
                             replaceBook = replaceBook
                         )

@@ -24,6 +24,8 @@ import io.legado.app.constant.AppLog
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.data.entities.SearchKeyword
 import io.legado.app.databinding.ActivityBookSearchBinding
@@ -543,6 +545,20 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
             context.startActivity<SearchActivity> {
                 putExtra("key", key)
                 putExtra("searchScope", searchScope)
+            }
+        }
+
+        fun start(context: Context, source: BookSource, key: String? = null) {
+            context.startActivity<SearchActivity> {
+                putExtra("key", key)
+                putExtra("searchScope", SearchScope(source).toString())
+            }
+        }
+
+        fun start(context: Context, source: BookSourcePart, key: String? = null) {
+            context.startActivity<SearchActivity> {
+                putExtra("key", key)
+                putExtra("searchScope", SearchScope(source).toString())
             }
         }
 

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<io.legado.app.ui.widget.text.ScrollTextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/tv_intro"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:clickable="true"
+    android:focusable="true"
+    android:paddingStart="16dp"
+    android:paddingTop="8dp"
+    android:paddingEnd="8dp"
+    android:text="@string/book_intro"
+    android:textColor="@color/secondaryText"
+    android:textIsSelectable="true"
+    android:textSize="14sp" />

@@ -387,3 +387,4 @@ result = `<img src = "${url}">`;
 </usehtml>
 ```
 > 支持Markdown语法，需要用`<md></md>`包裹起来  
+> 支持使用浏览器渲染，需要用`<useweb></useweb>`包裹起来  

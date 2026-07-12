@@ -2,11 +2,13 @@ package io.legado.app.help
 
 import androidx.annotation.Keep
 import io.legado.app.constant.AppLog
+import io.legado.app.model.analyzeRule.RuleData
 import io.legado.app.utils.ChineseUtils
 
 @Keep
 @Suppress("unused")
 class RegexJsExtensions(private val name: String): JsEncodeUtils {
+    private val ruleData by lazy { RuleData() }
 
     /**
      * 输出调试日志
@@ -33,5 +35,14 @@ class RegexJsExtensions(private val name: String): JsEncodeUtils {
 
     fun s2t(text: String): String {
         return ChineseUtils.s2t(text)
+    }
+
+    fun get(key: String): String {
+        return ruleData.getVariable(key).takeIf { it.isNotEmpty() } ?: ""
+    }
+
+    fun put(key: String, value: String): String {
+        ruleData.putVariable(key, value)
+        return value
     }
 }

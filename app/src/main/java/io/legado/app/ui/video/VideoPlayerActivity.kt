@@ -4,20 +4,30 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
+import android.graphics.Bitmap
+import android.os.Build
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.WindowManager
+import android.view.textclassifier.TextClassifier
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.addCallback
 import androidx.activity.viewModels
 import androidx.annotation.OptIn
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.util.UnstableApi
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.LinearSmoothScroller
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
+import com.bumptech.glide.request.RequestOptions
 import com.shuyu.gsyvideoplayer.listener.GSYSampleCallBack
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
@@ -28,9 +38,19 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.RssSource
 import io.legado.app.databinding.ActivityVideoPlayerBinding
+import io.legado.app.help.GlideImageGetter
+import io.legado.app.help.TextViewTagHandler
+import io.legado.app.help.WebCacheManager
 import io.legado.app.help.book.removeType
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.gsyVideo.VideoPlayer
+import io.legado.app.help.webView.PooledWebView
+import io.legado.app.help.webView.WebJsExtensions
+import io.legado.app.help.webView.WebJsExtensions.Companion.getInjectionString
+import io.legado.app.help.webView.WebJsExtensions.Companion.nameCache
+import io.legado.app.help.webView.WebJsExtensions.Companion.nameJava
+import io.legado.app.help.webView.WebJsExtensions.Companion.nameSource
+import io.legado.app.help.webView.WebViewPool
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryTextColor
@@ -38,17 +58,26 @@ import io.legado.app.model.VideoPlay
 import io.legado.app.service.VideoPlayService
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.model.SourceCallBack
+import io.legado.app.ui.association.OnLineImportActivity
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
 import io.legado.app.ui.book.toc.TocActivityResult
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.rss.favorites.RssFavoritesDialog
 import io.legado.app.ui.rss.source.edit.RssSourceEditActivity
 import io.legado.app.ui.video.config.SettingsDialog
+import io.legado.app.ui.widget.dialog.PhotoDialog
+import io.legado.app.ui.widget.text.ScrollTextView
 import io.legado.app.utils.StartActivityContract
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.gone
+import io.legado.app.utils.invisible
+import io.legado.app.utils.longSnackbar
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.observeEventSticky
+import io.legado.app.utils.openUrl
 import io.legado.app.utils.sendToClip
+import io.legado.app.utils.setHtml
+import io.legado.app.utils.setMarkdown
 import io.legado.app.utils.setTintMutate
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.startActivity
@@ -56,6 +85,13 @@ import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.toggleSystemBar
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.legado.app.utils.visible
+import io.noties.markwon.Markwon
+import io.noties.markwon.ext.tables.TablePlugin
+import io.noties.markwon.html.HtmlPlugin
+import io.noties.markwon.image.glide.GlideImagesPlugin
+import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlayerViewModel>(),
     SettingsDialog.CallBack,RssFavoritesDialog.Callback {
@@ -63,6 +99,40 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     override val viewModel by viewModels<VideoPlayerViewModel>()
     private val playerView: VideoPlayer by lazy { binding.playerView }
     private var starMenuItem: MenuItem? = null
+    private var initIntroView = false
+    private val introTextView by lazy {
+        initIntroView = true
+        val inflater = LayoutInflater.from(this)
+        val view = inflater.inflate(R.layout.view_book_intro, binding.tvIntroContainer, false) as ScrollTextView
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
+            view.revealOnFocusHint = false
+        }
+        view
+    }
+    private var pooledWebView: PooledWebView? = null
+    private val imgAvailableWidth by lazy {
+        val textView = introTextView
+        textView.width - textView.paddingLeft - textView.paddingRight - 8.dpToPx()
+    }
+    private var initGetter = false
+    private val glideImageGetter by lazy {
+        initGetter = true
+        GlideImageGetter(
+            this,
+            introTextView,
+            lifecycle,
+            imgAvailableWidth,
+            VideoPlay.source?.getKey()
+        )
+    }
+
+    private val textViewTagHandler by lazy {
+        TextViewTagHandler(object : TextViewTagHandler.OnButtonClickListener {
+            override fun onButtonClick(name: String, click: String) {
+                viewModel.onButtonClick(this@VideoPlayerActivity, "info button $name" , click)
+            }
+        })
+    }
     private var isNew = true
     private var isFullScreen = false
     private var orientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
@@ -148,23 +218,24 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     private fun initView() {
         viewModel.upStarMenuData.observe(this) { upStarMenu() }
         binding.root.setBackgroundColor(backgroundColor)
-        if (VideoPlay.book != null) {
-            showBook(VideoPlay.book!!)
-            if (VideoPlay.episodes.isNullOrEmpty()) {
-                binding.chapters.visibility = View.GONE
-            } else {
-                binding.chapters.visibility = View.VISIBLE
-                showToc(VideoPlay.episodes!!)
-            }
-            if (VideoPlay.volumes.isEmpty()) {
-                binding.volumes.visibility = View.GONE
-            } else {
-                binding.volumes.visibility = View.VISIBLE
-                showVolumes(VideoPlay.volumes)
-            }
+        val book = VideoPlay.book
+        if (book == null) {
+            binding.data.invisible()
+            binding.chaptersContainer.invisible()
+            return
+        }
+        showBook(book)
+        if (VideoPlay.episodes.isNullOrEmpty()) {
+            binding.chapters.gone()
         } else {
-            binding.data.visibility = View.INVISIBLE
-            binding.chaptersContainer.visibility = View.INVISIBLE
+            binding.chapters.visible()
+            showToc(VideoPlay.episodes!!)
+        }
+        if (VideoPlay.volumes.isEmpty()) {
+            binding.volumes.gone()
+        } else {
+            binding.volumes.visible()
+            showVolumes(VideoPlay.volumes)
         }
     }
 
@@ -175,7 +246,151 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             book.getRealAuthor().takeIf { it.isNotEmpty() }?.let {
                 tvAuthor.text = it
             } ?: tvAuthor.gone()
-            tvIntro.text = book.getDisplayIntro()
+            showBookIntro(book)
+        }
+    }
+
+    inner class CustomWebViewClient : WebViewClient() {
+        private val jsStr = getInjectionString
+        override fun shouldOverrideUrlLoading(
+            view: WebView?,
+            request: WebResourceRequest?
+        ): Boolean {
+            request?.let {
+                val uri = it.url
+                return when (uri.scheme) {
+                    "http", "https" -> false
+                    "legado", "yuedu" -> {
+                        startActivity<OnLineImportActivity> {
+                            data = uri
+                        }
+                        true
+                    }
+
+                    else -> {
+                        binding.root.longSnackbar(R.string.jump_to_another_app, R.string.confirm) {
+                            openUrl(uri)
+                        }
+                        true
+                    }
+                }
+            }
+            return true
+        }
+        override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+            super.onPageStarted(view, url, favicon)
+            view?.evaluateJavascript(jsStr, null)
+        }
+        override fun onPageFinished(view: WebView?, url: String?) {
+            super.onPageFinished(view, url)
+            view?.post {
+                binding.tvIntroContainer.requestLayout()
+            }
+        }
+    }
+
+    private fun showBookIntro(book: Book) {
+        val intro = book.getDisplayIntro()
+        if (intro?.startsWith("<useweb>") == true) {
+            val lastIndex = intro.lastIndexOf("<")
+            if (lastIndex < 8) {
+                introTextView.text = intro
+                return
+            }
+            val html = intro.substring(8, lastIndex)
+            val pooledWebView = this.pooledWebView ?: let{
+                val pooledWebView = WebViewPool.acquire(this)
+                val webView = pooledWebView.realWebView
+                webView.onResume()
+                webView.webViewClient = CustomWebViewClient()
+                webView.addJavascriptInterface(WebCacheManager, nameCache)
+                VideoPlay.source?.let {
+                    webView.addJavascriptInterface(it, nameSource)
+                    val webJsExtensions = WebJsExtensions(it, null, webView)
+                    webView.addJavascriptInterface(webJsExtensions, nameJava)
+                }
+                pooledWebView
+            }
+            val webView = pooledWebView.realWebView
+            if (initIntroView || this.pooledWebView == null) {
+                initIntroView = false
+                this.pooledWebView = pooledWebView
+                binding.tvIntroContainer.removeAllViews()
+                binding.tvIntroContainer.addView(webView)
+            }
+            val bookUrl = VideoPlay.book?.bookUrl
+                ?.takeIf { it.startsWith("http", true) }
+                ?.substringBefore(",")
+            webView.loadDataWithBaseURL(bookUrl, html, "text/html", "utf-8", bookUrl)
+            return
+        }
+        if (!initIntroView || pooledWebView != null) {
+            destroyWeb()
+            binding.tvIntroContainer.removeAllViews()
+            binding.tvIntroContainer.addView(introTextView)
+        }
+        if (intro.isNullOrBlank()) {
+            return
+        }
+        val tvIntro = introTextView
+        if (intro.startsWith("<usehtml>")) {
+            val lastIndex = intro.lastIndexOf("<")
+            if (lastIndex < 9) {
+                tvIntro.text = intro
+                return
+            }
+            val html = intro.substring(9, lastIndex)
+            tvIntro.setHtml(
+                html,
+                glideImageGetter,
+                textViewTagHandler,
+                imgOnLongClickListener = {
+                    showDialogFragment(PhotoDialog(it, VideoPlay.source?.getKey()))
+                },
+                imgOnClickListener = {
+                    viewModel.onButtonClick(this@VideoPlayerActivity, "info image" , it)
+                }
+            )
+        } else if (intro.startsWith("<md>")) {
+            val lastIndex = intro.lastIndexOf("<")
+            if (lastIndex < 4) {
+                tvIntro.text = intro
+                return
+            }
+            val mark = intro.substring(4, lastIndex)
+            lifecycleScope.launch {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    tvIntro.setTextClassifier(TextClassifier.NO_OP)
+                }
+                val context = this@VideoPlayerActivity
+                val markwon: Markwon
+                val markdown = withContext(IO) {
+                    markwon = Markwon.builder(context)
+                        .usePlugin(
+                            GlideImagesPlugin.create(
+                                Glide.with(context)
+                                    .applyDefaultRequestOptions(
+                                        RequestOptions()
+                                            .override(imgAvailableWidth)
+                                            .encodeQuality(88)
+                                    )
+                            )
+                        )
+                        .usePlugin(HtmlPlugin.create())
+                        .usePlugin(TablePlugin.create(context))
+                        .build()
+                    markwon.toMarkdown(mark)
+                }
+                tvIntro.setMarkdown(
+                    markwon,
+                    markdown,
+                    imgOnLongClickListener = { source ->
+                        showDialogFragment(PhotoDialog(source, VideoPlay.source?.getKey()))
+                    }
+                )
+            }
+        } else {
+            tvIntro.text = intro
         }
     }
 
@@ -500,14 +715,6 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         finish() //如果在播放器复刻前活动被销毁，会导致状态继承异常（这里服务创建很快，没发现异常）
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        VideoPlay.saveRead()
-        VideoPlay.stopLoading()
-        playerView.getCurrentPlayer().release()
-        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-    }
-
     override fun observeLiveBus() {
 
         observeEventSticky<String>(EventBus.VIDEO_SUB_TITLE) {
@@ -560,5 +767,36 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
 
     override fun deleteFavorite() {
         viewModel.delFavorite()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (initGetter) {
+            glideImageGetter.start()
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (initGetter) {
+            glideImageGetter.stop()
+        }
+    }
+
+    override fun onDestroy() {
+        destroyWeb()
+        super.onDestroy()
+        if (initGetter) {
+            glideImageGetter.clear()
+        }
+        VideoPlay.saveRead()
+        VideoPlay.stopLoading()
+        playerView.getCurrentPlayer().release()
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    private fun destroyWeb() {
+        pooledWebView?.let { WebViewPool.release(it) }
+        pooledWebView = null
     }
 }
