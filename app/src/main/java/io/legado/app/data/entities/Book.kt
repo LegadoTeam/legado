@@ -171,12 +171,12 @@ data class Book(
 
     fun getDisplayCover() = if (customCoverUrl.isNullOrEmpty()) coverUrl else customCoverUrl
 
-    /** Source credentials are only reused for custom covers on the same site. */
+    /** Source credentials are only reused for custom covers on the same network origin. */
     fun getCoverSourceOrigin(): String? {
         val customUrl = customCoverUrl?.takeIf { it.isNotEmpty() } ?: return origin
-        val sourceDomain = NetworkUtils.getSubDomainOrNull(origin) ?: return null
-        val coverDomain = NetworkUtils.getSubDomainOrNull(customUrl) ?: return null
-        return origin.takeIf { sourceDomain.equals(coverDomain, ignoreCase = true) }
+        val sourceOrigin = NetworkUtils.getBaseUrl(origin) ?: return null
+        val coverOrigin = NetworkUtils.getBaseUrl(customUrl) ?: return null
+        return origin.takeIf { sourceOrigin.equals(coverOrigin, ignoreCase = true) }
     }
 
     fun getDisplayIntro() = if (customIntro.isNullOrEmpty()) intro else customIntro

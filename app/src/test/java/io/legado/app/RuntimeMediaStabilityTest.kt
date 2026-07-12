@@ -39,15 +39,18 @@ class RuntimeMediaStabilityTest {
     }
 
     @Test
-    fun customCoverOnlyInheritsIdentityOnTheSameSite() {
+    fun customCoverOnlyInheritsIdentityOnTheSameOrigin() {
         val book = Book(
             origin = "https://books.example.com",
             coverUrl = "https://books.example.com/cover.jpg",
         )
         assertEquals(book.origin, book.getCoverSourceOrigin())
 
-        book.customCoverUrl = "https://images.example.com/cover.jpg"
+        book.customCoverUrl = "https://books.example.com/custom-cover.jpg"
         assertEquals(book.origin, book.getCoverSourceOrigin())
+
+        book.customCoverUrl = "https://images.example.com/cover.jpg"
+        assertNull(book.getCoverSourceOrigin())
 
         book.customCoverUrl = "https://images.example.net/cover.jpg"
         assertNull(book.getCoverSourceOrigin())
