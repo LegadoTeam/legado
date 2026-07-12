@@ -131,12 +131,6 @@ cn.hutool.core.util.**{*;}
 ## 对外提供api
 -keep class io.legado.app.api.ReturnData{*;}
 
-# Cronet
--keepclassmembers class org.chromium.net.X509Util {
-    *** sDefaultTrustManager;
-    *** sTestTrustManager;
-}
-
 # Throwable
 -keepnames class * extends java.lang.Throwable
 -keepclassmembernames,allowobfuscation class * extends java.lang.Throwable{*;}

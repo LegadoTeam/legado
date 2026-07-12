@@ -1,4 +1,5 @@
 import java.security.MessageDigest
+import groovy.json.JsonOutput
 
 apply plugin: 'de.undercouch.download'
 
@@ -6,6 +7,17 @@ def BASE_PATH = "https://storage.googleapis.com/chromium-cronet/android/" + Cron
 def assetsDir = projectDir.toString() + "/src/main/assets"
 def libPath = projectDir.toString() + "/cronetlib"
 def soPath = projectDir.toString() + "/so"
+// cronet_impl_util_java.jar is already merged into impl-common and would duplicate classes.
+def CRONET_JARS = [
+        "cronet_api.jar",
+        "cronet_impl_common_java.jar",
+        "cronet_impl_native_java.jar",
+        "cronet_impl_native_sentinel_java.jar",
+        "cronet_impl_platform_java.jar",
+        "cronet_shared_java.jar",
+        "httpengine_native_provider_java.jar"
+]
+def CRONET_ABIS = ["armeabi-v7a", "arm64-v8a", "riscv64", "x86", "x86_64"]
 
 /**
  * 从文件生成MD5
@@ -29,16 +41,18 @@ static def generateMD5(final file) {
  * 下载Cronet相关的jar
  */
 tasks.register('downloadJar', Download) {
-    src([
-            BASE_PATH + "cronet_api.jar",
-            BASE_PATH + "cronet_impl_common_java.jar",
-            BASE_PATH + "cronet_impl_native_java.jar",
-            BASE_PATH + "cronet_impl_platform_java.jar",
-            BASE_PATH + "cronet_shared_java.jar"
-    ])
+    src CRONET_JARS.collect { BASE_PATH + it }
     dest libPath
     overwrite true
     onlyIfModified false
+
+    doLast {
+        fileTree(libPath) {
+            include "*.jar", "*.aar"
+        }.files.findAll { !CRONET_JARS.contains(it.name) }.each {
+            project.delete(it)
+        }
+    }
 }
 /**
  * 下载Cronet的arm64-v8a so
@@ -55,6 +69,15 @@ tasks.register('downloadARM64', Download) {
 tasks.register('downloadARMv7', Download) {
     src BASE_PATH + "libs/armeabi-v7a/libcronet." + CronetVersion + ".so"
     dest soPath + "/armeabi-v7a.so"
+    overwrite true
+    onlyIfModified true
+}
+/**
+ * 下载Cronet的riscv64 so
+ */
+tasks.register('downloadRISCV64', Download) {
+    src BASE_PATH + "libs/riscv64/libcronet." + CronetVersion + ".so"
+    dest soPath + "/riscv64.so"
     overwrite true
     onlyIfModified true
 }
@@ -83,30 +106,25 @@ tasks.register('downloadX86', Download) {
  * gradlew app:downloadCronet
  */
 tasks.register('downloadCronet') {
-    dependsOn downloadJar, downloadARM64, downloadARMv7, downloadX86_64, downloadX86
+    dependsOn downloadJar, downloadARM64, downloadARMv7, downloadRISCV64, downloadX86_64, downloadX86
 
     doLast {
-        StringBuilder sb = new StringBuilder("{")
-        def files = new File(soPath).listFiles()
-        for (File file : files) {
-            println file.name.replace(".so", "")
-            sb.append("\"").append(file.name.replace(".so", "")).append("\":\"").append(generateMD5(file)).append("\",")
+        def hashes = new LinkedHashMap<String, String>()
+        CRONET_ABIS.each { abi ->
+            def file = new File(soPath, "$abi.so")
+            if (!file.isFile()) {
+                throw new GradleException("Missing Cronet library for $abi: $file")
+            }
+            println abi
+            hashes[abi] = generateMD5(file)
         }
-        sb.append("\"version\":\"").append(CronetVersion).append("\"}")
-
-        println sb.toString()
+        hashes["version"] = CronetVersion.toString()
+        def metadata = JsonOutput.toJson(hashes)
+        println metadata
 
         println assetsDir
         def f1 = new File(assetsDir + "/cronet.json")
-        if (!f1.exists()) {
-            f1.parentFile.mkdirs()
-            f1.createNewFile()
-        }
-        f1.text = sb.toString()
-
+        f1.parentFile.mkdirs()
+        f1.setText(metadata, "UTF-8")
     }
-
-
 }
-
-
