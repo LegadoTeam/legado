@@ -24,6 +24,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.webView.PooledWebView
 import io.legado.app.help.webView.WebJsExtensions
+import io.legado.app.help.webView.WebJsExtensions.Companion.getInjectionString
 import io.legado.app.help.webView.WebJsExtensions.Companion.nameCache
 import io.legado.app.help.webView.WebJsExtensions.Companion.nameJava
 import io.legado.app.help.webView.WebJsExtensions.Companion.nameSource
@@ -235,11 +236,13 @@ class BackstageWebView(
             private val intervals = listOf(200L, 400L, 600L, 800L, 1000L)
             private val mWebView: WeakReference<WebView> = WeakReference(webView)
             private val jsStr = if (isRule) {
-                "try{var cache=$nameCache,source=$nameSource,java=$nameJava;}catch(e){}\n$mJavaScript"
+                "$getInjectionString\n$mJavaScript"
             } else mJavaScript
             override fun run() {
                 mWebView.get()?.evaluateJavascript(jsStr) {
-                    handleResult(it)
+                    if (pooledWebView != null) {
+                        handleResult(it)
+                    }
                 }
             }
 

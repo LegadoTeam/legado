@@ -482,7 +482,7 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
                     startActivity<OnLineImportActivity> {
                         data = url
                     }
-                    return true
+                    true
                 }
 
                 else -> {

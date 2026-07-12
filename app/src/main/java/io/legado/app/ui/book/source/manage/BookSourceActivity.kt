@@ -762,9 +762,7 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
     }
 
     override fun searchBook(bookSource: BookSourcePart) {
-        startActivity<SearchActivity> {
-            putExtra("searchScope", SearchScope(bookSource).toString())
-        }
+        SearchActivity.start(this, bookSource)
     }
 
     override fun debug(bookSource: BookSourcePart) {

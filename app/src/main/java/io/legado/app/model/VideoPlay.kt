@@ -494,8 +494,9 @@ object VideoPlay : CoroutineScope by MainScope(){
         val durVolumeIndex = durVolumeIndex
         val chapterInVolumeIndex = chapterInVolumeIndex
         val source = source
-        val volumes = volumes
+        val volumes = volumes.toList()
         val durVolume = durVolume
+        val toc = toc
         Coroutine.async {
             book?.let { book ->
                 book.lastCheckCount = 0

@@ -4,8 +4,9 @@ import android.graphics.Canvas
 import android.os.Build
 import android.text.TextPaint
 import androidx.annotation.Keep
+import io.legado.app.help.TextViewTagHandler.Companion.HR_PLACE_CHAR
+import io.legado.app.help.TextViewTagHandler.Companion.HR_PLACE_STR
 import io.legado.app.help.config.ReadBookConfig
-import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.ui.book.read.page.ContentTextView
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.book.read.page.entities.TextLine.Companion.emptyTextLine
@@ -75,7 +76,9 @@ data class TextHtmlColumn(
     }
 
     private fun drawText(view: ContentTextView, canvas: Canvas, y: Float, textPaint: TextPaint) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+        if (charData == HR_PLACE_STR) {
+            canvas.drawRect(start, 0f, end, 3f, textPaint)
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
             val letterSpacing = textPaint.letterSpacing * textPaint.textSize
             val letterSpacingHalf = letterSpacing * 0.5f
             canvas.drawText(charData, start + letterSpacingHalf, y, textPaint)

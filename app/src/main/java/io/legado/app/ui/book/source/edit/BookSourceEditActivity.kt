@@ -32,7 +32,6 @@ import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.book.search.SearchActivity
-import io.legado.app.ui.book.search.SearchScope
 import io.legado.app.ui.book.source.debug.BookSourceDebugActivity
 import io.legado.app.ui.code.CodeEditActivity
 import io.legado.app.ui.file.HandleFileContract
@@ -197,9 +196,7 @@ class BookSourceEditActivity :
 
             R.id.menu_set_source_variable -> setSourceVariable()
             R.id.menu_search -> viewModel.save(getSource()) { source ->
-                startActivity<SearchActivity> {
-                    putExtra("searchScope", SearchScope(source).toString())
-                }
+                SearchActivity.start(this, source)
             }
 
         }
