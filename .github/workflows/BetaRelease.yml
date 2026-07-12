@@ -307,6 +307,12 @@ jobs:
             mv "$file" "$newName"
           done
           rm -rf */
+          
+      - name: Check apk size
+        working-directory: apk/
+        run: |
+          ls -lh
+          du -h *
       - name: Post to Telegram Channel
         uses: xireiki/channel-post@main
         with:
