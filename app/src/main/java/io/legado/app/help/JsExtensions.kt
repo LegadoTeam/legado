@@ -78,6 +78,25 @@ import androidx.core.net.toUri
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ThemeConfig
 
+internal fun parseJsRequestHeaders(headers: Any?): Map<String, String> {
+    val rawHeaders = when (headers) {
+        null -> return emptyMap()
+        is String -> GSON.fromJsonObject<Map<String, Any?>>(headers).getOrElse {
+            throw IllegalArgumentException("Invalid request header JSON", it)
+        }
+        is Map<*, *> -> headers
+        else -> throw IllegalArgumentException(
+            "Request headers must be a map or JSON string, got ${headers.javaClass.name}"
+        )
+    }
+    return buildMap(rawHeaders.size) {
+        rawHeaders.forEach { (name, value) ->
+            require(name != null && value != null) { "Request header names and values cannot be null" }
+            put(name.toString(), value.toString())
+        }
+    }
+}
+
 /**
  * js扩展类, 在js中通过java变量调用
  * 添加方法，请更新文档/legado/app/src/main/assets/help/JsHelp.md
@@ -480,14 +499,15 @@ interface JsExtensions : JsEncodeUtils {
     /**
      * js实现重定向拦截,网络访问get
      */
-    fun get(urlStr: String, headers: Map<String, String>): Connection.Response {
+    fun get(urlStr: String, headers: Any?): Connection.Response {
         return get(urlStr, headers, null)
     }
 
-    fun get(urlStr: String, headers: Map<String, String>, timeout: Int?): Connection.Response {
+    fun get(urlStr: String, headers: Any?, timeout: Int?): Connection.Response {
+        val headerMap = parseJsRequestHeaders(headers)
         val requestHeaders = if (getSource()?.enabledCookieJar == true) {
-            headers.toMutableMap().apply { put(cookieJarHeader, "1") }
-        } else headers
+            headerMap.toMutableMap().apply { put(cookieJarHeader, "1") }
+        } else headerMap
         val rateLimiter = ConcurrentRateLimiter(getSource())
         val response = rateLimiter.withLimitBlocking {
             rhinoContextOrNull?.ensureActive()
@@ -506,14 +526,15 @@ interface JsExtensions : JsEncodeUtils {
     /**
      * js实现重定向拦截,网络访问head,不返回Response Body更省流量
      */
-    fun head(urlStr: String, headers: Map<String, String>): Connection.Response {
+    fun head(urlStr: String, headers: Any?): Connection.Response {
         return head(urlStr, headers, null)
     }
 
-    fun head(urlStr: String, headers: Map<String, String>, timeout: Int?): Connection.Response {
+    fun head(urlStr: String, headers: Any?, timeout: Int?): Connection.Response {
+        val headerMap = parseJsRequestHeaders(headers)
         val requestHeaders = if (getSource()?.enabledCookieJar == true) {
-            headers.toMutableMap().apply { put(cookieJarHeader, "1") }
-        } else headers
+            headerMap.toMutableMap().apply { put(cookieJarHeader, "1") }
+        } else headerMap
         val rateLimiter = ConcurrentRateLimiter(getSource())
         val response = rateLimiter.withLimitBlocking {
             rhinoContextOrNull?.ensureActive()
@@ -532,14 +553,15 @@ interface JsExtensions : JsEncodeUtils {
     /**
      * 网络访问post
      */
-    fun post(urlStr: String, body: String, headers: Map<String, String>): Connection.Response {
+    fun post(urlStr: String, body: String, headers: Any?): Connection.Response {
         return post(urlStr, body, headers, null)
     }
 
-    fun post(urlStr: String, body: String, headers: Map<String, String>, timeout: Int?): Connection.Response {
+    fun post(urlStr: String, body: String, headers: Any?, timeout: Int?): Connection.Response {
+        val headerMap = parseJsRequestHeaders(headers)
         val requestHeaders = if (getSource()?.enabledCookieJar == true) {
-            headers.toMutableMap().apply { put(cookieJarHeader, "1") }
-        } else headers
+            headerMap.toMutableMap().apply { put(cookieJarHeader, "1") }
+        } else headerMap
         val rateLimiter = ConcurrentRateLimiter(getSource())
         val response = rateLimiter.withLimitBlocking {
             rhinoContextOrNull?.ensureActive()

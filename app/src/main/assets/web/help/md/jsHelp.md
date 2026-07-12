@@ -173,11 +173,11 @@ java.ajaxTestAll(urlList: Array<String>, timeout: Int, skipRateLimit: Boolean = 
 java.connect(urlStr, header = null, callTimeout: Int? = null): StrResponse
 //返回的StrResponse对象具有的方法 body() code() message() headers() raw() toString() callTime()
 
-java.post(url: String, body: String, headerMap: Map<String, String>, timeout: Int? = null): Connection.Response
+java.post(url: String, body: String, headers: Map<String, String> | JSON String, timeout: Int? = null): Connection.Response
 
-java.get(url: String, headerMap: Map<String, String>, timeout: Int? = null): Connection.Response
+java.get(url: String, headers: Map<String, String> | JSON String, timeout: Int? = null): Connection.Response
 
-java.head(url: String, headerMap: Map<String, String>, timeout: Int? = null): Connection.Response
+java.head(url: String, headers: Map<String, String> | JSON String, timeout: Int? = null): Connection.Response
 
 * 使用webView访问网络
 * @param html 直接用webView载入的html, 如果html为空直接访问url
