@@ -395,13 +395,7 @@ fun DocumentFile.readText(context: Context): String {
 
 @Throws(Exception::class)
 fun DocumentFile.readBytes(context: Context): ByteArray {
-    return context.contentResolver.openInputStream(uri)?.let {
-        val len: Int = it.available()
-        val buffer = ByteArray(len)
-        it.read(buffer)
-        it.close()
-        return buffer
-    } ?: throw NoStackTraceException("打开文件失败\n${uri}")
+    return uri.readBytes(context)
 }
 
 fun DocumentFile.checkWrite(): Boolean {

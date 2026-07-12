@@ -106,11 +106,8 @@ fun Fragment.readUri(uri: Uri?, success: (fileDoc: FileDoc, inputStream: InputSt
 @Throws(Exception::class)
 fun Uri.readBytes(context: Context): ByteArray {
     return if (this.isContentScheme()) {
-        context.contentResolver.openInputStream(this)?.use {
-            val len: Int = it.available()
-            val buffer = ByteArray(len)
-            it.read(buffer)
-            buffer
+        context.contentResolver.openInputStream(this)?.use { inputStream ->
+            inputStream.readBytes()
         } ?: throw NoStackTraceException("打开文件失败\n${this}")
     } else {
         val path = RealPathUtil.getPath(context, this)
@@ -135,12 +132,10 @@ fun Uri.writeBytes(
     byteArray: ByteArray
 ): Boolean {
     if (this.isContentScheme()) {
-        context.contentResolver.openOutputStream(this)?.let {
-            it.write(byteArray)
-            it.close()
-            return true
-        }
-        return false
+        return context.contentResolver.openOutputStream(this)?.use { outputStream ->
+            outputStream.write(byteArray)
+            true
+        } ?: false
     } else {
         val path = RealPathUtil.getPath(context, this)
         if (path?.isNotEmpty() == true) {
@@ -295,8 +290,11 @@ fun Uri.toRequestBody(contentType: MediaType? = null): RequestBody {
         override fun contentType() = contentType
 
         override fun contentLength(): Long {
-            val length = uri.inputStream(appCtx).getOrThrow().available().toLong()
-            return if (length > 0) length else -1
+            return uri.toReadPfd(appCtx)
+                .getOrNull()
+                ?.use { it.statSize }
+                ?.takeIf { it >= 0L }
+                ?: -1L
         }
 
         override fun writeTo(sink: BufferedSink) {

@@ -19,8 +19,9 @@ object SvgUtils {
     
     fun createBitmap(filePath: String, width: Int, height: Int? = null): Bitmap? {
         return kotlin.runCatching {
-            val inputStream = FileInputStream(filePath)
-            createBitmap(inputStream, width, height)
+            FileInputStream(filePath).use { inputStream ->
+                createBitmap(inputStream, width, height)
+            }
         }.getOrNull()
     }
 
@@ -43,8 +44,9 @@ object SvgUtils {
     //获取svg图片大小
     fun getSize(filePath: String): Size? {
         return kotlin.runCatching {
-            val inputStream = FileInputStream(filePath)
-            getSize(inputStream)
+            FileInputStream(filePath).use { inputStream ->
+                getSize(inputStream)
+            }
         }.getOrNull()
     }
 
