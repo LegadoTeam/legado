@@ -22,7 +22,6 @@ jobs:
 
   prepare:
     runs-on: ubuntu-latest
-    if: ${{ !startsWith(github.event.head_commit.message, 'Merge pull request') }}
     outputs:
       version: ${{ steps.set-ver.outputs.version }}
       versionL: ${{ steps.set-ver.outputs.versionL }}
@@ -31,8 +30,9 @@ jobs:
     steps:
       - id: set-ver
         run: |
-          echo "version=3.$(TZ=Asia/Shanghai date +%y.%m%d%H)" >> $GITHUB_OUTPUT
-          echo "versionL=3.$(TZ=Asia/Shanghai date +%y.%m%d%H%M)" >> $GITHUB_OUTPUT
+          version="3.$(TZ=Asia/Shanghai date +%y.%m%d%H%M%S)"
+          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "versionL=$version" >> $GITHUB_OUTPUT
 
       - id: check
         run: |
@@ -170,10 +170,12 @@ jobs:
           if-no-files-found: ignore
           path: ${{ github.workspace }}/mapping/mapping.txt
 
-  prerelease:
+  release:
     needs: [prepare, build]
     if: github.event_name != 'pull_request' && github.repository == 'LegadoTeam/legado'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
     steps:
@@ -199,31 +201,58 @@ jobs:
         run: |
           bash .github/scripts/extract-latest-update.sh \
             app/src/main/assets/updateLog.md \
-            > "$GITHUB_WORKSPACE/beta-release-notes.md"
+            > "$GITHUB_WORKSPACE/release-notes.md"
 
-      - name: Delete Pre-Release
-        run: |
-          if gh release view beta &>/dev/null; then
-            gh release delete beta -y
-          fi
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      - name: Create or update beta tag
-        uses: richardsimko/update-tag@v2
-        with:
-          tag_name: beta
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish Pre-Release
+      - name: Publish Release
         uses: ncipollo/release-action@v1
         with:
           name: legado_app_${{ env.VERSION }}
-          tag: "beta"
-          bodyFile: ${{ github.workspace }}/beta-release-notes.md
-          prerelease: true
+          tag: ${{ env.VERSION }}
+          bodyFile: ${{ github.workspace }}/release-notes.md
+          prerelease: false
+          makeLatest: false
+          allowUpdates: true
+          replacesArtifacts: true
+          artifactErrorsFailBuild: true
           artifacts: ${{ github.workspace }}/apk/*.apk
+
+      - name: Migrate Legacy Beta Clients
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          marker='<!-- versioned-release-migration -->'
+          if ! gh release view beta >/dev/null 2>&1; then
+            exit 0
+          fi
+          if gh release view beta --json body --jq '.body' | grep -Fq "$marker"; then
+            exit 0
+          fi
+
+          shopt -s nullglob
+          legacy_apks=("$GITHUB_WORKSPACE"/apk/*通用*.apk)
+          if [[ ${#legacy_apks[@]} -ne 2 ]]; then
+            echo "Expected two universal APKs for legacy beta migration"
+            exit 1
+          fi
+
+          legacy_dir="$GITHUB_WORKSPACE/legacy-beta-apk"
+          mkdir -p "$legacy_dir"
+          legacy_uploads=()
+          for apk in "${legacy_apks[@]}"; do
+            file_name=$(basename "$apk")
+            legacy_name=${file_name/$VERSION/${VERSION}00}
+            cp "$apk" "$legacy_dir/$legacy_name"
+            legacy_uploads+=("$legacy_dir/$legacy_name")
+          done
+
+          gh release upload beta "${legacy_uploads[@]}" --clobber
+          {
+            cat "$GITHUB_WORKSPACE/release-notes.md"
+            printf '\n\n%s\n' "$marker"
+          } > "$GITHUB_WORKSPACE/legacy-beta-release-notes.md"
+          gh release edit beta \
+            --notes-file "$GITHUB_WORKSPACE/legacy-beta-release-notes.md"
   CDN:
     needs: [prepare, build]
     runs-on: ubuntu-latest
