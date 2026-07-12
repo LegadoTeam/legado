@@ -69,7 +69,7 @@ import io.legado.app.utils.fromJsonObject
 class TextChapterLayout(
     scope: CoroutineScope,
     private val textChapter: TextChapter,
-    private val textPages: ArrayList<TextPage>,
+    private val textPages: MutableList<TextPage>,
     private val book: Book,
     private val bookContent: BookContent,
 ) {
@@ -1027,7 +1027,7 @@ class TextChapterLayout(
     }
 
     private fun calcTextLinePosition(
-        textPages: ArrayList<TextPage>,
+        textPages: MutableList<TextPage>,
         textLine: TextLine,
         sbLength: Int
     ) {

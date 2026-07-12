@@ -81,6 +81,10 @@ jobs:
           chmod +x .github/scripts/verify-cronet.sh
           .github/scripts/verify-cronet.sh
 
+      - name: Verify APK Collector
+        if: ${{ matrix.type == 'release' }}
+        run: bash .github/scripts/test-collect-apks.sh
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
@@ -127,9 +131,13 @@ jobs:
 
           echo "处理APK文件"
           mkdir -p ${{ github.workspace }}/apk/
-          for file in $(find ${{ github.workspace }}/app/build/outputs/apk -name "*.apk"); do
-            mv "$file" ${{ github.workspace }}/apk/legado_${{ env.product }}_${{ env.VERSIONL }}_$typeName.apk
-          done
+          bash $GITHUB_WORKSPACE/.github/scripts/collect-apks.sh \
+            $GITHUB_WORKSPACE/app/build/outputs/apk \
+            $GITHUB_WORKSPACE/apk \
+            ${{ env.product }} \
+            ${{ env.VERSIONL }} \
+            "$typeName" \
+            true
 
           echo "移动mapping文件"
           mkdir -p ${{ github.workspace }}/mapping/
@@ -152,14 +160,29 @@ jobs:
 
       - name: Check Build Result
         run: |
-          if [ ! -d ${{ github.workspace }}/apk ]; then
-            echo "❌ 未生成APK，请检查Gradle日志"
-            exit 1
-          fi
-          if [ ! -e ${{ github.workspace }}/apk/legado_*.apk ]; then
-            echo "❌ 未找到APK文件，请检查构建输出"
-            exit 1
-          fi
+          expected_abis=(arm64-v8a armeabi-v7a x86 x86_64 universal)
+          for abi in "${expected_abis[@]}"; do
+            mapfile -d '' matches < <(find ${{ github.workspace }}/apk -maxdepth 1 -type f \
+              -name "legado_${{ env.product }}_${{ env.VERSIONL }}_${abi}_*.apk" -print0)
+            if [[ ${#matches[@]} -ne 1 ]]; then
+              echo "Expected one $abi APK, found ${#matches[@]}"
+              exit 1
+            fi
+
+            packaged_abis=$(unzip -Z1 "${matches[0]}" \
+              | sed -n 's#^lib/\([^/]*\)/.*#\1#p' \
+              | sort -u \
+              | paste -sd ' ' -)
+            if [[ "$abi" == "universal" ]]; then
+              expected_native_abis="arm64-v8a armeabi-v7a x86 x86_64"
+            else
+              expected_native_abis="$abi"
+            fi
+            if [[ "$packaged_abis" != "$expected_native_abis" ]]; then
+              echo "$abi APK contains unexpected native ABIs: $packaged_abis"
+              exit 1
+            fi
+          done
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v7

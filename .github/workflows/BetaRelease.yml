@@ -110,9 +110,13 @@ jobs:
 
           echo "处理APK文件"
           mkdir -p ${{ github.workspace }}/apk/
-          for file in $(find ${{ github.workspace }}/app/build/outputs/apk -name "*.apk"); do
-            mv "$file" ${{ github.workspace }}/apk/legado_${{ env.product }}_${{ env.VERSIONL }}_$typeName.apk
-          done
+          bash $GITHUB_WORKSPACE/.github/scripts/collect-apks.sh \
+            $GITHUB_WORKSPACE/app/build/outputs/apk \
+            $GITHUB_WORKSPACE/apk \
+            ${{ env.product }} \
+            ${{ env.VERSIONL }} \
+            "$typeName" \
+            true
 
           echo "移动mapping文件"
           mkdir -p ${{ github.workspace }}/mapping/
