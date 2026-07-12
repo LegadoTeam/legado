@@ -40,8 +40,7 @@ inline fun <T> suspendContinuation(crossinline block: suspend CoroutineScope.() 
 }
 
 inline fun <T> runScriptWithContext(context: CoroutineContext, block: () -> T): T {
-    RhinoScriptEngine
-    val rhinoContext = Context.enter() as RhinoContext
+    val rhinoContext = enterRhinoContext()
     val previousCoroutineContext = rhinoContext.coroutineContext
     rhinoContext.coroutineContext = context.minusKey(ContinuationInterceptor)
     try {
@@ -53,13 +52,16 @@ inline fun <T> runScriptWithContext(context: CoroutineContext, block: () -> T): 
 }
 
 suspend inline fun <T> runScriptWithContext(block: () -> T): T {
-    val rhinoContext = Context.enter() as RhinoContext
-    val previousCoroutineContext = rhinoContext.coroutineContext
-    rhinoContext.coroutineContext = currentCoroutineContext().minusKey(ContinuationInterceptor)
-    try {
-        return block()
-    } finally {
-        rhinoContext.coroutineContext = previousCoroutineContext
-        Context.exit()
+    return runScriptWithContext(currentCoroutineContext(), block)
+}
+
+@PublishedApi
+internal fun enterRhinoContext(): RhinoContext {
+    RhinoScriptEngine.initialize()
+    val context = Context.enter()
+    if (context is RhinoContext) {
+        return context
     }
+    Context.exit()
+    throw IllegalStateException("Thread is bound to ${context.javaClass.name}, not RhinoContext")
 }

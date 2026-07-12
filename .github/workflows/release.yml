@@ -73,12 +73,33 @@ jobs:
         run: |
           echo "开始进行${{ env.product }}构建"
           chmod +x gradlew
+          if [[ "${{ env.product }}" == "app" ]]; then
+            ./gradlew assemble${{ env.product }}release -ParmOnly=true --build-cache --parallel --daemon --warning-mode all
+            mkdir -p ${{ github.workspace }}/apk/
+            bash $GITHUB_WORKSPACE/.github/scripts/collect-apks.sh \
+              $GITHUB_WORKSPACE/app/build/outputs/apk \
+              $GITHUB_WORKSPACE/apk \
+              ${{ env.product }} \
+              ${{ env.VERSION }} \
+              "" \
+              arm
+          fi
           ./gradlew assemble${{ env.product }}release --build-cache --parallel --daemon --warning-mode all
 
       - name: Organize the Files
         run: |
           mkdir -p ${{ github.workspace }}/apk/
-          cp -rf ${{ github.workspace }}/app/build/outputs/apk/*/*/*.apk ${{ github.workspace }}/apk/
+          if [[ "${{ env.product }}" == "app" ]]; then
+            bash $GITHUB_WORKSPACE/.github/scripts/collect-apks.sh \
+              $GITHUB_WORKSPACE/app/build/outputs/apk \
+              $GITHUB_WORKSPACE/apk \
+              ${{ env.product }} \
+              ${{ env.VERSION }} \
+              "" \
+              universal
+          else
+            cp -rf ${{ github.workspace }}/app/build/outputs/apk/*/*/*.apk ${{ github.workspace }}/apk/
+          fi
           
       - name: Upload App To Artifact
         uses: actions/upload-artifact@v7

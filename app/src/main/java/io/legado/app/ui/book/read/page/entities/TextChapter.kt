@@ -10,6 +10,7 @@ import io.legado.app.ui.book.read.page.provider.LayoutProgressListener
 import io.legado.app.ui.book.read.page.provider.TextChapterLayout
 import io.legado.app.utils.fastBinarySearchBy
 import kotlinx.coroutines.CoroutineScope
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.abs
 import kotlin.math.min
 
@@ -30,7 +31,8 @@ data class TextChapter(
     val effectiveReplaceRules: List<ReplaceRule>?
 ) : LayoutProgressListener {
 
-    private val textPages = arrayListOf<TextPage>()
+    // Layout appends from IO while reading, navigation and progress query from the main thread.
+    private val textPages = CopyOnWriteArrayList<TextPage>()
     val pages: List<TextPage> get() = textPages
 
     private var layout: TextChapterLayout? = null
