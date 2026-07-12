@@ -1,0 +1,217 @@
+package io.legado.app
+
+import com.script.rhino.RhinoScriptEngine
+import io.legado.app.data.entities.HttpTTS
+import io.legado.app.help.parseJsRequestHeaders
+import io.legado.app.help.http.TRANSPARENT_ACCEPT_ENCODING
+import io.legado.app.help.http.canUseTransparentDecompression
+import io.legado.app.help.http.decompressResponse
+import io.legado.app.model.analyzeRule.AnalyzeRule
+import io.legado.app.ui.book.read.config.hasLoginCapability
+import okhttp3.MediaType
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Protocol
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.ResponseBody
+import okhttp3.ResponseBody.Companion.toResponseBody
+import okio.Buffer
+import okio.BufferedSource
+import okio.ByteString.Companion.decodeHex
+import okio.ForwardingSource
+import okio.buffer
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.mozilla.javascript.NativeObject
+import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.util.zip.Deflater
+import java.util.zip.DeflaterOutputStream
+import java.util.zip.GZIPOutputStream
+
+class SourceCompatibilityTest {
+
+    @Test
+    fun nativeObjectUsesJsonPathRules() {
+        val content = RhinoScriptEngine.eval(
+            "({book:{title:'Nested'},items:[{name:'First'},{name:'Second'}]})"
+        )
+        assertTrue(content is NativeObject)
+        val analyzeRule = AnalyzeRule().setContent(content)
+
+        assertEquals(
+            "Nested",
+            analyzeRule.getString(analyzeRule.splitSourceRule("$.book.title"))
+        )
+        assertEquals(
+            listOf("First", "Second"),
+            analyzeRule.getStringList(analyzeRule.splitSourceRule("$.items[*].name"))
+        )
+        assertEquals(
+            emptyList<String>(),
+            analyzeRule.getStringList(analyzeRule.splitSourceRule("$.missing[*]"))
+        )
+        assertEquals(
+            "Updated",
+            analyzeRule.getString(
+                analyzeRule.splitSourceRule("$.book.title##Nested##Updated")
+            )
+        )
+    }
+
+    @Test
+    fun escapedJsonPathLikeKeyKeepsDirectAccess() {
+        val content = RhinoScriptEngine.eval("({'$.literal':'plain'})")
+        val analyzeRule = AnalyzeRule().setContent(content)
+
+        assertEquals(
+            "plain",
+            analyzeRule.getString(analyzeRule.splitSourceRule("@@$.literal"))
+        )
+    }
+
+    @Test
+    fun jsRequestHeadersAcceptMapsAndJsonStrings() {
+        assertEquals(
+            mapOf("Authorization" to "Bearer token", "X-Mode" to "test"),
+            parseJsRequestHeaders(
+                """{"Authorization":"Bearer token","X-Mode":"test"}"""
+            )
+        )
+        assertEquals(
+            mapOf("X-Map" to "value"),
+            parseJsRequestHeaders(mapOf("X-Map" to "value"))
+        )
+        assertEquals(
+            mapOf("X-Rhino" to "value"),
+            parseJsRequestHeaders(RhinoScriptEngine.eval("({'X-Rhino':'value'})"))
+        )
+        assertTrue(parseJsRequestHeaders(null).isEmpty())
+        assertThrows(IllegalArgumentException::class.java) {
+            parseJsRequestHeaders("{invalid")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            parseJsRequestHeaders(42)
+        }
+    }
+
+    @Test
+    fun httpTtsRecognizesScriptAndFormLoginCapabilities() {
+        assertTrue(HttpTTS(loginUrl = "<js>login()</js>").hasLoginCapability())
+        assertTrue(HttpTTS(loginUi = "[]").hasLoginCapability())
+        assertFalse(HttpTTS(loginUrl = " ", loginUi = "\n").hasLoginCapability())
+        assertFalse(HttpTTS().hasLoginCapability())
+    }
+
+    @Test
+    fun brotliResponseIsTransparentlyDecompressed() {
+        val compressed = (
+            "1bce00009c05ceb9f028d14e416230f718960a537b0922d2f7b6adef56532c08dff44551516690131494db" +
+                "6021c7e3616c82c1bc2416abb919aaa06e8d30d82cc2981c2f5c900bfb8ee29d5c03deb1c0dacff80e" +
+                "abe82ba64ed250a497162006824684db917963ecebe041b352a3e62d629cc97b95cac24265b175171e" +
+                "5cb384cd0912aeb5b5dd9555f2dd1a9b20688201"
+            ).decodeHex().toByteArray()
+
+        val response = decompressResponse(encodedResponse("br", compressed))
+
+        val responseText = response.body.string()
+        assertTrue(responseText.contains("\"brotli\": true"))
+        assertNull(response.header("Content-Encoding"))
+        assertNull(response.header("Content-Length"))
+    }
+
+    @Test
+    fun existingCompressionAndRequestGuardsRemainSupported() {
+        val text = "existing compression remains supported"
+        assertEquals(text, decompressResponse(encodedResponse("gzip", gzip(text))).body.string())
+        assertEquals(
+            text,
+            decompressResponse(encodedResponse("deflate", deflateRaw(text))).body.string()
+        )
+
+        val request = Request.Builder().url("https://example.com/data").build()
+        assertTrue(request.canUseTransparentDecompression())
+        assertEquals("gzip, deflate, br", TRANSPARENT_ACCEPT_ENCODING)
+        assertFalse(
+            request.newBuilder().header("Range", "bytes=0-10").build()
+                .canUseTransparentDecompression()
+        )
+        assertFalse(
+            request.newBuilder().header("Accept-Encoding", "identity").build()
+                .canUseTransparentDecompression()
+        )
+    }
+
+    @Test
+    fun invalidCompressedResponseClosesOriginalBody() {
+        mapOf(
+            "br" to byteArrayOf(0x11),
+            "gzip" to byteArrayOf(0x00)
+        ).forEach { (encoding, bytes) ->
+            val body = TrackingResponseBody(bytes)
+
+            assertThrows(IOException::class.java) {
+                decompressResponse(encodedResponse(encoding, body))
+            }
+            assertTrue("$encoding response body was not closed", body.closed)
+        }
+    }
+
+    private fun encodedResponse(encoding: String, bytes: ByteArray): Response {
+        return encodedResponse(
+            encoding,
+            bytes.toResponseBody("application/octet-stream".toMediaType())
+        )
+    }
+
+    private fun encodedResponse(encoding: String, body: ResponseBody): Response {
+        return Response.Builder()
+            .request(Request.Builder().url("https://example.com/data").build())
+            .protocol(Protocol.HTTP_1_1)
+            .code(200)
+            .message("OK")
+            .header("Content-Encoding", encoding)
+            .header("Content-Length", body.contentLength().toString())
+            .body(body)
+            .build()
+    }
+
+    private fun gzip(text: String): ByteArray {
+        val output = ByteArrayOutputStream()
+        GZIPOutputStream(output).use { it.write(text.toByteArray()) }
+        return output.toByteArray()
+    }
+
+    private fun deflateRaw(text: String): ByteArray {
+        val output = ByteArrayOutputStream()
+        DeflaterOutputStream(output, Deflater(Deflater.DEFAULT_COMPRESSION, true)).use {
+            it.write(text.toByteArray())
+        }
+        return output.toByteArray()
+    }
+
+    private class TrackingResponseBody(bytes: ByteArray) : ResponseBody() {
+
+        var closed = false
+            private set
+
+        private val length = bytes.size.toLong()
+        private val bufferedSource = object : ForwardingSource(Buffer().write(bytes)) {
+            override fun close() {
+                closed = true
+                super.close()
+            }
+        }.buffer()
+
+        override fun contentType(): MediaType? = "application/octet-stream".toMediaType()
+
+        override fun contentLength(): Long = length
+
+        override fun source(): BufferedSource = bufferedSource
+    }
+
+}

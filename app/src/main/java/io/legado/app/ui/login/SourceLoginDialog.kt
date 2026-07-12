@@ -736,8 +736,8 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
     }
 
     private fun login(source: BaseSource) {
+        val loginData = getLoginData(rowUis)
         lifecycleScope.launch(IO) {
-            val loginData = getLoginData(rowUis)
             if (loginData.isEmpty()) {
                 source.removeLoginInfo()
                 withContext(Main) {
@@ -745,15 +745,17 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
                 }
             } else if (source.putLoginInfo(GSON.toJson(loginData))) {
                 try {
-                    val buttonFunctionJS = "if (typeof login=='function'){ login.apply(this); } else { throw('Function login not implements!!!') }"
-                    val loginJS = loginUrl ?: return@launch
-                    runScriptWithContext {
-                        source.evalJS("$loginJS\n$buttonFunctionJS") {
-                            put("java", sourceLoginJsExtensions)
-                            put("result", loginData)
-                            put("book", viewModel.book)
-                            put("chapter", viewModel.chapter)
-                            put("isLongClick", false)
+                    val loginJS = loginUrl
+                    if (!loginJS.isNullOrBlank()) {
+                        val buttonFunctionJS = "if (typeof login=='function'){ login.apply(this); } else { throw('Function login not implements!!!') }"
+                        runScriptWithContext {
+                            source.evalJS("$loginJS\n$buttonFunctionJS") {
+                                put("java", sourceLoginJsExtensions)
+                                put("result", loginData)
+                                put("book", viewModel.book)
+                                put("chapter", viewModel.chapter)
+                                put("isLongClick", false)
+                            }
                         }
                     }
                     context?.toastOnUi(R.string.success)

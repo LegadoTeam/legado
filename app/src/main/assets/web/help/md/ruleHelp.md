@@ -201,8 +201,9 @@ https://dns.google,{"dnsIp":"8.8.8.8"}
 ```
 
 * 增加js方法，用于重定向拦截
-  * `java.get(urlStr: String, headers: Map<String, String>)`
-  * `java.post(urlStr: String, body: String, headers: Map<String, String>)`
+  * `java.get(urlStr: String, headers: Map<String, String> | JSON String)`
+  * `java.head(urlStr: String, headers: Map<String, String> | JSON String)`
+  * `java.post(urlStr: String, body: String, headers: Map<String, String> | JSON String)`
 * 对于搜索重定向的源，可以使用此方法获得重定向后的url
 ```
 (()=>{

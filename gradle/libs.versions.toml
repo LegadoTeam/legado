@@ -142,6 +142,7 @@ preference-preference = { module = "androidx.preference:preference", version.ref
 preference-ktx = { module = "androidx.preference:preference-ktx", version.ref = "preference" }
 
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+okhttpBrotli = { module = "com.squareup.okhttp3:okhttp-brotli", version.ref = "okhttp" }
 protobuf-javalite = { module = "com.google.protobuf:protobuf-javalite", version.ref = "protobufJavalite" }
 
 quick-chinese-transfer-core = { module = "com.github.liuyueyi.quick-chinese-transfer:quick-transfer-core", version.ref = "quickChineseTransfer" }

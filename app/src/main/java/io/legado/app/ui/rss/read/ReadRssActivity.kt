@@ -41,6 +41,7 @@ import io.legado.app.help.WebCacheManager
 import io.legado.app.help.webView.WebJsExtensions
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.CookieManager
+import io.legado.app.help.http.CookieStore
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.http.text
 import io.legado.app.lib.dialogs.SelectItem
@@ -713,6 +714,11 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
 
         override fun onPageFinished(view: WebView, url: String) {
             super.onPageFinished(view, url)
+            if (URLUtil.isNetworkUrl(url)) {
+                webCookieManager.getCookie(url)?.takeIf { it.isNotBlank() }?.let { cookie ->
+                    CookieStore.setCookie(url, cookie)
+                }
+            }
             view.title?.let { title ->
                 if (title != url
                     && title != view.url

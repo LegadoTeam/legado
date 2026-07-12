@@ -54,6 +54,10 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import java.io.File
 
+internal fun HttpTTS.hasLoginCapability(): Boolean {
+    return !loginUrl.isNullOrBlank() || !loginUi.isNullOrBlank()
+}
+
 /**
  * tts引擎管理
  */
@@ -299,7 +303,7 @@ class SpeakEngineDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
                     getItemByLayoutPosition(holder.layoutPosition)?.let { httpTTS ->
                         val id = httpTTS.id.toString()
                         upTts(id)
-                        if (!httpTTS.loginUrl.isNullOrBlank()
+                        if (httpTTS.hasLoginCapability()
                             && httpTTS.getLoginInfo().isNullOrBlank()
                         ) {
                             startActivity<SourceLoginActivity> {
@@ -311,7 +315,7 @@ class SpeakEngineDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
                 }
                 cbName.setOnLongClickListener {
                     getItemByLayoutPosition(holder.layoutPosition)?.let { httpTTS ->
-                        if (!httpTTS.loginUrl.isNullOrBlank()) {
+                        if (httpTTS.hasLoginCapability()) {
                             val id = httpTTS.id.toString()
                             startActivity<SourceLoginActivity> {
                                 putExtra("type", "httpTts")

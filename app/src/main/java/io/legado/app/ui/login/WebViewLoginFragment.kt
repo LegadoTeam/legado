@@ -23,6 +23,7 @@ import io.legado.app.databinding.FragmentWebViewLoginBinding
 import io.legado.app.help.http.CookieStore
 import io.legado.app.help.webView.PooledWebView
 import io.legado.app.lib.theme.accentColor
+import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.gone
 import io.legado.app.utils.longSnackbar
@@ -42,6 +43,7 @@ class WebViewLoginFragment : BaseFragment(R.layout.fragment_web_view_login) {
     private var checking = false
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
+        binding.root.setBackgroundColor(requireContext().backgroundColor)
         setSupportToolbar(binding.titleBar.toolbar)
         viewModel.source?.let {
             binding.titleBar.title = getString(R.string.login_source, it.getTag())
