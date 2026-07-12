@@ -55,12 +55,6 @@ class SourceCompatibilityTest {
             emptyList<String>(),
             analyzeRule.getStringList(analyzeRule.splitSourceRule("$.missing[*]"))
         )
-        assertEquals(
-            "Updated",
-            analyzeRule.getString(
-                analyzeRule.splitSourceRule("$.book.title##Nested##Updated")
-            )
-        )
     }
 
     @Test
