@@ -60,6 +60,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
 
       - name: Setup JDK 17
@@ -70,16 +71,6 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
-
-      - name: Cache Gradle Dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
 
       - name: Prepare Assets
         run: |
@@ -175,6 +166,8 @@ jobs:
       VERSION: ${{ needs.prepare.outputs.version }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: actions/download-artifact@v8
         with:
           path: apk/
@@ -189,6 +182,12 @@ jobs:
               mv "$file" "${file/新共存/releaseA}"
             fi
           done
+
+      - name: Prepare Release Notes
+        run: |
+          bash .github/scripts/extract-latest-update.sh \
+            app/src/main/assets/updateLog.md \
+            > "$GITHUB_WORKSPACE/beta-release-notes.md"
 
       - name: Delete Pre-Release
         run: |
@@ -210,7 +209,7 @@ jobs:
         with:
           name: legado_app_${{ env.VERSION }}
           tag: "beta"
-          body: "此版本为测试版，签名与正式版不同，可能存在不稳定情况，升级前请务必备份好数据。"
+          bodyFile: ${{ github.workspace }}/beta-release-notes.md
           prerelease: true
           artifacts: ${{ github.workspace }}/apk/*.apk
   CDN:

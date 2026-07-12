@@ -105,10 +105,8 @@ val okHttpClient: OkHttpClient by lazy {
         }
     }
     if (AppConfig.isCronet) {
-        if (Cronet.loader?.install() == true) {
-            Cronet.interceptor?.let {
-                builder.addInterceptor(it)
-            }
+        Cronet.interceptor?.let {
+            builder.addInterceptor(it)
         }
     }
     builder.addInterceptor(DecompressInterceptor)

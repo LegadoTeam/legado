@@ -35,7 +35,9 @@ object WebViewPool {
     private val CACHED_WEB_VIEW_MAX_NUM = max(AppConfig.threadCount / 10, 5) // 池子总容量（闲置+使用）
     private const val IDLE_TIME_OUT: Long = 5 * 60 * 1000 // 闲置5分钟后销毁
     private const val IDLE_TIME_OUT_LAST: Long = 30 * 60 * 1000 // 最后一个闲置30分钟后销毁
-    private val cleanupScope by lazy { CoroutineScope(Dispatchers.IO + SupervisorJob()) }
+    private val cleanupScope by lazy {
+        CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
+    }
     private var cleanupJob: Job? = null
 
     // 获取一个WebView

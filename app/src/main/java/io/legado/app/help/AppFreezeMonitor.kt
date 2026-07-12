@@ -14,6 +14,7 @@ import io.legado.app.utils.LogUtils
 object AppFreezeMonitor {
 
     private const val TAG = "AppFreezeMonitor"
+    private const val CHECK_INTERVAL = 3000L
 
     val handler by lazy {
         Handler(HandlerThread("AppFreezeMonitor").apply { start() }.looper)
@@ -24,29 +25,32 @@ object AppFreezeMonitor {
     }
 
     private var registeredReceiver = false
+    private var monitorRunnable: Runnable? = null
+    private var previous = 0L
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
+    @Synchronized
     fun init(context: Context) {
         if (!AppConfig.recordLog) {
+            monitorRunnable?.let { handler.removeCallbacks(it) }
             if (registeredReceiver) {
-                registeredReceiver = false
                 context.unregisterReceiver(screenStatusReceiver)
+                registeredReceiver = false
             }
             return
         }
 
         if (!registeredReceiver) {
-            registeredReceiver = true
             context.registerReceiver(screenStatusReceiver, screenStatusReceiver.filter)
+            registeredReceiver = true
         }
 
-        var previous = SystemClock.uptimeMillis()
-
-        val runnable = object : Runnable {
+        previous = SystemClock.uptimeMillis()
+        val runnable = monitorRunnable ?: object : Runnable {
             override fun run() {
                 val current = SystemClock.uptimeMillis()
                 val elapsed = current - previous
-                val extra = elapsed - 3000
+                val extra = elapsed - CHECK_INTERVAL
 
                 if (extra > 300) {
                     LogUtils.d(TAG, "检测到应用被系统冻结，时长：$extra 毫秒")
@@ -55,11 +59,14 @@ object AppFreezeMonitor {
                 previous = current
 
                 if (AppConfig.recordLog) {
-                    handler.postDelayed(this, 3000)
+                    handler.removeCallbacks(this)
+                    handler.postDelayed(this, CHECK_INTERVAL)
                 }
             }
         }
-        handler.postDelayed(runnable, 3000)
+        monitorRunnable = runnable
+        handler.removeCallbacks(runnable)
+        handler.postDelayed(runnable, CHECK_INTERVAL)
     }
 
     class ScreenStatusReceiver : BroadcastReceiver() {
