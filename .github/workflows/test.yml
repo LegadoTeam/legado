@@ -161,15 +161,33 @@ jobs:
       - name: Check Build Result
         run: |
           expected_abis=(arm64-v8a armeabi-v7a x86 x86_64 universal)
-          for abi in "${expected_abis[@]}"; do
-            mapfile -d '' matches < <(find ${{ github.workspace }}/apk -maxdepth 1 -type f \
-              -name "legado_${{ env.product }}_${{ env.VERSIONL }}_${abi}_*.apk" -print0)
-            if [[ ${#matches[@]} -ne 1 ]]; then
-              echo "Expected one $abi APK, found ${#matches[@]}"
+          mapfile -d '' apks < <(find ${{ github.workspace }}/apk -maxdepth 1 \
+            -type f -name 'legado_*.apk' -print0)
+          if [[ ${#apks[@]} -ne ${#expected_abis[@]} ]]; then
+            echo "Expected ${#expected_abis[@]} APKs, found ${#apks[@]}"
+            exit 1
+          fi
+
+          declare -A verified=()
+          for apk in "${apks[@]}"; do
+            file_name=$(basename "$apk")
+            case "$file_name" in
+              *arm64-v8a*) abi=arm64-v8a ;;
+              *armeabi-v7a*) abi=armeabi-v7a ;;
+              *x86_64*) abi=x86_64 ;;
+              *x86*) abi=x86 ;;
+              *universal*) abi=universal ;;
+              *)
+                echo "Cannot determine ABI from $file_name"
+                exit 1
+                ;;
+            esac
+            if [[ -n "${verified[$abi]:-}" ]]; then
+              echo "Multiple APKs detected for $abi"
               exit 1
             fi
 
-            packaged_abis=$(unzip -Z1 "${matches[0]}" \
+            packaged_abis=$(unzip -Z1 "$apk" \
               | sed -n 's#^lib/\([^/]*\)/.*#\1#p' \
               | sort -u \
               | paste -sd ' ' -)
@@ -180,6 +198,14 @@ jobs:
             fi
             if [[ "$packaged_abis" != "$expected_native_abis" ]]; then
               echo "$abi APK contains unexpected native ABIs: $packaged_abis"
+              exit 1
+            fi
+            verified[$abi]=$apk
+          done
+
+          for abi in "${expected_abis[@]}"; do
+            if [[ -z "${verified[$abi]:-}" ]]; then
+              echo "Missing APK for $abi"
               exit 1
             fi
           done

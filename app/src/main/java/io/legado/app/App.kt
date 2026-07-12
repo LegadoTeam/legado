@@ -223,7 +223,7 @@ class App : Application() {
     }
 
     private fun initRhino() {
-        RhinoScriptEngine
+        RhinoScriptEngine.initialize()
         RhinoWrapFactory.register(BookSource::class.java, NativeBaseSource.factory)
         RhinoWrapFactory.register(RssSource::class.java, NativeBaseSource.factory)
         RhinoWrapFactory.register(HttpTTS::class.java, NativeBaseSource.factory)

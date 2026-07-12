@@ -57,7 +57,7 @@ suspend inline fun <T> runScriptWithContext(block: () -> T): T {
 
 @PublishedApi
 internal fun enterRhinoContext(): RhinoContext {
-    RhinoScriptEngine
+    RhinoScriptEngine.initialize()
     val context = Context.enter()
     if (context is RhinoContext) {
         return context
