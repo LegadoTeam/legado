@@ -115,15 +115,6 @@ class BackstageWebView(
                         webView.addJavascriptInterface(WebCacheManager, nameCache)
                         tag?.let { key ->
                            appDb.bookSourceDao.getBookSource(key)?.let {
-                               webView.webChromeClient = object : WebChromeClient() {
-                                   /* 监听网页日志 */
-                                   override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
-                                       val messageLevel = consoleMessage.messageLevel().name
-                                       val message = consoleMessage.message()
-                                       Debug.log(it.bookSourceUrl, "${messageLevel}: $message", true)
-                                       return true
-                                   }
-                               }
                                webView.addJavascriptInterface(it as BaseSource, nameSource)
                                val webJsExtensions = WebJsExtensions(it, null, webView)
                                webView.addJavascriptInterface(webJsExtensions, nameJava)
@@ -158,6 +149,16 @@ class BackstageWebView(
         settings.blockNetworkImage = true
         settings.userAgentString = headerMap?.get(AppConst.UA_NAME, true) ?: AppConfig.userAgent
         settings.cacheMode = if(cacheFirst) WebSettings.LOAD_CACHE_ELSE_NETWORK else WebSettings.LOAD_DEFAULT
+        tag?.takeIf { it.isNotBlank() }?.let { sourceTag ->
+            webView.webChromeClient = object : WebChromeClient() {
+                override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
+                    val messageLevel = consoleMessage.messageLevel().name
+                    val message = consoleMessage.message()
+                    Debug.log(sourceTag, "$messageLevel: $message", true)
+                    return true
+                }
+            }
+        }
         if (sourceRegex.isNullOrBlank() && overrideUrlRegex.isNullOrBlank()) {
             webView.webViewClient = HtmlWebViewClient()
         } else {
