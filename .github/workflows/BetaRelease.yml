@@ -22,6 +22,7 @@ jobs:
 
   prepare:
     runs-on: ubuntu-latest
+    if: ${{ !startsWith(github.event.head_commit.message, 'Merge pull request') }}
     outputs:
       version: ${{ steps.set-ver.outputs.version }}
       versionL: ${{ steps.set-ver.outputs.versionL }}
@@ -30,7 +31,7 @@ jobs:
     steps:
       - id: set-ver
         run: |
-          version="3.$(TZ=Asia/Shanghai date +%y.%m%d%H%M%S)"
+          version="3.$(TZ=Asia/Shanghai date +%y%m%d%H)"
           echo "version=$version" >> $GITHUB_OUTPUT
           echo "versionL=$version" >> $GITHUB_OUTPUT
 
@@ -147,14 +148,48 @@ jobs:
 
       - name: Check Build Result
         run: |
-          if [ ! -d ${{ github.workspace }}/apk ]; then
-            echo "❌ 未生成APK，请检查Gradle日志"
+          expected_packages=(arm universal)
+          mapfile -d '' apks < <(find ${{ github.workspace }}/apk -maxdepth 1 \
+            -type f -name 'legado_*.apk' -print0)
+          if [[ ${#apks[@]} -ne ${#expected_packages[@]} ]]; then
+            echo "Expected ${#expected_packages[@]} APKs, found ${#apks[@]}"
             exit 1
           fi
-          if [ ! -e ${{ github.workspace }}/apk/legado_*.apk ]; then
-            echo "❌ 未找到APK文件，请检查构建输出"
-            exit 1
-          fi
+
+          declare -A verified=()
+          for apk in "${apks[@]}"; do
+            file_name=$(basename "$apk")
+            case "$file_name" in
+              *_universal_*) package_kind=universal ;;
+              *) package_kind=arm ;;
+            esac
+            if [[ -n "${verified[$package_kind]:-}" ]]; then
+              echo "Multiple APKs detected for $package_kind"
+              exit 1
+            fi
+
+            packaged_abis=$(unzip -Z1 "$apk" \
+              | sed -n 's#^lib/\([^/]*\)/.*#\1#p' \
+              | sort -u \
+              | paste -sd ' ' -)
+            if [[ "$package_kind" == "universal" ]]; then
+              expected_native_abis="arm64-v8a armeabi-v7a x86 x86_64"
+            else
+              expected_native_abis="arm64-v8a armeabi-v7a"
+            fi
+            if [[ "$packaged_abis" != "$expected_native_abis" ]]; then
+              echo "$package_kind APK contains unexpected native ABIs: $packaged_abis"
+              exit 1
+            fi
+            verified[$package_kind]=$apk
+          done
+
+          for package_kind in "${expected_packages[@]}"; do
+            if [[ -z "${verified[$package_kind]:-}" ]]; then
+              echo "Missing APK for $package_kind"
+              exit 1
+            fi
+          done
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v7
@@ -171,7 +206,7 @@ jobs:
           path: ${{ github.workspace }}/mapping/mapping.txt
 
   release:
-    needs: [prepare, build]
+    needs: [prepare, build, CDN]
     if: github.event_name != 'pull_request' && github.repository == 'LegadoTeam/legado'
     runs-on: ubuntu-latest
     permissions:
@@ -182,6 +217,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
       - uses: actions/download-artifact@v8
         with:
           path: apk/
@@ -203,6 +239,11 @@ jobs:
             app/src/main/assets/updateLog.md \
             > "$GITHUB_WORKSPACE/release-notes.md"
 
+      - name: Update Version Tag
+        run: |
+          git tag --force "$VERSION" "$(git rev-parse HEAD)"
+          git push origin "refs/tags/$VERSION" --force
+
       - name: Publish Release
         uses: ncipollo/release-action@v1
         with:
@@ -216,43 +257,6 @@ jobs:
           artifactErrorsFailBuild: true
           artifacts: ${{ github.workspace }}/apk/*.apk
 
-      - name: Migrate Legacy Beta Clients
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          marker='<!-- versioned-release-migration -->'
-          if ! gh release view beta >/dev/null 2>&1; then
-            exit 0
-          fi
-          if gh release view beta --json body --jq '.body' | grep -Fq "$marker"; then
-            exit 0
-          fi
-
-          shopt -s nullglob
-          legacy_apks=("$GITHUB_WORKSPACE"/apk/*通用*.apk)
-          if [[ ${#legacy_apks[@]} -ne 2 ]]; then
-            echo "Expected two universal APKs for legacy beta migration"
-            exit 1
-          fi
-
-          legacy_dir="$GITHUB_WORKSPACE/legacy-beta-apk"
-          mkdir -p "$legacy_dir"
-          legacy_uploads=()
-          for apk in "${legacy_apks[@]}"; do
-            file_name=$(basename "$apk")
-            legacy_name=${file_name/$VERSION/${VERSION}00}
-            cp "$apk" "$legacy_dir/$legacy_name"
-            legacy_uploads+=("$legacy_dir/$legacy_name")
-          done
-
-          gh release upload beta "${legacy_uploads[@]}" --clobber
-          {
-            cat "$GITHUB_WORKSPACE/release-notes.md"
-            printf '\n\n%s\n' "$marker"
-          } > "$GITHUB_WORKSPACE/legacy-beta-release-notes.md"
-          gh release edit beta \
-            --notes-file "$GITHUB_WORKSPACE/legacy-beta-release-notes.md"
   CDN:
     needs: [prepare, build]
     runs-on: ubuntu-latest
@@ -276,8 +280,6 @@ jobs:
           done
       - name: Deploy apk to server
         uses: easingthemes/ssh-deploy@main
-        continue-on-error: true
-        if: env.SSH_PRIVATE_KEY && ! contains(github.event.action, 'noser')
         with:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           ARGS: "-avzr"
@@ -302,7 +304,11 @@ jobs:
         with:
           path: apk/
       - working-directory: apk/
-        run: mv */*.apk . || true && rm -rf */
+        run: |
+          mv */*.apk . || true
+          rm -rf */
+          bash "$GITHUB_WORKSPACE/.github/scripts/remove-universal-apks.sh" \
+            "$GITHUB_WORKSPACE/apk"
       - name: Upload To Lanzou
         continue-on-error: true
         run: |
@@ -319,7 +325,11 @@ jobs:
         with:
           path: apk/
       - working-directory: apk/
-        run: mv */*.apk . ;rm -rf */
+        run: |
+          mv */*.apk .
+          rm -rf */
+          bash "$GITHUB_WORKSPACE/.github/scripts/remove-universal-apks.sh" \
+            "$GITHUB_WORKSPACE/apk"
       - name: Push To "test" Branch
         run: |
           cd $GITHUB_WORKSPACE/apk/
@@ -345,11 +355,14 @@ jobs:
       - name: Rename apk
         working-directory: apk/
         run: |
-          for file in */*.apk; do
-            newName=$(echo "$file" | sed -e 's#.*\/##g' -e "s/_/ /g" -e 's/legado/阅读/')
+          mv */*.apk . || true
+          rm -rf */
+          bash "$GITHUB_WORKSPACE/.github/scripts/remove-universal-apks.sh" \
+            "$GITHUB_WORKSPACE/apk"
+          for file in *.apk; do
+            newName=$(echo "$file" | sed -e "s/_/ /g" -e 's/legado/阅读/')
             mv "$file" "$newName"
           done
-          rm -rf */
 
       - name: Check apk size
         working-directory: apk/

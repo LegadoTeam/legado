@@ -34,8 +34,9 @@ jobs:
     steps:
       - id: set-ver
         run: |
-          echo "version=3.$(TZ=Asia/Shanghai date +%y.%m%d%H)" >> $GITHUB_OUTPUT
-          echo "versionL=3.$(TZ=Asia/Shanghai date +%y.%m%d%H%M)" >> $GITHUB_OUTPUT
+          version="3.$(TZ=Asia/Shanghai date +%y%m%d%H)"
+          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "versionL=$version" >> $GITHUB_OUTPUT
 
       - id: check
         run: |
@@ -180,7 +181,7 @@ jobs:
           for apk in "${apks[@]}"; do
             file_name=$(basename "$apk")
             case "$file_name" in
-              *通用*) package_kind=universal ;;
+              *_universal_*) package_kind=universal ;;
               *) package_kind=arm ;;
             esac
             if [[ -n "${verified[$package_kind]:-}" ]]; then

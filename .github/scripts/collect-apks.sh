@@ -28,7 +28,7 @@ fi
 
 case "$package_kind" in
   arm) marker="" ;;
-  universal) marker="_通用" ;;
+  universal) marker="_universal" ;;
   *)
     echo "Unknown APK package kind: $package_kind" >&2
     exit 2

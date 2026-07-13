@@ -11,7 +11,6 @@ import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.http.text
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
-import io.legado.app.utils.fromJsonObject
 import kotlinx.coroutines.CoroutineScope
 
 @Keep
@@ -28,12 +27,8 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
         }
 
     private suspend fun getLatestRelease(): List<AppReleaseInfo> {
-        val betaRelease = checkVariant.isBeta()
-        val lastReleaseUrl = if (betaRelease) {
-            "https://api.github.com/repos/LegadoTeam/legado/releases?per_page=10"
-        } else {
-            "https://api.github.com/repos/LegadoTeam/legado/releases/latest"
-        }
+        val lastReleaseUrl =
+            "https://api.github.com/repos/LegadoTeam/legado/releases?per_page=30"
         val res = okHttpClient.newCallResponse {
             url(lastReleaseUrl)
         }
@@ -44,16 +39,11 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
         if (body.isBlank()) {
             throw NoStackTraceException("获取新版本出错")
         }
-        val releases = if (betaRelease) {
-            GSON.fromJsonArray<GithubRelease>(body).getOrElse {
+        val releases = GSON.fromJsonArray<GithubRelease>(body).getOrElse {
                 throw NoStackTraceException("获取新版本出错 " + it.localizedMessage)
-            }
-        } else {
-            listOf(GSON.fromJsonObject<GithubRelease>(body).getOrElse {
-                throw NoStackTraceException("获取新版本出错 " + it.localizedMessage)
-            })
         }
         return releases
+            .filterNot { it.isPreRelease }
             .flatMap { it.gitReleaseToAppReleaseInfo() }
             .sortedByDescending { it.createdAt }
     }
@@ -72,7 +62,7 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
                     return@async AppUpdate.UpdateInfo(
                         it.versionName,
                         it.note,
-                        it.downloadUrl,
+                        resolveAppUpdateDownloadUrl(it.name, it.downloadUrl),
                         it.name
                     )
                 }

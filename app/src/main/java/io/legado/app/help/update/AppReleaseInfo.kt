@@ -76,12 +76,14 @@ data class Asset(
             name,
             apkUrl,
             url,
-            parseReleaseVersionName(releaseTag, name, appVariant)
+            parseReleaseVersionName(releaseTag, name)
         )
     }
 }
 
 private val versionPattern = Regex("""\d+(?:\.\d+)+""")
+private val legacyDottedVersionPattern = Regex("""^3\.(\d{2})\.(\d{6,})$""")
+private val compactVersionPattern = Regex("""^3\.(\d{8,})$""")
 private val releaseAPattern = Regex("""(?:^|[_\-.])releasea(?:[_\-.]|$)""", RegexOption.IGNORE_CASE)
 private val releasePattern = Regex("""(?:^|[_\-.])release(?:[_\-.]|$)""", RegexOption.IGNORE_CASE)
 
@@ -96,17 +98,23 @@ internal fun inferAppVariant(assetName: String, preRelease: Boolean): AppVariant
 
 internal fun parseReleaseVersionName(
     releaseTag: String,
-    assetName: String,
-    appVariant: AppVariant
+    assetName: String
 ): String {
-    versionPattern.find(releaseTag)?.value?.let { return it }
-    val assetVersion = versionPattern.find(assetName)?.value.orEmpty()
-    val lastPart = assetVersion.substringAfterLast('.')
-    return if (appVariant.isBeta() && lastPart.length >= 8) {
-        assetVersion.dropLast(2)
-    } else {
-        assetVersion
+    val versionName = versionPattern.find(releaseTag)?.value
+        ?: versionPattern.find(assetName)?.value
+        ?: return ""
+    return normalizeLegadoVersionName(versionName)
+}
+
+internal fun normalizeLegadoVersionName(versionName: String): String {
+    val version = versionPattern.find(versionName)?.value ?: return versionName
+    legacyDottedVersionPattern.matchEntire(version)?.let { match ->
+        return "3.${match.groupValues[1]}${match.groupValues[2].take(6)}"
     }
+    compactVersionPattern.matchEntire(version)?.let { match ->
+        return "3.${match.groupValues[1].take(8)}"
+    }
+    return version
 }
 
 

@@ -41,8 +41,8 @@ internal fun compareReleaseVersions(left: String, right: String): Int {
 }
 
 private fun String.toVersionParts(): List<Long> {
-    return comparableVersionPattern.find(this)
-        ?.value
+    return comparableVersionPattern.find(this)?.value
+        ?.let(::normalizeLegadoVersionName)
         ?.split('.')
         ?.mapNotNull { it.toLongOrNull() }
         .orEmpty()
@@ -56,5 +56,19 @@ private fun String.isArmAbi(): Boolean {
 }
 
 private fun AppReleaseInfo.isUniversalPackage(): Boolean {
-    return name.contains("通用") || name.contains("universal", ignoreCase = true)
+    return isUniversalPackageName(name)
+}
+
+internal fun isUniversalPackageName(fileName: String): Boolean {
+    return fileName.contains("通用") ||
+        fileName.contains("universal", ignoreCase = true) ||
+        fileName.contains("_._")
+}
+
+internal fun resolveAppUpdateDownloadUrl(fileName: String, githubUrl: String): String {
+    return if (fileName.contains("_._")) {
+        githubUrl
+    } else {
+        "https://cdn.mgz.la/app/$fileName"
+    }
 }
