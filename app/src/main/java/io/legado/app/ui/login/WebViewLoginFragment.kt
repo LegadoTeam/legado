@@ -17,10 +17,10 @@ import android.webkit.WebViewClient
 import androidx.fragment.app.activityViewModels
 import io.legado.app.R
 import io.legado.app.base.BaseFragment
-import io.legado.app.constant.AppConst
 import io.legado.app.data.entities.BaseSource
 import io.legado.app.databinding.FragmentWebViewLoginBinding
 import io.legado.app.help.http.CookieStore
+import io.legado.app.help.config.AppConfig
 import io.legado.app.help.webView.PooledWebView
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.backgroundColor
@@ -32,6 +32,7 @@ import io.legado.app.utils.snackbar
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import androidx.core.net.toUri
 import io.legado.app.help.webView.WebViewPool
+import io.legado.app.help.webView.toWebViewRequestConfig
 
 class WebViewLoginFragment : BaseFragment(R.layout.fragment_web_view_login) {
 
@@ -79,12 +80,11 @@ class WebViewLoginFragment : BaseFragment(R.layout.fragment_web_view_login) {
         binding.webViewContainer.addView(webView)
         currentWebView = webView
         binding.progressBar.fontColor = accentColor
+        val requestConfig = viewModel.headerMap.toWebViewRequestConfig(AppConfig.userAgent)
         webView.settings.apply {
             useWideViewPort = true
             loadWithOverviewMode = true
-            viewModel.headerMap[AppConst.UA_NAME]?.let {
-                userAgentString = it
-            }
+            userAgentString = requestConfig.userAgent
         }
         val cookieManager = CookieManager.getInstance()
         webView.webViewClient = object : WebViewClient() {
@@ -154,7 +154,11 @@ class WebViewLoginFragment : BaseFragment(R.layout.fragment_web_view_login) {
     private fun loadUrl(source: BaseSource) {
         val loginUrl = source.loginUrl ?: return
         val absoluteUrl = NetworkUtils.getAbsoluteURL(source.getKey(), loginUrl)
-        currentWebView?.loadUrl(absoluteUrl, viewModel.headerMap)
+        val requestConfig = viewModel.headerMap.toWebViewRequestConfig(AppConfig.userAgent)
+        currentWebView?.apply {
+            settings.userAgentString = requestConfig.userAgent
+            loadUrl(absoluteUrl, requestConfig.additionalHeaders)
+        }
     }
 
     override fun onDestroy() {

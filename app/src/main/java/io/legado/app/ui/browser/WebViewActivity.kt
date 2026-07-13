@@ -21,10 +21,10 @@ import androidx.activity.viewModels
 import androidx.core.view.size
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
-import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppConst.imagePathKey
 import io.legado.app.databinding.ActivityWebViewBinding
 import io.legado.app.help.http.CookieStore
+import io.legado.app.help.config.AppConfig
 import io.legado.app.help.source.SourceVerificationHelp
 import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.dialogs.alert
@@ -57,6 +57,7 @@ import io.legado.app.help.webView.PooledWebView
 import io.legado.app.help.webView.WebViewPool
 import io.legado.app.help.webView.WebViewPool.BLANK_HTML
 import io.legado.app.help.webView.WebViewPool.DATA_HTML
+import io.legado.app.help.webView.toWebViewRequestConfig
 import io.legado.app.model.Download
 import splitties.systemservices.powerManager
 import java.lang.ref.WeakReference
@@ -106,10 +107,11 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
         viewModel.initData(intent) {
             val url = viewModel.baseUrl
             val headerMap = viewModel.headerMap
-            initWebView(url, headerMap)
+            val requestConfig = headerMap.toWebViewRequestConfig(AppConfig.userAgent)
+            initWebView(url, requestConfig.userAgent)
             val html = viewModel.html
             if (html.isNullOrEmpty()) {
-                currentWebView.loadUrl(url, headerMap)
+                currentWebView.loadUrl(url, requestConfig.additionalHeaders)
             } else {
                 if (viewModel.localHtml) {
                     viewModel.source?.let {
@@ -236,7 +238,7 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private fun initWebView(url: String, headerMap: HashMap<String, String>) {
+    private fun initWebView(url: String, userAgent: String) {
         binding.progressBar.fontColor = accentColor
         currentWebView.webChromeClient = CustomWebChromeClient()
         // 添加 JavaScript 接口
@@ -245,9 +247,7 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
         currentWebView.settings.apply {
             useWideViewPort = true
             loadWithOverviewMode = true
-            headerMap[AppConst.UA_NAME]?.let {
-                userAgentString = it
-            }
+            userAgentString = userAgent
         }
         AppCookieManager.applyToWebView(url)
         currentWebView.setOnLongClickListener {
