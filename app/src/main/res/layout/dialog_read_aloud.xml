@@ -13,6 +13,50 @@
     android:paddingBottom="6dp">
 
     <LinearLayout
+        android:id="@+id/ll_engine"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
+        android:background="?android:attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:minHeight="48dp"
+        android:orientation="horizontal"
+        android:paddingHorizontal="8dp">
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/iv_engine"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_volume_up"
+            app:tint="@color/primaryText" />
+
+        <TextView
+            android:id="@+id/tv_engine_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:importantForAccessibility="no"
+            android:singleLine="true"
+            android:textColor="@color/primaryText"
+            android:textSize="14sp"
+            tools:text="系统默认" />
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/iv_engine_arrow"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_arrow_drop_down"
+            app:tint="@color/primaryText" />
+
+    </LinearLayout>
+
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
