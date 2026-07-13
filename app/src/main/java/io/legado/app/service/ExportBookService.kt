@@ -232,6 +232,13 @@ class ExportBookService : BaseService() {
         val src: String
     )
 
+    private fun getChapterContentForExport(book: Book, chapter: BookChapter): String? {
+        return resolveExportChapterContent(
+            content = BookHelp.getContent(book, chapter),
+            isVolume = chapter.isVolume
+        )
+    }
+
     private suspend fun exportTxt(path: String, book: Book) {
         exportMsg.remove(book.bookUrl)
         postEvent(EventBus.EXPORT_BOOK, book.bookUrl)
@@ -309,13 +316,14 @@ class ExportBookService : BaseService() {
         contentProcessor: ContentProcessor,
         useReplace: Boolean
     ): Pair<String, ArrayList<SrcData>?> {
-        val content = BookHelp.getContent(book, chapter)
+        val content = getChapterContentForExport(book, chapter)
+            ?: return Pair("", null)
         val content1 = contentProcessor
             .getContent(
                 book,
                 // 不导出vip标识
                 chapter.apply { isVip = false },
-                content ?: if (chapter.isVolume) "" else "null",
+                content,
                 includeTitle = !AppConfig.exportNoChapterName,
                 useReplace = useReplace,
                 chineseConvert = false,
@@ -324,7 +332,7 @@ class ExportBookService : BaseService() {
         if (AppConfig.exportPictureFile) {
             //txt导出图片文件
             val srcList = arrayListOf<SrcData>()
-            content?.split("\n")?.forEachIndexed { index, text ->
+            content.split("\n").forEachIndexed { index, text ->
                 val matcher = AppPattern.imgPattern.matcher(text)
                 while (matcher.find()) {
                     matcher.group(1)?.let {
@@ -536,10 +544,11 @@ class ExportBookService : BaseService() {
                 emit(chapter)
             }
         }.mapAsyncIndexed(threads) { index, chapter ->
-            val content = BookHelp.getContent(book, chapter)
+            val content = getChapterContentForExport(book, chapter)
+                ?: return@mapAsyncIndexed null
             val (contentFix, resources) = fixPic(
                 book,
-                content ?: if (chapter.isVolume) "" else "null",
+                content,
                 chapter
             )
             // 不导出vip标识
@@ -573,6 +582,9 @@ class ExportBookService : BaseService() {
         }.collectIndexed { index, exportChapter ->
             postEvent(EventBus.EXPORT_BOOK, book.bookUrl)
             exportProgress[book.bookUrl] = index
+            if (exportChapter == null) {
+                return@collectIndexed
+            }
             val (title, chapterResource, resources, chapter) = exportChapter
             epubBook.resources.addAll(resources)
             if (chapter.isVolume) {
@@ -733,42 +745,38 @@ class ExportBookService : BaseService() {
             chapterList.forEachIndexed { index, chapter ->
                 currentCoroutineContext().ensureActive()
                 updateProgress(chapterList, index)
-                BookHelp.getContent(book, chapter).let { content ->
-                    val (contentFix, resources) = fixPic(
+                val content = getChapterContentForExport(book, chapter)
+                    ?: return@forEachIndexed
+                val (contentFix, resources) = fixPic(book, content, chapter)
+                epubBook.resources.addAll(resources)
+                val content1 = contentProcessor
+                    .getContent(
                         book,
-                        content ?: if (chapter.isVolume) "" else "null",
-                        chapter
-                    )
-                    epubBook.resources.addAll(resources)
-                    val content1 = contentProcessor
-                        .getContent(
-                            book,
-                            chapter,
-                            contentFix,
-                            includeTitle = false,
-                            useReplace = useReplace,
-                            chineseConvert = false,
-                            reSegment = false
-                        ).toString()
-                    val title = chapter.run {
-                        // 不导出vip标识
-                        isVip = false
-                        getDisplayTitle(
-                            contentProcessor.getTitleReplaceRules(),
-                            useReplace = useReplace,
-                            replaceBook = replaceBook
-                        )
-                    }
-                    epubBook.addSection(
-                        title,
-                        ResourceUtil.createChapterResource(
-                            title.replace("\uD83D\uDD12", ""),
-                            content1,
-                            contentModel,
-                            "Text/chapter_${index}.html"
-                        )
+                        chapter,
+                        contentFix,
+                        includeTitle = false,
+                        useReplace = useReplace,
+                        chineseConvert = false,
+                        reSegment = false
+                    ).toString()
+                val title = chapter.run {
+                    // 不导出vip标识
+                    isVip = false
+                    getDisplayTitle(
+                        contentProcessor.getTitleReplaceRules(),
+                        useReplace = useReplace,
+                        replaceBook = replaceBook
                     )
                 }
+                epubBook.addSection(
+                    title,
+                    ResourceUtil.createChapterResource(
+                        title.replace("\uD83D\uDD12", ""),
+                        content1,
+                        contentModel,
+                        "Text/chapter_${index}.html"
+                    )
+                )
             }
         }
 

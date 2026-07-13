@@ -16,7 +16,7 @@ plugins {
 apply from: 'download.gradle'
 
 static def releaseTime() {
-    return new Date().format("yy.MMddHH", TimeZone.getTimeZone("GMT+8"))
+    return new Date().format("yyMMddHH", TimeZone.getTimeZone("GMT+8"))
 }
 
 def name = "legado"

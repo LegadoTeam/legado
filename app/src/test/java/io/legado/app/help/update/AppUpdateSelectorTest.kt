@@ -10,50 +10,53 @@ class AppUpdateSelectorTest {
     fun formalReleaseAssetsKeepTheirConfiguredVariants() {
         assertEquals(
             AppVariant.BETA_RELEASE,
-            inferAppVariant("legado_app_3.26.07131300_release.apk", preRelease = false)
+            inferAppVariant("legado_app_3.26071313_release.apk", preRelease = false)
         )
         assertEquals(
             AppVariant.BETA_RELEASEA,
-            inferAppVariant("legado_app_3.26.07131300_通用_releaseA.apk", preRelease = false)
+            inferAppVariant("legado_app_3.26071313_universal_releaseA.apk", preRelease = false)
         )
         assertEquals(
             AppVariant.OFFICIAL,
-            inferAppVariant("legado_app_3.26.071313_通用.apk", preRelease = false)
+            inferAppVariant("legado_app_3.26071313_universal.apk", preRelease = false)
         )
     }
 
     @Test
     fun releaseTagIsThePrimaryVersionSource() {
         assertEquals(
-            "3.26.0713134507",
+            "3.26071313",
             parseReleaseVersionName(
                 releaseTag = "3.26.0713134507",
-                assetName = "legado_app_3.26.0713134507_release.apk",
-                appVariant = AppVariant.BETA_RELEASE
+                assetName = "legado_app_3.26.0713134507_release.apk"
             )
         )
         assertEquals(
-            "3.26.071313",
+            "3.26071313",
             parseReleaseVersionName(
                 releaseTag = "beta",
-                assetName = "legado_app_3.26.07131345_release.apk",
-                appVariant = AppVariant.BETA_RELEASE
+                assetName = "legado_app_3.26.07131345_release.apk"
             )
         )
         assertEquals(
-            "3.26.0713134507",
+            "3.26071313",
             parseReleaseVersionName(
                 releaseTag = "beta",
-                assetName = "legado_app_3.26.071313450700_通用_release.apk",
-                appVariant = AppVariant.BETA_RELEASE
+                assetName = "legado_app_3.26.071313450700_universal_release.apk"
             )
         )
         assertEquals(
-            "3.26.071313",
+            "3.26071313",
             parseReleaseVersionName(
                 releaseTag = "",
-                assetName = "legado_app_3.26.071313.apk",
-                appVariant = AppVariant.OFFICIAL
+                assetName = "legado_app_3.26.071313.apk"
+            )
+        )
+        assertEquals(
+            "3.26071313",
+            parseReleaseVersionName(
+                releaseTag = "3.26071313",
+                assetName = "legado_app_3.26071313_release.apk"
             )
         )
     }
@@ -66,7 +69,7 @@ class AppUpdateSelectorTest {
         val selected = selectUpdateRelease(
             releases = listOf(universal, arm),
             appVariant = AppVariant.BETA_RELEASE,
-            currentVersionName = "3.26.071312",
+            currentVersionName = "3.26071312",
             supportedAbis = listOf("arm64-v8a", "armeabi-v7a")
         )
 
@@ -76,12 +79,12 @@ class AppUpdateSelectorTest {
     @Test
     fun x86DevicePrefersUniversalPackage() {
         val arm = release("legado_app_version_release.apk", createdAt = 2)
-        val universal = release("legado_app_version_通用_release.apk", createdAt = 1)
+        val universal = release("legado_app_version_universal_release.apk", createdAt = 1)
 
         val selected = selectUpdateRelease(
             releases = listOf(arm, universal),
             appVariant = AppVariant.BETA_RELEASE,
-            currentVersionName = "3.26.071312",
+            currentVersionName = "3.26071312",
             supportedAbis = listOf("x86_64", "x86")
         )
 
@@ -97,7 +100,7 @@ class AppUpdateSelectorTest {
             selectUpdateRelease(
                 releases = listOf(universal),
                 appVariant = AppVariant.BETA_RELEASE,
-                currentVersionName = "3.26.071312",
+                currentVersionName = "3.26071312",
                 supportedAbis = listOf("armeabi-v7a")
             )
         )
@@ -107,21 +110,45 @@ class AppUpdateSelectorTest {
     fun newerVersionWinsBeforePackagePreference() {
         val olderArm = release(
             "legado_app_old_release.apk",
-            versionName = "3.26.071313"
+            versionName = "3.26071313"
         )
         val newerUniversal = release(
             "legado_app_new_通用_release.apk",
-            versionName = "3.26.071314"
+            versionName = "3.26071314"
         )
 
         val selected = selectUpdateRelease(
             releases = listOf(olderArm, newerUniversal),
             appVariant = AppVariant.BETA_RELEASE,
-            currentVersionName = "3.26.071312",
+            currentVersionName = "3.26071312",
             supportedAbis = listOf("arm64-v8a")
         )
 
         assertSame(newerUniversal, selected)
+    }
+
+    @Test
+    fun restoredHourVersionWinsOverHistoricalSecondVersion() {
+        val historical = release(
+            "legado_app_3.26.0713082212_release.apk",
+            versionName = "3.26.0713082212",
+            createdAt = 2
+        )
+        val restored = release(
+            "legado_app_3.26071309_release.apk",
+            versionName = "3.26071309",
+            createdAt = 1
+        )
+
+        assertSame(
+            restored,
+            selectUpdateRelease(
+                releases = listOf(historical, restored),
+                appVariant = AppVariant.BETA_RELEASE,
+                currentVersionName = "3.26.0713082212",
+                supportedAbis = listOf("arm64-v8a")
+            )
+        )
     }
 
     @Test
@@ -137,7 +164,7 @@ class AppUpdateSelectorTest {
             selectUpdateRelease(
                 releases = listOf(release, releaseA),
                 appVariant = AppVariant.BETA_RELEASEA,
-                currentVersionName = "3.26.071312",
+                currentVersionName = "3.26071312",
                 supportedAbis = listOf("arm64-v8a")
             )
         )
@@ -148,13 +175,56 @@ class AppUpdateSelectorTest {
         assertEquals(1, compareReleaseVersions("3.26.10", "3.26.9"))
         assertEquals(0, compareReleaseVersions("3.26.10", "3.26.10.0"))
         assertEquals(-1, compareReleaseVersions("3.26.9", "3.26.10"))
-        assertEquals(0, compareReleaseVersions("3.26.071313", "3.26.071313debug"))
+        assertEquals(0, compareReleaseVersions("3.26071313", "3.26.071313debug"))
+        assertEquals(1, compareReleaseVersions("3.26071309", "3.26.0713082212"))
+        assertEquals(0, compareReleaseVersions("3.26071308", "3.26.0713082212"))
+    }
+
+    @Test
+    fun x86DeviceRecognizesHistoricalSanitizedUniversalPackage() {
+        val arm = release("legado_app_3.26.0713082212_release.apk", createdAt = 2)
+        val universal = release("legado_app_3.26.0713082212_._release.apk", createdAt = 1)
+
+        assertSame(
+            universal,
+            selectUpdateRelease(
+                releases = listOf(arm, universal),
+                appVariant = AppVariant.BETA_RELEASE,
+                currentVersionName = "3.26071307",
+                supportedAbis = listOf("x86_64")
+            )
+        )
+    }
+
+    @Test
+    fun updateDownloadsUseCdnExceptForHistoricalSanitizedNames() {
+        assertEquals(
+            "https://cdn.mgz.la/app/legado_app_3.26071309_release.apk",
+            resolveAppUpdateDownloadUrl(
+                "legado_app_3.26071309_release.apk",
+                "https://github.com/example/arm.apk"
+            )
+        )
+        assertEquals(
+            "https://cdn.mgz.la/app/legado_app_3.26071309_universal_release.apk",
+            resolveAppUpdateDownloadUrl(
+                "legado_app_3.26071309_universal_release.apk",
+                "https://github.com/example/universal.apk"
+            )
+        )
+        assertEquals(
+            "https://github.com/example/legacy-universal.apk",
+            resolveAppUpdateDownloadUrl(
+                "legado_app_3.26.0713082212_._release.apk",
+                "https://github.com/example/legacy-universal.apk"
+            )
+        )
     }
 
     private fun release(
         name: String,
         appVariant: AppVariant = AppVariant.BETA_RELEASE,
-        versionName: String = "3.26.071313",
+        versionName: String = "3.26071313",
         createdAt: Long = 0
     ) = AppReleaseInfo(
         appVariant = appVariant,
