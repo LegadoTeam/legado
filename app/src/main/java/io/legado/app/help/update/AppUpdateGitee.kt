@@ -1,5 +1,6 @@
 package io.legado.app.help.update
 
+import android.os.Build
 import androidx.annotation.Keep
 import io.legado.app.constant.AppConst
 import io.legado.app.exception.NoStackTraceException
@@ -62,15 +63,17 @@ object AppUpdateGitee : AppUpdate.AppUpdateInterface {
         scope: CoroutineScope,
     ): Coroutine<AppUpdate.UpdateInfo> {
         return Coroutine.async(scope) {
-            getLatestRelease()
-                .filter {
-                    if (AppConst.appInfo.appVariant == AppVariant.BETA_RELEASE) { //不切版本
-                        it.appVariant == AppConst.appInfo.appVariant
-                    } else {
-                        it.appVariant == checkVariant
-                    }
-                }
-                .firstOrNull { it.versionName > AppConst.appInfo.versionName }
+            val targetVariant = if (AppConst.appInfo.appVariant == AppVariant.BETA_RELEASE) {
+                AppConst.appInfo.appVariant
+            } else {
+                checkVariant
+            }
+            selectUpdateRelease(
+                releases = getLatestRelease(),
+                appVariant = targetVariant,
+                currentVersionName = AppConst.appInfo.versionName,
+                supportedAbis = Build.SUPPORTED_ABIS.toList()
+            )
                 ?.let {
                     return@async AppUpdate.UpdateInfo(
                         it.versionName,

@@ -32,6 +32,8 @@ jobs:
   build:
     needs: prepare
     if: ${{ needs.prepare.outputs.sign }}
+    permissions:
+      contents: write
     strategy:
       matrix:
         product: [ app, google ]
