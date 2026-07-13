@@ -17,8 +17,9 @@
         android:src="@drawable/image_cover_default"
         android:transitionName="img_cover"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0"
         tools:ignore="UnusedAttribute" />
 
     <io.legado.app.ui.widget.image.CircleImageView
@@ -30,7 +31,8 @@
         android:scrollbars="none"
         android:src="@color/md_green_600"
         android:visibility="invisible"
-        app:layout_constraintLeft_toRightOf="@id/iv_cover"
+        app:layout_constraintBottom_toBottomOf="@id/tv_name"
+        app:layout_constraintStart_toEndOf="@id/iv_cover"
         app:layout_constraintTop_toTopOf="@id/tv_name" />
 
     <io.legado.app.ui.widget.text.BadgeView
@@ -39,8 +41,9 @@
         android:layout_height="wrap_content"
         android:layout_margin="8dp"
         android:scrollbars="none"
-        app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintBottom_toBottomOf="@id/tv_name"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/tv_name" />
 
     <TextView
         android:id="@+id/tv_name"
@@ -56,58 +59,68 @@
         app:layout_constraintStart_toEndOf="@+id/iv_in_bookshelf"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <LinearLayout
+    <TextView
+        android:id="@+id/tv_author"
         android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_marginStart="8dp"
+        android:layout_height="wrap_content"
         android:layout_marginTop="3dp"
-        android:orientation="vertical"
+        android:layout_marginEnd="8dp"
+        android:ellipsize="end"
+        android:lines="1"
         android:scrollbars="none"
-        app:layout_constraintBottom_toBottomOf="@id/iv_cover"
-        app:layout_constraintLeft_toRightOf="@+id/iv_cover"
-        app:layout_constraintRight_toRightOf="@id/tv_name"
-        app:layout_constraintTop_toBottomOf="@+id/tv_name">
+        android:text="@string/author"
+        android:textColor="@color/primaryText"
+        android:textSize="12sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@id/tv_name"
+        app:layout_constraintTop_toBottomOf="@id/tv_name" />
 
-        <TextView
-            android:id="@+id/tv_author"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:lines="1"
-            android:scrollbars="none"
-            android:text="@string/author"
-            android:textColor="@color/primaryText"
-            android:textSize="12sp" />
+    <io.legado.app.ui.widget.LabelsBar
+        android:id="@+id/ll_kind"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="8dp"
+        android:orientation="horizontal"
+        android:scrollbars="none"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@id/tv_name"
+        app:layout_constraintTop_toBottomOf="@id/tv_author" />
 
-        <io.legado.app.ui.widget.LabelsBar
-            android:id="@+id/ll_kind"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:scrollbars="none" />
+    <TextView
+        android:id="@+id/tv_lasted"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="8dp"
+        android:ellipsize="end"
+        android:lines="1"
+        android:scrollbars="none"
+        android:text="@string/last_read"
+        android:textColor="@color/primaryText"
+        android:textSize="12sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@id/tv_name"
+        app:layout_constraintTop_toBottomOf="@id/ll_kind" />
 
-        <TextView
-            android:id="@+id/tv_lasted"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:lines="1"
-            android:scrollbars="none"
-            android:text="@string/last_read"
-            android:textColor="@color/primaryText"
-            android:textSize="12sp" />
-
-        <io.legado.app.ui.widget.text.MultilineTextView
-            android:id="@+id/tv_introduce"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:ellipsize="end"
-            android:scrollbars="none"
-            android:text="@string/book_intro"
-            android:textColor="@color/primaryText"
-            android:textSize="12sp" />
-
-    </LinearLayout>
+    <TextView
+        android:id="@+id/tv_introduce"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="8dp"
+        android:ellipsize="end"
+        android:maxLines="3"
+        android:scrollbars="none"
+        android:text="@string/book_intro"
+        android:textColor="@color/primaryText"
+        android:textSize="12sp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@id/tv_name"
+        app:layout_constraintTop_toBottomOf="@id/tv_lasted"
+        app:layout_constraintVertical_bias="0" />
 
 
 </androidx.constraintlayout.widget.ConstraintLayout>

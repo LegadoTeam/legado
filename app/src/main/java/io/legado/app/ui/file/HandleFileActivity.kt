@@ -30,6 +30,26 @@ import io.legado.app.utils.viewbindingdelegate.viewBinding
 import splitties.init.appCtx
 import java.io.File
 
+internal fun takePersistableUriPermissions(
+    requestedFlags: Int,
+    takePermission: (Int) -> Unit,
+): Int {
+    var persistedFlags = 0
+    listOf(
+        Intent.FLAG_GRANT_READ_URI_PERMISSION,
+        Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+    ).forEach { flag ->
+        if (requestedFlags and flag != 0) {
+            try {
+                takePermission(flag)
+                persistedFlags = persistedFlags or flag
+            } catch (_: SecurityException) {
+            }
+        }
+    }
+    return persistedFlags
+}
+
 class HandleFileActivity :
     VMBaseActivity<ActivityTranslucenceBinding, HandleFileViewModel>(),
     FilePickerDialog.CallBack {
@@ -41,24 +61,18 @@ class HandleFileActivity :
     private val selectDocTree =
         registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
             uri?.let {
-                if (uri.isContentScheme()) {
-                    val modeFlags =
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                    contentResolver.takePersistableUriPermission(uri, modeFlags)
-                }
+                takePersistableUriPermission(
+                    it,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
                 onResult(Intent().setData(uri))
             } ?: finish()
         }
 
     private val selectDoc = registerForActivityResult(ActivityResultContracts.OpenDocument()) {
         it?.let {
-            if (it.isContentScheme()) {
-                val modeFlags =
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                try {
-                    contentResolver.takePersistableUriPermission(it, modeFlags)
-                } catch (_: SecurityException) { }
-            }
+            takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             onResult(Intent().setData(it))
         } ?: finish()
     }
@@ -269,6 +283,13 @@ class HandleFileActivity :
         } catch (_: IllegalArgumentException) {
         }
         return false
+    }
+
+    private fun takePersistableUriPermission(uri: Uri, requestedFlags: Int) {
+        if (!uri.isContentScheme()) return
+        takePersistableUriPermissions(requestedFlags) { flag ->
+            contentResolver.takePersistableUriPermission(uri, flag)
+        }
     }
 
     private fun getFileData(): Triple<String, Any, String>? {
