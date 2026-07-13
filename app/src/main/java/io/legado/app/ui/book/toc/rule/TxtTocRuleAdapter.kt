@@ -156,6 +156,13 @@ class TxtTocRuleAdapter(context: Context, private val callBack: CallBack) :
         callBack.upCountView()
     }
 
+    fun clearSelection() {
+        if (selected.isEmpty()) return
+        selected.clear()
+        notifyItemRangeChanged(0, itemCount, bundleOf(Pair("selected", null)))
+        callBack.upCountView()
+    }
+
     fun revertSelection() {
         getItems().forEach {
             if (selected.contains(it)) {

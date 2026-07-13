@@ -6,6 +6,7 @@ import android.view.Menu
 import android.view.MenuItem
 import androidx.activity.viewModels
 import androidx.appcompat.widget.PopupMenu
+import androidx.appcompat.widget.SearchView
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
 import io.legado.app.R
@@ -18,6 +19,7 @@ import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.DirectLinkUpload
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
+import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.ui.association.ImportTxtTocRuleDialog
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.qrcode.QrCodeResult
@@ -27,6 +29,7 @@ import io.legado.app.ui.widget.recycler.ItemTouchCallback
 import io.legado.app.ui.widget.recycler.VerticalDivider
 import io.legado.app.utils.ACache
 import io.legado.app.utils.GSON
+import io.legado.app.utils.applyTint
 import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.launch
 import io.legado.app.utils.sendToClip
@@ -53,6 +56,10 @@ class TxtTocRuleActivity : VMBaseActivity<ActivityTxtTocRuleBinding, TxtTocRuleV
         TxtTocRuleAdapter(this, this)
     }
     private val importTocRuleKey = "tocRuleUrl"
+    private val searchView: SearchView by lazy { binding.root.findViewById(R.id.search_view) }
+    private lateinit var itemTouchCallback: ItemTouchCallback
+    private var allRules: List<TxtTocRule> = emptyList()
+    private var searchKey = ""
     private val qrCodeResult = registerForActivityResult(QrCodeResult()) {
         it ?: return@registerForActivityResult
         showDialogFragment(ImportTxtTocRuleDialog(it))
@@ -82,6 +89,7 @@ class TxtTocRuleActivity : VMBaseActivity<ActivityTxtTocRuleBinding, TxtTocRuleV
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         initView()
+        initSearchView()
         initBottomActionBar()
         initData()
     }
@@ -96,9 +104,27 @@ class TxtTocRuleActivity : VMBaseActivity<ActivityTxtTocRuleBinding, TxtTocRuleV
         dragSelectTouchHelper.attachToRecyclerView(binding.recyclerView)
         dragSelectTouchHelper.activeSlideSelect()
         // Note: need judge selection first, so add ItemTouchHelper after it.
-        val itemTouchCallback = ItemTouchCallback(adapter)
+        itemTouchCallback = ItemTouchCallback(adapter)
         itemTouchCallback.isCanDrag = true
         ItemTouchHelper(itemTouchCallback).attachToRecyclerView(binding.recyclerView)
+    }
+
+    private fun initSearchView() {
+        binding.searchBar.setBackgroundColor(primaryColor)
+        searchView.applyTint(primaryTextColor)
+        searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?): Boolean = false
+
+            override fun onQueryTextChange(newText: String?): Boolean {
+                val newKey = newText.orEmpty()
+                if (newKey != searchKey) {
+                    adapter.clearSelection()
+                }
+                searchKey = newKey
+                updateAdapter()
+                return true
+            }
+        })
     }
 
     private fun initBottomActionBar() {
@@ -113,9 +139,15 @@ class TxtTocRuleActivity : VMBaseActivity<ActivityTxtTocRuleBinding, TxtTocRuleV
             appDb.txtTocRuleDao.observeAll().catch {
                 AppLog.put("TXT目录规则界面获取数据失败\n${it.localizedMessage}", it)
             }.flowOn(IO).conflate().collect { tocRules ->
-                adapter.setItems(tocRules, adapter.diffItemCallBack)
+                allRules = tocRules
+                updateAdapter()
             }
         }
+    }
+
+    private fun updateAdapter() {
+        itemTouchCallback.isCanDrag = searchKey.isBlank()
+        adapter.setItems(allRules.filterByKeyword(searchKey), adapter.diffItemCallBack)
     }
 
     override fun onResume() {

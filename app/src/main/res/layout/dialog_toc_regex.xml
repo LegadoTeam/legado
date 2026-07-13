@@ -14,6 +14,17 @@
         app:titleTextAppearance="@style/ToolbarTitle"
         app:popupTheme="@style/AppTheme.PopupOverlay" />
 
+    <LinearLayout
+        android:id="@+id/search_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp">
+
+        <include layout="@layout/view_search" />
+
+    </LinearLayout>
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_view"
         android:layout_width="match_parent"

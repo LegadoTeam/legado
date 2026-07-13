@@ -6,6 +6,7 @@ import android.content.res.ColorStateList
 import android.graphics.PorterDuff
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.RippleDrawable
+import android.os.Build
 import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
@@ -172,6 +173,11 @@ object TintHelper {
                         if (icon != null) {
                             setTint(icon, color)
                         }
+                    }
+                    view.findViewById<EditText>(androidx.appcompat.R.id.search_src_text)?.apply {
+                        setTextColor(color)
+                        setHintTextColor(ColorUtils.adjustAlpha(color, 0.5f))
+                        setCursorTint(this, color)
                     }
                 }
                 else -> isBg = true
@@ -464,6 +470,13 @@ object TintHelper {
 
     @SuppressLint("DiscouragedPrivateApi", "SoonBlockedPrivateApi")
     fun setCursorTint(editText: EditText, @ColorInt color: Int) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            editText.textCursorDrawable = createTintedDrawable(
+                ContextCompat.getDrawable(editText.context, R.drawable.shape_text_cursor),
+                color
+            )
+            return
+        }
         try {
             val fCursorDrawableRes = TextView::class.java.getDeclaredField("mCursorDrawableRes")
             fCursorDrawableRes.isAccessible = true

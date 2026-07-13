@@ -26,7 +26,18 @@ import io.legado.app.ui.widget.image.photo.Info
 import io.legado.app.ui.widget.image.photo.OnRotateListener
 import io.legado.app.ui.widget.image.photo.RotateGestureDetector
 import kotlin.math.abs
+import kotlin.math.min
 import kotlin.math.roundToInt
+
+internal fun fitCenterUpscale(
+    imageWidth: Float,
+    imageHeight: Float,
+    containerWidth: Float,
+    containerHeight: Float,
+): Float {
+    if (imageWidth <= 0f || imageHeight <= 0f) return 1f
+    return min(containerWidth / imageWidth, containerHeight / imageHeight).coerceAtLeast(1f)
+}
 
 @Suppress("UNUSED_PARAMETER", "unused", "MemberVisibilityCanBePrivate", "PropertyName")
 class PhotoView @JvmOverloads constructor(
@@ -328,8 +339,14 @@ class PhotoView @JvmOverloads constructor(
     }
 
     private fun initFitCenter() {
-        if (mImgRect.width() < mWidgetRect.width()) {
-            mScale = mWidgetRect.width() / mImgRect.width()
+        val scale = fitCenterUpscale(
+            mImgRect.width(),
+            mImgRect.height(),
+            mWidgetRect.width(),
+            mWidgetRect.height(),
+        )
+        if (scale > 1f) {
+            mScale = scale
             mAnimMatrix.postScale(mScale, mScale, mScreenCenter.x, mScreenCenter.y)
             executeTranslate()
             resetBase()
