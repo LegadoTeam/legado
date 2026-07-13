@@ -99,9 +99,8 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     override val viewModel by viewModels<VideoPlayerViewModel>()
     private val playerView: VideoPlayer by lazy { binding.playerView }
     private var starMenuItem: MenuItem? = null
-    private var initIntroView = false
+    private var isIntroTextViewAttached = false
     private val introTextView by lazy {
-        initIntroView = true
         val inflater = LayoutInflater.from(this)
         val view = inflater.inflate(R.layout.view_book_intro, binding.tvIntroContainer, false) as ScrollTextView
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
@@ -291,7 +290,15 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
 
     private fun showBookIntro(book: Book) {
         val intro = book.getDisplayIntro()
-        if (intro?.startsWith("<useweb>") == true) {
+        if (intro.isNullOrBlank()) {
+            destroyWeb()
+            binding.tvIntroContainer.removeAllViews()
+            isIntroTextViewAttached = false
+            binding.tvIntroContainer.gone()
+            return
+        }
+        binding.tvIntroContainer.visible()
+        if (intro.startsWith("<useweb>")) {
             val lastIndex = intro.lastIndexOf("<")
             if (lastIndex < 8) {
                 introTextView.text = intro
@@ -312,8 +319,8 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                 pooledWebView
             }
             val webView = pooledWebView.realWebView
-            if (initIntroView || this.pooledWebView == null) {
-                initIntroView = false
+            if (isIntroTextViewAttached || this.pooledWebView == null) {
+                isIntroTextViewAttached = false
                 this.pooledWebView = pooledWebView
                 binding.tvIntroContainer.removeAllViews()
                 binding.tvIntroContainer.addView(webView)
@@ -324,15 +331,14 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             webView.loadDataWithBaseURL(bookUrl, html, "text/html", "utf-8", bookUrl)
             return
         }
-        if (!initIntroView || pooledWebView != null) {
+        val tvIntro = introTextView
+        if (!isIntroTextViewAttached || pooledWebView != null) {
             destroyWeb()
             binding.tvIntroContainer.removeAllViews()
-            binding.tvIntroContainer.addView(introTextView)
+            tvIntro.text = null
+            binding.tvIntroContainer.addView(tvIntro)
+            isIntroTextViewAttached = true
         }
-        if (intro.isNullOrBlank()) {
-            return
-        }
-        val tvIntro = introTextView
         if (intro.startsWith("<usehtml>")) {
             val lastIndex = intro.lastIndexOf("<")
             if (lastIndex < 9) {
