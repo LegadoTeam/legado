@@ -33,7 +33,6 @@ import androidx.core.view.size
 import com.script.rhino.runScriptWithContext
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
-import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppConst.imagePathKey
 import io.legado.app.constant.AppLog
 import io.legado.app.databinding.ActivityRssReadBinding
@@ -96,6 +95,7 @@ import io.legado.app.help.webView.WebJsExtensions.Companion.nameUrl
 import io.legado.app.help.webView.WebViewPool
 import io.legado.app.help.webView.WebViewPool.BLANK_HTML
 import io.legado.app.help.webView.WebViewPool.DATA_HTML
+import io.legado.app.help.webView.toWebViewRequestConfig
 import io.legado.app.model.Download
 import kotlinx.coroutines.Dispatchers.IO
 import java.lang.ref.WeakReference
@@ -396,10 +396,11 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             }
         }
         viewModel.urlLiveData.observe(this) { urlState ->
-            upWebviewSettings(urlState.getUserAgent())
+            val requestConfig = urlState.headerMap.toWebViewRequestConfig(urlState.getUserAgent())
+            upWebviewSettings(requestConfig.userAgent)
             initJavascriptInterface()
             CookieManager.applyToWebView(urlState.url)
-            currentWebView.loadUrl(urlState.url, urlState.headerMap)
+            currentWebView.loadUrl(urlState.url, requestConfig.additionalHeaders)
         }
         viewModel.htmlLiveData.observe(this) { html ->
             viewModel.rssSource?.let {
@@ -416,8 +417,11 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
     @SuppressLint("SetJavaScriptEnabled")
     private fun upWebviewSettings(userAgent: String? = null) {
         viewModel.rssSource?.let { s ->
+            val sourceUserAgent = viewModel.headerMap
+                .toWebViewRequestConfig(AppConfig.userAgent)
+                .userAgent
             currentWebView.settings.run {
-                userAgentString = userAgent ?: viewModel.headerMap[AppConst.UA_NAME] ?: AppConfig.userAgent
+                userAgentString = userAgent ?: sourceUserAgent
                 javaScriptEnabled = s.enableJs
                 cacheMode = if (s.cacheFirst) WebSettings.LOAD_CACHE_ELSE_NETWORK else WebSettings.LOAD_DEFAULT
             }

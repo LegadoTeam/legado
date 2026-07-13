@@ -53,7 +53,10 @@ object WebViewPool {
             createNewWebView() // 创建新实例
         }
         pooledWebView.upContext(context).apply {
-            realWebView.settings.setDarkeningAllowed(AppConfig.isNightTheme) //设置是否夜间
+            realWebView.settings.apply {
+                setDarkeningAllowed(AppConfig.isNightTheme) //设置是否夜间
+                userAgentString = AppConfig.userAgent
+            }
             if (inUsePool.isEmpty()) {
                 realWebView.resumeTimers()
             }

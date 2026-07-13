@@ -14,7 +14,6 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import io.legado.app.constant.AppConst
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BaseSource
 import io.legado.app.exception.NoStackTraceException
@@ -23,14 +22,15 @@ import io.legado.app.help.WebCacheManager
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.webView.PooledWebView
+import io.legado.app.help.webView.WebViewRequestConfig
 import io.legado.app.help.webView.WebJsExtensions
 import io.legado.app.help.webView.WebJsExtensions.Companion.getInjectionString
 import io.legado.app.help.webView.WebJsExtensions.Companion.nameCache
 import io.legado.app.help.webView.WebJsExtensions.Companion.nameJava
 import io.legado.app.help.webView.WebJsExtensions.Companion.nameSource
 import io.legado.app.help.webView.WebViewPool
+import io.legado.app.help.webView.toWebViewRequestConfig
 import io.legado.app.model.Debug
-import io.legado.app.utils.get
 import io.legado.app.utils.runOnUI
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Runnable
@@ -107,7 +107,8 @@ class BackstageWebView(
 
     @Throws(AndroidRuntimeException::class)
     private fun load() {
-        val webView = createWebView()
+        val requestConfig = headerMap.toWebViewRequestConfig(AppConfig.userAgent)
+        val webView = createWebView(requestConfig)
         try {
             when {
                 !html.isNullOrEmpty() -> {
@@ -127,10 +128,10 @@ class BackstageWebView(
                     webView.loadDataWithBaseURL(url, html, "text/html", getEncoding(), url)
                 }
 
-                else -> if (headerMap == null) {
+                else -> if (requestConfig.additionalHeaders.isEmpty()) {
                     webView.loadUrl(url!!)
                 } else {
-                    webView.loadUrl(url!!, headerMap)
+                    webView.loadUrl(url!!, requestConfig.additionalHeaders)
                 }
             }
         } catch (e: Exception) {
@@ -140,14 +141,14 @@ class BackstageWebView(
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private fun createWebView(): WebView {
+    private fun createWebView(requestConfig: WebViewRequestConfig): WebView {
         val pooledWebView = WebViewPool.acquire(appCtx)
         this.pooledWebView = pooledWebView
         val webView = pooledWebView.realWebView
         webView.onResume() //缓存库拿的需要激活
         val settings = webView.settings
         settings.blockNetworkImage = true
-        settings.userAgentString = headerMap?.get(AppConst.UA_NAME, true) ?: AppConfig.userAgent
+        settings.userAgentString = requestConfig.userAgent
         settings.cacheMode = if(cacheFirst) WebSettings.LOAD_CACHE_ELSE_NETWORK else WebSettings.LOAD_DEFAULT
         tag?.takeIf { it.isNotBlank() }?.let { sourceTag ->
             webView.webChromeClient = object : WebChromeClient() {
