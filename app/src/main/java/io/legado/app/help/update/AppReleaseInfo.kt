@@ -44,23 +44,6 @@ data class GithubRelease(
     }
 }
 @Keep
-data class GiteeRelease(
-    val assets: List<GiteeAsset>?,
-    val body: String,
-    @SerializedName("prerelease")
-    val prerelease: Boolean,
-    @SerializedName("tag_name")
-    val tagName: String = "",
-) {
-    fun gitReleaseToAppReleaseInfo(): List<AppReleaseInfo> {
-        assets ?: throw NoStackTraceException("获取新版本出错")
-        return assets
-            .filter { it.isValid }
-            .map { it.assetToAppReleaseInfo(prerelease, body, tagName) }
-    }
-}
-
-@Keep
 data class Asset(
     @SerializedName("browser_download_url")
     val apkUrl: String,
@@ -93,34 +76,6 @@ data class Asset(
             name,
             apkUrl,
             url,
-            parseReleaseVersionName(releaseTag, name, appVariant)
-        )
-    }
-}
-
-@Keep
-data class GiteeAsset(
-    @SerializedName("browser_download_url")
-    val apkUrl: String,
-    @SerializedName("name")
-    val name: String
-) {
-    val isValid: Boolean
-        get() = apkUrl.contains(".apk")
-
-    fun assetToAppReleaseInfo(
-        preRelease: Boolean,
-        note: String,
-        releaseTag: String = ""
-    ): AppReleaseInfo {
-        val appVariant = inferAppVariant(name, preRelease)
-        return AppReleaseInfo(
-            appVariant,
-            0,
-            note,
-            name,
-            apkUrl,
-            "",
             parseReleaseVersionName(releaseTag, name, appVariant)
         )
     }
