@@ -25,10 +25,12 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import splitties.init.appCtx
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.min
 
 class SearchModel(private val scope: CoroutineScope, private val callBack: CallBack) {
@@ -41,6 +43,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
     private var searchBooks = arrayListOf<SearchBook>()
     private var searchJob: Job? = null
     private var workingState = MutableStateFlow(true)
+    private val activeProgress = AtomicReference<SearchProgressReporter?>()
 
 
     private fun initSearchPool() {
@@ -76,25 +79,41 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
     private fun startSearch() {
         val precision = appCtx.getPrefBoolean(PreferKey.precisionSearch)
         var hasMore = false
+        val sourceParts = bookSourceParts
+        val key = searchKey
+        val page = searchPage
+        val progress = SearchProgressReporter(sourceParts.size, callBack::onSearchProgress)
+        activeProgress.getAndSet(progress)?.cancel()
         searchJob = scope.launch(searchPool!!) {
             flow {
-                for (bs in bookSourceParts) {
-                    bs.getBookSource()?.let {
-                        emit(it)
+                for (bs in sourceParts) {
+                    val source = bs.getBookSource()
+                    if (source == null) {
+                        if (currentCoroutineContext().isActive) {
+                            progress.completeOne()
+                        }
+                    } else {
+                        emit(source)
                     }
                     workingState.first { it }
                 }
             }.onStart {
-                callBack.onSearchStart()
+                progress.start(callBack::onSearchStart)
             }.mapParallelSafe(threadCount) {
-                withTimeout(30000L) {
-                    WebBook.searchBookAwait(
-                        it, searchKey, searchPage,
-                        filter = { name, author, kind ->
-                            !precision || name.contains(searchKey) ||
-                                    author.contains(searchKey) ||
-                                    kind?.contains(searchKey) == true
-                        })
+                try {
+                    withTimeout(30000L) {
+                        WebBook.searchBookAwait(
+                            it, key, page,
+                            filter = { name, author, kind ->
+                                !precision || name.contains(key) ||
+                                        author.contains(key) ||
+                                        kind?.contains(key) == true
+                            })
+                    }
+                } finally {
+                    if (currentCoroutineContext().isActive) {
+                        progress.completeOne()
+                    }
                 }
             }.onEach { items ->
                 for (book in items) {
@@ -102,18 +121,27 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                 }
                 hasMore = hasMore || items.isNotEmpty()
                 appDb.searchBookDao.insert(*items.toTypedArray())
-                mergeItems(items, precision)
+                mergeItems(items, precision, key)
                 currentCoroutineContext().ensureActive()
                 callBack.onSearchSuccess(searchBooks)
-            }.onCompletion {
-                if (it == null) callBack.onSearchFinish(searchBooks.isEmpty(), hasMore)
+            }.onCompletion { error ->
+                when {
+                    error == null -> progress.finish {
+                        callBack.onSearchFinish(searchBooks.isEmpty(), hasMore)
+                    }
+                    currentCoroutineContext().isActive -> progress.finish {
+                        callBack.onSearchCancel()
+                    }
+                    else -> progress.cancel()
+                }
+                activeProgress.compareAndSet(progress, null)
             }.catch {
                 AppLog.put("书源搜索出错\n${it.localizedMessage}", it)
             }.collect()
         }
     }
 
-    private suspend fun mergeItems(newDataS: List<SearchBook>, precision: Boolean) {
+    private suspend fun mergeItems(newDataS: List<SearchBook>, precision: Boolean, key: String) {
         if (newDataS.isNotEmpty()) {
             val copyData = ArrayList(searchBooks)
             val equalData = arrayListOf<SearchBook>()
@@ -122,11 +150,11 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
             val otherData = arrayListOf<SearchBook>()
             copyData.forEach {
                 currentCoroutineContext().ensureActive()
-                if (it.name == searchKey || it.author == searchKey) {
+                if (it.name == key || it.author == key) {
                     equalData.add(it)
-                } else if (it.kind?.contains(searchKey) == true) {
+                } else if (it.kind?.contains(key) == true) {
                     tagsData.add(it)
-                } else if (it.name.contains(searchKey) || it.author.contains(searchKey)) {
+                } else if (it.name.contains(key) || it.author.contains(key)) {
                     containsData.add(it)
                 } else {
                     otherData.add(it)
@@ -134,7 +162,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
             }
             newDataS.forEach { nBook ->
                 currentCoroutineContext().ensureActive()
-                if (nBook.name == searchKey || nBook.author == searchKey) {
+                if (nBook.name == key || nBook.author == key) {
                     var hasSame = false
                     equalData.forEach { pBook ->
                         currentCoroutineContext().ensureActive()
@@ -146,7 +174,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                     if (!hasSame) {
                         equalData.add(nBook)
                     }
-                } else if (nBook.kind?.contains(searchKey) == true) {
+                } else if (nBook.kind?.contains(key) == true) {
                     var hasSame = false
                     tagsData.forEach { pBook ->
                         currentCoroutineContext().ensureActive()
@@ -158,7 +186,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                     if (!hasSame) {
                         tagsData.add(nBook)
                     }
-                } else if (nBook.name.contains(searchKey) || nBook.author.contains(searchKey)) {
+                } else if (nBook.name.contains(key) || nBook.author.contains(key)) {
                     var hasSame = false
                     containsData.forEach { pBook ->
                         currentCoroutineContext().ensureActive()
@@ -210,6 +238,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
     }
 
     fun close() {
+        activeProgress.getAndSet(null)?.cancel()
         searchJob?.cancel()
         searchPool?.close()
         searchPool = null
@@ -219,9 +248,47 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
     interface CallBack {
         fun getSearchScope(): SearchScope
         fun onSearchStart()
+        fun onSearchProgress(searched: Int, total: Int)
         fun onSearchSuccess(searchBooks: List<SearchBook>)
         fun onSearchFinish(isEmpty: Boolean, hasMore: Boolean)
         fun onSearchCancel(exception: Throwable? = null)
     }
 
+}
+
+internal class SearchProgressReporter(
+    total: Int,
+    private val onProgress: (searched: Int, total: Int) -> Unit,
+) {
+    private val total = total.coerceAtLeast(0)
+    private var completed = 0
+    private var active = true
+    private var started = false
+
+    @Synchronized
+    fun start(onStart: () -> Unit = {}) {
+        if (!active || started) return
+        started = true
+        onStart()
+        onProgress(0, total)
+    }
+
+    @Synchronized
+    fun completeOne() {
+        if (!active || !started || completed >= total) return
+        completed++
+        onProgress(completed, total)
+    }
+
+    @Synchronized
+    fun finish(onFinish: () -> Unit) {
+        if (!active || !started) return
+        active = false
+        onFinish()
+    }
+
+    @Synchronized
+    fun cancel() {
+        active = false
+    }
 }

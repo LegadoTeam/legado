@@ -29,6 +29,7 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
     val searchScope: SearchScope = SearchScope(AppConfig.searchScope)
     var searchFinishLiveData = MutableLiveData<Boolean>()
     var isSearchLiveData = MutableLiveData<Boolean>()
+    val searchProgressLiveData = MutableLiveData<Pair<Int, Int>>()
     var searchKey: String = ""
     var hasMore = true
     private var searchID = 0L
@@ -40,6 +41,10 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
 
         override fun onSearchStart() {
             isSearchLiveData.postValue(true)
+        }
+
+        override fun onSearchProgress(searched: Int, total: Int) {
+            searchProgressLiveData.postValue(searched to total)
         }
 
         override fun onSearchSuccess(searchBooks: List<SearchBook>) {

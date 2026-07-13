@@ -37,6 +37,23 @@
 
     </io.legado.app.ui.widget.dynamiclayout.DynamicFrameLayout>
 
+    <TextView
+        android:id="@+id/tv_search_progress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/shape_translucent_card"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="3dp"
+        android:textColor="@android:color/white"
+        android:textSize="12sp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/fb_start_stop"
+        app:layout_constraintEnd_toEndOf="@id/fb_start_stop"
+        app:layout_constraintStart_toStartOf="@id/fb_start_stop"
+        tools:text="30/50"
+        tools:visibility="visible" />
+
     <LinearLayout
         android:id="@+id/ll_input_help"
         android:layout_width="match_parent"
