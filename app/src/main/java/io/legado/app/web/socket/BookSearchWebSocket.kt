@@ -86,6 +86,10 @@ class BookSearchWebSocket(handshakeRequest: NanoHTTPD.IHTTPSession) :
 
     }
 
+    override fun onSearchProgress(searched: Int, total: Int) {
+
+    }
+
     override fun onSearchSuccess(searchBooks: List<SearchBook>) {
         send(GSON.toJson(searchBooks))
     }

@@ -208,7 +208,9 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
             }
         })
         searchView.setOnQueryTextFocusChangeListener { _, hasFocus ->
-            if (binding.refreshProgressBar.isAutoLoading || (!hasFocus && adapter.isNotEmpty() && searchView.query.isNotBlank())) {
+            if (viewModel.isSearchLiveData.value == true ||
+                (!hasFocus && adapter.isNotEmpty() && searchView.query.isNotBlank())
+            ) {
                 visibleInputHelp(false)
             } else {
                 visibleInputHelp(true)
@@ -280,7 +282,6 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
             if (viewModel.isSearchLiveData.value == true) {
                 isManualStopSearch = true
                 viewModel.stop()
-                binding.refreshProgressBar.isAutoLoading = false
             } else {
                 viewModel.search("")
             }
@@ -306,6 +307,11 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
         }
         viewModel.searchBookLiveData.observe(this) {
             adapter.setItems(it)
+        }
+        viewModel.searchProgressLiveData.observe(this) { (searched, total) ->
+            binding.refreshProgressBar.maxProgress = total
+            binding.refreshProgressBar.setDurProgress(searched)
+            binding.tvSearchProgress.text = "$searched/$total"
         }
         lifecycleScope.launch {
             appDb.bookSourceDao.flowEnabledGroups().collect {
@@ -412,8 +418,9 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
      * 开始搜索
      */
     private fun startSearch() {
+        binding.refreshProgressBar.fontColor = accentColor
         binding.refreshProgressBar.visible()
-        binding.refreshProgressBar.isAutoLoading = true
+        binding.tvSearchProgress.visible()
         binding.fbStartStop.setImageResource(R.drawable.ic_stop_black_24dp)
         binding.fbStartStop.visible()
     }
@@ -422,8 +429,9 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
      * 搜索结束
      */
     private fun searchFinally() {
-        binding.refreshProgressBar.isAutoLoading = false
         binding.refreshProgressBar.gone()
+        binding.refreshProgressBar.setDurProgress(0)
+        binding.tvSearchProgress.gone()
         if (!isManualStopSearch && viewModel.hasMore) {
             binding.fbStartStop.setImageResource(R.drawable.ic_play_24dp)
         } else {
