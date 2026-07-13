@@ -12,19 +12,14 @@ import io.legado.app.R
 import io.legado.app.base.BasePrefDialogFragment
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
-import io.legado.app.data.appDb
 import io.legado.app.help.IntentHelp
 import io.legado.app.help.config.AppConfig
-import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.prefs.SwitchPreference
 import io.legado.app.lib.prefs.fragment.PreferenceFragment
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.model.ReadAloud
 import io.legado.app.service.BaseReadAloudService
-import io.legado.app.utils.GSON
-import io.legado.app.utils.StringUtils
-import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.setLayout
@@ -67,16 +62,7 @@ class ReadAloudConfigDialog : BasePrefDialogFragment() {
         SharedPreferences.OnSharedPreferenceChangeListener {
 
         private val speakEngineSummary: String
-            get() {
-                val ttsEngine = ReadAloud.ttsEngine
-                    ?: return getString(R.string.system_tts)
-                if (StringUtils.isNumeric(ttsEngine)) {
-                    return appDb.httpTTSDao.getName(ttsEngine.toLong())
-                        ?: getString(R.string.system_tts)
-                }
-                return GSON.fromJsonObject<SelectItem<String>>(ttsEngine).getOrNull()?.title
-                    ?: getString(R.string.system_tts)
-            }
+            get() = ReadAloud.getEngineName(requireContext())
 
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             addPreferencesFromResource(R.xml.pref_config_aloud)

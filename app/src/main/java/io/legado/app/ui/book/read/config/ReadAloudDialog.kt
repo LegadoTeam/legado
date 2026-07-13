@@ -25,7 +25,8 @@ import io.legado.app.utils.*
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 
 
-class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud) {
+class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud),
+    SpeakEngineDialog.CallBack {
     private val callBack: CallBack? get() = activity as? CallBack
     private val binding by viewBinding(DialogReadAloudBinding::bind)
 
@@ -80,6 +81,9 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud) {
             ivSetting.setColorFilter(textColor)
             tvSetting.setTextColor(textColor)
             cbTtsFollowSys.setTextColor(textColor)
+            ivEngine.setColorFilter(textColor)
+            tvEngineName.setTextColor(textColor)
+            ivEngineArrow.setColorFilter(textColor)
         }
         initData()
         initEvent()
@@ -87,6 +91,7 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud) {
 
     private fun initData() = binding.run {
         upPlayState()
+        upEngineName()
         upTimerText(BaseReadAloudService.timeMinute)
         cbTtsFollowSys.isChecked = requireContext().getPrefBoolean("ttsFollowSys", true)
         upTtsSpeechRateEnabled(!cbTtsFollowSys.isChecked)
@@ -100,6 +105,9 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud) {
         }
         llSetting.setOnClickListener {
             ReadAloudConfigDialog().show(childFragmentManager, "readAloudConfigDialog")
+        }
+        llEngine.setOnClickListener {
+            SpeakEngineDialog().show(childFragmentManager, "speakEngineDialog")
         }
         tvPre.setOnClickListener { ReadBook.moveToPrevChapter(upContent = true, toLast = false) }
         tvNext.setOnClickListener { ReadBook.moveToNextChapter(true) }
@@ -216,6 +224,16 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud) {
             ReadAloud.pause(requireContext())
             ReadAloud.resume(requireContext())
         }
+    }
+
+    private fun upEngineName() {
+        val engineName = ReadAloud.getEngineName(requireContext())
+        binding.tvEngineName.text = engineName
+        binding.llEngine.contentDescription = "${getString(R.string.speak_engine)}: $engineName"
+    }
+
+    override fun upSpeakEngineSummary() {
+        upEngineName()
     }
 
     override fun observeLiveBus() {
