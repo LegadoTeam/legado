@@ -18,11 +18,16 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Semaphore
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.CoroutineContext
 import android.provider.Settings
 import androidx.annotation.RequiresApi
 
 abstract class BaseService : LifecycleService() {
+
+    companion object {
+        private val permissionRationaleGate = PermissionRationaleGate()
+    }
 
     private val simpleName = this::class.simpleName.toString()
     private var isForeground = false
@@ -91,12 +96,17 @@ abstract class BaseService : LifecycleService() {
     }
 
     /**
-     * 检测通知权限和后台权限
+     * 检测通知权限和后台权限，同一进程内仅首次检查显示权限理由。
      */
     private fun checkPermission() {
+        val showRationale = permissionRationaleGate.acquire()
         PermissionsCompat.Builder()
             .addPermissions(Permissions.POST_NOTIFICATIONS)
-            .rationale(R.string.notification_permission_rationale)
+            .apply {
+                if (showRationale) {
+                    rationale(R.string.notification_permission_rationale)
+                }
+            }
             .onGranted {
                 if (lifecycleScope.isActive && !isForeground) {
                     if (tryStartForegroundNotification()) {
@@ -110,7 +120,11 @@ abstract class BaseService : LifecycleService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             PermissionsCompat.Builder()
                 .addPermissions(Permissions.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-                .rationale(R.string.ignore_battery_permission_rationale)
+                .apply {
+                    if (showRationale) {
+                        rationale(R.string.ignore_battery_permission_rationale)
+                    }
+                }
                 .request()
         }
     }
@@ -140,4 +154,10 @@ abstract class BaseService : LifecycleService() {
             .rationale(R.string.float_permission_rationale)
             .request()
     }
+}
+
+internal class PermissionRationaleGate {
+    private val acquired = AtomicBoolean(false)
+
+    fun acquire(): Boolean = acquired.compareAndSet(false, true)
 }
