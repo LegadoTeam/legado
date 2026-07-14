@@ -65,6 +65,7 @@ class CodeView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
             if (highlightWhileTextChanging) {
                 if (mSyntaxPatternMap.isNotEmpty()) {
                     convertTabs(editableText, start, count)
+                    cancelHighlighterRender()
                     mUpdateHandler.postDelayed(mUpdateRunnable, mUpdateDelayTime.toLong())
                 }
             }
