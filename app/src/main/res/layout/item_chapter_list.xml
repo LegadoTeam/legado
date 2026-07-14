@@ -31,7 +31,7 @@
         android:singleLine="true"
         app:layout_constraintBottom_toTopOf="@+id/barrier"
         app:layout_constraintStart_toEndOf="@+id/iv_locked"
-        app:layout_constraintEnd_toStartOf="@+id/iv_checked"
+        app:layout_constraintEnd_toStartOf="@+id/end_actions"
         app:layout_constraintTop_toTopOf="parent"
         tools:text="标题" />
 
@@ -65,7 +65,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toEndOf="@+id/tv_tag"
         app:layout_constraintTop_toBottomOf="@+id/barrier"
-        app:layout_constraintEnd_toStartOf="@+id/iv_checked"
+        app:layout_constraintEnd_toStartOf="@+id/end_actions"
         app:layout_constraintHorizontal_bias="0"
         app:layout_goneMarginStart="0dp"
         tools:ignore="RtlSymmetry"
@@ -79,18 +79,36 @@
         app:barrierDirection="top"
         app:constraint_referenced_ids="tv_word_count,tv_tag" />
 
-    <ImageView
-        android:id="@+id/iv_checked"
+    <FrameLayout
+        android:id="@+id/end_actions"
         android:layout_width="24dp"
         android:layout_height="24dp"
-        android:contentDescription="@string/success"
-        android:padding="4dp"
-        android:src="@drawable/ic_check"
-        android:visibility="invisible"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:tint="@color/secondaryText"
-        tools:visibility="visible" />
+        app:layout_constraintTop_toTopOf="parent">
+
+        <ImageView
+            android:id="@+id/iv_checked"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@string/success"
+            android:padding="4dp"
+            android:src="@drawable/ic_check"
+            android:visibility="invisible"
+            app:tint="@color/secondaryText"
+            tools:visibility="visible" />
+
+        <ImageView
+            android:id="@+id/iv_volume_arrow"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_expand_more"
+            android:visibility="gone"
+            app:tint="@color/secondaryText"
+            tools:visibility="visible" />
+
+    </FrameLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -137,6 +137,11 @@
     <string name="screen_unspecified">Follow system</string>
     <string name="disclaimer">Disclaimer</string>
     <string name="all_chapter_num">%d chapters</string>
+    <string name="toc_search_match_count">%1$d/%2$d chapters matched</string>
+    <string name="toc_volume_title_match">Volume title matched</string>
+    <string name="toc_volume_tag_summary">%1$s · %2$s</string>
+    <string name="toc_expand_volume">Expand volume</string>
+    <string name="toc_collapse_volume">Collapse volume</string>
     <string name="interface_setting">Interface</string>
     <string name="brightness">Brightness</string>
     <string name="chapter_list">Chapters</string>

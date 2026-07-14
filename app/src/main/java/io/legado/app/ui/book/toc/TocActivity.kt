@@ -139,7 +139,10 @@ class TocActivity : VMBaseActivity<ActivityChapterListBinding, TocViewModel>(),
             }
 
             R.id.menu_reverse_toc -> viewModel.reverseToc {
-                viewModel.chapterListCallBack?.upChapterList(searchView?.query?.toString())
+                viewModel.chapterListCallBack?.upChapterList(
+                    searchView?.query?.toString(),
+                    resetCollapse = true,
+                )
                 setResult(RESULT_OK, Intent().apply {
                     putExtra("index", it.durChapterIndex)
                     putExtra("chapterPos", 0)

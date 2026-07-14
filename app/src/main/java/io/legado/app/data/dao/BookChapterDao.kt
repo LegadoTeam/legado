@@ -16,6 +16,9 @@ interface BookChapterDao {
     @Query("SELECT * FROM chapters where bookUrl = :bookUrl and `index` >= :start and `index` <= :end and title like '%'||:key||'%' order by `index`")
     fun search(bookUrl: String, key: String, start: Int, end: Int): List<BookChapter>
 
+    @Query("SELECT `index` FROM chapters where bookUrl = :bookUrl and `index` >= :start and `index` <= :end and title like '%'||:key||'%' order by `index`")
+    fun searchIndexes(bookUrl: String, key: String, start: Int, end: Int): List<Int>
+
     @Query("select * from chapters where bookUrl = :bookUrl order by `index`")
     fun getChapterList(bookUrl: String): List<BookChapter>
 

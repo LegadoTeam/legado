@@ -28,29 +28,38 @@ import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers.Default
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapter_list),
     ChapterListAdapter.Callback,
     TocViewModel.ChapterListCallBack {
+
     override val viewModel by activityViewModels<TocViewModel>()
     private val binding by viewBinding(FragmentChapterListBinding::bind)
-    private val mLayoutManager by lazy { UpLinearLayoutManager(requireContext()) }
+    private val layoutManager by lazy { UpLinearLayoutManager(requireContext()) }
     private val adapter by lazy { ChapterListAdapter(requireContext(), this) }
+    private val tocListState = TocListState()
     private var durChapterIndex = 0
+    private var chapterList: List<BookChapter> = emptyList()
+    private var currentSearchKey: String? = null
+    private var chapterListJob: Job? = null
+    private var cacheFileJob: Job? = null
+    private var pendingScrollItemKey: String? = null
+    private var pendingChapterScroll: Int? = null
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) = binding.run {
         viewModel.chapterListCallBack = this@ChapterListFragment
-        val bbg = bottomBackground
-        val btc = requireContext().getPrimaryTextColor(ColorUtils.isColorLight(bbg))
-        llChapterBaseInfo.setBackgroundColor(bbg)
-        tvCurrentChapterInfo.setTextColor(btc)
-        ivChapterTop.setColorFilter(btc, PorterDuff.Mode.SRC_IN)
-        ivChapterBottom.setColorFilter(btc, PorterDuff.Mode.SRC_IN)
+        val background = bottomBackground
+        val foreground = requireContext().getPrimaryTextColor(ColorUtils.isColorLight(background))
+        llChapterBaseInfo.setBackgroundColor(background)
+        tvCurrentChapterInfo.setTextColor(foreground)
+        ivChapterTop.setColorFilter(foreground, PorterDuff.Mode.SRC_IN)
+        ivChapterBottom.setColorFilter(foreground, PorterDuff.Mode.SRC_IN)
         initRecyclerView()
         initView()
         viewModel.bookData.observe(this@ChapterListFragment) {
@@ -59,51 +68,69 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     }
 
     override fun onDestroyView() {
-        super.onDestroyView()
+        chapterListJob?.cancel()
+        cacheFileJob?.cancel()
+        pendingScrollItemKey = null
+        pendingChapterScroll = null
+        binding.recyclerView.adapter = null
+        adapter.release()
         viewModel.chapterListCallBack = clearCallbackIfOwned(
             viewModel.chapterListCallBack,
-            this
+            this,
         )
+        super.onDestroyView()
     }
 
     private fun initRecyclerView() {
-        binding.recyclerView.layoutManager = mLayoutManager
+        adapter.attach()
+        binding.recyclerView.layoutManager = layoutManager
         binding.recyclerView.addItemDecoration(VerticalDivider(requireContext()))
         binding.recyclerView.adapter = adapter
     }
 
     private fun initView() = binding.run {
         ivChapterTop.setOnClickListener {
-            mLayoutManager.scrollToPositionWithOffset(0, 0)
+            layoutManager.scrollToPositionWithOffset(0, 0)
         }
         ivChapterBottom.setOnClickListener {
             if (adapter.itemCount > 0) {
-                mLayoutManager.scrollToPositionWithOffset(adapter.itemCount - 1, 0)
+                layoutManager.scrollToPositionWithOffset(adapter.itemCount - 1, 0)
             }
         }
         tvCurrentChapterInfo.setOnClickListener {
-            mLayoutManager.scrollToPositionWithOffset(durChapterIndex, 0)
+            scrollToChapterIndex(durChapterIndex, expandVolume = true)
         }
-        binding.llChapterBaseInfo.applyNavigationBarPadding()
+        llChapterBaseInfo.applyNavigationBarPadding()
     }
 
     @SuppressLint("SetTextI18n")
     private fun initBook(book: Book) {
-        lifecycleScope.launch {
-            upChapterList(null)
-            durChapterIndex = book.durChapterIndex
-            binding.tvCurrentChapterInfo.text =
-                "${book.durChapterTitle}(${book.durChapterIndex + 1}/${book.simulatedTotalChapterNum()})"
-            initCacheFileNames(book)
+        chapterListJob?.cancel()
+        cacheFileJob?.cancel()
+        durChapterIndex = book.durChapterIndex
+        binding.tvCurrentChapterInfo.text =
+            "${book.durChapterTitle}(${book.durChapterIndex + 1}/${book.simulatedTotalChapterNum()})"
+        adapter.cacheFileNames.clear()
+        tocListState.clear()
+        chapterList = emptyList()
+        adapter.setItems(emptyList())
+        currentSearchKey = null
+        pendingScrollItemKey = null
+        pendingChapterScroll = null
+        chapterListJob = viewLifecycleOwner.lifecycleScope.launch {
+            val chapters = queryChapterList(book)
+            chapterList = chapters
+            tocListState.setFullChapters(
+                chapters = chapters,
+                currentChapterIndex = durChapterIndex,
+                reverseOrder = book.getReverseToc(),
+                resetCollapse = true,
+            )
+            adapter.setItems(tocListState.showNormal(durChapterIndex))
         }
-    }
-
-    private fun initCacheFileNames(book: Book) {
-        lifecycleScope.launch(IO) {
-            adapter.cacheFileNames.addAll(BookHelp.getChapterFiles(book))
-            withContext(Main) {
-                adapter.notifyItemRangeChanged(0, adapter.itemCount, true)
-            }
+        cacheFileJob = viewLifecycleOwner.lifecycleScope.launch {
+            adapter.cacheFileNames.addAll(withContext(IO) { BookHelp.getChapterFiles(book) })
+            adapter.notifyItemRangeChanged(0, adapter.itemCount, true)
         }
     }
 
@@ -112,57 +139,155 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
             viewModel.bookData.value?.bookUrl?.let { bookUrl ->
                 if (book.bookUrl == bookUrl) {
                     adapter.cacheFileNames.add(chapter.getFileName())
-                    if (viewModel.searchKey.isNullOrEmpty()) {
-                        adapter.notifyItemChanged(chapter.index, true)
-                    } else {
-                        adapter.getItems().forEachIndexed { index, bookChapter ->
-                            if (bookChapter.index == chapter.index) {
-                                adapter.notifyItemChanged(index, true)
-                            }
-                        }
-                    }
+                    notifyVisibleChapterChanged(chapter.index)
                 }
             }
         }
     }
 
-    override fun upChapterList(searchKey: String?) {
-        lifecycleScope.launch {
-            withContext(IO) {
-                val end = (book?.simulatedTotalChapterNum() ?: Int.MAX_VALUE) - 1
-                when {
-                    searchKey.isNullOrBlank() ->
-                        appDb.bookChapterDao.getChapterList(viewModel.bookUrl, 0, end).also {
-                            chapterList = it
-                        }
-
-                    else -> appDb.bookChapterDao.search(viewModel.bookUrl, searchKey, 0, end)
+    override fun upChapterList(searchKey: String?, resetCollapse: Boolean) {
+        chapterListJob?.cancel()
+        chapterListJob = viewLifecycleOwner.lifecycleScope.launch {
+            val normalizedSearchKey = searchKey?.takeIf { it.isNotBlank() }
+            currentSearchKey = normalizedSearchKey
+            pendingScrollItemKey = null
+            pendingChapterScroll = null
+            val currentBook = book ?: return@launch
+            val reverseOrder = currentBook.getReverseToc()
+            if (normalizedSearchKey == null) {
+                if (resetCollapse || !tocListState.hasFullChapters()) {
+                    val chapters = queryChapterList(currentBook)
+                    chapterList = chapters
+                    tocListState.setFullChapters(
+                        chapters = chapters,
+                        currentChapterIndex = durChapterIndex,
+                        reverseOrder = reverseOrder,
+                        resetCollapse = resetCollapse,
+                    )
                 }
-            }.let {
-                adapter.setItems(it)
+                adapter.setItems(tocListState.showNormal(durChapterIndex))
+            } else {
+                delay(150)
+                if (resetCollapse || !tocListState.hasFullChapters()) {
+                    val chapters = queryChapterList(currentBook)
+                    chapterList = chapters
+                    tocListState.setFullChapters(
+                        chapters = chapters,
+                        currentChapterIndex = durChapterIndex,
+                        reverseOrder = reverseOrder,
+                        resetCollapse = resetCollapse,
+                    )
+                }
+                adapter.setItems(
+                    tocListState.showSearch(
+                        searchResultIndexes = queryChapterIndexes(
+                            currentBook,
+                            normalizedSearchKey,
+                        ),
+                        currentChapterIndex = durChapterIndex,
+                    )
+                )
+            }
+        }
+    }
+
+    private suspend fun queryChapterList(book: Book): List<BookChapter> {
+        return withContext(IO) {
+            val end = book.simulatedTotalChapterNum() - 1
+            appDb.bookChapterDao.getChapterList(book.bookUrl, 0, end)
+        }
+    }
+
+    private suspend fun queryChapterIndexes(book: Book, searchKey: String): List<Int> {
+        return withContext(IO) {
+            val end = book.simulatedTotalChapterNum() - 1
+            appDb.bookChapterDao.searchIndexes(book.bookUrl, searchKey, 0, end)
+        }
+    }
+
+    private fun notifyVisibleChapterChanged(chapterIndex: Int) {
+        val position = adapter.findVisiblePositionByChapterIndex(chapterIndex)
+        if (position >= 0) {
+            adapter.notifyItemChanged(position, true)
+        }
+    }
+
+    private fun scrollToChapterIndex(chapterIndex: Int, expandVolume: Boolean) {
+        if (expandVolume && currentSearchKey == null &&
+            tocListState.expandVolumeContainingChapter(chapterIndex)
+        ) {
+            pendingChapterScroll = chapterIndex
+            adapter.setItems(tocListState.showNormal(durChapterIndex))
+            return
+        }
+        scrollToResolvedChapterPosition(chapterIndex)
+    }
+
+    private fun scrollToResolvedChapterPosition(chapterIndex: Int) {
+        binding.recyclerView.post {
+            val position = tocListState.findFallbackVisiblePositionForChapterIndex(chapterIndex)
+            if (position >= 0) {
+                layoutManager.scrollToPositionWithOffset(position, 0)
+                adapter.upDisplayTitles(position)
             }
         }
     }
 
     override fun onListChanged() {
-        lifecycleScope.launch {
-            var scrollPos = 0
-            withContext(Default) {
-                adapter.getItems().forEachIndexed { index, bookChapter ->
-                    if (bookChapter.index >= durChapterIndex) {
-                        return@withContext
-                    }
-                    scrollPos = index
-                }
+        if (pendingScrollItemKey != null || pendingChapterScroll != null) return
+        viewLifecycleOwner.lifecycleScope.launch(Main) {
+            val scrollPosition = if (currentSearchKey == null) {
+                tocListState.findFallbackVisiblePositionForChapterIndex(durChapterIndex)
+                    .coerceAtLeast(0)
+            } else {
+                0
             }
-            mLayoutManager.scrollToPositionWithOffset(scrollPos, 0)
-            adapter.upDisplayTitles(scrollPos)
+            layoutManager.scrollToPositionWithOffset(scrollPosition, 0)
+            adapter.upDisplayTitles(scrollPosition)
+        }
+    }
+
+    override fun onVolumeToggled(volumeIndex: Int) {
+        if (currentSearchKey != null) return
+        val firstVisibleItem = adapter.getItem(layoutManager.findFirstVisibleItemPosition())
+        pendingScrollItemKey = if (
+            firstVisibleItem is TocListItem.Chapter &&
+            firstVisibleItem.parentVolumeIndex == volumeIndex &&
+            !tocListState.isVolumeCollapsed(volumeIndex)
+        ) {
+            "volume:$volumeIndex"
+        } else {
+            firstVisibleItem?.key
+        }
+        if (tocListState.toggleVolume(volumeIndex)) {
+            adapter.setItems(tocListState.showNormal(durChapterIndex))
+        } else {
+            pendingScrollItemKey = null
+        }
+    }
+
+    override fun onItemsUpdated() {
+        pendingChapterScroll?.let { chapterIndex ->
+            pendingChapterScroll = null
+            scrollToResolvedChapterPosition(chapterIndex)
+            return
+        }
+        val anchorKey = pendingScrollItemKey ?: return
+        pendingScrollItemKey = null
+        binding.recyclerView.post {
+            val position = adapter.findVisiblePositionByItemKey(anchorKey)
+            if (position >= 0) {
+                layoutManager.scrollToPositionWithOffset(position, 0)
+                adapter.upDisplayTitles(position)
+            } else {
+                adapter.upDisplayTitles(layoutManager.findFirstVisibleItemPosition())
+            }
         }
     }
 
     override fun clearDisplayTitle() {
         adapter.clearDisplayTitle()
-        adapter.upDisplayTitles(mLayoutManager.findFirstVisibleItemPosition())
+        adapter.upDisplayTitles(layoutManager.findFirstVisibleItemPosition())
     }
 
     override fun upAdapter() {
@@ -170,7 +295,7 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     }
 
     override val scope: CoroutineScope
-        get() = lifecycleScope
+        get() = viewLifecycleOwner.lifecycleScope
 
     override val book: Book?
         get() = viewModel.bookData.value
@@ -181,28 +306,21 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     override fun durChapterIndex(): Int {
         return durChapterIndex
     }
-    private var chapterList: List<BookChapter>? = null
 
     override fun openChapter(bookChapter: BookChapter) {
         activity?.run {
             if (book?.isVideo == true) {
-                val volumes = arrayListOf<BookChapter>()
-                chapterList?.forEach { chapter ->
-                    if (chapter.isVolume) {
-                        volumes.add(chapter)
-                    }
-                }
+                val volumes = chapterList.filterTo(arrayListOf()) { it.isVolume }
                 var chapterInVolumeIndex = 0
                 var durVolumeIndex = 0
                 if (volumes.isNotEmpty()) {
                     for ((index, volume) in volumes.reversed().withIndex()) {
-                        val first = bookChapter.index
-                        if (volume.index < first) {
-                            chapterInVolumeIndex = first - volume.index - 1
+                        val chapterIndex = bookChapter.index
+                        if (volume.index < chapterIndex) {
+                            chapterInVolumeIndex = chapterIndex - volume.index - 1
                             durVolumeIndex = volumes.size - index - 1
                             break
-                        } else if (volume.index == first) {
-                            chapterInVolumeIndex = 0
+                        } else if (volume.index == chapterIndex) {
                             durVolumeIndex = volumes.size - index - 1
                             break
                         }
@@ -211,22 +329,23 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                     chapterInVolumeIndex = bookChapter.index
                 }
                 setResult(
-                    RESULT_OK, Intent()
+                    RESULT_OK,
+                    Intent()
                         .putExtra("index", bookChapter.index)
                         .putExtra("chapterChanged", bookChapter.index != durChapterIndex)
                         .putExtra("durVolumeIndex", durVolumeIndex)
-                        .putExtra("chapterInVolumeIndex", chapterInVolumeIndex)
+                        .putExtra("chapterInVolumeIndex", chapterInVolumeIndex),
                 )
                 finish()
                 return@run
             }
             setResult(
-                RESULT_OK, Intent()
+                RESULT_OK,
+                Intent()
                     .putExtra("index", bookChapter.index)
-                    .putExtra("chapterChanged", bookChapter.index != durChapterIndex)
+                    .putExtra("chapterChanged", bookChapter.index != durChapterIndex),
             )
             finish()
         }
     }
-
 }
