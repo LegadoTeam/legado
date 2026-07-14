@@ -46,6 +46,14 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
         }
     }
 
+    override fun onDestroyView() {
+        super.onDestroyView()
+        viewModel.bookMarkCallBack = clearCallbackIfOwned(
+            viewModel.bookMarkCallBack,
+            this
+        )
+    }
+
     private fun initRecyclerView() {
         binding.recyclerView.setEdgeEffectColor(primaryColor)
         binding.recyclerView.layoutManager = mLayoutManager
