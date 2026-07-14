@@ -38,7 +38,7 @@ class BookshelfViewModel(application: Application) : BaseViewModel(application) 
     val addBookProgressLiveData = MutableLiveData(-1)
     var addBookJob: Coroutine<*>? = null
 
-    fun addBookByUrl(bookUrls: String) {
+    fun addBookByUrl(bookUrls: String, groupId: Long) {
         var successCount = 0
         addBookJob = execute {
             val hasBookUrlPattern: List<BookSourcePart> by lazy {
@@ -48,7 +48,13 @@ class BookshelfViewModel(application: Application) : BaseViewModel(application) 
             for (url in urls) {
                 val bookUrl = url.trim()
                 if (bookUrl.isEmpty()) continue
-                if (appDb.bookDao.getBook(bookUrl) != null) {
+                val existedBook = appDb.bookDao.getBook(bookUrl)
+                if (existedBook != null) {
+                    val mergedGroup = mergeBookGroupForUrlAdd(existedBook.group, groupId)
+                    if (mergedGroup != existedBook.group) {
+                        existedBook.group = mergedGroup
+                        appDb.bookDao.update(existedBook)
+                    }
                     successCount++
                     continue
                 }
@@ -97,10 +103,11 @@ class BookshelfViewModel(application: Application) : BaseViewModel(application) 
                     val dbBook = appDb.bookDao.getBook(it.name, it.author)
                     if (dbBook != null) {
                         val toc = WebBook.getChapterListAwait(bookSource, it).getOrThrow()
-                        dbBook.migrateTo(it, toc)
-                        appDb.bookDao.insert(it)
+                        val migratedBook = migrateBookForUrlAdd(dbBook, it, toc, groupId)
+                        appDb.bookDao.insert(migratedBook)
                         appDb.bookChapterDao.insert(*toc.toTypedArray())
                     } else {
+                        it.group = mergeBookGroupForUrlAdd(it.group, groupId)
                         it.order = appDb.bookDao.minOrder - 1
                         it.save()
                     }
