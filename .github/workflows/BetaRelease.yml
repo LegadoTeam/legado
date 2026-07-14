@@ -1,17 +1,6 @@
 name: Beta Release
 
 on:
-  push:
-    branches:
-      - master
-    paths:
-      - '**'
-      - '!**/ISSUE_TEMPLATE/**'
-      - '!**/modules/web/**'
-  workflow_run:
-    workflows: [Build Web]
-    branches: [master]
-    types: [completed]
   workflow_dispatch:
 
 concurrency:
