@@ -107,11 +107,15 @@ jobs:
       - name: Run Unit Tests
         if: ${{ matrix.type == 'release' }}
         run: |
+          set -o pipefail
           chmod +x gradlew
-          ./gradlew :app:testAppReleaseUnitTest --build-cache --parallel --daemon --warning-mode all
+          ./gradlew :app:testAppReleaseUnitTest --build-cache --parallel --daemon --warning-mode all \
+            2>&1 | tee "$RUNNER_TEMP/gradle-unit-test.log"
 
       - name: Build With Gradle
         run: |
+          set -o pipefail
+          build_log="$RUNNER_TEMP/gradle-build.log"
           echo "当前版本号: $VERSION"
           sed -i "/def version/c\def version = \"$VERSION\"" "$GITHUB_WORKSPACE/app/build.gradle"
 
@@ -128,7 +132,8 @@ jobs:
 
           chmod +x gradlew
           echo "开始构建 ARM APK: $product - $typeName"
-          ./gradlew :$product:assembleRelease -ParmOnly=true --build-cache --parallel --daemon --warning-mode all
+          ./gradlew :$product:assembleRelease -ParmOnly=true --build-cache --parallel --daemon --warning-mode all \
+            2>&1 | tee "$build_log"
           mkdir -p ${{ github.workspace }}/apk/
           bash $GITHUB_WORKSPACE/.github/scripts/collect-apks.sh \
             $GITHUB_WORKSPACE/app/build/outputs/apk \
@@ -139,7 +144,8 @@ jobs:
             arm
 
           echo "开始构建通用 APK: $product - $typeName"
-          ./gradlew :$product:assembleRelease --build-cache --parallel --daemon --warning-mode all
+          ./gradlew :$product:assembleRelease --build-cache --parallel --daemon --warning-mode all \
+            2>&1 | tee -a "$build_log"
           bash $GITHUB_WORKSPACE/.github/scripts/collect-apks.sh \
             $GITHUB_WORKSPACE/app/build/outputs/apk \
             $GITHUB_WORKSPACE/apk \
@@ -153,6 +159,14 @@ jobs:
           for file in $(find ${{ github.workspace }}/app/build/outputs/mapping -name "mapping.txt"); do
             mv "$file" ${{ github.workspace }}/mapping/mapping.txt
           done
+
+      - name: Check Resolved Gradle Warnings
+        run: |
+          warning_pattern='Properties should be assigned using|Unable to strip (the following )?librar|error occurred when parsing kotlin metadata|running out of JVM Metaspace'
+          if grep -E "$warning_pattern" "$RUNNER_TEMP"/gradle-*.log; then
+            echo "Resolved Gradle warning reappeared"
+            exit 1
+          fi
 
       - name: Move Missing Rules Files
         run: |

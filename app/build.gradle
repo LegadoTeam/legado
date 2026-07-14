@@ -21,7 +21,18 @@ static def releaseTime() {
 
 def name = "legado"
 def version = "3." + releaseTime()
-def gitCommits = Integer.parseInt('git rev-list HEAD --count'.execute().text.trim())
+def gitCommits = 0
+try {
+    def gitCount = providers.exec {
+        commandLine 'git', 'rev-list', 'HEAD', '--count'
+        ignoreExitValue = true
+    }.standardOutput.asText.get().trim()
+    if (gitCount) {
+        gitCommits = Integer.parseInt(gitCount)
+    }
+} catch (ignored) {
+    // Keep source archives buildable when Git is unavailable.
+}
 def armOnly = project.findProperty("armOnly")?.toBoolean() ?: false
 
 android {
@@ -82,7 +93,7 @@ android {
     buildTypes {
         release {
             if (project.hasProperty("RELEASE_STORE_FILE")) {
-                signingConfig signingConfigs.myConfig
+                signingConfig = signingConfigs.myConfig
             }
             applicationIdSuffix '.release'
             if (getApplicationIdSuffix() == '.releaseA') {
@@ -97,7 +108,7 @@ android {
         }
         debug {
             if (project.hasProperty("RELEASE_STORE_FILE")) {
-                signingConfig signingConfigs.myConfig
+                signingConfig = signingConfigs.myConfig
             }
             manifestPlaceholders.put("app_name", "@string/app_name")
 
@@ -137,6 +148,18 @@ android {
     }
     packaging {
         resources.excludes.add('META-INF/*')
+        jniLibs {
+            // These dependencies already ship stripped; skip redundant strip attempts.
+            keepDebugSymbols += [
+                    '**/libandroidx.graphics.path.so',
+                    '**/libarchive-jni.so',
+                    '**/libdatastore_shared_counter.so',
+                    '**/libimage_processing_util_jni.so',
+                    '**/librenderscript-toolkit.so',
+                    '**/librtmp-jni.so',
+                    '**/libsurface_util_jni.so'
+            ]
+        }
     }
 
     sourceSets {
