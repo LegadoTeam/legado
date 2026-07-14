@@ -58,6 +58,14 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
         }
     }
 
+    override fun onDestroyView() {
+        super.onDestroyView()
+        viewModel.chapterListCallBack = clearCallbackIfOwned(
+            viewModel.chapterListCallBack,
+            this
+        )
+    }
+
     private fun initRecyclerView() {
         binding.recyclerView.layoutManager = mLayoutManager
         binding.recyclerView.addItemDecoration(VerticalDivider(requireContext()))
