@@ -21,14 +21,17 @@ static def releaseTime() {
 
 def name = "legado"
 def version = "3." + releaseTime()
-def gitCommits = 0
+def versionCodeValue = 30000
+// Preserve the published code at this point, then ignore GitHub wrapper merge commits.
+def versionCodeBaseCommit = '9639f027fbc8cfdf57ce136a9e0c98829a235aef'
+def versionCodeAtBase = 37540
 try {
     def gitCount = providers.exec {
-        commandLine 'git', 'rev-list', 'HEAD', '--count'
+        commandLine 'git', 'rev-list', "${versionCodeBaseCommit}..HEAD", '--count', '--no-merges'
         ignoreExitValue = true
     }.standardOutput.asText.get().trim()
     if (gitCount) {
-        gitCommits = Integer.parseInt(gitCount)
+        versionCodeValue = versionCodeAtBase + Integer.parseInt(gitCount)
     }
 } catch (ignored) {
     // Keep source archives buildable when Git is unavailable.
@@ -62,7 +65,7 @@ android {
         applicationId "com.legado.app"
         minSdk 23
         targetSdk 36
-        versionCode 30000 + gitCommits
+        versionCode = versionCodeValue
         versionName version
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         project.ext.set("archivesBaseName", name + "_" + version)
