@@ -117,7 +117,7 @@ jobs:
           set -o pipefail
           build_log="$RUNNER_TEMP/gradle-build.log"
           echo "当前版本号: $VERSION"
-          sed -i "/def version/c\def version = \"$VERSION\"" "$GITHUB_WORKSPACE/app/build.gradle"
+          sed -i "s/^def version = .*/def version = \"$VERSION\"/" "$GITHUB_WORKSPACE/app/build.gradle"
 
           if [ "$type" == "release" ]; then
             typeName="新包名"
