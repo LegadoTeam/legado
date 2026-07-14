@@ -20,7 +20,12 @@
                 android:id="@+id/edit_1"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                tools:ignore="SpeakableTextPresentCheck,TouchTargetSizeCheck" />
+                android:minHeight="48dp"
+                android:paddingStart="12dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="6dp"
+                tools:ignore="SpeakableTextPresentCheck" />
 
         </io.legado.app.ui.widget.text.TextInputLayout>
 
@@ -28,13 +33,19 @@
             android:id="@+id/layout_2"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
             android:visibility="gone">
 
             <io.legado.app.ui.widget.text.AutoCompleteTextView
                 android:id="@+id/edit_2"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                tools:ignore="SpeakableTextPresentCheck,TouchTargetSizeCheck" />
+                android:minHeight="48dp"
+                android:paddingStart="12dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="6dp"
+                tools:ignore="SpeakableTextPresentCheck" />
 
         </io.legado.app.ui.widget.text.TextInputLayout>
 
