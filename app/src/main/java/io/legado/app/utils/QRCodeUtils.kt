@@ -175,7 +175,7 @@ object QRCodeUtils {
         bitmap: Bitmap,
         reqWidth: Int = DEFAULT_REQ_WIDTH,
         reqHeight: Int = DEFAULT_REQ_HEIGHT,
-        hints: Map<DecodeHintType?, Any?> = DecodeFormatManager.ALL_HINTS
+        hints: Map<DecodeHintType, Any?> = DecodeFormatManager.ALL_HINTS
     ): String? {
         val result = parseCodeResult(bitmap, reqWidth, reqHeight, hints)
         return result?.text
@@ -191,7 +191,7 @@ object QRCodeUtils {
         bitmap: Bitmap,
         reqWidth: Int = DEFAULT_REQ_WIDTH,
         reqHeight: Int = DEFAULT_REQ_HEIGHT,
-        hints: Map<DecodeHintType?, Any?> = DecodeFormatManager.ALL_HINTS
+        hints: Map<DecodeHintType, Any?> = DecodeFormatManager.ALL_HINTS
     ): Result? {
         if (bitmap.width > reqWidth || bitmap.height > reqHeight) {
             val bm = bitmap.resizeAndRecycle(reqWidth, reqHeight)
@@ -206,7 +206,7 @@ object QRCodeUtils {
      * @param hints
      * @return
      */
-    fun parseCodeResult(source: LuminanceSource?, hints: Map<DecodeHintType?, Any?>?): Result? {
+    fun parseCodeResult(source: LuminanceSource?, hints: Map<DecodeHintType, Any?>?): Result? {
         var result: Result? = null
         val reader = MultiFormatReader()
         try {
@@ -262,7 +262,7 @@ object QRCodeUtils {
         bitmapPath: String?,
         reqWidth: Int = DEFAULT_REQ_WIDTH,
         reqHeight: Int = DEFAULT_REQ_HEIGHT,
-        hints: Map<DecodeHintType?, Any?> = DecodeFormatManager.ALL_HINTS
+        hints: Map<DecodeHintType, Any?> = DecodeFormatManager.ALL_HINTS
     ): String? {
         return parseCodeResult(bitmapPath, reqWidth, reqHeight, hints)?.text
     }
@@ -279,7 +279,7 @@ object QRCodeUtils {
         bitmapPath: String?,
         reqWidth: Int = DEFAULT_REQ_WIDTH,
         reqHeight: Int = DEFAULT_REQ_HEIGHT,
-        hints: Map<DecodeHintType?, Any?> = DecodeFormatManager.ALL_HINTS
+        hints: Map<DecodeHintType, Any?> = DecodeFormatManager.ALL_HINTS
     ): Result? {
         var result: Result? = null
         val reader = MultiFormatReader()
