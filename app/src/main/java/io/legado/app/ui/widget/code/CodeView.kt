@@ -19,6 +19,11 @@ import java.util.regex.Matcher
 import java.util.regex.Pattern
 import kotlin.math.roundToInt
 
+internal const val MAX_CODE_HIGHLIGHT_LENGTH = 4096
+
+internal fun isCodeHighlightSupported(length: Int): Boolean =
+    length in 1..MAX_CODE_HIGHLIGHT_LENGTH
+
 @Suppress("unused")
 class CodeView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
     ScrollMultiAutoCompleteTextView(context, attrs) {
@@ -30,6 +35,7 @@ class CodeView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
     private var highlightWhileTextChanging = true
     private var hasErrors = false
     private var mRemoveErrorsWhenTextChanged = true
+    private var largeTextMode = false
     private val mUpdateHandler = Handler(Looper.getMainLooper())
     private var mAutoCompleteTokenizer: Tokenizer? = null
     private val displayDensity = resources.displayMetrics.density
@@ -62,9 +68,10 @@ class CodeView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
             count: Int
         ) {
             if (!modified) return
-            if (highlightWhileTextChanging) {
-                if (mSyntaxPatternMap.isNotEmpty()) {
-                    convertTabs(editableText, start, count)
+            val canHighlight = updateLargeTextMode(editableText)
+            if (highlightWhileTextChanging && mSyntaxPatternMap.isNotEmpty()) {
+                convertTabs(editableText, start, count)
+                if (canHighlight) {
                     cancelHighlighterRender()
                     mUpdateHandler.postDelayed(mUpdateRunnable, mUpdateDelayTime.toLong())
                 }
@@ -75,10 +82,13 @@ class CodeView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
         override fun afterTextChanged(editable: Editable) {
             if (!highlightWhileTextChanging) {
                 if (!modified) return
+                val canHighlight = updateLargeTextMode(editable)
                 cancelHighlighterRender()
                 if (mSyntaxPatternMap.isNotEmpty()) {
                     convertTabs(editableText, start, count)
-                    mUpdateHandler.postDelayed(mUpdateRunnable, mUpdateDelayTime.toLong())
+                    if (canHighlight) {
+                        mUpdateHandler.postDelayed(mUpdateRunnable, mUpdateDelayTime.toLong())
+                    }
                 }
             }
         }
@@ -217,8 +227,7 @@ class CodeView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
     }
 
     private fun highlight(editable: Editable): Editable {
-        // if (editable.isEmpty() || editable.length > 1024) return editable
-        if (editable.length !in 1..4096) {
+        if (!isCodeHighlightSupported(editable.length)) {
             return editable
         }
         try {
@@ -242,8 +251,27 @@ class CodeView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
         cancelHighlighterRender()
         removeAllErrorLines()
         modified = false
-        setText(highlight(SpannableStringBuilder(text)))
+        val content = if (isCodeHighlightSupported(text.length)) {
+            highlight(SpannableStringBuilder(text))
+        } else {
+            text
+        }
+        setText(content)
         modified = true
+        largeTextMode = text.length > MAX_CODE_HIGHLIGHT_LENGTH
+    }
+
+    private fun updateLargeTextMode(editable: Editable): Boolean {
+        val useLargeTextMode = editable.length > MAX_CODE_HIGHLIGHT_LENGTH
+        if (useLargeTextMode != largeTextMode) {
+            largeTextMode = useLargeTextMode
+            cancelHighlighterRender()
+            if (useLargeTextMode) {
+                clearSpans(editable)
+                removeAllErrorLines()
+            }
+        }
+        return isCodeHighlightSupported(editable.length)
     }
 
     fun setTabWidth(characters: Int) {
@@ -277,17 +305,19 @@ class CodeView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
     }
 
     private fun convertTabs(editable: Editable, start: Int, count: Int) {
-        var startIndex = start
         if (tabWidth < 1) return
-        val s = editable.toString()
-        val stop = startIndex + count
-        while (s.indexOf("\t", startIndex).also { startIndex = it } > -1 && startIndex < stop) {
-            editable.setSpan(
-                TabWidthSpan(),
-                startIndex,
-                startIndex + 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-            )
-            ++startIndex
+        var index = start.coerceIn(0, editable.length)
+        val stop = (index + count).coerceAtMost(editable.length)
+        while (index < stop) {
+            if (editable[index] == '\t') {
+                editable.setSpan(
+                    TabWidthSpan(),
+                    index,
+                    index + 1,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+            }
+            index++
         }
     }
 
@@ -358,11 +388,15 @@ class CodeView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
     }
 
     fun reHighlightSyntax() {
-        highlightSyntax(editableText)
+        if (isCodeHighlightSupported(editableText.length)) {
+            highlightSyntax(editableText)
+        }
     }
 
     fun reHighlightErrors() {
-        highlightErrorLines(editableText)
+        if (isCodeHighlightSupported(editableText.length)) {
+            highlightErrorLines(editableText)
+        }
     }
 
     fun isHasError(): Boolean {

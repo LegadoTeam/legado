@@ -65,32 +65,6 @@ abstract class DiffRecyclerAdapter<ITEM, VB : ViewBinding>(protected val context
         }
     }
 
-    fun setItem(position: Int, item: ITEM) {
-        kotlin.runCatching {
-            asyncListDiffer.currentList[position] = item
-            notifyItemChanged(position)
-        }
-    }
-
-    fun updateItem(item: ITEM) {
-        kotlin.runCatching {
-            val index = asyncListDiffer.currentList.indexOf(item)
-            if (index >= 0) {
-                asyncListDiffer.currentList[index] = item
-                notifyItemChanged(index)
-            }
-        }
-    }
-
-    fun updateItem(position: Int, payload: Any) {
-        kotlin.runCatching {
-            val size = itemCount
-            if (position in 0 until size) {
-                notifyItemChanged(position, payload)
-            }
-        }
-    }
-
     fun updateItems(fromPosition: Int, toPosition: Int, payloads: Any) {
         kotlin.runCatching {
             val size = itemCount
