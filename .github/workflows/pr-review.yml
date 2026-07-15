@@ -21,7 +21,7 @@ jobs:
       final_message: ${{ steps.codex.outputs.final-message }}
     steps:
       - name: Checkout pull request
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: refs/pull/${{ github.event.pull_request.number }}/merge
           fetch-depth: 0
