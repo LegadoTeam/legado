@@ -49,7 +49,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Publish review comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           REVIEW_BODY: ${{ needs.review.outputs.final_message }}
         with:
