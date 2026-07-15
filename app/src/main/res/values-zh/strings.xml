@@ -262,6 +262,8 @@
     <string name="data_loading">加载数据中…</string>
     <string name="load_error_retry">加载失败，点击重试</string>
     <string name="book_intro">内容简介</string>
+    <string name="book_intro_expand">展开</string>
+    <string name="book_intro_collapse">收起</string>
     <string name="intro_show">简介：%s</string>
     <string name="intro_show_null">简介：暂无简介</string>
     <string name="open_from_other">打开外部书籍</string>

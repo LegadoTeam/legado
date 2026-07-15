@@ -236,6 +236,8 @@
     <string name="data_loading">Cargando…</string>
     <string name="load_error_retry">Error cargando, toque para volver a iniciar</string>
     <string name="book_intro">Descripción de libro</string>
+    <string name="book_intro_expand">Expandir</string>
+    <string name="book_intro_collapse">Contraer</string>
     <string name="intro_show">Descripción:%s</string>
     <string name="intro_show_null">Descripción: sin introducción</string>
     <string name="open_from_other">Abrir libro externo</string>
