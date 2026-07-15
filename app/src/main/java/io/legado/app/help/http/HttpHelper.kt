@@ -22,7 +22,7 @@ import java.util.concurrent.ThreadFactory
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
-private val proxyClientCache: ConcurrentHashMap<String, OkHttpClient> by lazy {
+private val proxyClientCache: ConcurrentHashMap<ProxyConfig, OkHttpClient> by lazy {
     ConcurrentHashMap()
 }
 
@@ -151,39 +151,45 @@ fun getProxyClient(proxy: String? = null): OkHttpClient {
     if (proxy.isNullOrBlank()) {
         return okHttpClient
     }
-    proxyClientCache[proxy]?.let {
+    val proxyConfig = parseProxyConfig(proxy)
+    proxyClientCache[proxyConfig]?.let {
         return it
     }
-    val r = Regex("(http|socks4|socks5)://(.*):(\\d{2,5})(@.*@.*)?")
-    val ms = r.findAll(proxy)
-    val group = ms.first()
-    var username = ""       //代理服务器验证用户名
-    var password = ""       //代理服务器验证密码
-    val type = if (group.groupValues[1] == "http") "http" else "socks"
-    val host = group.groupValues[2]
-    val port = group.groupValues[3].toInt()
-    if (group.groupValues[4] != "") {
-        username = group.groupValues[4].split("@")[1]
-        password = group.groupValues[4].split("@")[2]
+    val builder = okHttpClient.newBuilder()
+        .proxy(
+            Proxy(
+                proxyConfig.protocol.proxyType,
+                InetSocketAddress(proxyConfig.host, proxyConfig.port),
+            )
+        )
+    if (AppConfig.isCronet) {
+        Cronet.interceptor?.let { builder.interceptors().remove(it) }
     }
-    if (host != "") {
-        val builder = okHttpClient.newBuilder()
-        if (type == "http") {
-            builder.proxy(Proxy(Proxy.Type.HTTP, InetSocketAddress(host, port)))
-        } else {
-            builder.proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(host, port)))
-        }
-        if (username != "" && password != "") {
-            builder.proxyAuthenticator { _, response -> //设置代理服务器账号密码
-                val credential: String = Credentials.basic(username, password)
-                response.request.newBuilder()
-                    .header("Proxy-Authorization", credential)
-                    .build()
+    proxyConfig.credentials?.let { credentials ->
+        builder.proxyAuthenticator { _, response ->
+            val challengeCount = response.consecutiveProxyChallengeCount()
+            val hasAuthorization = response.request.header("Proxy-Authorization") != null
+            if (!shouldRetryProxyAuthentication(response.code, hasAuthorization, challengeCount)) {
+                return@proxyAuthenticator null
             }
+            response.request.newBuilder()
+                .header(
+                    "Proxy-Authorization",
+                    Credentials.basic(credentials.username, credentials.password),
+                )
+                .build()
         }
-        val proxyClient = builder.build()
-        proxyClientCache[proxy] = proxyClient
-        return proxyClient
     }
-    return okHttpClient
+    val proxyClient = builder.build()
+    return proxyClientCache.putIfAbsent(proxyConfig, proxyClient) ?: proxyClient
+}
+
+private fun okhttp3.Response.consecutiveProxyChallengeCount(): Int {
+    var count = 0
+    var current: okhttp3.Response? = this
+    while (current?.code == 407) {
+        count++
+        current = current.priorResponse
+    }
+    return count
 }

@@ -26,6 +26,7 @@ import io.legado.app.help.http.BackstageWebView
 import io.legado.app.help.http.CookieManager
 import io.legado.app.help.http.CookieManager.mergeCookies
 import io.legado.app.help.http.CookieStore
+import io.legado.app.help.http.Cronet
 import io.legado.app.help.http.RequestMethod
 import io.legado.app.help.http.StrResponse
 import io.legado.app.help.http.addHeaders
@@ -49,22 +50,19 @@ import io.legado.app.utils.isJson
 import io.legado.app.utils.isJsonArray
 import io.legado.app.utils.isJsonObject
 import io.legado.app.utils.isXml
-import io.legado.app.utils.parseIpsFromString
 import io.legado.app.utils.stackTraceStr
 import kotlinx.coroutines.runBlocking
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
-import okhttp3.Dns
 import okhttp3.Request
 import okhttp3.ResponseBody.Companion.toResponseBody
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.net.URLEncoder
 import java.nio.charset.Charset
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 import kotlin.coroutines.ContinuationInterceptor
 import kotlin.coroutines.CoroutineContext
@@ -112,6 +110,10 @@ class AnalyzeUrl(
     private var charset: String? = null
     private var method = RequestMethod.GET
     private var proxy: String? = null
+    private var readTimeoutMs: Long? = readTimeout
+    private var callTimeoutMs: Long? = callTimeout
+    private var urlTimeoutConfigured: Boolean = false
+    private var followRedirects: Boolean? = null
     private var retry: Int = 0
     private var useWebView: Boolean = false
     private var webJs: String? = null
@@ -257,6 +259,11 @@ class AnalyzeUrl(
                 useWebView = option.useWebView()
                 webJs = option.getWebJs()
                 bodyJs = option.getBodyJs()
+                option.getTimeout()?.let {
+                    readTimeoutMs = it
+                    urlTimeoutConfigured = true
+                }
+                followRedirects = option.getFollowRedirects()
                 dnsIp = option.getDnsIp()
                 option.getJs()?.let { jsStr ->
                     evalJS(jsStr, url)?.toString()?.let {
@@ -454,15 +461,19 @@ class AnalyzeUrl(
                                 postJson(body)
                             }
                         }
-                        BackstageWebView(
-                            url = res.url,
-                            html = res.body,
-                            tag = source?.getKey(),
-                            javaScript = webJs ?: jsStr,
-                            sourceRegex = sourceRegex,
-                            headerMap = headerMap,
-                            delayTime = webViewDelayTime
-                        ).getStrResponse()
+                        if (shouldReturnRedirectBeforeWebView(followRedirects, res.raw.code)) {
+                            res
+                        } else {
+                            BackstageWebView(
+                                url = res.url,
+                                html = res.body,
+                                tag = source?.getKey(),
+                                javaScript = webJs ?: jsStr,
+                                sourceRegex = sourceRegex,
+                                headerMap = headerMap,
+                                delayTime = webViewDelayTime
+                            ).getStrResponse()
+                        }
                     }
 
                     else -> BackstageWebView(
@@ -595,29 +606,38 @@ class AnalyzeUrl(
         StrResponse(getErrResponse(e), e.stackTraceStr)
 
     private fun getClient(): OkHttpClient {
+        validateDnsIpProxyCompatibility(proxy, dnsIp)
         val client = getProxyClient(proxy)
-        if (readTimeout == null && callTimeout == null && dnsIp == null) {
+        if (
+            readTimeoutMs == null &&
+            callTimeoutMs == null &&
+            followRedirects == null &&
+            dnsIp == null
+        ) {
             return client
         }
-        if (AppConfig.isCronet && dnsIp != null) {
-            customIp[urlNoQuery] = dnsIp!!
+        val dnsAddresses = dnsIp?.let(::parseDnsIpAddresses)
+        val targetHost = dnsAddresses?.let {
+            urlNoQuery.toHttpUrlOrNull()?.host
+                ?: throw IllegalArgumentException("dnsIp requires a valid HTTP URL")
         }
-        return client.newBuilder().run {
-            if (readTimeout != null) {
-                readTimeout(readTimeout, TimeUnit.MILLISECONDS)
-                callTimeout(max(60 * 1000L, readTimeout * 2), TimeUnit.MILLISECONDS)
-            }
-            if (callTimeout != null) {
-                callTimeout(callTimeout, TimeUnit.MILLISECONDS)
-            }
-            if (dnsIp != null) {
-                val inetAddress = dnsIp!!.parseIpsFromString()
-                dns { hostname ->
-                    inetAddress ?: Dns.SYSTEM.lookup(hostname)
-                }
-            }
-            build()
+        val cronetInterceptor = if (
+            AppConfig.isCronet &&
+            (urlTimeoutConfigured || followRedirects != null || dnsAddresses != null)
+        ) {
+            Cronet.interceptor
+        } else {
+            null
         }
+        return buildRequestClient(
+            baseClient = client,
+            readTimeoutMillis = readTimeoutMs,
+            callTimeoutMillis = callTimeoutMs,
+            followRedirects = followRedirects,
+            targetHost = targetHost,
+            dnsAddresses = dnsAddresses,
+            interceptorToRemove = cronetInterceptor,
+        )
     }
 
     private fun extractHostFromUrl(url: String): String? {
@@ -769,7 +789,6 @@ class AnalyzeUrl(
         private val pagePattern = Pattern.compile("<(.*?)>")
         private val queryEncoder =
             RFC3986.UNRESERVED.orNew(PercentCodec.of("!$%&()*+,/:;=?@[\\]^`{|}"))
-        val customIp by lazy { ConcurrentHashMap<String, String>() }
         fun AnalyzeUrl.getMediaItem(): MediaItem {
             setCookie()
             return ExoPlayerHelper.createMediaItem(url, headerMap)
@@ -803,6 +822,14 @@ class AnalyzeUrl(
          * webView中执行的js
          **/
         private var webJs: String? = null,
+        /**
+         * 读取超时（毫秒）
+         **/
+        private var timeout: Any? = null,
+        /**
+         * 是否跟随重定向
+         **/
+        private var followRedirects: Any? = null,
         /**
          * 自定义的域名ip
          **/
@@ -915,8 +942,25 @@ class AnalyzeUrl(
         fun getWebJs(): String? {
             return webJs
         }
+
+        fun setTimeout(value: String?) {
+            timeout = value
+        }
+
+        fun getTimeout(): Long? {
+            return parseRequestTimeoutMillis(timeout)
+        }
+
+        fun setFollowRedirects(value: String?) {
+            followRedirects = value
+        }
+
+        fun getFollowRedirects(): Boolean? {
+            return parseBooleanOption(followRedirects)
+        }
+
         fun setDnsIp(value: String?) {
-            dnsIp = if (value.isNullOrBlank()) null else value
+            dnsIp = if (value.isNullOrBlank()) null else value.trim()
         }
 
         fun getDnsIp(): String? {
