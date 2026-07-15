@@ -12,6 +12,7 @@ jobs:
   review:
     if: >-
       ${{ !github.event.pull_request.draft &&
+          github.event.pull_request.user.type != 'Bot' &&
           github.event.pull_request.user.login != 'mgz0227' &&
           github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
