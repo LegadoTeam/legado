@@ -130,6 +130,11 @@
     <string name="screen_unspecified">Theo hệ thống</string>
     <string name="disclaimer">Tuyên bố miễn trừ trách nhiệm</string>
     <string name="all_chapter_num">%d chương</string>
+    <string name="toc_search_match_count">Khớp %1$d/%2$d chương</string>
+    <string name="toc_volume_title_match">Khớp tiêu đề tập</string>
+    <string name="toc_volume_tag_summary">%1$s · %2$s</string>
+    <string name="toc_expand_volume">Mở rộng tập</string>
+    <string name="toc_collapse_volume">Thu gọn tập</string>
     <string name="interface_setting">Giao diện</string>
     <string name="brightness">Độ sáng</string>
     <string name="chapter_list">Danh sách chương</string>

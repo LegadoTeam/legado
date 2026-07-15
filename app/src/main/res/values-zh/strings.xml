@@ -135,6 +135,11 @@
     <string name="screen_unspecified">跟随系统</string>
     <string name="disclaimer">免责声明</string>
     <string name="all_chapter_num">共 %d 章</string>
+    <string name="toc_search_match_count">匹配 %1$d/%2$d 章</string>
+    <string name="toc_volume_title_match">卷名匹配</string>
+    <string name="toc_volume_tag_summary">%1$s · %2$s</string>
+    <string name="toc_expand_volume">展开分卷</string>
+    <string name="toc_collapse_volume">折叠分卷</string>
     <string name="interface_setting">界面</string>
     <string name="brightness">亮度</string>
     <string name="chapter_list">目录</string>
