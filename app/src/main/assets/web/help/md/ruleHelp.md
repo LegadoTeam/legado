@@ -179,8 +179,11 @@ socks5代理    不支持需要验证的socks5代理
 { "proxy":"socks5://127.0.0.1:1080" }
 http代理
 { "proxy":"http://127.0.0.1:1080" }
-支持http代理服务器验证
+支持旧版http代理服务器验证格式
 { "proxy":"http://127.0.0.1:1080@用户名@密码" }
+支持标准http代理服务器验证格式
+{ "proxy":"http://用户名:密码@127.0.0.1:1080" }
+注意: socks4和socks5代理仍不支持账号密码验证，无效代理配置会直接返回错误，不会绕过代理直连
 注意:这些请求头是无意义的,会被忽略掉
 ```
 
@@ -199,6 +202,14 @@ https://www.baidu.com,{"bodyJs":"if(result)'这里的文本作为访问返回的
 ```
 https://dns.google,{"dnsIp":"8.8.8.8"}
 ```
+`dnsIp`支持使用英文逗号分隔多个IPv4或IPv6地址，仅作用于当前链接的目标域名，不会覆盖重定向或CDN域名。
+`dnsIp`不能与`proxy`同时使用，组合配置会直接返回错误。
+
+* url添加timeout和followRedirects参数，设置读取超时（毫秒）和是否跟随重定向,例
+```
+https://www.example.com,{"timeout":5000,"followRedirects":false}
+```
+这些网络参数适用于普通HTTP请求和文件上传；一旦进入WebView，后续页面加载不再受这些参数控制。
 
 * 增加js方法，用于重定向拦截
   * `java.get(urlStr: String, headers: Map<String, String> | JSON String)`

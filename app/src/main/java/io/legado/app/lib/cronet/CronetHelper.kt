@@ -9,7 +9,6 @@ import io.legado.app.constant.AppPattern
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.CookieManager.cookieJarHeader
 import io.legado.app.help.http.okHttpClient
-import io.legado.app.model.analyzeRule.AnalyzeUrl.Companion.customIp
 import io.legado.app.utils.DebugLog
 import io.legado.app.utils.externalCache
 import okhttp3.Headers
@@ -105,10 +104,8 @@ fun buildRequest(request: Request, callback: UrlRequest.Callback): UrlRequest? {
 }
 
 private fun customHost(url: String): String {
-    val urlIp = customIp.remove(url)
-    if (AppConfig.hostMap.isEmpty() && urlIp == null) return url
+    if (AppConfig.hostMap.isEmpty()) return url
     val host = AppPattern.domainRegex.find(url)?.groupValues?.getOrNull(1) ?: return url
-    if (urlIp != null) return url.replaceFirst(host, urlIp)
     val ip = when (val configIps = AppConfig.hostMap[host]) {
         is String -> configIps.splitToSequence(',')
             .firstOrNull { it.isNotBlank() }

@@ -32,14 +32,15 @@ suspend fun OkHttpClient.newCallResponse(
 ): Response {
     val requestBuilder = Request.Builder()
     requestBuilder.apply(builder)
-    var response: Response? = null
-    for (i in 0..retry) {
-        response = newCall(requestBuilder.build()).await()
-        if (response.isSuccessful) {
+    var retriesRemaining = retry.coerceAtLeast(0)
+    while (true) {
+        val response = newCall(requestBuilder.build()).await()
+        if (response.isSuccessful || response.code in 300..399 || retriesRemaining == 0) {
             return response
         }
+        response.close()
+        retriesRemaining--
     }
-    return response!!
 }
 
 suspend fun OkHttpClient.newCallResponseBody(
