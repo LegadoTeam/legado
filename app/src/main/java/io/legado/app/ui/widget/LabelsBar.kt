@@ -1,9 +1,11 @@
 package io.legado.app.ui.widget
 
 import android.content.Context
+import android.text.TextUtils
 import android.util.AttributeSet
-import android.widget.LinearLayout
 import android.widget.TextView
+import com.google.android.flexbox.FlexWrap
+import com.google.android.flexbox.FlexboxLayout
 import io.legado.app.ui.widget.text.AccentBgTextView
 import io.legado.app.utils.dpToPx
 
@@ -11,13 +13,17 @@ import io.legado.app.utils.dpToPx
 class LabelsBar @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
-) : LinearLayout(context, attrs) {
+) : FlexboxLayout(context, attrs) {
 
     private val unUsedViews = arrayListOf<TextView>()
     private val usedViews = arrayListOf<TextView>()
     var textSize = 12f
 
-    fun setLabels(labels: List<String>, onClick: ((String) -> Unit)? = null, onLongClick: ((String) -> Boolean)? = null) {
+    fun setLabels(
+        labels: List<String>,
+        onClick: ((String) -> Unit)? = null,
+        onLongClick: ((String) -> Boolean)? = null
+    ) {
         clear()
         labels.forEach {
             addLabel(it, onClick, onLongClick)
@@ -35,11 +41,21 @@ class LabelsBar @JvmOverloads constructor(
             AccentBgTextView(context, null).apply {
                 setPadding(3.dpToPx(), 0, 3.dpToPx(), 0)
                 setRadius(2)
-                val lp = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
-                lp.setMargins(0, 0, 2.dpToPx(), 0)
+                ellipsize = TextUtils.TruncateAt.END
+                maxLines = 1
+                val lp = FlexboxLayout.LayoutParams(
+                    LayoutParams.WRAP_CONTENT,
+                    LayoutParams.WRAP_CONTENT
+                ).apply {
+                    marginEnd = 2.dpToPx()
+                    if (this@LabelsBar.flexWrap == FlexWrap.NOWRAP) {
+                        flexShrink = 0f
+                    } else {
+                        bottomMargin = 2.dpToPx()
+                    }
+                }
                 layoutParams = lp
                 text = label
-                maxLines = 1
                 usedViews.add(this)
             }
         } else {
@@ -50,6 +66,10 @@ class LabelsBar @JvmOverloads constructor(
         }
         tv.textSize = textSize
         tv.text = label
+        tv.setOnClickListener(null)
+        tv.setOnLongClickListener(null)
+        tv.isClickable = false
+        tv.isLongClickable = false
         if (onClick != null) {
             tv.setOnClickListener { onClick.invoke(label) }
         }

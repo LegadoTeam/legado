@@ -97,19 +97,16 @@
                                 android:textSize="20sp" />
                         </HorizontalScrollView>
 
-                        <HorizontalScrollView
-                            android:layout_width="wrap_content"
+                        <io.legado.app.ui.widget.LabelsBar
+                            android:id="@+id/lb_kind"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_gravity="center"
                             android:layout_marginBottom="12dp"
-                            android:scrollbars="none">
-
-                            <io.legado.app.ui.widget.LabelsBar
-                                android:id="@+id/lb_kind"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:visibility="gone" />
-                        </HorizontalScrollView>
+                            android:visibility="gone"
+                            app:alignItems="center"
+                            app:flexDirection="row"
+                            app:flexWrap="wrap"
+                            app:justifyContent="center" />
 
                         <LinearLayout
                             android:layout_width="match_parent"
