@@ -235,6 +235,8 @@
     <string name="data_loading">Đang tải dữ liệu…</string>
     <string name="load_error_retry">Tải thất bại, chạm để thử lại</string>
     <string name="book_intro">Mô tả sách</string>
+    <string name="book_intro_expand">Mở rộng</string>
+    <string name="book_intro_collapse">Thu gọn</string>
     <string name="intro_show">Mô tả: %s</string>
     <string name="intro_show_null">Mô tả: không có giới thiệu</string>
     <string name="open_from_other">Mở sách từ bên ngoài</string>

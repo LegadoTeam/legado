@@ -354,10 +354,33 @@
 
                         </LinearLayout>
 
-                        <FrameLayout
-                            android:id="@+id/tv_intro_container"
+                        <LinearLayout
                             android:layout_width="match_parent"
-                            android:layout_height="wrap_content" />
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical">
+
+                            <FrameLayout
+                                android:id="@+id/tv_intro_container"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content" />
+
+                            <io.legado.app.ui.widget.text.AccentTextView
+                                android:id="@+id/tv_intro_toggle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="48dp"
+                                android:layout_gravity="end"
+                                android:background="?attr/selectableItemBackground"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:gravity="center"
+                                android:minWidth="48dp"
+                                android:paddingHorizontal="12dp"
+                                android:text="@string/book_intro_expand"
+                                android:textSize="14sp"
+                                android:visibility="gone"
+                                tools:visibility="visible" />
+
+                        </LinearLayout>
 
                     </LinearLayout>
 

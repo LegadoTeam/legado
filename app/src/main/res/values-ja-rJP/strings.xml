@@ -240,6 +240,8 @@
     <string name="data_loading">Loading…</string>
     <string name="load_error_retry">Load failed, tap to retry</string>
     <string name="book_intro">Book description</string>
+    <string name="book_intro_expand">展開</string>
+    <string name="book_intro_collapse">折りたたむ</string>
     <string name="intro_show">Description:%s</string>
     <string name="intro_show_null">Description: no introduction</string>
     <string name="open_from_other">Open external book</string>
