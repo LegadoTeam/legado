@@ -75,7 +75,7 @@ class BottomWebViewHeightConfigTest {
     fun `fixed mode supplies stable defaults`() {
         val spec = resolveBottomSheetBehaviorSpec(
             fixedHeight = 480,
-            resetFixedDefaults = false,
+            resetHeightModeDefaults = false,
             state = null,
             peekHeight = null,
             skipCollapsed = null,
@@ -96,7 +96,7 @@ class BottomWebViewHeightConfigTest {
     fun `explicit behavior fields override fixed mode defaults`() {
         val spec = resolveBottomSheetBehaviorSpec(
             fixedHeight = 480,
-            resetFixedDefaults = false,
+            resetHeightModeDefaults = false,
             state = BottomSheetBehavior.STATE_COLLAPSED,
             peekHeight = 320,
             skipCollapsed = false,
@@ -117,7 +117,7 @@ class BottomWebViewHeightConfigTest {
     fun `leaving fixed mode restores flexible constraints without changing state`() {
         val spec = resolveBottomSheetBehaviorSpec(
             fixedHeight = null,
-            resetFixedDefaults = true,
+            resetHeightModeDefaults = true,
             state = null,
             peekHeight = null,
             skipCollapsed = null,
@@ -132,5 +132,163 @@ class BottomWebViewHeightConfigTest {
         assertFalse(spec.skipCollapsed == true)
         assertTrue(spec.fitToContents == true)
         assertTrue(spec.draggableOnNestedScroll == true)
+    }
+
+    @Test
+    fun `expanded mode uses the larger height as layout limit`() {
+        val spec = resolveBottomSheetHeightSpec(
+            screenHeight = 1_000,
+            dialogHeight = 400,
+            heightPercentage = null,
+            first = true,
+            expandedHeight = 800,
+        )
+
+        assertEquals(800, spec.layoutHeight)
+        assertNull(spec.fixedHeight)
+        assertEquals(400, spec.collapsedHeight)
+        assertEquals(800, spec.expandedHeight)
+        assertEquals(800, spec.constrainedHeight)
+    }
+
+    @Test
+    fun `expanded percentages follow the same precedence as collapsed percentages`() {
+        val spec = resolveBottomSheetHeightSpec(
+            screenHeight = 1_000,
+            dialogHeight = 300,
+            heightPercentage = 0.4f,
+            first = true,
+            expandedHeight = 700,
+            expandedHeightPercentage = 0.9f,
+        )
+
+        assertEquals(400, spec.collapsedHeight)
+        assertEquals(900, spec.expandedHeight)
+    }
+
+    @Test
+    fun `invalid expanded height falls back to fixed mode`() {
+        val spec = resolveBottomSheetHeightSpec(
+            screenHeight = 1_000,
+            dialogHeight = 480,
+            heightPercentage = null,
+            first = true,
+            expandedHeight = 320,
+        )
+
+        assertEquals(BottomSheetHeightSpec(480, 480), spec)
+    }
+
+    @Test
+    fun `expanded height without a collapsed height is ignored`() {
+        val spec = resolveBottomSheetHeightSpec(
+            screenHeight = 1_000,
+            dialogHeight = null,
+            heightPercentage = null,
+            first = true,
+            expandedHeight = 800,
+        )
+
+        assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, spec.layoutHeight)
+        assertNull(spec.constrainedHeight)
+    }
+
+    @Test
+    fun `expanded mode supplies collapsed and draggable defaults`() {
+        val spec = resolveBottomSheetBehaviorSpec(
+            fixedHeight = null,
+            resetHeightModeDefaults = false,
+            state = null,
+            peekHeight = null,
+            skipCollapsed = null,
+            fitToContents = null,
+            draggableOnNestedScroll = null,
+            maxHeight = null,
+            collapsedHeight = 400,
+            expandedHeight = 800,
+        )
+
+        assertEquals(BottomSheetBehavior.STATE_COLLAPSED, spec.state)
+        assertEquals(400, spec.peekHeight)
+        assertEquals(800, spec.maxHeight)
+        assertFalse(spec.skipCollapsed == true)
+        assertTrue(spec.fitToContents == true)
+        assertTrue(spec.draggableOnNestedScroll == true)
+    }
+
+    @Test
+    fun `explicit behavior fields override expanded mode defaults`() {
+        val spec = resolveBottomSheetBehaviorSpec(
+            fixedHeight = null,
+            resetHeightModeDefaults = false,
+            state = BottomSheetBehavior.STATE_EXPANDED,
+            peekHeight = 360,
+            skipCollapsed = true,
+            fitToContents = false,
+            draggableOnNestedScroll = false,
+            maxHeight = 760,
+            collapsedHeight = 400,
+            expandedHeight = 800,
+        )
+
+        assertEquals(BottomSheetBehavior.STATE_EXPANDED, spec.state)
+        assertEquals(360, spec.peekHeight)
+        assertEquals(760, spec.maxHeight)
+        assertTrue(spec.skipCollapsed == true)
+        assertFalse(spec.fitToContents == true)
+        assertFalse(spec.draggableOnNestedScroll == true)
+    }
+
+    @Test
+    fun `sparse expanded update keeps the configured collapsed height`() {
+        val previous = BottomSheetHeightConfig(
+            dialogHeight = null,
+            heightPercentage = 0.4f,
+            expandedHeight = null,
+            expandedHeightPercentage = null,
+        )
+
+        val merged = mergeBottomSheetHeightConfig(
+            previous = previous,
+            dialogHeight = null,
+            heightPercentage = null,
+            expandedHeight = 800,
+            expandedHeightPercentage = null,
+        )
+
+        assertEquals(0.4f, merged.heightPercentage)
+        assertEquals(800, merged.expandedHeight)
+    }
+
+    @Test
+    fun `explicit zero expanded height clears an older percentage mode`() {
+        val previous = BottomSheetHeightConfig(
+            dialogHeight = 400,
+            heightPercentage = null,
+            expandedHeight = null,
+            expandedHeightPercentage = 0.9f,
+        )
+
+        val merged = mergeBottomSheetHeightConfig(
+            previous = previous,
+            dialogHeight = null,
+            heightPercentage = null,
+            expandedHeight = 0,
+            expandedHeightPercentage = null,
+        )
+
+        assertEquals(0, merged.expandedHeight)
+        assertNull(merged.expandedHeightPercentage)
+        assertEquals(
+            BottomSheetHeightSpec(400, 400),
+            resolveBottomSheetHeightSpec(
+                screenHeight = 1_000,
+                dialogHeight = merged.dialogHeight,
+                heightPercentage = merged.heightPercentage,
+                first = false,
+                expandedHeight = merged.expandedHeight,
+                expandedHeightPercentage = merged.expandedHeightPercentage,
+            ),
+        )
     }
 }

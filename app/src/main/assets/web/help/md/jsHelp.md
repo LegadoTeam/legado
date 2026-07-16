@@ -99,6 +99,22 @@ java.clearTtsCache()
 //刷新发现，仅限发现按钮
 java.refreshExplore()
 ```
+
+`config` 高度配置示例：
+
+```js
+// 固定为 600 像素高
+java.showBrowser(url, html, null, JSON.stringify({dialogHeight: 600}))
+
+// 初始占屏幕高度 45%，上滑可展开到 90%
+java.showBrowser(url, html, null, JSON.stringify({
+    heightPercentage: 0.45,
+    expandedHeightPercentage: 0.9
+}))
+```
+
+`expandedHeight` 和 `expandedHeightPercentage` 分别表示展开后的像素高度和屏幕高度比例。展开高度必须大于 `dialogHeight` 或 `heightPercentage` 计算出的折叠高度，否则继续使用固定高度模式。百分比与像素值同时提供时优先使用百分比。
+
 [showBrowser](https://github.com/Luoyacheng/legado/wiki/java.showBrowser%E5%87%BD%E6%95%B0%E4%BB%8B%E7%BB%8D)函数介绍
 
 ### [AnalyzeUrl](https://github.com/LegadoTeam/legado/blob/master/app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeUrl.kt) 部分函数
