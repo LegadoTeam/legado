@@ -13,6 +13,7 @@ import androidx.core.view.postDelayed
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
 import androidx.fragment.app.FragmentStatePagerAdapter
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.viewpager.widget.ViewPager
 import com.google.android.material.bottomnavigation.BottomNavigationView
@@ -25,7 +26,9 @@ import io.legado.app.constant.PreferKey
 import io.legado.app.databinding.ActivityMainBinding
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.AppWebDav
+import io.legado.app.help.LifecycleHelp
 import io.legado.app.help.SourceSharePassphrase
+import io.legado.app.help.SourceSharePassphraseImportPolicy
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
@@ -161,7 +164,11 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
 
     override fun onResume() {
         super.onResume()
-        if (LocalConfig.privacyPolicyOk) {
+        if (SourceSharePassphraseImportPolicy.shouldScheduleOnResume(
+                privacyPolicyOk = LocalConfig.privacyPolicyOk,
+                activityCount = LifecycleHelp.activitySize()
+            )
+        ) {
             readSourceSharePassphrase(500)
         }
     }
@@ -421,7 +428,15 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
 
     private fun readSourceSharePassphrase(delayMillis: Long) {
         binding.viewPagerMain.postDelayed(delayMillis) {
-            if (!LocalConfig.privacyPolicyOk || isFinishing) return@postDelayed
+            if (!SourceSharePassphraseImportPolicy.canReadClipboard(
+                    privacyPolicyOk = LocalConfig.privacyPolicyOk,
+                    isFinishing = isFinishing,
+                    isResumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED),
+                    isFragmentStateSaved = supportFragmentManager.isStateSaved
+                )
+            ) {
+                return@postDelayed
+            }
             val text = getClipText()?.takeIf { it.isNotBlank() } ?: return@postDelayed
             if (text == lastPassphraseText) return@postDelayed
             when (val result = SourceSharePassphrase.decode(text)) {
