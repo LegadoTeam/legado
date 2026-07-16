@@ -1,0 +1,159 @@
+{
+  "project_info": {
+    "project_number": "620835636521",
+    "firebase_url": "https://legado-b3157-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "legado-b3157",
+    "storage_bucket": "legado-b3157.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:620835636521:android:acc9f20879607ff3cda338",
+        "android_client_info": {
+          "package_name": "com.legado.app.debug"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "620835636521-sd6itkss17k8sg18kuhbf5v9o2sdoul9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.legado.app.debug",
+            "certificate_hash": "acc4d404a12261f8fbc70954f715fcd4a211e3e9"
+          }
+        },
+        {
+          "client_id": "620835636521-2m4f4ft69l27l3njmbtl5hd742phurdf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAXWWvSgBYeQv5VHIzq_I2zrB6IVxIPPv4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "620835636521-2m4f4ft69l27l3njmbtl5hd742phurdf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:620835636521:android:0839a6ecc9c33bd2cda338",
+        "android_client_info": {
+          "package_name": "com.legado.app.release"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "620835636521-ndsrgnnhfquo2uk7mdm0d3kqoflq5ulp.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.legado.app.release",
+            "certificate_hash": "acc4d404a12261f8fbc70954f715fcd4a211e3e9"
+          }
+        },
+        {
+          "client_id": "620835636521-2m4f4ft69l27l3njmbtl5hd742phurdf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAXWWvSgBYeQv5VHIzq_I2zrB6IVxIPPv4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "620835636521-2m4f4ft69l27l3njmbtl5hd742phurdf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:620835636521:android:89ebce5eda02d24ccda338",
+        "android_client_info": {
+          "package_name": "com.legado.play.debug"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "620835636521-shmtpitnopjakkslbchajifvc5iq8cko.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.legado.play.debug",
+            "certificate_hash": "acc4d404a12261f8fbc70954f715fcd4a211e3e9"
+          }
+        },
+        {
+          "client_id": "620835636521-2m4f4ft69l27l3njmbtl5hd742phurdf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAXWWvSgBYeQv5VHIzq_I2zrB6IVxIPPv4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "620835636521-2m4f4ft69l27l3njmbtl5hd742phurdf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:620835636521:android:76cf3010ac7cbb91cda338",
+        "android_client_info": {
+          "package_name": "com.legado.play.release"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "620835636521-mo0lj8iiipp6t1o7bmkjlfublg6u5npd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.legado.play.release",
+            "certificate_hash": "acc4d404a12261f8fbc70954f715fcd4a211e3e9"
+          }
+        },
+        {
+          "client_id": "620835636521-2m4f4ft69l27l3njmbtl5hd742phurdf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAXWWvSgBYeQv5VHIzq_I2zrB6IVxIPPv4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "620835636521-2m4f4ft69l27l3njmbtl5hd742phurdf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
