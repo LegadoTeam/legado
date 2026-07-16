@@ -1352,4 +1352,12 @@
     <string name="shibboleth_invalid">口令格式不正确</string>
     <string name="share_expiry_days">分享有效期（天，0为永久）</string>
     <string name="invalid_share_expiry_days">分享有效期必须为0到36500天</string>
+    <string name="text_select_menu_config">Customize selection menu</string>
+    <string name="text_select_menu_config_summary">Reorder actions shown in the floating bar and More</string>
+    <string name="text_menu_zone_bar">Floating bar</string>
+    <string name="text_menu_zone_more">More</string>
+    <string name="process_text_actions">Other app actions</string>
+    <string name="drag_to_reorder">Drag to reorder</string>
+    <string name="move_to_more">Move to More</string>
+    <string name="move_to_floating_bar">Move to floating bar</string>
 </resources>

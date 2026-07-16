@@ -22,11 +22,9 @@ import io.legado.app.R
 import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.constant.AppLog
-import io.legado.app.constant.PreferKey
 import io.legado.app.databinding.ItemTextBinding
 import io.legado.app.databinding.PopupActionMenuBinding
 import io.legado.app.help.config.AppConfig
-import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.gone
 import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.printOnDebug
@@ -46,7 +44,6 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
     private val menuItems: List<MenuItemImpl>
     private val visibleMenuItems = arrayListOf<MenuItemImpl>()
     private val moreMenuItems = arrayListOf<MenuItemImpl>()
-    private val expandTextMenu get() = context.getPrefBoolean(PreferKey.expandTextMenu)
 
     init {
         @SuppressLint("InflateParams")
@@ -63,17 +60,10 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
             onInitializeMenu(otherMenu)
         }
         menuItems = myMenu.visibleItems + otherMenu.visibleItems
-        visibleMenuItems.addAll(menuItems.subList(0, 5))
-        moreMenuItems.addAll(menuItems.subList(5, menuItems.size))
         binding.recyclerView.adapter = adapter
         binding.recyclerViewMore.adapter = adapter
         setOnDismissListener {
-            if (!context.getPrefBoolean(PreferKey.expandTextMenu)) {
-                binding.ivMenuMore.setImageResource(R.drawable.ic_more_vert)
-                binding.recyclerViewMore.gone()
-                adapter.setItems(visibleMenuItems)
-                binding.recyclerView.visible()
-            }
+            resetToPrimaryView()
         }
         binding.ivMenuMore.setOnClickListener {
             if (binding.recyclerView.isVisible) {
@@ -82,23 +72,53 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
                 binding.recyclerView.gone()
                 binding.recyclerViewMore.visible()
             } else {
-                binding.ivMenuMore.setImageResource(R.drawable.ic_more_vert)
-                binding.recyclerViewMore.gone()
-                adapter.setItems(visibleMenuItems)
-                binding.recyclerView.visible()
+                resetToPrimaryView()
             }
+        }
+        binding.ivMenuMore.setOnLongClickListener {
+            dismiss()
+            callBack.onEditTextActionMenu()
+            true
         }
         upMenu()
     }
 
+    private fun resetToPrimaryView() {
+        binding.ivMenuMore.setImageResource(R.drawable.ic_more_vert)
+        binding.recyclerViewMore.gone()
+        adapter.setItems(visibleMenuItems)
+        binding.recyclerView.visible()
+    }
+
     fun upMenu() {
-        if (expandTextMenu) {
-            adapter.setItems(menuItems)
+        buildPartition()
+        resetToPrimaryView()
+        if (moreMenuItems.isEmpty()) {
             binding.ivMenuMore.gone()
         } else {
-            adapter.setItems(visibleMenuItems)
             binding.ivMenuMore.visible()
         }
+    }
+
+    private fun buildPartition() {
+        val itemsById = menuItems
+            .filter { it.itemId != Menu.NONE }
+            .associateBy { it.itemId }
+        val builtInItems = TextSelectMenuItem.entries.mapNotNull { item ->
+            item.menuId?.let { id -> itemsById[id]?.let { item.key to it } }
+        }.toMap()
+        val processTextItems = menuItems.filter {
+            it.itemId == Menu.NONE && it.intent?.action == Intent.ACTION_PROCESS_TEXT
+        }
+        val partition = loadTextSelectMenuConfig(context).partitionItems(
+            builtInItems = builtInItems,
+            processTextItems = processTextItems,
+            allItems = menuItems
+        )
+        visibleMenuItems.clear()
+        visibleMenuItems.addAll(partition.bar)
+        moreMenuItems.clear()
+        moreMenuItems.addAll(partition.more)
     }
 
     fun show(
@@ -110,7 +130,8 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
         endX: Int,
         endBottomY: Int
     ) {
-        if (expandTextMenu) {
+        upMenu()
+        if (moreMenuItems.isEmpty()) {
             when {
                 startTopY > 500 -> {
                     showAtLocation(
@@ -291,5 +312,7 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
         fun onMenuItemSelected(itemId: Int): Boolean
 
         fun onMenuActionFinally()
+
+        fun onEditTextActionMenu()
     }
 }
