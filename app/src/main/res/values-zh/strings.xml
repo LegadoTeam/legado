@@ -1246,4 +1246,12 @@
     <string name="auto_check_new_backup_t">自动检查新备份</string>
     <string name="auto_check_new_backup_s">打开软件时检查是否有新备份，有新备份时提示是否更新</string>
     <string name="sys_image_picker">系统图片选择器</string>
+    <string name="text_select_menu_config">自定义选择菜单</string>
+    <string name="text_select_menu_config_summary">调整浮动条与更多菜单中的操作及顺序</string>
+    <string name="text_menu_zone_bar">浮动条</string>
+    <string name="text_menu_zone_more">更多</string>
+    <string name="process_text_actions">其他应用操作</string>
+    <string name="drag_to_reorder">拖动排序</string>
+    <string name="move_to_more">移至更多</string>
+    <string name="move_to_floating_bar">移至浮动条</string>
 </resources>
