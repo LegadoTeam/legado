@@ -310,7 +310,7 @@ class MobiFile(var book: Book) {
                 book.author = metadata.author.first()
             }
             if (metadata.description.isNotBlank()) {
-                book.intro = HtmlFormatter.format(metadata.description)
+                book.intro = HtmlFormatter.formatIntro(metadata.description)
             }
         }
     }

@@ -126,7 +126,7 @@ object BookInfo {
                 book.intro = introTrimS
                 Debug.log(bookSource.bookSourceUrl, "└${introTrimS}")
             } else {
-                HtmlFormatter.format(intro).let {
+                HtmlFormatter.formatIntro(intro).let {
                     if (it.isNotEmpty()) book.intro = it
                     Debug.log(bookSource.bookSourceUrl, "└${it}")
                 }

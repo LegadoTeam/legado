@@ -257,7 +257,7 @@ object BookList {
             currentCoroutineContext().ensureActive()
             Debug.log(bookSource.bookSourceUrl, "┌获取简介", log)
             try {
-                searchBook.intro = HtmlFormatter.format(analyzeRule.getString(ruleIntro))
+                searchBook.intro = HtmlFormatter.formatIntro(analyzeRule.getString(ruleIntro))
                 Debug.log(bookSource.bookSourceUrl, "└${searchBook.intro}", log)
             } catch (e: Exception) {
                 currentCoroutineContext().ensureActive()
