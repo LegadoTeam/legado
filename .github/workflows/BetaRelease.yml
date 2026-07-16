@@ -89,9 +89,6 @@ jobs:
             typeName="新共存"
             # 替换 releaseA 相关包名（防止冲突）
             sed -i "s/'.release'/'.releaseA'/" "$GITHUB_WORKSPACE/app/build.gradle"
-            if [ -f "$GITHUB_WORKSPACE/app/google-services.json" ]; then
-              sed -i 's/.release/.releaseA/' "$GITHUB_WORKSPACE/app/google-services.json"
-            fi
           fi
 
           chmod +x gradlew
