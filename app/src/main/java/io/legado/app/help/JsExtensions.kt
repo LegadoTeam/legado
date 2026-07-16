@@ -58,6 +58,7 @@ import kotlinx.coroutines.runBlocking
 import okio.use
 import org.jsoup.Connection
 import org.jsoup.Jsoup
+import org.mozilla.javascript.Function
 import splitties.init.appCtx
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -1183,6 +1184,51 @@ interface JsExtensions : JsEncodeUtils {
             putExtra("sourceName", source.getTag())
             putExtra("sourceType", source.getSourceType())
         }
+    }
+
+    fun singleFlight(
+        name: String,
+        action: Function,
+        timeoutMs: Long
+    ) {
+        SourceLock.singleFlight(sourceConcurrencyKey(name), timeoutMs) {
+            val cx = rhinoContext
+            action.call(cx, action.parentScope, action.parentScope, emptyArray<Any?>())
+        }
+    }
+
+    fun singleFlight(
+        name: String,
+        action: Function
+    ) = singleFlight(name, action, 15_000L)
+
+    fun lock(
+        name: String,
+        action: Function,
+        timeoutMs: Long
+    ) {
+        SourceLock.lock(sourceConcurrencyKey(name), timeoutMs) {
+            val cx = rhinoContext
+            action.call(cx, action.parentScope, action.parentScope, emptyArray<Any?>())
+        }
+    }
+
+    fun lock(
+        name: String,
+        action: Function
+    ) = lock(name, action, 15_000L)
+
+    fun tick(name: String): Int {
+        return SourceLock.tick(sourceConcurrencyKey(name))
+    }
+
+    private fun sourceConcurrencyKey(name: String): String {
+        if (name.isBlank() || name.length > 256) {
+            throw NoStackTraceException("name 不能为空且长度不能超过 256")
+        }
+        val sourceKey = getSource()?.getKey()
+            ?: throw NoStackTraceException("并发工具只能在书源、订阅源或朗读源中使用")
+        return "$sourceKey@$name"
     }
 
     /**
