@@ -11,6 +11,11 @@
         app:showAsAction="always" />
 
     <item
+        android:id="@+id/menu_import_old"
+        android:title="@string/menu_import_old_version"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_log"
         android:title="@string/log"
         app:showAsAction="never" />

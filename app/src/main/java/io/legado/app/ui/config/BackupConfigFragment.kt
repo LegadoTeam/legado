@@ -163,6 +163,11 @@ class BackupConfigFragment : PreferenceFragment(),
                 return true
             }
 
+            R.id.menu_import_old -> {
+                restoreOld.launch()
+                return true
+            }
+
             R.id.menu_log -> showDialogFragment<AppLogDialog>()
         }
         return false
@@ -235,7 +240,6 @@ class BackupConfigFragment : PreferenceFragment(),
             PreferKey.restoreIgnore -> backupIgnore()
             "web_dav_backup" -> backup()
             "web_dav_restore" -> restore()
-            "import_old" -> restoreOld.launch()
         }
         return super.onPreferenceTreeClick(preference)
     }

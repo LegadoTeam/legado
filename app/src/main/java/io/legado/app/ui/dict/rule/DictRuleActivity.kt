@@ -17,7 +17,9 @@ import io.legado.app.data.entities.DictRule
 import io.legado.app.databinding.ActivityDictRuleBinding
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.DirectLinkUpload
+import io.legado.app.help.SourceSharePassphrase
 import io.legado.app.lib.dialogs.alert
+import io.legado.app.lib.dialogs.sourceSharePassphraseButton
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.association.ImportDictRuleDialog
 import io.legado.app.ui.file.HandleFileContract
@@ -61,17 +63,23 @@ class DictRuleActivity : VMBaseActivity<ActivityDictRuleBinding, DictRuleViewMod
     }
     private val exportResult = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
+            val url = uri.toString()
             alert(R.string.export_success) {
-                if (uri.toString().isAbsUrl()) {
+                if (url.isAbsUrl()) {
                     setMessage(DirectLinkUpload.getSummary())
+                    sourceSharePassphraseButton(
+                        layoutInflater,
+                        url,
+                        SourceSharePassphrase.Type.DICT_RULE,
+                    )
                 }
                 val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
                     editView.hint = getString(R.string.path)
-                    editView.setText(uri.toString())
+                    editView.setText(url)
                 }
                 customView { alertBinding.root }
                 okButton {
-                    sendToClip(uri.toString())
+                    sendToClip(url)
                 }
             }
         }

@@ -1347,4 +1347,9 @@
     <string name="is_system_tts_no_export">无法导出系统tts</string>
     <string name="click_image_way">点击图片方式</string>
     <string name="auto_update_summary">每天自动检查软件是否更新</string>
+    <string name="shibboleth">口令</string>
+    <string name="shibboleth_expired">口令已过期</string>
+    <string name="shibboleth_invalid">口令格式不正确</string>
+    <string name="share_expiry_days">分享有效期（天，0为永久）</string>
+    <string name="invalid_share_expiry_days">分享有效期必须为0到36500天</string>
 </resources>
