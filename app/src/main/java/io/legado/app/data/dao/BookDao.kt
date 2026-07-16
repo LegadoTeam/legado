@@ -149,6 +149,9 @@ interface BookDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insert(vararg book: Book)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    fun insertIgnore(book: Book): Long
+
     @Update
     fun update(vararg book: Book)
 
@@ -163,6 +166,9 @@ interface BookDao {
 
     @Query("update books set durChapterPos = :pos where bookUrl = :bookUrl")
     fun upProgress(bookUrl: String, pos: Int)
+
+    @Query("update books set type = :type, `order` = :order where bookUrl = :bookUrl")
+    fun updateShelfState(bookUrl: String, type: Int, order: Int)
 
     @Query("update books set `group` = :newGroupId where `group` = :oldGroupId")
     fun upGroup(oldGroupId: Long, newGroupId: Long)

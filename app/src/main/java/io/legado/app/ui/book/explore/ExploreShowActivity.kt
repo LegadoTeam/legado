@@ -12,12 +12,14 @@ import io.legado.app.base.VMBaseActivity
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.databinding.ActivityExploreShowBinding
 import io.legado.app.databinding.ViewLoadMoreBinding
+import io.legado.app.lib.dialogs.alert
 import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.widget.number.NumberPickerDialog
 import io.legado.app.ui.widget.recycler.LoadMoreView
 import io.legado.app.ui.widget.recycler.VerticalDivider
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.startActivity
+import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 
 /**
@@ -33,6 +35,15 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
     private val loadMoreViewTop by lazy { LoadMoreView(this) }
     private var oldPage = -1
     private var isClearAll = false
+    private val menuAddLoadedBooks by lazy {
+        binding.titleBar.menu.add(R.string.add_loaded_books_to_bookshelf).apply {
+            setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+            setOnMenuItemClickListener {
+                alertAddLoadedBooksToShelf()
+                true
+            }
+        }
+    }
     private val menuPage by lazy {
         binding.titleBar.menu.add(getString(R.string.menu_page, 1)).apply {
             setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
@@ -73,6 +84,7 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         binding.titleBar.title = intent.getStringExtra("exploreName")
         initRecyclerView()
+        menuAddLoadedBooks
         viewModel.booksData.observe(this) { upData(it) }
         viewModel.addBooksData.observe(this) { upDataTop(it) }
         viewModel.initData(intent)
@@ -87,6 +99,29 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
         }
         viewModel.pageLiveData.observe(this) {
             menuPage.title = getString(R.string.menu_page, it)
+        }
+        viewModel.addBooksBusy.observe(this) {
+            menuAddLoadedBooks.isEnabled = !it
+        }
+    }
+
+    private fun alertAddLoadedBooksToShelf() {
+        val loadedBooks = viewModel.getLoadedBooks()
+        if (loadedBooks.isEmpty()) {
+            toastOnUi(R.string.no_loaded_books_to_add)
+            return
+        }
+        alert(titleResource = R.string.add_loaded_books_to_bookshelf) {
+            setMessage(
+                getString(R.string.add_loaded_books_to_bookshelf_message, loadedBooks.size)
+            )
+            yesButton {
+                val started = viewModel.addLoadedBooksToShelf(loadedBooks)
+                if (!started) {
+                    toastOnUi(R.string.add_loaded_books_to_bookshelf_in_progress)
+                }
+            }
+            noButton()
         }
     }
 

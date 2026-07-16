@@ -386,6 +386,12 @@
     <string name="imm_navigation_bar">immersion navigation bar</string>
     <string name="imm_navigation_bar_s">The navigation bar becomes transparent</string>
     <string name="add_to_bookshelf">Add to Bookshelf</string>
+    <string name="add_loaded_books_to_bookshelf">Add Loaded Books to Bookshelf</string>
+    <string name="add_loaded_books_to_bookshelf_message">Add the %1$d currently loaded results to the bookshelf? Existing books and duplicates will be skipped.</string>
+    <string name="add_loaded_books_to_bookshelf_result">Added %1$d book(s); skipped %2$d</string>
+    <string name="add_loaded_books_to_bookshelf_failed">Failed to add loaded books</string>
+    <string name="add_loaded_books_to_bookshelf_in_progress">Loaded books are already being added</string>
+    <string name="no_loaded_books_to_add">No loaded books to add</string>
     <string name="continue_read">Continue reading</string>
     <string name="cover_path">Cover path</string>
     <string name="page_anim_cover">Cover</string>
