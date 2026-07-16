@@ -376,6 +376,12 @@
     <string name="imm_navigation_bar">沉浸式導航欄</string>
     <string name="imm_navigation_bar_s">導航欄顏色透明</string>
     <string name="add_to_bookshelf">放入書架</string>
+    <string name="add_loaded_books_to_bookshelf">將已載入結果加入書架</string>
+    <string name="add_loaded_books_to_bookshelf_message">是否將目前已載入的 %1$d 項結果加入書架？已存在和重複的書籍會自動略過。</string>
+    <string name="add_loaded_books_to_bookshelf_result">已加入 %1$d 本，略過 %2$d 本</string>
+    <string name="add_loaded_books_to_bookshelf_failed">批次加入書架失敗</string>
+    <string name="add_loaded_books_to_bookshelf_in_progress">正在批次加入書架</string>
+    <string name="no_loaded_books_to_add">暫無已載入的書籍</string>
     <string name="continue_read">繼續閱讀</string>
     <string name="cover_path">封面地址</string>
     <string name="page_anim_cover">覆蓋</string>

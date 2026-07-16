@@ -90,12 +90,36 @@ object SourceCallBack {
         chapter: BookChapter? = null,
         result: String? = null
     ) {
+        Coroutine.async {
+            callBackBookInternal(event, source, book, chapter, result)
+        }
+    }
+
+    fun callBackBooks(
+        event: String,
+        books: List<Pair<BookSource?, Book>>,
+    ) {
+        if (books.isEmpty()) return
+        Coroutine.async {
+            books.forEach { (source, book) ->
+                callBackBookInternal(event, source, book)
+            }
+        }
+    }
+
+    private suspend fun callBackBookInternal(
+        event: String,
+        source: BookSource?,
+        book: Book?,
+        chapter: BookChapter? = null,
+        result: String? = null,
+    ) {
         if (source == null || book == null || !source.eventListener) return
         val jsStr = source.getContentRule().callBackJs
         if (jsStr.isNullOrEmpty()) return
-        Coroutine.async {
+        kotlin.runCatching {
             withTimeout(60000L) {
-                runScriptWithContext(coroutineContext) {
+                runScriptWithContext(kotlin.coroutines.coroutineContext) {
                     source.evalJS(jsStr) {
                         put("event", event)
                         put("result", result)
@@ -104,7 +128,7 @@ object SourceCallBack {
                     }
                 }
             }
-        }.onError {
+        }.onFailure {
             AppLog.put("${source.bookSourceName}\n书源执行回调事件${event}出错\n${it.localizedMessage}", it, true)
         }
     }
