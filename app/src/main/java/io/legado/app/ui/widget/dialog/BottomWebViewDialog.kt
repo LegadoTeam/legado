@@ -94,29 +94,91 @@ import java.util.ArrayDeque
 import java.util.Date
 import androidx.core.graphics.createBitmap
 
+internal data class BottomSheetHeightConfig(
+    val dialogHeight: Int?,
+    val heightPercentage: Float?,
+    val expandedHeight: Int?,
+    val expandedHeightPercentage: Float?,
+)
+
+internal fun mergeBottomSheetHeightConfig(
+    previous: BottomSheetHeightConfig?,
+    dialogHeight: Int?,
+    heightPercentage: Float?,
+    expandedHeight: Int?,
+    expandedHeightPercentage: Float?,
+): BottomSheetHeightConfig {
+    val collapsedUpdated = dialogHeight != null || heightPercentage != null
+    val expandedUpdated = expandedHeight != null || expandedHeightPercentage != null
+    return BottomSheetHeightConfig(
+        dialogHeight = if (collapsedUpdated) dialogHeight else previous?.dialogHeight,
+        heightPercentage = if (collapsedUpdated) {
+            heightPercentage
+        } else {
+            previous?.heightPercentage
+        },
+        expandedHeight = if (expandedUpdated) expandedHeight else previous?.expandedHeight,
+        expandedHeightPercentage = if (expandedUpdated) {
+            expandedHeightPercentage
+        } else {
+            previous?.expandedHeightPercentage
+        },
+    )
+}
+
 internal data class BottomSheetHeightSpec(
     val layoutHeight: Int?,
     val fixedHeight: Int?,
-)
+    val collapsedHeight: Int? = fixedHeight,
+    val expandedHeight: Int? = null,
+) {
+    val constrainedHeight: Int?
+        get() = expandedHeight ?: fixedHeight
+}
+
+private fun resolvePositiveHeight(
+    screenHeight: Int,
+    pixelHeight: Int?,
+    percentage: Float?,
+): Int? {
+    val percentageHeight = percentage
+        ?.takeIf { screenHeight > 0 && it > 0f && it <= 1f }
+        ?.let { (screenHeight * it).toInt().coerceAtLeast(1) }
+    return percentageHeight ?: pixelHeight?.takeIf { it > 0 }
+}
 
 internal fun resolveBottomSheetHeightSpec(
     screenHeight: Int,
     dialogHeight: Int?,
     heightPercentage: Float?,
     first: Boolean,
+    expandedHeight: Int? = null,
+    expandedHeightPercentage: Float? = null,
 ): BottomSheetHeightSpec {
-    val percentageHeight = heightPercentage
-        ?.takeIf { screenHeight > 0 && it > 0f && it <= 1f }
-        ?.let { (screenHeight * it).toInt().coerceAtLeast(1) }
+    val percentageHeight = resolvePositiveHeight(screenHeight, null, heightPercentage)
     val validDialogHeight = dialogHeight?.takeIf {
         it > 0 || it == ViewGroup.LayoutParams.MATCH_PARENT ||
                 it == ViewGroup.LayoutParams.WRAP_CONTENT
     }
     val configuredHeight = percentageHeight ?: validDialogHeight
+    val collapsedHeight = percentageHeight ?: validDialogHeight?.takeIf { it > 0 }
+    val resolvedExpandedHeight = resolvePositiveHeight(
+        screenHeight,
+        expandedHeight,
+        expandedHeightPercentage,
+    )?.takeIf { collapsedHeight != null && it > collapsedHeight }
+    if (collapsedHeight != null && resolvedExpandedHeight != null) {
+        return BottomSheetHeightSpec(
+            layoutHeight = resolvedExpandedHeight,
+            fixedHeight = null,
+            collapsedHeight = collapsedHeight,
+            expandedHeight = resolvedExpandedHeight,
+        )
+    }
     return BottomSheetHeightSpec(
         layoutHeight = configuredHeight
             ?: if (first) ViewGroup.LayoutParams.MATCH_PARENT else null,
-        fixedHeight = percentageHeight ?: validDialogHeight?.takeIf { it > 0 },
+        fixedHeight = collapsedHeight,
     )
 }
 
@@ -131,15 +193,26 @@ internal data class BottomSheetBehaviorSpec(
 
 internal fun resolveBottomSheetBehaviorSpec(
     fixedHeight: Int?,
-    resetFixedDefaults: Boolean,
+    resetHeightModeDefaults: Boolean,
     state: Int?,
     peekHeight: Int?,
     skipCollapsed: Boolean?,
     fitToContents: Boolean?,
     draggableOnNestedScroll: Boolean?,
     maxHeight: Int?,
+    collapsedHeight: Int? = fixedHeight,
+    expandedHeight: Int? = null,
 ): BottomSheetBehaviorSpec {
     return when {
+        collapsedHeight != null && expandedHeight != null -> BottomSheetBehaviorSpec(
+            state = state ?: BottomSheetBehavior.STATE_COLLAPSED,
+            peekHeight = peekHeight ?: collapsedHeight,
+            skipCollapsed = skipCollapsed ?: false,
+            fitToContents = fitToContents ?: true,
+            draggableOnNestedScroll = draggableOnNestedScroll ?: true,
+            maxHeight = maxHeight ?: expandedHeight,
+        )
+
         fixedHeight != null -> BottomSheetBehaviorSpec(
             state = state ?: BottomSheetBehavior.STATE_EXPANDED,
             peekHeight = peekHeight ?: fixedHeight,
@@ -149,7 +222,7 @@ internal fun resolveBottomSheetBehaviorSpec(
             maxHeight = maxHeight ?: fixedHeight,
         )
 
-        resetFixedDefaults -> BottomSheetBehaviorSpec(
+        resetHeightModeDefaults -> BottomSheetBehaviorSpec(
             state = state,
             peekHeight = peekHeight ?: BottomSheetBehavior.PEEK_HEIGHT_AUTO,
             skipCollapsed = skipCollapsed ?: false,
@@ -220,10 +293,10 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     private var customWebViewCallback: WebChromeClient.CustomViewCallback? = null
     private var originOrientation: Int? = null
     private var needClearHistory = true
-    private var fixedSheetHeight: Int? = null
-    private var configuredHeightPercentage: Float? = null
-    private var peekHeightTracksFixedHeight = false
-    private var maxHeightTracksFixedHeight = false
+    private var constrainedSheetHeight: Int? = null
+    private var configuredHeight: BottomSheetHeightConfig? = null
+    private var peekHeightTracksHeightMode = false
+    private var maxHeightTracksHeightMode = false
     private var sheetSizeBeforeFullScreen: SheetSizeSnapshot? = null
     private val pendingFullScreenConfigs = ArrayDeque<Config>()
 
@@ -261,39 +334,57 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         if (!isAdded || context == null) {
             return
         }
+        val hasHeightUpdate = config.dialogHeight != null || config.heightPercentage != null ||
+                config.expandedHeight != null || config.expandedHeightPercentage != null
+        val heightConfig = if (hasHeightUpdate) {
+            mergeBottomSheetHeightConfig(
+                previous = configuredHeight,
+                dialogHeight = config.dialogHeight,
+                heightPercentage = config.heightPercentage,
+                expandedHeight = config.expandedHeight,
+                expandedHeightPercentage = config.expandedHeightPercentage,
+            )
+        } else {
+            BottomSheetHeightConfig(null, null, null, null)
+        }
         val heightSpec = resolveBottomSheetHeightSpec(
             displayMetrics.heightPixels,
-            config.dialogHeight,
-            config.heightPercentage,
+            heightConfig.dialogHeight,
+            heightConfig.heightPercentage,
             first,
+            heightConfig.expandedHeight,
+            heightConfig.expandedHeightPercentage,
         )
-        val resetFixedDefaults = fixedSheetHeight != null &&
-                heightSpec.layoutHeight != null && heightSpec.fixedHeight == null
+        val resetHeightModeDefaults = constrainedSheetHeight != null &&
+                heightSpec.layoutHeight != null && heightSpec.constrainedHeight == null
         if (heightSpec.layoutHeight != null) {
-            fixedSheetHeight = heightSpec.fixedHeight
-            configuredHeightPercentage = config.heightPercentage
-                ?.takeIf { heightSpec.fixedHeight != null && it > 0f && it <= 1f }
-            peekHeightTracksFixedHeight = heightSpec.fixedHeight != null &&
+            constrainedSheetHeight = heightSpec.constrainedHeight
+            configuredHeight = heightSpec.constrainedHeight?.let {
+                heightConfig
+            }
+            peekHeightTracksHeightMode = heightSpec.constrainedHeight != null &&
                     config.peekHeight == null
-            maxHeightTracksFixedHeight = heightSpec.fixedHeight != null &&
+            maxHeightTracksHeightMode = heightSpec.constrainedHeight != null &&
                     config.maxHeight == null
-        } else if (fixedSheetHeight != null) {
+        } else if (constrainedSheetHeight != null) {
             if (config.peekHeight != null) {
-                peekHeightTracksFixedHeight = false
+                peekHeightTracksHeightMode = false
             }
             if (config.maxHeight != null) {
-                maxHeightTracksFixedHeight = false
+                maxHeightTracksHeightMode = false
             }
         }
         val behaviorSpec = resolveBottomSheetBehaviorSpec(
             fixedHeight = heightSpec.fixedHeight,
-            resetFixedDefaults = resetFixedDefaults,
+            resetHeightModeDefaults = resetHeightModeDefaults,
             state = config.state,
             peekHeight = config.peekHeight,
             skipCollapsed = config.skipCollapsed,
             fitToContents = config.setFitToContents,
             draggableOnNestedScroll = config.isDraggableOnNestedScroll,
             maxHeight = config.maxHeight,
+            collapsedHeight = heightSpec.collapsedHeight,
+            expandedHeight = heightSpec.expandedHeight,
         )
         behavior?.let { behavior ->
             behaviorSpec.state?.let { behavior.state = it }
@@ -432,7 +523,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             val screenWidth = displayMetrics.widthPixels
             if (screenWidth < breakpoint) {
                 // 移动端布局（小屏幕）设置
-                if (fixedSheetHeight == null) {
+                if (constrainedSheetHeight == null) {
                     behavior?.peekHeight = config.peekHeight ?: 300
                 }
                 config.widthPercentage?.let { percentage ->
@@ -444,7 +535,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                 }
             } else {
                 // 平板/大屏幕布局设置
-                if (fixedSheetHeight == null) {
+                if (constrainedSheetHeight == null) {
                     behavior?.peekHeight = config.peekHeight ?: 400
                 }
                 config.widthPercentage?.let { percentage ->
@@ -482,32 +573,35 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         }
     }
 
-    private fun reapplyPercentageHeight() {
-        val percentage = configuredHeightPercentage ?: return
-        val height = resolveBottomSheetHeightSpec(
+    private fun reapplyConfiguredHeight() {
+        val config = configuredHeight ?: return
+        val heightSpec = resolveBottomSheetHeightSpec(
             displayMetrics.heightPixels,
-            dialogHeight = null,
-            heightPercentage = percentage,
+            dialogHeight = config.dialogHeight,
+            heightPercentage = config.heightPercentage,
             first = false,
-        ).fixedHeight ?: return
-        fixedSheetHeight = height
+            expandedHeight = config.expandedHeight,
+            expandedHeightPercentage = config.expandedHeightPercentage,
+        )
+        val height = heightSpec.constrainedHeight ?: return
+        constrainedSheetHeight = height
         bottomSheet?.let { sheet ->
             val params = sheet.layoutParams
-            params.height = height
+            params.height = heightSpec.layoutHeight ?: height
             sheet.layoutParams = params
         }
         behavior?.let { behavior ->
-            if (peekHeightTracksFixedHeight) {
-                behavior.peekHeight = height
+            if (peekHeightTracksHeightMode) {
+                behavior.peekHeight = heightSpec.collapsedHeight ?: height
             }
-            if (maxHeightTracksFixedHeight) {
+            if (maxHeightTracksHeightMode) {
                 behavior.maxHeight = height
             }
         }
     }
 
     private fun expandSheetForFullScreen() {
-        if (fixedSheetHeight != null && sheetSizeBeforeFullScreen == null) {
+        if (constrainedSheetHeight != null && sheetSizeBeforeFullScreen == null) {
             bottomSheet?.let { sheet ->
                 sheetSizeBeforeFullScreen = SheetSizeSnapshot(
                     layoutHeight = sheet.layoutParams.height,
@@ -538,7 +632,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             }
         }
         sheetSizeBeforeFullScreen = null
-        reapplyPercentageHeight()
+        reapplyConfiguredHeight()
         snapshot?.state?.let { behavior?.state = it }
         while (pendingFullScreenConfigs.isNotEmpty()) {
             setConfig(pendingFullScreenConfigs.removeFirst())
@@ -794,7 +888,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         if (!isFullScreen) {
-            reapplyPercentageHeight()
+            reapplyConfiguredHeight()
         }
     }
 
@@ -894,6 +988,8 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         var heightPercentage: Float? = null, // 弹窗高度占屏幕高度的百分比（0.0-1.0）
         var responsiveBreakpoint: Int? = null, // 响应式断点（像素），小于此宽度时使用移动端布局
         var dialogHeight: Int? = null, //弹窗高度（像素），默认为-1（父容器最大高度）、-2（最大内容高度）
+        var expandedHeight: Int? = null, // 可展开模式的最大高度（像素），必须大于折叠高度
+        var expandedHeightPercentage: Float? = null, // 可展开模式的最大高度占屏幕高度比例（0.0-1.0）
 
         //阅读功能自定义配置
         var longClickSaveImg : Boolean? = null, //是否启用长按图片保存功能，默认启用
