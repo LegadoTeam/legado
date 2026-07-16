@@ -9,6 +9,7 @@ import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.databinding.DialogDirectLinkUploadConfigBinding
 import io.legado.app.help.DirectLinkUpload
+import io.legado.app.help.SourceSharePassphrase
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.primaryColor
@@ -76,6 +77,7 @@ class DirectLinkUploadConfig : BaseDialogFragment(R.layout.dialog_direct_link_up
         binding.editUploadUrl.setText(rule.uploadUrl)
         binding.editDownloadUrlRule.setText(rule.downloadUrlRule)
         binding.editSummary.setText(rule.summary)
+        binding.editExpiryDate.setText(rule.expiryDate.toString())
         binding.cbCompress.isChecked = rule.compress
     }
 
@@ -83,6 +85,7 @@ class DirectLinkUploadConfig : BaseDialogFragment(R.layout.dialog_direct_link_up
         val uploadUrl = binding.editUploadUrl.text?.toString()
         val downloadUrlRule = binding.editDownloadUrlRule.text?.toString()
         val summary = binding.editSummary.text?.toString()
+        val expiryDate = binding.editExpiryDate.text?.toString()?.toIntOrNull()
         val compress = binding.cbCompress.isChecked
         if (uploadUrl.isNullOrBlank()) {
             toastOnUi("上传Url不能为空")
@@ -96,7 +99,17 @@ class DirectLinkUploadConfig : BaseDialogFragment(R.layout.dialog_direct_link_up
             toastOnUi("注释不能为空")
             return null
         }
-        return DirectLinkUpload.Rule(uploadUrl, downloadUrlRule, summary, compress)
+        if (expiryDate == null || expiryDate !in 0..SourceSharePassphrase.MAX_EXPIRY_DAYS) {
+            toastOnUi(R.string.invalid_share_expiry_days)
+            return null
+        }
+        return DirectLinkUpload.Rule(
+            uploadUrl = uploadUrl,
+            downloadUrlRule = downloadUrlRule,
+            summary = summary,
+            compress = compress,
+            expiryDate = expiryDate,
+        )
     }
 
     private fun importDefault() {
