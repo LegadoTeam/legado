@@ -22,6 +22,14 @@ object HtmlFormatter {
     private val lastRegex = "[\\n\\s]+$".toRegex()
 
     fun format(html: String?, otherRegex: Regex = otherHtmlRegex): String {
+        return formatText(html, otherRegex, "　　")
+    }
+
+    fun formatIntro(html: String?): String {
+        return formatText(html, otherHtmlRegex, "")
+    }
+
+    private fun formatText(html: String?, otherRegex: Regex, paragraphIndent: String): String {
         html ?: return ""
         return html.replace(nbspRegex, " ")
             .replace(espRegex, " ")
@@ -29,8 +37,8 @@ object HtmlFormatter {
             .replace(wrapHtmlRegex, "\n")
             .replace(commentRegex, "")
             .replace(otherRegex, "")
-            .replace(indent1Regex, "\n　　")
-            .replace(indent2Regex, "　　")
+            .replace(indent1Regex, "\n$paragraphIndent")
+            .replace(indent2Regex, paragraphIndent)
             .replace(lastRegex, "")
     }
 
