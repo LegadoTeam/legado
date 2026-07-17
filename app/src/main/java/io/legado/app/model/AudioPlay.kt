@@ -387,8 +387,24 @@ object AudioPlay : CoroutineScope by MainScope() {
             intent.putExtra("minute", minute)
             context.startService(intent)
         } else {
-            AudioPlayService.timeMinute = minute
-            postEvent(EventBus.AUDIO_DS, minute)
+            AudioPlayService.timeMinute = minute.coerceIn(0, 180)
+            AudioPlayService.setPendingChapterStop(0)
+            postEvent(EventBus.AUDIO_DS, AudioPlayService.timeMinute)
+            postEvent(EventBus.AUDIO_CHAPTER_STOP, 0)
+        }
+    }
+
+    fun setChapterStop(count: Int) {
+        if (AudioPlayService.isRun) {
+            val intent = Intent(context, AudioPlayService::class.java)
+            intent.action = IntentAction.setChapterStop
+            intent.putExtra("count", count)
+            context.startService(intent)
+        } else {
+            AudioPlayService.timeMinute = 0
+            AudioPlayService.setPendingChapterStop(count)
+            postEvent(EventBus.AUDIO_DS, 0)
+            postEvent(EventBus.AUDIO_CHAPTER_STOP, AudioPlayService.chapterToStop)
         }
     }
 

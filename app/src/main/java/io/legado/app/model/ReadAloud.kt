@@ -152,6 +152,15 @@ object ReadAloud {
         }
     }
 
+    fun setChapterStop(context: Context, count: Int) {
+        if (BaseReadAloudService.isRun) {
+            val intent = Intent(context, aloudClass)
+            intent.action = IntentAction.setChapterStop
+            intent.putExtra("count", count)
+            context.startForegroundServiceCompat(intent)
+        }
+    }
+
     fun getEngineName(context: Context): String {
         val systemTtsName = context.getString(R.string.system_tts)
         return resolveReadAloudEngineName(ttsEngine, systemTtsName) { id ->

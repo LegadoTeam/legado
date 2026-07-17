@@ -80,6 +80,14 @@ class AudioPlayService : BaseService(),
         var timeMinute: Int = 0
 
         @JvmStatic
+        var chapterToStop: Int = 0
+            private set
+
+        internal fun setPendingChapterStop(count: Int) {
+            chapterToStop = normalizeChapterStopCount(count)
+        }
+
+        @JvmStatic
         var playSpeed: Float = 1f
 
         var url: String = ""
@@ -121,6 +129,7 @@ class AudioPlayService : BaseService(),
     private var broadcastReceiver: BroadcastReceiver? = null
     private var needResumeOnAudioFocusGain = false
     private var position = AudioPlay.book?.durChapterPos ?: 0
+    private val chapterStopTimer = ChapterStopTimer(chapterToStop)
     private var dsJob: Job? = null
     private var upNotificationJob: Coroutine<*>? = null
     private var upPlayProgressJob: Job? = null
@@ -130,6 +139,10 @@ class AudioPlayService : BaseService(),
     override fun onCreate() {
         super.onCreate()
         isRun = true
+        chapterToStop = chapterStopTimer.remaining
+        if (chapterToStop > 0) {
+            timeMinute = 0
+        }
         exoPlayer.addListener(this)
         AudioPlay.registerService(this)
         initMediaSession()
@@ -186,6 +199,7 @@ class AudioPlayService : BaseService(),
                 IntentAction.setSpeed -> upSpeed(intent.getFloatExtra("speed", 1f))
                 IntentAction.addTimer -> addTimer()
                 IntentAction.setTimer -> setTimer(intent.getIntExtra("minute", 0))
+                IntentAction.setChapterStop -> setChapterStop(intent.getIntExtra("count", 0))
                 IntentAction.adjustProgress -> {
                     adjustProgress(intent.getIntExtra("position", position))
                 }
@@ -203,6 +217,11 @@ class AudioPlayService : BaseService(),
             wifiLock?.release()
         }
         isRun = false
+        timeMinute = 0
+        chapterStopTimer.clear()
+        chapterToStop = 0
+        postEvent(EventBus.AUDIO_DS, 0)
+        postEvent(EventBus.AUDIO_CHAPTER_STOP, 0)
         abandonFocus()
         exoPlayer.release()
         mediaSessionCompat.release()
@@ -381,7 +400,18 @@ class AudioPlayService : BaseService(),
                 // 结束
                 upPlayProgressJob?.cancel()
                 AudioPlay.playPositionChanged(exoPlayer.duration.toInt())
-                AudioPlay.next()
+                val stopResult = chapterStopTimer.onChapterCompleted()
+                if (stopResult == null) {
+                    AudioPlay.next()
+                } else {
+                    chapterToStop = stopResult.remaining
+                    postEvent(EventBus.AUDIO_CHAPTER_STOP, chapterToStop)
+                    if (stopResult.shouldStop) {
+                        AudioPlay.stop()
+                    } else {
+                        AudioPlay.next()
+                    }
+                }
             }
         }
         upAudioPlayNotification()
@@ -412,7 +442,10 @@ class AudioPlayService : BaseService(),
     }
 
     private fun setTimer(minute: Int) {
-        timeMinute = minute
+        timeMinute = minute.coerceIn(0, 180)
+        chapterStopTimer.clear()
+        chapterToStop = 0
+        postEvent(EventBus.AUDIO_CHAPTER_STOP, 0)
         doDs()
     }
 
@@ -423,7 +456,19 @@ class AudioPlayService : BaseService(),
             timeMinute += 10
             if (timeMinute > 180) timeMinute = 180
         }
+        chapterStopTimer.clear()
+        chapterToStop = 0
+        postEvent(EventBus.AUDIO_CHAPTER_STOP, 0)
         doDs()
+    }
+
+    private fun setChapterStop(count: Int) {
+        chapterToStop = chapterStopTimer.set(count)
+        timeMinute = 0
+        dsJob?.cancel()
+        postEvent(EventBus.AUDIO_DS, 0)
+        postEvent(EventBus.AUDIO_CHAPTER_STOP, chapterToStop)
+        upAudioPlayNotification()
     }
 
     /**
@@ -433,6 +478,7 @@ class AudioPlayService : BaseService(),
         postEvent(EventBus.AUDIO_DS, timeMinute)
         upAudioPlayNotification()
         dsJob?.cancel()
+        if (timeMinute <= 0) return
         dsJob = lifecycleScope.launch {
             while (isActive) {
                 delay(60000)
@@ -616,7 +662,8 @@ class AudioPlayService : BaseService(),
     private fun createNotification(): NotificationCompat.Builder {
         var nTitle: String = when {
             pause -> getString(R.string.audio_pause)
-            timeMinute in 1..60 -> getString(
+            chapterToStop > 0 -> getString(R.string.playing_timer_chapter, chapterToStop)
+            timeMinute > 0 -> getString(
                 R.string.playing_timer,
                 timeMinute
             )

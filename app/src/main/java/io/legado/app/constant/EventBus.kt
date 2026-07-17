@@ -9,6 +9,8 @@ object EventBus {
     const val TTS_PROGRESS = "ttsStart"
     const val AUDIO_DS = "audioDs"
     const val READ_ALOUD_DS = "readAloudDs"
+    const val AUDIO_CHAPTER_STOP = "audioChapterStop"
+    const val READ_ALOUD_CHAPTER_STOP = "readAloudChapterStop"
     const val BATTERY_CHANGED = "batteryChanged"
     const val TIME_CHANGED = "timeChanged"
     const val UP_CONFIG = "upConfig"
