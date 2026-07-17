@@ -8,6 +8,7 @@ import io.legado.app.help.http.canUseTransparentDecompression
 import io.legado.app.help.http.decompressResponse
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.ui.book.read.config.hasLoginCapability
+import io.legado.app.ui.book.read.config.shouldOpenLoginOnSelection
 import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Protocol
@@ -28,6 +29,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.mozilla.javascript.NativeObject
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.io.IOException
 import java.util.zip.Deflater
 import java.util.zip.DeflaterOutputStream
@@ -99,6 +101,19 @@ class SourceCompatibilityTest {
         assertTrue(HttpTTS(loginUi = "[]").hasLoginCapability())
         assertFalse(HttpTTS(loginUrl = " ", loginUi = "\n").hasLoginCapability())
         assertFalse(HttpTTS().hasLoginCapability())
+    }
+
+    @Test
+    fun httpTtsSelectionAlwaysOffersAvailableLoginAgain() {
+        assertTrue(HttpTTS(loginUrl = "<js>login()</js>").shouldOpenLoginOnSelection())
+        assertTrue(HttpTTS(loginUi = "[]").shouldOpenLoginOnSelection())
+        assertFalse(HttpTTS().shouldOpenLoginOnSelection())
+
+        val source = File(
+            "src/main/java/io/legado/app/ui/book/read/config/SpeakEngineDialog.kt"
+        ).readText()
+        assertTrue(source.contains("if (httpTTS.shouldOpenLoginOnSelection())"))
+        assertFalse(source.contains("&& httpTTS.getLoginInfo().isNullOrBlank()"))
     }
 
     @Test
