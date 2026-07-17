@@ -66,6 +66,7 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud),
             ivPlayPrev.setColorFilter(textColor)
             ivPlayPause.setColorFilter(textColor)
             ivPlayNext.setColorFilter(textColor)
+            ivBackToSpeech.setColorFilter(textColor)
             ivStop.setColorFilter(textColor)
             ivTimer.setColorFilter(textColor)
             tvTimer.setTextColor(textColor)
@@ -110,8 +111,8 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud),
         llEngine.setOnClickListener {
             SpeakEngineDialog().show(childFragmentManager, "speakEngineDialog")
         }
-        tvPre.setOnClickListener { ReadBook.moveToPrevChapter(upContent = true, toLast = false) }
-        tvNext.setOnClickListener { ReadBook.moveToNextChapter(true) }
+        tvPre.setOnClickListener { ReadAloud.prevChapter(requireContext()) }
+        tvNext.setOnClickListener { ReadAloud.nextChapter(requireContext()) }
         ivStop.setOnClickListener {
             ReadAloud.stop(requireContext())
             dismissAllowingStateLoss()
@@ -119,6 +120,10 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud),
         ivPlayPause.setOnClickListener { callBack?.onClickReadAloud() }
         ivPlayPrev.setOnClickListener { ReadAloud.prevParagraph(requireContext()) }
         ivPlayNext.setOnClickListener { ReadAloud.nextParagraph(requireContext()) }
+        ivBackToSpeech.setOnClickListener {
+            callBack?.backToSpeakingPosition()
+            dismissAllowingStateLoss()
+        }
         llCatalog.setOnClickListener { callBack?.openChapterList() }
         llToBackstage.setOnClickListener { callBack?.finish() }
         cbTtsFollowSys.setOnCheckedChangeListener { _, isChecked ->
@@ -278,6 +283,7 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud),
         fun showMenuBar()
         fun openChapterList()
         fun onClickReadAloud()
+        fun backToSpeakingPosition()
         fun finish()
     }
 }

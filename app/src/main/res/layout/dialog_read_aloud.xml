@@ -135,6 +135,19 @@
             app:tint="@color/primaryText"
             tools:ignore="UnusedAttribute" />
 
+        <ImageView
+            android:id="@+id/iv_back_to_speech"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_marginLeft="8dp"
+            android:layout_marginRight="8dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/back_to_speaking_position"
+            android:src="@drawable/ic_read_aloud"
+            android:tooltipText="@string/back_to_speaking_position"
+            app:tint="@color/primaryText"
+            tools:ignore="UnusedAttribute" />
+
         <View
             android:layout_width="0dp"
             android:layout_height="1dp"

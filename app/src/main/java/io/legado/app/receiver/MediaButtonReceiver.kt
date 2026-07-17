@@ -49,7 +49,11 @@ class MediaButtonReceiver : BroadcastReceiver() {
                     when (keycode) {
                         KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
                             if (context.getPrefBoolean("mediaButtonPerNext", false)) {
-                                ReadBook.moveToPrevChapter(true)
+                                if (BaseReadAloudService.isRun) {
+                                    ReadAloud.prevChapter(context)
+                                } else {
+                                    ReadBook.moveToPrevChapter(true)
+                                }
                             } else {
                                 ReadAloud.prevParagraph(context)
                             }
@@ -57,7 +61,11 @@ class MediaButtonReceiver : BroadcastReceiver() {
 
                         KeyEvent.KEYCODE_MEDIA_NEXT -> {
                             if (context.getPrefBoolean("mediaButtonPerNext", false)) {
-                                ReadBook.moveToNextChapter(true)
+                                if (BaseReadAloudService.isRun) {
+                                    ReadAloud.nextChapter(context)
+                                } else {
+                                    ReadBook.moveToNextChapter(true)
+                                }
                             } else {
                                 ReadAloud.nextParagraph(context)
                             }
