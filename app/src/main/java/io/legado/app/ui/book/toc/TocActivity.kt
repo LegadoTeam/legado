@@ -142,6 +142,7 @@ class TocActivity : VMBaseActivity<ActivityChapterListBinding, TocViewModel>(),
                 viewModel.chapterListCallBack?.upChapterList(
                     searchView?.query?.toString(),
                     resetCollapse = true,
+                    replaceAll = true,
                 )
                 setResult(RESULT_OK, Intent().apply {
                     putExtra("index", it.durChapterIndex)

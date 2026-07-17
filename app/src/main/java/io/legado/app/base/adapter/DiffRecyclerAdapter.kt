@@ -23,6 +23,10 @@ abstract class DiffRecyclerAdapter<ITEM, VB : ViewBinding>(protected val context
     private val asyncListDiffer: AsyncListDiffer<ITEM> by lazy {
         AsyncListDiffer(this, diffItemCallback).apply {
             addListListener { _, _ ->
+                if (suppressNextListChange) {
+                    suppressNextListChange = false
+                    return@addListListener
+                }
                 onCurrentListChanged()
                 if (keepScrollPosition) {
                     layoutManager?.onRestoreInstanceState(layoutState)
@@ -37,6 +41,7 @@ abstract class DiffRecyclerAdapter<ITEM, VB : ViewBinding>(protected val context
 
     private var layoutManager: RecyclerView.LayoutManager? = null
     private var layoutState: Parcelable? = null
+    private var suppressNextListChange = false
 
     var itemAnimation: ItemAnimation? = null
 
@@ -62,6 +67,22 @@ abstract class DiffRecyclerAdapter<ITEM, VB : ViewBinding>(protected val context
                 layoutState = layoutManager?.onSaveInstanceState()
             }
             asyncListDiffer.submitList(items?.toMutableList())
+        }
+    }
+
+    /**
+     * Replaces a completely reordered list without calculating an unusable item diff.
+     */
+    fun setItemsNoDiff(items: List<ITEM>) {
+        kotlin.runCatching {
+            if (asyncListDiffer.currentList.isEmpty()) {
+                setItems(items)
+                return@runCatching
+            }
+            layoutState = null
+            suppressNextListChange = true
+            asyncListDiffer.submitList(null)
+            asyncListDiffer.submitList(items.toMutableList())
         }
     }
 
