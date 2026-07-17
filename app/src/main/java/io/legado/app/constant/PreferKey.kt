@@ -49,6 +49,7 @@ object PreferKey {
     const val bookImportFileName = "bookImportFileName"
     const val episodeExportFileName = "episodeExportFileName"
     const val recordLog = "recordLog"
+    const val recordHttpLog = "recordHttpLog"
     const val processText = "process_text"
     const val cleanCache = "cleanCache"
     const val saveTabPosition = "saveTabPosition"

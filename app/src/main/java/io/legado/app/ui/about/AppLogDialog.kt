@@ -14,6 +14,8 @@ import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.constant.AppLog
 import io.legado.app.databinding.DialogRecyclerViewBinding
 import io.legado.app.databinding.ItemAppLogBinding
+import io.legado.app.help.http.HttpLogRecord
+import io.legado.app.help.http.HttpLogStore
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.widget.dialog.TextDialog
 import io.legado.app.utils.LogUtils
@@ -52,6 +54,7 @@ class AppLogDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
         when (item?.itemId) {
             R.id.menu_clear -> {
                 AppLog.clear()
+                HttpLogStore.clear()
                 adapter.clearItems()
             }
         }
@@ -78,8 +81,16 @@ class AppLogDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
         override fun registerListener(holder: ItemViewHolder, binding: ItemAppLogBinding) {
             binding.root.onClick {
                 getItem(holder.layoutPosition)?.let { item ->
-                    item.third?.let {
-                        showDialogFragment(TextDialog("Log", it.stackTraceToString()))
+                    val httpId = HttpLogRecord.parseId(item.second)
+                    val httpRecord = httpId?.let(HttpLogStore::get)
+                    when {
+                        httpId != null -> {
+                            showDialogFragment(TextDialog("HTTP", httpRecord?.detail ?: item.second))
+                        }
+
+                        else -> item.third?.let { throwable ->
+                            showDialogFragment(TextDialog("Log", throwable.stackTraceToString()))
+                        }
                     }
                 }
             }

@@ -104,6 +104,7 @@ val okHttpClient: OkHttpClient by lazy {
             cachedAddress ?: Dns.SYSTEM.lookup(hostname)
         }
     }
+    builder.addInterceptor(HttpLogInterceptor())
     if (AppConfig.isCronet) {
         Cronet.interceptor?.let {
             builder.addInterceptor(it)
