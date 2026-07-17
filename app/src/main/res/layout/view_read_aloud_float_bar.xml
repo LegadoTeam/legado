@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/read_aloud_float_bar"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_gravity="center_horizontal|bottom"
+    android:layout_marginStart="16dp"
+    android:layout_marginEnd="16dp"
+    android:layout_marginBottom="24dp"
+    android:background="@drawable/bg_read_aloud_float_bar"
+    android:elevation="6dp"
+    android:orientation="horizontal"
+    android:visibility="gone">
+
+    <LinearLayout
+        android:id="@+id/ll_back_to_speech"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:minHeight="48dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp">
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/iv_back_to_speech"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:contentDescription="@string/back_to_speaking_position"
+            android:src="@drawable/ic_read_aloud" />
+
+        <TextView
+            android:id="@+id/tv_back_to_speech"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:maxLines="2"
+            android:text="@string/back_to_speaking_position"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <View
+        android:id="@+id/v_bar_divider"
+        android:layout_width="1dp"
+        android:layout_height="20dp"
+        android:layout_gravity="center_vertical"
+        android:background="@color/bg_divider_line" />
+
+    <LinearLayout
+        android:id="@+id/ll_read_from_here"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:minHeight="48dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp">
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/iv_read_from_here"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:contentDescription="@string/read_aloud_from_here"
+            android:src="@drawable/ic_play_24dp" />
+
+        <TextView
+            android:id="@+id/tv_read_from_here"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:maxLines="2"
+            android:text="@string/read_aloud_from_here"
+            android:textSize="14sp" />
+    </LinearLayout>
+</LinearLayout>

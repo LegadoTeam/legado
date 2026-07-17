@@ -121,11 +121,13 @@ abstract class BaseReadAloudService : BaseService(),
         @JvmStatic
         fun detachReadAloudFollow() {
             speechFollowState.detachForManualNavigation()
+            postEvent(EventBus.READ_ALOUD_FOLLOW, speechFollowState.followReadAloudPosition)
         }
 
         @JvmStatic
         fun restoreReadAloudFollow() {
             speechFollowState.restoreForNewSpeechSession()
+            postEvent(EventBus.READ_ALOUD_FOLLOW, speechFollowState.followReadAloudPosition)
         }
 
         @JvmStatic

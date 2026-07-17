@@ -153,6 +153,7 @@
     <string name="read_aloud_t">Speaking</string>
     <string name="read_aloud_s">Click to open the Reading</string>
     <string name="back_to_speaking_position">Back to speaking position</string>
+    <string name="read_aloud_from_here">Read from here</string>
     <string name="audio_play">Play</string>
     <string name="audio_play_t">Playing</string>
     <string name="audio_play_s">Click to open the Playing</string>
