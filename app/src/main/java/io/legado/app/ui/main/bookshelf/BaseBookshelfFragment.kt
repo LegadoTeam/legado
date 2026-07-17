@@ -191,6 +191,7 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
                         spGroupStyle.setSelection(AppConfig.bookGroupStyle)
                         swShowUnread.isChecked = AppConfig.showUnread
                         swShowLastUpdateTime.isChecked = AppConfig.showLastUpdateTime
+                        swShowReadProgress.isChecked = AppConfig.showBookshelfReadProgress
                         swShowWaitUpBooks.isChecked = AppConfig.showWaitUpCount
                         swShowBookshelfFastScroller.isChecked = AppConfig.showBookshelfFastScroller
                         rgLayout.checkByIndex(bookshelfLayout)
@@ -228,6 +229,10 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
                     }
                     if (AppConfig.showLastUpdateTime != swShowLastUpdateTime.isChecked) {
                         AppConfig.showLastUpdateTime = swShowLastUpdateTime.isChecked
+                        postEvent(EventBus.BOOKSHELF_REFRESH, "")
+                    }
+                    if (AppConfig.showBookshelfReadProgress != swShowReadProgress.isChecked) {
+                        AppConfig.showBookshelfReadProgress = swShowReadProgress.isChecked
                         postEvent(EventBus.BOOKSHELF_REFRESH, "")
                     }
                     if (AppConfig.showWaitUpCount != swShowWaitUpBooks.isChecked) {

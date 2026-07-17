@@ -11,6 +11,7 @@ import io.legado.app.databinding.ItemBookshelfListBinding
 import io.legado.app.databinding.ItemBookshelfListGroupBinding
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.config.AppConfig
+import io.legado.app.ui.main.bookshelf.updateBookshelfReadProgress
 import io.legado.app.utils.gone
 import io.legado.app.utils.invisible
 import io.legado.app.utils.visible
@@ -104,6 +105,7 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
         }
 
         private fun upRefresh(binding: ItemBookshelfListBinding, item: Book) {
+            binding.pbReadProgress.updateBookshelfReadProgress(item, binding.tvReadPercent)
             if (!item.isLocal && callBack.isUpdate(item.bookUrl)) {
                 binding.bvUnread.invisible()
                 binding.rlLoading.visible()
@@ -172,6 +174,7 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
         }
 
         private fun upRefresh(binding: ItemBookshelfList2Binding, item: Book) {
+            binding.pbReadProgress.updateBookshelfReadProgress(item, binding.tvReadPercent)
             if (!item.isLocal && callBack.isUpdate(item.bookUrl)) {
                 binding.bvUnread.invisible()
                 binding.rlLoading.visible()

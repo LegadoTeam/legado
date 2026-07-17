@@ -86,6 +86,20 @@
                 app:loading_width="2dp"
                 tools:ignore="RtlHardcoded" />
 
+            <com.google.android.material.progressindicator.LinearProgressIndicator
+                android:id="@+id/pb_read_progress"
+                android:layout_width="0dp"
+                android:layout_height="2dp"
+                android:visibility="gone"
+                app:indicatorColor="@color/accent"
+                app:layout_constraintBottom_toBottomOf="@+id/iv_cover"
+                app:layout_constraintEnd_toEndOf="@+id/iv_cover"
+                app:layout_constraintStart_toStartOf="@+id/iv_cover"
+                app:trackThickness="2dp"
+                tools:ignore="UnusedAttribute"
+                tools:progress="60"
+                tools:visibility="visible" />
+
         </androidx.constraintlayout.widget.ConstraintLayout>
 
     </LinearLayout>
