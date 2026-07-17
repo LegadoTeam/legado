@@ -48,14 +48,14 @@
                 android:id="@+id/dsb_header_padding_top"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:max="100"
+                app:max="400"
                 app:title="@string/padding_top" />
 
             <io.legado.app.ui.widget.DetailSeekBar
                 android:id="@+id/dsb_header_padding_bottom"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:max="100"
+                app:max="400"
                 app:title="@string/padding_bottom" />
 
             <io.legado.app.ui.widget.DetailSeekBar
@@ -87,14 +87,14 @@
             android:id="@+id/dsb_padding_top"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:max="200"
+            app:max="400"
             app:title="@string/padding_top" />
 
         <io.legado.app.ui.widget.DetailSeekBar
             android:id="@+id/dsb_padding_bottom"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:max="100"
+            app:max="400"
             app:title="@string/padding_bottom" />
 
         <io.legado.app.ui.widget.DetailSeekBar
@@ -143,14 +143,14 @@
             android:id="@+id/dsb_footer_padding_top"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:max="100"
+            app:max="400"
             app:title="@string/padding_top" />
 
         <io.legado.app.ui.widget.DetailSeekBar
             android:id="@+id/dsb_footer_padding_bottom"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:max="100"
+            app:max="400"
             app:title="@string/padding_bottom" />
 
         <io.legado.app.ui.widget.DetailSeekBar
