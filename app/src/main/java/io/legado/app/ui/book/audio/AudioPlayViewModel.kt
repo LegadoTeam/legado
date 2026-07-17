@@ -95,9 +95,9 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
     fun upSource() {
         execute {
             val book = AudioPlay.book ?: return@execute
-            AudioPlay.bookSource = book.getBookSource()?.also{
-                customBtnListData.postValue(it.customButton)
-            }
+            val source = book.getBookSource()
+            AudioPlay.setBookSource(source)
+            customBtnListData.postValue(source?.customButton == true)
         }
     }
 
@@ -108,7 +108,7 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
             AudioPlay.book?.delete()
             appDb.bookDao.insert(book)
             AudioPlay.book = book
-            AudioPlay.bookSource = source
+            AudioPlay.setBookSource(source)
             appDb.bookChapterDao.insert(*toc.toTypedArray())
             AudioPlay.upDurChapter()
         }.onFinally {
