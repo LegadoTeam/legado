@@ -63,6 +63,7 @@ import splitties.init.appCtx
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.net.URL
 import java.net.URLEncoder
 import java.nio.charset.Charset
 import java.security.MessageDigest
@@ -697,6 +698,12 @@ interface JsExtensions : JsEncodeUtils {
     @JavascriptInterface
     fun htmlFormat(str: String): String {
         return HtmlFormatter.formatKeepImg(str)
+    }
+
+    @JavascriptInterface
+    fun htmlFormat(str: String, redirectUrl: String): String {
+        val url = kotlin.runCatching { URL(redirectUrl) }.getOrNull()
+        return HtmlFormatter.formatKeepImg(str, url)
     }
 
     @JavascriptInterface

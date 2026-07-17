@@ -350,7 +350,9 @@ java.timeFormat(time: Long): String
 * html格式化
 ```js
 java.htmlFormat(str: String): String
+java.htmlFormat(str: String, redirectUrl: String): String
 ```
+第二个参数用于按当前页面地址补全正文 HTML 中 `<img>` 的相对地址。
 * 文件
 >  所有对于文件的读写删操作都是相对路径,只能操作阅读缓存/android/data/{package}/cache/内的文件
 ```js

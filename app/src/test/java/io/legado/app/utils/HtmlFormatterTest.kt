@@ -1,5 +1,7 @@
 package io.legado.app.utils
 
+import io.legado.app.data.entities.BaseSource
+import io.legado.app.help.JsExtensions
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -43,6 +45,21 @@ class HtmlFormatterTest {
         assertEquals("别名：A\n主角：B", HtmlFormatter.formatIntro(intro))
         assertEquals("　　手动缩进\n第二行", HtmlFormatter.formatIntro("　　手动缩进\n第二行"))
         assertEquals("", HtmlFormatter.formatIntro(null))
+    }
+
+    @Test
+    fun `js html formatter resolves relative image urls`() {
+        val extensions = object : JsExtensions {
+            override fun getSource(): BaseSource? = null
+            override fun getTag(): String? = null
+        }
+
+        val result = extensions.htmlFormat(
+            "<p>正文</p><img src=\"../images/cover.jpg\"><p>结尾</p>",
+            "https://example.com/books/chapters/1.html"
+        )
+
+        assertTrue(result.contains("<img src=\"https://example.com/books/images/cover.jpg\">"))
     }
 
     @Test
