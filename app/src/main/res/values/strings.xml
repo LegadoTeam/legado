@@ -1109,6 +1109,9 @@
     <string name="show_last_update_time">Show last updated time</string>
     <string name="refresh_list">Refresh list</string>
     <string name="tip_divider_color">Divider color</string>
+    <string name="reader_info_template">Info template</string>
+    <string name="reader_info_template_hint">Enter text and insert placeholders below</string>
+    <string name="reader_info_placeholders">Placeholders</string>
     <string name="same_title_removed">Remove duplicate title</string>
     <string name="update_book_fail">Update failed</string>
     <string name="notification_permission_rationale">Reading requires sending notifications to show reading control and download progress</string>

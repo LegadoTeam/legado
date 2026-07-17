@@ -5,12 +5,16 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.core.view.indices
 import com.jaredrummler.android.colorpicker.ColorPickerDialog
+import com.google.android.material.chip.Chip
 import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.constant.EventBus
+import io.legado.app.databinding.DialogReaderInfoTemplateBinding
 import io.legado.app.databinding.DialogTipConfigBinding
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ReadTipConfig
+import io.legado.app.help.config.ReaderInfoTemplate
+import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.utils.checkByIndex
 import io.legado.app.utils.getIndexById
@@ -19,7 +23,6 @@ import io.legado.app.utils.observeEvent
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.viewbindingdelegate.viewBinding
-
 
 class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
 
@@ -58,24 +61,20 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
         binding.tvFooterShow.text =
             ReadTipConfig.getFooterModes(requireContext())[ReadTipConfig.footerMode]
 
-        ReadTipConfig.run {
-            tipNames.let { tipNames ->
-                binding.tvHeaderLeft.text =
-                    tipNames.getOrElse(tipValues.indexOf(tipHeaderLeft)) { tipNames[none] }
-                binding.tvHeaderMiddle.text =
-                    tipNames.getOrElse(tipValues.indexOf(tipHeaderMiddle)) { tipNames[none] }
-                binding.tvHeaderRight.text =
-                    tipNames.getOrElse(tipValues.indexOf(tipHeaderRight)) { tipNames[none] }
-                binding.tvFooterLeft.text =
-                    tipNames.getOrElse(tipValues.indexOf(tipFooterLeft)) { tipNames[none] }
-                binding.tvFooterMiddle.text =
-                    tipNames.getOrElse(tipValues.indexOf(tipFooterMiddle)) { tipNames[none] }
-                binding.tvFooterRight.text =
-                    tipNames.getOrElse(tipValues.indexOf(tipFooterRight)) { tipNames[none] }
-            }
-        }
+        initTipValues()
         upTvTipColor()
         upTvTipDividerColor()
+    }
+
+    private fun initTipValues() = binding.run {
+        ReadTipConfig.run {
+            tvHeaderLeft.text = effectiveTemplate(tipHeaderLeftTemplate, tipHeaderLeft)
+            tvHeaderMiddle.text = effectiveTemplate(tipHeaderMiddleTemplate, tipHeaderMiddle)
+            tvHeaderRight.text = effectiveTemplate(tipHeaderRightTemplate, tipHeaderRight)
+            tvFooterLeft.text = effectiveTemplate(tipFooterLeftTemplate, tipFooterLeft)
+            tvFooterMiddle.text = effectiveTemplate(tipFooterMiddleTemplate, tipFooterMiddle)
+            tvFooterRight.text = effectiveTemplate(tipFooterRightTemplate, tipFooterRight)
+        }
     }
 
     private fun upTvTipColor() {
@@ -131,57 +130,51 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
             }
         }
         llHeaderLeft.setOnClickListener {
-            context?.selector(items = ReadTipConfig.tipNames) { _, i ->
-                val tipValue = ReadTipConfig.tipValues[i]
-                clearRepeat(tipValue)
-                ReadTipConfig.tipHeaderLeft = tipValue
-                tvHeaderLeft.text = ReadTipConfig.tipNames[i]
-                postEvent(EventBus.UP_CONFIG, arrayListOf(2, 6))
+            ReadTipConfig.run {
+                editTemplate(
+                    title = getString(R.string.reader_info_template),
+                    current = effectiveTemplate(tipHeaderLeftTemplate, tipHeaderLeft),
+                ) { tipHeaderLeftTemplate = it }
             }
         }
         llHeaderMiddle.setOnClickListener {
-            context?.selector(items = ReadTipConfig.tipNames) { _, i ->
-                val tipValue = ReadTipConfig.tipValues[i]
-                clearRepeat(tipValue)
-                ReadTipConfig.tipHeaderMiddle = tipValue
-                tvHeaderMiddle.text = ReadTipConfig.tipNames[i]
-                postEvent(EventBus.UP_CONFIG, arrayListOf(2, 6))
+            ReadTipConfig.run {
+                editTemplate(
+                    title = getString(R.string.reader_info_template),
+                    current = effectiveTemplate(tipHeaderMiddleTemplate, tipHeaderMiddle),
+                ) { tipHeaderMiddleTemplate = it }
             }
         }
         llHeaderRight.setOnClickListener {
-            context?.selector(items = ReadTipConfig.tipNames) { _, i ->
-                val tipValue = ReadTipConfig.tipValues[i]
-                clearRepeat(tipValue)
-                ReadTipConfig.tipHeaderRight = tipValue
-                tvHeaderRight.text = ReadTipConfig.tipNames[i]
-                postEvent(EventBus.UP_CONFIG, arrayListOf(2, 6))
+            ReadTipConfig.run {
+                editTemplate(
+                    title = getString(R.string.reader_info_template),
+                    current = effectiveTemplate(tipHeaderRightTemplate, tipHeaderRight),
+                ) { tipHeaderRightTemplate = it }
             }
         }
         llFooterLeft.setOnClickListener {
-            context?.selector(items = ReadTipConfig.tipNames) { _, i ->
-                val tipValue = ReadTipConfig.tipValues[i]
-                clearRepeat(tipValue)
-                ReadTipConfig.tipFooterLeft = tipValue
-                tvFooterLeft.text = ReadTipConfig.tipNames[i]
-                postEvent(EventBus.UP_CONFIG, arrayListOf(2, 6))
+            ReadTipConfig.run {
+                editTemplate(
+                    title = getString(R.string.reader_info_template),
+                    current = effectiveTemplate(tipFooterLeftTemplate, tipFooterLeft),
+                ) { tipFooterLeftTemplate = it }
             }
         }
         llFooterMiddle.setOnClickListener {
-            context?.selector(items = ReadTipConfig.tipNames) { _, i ->
-                val tipValue = ReadTipConfig.tipValues[i]
-                clearRepeat(tipValue)
-                ReadTipConfig.tipFooterMiddle = tipValue
-                tvFooterMiddle.text = ReadTipConfig.tipNames[i]
-                postEvent(EventBus.UP_CONFIG, arrayListOf(2, 6))
+            ReadTipConfig.run {
+                editTemplate(
+                    title = getString(R.string.reader_info_template),
+                    current = effectiveTemplate(tipFooterMiddleTemplate, tipFooterMiddle),
+                ) { tipFooterMiddleTemplate = it }
             }
         }
         llFooterRight.setOnClickListener {
-            context?.selector(items = ReadTipConfig.tipNames) { _, i ->
-                val tipValue = ReadTipConfig.tipValues[i]
-                clearRepeat(tipValue)
-                ReadTipConfig.tipFooterRight = tipValue
-                tvFooterRight.text = ReadTipConfig.tipNames[i]
-                postEvent(EventBus.UP_CONFIG, arrayListOf(2, 6))
+            ReadTipConfig.run {
+                editTemplate(
+                    title = getString(R.string.reader_info_template),
+                    current = effectiveTemplate(tipFooterRightTemplate, tipFooterRight),
+                ) { tipFooterRightTemplate = it }
             }
         }
         llTipColor.setOnClickListener {
@@ -220,32 +213,38 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
         }
     }
 
-    private fun clearRepeat(repeat: Int) = ReadTipConfig.apply {
-        if (repeat != none) {
-            if (tipHeaderLeft == repeat) {
-                tipHeaderLeft = none
-                binding.tvHeaderLeft.text = tipNames[none]
+    private fun editTemplate(
+        title: String,
+        current: String,
+        save: (String) -> Unit,
+    ) {
+        val dialogBinding = DialogReaderInfoTemplateBinding.inflate(layoutInflater)
+        dialogBinding.editTemplate.setText(current)
+        dialogBinding.editTemplate.setSelection(current.length)
+        ReaderInfoTemplate.placeholders.forEach { placeholder ->
+            val chip = Chip(requireContext()).apply {
+                text = placeholder
+                isCheckable = false
+                setOnClickListener {
+                    val edit = dialogBinding.editTemplate
+                    val editable = edit.editableText
+                    val start = minOf(edit.selectionStart, edit.selectionEnd)
+                        .coerceIn(0, editable.length)
+                    val end = maxOf(edit.selectionStart, edit.selectionEnd)
+                        .coerceIn(0, editable.length)
+                    editable.replace(start, end, placeholder)
+                }
             }
-            if (tipHeaderMiddle == repeat) {
-                tipHeaderMiddle = none
-                binding.tvHeaderMiddle.text = tipNames[none]
+            dialogBinding.chipPlaceholders.addView(chip)
+        }
+        alert(title) {
+            customView { dialogBinding.root }
+            okButton {
+                save(dialogBinding.editTemplate.editableText.toString())
+                initTipValues()
+                postEvent(EventBus.UP_CONFIG, arrayListOf(2, 6))
             }
-            if (tipHeaderRight == repeat) {
-                tipHeaderRight = none
-                binding.tvHeaderRight.text = tipNames[none]
-            }
-            if (tipFooterLeft == repeat) {
-                tipFooterLeft = none
-                binding.tvFooterLeft.text = tipNames[none]
-            }
-            if (tipFooterMiddle == repeat) {
-                tipFooterMiddle = none
-                binding.tvFooterMiddle.text = tipNames[none]
-            }
-            if (tipFooterRight == repeat) {
-                tipFooterRight = none
-                binding.tvFooterRight.text = tipNames[none]
-            }
+            cancelButton()
         }
     }
 

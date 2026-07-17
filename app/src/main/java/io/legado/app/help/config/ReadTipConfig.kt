@@ -66,6 +66,45 @@ object ReadTipConfig {
             ReadBookConfig.config.tipFooterRight = value
         }
 
+    var tipHeaderLeftTemplate: String?
+        get() = ReadBookConfig.config.tipHeaderLeftTemplate
+        set(value) {
+            ReadBookConfig.config.tipHeaderLeftTemplate = value
+        }
+
+    var tipHeaderMiddleTemplate: String?
+        get() = ReadBookConfig.config.tipHeaderMiddleTemplate
+        set(value) {
+            ReadBookConfig.config.tipHeaderMiddleTemplate = value
+        }
+
+    var tipHeaderRightTemplate: String?
+        get() = ReadBookConfig.config.tipHeaderRightTemplate
+        set(value) {
+            ReadBookConfig.config.tipHeaderRightTemplate = value
+        }
+
+    var tipFooterLeftTemplate: String?
+        get() = ReadBookConfig.config.tipFooterLeftTemplate
+        set(value) {
+            ReadBookConfig.config.tipFooterLeftTemplate = value
+        }
+
+    var tipFooterMiddleTemplate: String?
+        get() = ReadBookConfig.config.tipFooterMiddleTemplate
+        set(value) {
+            ReadBookConfig.config.tipFooterMiddleTemplate = value
+        }
+
+    var tipFooterRightTemplate: String?
+        get() = ReadBookConfig.config.tipFooterRightTemplate
+        set(value) {
+            ReadBookConfig.config.tipFooterRightTemplate = value
+        }
+
+    fun effectiveTemplate(template: String?, legacyTip: Int): String =
+        template ?: ReaderInfoTemplate.fromLegacy(legacyTip)
+
     var headerMode: Int
         get() = ReadBookConfig.config.headerMode
         set(value) {
