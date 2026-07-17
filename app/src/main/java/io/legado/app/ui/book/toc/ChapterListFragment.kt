@@ -145,7 +145,11 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
         }
     }
 
-    override fun upChapterList(searchKey: String?, resetCollapse: Boolean) {
+    override fun upChapterList(
+        searchKey: String?,
+        resetCollapse: Boolean,
+        replaceAll: Boolean,
+    ) {
         chapterListJob?.cancel()
         chapterListJob = viewLifecycleOwner.lifecycleScope.launch {
             val normalizedSearchKey = searchKey?.takeIf { it.isNotBlank() }
@@ -165,7 +169,10 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                         resetCollapse = resetCollapse,
                     )
                 }
-                adapter.setItems(tocListState.showNormal(durChapterIndex))
+                submitChapterItems(
+                    tocListState.showNormal(durChapterIndex),
+                    replaceAll,
+                )
             } else {
                 delay(150)
                 if (resetCollapse || !tocListState.hasFullChapters()) {
@@ -178,16 +185,25 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                         resetCollapse = resetCollapse,
                     )
                 }
-                adapter.setItems(
+                submitChapterItems(
                     tocListState.showSearch(
                         searchResultIndexes = queryChapterIndexes(
                             currentBook,
                             normalizedSearchKey,
                         ),
                         currentChapterIndex = durChapterIndex,
-                    )
+                    ),
+                    replaceAll,
                 )
             }
+        }
+    }
+
+    private fun submitChapterItems(items: List<TocListItem>, replaceAll: Boolean) {
+        if (replaceAll) {
+            adapter.setItemsNoDiff(items)
+        } else {
+            adapter.setItems(items)
         }
     }
 

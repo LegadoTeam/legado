@@ -123,7 +123,11 @@ class TocViewModel(application: Application) : BaseViewModel(application) {
     }
 
     interface ChapterListCallBack {
-        fun upChapterList(searchKey: String?, resetCollapse: Boolean = false)
+        fun upChapterList(
+            searchKey: String?,
+            resetCollapse: Boolean = false,
+            replaceAll: Boolean = false,
+        )
 
         fun clearDisplayTitle()
 
