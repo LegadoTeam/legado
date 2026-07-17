@@ -190,9 +190,41 @@
         android:textSize="13sp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toRightOf="@+id/iv_last"
-        app:layout_constraintRight_toRightOf="@id/fl_has_new"
+        app:layout_constraintRight_toLeftOf="@+id/tv_read_percent"
         app:layout_constraintTop_toBottomOf="@+id/tv_read"
         tools:ignore="TextContrastCheck" />
+
+    <TextView
+        android:id="@+id/tv_read_percent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="6dp"
+        android:includeFontPadding="false"
+        android:paddingEnd="6dp"
+        android:textColor="@color/tv_text_summary"
+        android:textSize="11sp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@+id/tv_last"
+        app:layout_constraintLeft_toRightOf="@+id/tv_last"
+        app:layout_constraintRight_toRightOf="@id/fl_has_new"
+        app:layout_constraintTop_toTopOf="@+id/tv_last"
+        tools:text="60%"
+        tools:visibility="visible" />
+
+    <com.google.android.material.progressindicator.LinearProgressIndicator
+        android:id="@+id/pb_read_progress"
+        android:layout_width="0dp"
+        android:layout_height="2dp"
+        android:layout_marginBottom="1dp"
+        android:visibility="gone"
+        app:indicatorColor="@color/accent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="@id/fl_has_new"
+        app:layout_constraintStart_toStartOf="@+id/tv_name"
+        app:trackThickness="2dp"
+        tools:ignore="UnusedAttribute"
+        tools:progress="60"
+        tools:visibility="visible" />
 
     <View
         android:id="@+id/vw_foreground"

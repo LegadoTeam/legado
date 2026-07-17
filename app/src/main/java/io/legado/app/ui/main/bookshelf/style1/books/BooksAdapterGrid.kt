@@ -10,6 +10,7 @@ import io.legado.app.databinding.ItemBookshelfGrid2Binding
 import io.legado.app.databinding.ItemBookshelfGridBinding
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.config.AppConfig
+import io.legado.app.ui.main.bookshelf.updateBookshelfReadProgress
 import io.legado.app.utils.gone
 import io.legado.app.utils.invisible
 import io.legado.app.utils.visible
@@ -88,6 +89,7 @@ class BooksAdapterGrid(context: Context, private val callBack: CallBack) :
     private fun upRefresh(binding: ViewBinding, item: Book) {
         when (binding) {
             is ItemBookshelfGridBinding -> binding.run {
+                pbReadProgress.updateBookshelfReadProgress(item)
                 if (!item.isLocal && callBack.isUpdate(item.bookUrl)) {
                     bvUnread.invisible()
                     rlLoading.visible()
@@ -102,6 +104,7 @@ class BooksAdapterGrid(context: Context, private val callBack: CallBack) :
                 }
             }
             is ItemBookshelfGrid2Binding -> binding.run {
+                pbReadProgress.updateBookshelfReadProgress(item)
                 if (!item.isLocal && callBack.isUpdate(item.bookUrl)) {
                     bvUnread.invisible()
                     rlLoading.visible()

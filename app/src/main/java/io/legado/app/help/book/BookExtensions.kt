@@ -376,6 +376,14 @@ fun Book.readSimulating(): Boolean {
     return config.readSimulating
 }
 
+fun Book.readProgress(): Float? {
+    if (durChapterIndex == 0 && durChapterPos == 0) return null
+    val chapterCount = simulatedTotalChapterNum()
+    if (chapterCount <= 1) return 1f
+    val lastChapterIndex = chapterCount - 1
+    return (durChapterIndex.toFloat() / lastChapterIndex).coerceIn(0f, 1f)
+}
+
 fun tryParesExportFileName(jsStr: String): Boolean {
     val bindings = buildScriptBindings { bindings ->
         bindings["name"] = "name"

@@ -10,6 +10,7 @@ import io.legado.app.data.entities.Book
 import io.legado.app.databinding.ItemBookshelfListBinding
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.config.AppConfig
+import io.legado.app.ui.main.bookshelf.updateBookshelfReadProgress
 import io.legado.app.utils.invisible
 import io.legado.app.utils.toTimeAgo
 import splitties.views.onLongClick
@@ -64,6 +65,7 @@ class BooksAdapterList(
     }
 
     private fun upRefresh(binding: ItemBookshelfListBinding, item: Book) {
+        binding.pbReadProgress.updateBookshelfReadProgress(item, binding.tvReadPercent)
         if (!item.isLocal && callBack.isUpdate(item.bookUrl)) {
             binding.bvUnread.invisible()
             binding.rlLoading.visible()
