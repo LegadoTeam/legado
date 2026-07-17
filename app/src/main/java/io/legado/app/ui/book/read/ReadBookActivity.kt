@@ -1,8 +1,11 @@
 package io.legado.app.ui.book.read
 
+import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.Bundle
 import android.os.Looper
 import android.view.Gravity
@@ -17,6 +20,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.view.get
+import androidx.core.view.isGone
+import androidx.core.view.isVisible
 import androidx.core.view.size
 import androidx.lifecycle.lifecycleScope
 import com.jaredrummler.android.colorpicker.ColorPickerDialogListener
@@ -56,6 +61,8 @@ import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.accentColor
+import io.legado.app.lib.theme.bottomBackground
+import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.model.ReadAloud
 import io.legado.app.model.ReadBook
 import io.legado.app.model.analyzeRule.AnalyzeRule
@@ -106,6 +113,7 @@ import io.legado.app.ui.replace.edit.ReplaceEditActivity
 import io.legado.app.ui.widget.PopupAction
 import io.legado.app.ui.widget.dialog.PhotoDialog
 import io.legado.app.utils.ACache
+import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.Debounce
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.NetworkUtils
@@ -113,6 +121,7 @@ import io.legado.app.utils.StartActivityContract
 import io.legado.app.utils.applyOpenTint
 import io.legado.app.utils.buildMainHandler
 import io.legado.app.utils.dismissDialogFragment
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.hexString
@@ -277,6 +286,12 @@ class ReadBookActivity : BaseReadBookActivity(),
         binding.cursorRight.setColorFilter(accentColor)
         binding.cursorLeft.setOnTouchListener(this)
         binding.cursorRight.setOnTouchListener(this)
+        binding.readAloudFloatBarContainer.llBackToSpeech.setOnClickListener {
+            backToSpeakingPosition()
+        }
+        binding.readAloudFloatBarContainer.llReadFromHere.setOnClickListener {
+            ReadBook.readAloud()
+        }
         window.setBackgroundDrawable(null)
         upScreenTimeOut()
         ReadBook.register(this)
@@ -363,6 +378,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         upSystemUiVisibility()
         registerReceiver(timeBatteryReceiver, timeBatteryReceiver.filter)
         binding.readView.upTime()
+        updateReadAloudFloatBar()
         screenOffTimerStart()
         // 网络监听，当从无网切换到网络环境时同步进度（注意注册的同时就会收到监听，因此界面激活时无需重复执行同步操作）
         networkChangedListener.register()
@@ -1650,10 +1666,81 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     override fun onMenuShow() {
         binding.readView.autoPager.pause()
+        updateReadAloudFloatBar(menuShowing = true)
     }
 
     override fun onMenuHide() {
         binding.readView.autoPager.resume()
+        updateReadAloudFloatBar(menuHiding = true)
+    }
+
+    private fun updateReadAloudFloatBar(
+        menuShowing: Boolean = false,
+        menuHiding: Boolean = false,
+    ) {
+        val floatBarBinding = binding.readAloudFloatBarContainer
+        val menuVisible = when {
+            menuShowing -> true
+            menuHiding -> bottomDialog > 0 || binding.searchMenu.bottomMenuVisible
+            else -> menuLayoutIsVisible
+        }
+        val shouldShow = ReadAloudBarVisibility.shouldShow(
+            isRun = BaseReadAloudService.isRun,
+            following = ReadAloud.followReadAloudPosition,
+            menuVisible = menuVisible,
+        )
+
+        if (shouldShow) {
+            val backgroundColor = bottomBackground
+            val foregroundColor = getPrimaryTextColor(ColorUtils.isColorLight(backgroundColor))
+            (floatBarBinding.readAloudFloatBar.background.mutate() as? GradientDrawable)?.apply {
+                setColor(backgroundColor)
+                val strokeColor = if (AppConfig.isEInkMode) {
+                    foregroundColor
+                } else {
+                    ColorUtils.withAlpha(foregroundColor, 0.25f)
+                }
+                setStroke(1.dpToPx(), strokeColor)
+            }
+            floatBarBinding.ivBackToSpeech.setColorFilter(foregroundColor)
+            floatBarBinding.tvBackToSpeech.setTextColor(foregroundColor)
+            floatBarBinding.ivReadFromHere.setColorFilter(foregroundColor)
+            floatBarBinding.tvReadFromHere.setTextColor(foregroundColor)
+            floatBarBinding.vBarDivider.setBackgroundColor(
+                ColorUtils.withAlpha(foregroundColor, 0.3f)
+            )
+        }
+
+        val floatBar = floatBarBinding.readAloudFloatBar
+        val settledShown = floatBar.isVisible && floatBar.alpha == 1f
+        if (shouldShow && settledShown) return
+        if (!shouldShow && floatBar.isGone) return
+        floatBar.animate().cancel()
+
+        val animationsEnabled = !AppConfig.isEInkMode &&
+            (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || ValueAnimator.areAnimatorsEnabled())
+        if (!animationsEnabled) {
+            floatBar.alpha = 1f
+            floatBar.isVisible = shouldShow
+        } else if (shouldShow) {
+            if (floatBar.isGone) {
+                floatBar.alpha = 0f
+                floatBar.isVisible = true
+            }
+            floatBar.animate()
+                .alpha(1f)
+                .setDuration(180)
+                .start()
+        } else {
+            floatBar.animate()
+                .alpha(0f)
+                .setDuration(180)
+                .withEndAction {
+                    floatBar.isGone = true
+                    floatBar.alpha = 1f
+                }
+                .start()
+        }
     }
 
     override fun onLayoutPageCompleted(index: Int, page: TextPage) {
@@ -1822,6 +1909,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                     13 -> upPageAnim()
                 }
             }
+            updateReadAloudFloatBar()
         }
         observeEvent<Int>(EventBus.ALOUD_STATE) {
             if (it == Status.STOP || it == Status.PAUSE) {
@@ -1833,6 +1921,10 @@ class ReadBookActivity : BaseReadBookActivity(),
                     }
                 }
             }
+            updateReadAloudFloatBar()
+        }
+        observeEvent<Boolean>(EventBus.READ_ALOUD_FOLLOW) {
+            updateReadAloudFloatBar()
         }
         observeEventSticky<Int>(EventBus.TTS_PROGRESS) { chapterStart ->
             lastReadAloudChapterStart = chapterStart

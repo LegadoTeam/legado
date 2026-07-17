@@ -50,4 +50,8 @@
         android:background="@color/background_menu"
         android:layout_gravity="bottom" />
 
+    <include
+        android:id="@+id/read_aloud_float_bar_container"
+        layout="@layout/view_read_aloud_float_bar" />
+
 </FrameLayout>
