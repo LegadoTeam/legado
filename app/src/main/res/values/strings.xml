@@ -423,6 +423,7 @@
     <string name="diy_source_group">Custom source grouping</string>
     <string name="diy_edit_source_group">Enter the custom source group name</string>
     <string name="concurrent_rate">Concurrency rate(concurrentRate)</string>
+    <string name="http_tts_pause_duration">Paragraph pause (ms, 0-10000)</string>
     <string name="sort_url">Sort url(sortUrl)</string>
     <string name="login_url">Log in url(loginUrl)</string>
     <string name="login_ui">Login UI(loginUi)</string>

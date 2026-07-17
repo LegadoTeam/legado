@@ -90,6 +90,7 @@ class HttpTtsEditDialog() : BaseDialogFragment(R.layout.dialog_http_tts_edit, tr
         binding.tvName.setText(httpTTS.name)
         binding.tvUrl.setText(httpTTS.url)
         binding.tvContentType.setText(httpTTS.contentType)
+        binding.tvPauseDuration.setText(httpTTS.pauseDuration.toString())
         binding.tvConcurrentRate.setText(httpTTS.concurrentRate)
         binding.tvLoginUrl.setText(httpTTS.loginUrl)
         binding.tvLoginUi.setText(httpTTS.loginUi)
@@ -175,6 +176,10 @@ class HttpTtsEditDialog() : BaseDialogFragment(R.layout.dialog_http_tts_edit, tr
             name = binding.tvName.text.toString(),
             url = binding.tvUrl.text.toString(),
             contentType = binding.tvContentType.text?.toString(),
+            pauseDuration = binding.tvPauseDuration.text?.toString()
+                ?.toIntOrNull()
+                ?.coerceIn(0, 10_000)
+                ?: 0,
             concurrentRate = binding.tvConcurrentRate.text?.toString(),
             loginUrl = binding.tvLoginUrl.text?.toString(),
             loginUi = binding.tvLoginUi.text?.toString(),

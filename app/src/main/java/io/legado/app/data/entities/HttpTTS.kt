@@ -20,6 +20,8 @@ data class HttpTTS(
     var url: String = "",
     var contentType: String? = null,
     @ColumnInfo(defaultValue = "0")
+    var pauseDuration: Int = 0,
+    @ColumnInfo(defaultValue = "0")
     override var concurrentRate: String? = "0",
     override var loginUrl: String? = null,
     override var loginUi: String? = null,
@@ -44,6 +46,7 @@ data class HttpTTS(
         return name == source.name &&
                 url == source.url &&
                 contentType == source.contentType &&
+                pauseDuration == source.pauseDuration &&
                 concurrentRate == source.concurrentRate &&
                 loginUrl == source.loginUrl &&
                 loginUi == source.loginUi &&
@@ -64,6 +67,10 @@ data class HttpTTS(
                     name = doc.readString("$.name")!!,
                     url = doc.readString("$.url")!!,
                     contentType = doc.readString("$.contentType"),
+                    pauseDuration = doc.readLong("$.pauseDuration")
+                        ?.coerceIn(0L, 10_000L)
+                        ?.toInt()
+                        ?: 0,
                     concurrentRate = doc.readString("$.concurrentRate"),
                     loginUrl = doc.readString("$.loginUrl"),
                     loginUi = if (loginUi is List<*>) GSON.toJson(loginUi) else loginUi?.toString(),
