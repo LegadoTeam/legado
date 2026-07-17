@@ -1,6 +1,5 @@
 package io.legado.app.ui.book.read.page
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.drawable.LayerDrawable
 import android.view.LayoutInflater
@@ -18,6 +17,7 @@ import io.legado.app.databinding.ViewBookPageBinding
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ReadTipConfig
+import io.legado.app.help.config.ReaderInfoValues
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.ReadBookActivity
 import io.legado.app.ui.book.read.page.entities.TextLine
@@ -43,17 +43,8 @@ class PageView(context: Context) : FrameLayout(context) {
     private val binding = ViewBookPageBinding.inflate(LayoutInflater.from(context), this, true)
     private val readBookActivity get() = activity as? ReadBookActivity
     private var battery = 100
-    private var tvTitle: BatteryView? = null
-    private var tvTime: BatteryView? = null
-    private var tvBattery: BatteryView? = null
-    private var tvBatteryP: BatteryView? = null
-    private var tvPage: BatteryView? = null
-    private var tvTotalProgress: BatteryView? = null
-    private var tvTotalProgress1: BatteryView? = null
-    private var tvPageAndTotal: BatteryView? = null
-    private var tvBookName: BatteryView? = null
-    private var tvTimeBattery: BatteryView? = null
-    private var tvTimeBatteryP: BatteryView? = null
+    private var readerInfoValues = ReaderInfoValues(battery = 100)
+    private var readerInfoViews = emptyArray<ReaderInfoView>()
     private var isMainView = false
     var isScroll = false
 
@@ -121,8 +112,11 @@ class PageView(context: Context) : FrameLayout(context) {
             vwTopDivider.gone(llHeader.isGone || !it.showHeaderLine)
             vwBottomDivider.gone(llFooter.isGone || !it.showFooterLine)
         }
-        upTime()
-        upBattery(battery)
+        readerInfoValues = readerInfoValues.copy(
+            time = timeFormat.format(Date(System.currentTimeMillis())),
+            battery = battery,
+        )
+        renderReaderInfo()
     }
 
     /**
@@ -163,12 +157,6 @@ class PageView(context: Context) : FrameLayout(context) {
      * 更新阅读信息
      */
     private fun upTipStyle() = binding.run {
-        tvHeaderLeft.tag = null
-        tvHeaderMiddle.tag = null
-        tvHeaderRight.tag = null
-        tvFooterLeft.tag = null
-        tvFooterMiddle.tag = null
-        tvFooterRight.tag = null
         llHeader.isGone = when (ReadTipConfig.headerMode) {
             1 -> false
             2 -> true
@@ -178,96 +166,64 @@ class PageView(context: Context) : FrameLayout(context) {
             1 -> true
             else -> false
         }
-        ReadTipConfig.apply {
-            tvHeaderLeft.isGone = tipHeaderLeft == none
-            tvHeaderRight.isGone = tipHeaderRight == none
-            tvHeaderMiddle.isGone = tipHeaderMiddle == none
-            tvFooterLeft.isInvisible = tipFooterLeft == none
-            tvFooterRight.isGone = tipFooterRight == none
-            tvFooterMiddle.isGone = tipFooterMiddle == none
+        readerInfoViews = with(ReadTipConfig) {
+            arrayOf(
+                ReaderInfoView(
+                    tvHeaderLeft,
+                    effectiveTemplate(tipHeaderLeftTemplate, tipHeaderLeft),
+                ),
+                ReaderInfoView(
+                    tvHeaderMiddle,
+                    effectiveTemplate(tipHeaderMiddleTemplate, tipHeaderMiddle),
+                ),
+                ReaderInfoView(
+                    tvHeaderRight,
+                    effectiveTemplate(tipHeaderRightTemplate, tipHeaderRight),
+                ),
+                ReaderInfoView(
+                    tvFooterLeft,
+                    effectiveTemplate(tipFooterLeftTemplate, tipFooterLeft),
+                ),
+                ReaderInfoView(
+                    tvFooterMiddle,
+                    effectiveTemplate(tipFooterMiddleTemplate, tipFooterMiddle),
+                ),
+                ReaderInfoView(
+                    tvFooterRight,
+                    effectiveTemplate(tipFooterRightTemplate, tipFooterRight),
+                ),
+            )
         }
-        tvTitle = getTipView(ReadTipConfig.chapterTitle)?.apply {
-            tag = ReadTipConfig.chapterTitle
-            isBattery = false
-            typeface = ChapterProvider.typeface
-            textSize = 12f
-        }
-        tvTime = getTipView(ReadTipConfig.time)?.apply {
-            tag = ReadTipConfig.time
-            isBattery = false
-            typeface = ChapterProvider.typeface
-            textSize = 12f
-        }
-        tvBattery = getTipView(ReadTipConfig.battery)?.apply {
-            tag = ReadTipConfig.battery
-            isBattery = true
-            textSize = 11f
-        }
-        tvPage = getTipView(ReadTipConfig.page)?.apply {
-            tag = ReadTipConfig.page
-            isBattery = false
-            typeface = ChapterProvider.typeface
-            textSize = 12f
-        }
-        tvTotalProgress = getTipView(ReadTipConfig.totalProgress)?.apply {
-            tag = ReadTipConfig.totalProgress
-            isBattery = false
-            typeface = ChapterProvider.typeface
-            textSize = 12f
-        }
-        tvTotalProgress1 = getTipView(ReadTipConfig.totalProgress1)?.apply {
-            tag = ReadTipConfig.totalProgress1
-            isBattery = false
-            typeface = ChapterProvider.typeface
-            textSize = 12f
-        }
-        tvPageAndTotal = getTipView(ReadTipConfig.pageAndTotal)?.apply {
-            tag = ReadTipConfig.pageAndTotal
-            isBattery = false
-            typeface = ChapterProvider.typeface
-            textSize = 12f
-        }
-        tvBookName = getTipView(ReadTipConfig.bookName)?.apply {
-            tag = ReadTipConfig.bookName
-            isBattery = false
-            typeface = ChapterProvider.typeface
-            textSize = 12f
-        }
-        tvTimeBattery = getTipView(ReadTipConfig.timeBattery)?.apply {
-            tag = ReadTipConfig.timeBattery
-            isBattery = true
-            typeface = ChapterProvider.typeface
-            textSize = 11f
-        }
-        tvBatteryP = getTipView(ReadTipConfig.batteryPercentage)?.apply {
-            tag = ReadTipConfig.batteryPercentage
-            isBattery = false
-            typeface = ChapterProvider.typeface
-            textSize = 12f
-        }
-        tvTimeBatteryP = getTipView(ReadTipConfig.timeBatteryPercentage)?.apply {
-            tag = ReadTipConfig.timeBatteryPercentage
-            isBattery = false
-            typeface = ChapterProvider.typeface
-            textSize = 12f
+        readerInfoViews.forEach { readerInfoView ->
+            readerInfoView.view.apply {
+                isBattery = false
+                typeface = ChapterProvider.typeface
+                textSize = 12f
+            }
         }
     }
 
-    /**
-     * 获取信息视图
-     * @param tip 信息类型
-     */
-    private fun getTipView(tip: Int): BatteryView? = binding.run {
-        return when (tip) {
-            ReadTipConfig.tipHeaderLeft -> tvHeaderLeft
-            ReadTipConfig.tipHeaderMiddle -> tvHeaderMiddle
-            ReadTipConfig.tipHeaderRight -> tvHeaderRight
-            ReadTipConfig.tipFooterLeft -> tvFooterLeft
-            ReadTipConfig.tipFooterMiddle -> tvFooterMiddle
-            ReadTipConfig.tipFooterRight -> tvFooterRight
-            else -> null
+    private fun renderReaderInfo() {
+        readerInfoViews.forEach { readerInfoView ->
+            val view = readerInfoView.view
+            val template = readerInfoView.template
+            if (view === binding.tvFooterLeft) {
+                view.isInvisible = template.isEmpty()
+            } else {
+                view.isGone = template.isEmpty()
+            }
+            if (template.isNotEmpty()) {
+                view.setTextIfNotEqual(
+                    ReaderInfoTemplateRenderer.render(template, readerInfoValues)
+                )
+            }
         }
     }
+
+    private data class ReaderInfoView(
+        val view: BatteryView,
+        val template: String,
+    )
 
     /**
      * 更新背景
@@ -294,29 +250,19 @@ class PageView(context: Context) : FrameLayout(context) {
      * 更新时间信息
      */
     fun upTime() {
-        tvTime?.text = timeFormat.format(Date(System.currentTimeMillis()))
-        upTimeBattery()
+        readerInfoValues = readerInfoValues.copy(
+            time = timeFormat.format(Date(System.currentTimeMillis())),
+        )
+        renderReaderInfo()
     }
 
     /**
      * 更新电池信息
      */
-    @SuppressLint("SetTextI18n")
     fun upBattery(battery: Int) {
-        this.battery = battery
-        tvBattery?.setBattery(battery)
-        tvBatteryP?.text = "$battery%"
-        upTimeBattery()
-    }
-
-    /**
-     * 更新电池信息
-     */
-    @SuppressLint("SetTextI18n")
-    private fun upTimeBattery() {
-        val time = timeFormat.format(Date(System.currentTimeMillis()))
-        tvTimeBattery?.setBattery(battery, time)
-        tvTimeBatteryP?.text = "$time $battery%"
+        this.battery = battery.coerceIn(0, 100)
+        readerInfoValues = readerInfoValues.copy(battery = this.battery)
+        renderReaderInfo()
     }
 
     /**
@@ -357,22 +303,24 @@ class PageView(context: Context) : FrameLayout(context) {
     /**
      * 设置进度
      */
-    @SuppressLint("SetTextI18n")
     fun setProgress(textPage: TextPage) = textPage.apply {
-        tvBookName?.setTextIfNotEqual(ReadBook.book?.name)
-        tvTitle?.setTextIfNotEqual(textPage.title)
         val readProgress = readProgress
-        tvTotalProgress?.setTextIfNotEqual(readProgress)
-        tvTotalProgress1?.setTextIfNotEqual("${chapterIndex.plus(1)}/${chapterSize}")
-        if (textChapter.isCompleted) {
-            tvPageAndTotal?.setTextIfNotEqual("${index.plus(1)}/$pageSize  $readProgress")
-            tvPage?.setTextIfNotEqual("${index.plus(1)}/$pageSize")
+        val totalPages = if (textChapter.isCompleted) {
+            pageSize.toString()
         } else {
             val pageSizeInt = pageSize
-            val pageSize = if (pageSizeInt <= 0) "-" else "~$pageSizeInt"
-            tvPageAndTotal?.setTextIfNotEqual("${index.plus(1)}/$pageSize  $readProgress")
-            tvPage?.setTextIfNotEqual("${index.plus(1)}/$pageSize")
+            if (pageSizeInt <= 0) "-" else "~$pageSizeInt"
         }
+        readerInfoValues = readerInfoValues.copy(
+            bookName = ReadBook.book?.name.orEmpty(),
+            chapterTitle = title,
+            page = index.plus(1).toString(),
+            totalPages = totalPages,
+            readProgress = readProgress,
+            chapter = chapterIndex.plus(1).toString(),
+            totalChapters = chapterSize.toString(),
+        )
+        renderReaderInfo()
     }
 
     fun setAutoPager(autoPager: AutoPager?) {
