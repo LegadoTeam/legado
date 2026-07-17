@@ -33,6 +33,65 @@ import kotlinx.coroutines.cancelChildren
 import splitties.init.appCtx
 import kotlin.text.trim
 
+internal data class AudioPlayUrlKey(
+    val bookUrl: String,
+    val sourceUrl: String,
+    val chapterIndex: Int,
+)
+
+internal data class PreloadedAudioPlayUrl(
+    val url: String,
+    val lyric: String?,
+)
+
+internal class AudioPlayUrlPreloadStore {
+
+    private data class Entry(val key: AudioPlayUrlKey, val value: PreloadedAudioPlayUrl)
+
+    private var generation = 0L
+    private var entry: Entry? = null
+    private val loadingKeys = hashSetOf<AudioPlayUrlKey>()
+
+    @Synchronized
+    fun reset() {
+        generation++
+        entry = null
+        loadingKeys.clear()
+    }
+
+    @Synchronized
+    fun begin(key: AudioPlayUrlKey): Long? {
+        if (entry?.key == key || !loadingKeys.add(key)) return null
+        return generation
+    }
+
+    @Synchronized
+    fun complete(
+        key: AudioPlayUrlKey,
+        requestGeneration: Long,
+        url: String,
+        lyric: String? = null,
+    ) {
+        loadingKeys.remove(key)
+        if (requestGeneration == generation && url.isNotBlank()) {
+            entry = Entry(key, PreloadedAudioPlayUrl(url, lyric))
+        }
+    }
+
+    @Synchronized
+    fun finish(key: AudioPlayUrlKey) {
+        loadingKeys.remove(key)
+    }
+
+    @Synchronized
+    fun consume(key: AudioPlayUrlKey): PreloadedAudioPlayUrl? {
+        val current = entry ?: return null
+        if (current.key != key) return null
+        entry = null
+        return current.value
+    }
+}
+
 @SuppressLint("StaticFieldLeak")
 @Suppress("unused")
 object AudioPlay : CoroutineScope by MainScope() {
@@ -72,7 +131,9 @@ object AudioPlay : CoroutineScope by MainScope() {
     var durAudioSize = 0
     var inBookshelf = false
     var bookSource: BookSource? = null
+        private set
     val loadingChapters = arrayListOf<Int>()
+    private val playUrlPreloadStore = AudioPlayUrlPreloadStore()
     private val readRecord = ReadRecord()
     var readStartTime: Long = System.currentTimeMillis()
     val executor = globalExecutor
@@ -104,6 +165,7 @@ object AudioPlay : CoroutineScope by MainScope() {
 
     fun resetData(book: Book) {
         stop()
+        playUrlPreloadStore.reset()
         AudioPlay.book = book
         readRecord.bookName = book.name
         readRecord.readTime = appDb.readRecordDao.getReadTime(book.name) ?: 0
@@ -113,7 +175,7 @@ object AudioPlay : CoroutineScope by MainScope() {
         } else {
             chapterSize
         }
-        bookSource = book.getBookSource()
+        setBookSource(book.getBookSource())
         durChapterIndex = book.durChapterIndex
         durChapterPos = book.durChapterPos
         PlayMode.entries.getOrNull(book.getPlayMode())?.let{
@@ -129,6 +191,11 @@ object AudioPlay : CoroutineScope by MainScope() {
         upDurChapter()
         SourceCallBack.callBackBook(SourceCallBack.START_READ, bookSource, book, durChapter)
         postEvent(EventBus.AUDIO_BUFFER_PROGRESS, 0)
+    }
+
+    fun setBookSource(source: BookSource?) {
+        bookSource = source
+        playUrlPreloadStore.reset()
     }
 
     fun upReadTime() {
@@ -185,6 +252,21 @@ object AudioPlay : CoroutineScope by MainScope() {
                     removeLoading(index)
                     return
                 }
+                val preloadKey = AudioPlayUrlKey(
+                    book.bookUrl,
+                    bookSource.bookSourceUrl,
+                    chapter.index,
+                )
+                playUrlPreloadStore.consume(preloadKey)?.let { preloaded ->
+                    durPlayUrl = preloaded.url
+                    durLyric = preloaded.lyric
+                    removeLoading(index)
+                    upLoading(false)
+                    callback?.upLyric(durLyric)
+                    upPlayUrl()
+                    preloadNextPlayUrl(index)
+                    return
+                }
                 upLoading(true)
                 WebBook.getContent(this, bookSource, book, chapter)
                     .onSuccess { content ->
@@ -218,7 +300,42 @@ object AudioPlay : CoroutineScope by MainScope() {
             durPlayUrl = content
             durLyric = chapter.getVariable("lyric")
             upPlayUrl()
+            preloadNextPlayUrl(chapter.index)
         }
+    }
+
+    private fun preloadNextPlayUrl(currentIndex: Int) {
+        if (playMode != PlayMode.LIST_END_STOP && playMode != PlayMode.LIST_LOOP) return
+        val book = book ?: return
+        val source = bookSource ?: return
+        val nextChapter = findNextPlayableChapter(book.bookUrl, currentIndex + 1) ?: return
+        val key = AudioPlayUrlKey(book.bookUrl, source.bookSourceUrl, nextChapter.index)
+        val requestGeneration = playUrlPreloadStore.begin(key) ?: return
+        WebBook.getContent(this, source, book, nextChapter, needSave = false)
+            .onSuccess { content ->
+                playUrlPreloadStore.complete(
+                    key,
+                    requestGeneration,
+                    content.trim(),
+                    nextChapter.getVariable("lyric"),
+                )
+            }
+            .onError {
+                playUrlPreloadStore.finish(key)
+            }
+            .onCancel {
+                playUrlPreloadStore.finish(key)
+            }
+    }
+
+    private fun findNextPlayableChapter(bookUrl: String, startIndex: Int): BookChapter? {
+        var index = startIndex
+        while (index in 0..<simulatedChapterSize) {
+            val chapter = appDb.bookChapterDao.getChapter(bookUrl, index) ?: return null
+            if (!chapter.isVolume) return chapter
+            index++
+        }
+        return null
     }
 
     private fun upPlayUrl() {
