@@ -164,6 +164,31 @@ java.get(key)
 java.put(key, value)
 ```
 
+* 并发合并(single-flight)
+
+> 同一书源、同一 name 的并发调用只执行一次 action，其他调用等待完成后跳过；action 失败时，后续调用可重新执行。timeoutMs 默认 15000，范围为 0 到 300000 毫秒。
+> jsLib 中的函数如需访问 java/source/book 等执行对象，请使用 fn.bind(this) 绑定当前执行环境。
+
+```js
+java.singleFlight(name: String, action: Function, timeoutMs: Long = 15000)
+```
+
+* 互斥锁
+
+> 同一书源、同一 name 的调用按顺序逐个执行，适合把读取、修改、写回组合成不可分割的操作；超时范围与 singleFlight 相同。
+
+```js
+java.lock(name: String, action: Function, timeoutMs: Long = 15000)
+```
+
+* 轮询计数器
+
+> 返回同一书源、同一 name 的进程内非负递增序号，可用于多账号或多个地址轮流选择。计数器最多保留 4096 项，长期未使用的项目可能被回收并从 0 重新开始。
+
+```js
+java.tick(name: String): Int
+```
+
 ### [js扩展类](https://github.com/LegadoTeam/legado/blob/master/app/src/main/java/io/legado/app/help/JsExtensions.kt) 部分函数
 
 * 链接解析[JsURL](https://github.com/LegadoTeam/legado/blob/master/app/src/main/java/io/legado/app/utils/JsURL.kt)　
