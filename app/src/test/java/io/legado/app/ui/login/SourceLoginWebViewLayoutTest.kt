@@ -1,5 +1,6 @@
 package io.legado.app.ui.login
 
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -7,12 +8,19 @@ import java.io.File
 class SourceLoginWebViewLayoutTest {
 
     @Test
-    fun `web login root paints an opaque app background`() {
+    fun `web login root paints the runtime theme background`() {
         val xml = readProjectFile("src/main/res/layout/fragment_web_view_login.xml")
+        val fragment = readProjectFile(
+            "src/main/java/io/legado/app/ui/login/WebViewLoginFragment.kt"
+        )
 
-        assertTrue(
-            "Web login must hide the activity underneath while its content is loading",
+        assertFalse(
+            "Web login must not override the user-selected background with a static color",
             xml.contains("android:background=\"@color/background\"")
+        )
+        assertTrue(
+            "Web login must paint an opaque runtime theme background",
+            fragment.contains("binding.root.setBackgroundColor(requireContext().backgroundColor)")
         )
     }
 
