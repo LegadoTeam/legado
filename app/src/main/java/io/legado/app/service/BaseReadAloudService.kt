@@ -85,6 +85,10 @@ abstract class BaseReadAloudService : BaseService(),
         var timeMinute: Int = 0
             private set
 
+        @JvmStatic
+        var chapterToStop: Int = 0
+            private set
+
         fun isPlay(): Boolean {
             return isRun && !pause
         }
@@ -124,6 +128,7 @@ abstract class BaseReadAloudService : BaseService(),
     private var needResumeOnAudioFocusGain = false
     private var needResumeOnCallStateIdle = false
     private var registeredPhoneStateListener = false
+    private val chapterStopTimer = ChapterStopTimer()
     private var dsJob: Job? = null
     private var upNotificationJob: Coroutine<*>? = null
     private var cover: Bitmap =
@@ -147,6 +152,8 @@ abstract class BaseReadAloudService : BaseService(),
         super.onCreate()
         isRun = true
         pause = false
+        chapterStopTimer.clear()
+        chapterToStop = 0
         observeLiveBus()
         initMediaSession()
         initBroadcastReceiver()
@@ -194,6 +201,11 @@ abstract class BaseReadAloudService : BaseService(),
         }
         isRun = false
         pause = true
+        timeMinute = 0
+        chapterStopTimer.clear()
+        chapterToStop = 0
+        postEvent(EventBus.READ_ALOUD_DS, 0)
+        postEvent(EventBus.READ_ALOUD_CHAPTER_STOP, 0)
         abandonFocus()
         unregisterReceiver(broadcastReceiver)
         postEvent(EventBus.ALOUD_STATE, Status.STOP)
@@ -224,6 +236,7 @@ abstract class BaseReadAloudService : BaseService(),
             IntentAction.next -> nextChapter()
             IntentAction.addTimer -> addTimer()
             IntentAction.setTimer -> setTimer(intent.getIntExtra("minute", 0))
+            IntentAction.setChapterStop -> setChapterStop(intent.getIntExtra("count", 0))
             IntentAction.stop -> stopSelf()
         }
         return super.onStartCommand(intent, flags, startId)
@@ -381,7 +394,10 @@ abstract class BaseReadAloudService : BaseService(),
     }
 
     private fun setTimer(minute: Int) {
-        timeMinute = minute
+        timeMinute = minute.coerceIn(0, 180)
+        chapterStopTimer.clear()
+        chapterToStop = 0
+        postEvent(EventBus.READ_ALOUD_CHAPTER_STOP, 0)
         doDs()
     }
 
@@ -392,7 +408,19 @@ abstract class BaseReadAloudService : BaseService(),
             timeMinute += 10
             if (timeMinute > 180) timeMinute = 180
         }
+        chapterStopTimer.clear()
+        chapterToStop = 0
+        postEvent(EventBus.READ_ALOUD_CHAPTER_STOP, 0)
         doDs()
+    }
+
+    private fun setChapterStop(count: Int) {
+        chapterToStop = chapterStopTimer.set(count)
+        timeMinute = 0
+        dsJob?.cancel()
+        postEvent(EventBus.READ_ALOUD_DS, 0)
+        postEvent(EventBus.READ_ALOUD_CHAPTER_STOP, chapterToStop)
+        upReadAloudNotification()
     }
 
     /**
@@ -403,6 +431,7 @@ abstract class BaseReadAloudService : BaseService(),
         postEvent(EventBus.READ_ALOUD_DS, timeMinute)
         upReadAloudNotification()
         dsJob?.cancel()
+        if (timeMinute <= 0) return
         dsJob = lifecycleScope.launch {
             while (isActive) {
                 delay(60000)
@@ -520,6 +549,7 @@ abstract class BaseReadAloudService : BaseService(),
     private fun upMediaMetadata() {
         var nTitle: String = when {
             pause -> getString(R.string.read_aloud_pause)
+            chapterToStop > 0 -> getString(R.string.read_aloud_timer_chapter, chapterToStop)
             timeMinute > 0 -> getString(
                 R.string.read_aloud_timer,
                 timeMinute
@@ -599,6 +629,7 @@ abstract class BaseReadAloudService : BaseService(),
     private fun createNotification(): NotificationCompat.Builder {
         var nTitle: String = when {
             pause -> getString(R.string.read_aloud_pause)
+            chapterToStop > 0 -> getString(R.string.read_aloud_timer_chapter, chapterToStop)
             timeMinute > 0 -> getString(
                 R.string.read_aloud_timer,
                 timeMinute
@@ -694,8 +725,19 @@ abstract class BaseReadAloudService : BaseService(),
         ReadBook.moveToPrevChapter(true, toLast = false)
     }
 
-    open fun nextChapter() {
+    open fun nextChapter(auto: Boolean = false) {
         ReadBook.upReadTime()
+        if (auto) {
+            chapterStopTimer.onChapterCompleted()?.let { stopResult ->
+                chapterToStop = stopResult.remaining
+                postEvent(EventBus.READ_ALOUD_CHAPTER_STOP, chapterToStop)
+                if (stopResult.shouldStop) {
+                    stopSelf()
+                    return
+                }
+                upReadAloudNotification()
+            }
+        }
         AppLog.putDebug("${ReadBook.curTextChapter?.chapter?.title} 朗读结束跳转下一章并朗读")
         resumeReadAloudInternal()
         if (!ReadBook.moveToNextChapter(true)) {

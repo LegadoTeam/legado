@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="@string/sleep_timer_title"
+        android:textColor="@color/primaryText"
+        android:textSize="18sp" />
+
+    <RadioGroup
+        android:id="@+id/rg_mode"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <io.legado.app.lib.theme.view.ThemeRadioButton
+            android:id="@+id/rb_time"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginEnd="16dp"
+            android:gravity="center_vertical"
+            android:text="@string/sleep_timer_by_time" />
+
+        <io.legado.app.lib.theme.view.ThemeRadioButton
+            android:id="@+id/rb_chapter"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:gravity="center_vertical"
+            android:text="@string/sleep_timer_by_chapter" />
+
+    </RadioGroup>
+
+    <TextView
+        android:id="@+id/tv_value"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:minHeight="32dp"
+        android:textColor="@color/secondaryText"
+        android:textSize="14sp" />
+
+    <io.legado.app.lib.theme.view.ThemeSeekBar
+        android:id="@+id/seek_value"
+        android:layout_width="match_parent"
+        android:layout_height="48dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="end"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/tv_cancel"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:background="?android:attr/selectableItemBackground"
+            android:gravity="center"
+            android:minWidth="72dp"
+            android:text="@string/cancel"
+            android:textColor="@color/primaryText" />
+
+        <TextView
+            android:id="@+id/tv_ok"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:background="?android:attr/selectableItemBackground"
+            android:gravity="center"
+            android:minWidth="72dp"
+            android:text="@string/confirm"
+            android:textColor="@color/accent" />
+
+    </LinearLayout>
+
+</LinearLayout>

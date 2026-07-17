@@ -13,20 +13,21 @@ import io.legado.app.base.BaseDialogFragment
 import io.legado.app.constant.EventBus
 import io.legado.app.databinding.DialogReadAloudBinding
 import io.legado.app.help.config.AppConfig
-import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.model.ReadAloud
 import io.legado.app.model.ReadBook
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.ui.book.read.ReadBookActivity
+import io.legado.app.ui.widget.dialog.SleepTimerDialog
 import io.legado.app.ui.widget.seekbar.SeekBarChangeListener
 import io.legado.app.utils.*
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 
 
 class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud),
-    SpeakEngineDialog.CallBack {
+    SpeakEngineDialog.CallBack,
+    SleepTimerDialog.CallBack {
     private val callBack: CallBack? get() = activity as? CallBack
     private val binding by viewBinding(DialogReadAloudBinding::bind)
 
@@ -92,7 +93,7 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud),
     private fun initData() = binding.run {
         upPlayState()
         upEngineName()
-        upTimerText(BaseReadAloudService.timeMinute)
+        upStopText()
         cbTtsFollowSys.isChecked = requireContext().getPrefBoolean("ttsFollowSys", true)
         upTtsSpeechRateEnabled(!cbTtsFollowSys.isChecked)
         upSeekTimer()
@@ -140,11 +141,12 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud),
             toastOnUi("保存设定时间成功！")
         }
         tvTimer.setOnClickListener {
-            val times = intArrayOf(0, 5, 10, 15, 30, 60, 90, 180)
-            val timeKeys = times.map { "$it 分钟" }
-            context?.selector("设定时间", timeKeys) { _, index ->
-                ReadAloud.setTimer(requireContext(), times[index])
-            }
+            showDialogFragment(
+                SleepTimerDialog.newInstance(
+                    BaseReadAloudService.timeMinute,
+                    BaseReadAloudService.chapterToStop,
+                )
+            )
         }
         //设置保存的默认值
         seekTtsSpeechRate.progress = AppConfig.ttsSpeechRate
@@ -162,7 +164,7 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud),
         })
         seekTimer.setOnSeekBarChangeListener(object : SeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-                upTimerText(progress)
+                if (fromUser) upTimerText(progress)
             }
 
             override fun onStopTrackingTouch(seekBar: SeekBar) {
@@ -197,11 +199,27 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud),
 
     private fun upSeekTimer() {
         binding.seekTimer.post {
-            if (BaseReadAloudService.timeMinute > 0) {
-                binding.seekTimer.progress = BaseReadAloudService.timeMinute
-            } else {
-                binding.seekTimer.progress = AppConfig.ttsTimer
+            binding.seekTimer.progress = when {
+                BaseReadAloudService.timeMinute > 0 -> BaseReadAloudService.timeMinute
+                BaseReadAloudService.chapterToStop > 0 -> 0
+                else -> AppConfig.ttsTimer
             }
+        }
+    }
+
+    private fun upStopText() {
+        binding.tvTimer.text = when {
+            BaseReadAloudService.chapterToStop > 0 -> getString(
+                R.string.sleep_timer_chapters,
+                BaseReadAloudService.chapterToStop,
+            )
+
+            BaseReadAloudService.timeMinute > 0 -> getString(
+                R.string.timer_m,
+                BaseReadAloudService.timeMinute,
+            )
+
+            else -> getString(R.string.set_timer)
         }
     }
 
@@ -236,9 +254,24 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud),
         upEngineName()
     }
 
+    override fun onSleepTimerMinute(minute: Int) {
+        ReadAloud.setTimer(requireContext(), minute)
+    }
+
+    override fun onSleepTimerChapter(count: Int) {
+        ReadAloud.setChapterStop(requireContext(), count)
+    }
+
     override fun observeLiveBus() {
         observeEvent<Int>(EventBus.ALOUD_STATE) { upPlayState() }
-        observeEvent<Int>(EventBus.READ_ALOUD_DS) { binding.seekTimer.progress = it }
+        observeEvent<Int>(EventBus.READ_ALOUD_DS) {
+            binding.seekTimer.progress = it
+            upStopText()
+        }
+        observeEvent<Int>(EventBus.READ_ALOUD_CHAPTER_STOP) {
+            if (it > 0) binding.seekTimer.progress = 0
+            upStopText()
+        }
     }
 
     interface CallBack {
