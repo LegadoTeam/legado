@@ -60,6 +60,10 @@ internal fun HttpTTS.hasLoginCapability(): Boolean {
     return !loginUrl.isNullOrBlank() || !loginUi.isNullOrBlank()
 }
 
+internal fun HttpTTS.shouldOpenLoginOnSelection(): Boolean {
+    return hasLoginCapability()
+}
+
 /**
  * tts引擎管理
  */
@@ -311,9 +315,7 @@ class SpeakEngineDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
                     getItemByLayoutPosition(holder.layoutPosition)?.let { httpTTS ->
                         val id = httpTTS.id.toString()
                         upTts(id)
-                        if (httpTTS.hasLoginCapability()
-                            && httpTTS.getLoginInfo().isNullOrBlank()
-                        ) {
+                        if (httpTTS.shouldOpenLoginOnSelection()) {
                             startActivity<SourceLoginActivity> {
                                 putExtra("type", "httpTts")
                                 putExtra("key", id)
