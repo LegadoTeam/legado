@@ -95,6 +95,22 @@ fun String.splitNotBlank(regex: Regex, limit: Int = 0): Array<String> = run {
     this.split(regex, limit).map { it.trim() }.filterNot { it.isBlank() }.toTypedArray()
 }
 
+/**
+ * Returns the normalized group list after an exact rename, or null when [oldGroup]
+ * is not a complete group member.
+ */
+fun String?.renameGroupExact(oldGroup: String, newGroup: String?): String? {
+    val groups = this
+        ?.splitNotBlank(AppPattern.splitGroupRegex)
+        ?.toCollection(linkedSetOf())
+        ?: return null
+    if (!groups.remove(oldGroup)) return null
+    if (!newGroup.isNullOrEmpty()) {
+        groups.addAll(newGroup.splitNotBlank(AppPattern.splitGroupRegex))
+    }
+    return groups.joinToString(",")
+}
+
 @SuppressLint("ObsoleteSdkInt")
 fun String.cnCompare(other: String): Int {
     return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {

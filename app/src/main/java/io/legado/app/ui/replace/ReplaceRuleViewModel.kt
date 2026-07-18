@@ -5,6 +5,7 @@ import android.text.TextUtils
 import io.legado.app.base.BaseViewModel
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.ReplaceRule
+import io.legado.app.utils.renameGroupExact
 import io.legado.app.utils.splitNotBlank
 
 /**
@@ -105,16 +106,14 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
 
     fun upGroup(oldGroup: String, newGroup: String?) {
         execute {
-            val sources = appDb.replaceRuleDao.getByGroup(oldGroup)
-            sources.forEach { source ->
-                source.group?.splitNotBlank(",")?.toHashSet()?.let {
-                    it.remove(oldGroup)
-                    if (!newGroup.isNullOrEmpty())
-                        it.add(newGroup)
-                    source.group = TextUtils.join(",", it)
+            val sources = appDb.replaceRuleDao.getByGroup(oldGroup).mapNotNull { source ->
+                source.group.renameGroupExact(oldGroup, newGroup)?.let { groups ->
+                    source.apply { group = groups }
                 }
             }
-            appDb.replaceRuleDao.update(*sources.toTypedArray())
+            if (sources.isNotEmpty()) {
+                appDb.replaceRuleDao.update(*sources.toTypedArray())
+            }
         }
     }
 
