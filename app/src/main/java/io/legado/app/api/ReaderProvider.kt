@@ -19,36 +19,19 @@ import kotlinx.coroutines.runBlocking
  * Export book data to other app.
  */
 class ReaderProvider : ContentProvider() {
-    private enum class RequestCode {
-        SaveBookSource, SaveBookSources, DeleteBookSources, GetBookSource, GetBookSources,
-        SaveRssSource, SaveRssSources, DeleteRssSources, GetRssSource, GetRssSources,
-        SaveBook, GetBookshelf, RefreshToc, GetChapterList, GetBookContent, GetBookCover,
-        SaveBookProgress
-    }
-
     private val postBodyKey = "json"
     private val sMatcher by lazy {
         UriMatcher(UriMatcher.NO_MATCH).apply {
             "${context?.applicationInfo?.packageName}.readerProvider".also { authority ->
-                addURI(authority, "bookSource/insert", RequestCode.SaveBookSource.ordinal)
-                addURI(authority, "bookSources/insert", RequestCode.SaveBookSources.ordinal)
-                addURI(authority, "bookSources/delete", RequestCode.DeleteBookSources.ordinal)
-                addURI(authority, "bookSource/query", RequestCode.GetBookSource.ordinal)
-                addURI(authority, "bookSources/query", RequestCode.GetBookSources.ordinal)
-                addURI(authority, "rssSource/insert", RequestCode.SaveBookSource.ordinal)
-                addURI(authority, "rssSources/insert", RequestCode.SaveBookSources.ordinal)
-                addURI(authority, "rssSources/delete", RequestCode.DeleteBookSources.ordinal)
-                addURI(authority, "rssSource/query", RequestCode.GetBookSource.ordinal)
-                addURI(authority, "rssSources/query", RequestCode.GetBookSources.ordinal)
-                addURI(authority, "book/insert", RequestCode.SaveBook.ordinal)
-                addURI(authority, "books/query", RequestCode.GetBookshelf.ordinal)
-                addURI(authority, "book/refreshToc/query", RequestCode.RefreshToc.ordinal)
-                addURI(authority, "book/chapter/query", RequestCode.GetChapterList.ordinal)
-                addURI(authority, "book/content/query", RequestCode.GetBookContent.ordinal)
-                addURI(authority, "book/cover/query", RequestCode.GetBookCover.ordinal)
+                ReaderProviderRoutes.all.forEach { route ->
+                    addURI(authority, route.path, route.requestCode.ordinal)
+                }
             }
         }
     }
+
+    private fun requestCode(uri: Uri): ReaderProviderRequestCode? =
+        ReaderProviderRoutes.requestForMatcherCode(sMatcher.match(uri))
 
     override fun onCreate(): Boolean {
         context?.let { context ->
@@ -62,51 +45,32 @@ class ReaderProvider : ContentProvider() {
         selection: String?,
         selectionArgs: Array<String>?
     ): Int {
-        if (sMatcher.match(uri) < 0) return -1
-        when (RequestCode.entries[sMatcher.match(uri)]) {
-            RequestCode.DeleteBookSources -> BookSourceController.deleteSources(selection)
-            RequestCode.DeleteRssSources -> BookSourceController.deleteSources(selection)
-            else -> throw IllegalStateException(
-                "Unexpected value: " + RequestCode.entries[sMatcher.match(uri)].name
-            )
-        }
+        val requestCode = requestCode(uri) ?: return -1
+        dispatchReaderProviderDelete(
+            requestCode,
+            selection,
+            deleteBookSources = { BookSourceController.deleteSources(it) },
+            deleteRssSources = { RssSourceController.deleteSources(it) },
+        )
         return 0
     }
 
     override fun getType(uri: Uri) = throw UnsupportedOperationException("Not yet implemented")
 
     override fun insert(uri: Uri, values: ContentValues?): Uri? {
-        if (sMatcher.match(uri) < 0) return null
+        val requestCode = requestCode(uri) ?: return null
         runBlocking {
-            when (RequestCode.entries[sMatcher.match(uri)]) {
-                RequestCode.SaveBookSource -> values?.let {
-                    BookSourceController.saveSource(values.getAsString(postBodyKey))
-                }
-
-                RequestCode.SaveBookSources -> values?.let {
-                    BookSourceController.saveSources(values.getAsString(postBodyKey))
-                }
-
-                RequestCode.SaveRssSource -> values?.let {
-                    RssSourceController.saveSource(values.getAsString(postBodyKey))
-                }
-
-                RequestCode.SaveRssSources -> values?.let {
-                    RssSourceController.saveSources(values.getAsString(postBodyKey))
-                }
-
-                RequestCode.SaveBook -> values?.let {
-                    BookController.saveBook(values.getAsString(postBodyKey))
-                }
-
-                RequestCode.SaveBookProgress -> values?.let {
-                    BookController.saveBookProgress(values.getAsString(postBodyKey))
-                }
-
-                else -> throw IllegalStateException(
-                    "Unexpected value: " + RequestCode.entries[sMatcher.match(uri)].name
-                )
-            }
+            dispatchReaderProviderInsert(
+                requestCode,
+                values?.getAsString(postBodyKey),
+                valuesPresent = values != null,
+                saveBookSource = { BookSourceController.saveSource(it) },
+                saveBookSources = { BookSourceController.saveSources(it) },
+                saveRssSource = { RssSourceController.saveSource(it) },
+                saveRssSources = { RssSourceController.saveSources(it) },
+                saveBook = { BookController.saveBook(it) },
+                saveBookProgress = { BookController.saveBookProgress(it) },
+            )
         }
         return null
     }
@@ -125,20 +89,22 @@ class ReaderProvider : ContentProvider() {
         uri.getQueryParameter("path")?.let {
             map["path"] = arrayListOf(it)
         }
-        return if (sMatcher.match(uri) < 0) null else when (RequestCode.entries[sMatcher.match(uri)]) {
-            RequestCode.GetBookSource -> SimpleCursor(BookSourceController.getSource(map))
-            RequestCode.GetBookSources -> SimpleCursor(BookSourceController.sources)
-            RequestCode.GetRssSource -> SimpleCursor(RssSourceController.getSource(map))
-            RequestCode.GetRssSources -> SimpleCursor(RssSourceController.sources)
-            RequestCode.GetBookshelf -> SimpleCursor(BookController.bookshelf)
-            RequestCode.GetBookContent -> SimpleCursor(BookController.getBookContent(map))
-            RequestCode.RefreshToc -> SimpleCursor(BookController.refreshToc(map))
-            RequestCode.GetChapterList -> SimpleCursor(BookController.getChapterList(map))
-            RequestCode.GetBookCover -> SimpleCursor(BookController.getCover(map))
-            else -> throw IllegalStateException(
-                "Unexpected value: " + RequestCode.entries[sMatcher.match(uri)].name
+        val requestCode = requestCode(uri) ?: return null
+        return SimpleCursor(
+            dispatchReaderProviderQuery(
+                requestCode,
+                map,
+                getBookSource = { BookSourceController.getSource(it) },
+                getBookSources = { BookSourceController.sources },
+                getRssSource = { RssSourceController.getSource(it) },
+                getRssSources = { RssSourceController.sources },
+                getBookshelf = { BookController.bookshelf },
+                getBookContent = { BookController.getBookContent(it) },
+                refreshToc = { BookController.refreshToc(it) },
+                getChapterList = { BookController.getChapterList(it) },
+                getBookCover = { BookController.getCover(it) },
             )
-        }
+        )
     }
 
     override fun update(

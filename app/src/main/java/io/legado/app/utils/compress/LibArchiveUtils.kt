@@ -236,31 +236,18 @@ object LibArchiveUtils {
                 val entryName =
                     getEntryString(ArchiveEntry.pathnameUtf8(entry), ArchiveEntry.pathname(entry))
                         ?: continue
-                val entryFile = File(destDir, entryName)
-                if (!entryFile.canonicalPath.startsWith(destDir.canonicalPath)) {
-                    throw SecurityException("压缩文件只能解压到指定路径")
-                }
                 val entryStat = ArchiveEntry.stat(entry)
 
                 //判断是否是文件夹
                 if (entryStat.isDir()) {
-                    if (!entryFile.exists()) {
-                        entryFile.mkdirs()
-                    }
+                    prepareArchiveEntryFile(destDir, entryName, isDirectory = true)
                     continue
                 }
 
 
 
-                if (entryFile.parentFile?.exists() != true) {
-                    entryFile.parentFile?.mkdirs()
-                }
                 if (filter != null && !filter.invoke(entryName)) continue
-                if (!entryFile.exists()) {
-                    entryFile.createNewFile()
-                    entryFile.setReadable(true)
-                    entryFile.setExecutable(true)
-                }
+                val entryFile = prepareArchiveEntryFile(destDir, entryName, isDirectory = false)
 
                 ParcelFileDescriptor.open(entryFile, ParcelFileDescriptor.MODE_WRITE_ONLY).use {
                     Archive.readDataIntoFd(archive, it.fd)
