@@ -44,6 +44,10 @@ class CodeEditActivity :
     VMBaseActivity<ActivityCodeEditBinding, CodeEditViewModel>(),
     KeyboardToolPop.CallBack, ChangeThemeDialog.CallBack, SettingsDialog.CallBack {
     companion object {
+        const val EXTRA_SHOW_DEBUG_SOURCE = "showDebugSourceAction"
+        const val EXTRA_RESULT_ACTION = "resultAction"
+        const val RESULT_ACTION_DEBUG_SOURCE = "debugSource"
+
         private var isInitialized = false
         private var findText = ""
         private var replaceText = ""
@@ -58,6 +62,7 @@ class CodeEditActivity :
     private val editorSearcher: EditorSearcher by lazy { editor.searcher }
     private var searchOptions: SearchOptions? = null
     private var menuSaveBtn: MenuItem? = null
+    private var menuDebugSourceBtn: MenuItem? = null
 
     private val isDark
         get() = AppConfig.editTemeAuto && ThemeConfig.isDarkTheme()
@@ -77,6 +82,8 @@ class CodeEditActivity :
                 setText(viewModel.initialText)
                 editable = viewModel.writable
                 menuSaveBtn?.isVisible = viewModel.writable
+                menuDebugSourceBtn?.isVisible =
+                    shouldShowDebugSourceAction(viewModel.writable, isDebugSourceActionEnabled())
                 requestFocus()
                 postDelayed({
                     val pos = cursor.indexer.getCharPosition(viewModel.cursorPosition)
@@ -148,6 +155,21 @@ class CodeEditActivity :
         }
     }
 
+    private fun returnText(action: String) {
+        if (!viewModel.writable) return
+        val result = Intent().apply {
+            putExtra("text", editor.text.toString())
+            putExtra("cursorPosition", editor.cursor?.left ?: 0)
+            putExtra(EXTRA_RESULT_ACTION, action)
+        }
+        setResult(RESULT_OK, result)
+        super.finish()
+    }
+
+    private fun isDebugSourceActionEnabled(): Boolean {
+        return intent.getBooleanExtra(EXTRA_SHOW_DEBUG_SOURCE, false)
+    }
+
     override fun upEdit(fontSize: Int?, autoComplete: Boolean?, autoWarp: Boolean?, editNonPrintable: Int?) {
         if (fontSize != null) {
             editor.setTextSize(fontSize.toFloat())
@@ -191,6 +213,12 @@ class CodeEditActivity :
         menuInflater.inflate(R.menu.code_edit_activity, menu)
         menuSaveBtn = menu.findItem(R.id.menu_save).apply {
             isVisible = viewModel.writable
+        }
+        menuDebugSourceBtn = menu.findItem(R.id.menu_debug_source).apply {
+            isVisible = shouldShowDebugSourceAction(
+                viewModel.writable,
+                isDebugSourceActionEnabled()
+            )
         }
         return super.onCompatCreateOptionsMenu(menu)
     }
@@ -323,6 +351,7 @@ class CodeEditActivity :
         when (item.itemId) {
             R.id.menu_search -> search()
             R.id.menu_save -> save(false)
+            R.id.menu_debug_source -> returnText(RESULT_ACTION_DEBUG_SOURCE)
             R.id.menu_format_code -> viewModel.formatCode(editor)
             R.id.menu_change_theme -> showDialogFragment(ChangeThemeDialog())
             R.id.menu_config_settings -> showDialogFragment(SettingsDialog(this, this))
@@ -391,4 +420,8 @@ class CodeEditActivity :
     override fun onRedoClicked() {
         editor.redo()
     }
+}
+
+internal fun shouldShowDebugSourceAction(writable: Boolean, requested: Boolean): Boolean {
+    return writable && requested
 }
