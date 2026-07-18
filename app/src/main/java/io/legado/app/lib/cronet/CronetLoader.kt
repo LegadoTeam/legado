@@ -14,19 +14,27 @@ import io.legado.app.utils.printOnDebug
 import org.chromium.net.CronetEngine
 import org.json.JSONObject
 import splitties.init.appCtx
-import java.io.BufferedReader
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.io.IOException
-import java.io.InputStream
-import java.io.InputStreamReader
-import java.io.OutputStream
 import java.math.BigInteger
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
-import java.util.Objects
+import java.util.concurrent.atomic.AtomicBoolean
+
+internal class CronetDownloadState {
+    private val running = AtomicBoolean(false)
+
+    val isRunning: Boolean
+        get() = running.get()
+
+    fun tryStart(): Boolean = running.compareAndSet(false, true)
+
+    fun finish() {
+        running.set(false)
+    }
+}
 
 @Suppress("ConstPropertyName")
 @Keep
@@ -40,7 +48,9 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
     private val downloadFile: File
     private var cpuAbi: String? = null
     private var md5: String
-    var download = false
+    private val downloadState = CronetDownloadState()
+    val download: Boolean
+        get() = downloadState.isRunning
 
     @Volatile
     private var cacheInstall = false
@@ -94,21 +104,11 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
     }
 
     private fun getMd5(context: Context): String {
-        val stringBuilder = StringBuilder()
         return try {
-            //获取assets资源管理器
-            val assetManager = context.assets
-            //通过管理器打开文件并读取
-            val bf = BufferedReader(
-                InputStreamReader(
-                    assetManager.open("cronet.json")
-                )
-            )
-            var line: String?
-            while (bf.readLine().also { line = it } != null) {
-                stringBuilder.append(line)
+            val json = context.assets.open("cronet.json").bufferedReader().use {
+                it.readText()
             }
-            JSONObject(stringBuilder.toString()).optString(getCpuAbi(context), "")
+            JSONObject(json).optString(getCpuAbi(context), "")
         } catch (e: java.lang.Exception) {
             return ""
         }
@@ -132,7 +132,7 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
         } catch (e: Throwable) {
             //如果找不到，则从远程下载
             //删除历史文件
-            deleteHistoryFile(Objects.requireNonNull(soFile.parentFile), soFile)
+            deleteHistoryFile(soFile.parentFile, soFile)
             //md5 = getUrlMd5(md5Url)
             DebugLog.d(javaClass.simpleName, "soMD5:$md5")
             if (md5.length != 32 || soUrl.isEmpty()) {
@@ -192,17 +192,13 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
     /**
      * 删除历史文件
      */
-    private fun deleteHistoryFile(dir: File, currentFile: File?) {
-        val files = dir.listFiles()
-        @Suppress("SameParameterValue")
-        if (files != null && files.isNotEmpty()) {
-            for (f in files) {
-                if (f.exists() && (currentFile == null || f.absolutePath != currentFile.absolutePath)) {
-                    val delete = f.delete()
-                    DebugLog.d(javaClass.simpleName, "delete file: $f result: $delete")
-                    if (!delete) {
-                        f.deleteOnExit()
-                    }
+    private fun deleteHistoryFile(dir: File?, currentFile: File?) {
+        dir?.listFiles()?.forEach { file ->
+            if (file.exists() && (currentFile == null || file.absolutePath != currentFile.absolutePath)) {
+                val deleted = file.delete()
+                DebugLog.d(javaClass.simpleName, "delete file: $file result: $deleted")
+                if (!deleted) {
+                    file.deleteOnExit()
                 }
             }
         }
@@ -212,22 +208,17 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
      * 下载文件
      */
     private fun downloadFileIfNotExist(url: String, destFile: File): Boolean {
-        var inputStream: InputStream? = null
-        var outputStream: OutputStream? = null
+        if (destFile.exists()) {
+            return true
+        }
+        var connection: HttpURLConnection? = null
         try {
-            val connection = URL(url).openConnection() as HttpURLConnection
-            inputStream = connection.inputStream
-            if (destFile.exists()) {
-                return true
-            }
-            destFile.parentFile!!.mkdirs()
-            destFile.createNewFile()
-            outputStream = FileOutputStream(destFile)
-            val buffer = ByteArray(32768)
-            var read: Int
-            while (inputStream.read(buffer).also { read = it } != -1) {
-                outputStream.write(buffer, 0, read)
-                outputStream.flush()
+            connection = URL(url).openConnection() as HttpURLConnection
+            destFile.parentFile?.mkdirs()
+            connection.inputStream.use { input ->
+                FileOutputStream(destFile).use { output ->
+                    input.copyTo(output, 32768)
+                }
             }
             return true
         } catch (e: Throwable) {
@@ -236,20 +227,7 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
                 destFile.deleteOnExit()
             }
         } finally {
-            if (inputStream != null) {
-                try {
-                    inputStream.close()
-                } catch (e: IOException) {
-                    e.printOnDebug()
-                }
-            }
-            if (outputStream != null) {
-                try {
-                    outputStream.close()
-                } catch (e: IOException) {
-                    e.printOnDebug()
-                }
-            }
+            connection?.disconnect()
         }
         return false
     }
@@ -265,79 +243,58 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
         downloadTempFile: File,
         destSuccessFile: File
     ) {
-        if (download) {
+        if (!downloadState.tryStart()) {
             return
         }
-        download = true
 
         Coroutine.async {
-            val result = downloadFileIfNotExist(url, downloadTempFile)
-            DebugLog.d(javaClass.simpleName, "download result:$result")
-            //文件md5再次校验
-            val fileMD5 = getFileMD5(downloadTempFile)
-            if (md5 != null && !md5.equals(fileMD5, ignoreCase = true)) {
-                val delete = downloadTempFile.delete()
-                if (!delete) {
-                    downloadTempFile.deleteOnExit()
+            try {
+                val result = downloadFileIfNotExist(url, downloadTempFile)
+                DebugLog.d(javaClass.simpleName, "download result:$result")
+                if (!result) {
+                    return@async
                 }
-                download = false
-                return@async
+                val fileMD5 = getFileMD5(downloadTempFile)
+                if (md5 != null && !md5.equals(fileMD5, ignoreCase = true)) {
+                    if (!downloadTempFile.delete()) {
+                        downloadTempFile.deleteOnExit()
+                    }
+                    return@async
+                }
+                DebugLog.d(javaClass.simpleName, "download success, copy to $destSuccessFile")
+                if (copyFile(downloadTempFile, destSuccessFile)) {
+                    cacheInstall = false
+                }
+                deleteHistoryFile(downloadTempFile.parentFile, null)
+            } finally {
+                downloadState.finish()
             }
-            DebugLog.d(javaClass.simpleName, "download success, copy to $destSuccessFile")
-            //下载成功拷贝文件
-            copyFile(downloadTempFile, destSuccessFile)
-            cacheInstall = false
-            val parentFile = downloadTempFile.parentFile
-            @Suppress("SameParameterValue")
-            (deleteHistoryFile(parentFile!!, null))
         }
     }
 
     /**
      * 拷贝文件
      */
-    private fun copyFile(source: File?, dest: File?): Boolean {
-        if (source == null || !source.exists() || !source.isFile || dest == null) {
+    private fun copyFile(source: File, dest: File): Boolean {
+        if (!source.exists() || !source.isFile) {
             return false
         }
         if (source.absolutePath == dest.absolutePath) {
             return true
         }
-        var fileInputStream: FileInputStream? = null
-        var os: FileOutputStream? = null
         val parent = dest.parentFile
         if (parent != null && !parent.exists()) {
-            val mkdirs = parent.mkdirs()
-            if (!mkdirs) {
-                parent.mkdirs()
-            }
+            parent.mkdirs()
         }
         try {
-            fileInputStream = FileInputStream(source)
-            os = FileOutputStream(dest, false)
-            val buffer = ByteArray(1024 * 512)
-            var length: Int
-            while (fileInputStream.read(buffer).also { length = it } > 0) {
-                os.write(buffer, 0, length)
+            FileInputStream(source).use { input ->
+                FileOutputStream(dest, false).use { output ->
+                    input.copyTo(output, 1024 * 512)
+                }
             }
             return true
         } catch (e: Exception) {
             e.printOnDebug()
-        } finally {
-            if (fileInputStream != null) {
-                try {
-                    fileInputStream.close()
-                } catch (e: Exception) {
-                    e.printOnDebug()
-                }
-            }
-            if (os != null) {
-                try {
-                    os.close()
-                } catch (e: Exception) {
-                    e.printOnDebug()
-                }
-            }
         }
         return false
     }
@@ -346,28 +303,20 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
      * 获得文件md5
      */
     private fun getFileMD5(file: File): String? {
-        var fileInputStream: FileInputStream? = null
         try {
-            fileInputStream = FileInputStream(file)
             val md5 = MessageDigest.getInstance("MD5")
             val buffer = ByteArray(1024)
-            var numRead: Int
-            while (fileInputStream.read(buffer).also { numRead = it } > 0) {
-                md5.update(buffer, 0, numRead)
+            FileInputStream(file).use { input ->
+                var numRead: Int
+                while (input.read(buffer).also { numRead = it } > 0) {
+                    md5.update(buffer, 0, numRead)
+                }
             }
             return String.format("%032x", BigInteger(1, md5.digest())).lowercase()
         } catch (e: Exception) {
             e.printOnDebug()
         } catch (e: OutOfMemoryError) {
             e.printOnDebug()
-        } finally {
-            if (fileInputStream != null) {
-                try {
-                    fileInputStream.close()
-                } catch (e: Exception) {
-                    e.printOnDebug()
-                }
-            }
         }
         return null
     }
