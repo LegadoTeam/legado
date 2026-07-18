@@ -72,6 +72,17 @@ class JsSourceConfigTest {
     }
 
     @Test
+    fun `explore metadata requires matching function`() {
+        assertExtractError(
+            validScript.replace(
+                "header: \"{\\\"User-Agent\\\":\\\"test\\\"}\"",
+                "exploreUrl: \"分类::https://example.com/list\"",
+            ),
+            "explore",
+        )
+    }
+
+    @Test
     fun `normalizes login form array`() {
         val source = JsSourceConfig.extract(
             validScript.replace(
@@ -165,6 +176,37 @@ class JsSourceConfigTest {
             "var source = { lastUpdateTime: 123456 };",
             JsSourceConfig.stampLastUpdateTime(script, 123456),
         )
+    }
+
+    @Test
+    fun `extracts declared update time and defaults missing to zero`() {
+        val declared = JsSourceConfig.extract(
+            validScript.replace(
+                "header: \"{\\\"User-Agent\\\":\\\"test\\\"}\"",
+                "lastUpdateTime: 1752449000000",
+            )
+        )
+
+        assertEquals(1752449000000L, declared.lastUpdateTime)
+        assertEquals(0L, JsSourceConfig.extract(validScript).lastUpdateTime)
+    }
+
+    @Test
+    fun `stamps numeric update time without touching later declarations`() {
+        val script = """
+            var source = {
+                lastUpdateTime: 0 // version timestamp
+            };
+            var fallback = { lastUpdateTime: 1 };
+        """.trimIndent()
+        val expected = """
+            var source = {
+                lastUpdateTime: 123456 // version timestamp
+            };
+            var fallback = { lastUpdateTime: 1 };
+        """.trimIndent()
+
+        assertEquals(expected, JsSourceConfig.stampLastUpdateTime(script, 123456))
     }
 
     private fun assertExtractError(script: String, messagePart: String) {
