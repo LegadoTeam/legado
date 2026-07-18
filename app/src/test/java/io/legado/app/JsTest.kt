@@ -121,6 +121,53 @@ class JsTest {
     }
 
     @Test
+    fun javaStringInteropBoundary() {
+        val chapter = BookChapter(
+            title = "第1章",
+            url = "https://a/b/",
+            tag = "",
+        )
+        val bindings = ScriptBindings()
+        bindings["chapter"] = chapter
+        bindings["key"] = "native"
+        bindings["baseUrl"] = "https://base.example"
+        fun evaluate(js: String) = RhinoScriptEngine.eval(js, bindings)
+
+        Assert.assertEquals("string", evaluate("typeof key"))
+        Assert.assertEquals("string", evaluate("typeof baseUrl"))
+        Assert.assertEquals("object", evaluate("typeof chapter.title"))
+        Assert.assertEquals("object", evaluate("typeof chapter.title.substring(0, 1)"))
+        Assert.assertEquals("function", evaluate("typeof chapter.title.length"))
+        Assert.assertEquals("3", evaluate("'' + chapter.title.length()"))
+        Assert.assertEquals("3", evaluate("'' + String(chapter.title).length"))
+
+        Assert.assertEquals("T", evaluate("chapter.tag ? 'T' : 'F'"))
+        Assert.assertEquals("F", evaluate("String(chapter.tag) ? 'T' : 'F'"))
+        Assert.assertEquals(
+            "false:true:true",
+            evaluate(
+                "(chapter.title === '第1章') + ':' + " +
+                    "(chapter.title == '第1章') + ':' + " +
+                    "(String(chapter.title) === '第1章')"
+            ),
+        )
+
+        val ambiguousReplace = runCatching {
+            evaluate("chapter.url.replace(/b/, 'X')")
+        }
+        Assert.assertTrue("Java replace overload should reject a JS RegExp", ambiguousReplace.isFailure)
+        Assert.assertEquals(
+            "https://a/X/",
+            evaluate("String(chapter.url).replace(/b/, 'X')"),
+        )
+
+        Assert.assertEquals("4", evaluate("'' + chapter.url.split('/').length"))
+        Assert.assertEquals("5", evaluate("'' + chapter.url.split('/', -1).length"))
+        Assert.assertEquals("5", evaluate("'' + String(chapter.url).split('/').length"))
+        Assert.assertEquals("string", evaluate("typeof String(chapter.url)"))
+    }
+
+    @Test
     fun typeofString() {
         val bindings = ScriptBindings()
         @Language("js")

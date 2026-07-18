@@ -56,6 +56,24 @@ class JsSourceAuthorGuideTest {
         assertFalse(guide.contains("getReviewSummary"))
     }
 
+    @Test
+    fun `guide documents Java string wrapper boundaries`() {
+        val requiredText = listOf(
+            "`typeof chapter.title`",
+            "`chapter.title.length()`",
+            "`chapter.tag ? \"T\" : \"F\"`",
+            "`chapter.title === \"第1章\"`",
+            "`chapter.url.replace(/b/, \"X\")`",
+            "`chapter.url.split(\"/\", -1).length`",
+            "String(chapter.url || \"\")",
+            "String(chapter.tag || \"\")",
+        )
+
+        requiredText.forEach { text ->
+            assertTrue("Missing Java string boundary documentation: $text", guide.contains(text))
+        }
+    }
+
     private fun source(relativePath: String): String {
         return File(repositoryRoot(), relativePath).readText()
     }

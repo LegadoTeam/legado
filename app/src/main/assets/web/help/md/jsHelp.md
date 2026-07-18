@@ -795,6 +795,44 @@ function getContent(chapter, book, nextChapterUrl) {
 函数运行时可使用 `java`、`sourceApi`、`baseUrl`、`cookie`、`cache` 和当前函数参数。
 每次调用都会建立新的脚本作用域并重新执行主脚本，编译缓存不会保留顶层变量值。
 
+#### Java String 包装边界
+
+`key`、`baseUrl` 等直接绑定的字符串是 JS 原生字符串。从 Java 对象成员或 Java 方法取得的
+字符串，例如 `book.bookUrl`、`chapter.title`、`chapter.url`、Jsoup 的 `.text()`/`.attr()`
+以及 `java.ajax()` 返回值，则可能保留为 Java `String` 包装对象。两者显示和拼接结果相同，
+但类型、真假值、严格相等和同名方法分派不同。
+
+以下示例假设 `chapter.title` 为 `"第1章"`、`chapter.url` 为 `"https://a/b/"`、
+`chapter.tag` 为 Java 空字符串：
+
+|表达式|当前行为|
+|---|---|
+|`typeof chapter.title`|`"object"`|
+|`typeof chapter.title.length`|`"function"`；Java 长度应调用 `chapter.title.length()`|
+|`chapter.tag ? "T" : "F"`|`"T"`；包装后的 Java 空字符串仍是真值|
+|`chapter.title === "第1章"`|`false`；使用宽松相等 `==` 才按文本相等|
+|`chapter.url.replace(/b/, "X")`|可能因 Java `replace` 重载无法唯一选择而抛错|
+|`chapter.url.split("/").length`|`4`；调用 Java `split(regex)`，会丢弃尾部空串|
+|`chapter.url.split("/", -1).length`|`5`；Java 双参数重载可保留尾部空串|
+
+需要使用 JS 的正则 `replace`、`split`、`.length` 属性、空串真假值或严格相等时，先用
+`String(...)` 归一化：
+
+```js
+var url = String(chapter.url || "");
+var title = String(chapter.title || "");
+var tag = String(chapter.tag || "");
+
+url.replace(/b/, "X");       // https://a/X/
+url.split("/").length;       // 5，使用 JS split 语义
+title.length;                 // 3，使用 JS length 属性
+tag ? "T" : "F";             // F
+title === "第1章";           // true
+```
+
+若明确需要 Java 语义，可以直接调用 `length()`、`indexOf(...)`、`split(regex, limit)` 等
+Java 方法。不要依赖某个方法名恰好回落到 `String.prototype`；跨 Java/JS 边界后先归一化最稳妥。
+
 - 不要依赖顶层可变变量在函数或请求之间传递状态。
 - 不要假设搜索、详情、目录和正文一定按固定顺序执行。
 - 同一个书源可能同时执行多个请求。
