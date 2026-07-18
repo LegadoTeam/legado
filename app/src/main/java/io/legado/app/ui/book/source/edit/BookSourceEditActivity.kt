@@ -78,6 +78,7 @@ class BookSourceEditActivity :
     private val infoEntities: ArrayList<EditEntity> = ArrayList()
     private val tocEntities: ArrayList<EditEntity> = ArrayList()
     private val contentEntities: ArrayList<EditEntity> = ArrayList()
+    private var redirectJsSourceUrl: String? = null
 
     private val jsSourceEdit = registerForActivityResult(
         StartActivityContract(JsSourceEditActivity::class.java)
@@ -107,7 +108,21 @@ class BookSourceEditActivity :
         KeyboardToolPop(this, lifecycleScope, binding.root, this)
     }
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        redirectJsSourceUrl = intent.getStringExtra("sourceUrl")
+            ?.takeIf { appDb.bookSourceDao.hasJsSource(it) }
+        super.onCreate(savedInstanceState)
+    }
+
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        redirectJsSourceUrl?.let { sourceUrl ->
+            if (savedInstanceState == null) {
+                jsSourceEdit.launch {
+                    putExtra("sourceUrl", sourceUrl)
+                }
+            }
+            return
+        }
         softKeyboardTool.attachToWindow(window)
         initView()
         viewModel.initData(intent) {
@@ -123,6 +138,7 @@ class BookSourceEditActivity :
 
     override fun onPostCreate(savedInstanceState: Bundle?) {
         super.onPostCreate(savedInstanceState)
+        if (redirectJsSourceUrl != null) return
         if (!LocalConfig.ruleHelpVersionIsLast) {
             showHelp("ruleHelp")
         }
