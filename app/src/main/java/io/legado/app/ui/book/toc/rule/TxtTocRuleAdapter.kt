@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import android.widget.PopupMenu
-import androidx.core.os.bundleOf
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.R
@@ -152,14 +151,18 @@ class TxtTocRuleAdapter(context: Context, private val callBack: CallBack) :
         getItems().forEach {
             selected.add(it)
         }
-        notifyItemRangeChanged(0, itemCount, bundleOf(Pair("selected", null)))
+        notifyItemRangeChanged(0, itemCount, Bundle().apply {
+            putString("selected", null)
+        })
         callBack.upCountView()
     }
 
     fun clearSelection() {
         if (selected.isEmpty()) return
         selected.clear()
-        notifyItemRangeChanged(0, itemCount, bundleOf(Pair("selected", null)))
+        notifyItemRangeChanged(0, itemCount, Bundle().apply {
+            putString("selected", null)
+        })
         callBack.upCountView()
     }
 
@@ -171,7 +174,9 @@ class TxtTocRuleAdapter(context: Context, private val callBack: CallBack) :
                 selected.add(it)
             }
         }
-        notifyItemRangeChanged(0, itemCount, bundleOf(Pair("selected", null)))
+        notifyItemRangeChanged(0, itemCount, Bundle().apply {
+            putString("selected", null)
+        })
         callBack.upCountView()
     }
 
@@ -219,7 +224,9 @@ class TxtTocRuleAdapter(context: Context, private val callBack: CallBack) :
                     } else {
                         selected.remove(it)
                     }
-                    notifyItemChanged(position, bundleOf(Pair("selected", null)))
+                    notifyItemChanged(position, Bundle().apply {
+                        putString("selected", null)
+                    })
                     callBack.upCountView()
                     return true
                 }

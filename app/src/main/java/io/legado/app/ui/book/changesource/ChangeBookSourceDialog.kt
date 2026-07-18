@@ -8,7 +8,6 @@ import android.view.ViewGroup
 import android.widget.ImageButton
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
-import androidx.core.os.bundleOf
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle.State.STARTED
 import androidx.lifecycle.lifecycleScope
@@ -461,7 +460,9 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
             adapter.notifyItemRangeChanged(
                 0,
                 adapter.itemCount,
-                bundleOf(Pair("upCurSource", oldBookUrl))
+                Bundle().apply {
+                    putString("upCurSource", oldBookUrl)
+                }
             )
         }
     }

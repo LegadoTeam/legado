@@ -10,7 +10,6 @@ import android.view.View.VISIBLE
 import android.widget.TextView
 import androidx.activity.viewModels
 import androidx.appcompat.widget.SearchView
-import androidx.core.os.bundleOf
 import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -441,7 +440,9 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
 
     override fun observeLiveBus() {
         viewModel.upAdapterLiveData.observe(this) {
-            adapter.notifyItemRangeChanged(0, adapter.itemCount, bundleOf(it to null))
+            adapter.notifyItemRangeChanged(0, adapter.itemCount, Bundle().apply {
+                putString(it, null)
+            })
         }
         viewModel.searchFinishLiveData.observe(this) { isEmpty ->
             if (!isEmpty || viewModel.searchScope.isAll()) return@observe

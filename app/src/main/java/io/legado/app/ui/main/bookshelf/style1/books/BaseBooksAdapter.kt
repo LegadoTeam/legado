@@ -1,7 +1,7 @@
 package io.legado.app.ui.main.bookshelf.style1.books
 
 import android.content.Context
-import androidx.core.os.bundleOf
+import android.os.Bundle
 import androidx.recyclerview.widget.DiffUtil
 import androidx.viewbinding.ViewBinding
 import io.legado.app.base.adapter.DiffRecyclerAdapter
@@ -36,7 +36,7 @@ abstract class BaseBooksAdapter<VB : ViewBinding>(context: Context) :
             }
 
             override fun getChangePayload(oldItem: Book, newItem: Book): Any? {
-                val bundle = bundleOf()
+                val bundle = Bundle()
                 if (oldItem.name != newItem.name) {
                     bundle.putString("name", newItem.name)
                 }
@@ -77,14 +77,19 @@ abstract class BaseBooksAdapter<VB : ViewBinding>(context: Context) :
     fun notification(bookUrl: String) {
         getItems().forEachIndexed { i, it ->
             if (it.bookUrl == bookUrl) {
-                notifyItemChanged(i, bundleOf(Pair("refresh", null), Pair("lastUpdateTime", null)))
+                notifyItemChanged(i, Bundle().apply {
+                    putString("refresh", null)
+                    putString("lastUpdateTime", null)
+                })
                 return
             }
         }
     }
 
     fun upLastUpdateTime() {
-        notifyItemRangeChanged(0, itemCount, bundleOf(Pair("lastUpdateTime", null)))
+        notifyItemRangeChanged(0, itemCount, Bundle().apply {
+            putString("lastUpdateTime", null)
+        })
     }
 
     interface CallBack {

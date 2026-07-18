@@ -7,7 +7,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.PopupMenu
-import androidx.core.os.bundleOf
 import androidx.core.view.doOnLayout
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
@@ -156,7 +155,9 @@ class BookSourceAdapter(
         callBack.upCountView()
         recyclerView.doOnLayout {
             handler.post {
-                notifyItemRangeChanged(0, itemCount, bundleOf("upSourceHost" to null))
+                notifyItemRangeChanged(0, itemCount, Bundle().apply {
+                    putString("upSourceHost", null)
+                })
             }
         }
     }
@@ -257,7 +258,9 @@ class BookSourceAdapter(
         getItems().forEach {
             selected.add(it)
         }
-        notifyItemRangeChanged(0, itemCount, bundleOf(Pair("selected", null)))
+        notifyItemRangeChanged(0, itemCount, Bundle().apply {
+            putString("selected", null)
+        })
         callBack.upCountView()
     }
 
@@ -269,7 +272,9 @@ class BookSourceAdapter(
                 selected.add(it)
             }
         }
-        notifyItemRangeChanged(0, itemCount, bundleOf(Pair("selected", null)))
+        notifyItemRangeChanged(0, itemCount, Bundle().apply {
+            putString("selected", null)
+        })
         callBack.upCountView()
     }
 
@@ -288,7 +293,9 @@ class BookSourceAdapter(
                 selected.add(it)
             }
         }
-        notifyItemRangeChanged(minPosition, itemCount, bundleOf(Pair("selected", null)))
+        notifyItemRangeChanged(minPosition, itemCount, Bundle().apply {
+            putString("selected", null)
+        })
         callBack.upCountView()
     }
 
@@ -355,7 +362,9 @@ class BookSourceAdapter(
                     } else {
                         selected.remove(it)
                     }
-                    notifyItemChanged(position, bundleOf(Pair("selected", null)))
+                    notifyItemChanged(position, Bundle().apply {
+                        putString("selected", null)
+                    })
                     callBack.upCountView()
                     return true
                 }

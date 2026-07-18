@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.view.MenuItem
 import android.view.ViewGroup
 import androidx.activity.viewModels
-import androidx.core.os.bundleOf
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.R
@@ -95,7 +94,9 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
             loadMoreViewTop.error(it)
         }
         viewModel.upAdapterLiveData.observe(this) {
-            adapter.notifyItemRangeChanged(0, adapter.itemCount, bundleOf(it to null))
+            adapter.notifyItemRangeChanged(0, adapter.itemCount, Bundle().apply {
+                putString(it, null)
+            })
         }
         viewModel.pageLiveData.observe(this) {
             menuPage.title = getString(R.string.menu_page, it)
