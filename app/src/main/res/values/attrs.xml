@@ -162,6 +162,10 @@
         <attr name="radius" />
     </declare-styleable>
 
+    <declare-styleable name="AccentTonalBgTextView">
+        <attr name="radius" />
+    </declare-styleable>
+
     <declare-styleable name="AccentStrokeTextView">
         <attr name="radius" />
         <attr name="isBottomBackground" />
