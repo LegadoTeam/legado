@@ -54,6 +54,7 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
     private val binding by viewBinding(DialogRecyclerViewBinding::bind)
     private val viewModel by viewModels<ImportBookSourceViewModel>()
     private val adapter by lazy { SourcesAdapter(requireContext()) }
+    private var sourceListReady = false
 
     override fun onStart() {
         super.onStart()
@@ -80,7 +81,9 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
             dismissAllowingStateLoss()
         }
         binding.tvOk.visible()
+        binding.tvOk.isEnabled = false
         binding.tvOk.setOnClickListener {
+            if (viewModel.sourceUpdatePending.value == true) return@setOnClickListener
             val waitDialog = WaitDialog(requireContext())
             waitDialog.show()
             viewModel.importSelect {
@@ -89,34 +92,40 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
             }
         }
         binding.tvFooterLeft.visible()
+        binding.tvFooterLeft.isEnabled = false
         binding.tvFooterLeft.setOnClickListener {
             val selectAll = viewModel.isSelectAll
             viewModel.selectStatus.forEachIndexed { index, b ->
                 if (b != !selectAll) {
-                    viewModel.selectStatus[index] = !selectAll
+                    viewModel.setSelection(index, !selectAll)
                 }
             }
             adapter.notifyDataSetChanged()
             upSelectText()
         }
-        viewModel.errorLiveData.observe(this) {
+        viewModel.errorLiveData.observe(viewLifecycleOwner) {
             binding.rotateLoading.gone()
             binding.tvMsg.apply {
                 text = it
                 visible()
             }
         }
-        viewModel.successLiveData.observe(this) {
+        viewModel.successLiveData.observe(viewLifecycleOwner) {
             binding.rotateLoading.gone()
             if (it > 0) {
+                sourceListReady = true
                 adapter.setItems(viewModel.allSources)
                 upSelectText()
+                updateInteractionState()
             } else {
                 binding.tvMsg.apply {
                     setText(R.string.wrong_format)
                     visible()
                 }
             }
+        }
+        viewModel.sourceUpdatePending.observe(viewLifecycleOwner) {
+            updateInteractionState()
         }
         val source = arguments?.getString("source")
         if (source.isNullOrEmpty()) {
@@ -165,7 +174,7 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
                 val selectAllNew = viewModel.isSelectAllNew
                 viewModel.newSourceStatus.forEachIndexed { index, b ->
                     if (b) {
-                        viewModel.selectStatus[index] = !selectAllNew
+                        viewModel.setSelection(index, !selectAllNew)
                     }
                 }
                 adapter.notifyDataSetChanged()
@@ -176,7 +185,7 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
                 val selectAllUpdate = viewModel.isSelectAllUpdate
                 viewModel.updateSourceStatus.forEachIndexed { index, b ->
                     if (b) {
-                        viewModel.selectStatus[index] = !selectAllUpdate
+                        viewModel.setSelection(index, !selectAllUpdate)
                     }
                 }
                 adapter.notifyDataSetChanged()
@@ -236,13 +245,21 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
         }
     }
 
+    private fun updateInteractionState() {
+        val sourceUpdatePending = viewModel.sourceUpdatePending.value == true
+        val importEnabled = sourceListReady && !sourceUpdatePending
+        binding.tvOk.isEnabled = importEnabled
+        binding.tvFooterLeft.isEnabled = importEnabled
+        binding.tvCancel.isEnabled = !sourceUpdatePending
+        isCancelable = !sourceUpdatePending
+    }
+
     override fun onCodeSave(code: String, requestId: String?) {
-        requestId?.toInt()?.let {
-            GSON.fromJsonObject<BookSource>(code).getOrNull()?.let { source ->
-                viewModel.allSources[it] = source
-                adapter.setItem(it, source)
-            }
-        }
+        if (viewModel.sourceUpdatePending.value == true) return
+        val index = requestId?.toIntOrNull() ?: return
+        if (index !in viewModel.allSources.indices) return
+        val source = GSON.fromJsonObject<BookSource>(code).getOrNull() ?: return
+        viewModel.updateSource(index, source)
     }
 
     inner class SourcesAdapter(context: Context) :
@@ -278,10 +295,9 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
                 } else {
                     showComment.gone()
                 }
-                val localSource = viewModel.checkSources[holder.layoutPosition]
                 tvSourceState.text = when {
-                    localSource == null -> "新增"
-                    item.lastUpdateTime > localSource.lastUpdateTime -> "更新"
+                    viewModel.newSourceStatus[holder.layoutPosition] -> "新增"
+                    viewModel.updateSourceStatus[holder.layoutPosition] -> "更新"
                     else -> "已有"
                 }
             }
@@ -290,15 +306,18 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
         override fun registerListener(holder: ItemViewHolder, binding: ItemSourceImportBinding) {
             binding.apply {
                 cbSourceName.setOnUserCheckedChangeListener { isChecked ->
-                    viewModel.selectStatus[holder.layoutPosition] = isChecked
+                    viewModel.setSelection(holder.layoutPosition, isChecked)
                     upSelectText()
                 }
                 root.onClick {
                     cbSourceName.isChecked = !cbSourceName.isChecked
-                    viewModel.selectStatus[holder.layoutPosition] = cbSourceName.isChecked
+                    viewModel.setSelection(holder.layoutPosition, cbSourceName.isChecked)
                     upSelectText()
                 }
                 tvOpen.setOnClickListener {
+                    if (viewModel.sourceUpdatePending.value == true) {
+                        return@setOnClickListener
+                    }
                     val source = viewModel.allSources[holder.layoutPosition]
                     showDialogFragment(
                         CodeDialog(
