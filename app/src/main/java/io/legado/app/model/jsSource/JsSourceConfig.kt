@@ -1,0 +1,97 @@
+package io.legado.app.model.jsSource
+
+import com.google.gson.JsonObject
+import com.script.rhino.RhinoScriptEngine
+import io.legado.app.data.entities.BookSource
+import io.legado.app.exception.NoStackTraceException
+import io.legado.app.utils.GSON
+import org.mozilla.javascript.Context
+import org.mozilla.javascript.Function
+import org.mozilla.javascript.Scriptable
+import org.mozilla.javascript.ScriptableObject
+import kotlin.coroutines.CoroutineContext
+
+object JsSourceConfig {
+
+    val requiredFunctions = listOf("search", "getChapters", "getContent")
+
+    private val strippedKeys = listOf(
+        "mainJs",
+        "ruleSearch",
+        "ruleExplore",
+        "ruleBookInfo",
+        "ruleToc",
+        "ruleContent",
+        "ruleReview",
+    )
+
+    fun extract(text: String, coroutineContext: CoroutineContext? = null): BookSource {
+        val scope = Context.enter().let { context ->
+            try {
+                context.initSafeStandardObjects()
+            } finally {
+                Context.exit()
+            }
+        }
+        try {
+            RhinoScriptEngine.eval(text, scope, coroutineContext)
+        } catch (error: Exception) {
+            throw NoStackTraceException("JS源脚本执行失败: ${error.message}")
+        }
+        val config = ScriptableObject.getProperty(scope, "source")
+        if (config == null || config === Scriptable.NOT_FOUND) {
+            throw NoStackTraceException("JS源缺少顶层 source 配置对象")
+        }
+        val json = JsSourceEngine.normalizeJsResult(config, scope, coroutineContext)
+            ?: throw NoStackTraceException("source 配置对象无法解析")
+        val jsonObject = runCatching { GSON.fromJson(json, JsonObject::class.java) }.getOrNull()
+            ?: throw NoStackTraceException("source 配置对象不是合法对象")
+        strippedKeys.forEach(jsonObject::remove)
+        normalizeExploreUrl(jsonObject)
+        val source = runCatching { GSON.fromJson(jsonObject, BookSource::class.java) }.getOrNull()
+            ?: throw NoStackTraceException("source 配置对象字段类型不符")
+        if (source.bookSourceUrl.isBlank()) {
+            throw NoStackTraceException("JS源 source.bookSourceUrl 不能为空")
+        }
+        if (source.bookSourceName.isBlank()) {
+            throw NoStackTraceException("JS源 source.bookSourceName 不能为空")
+        }
+        requiredFunctions.forEach { name ->
+            if (ScriptableObject.getProperty(scope, name) !is Function) {
+                throw NoStackTraceException("JS源缺少必备函数 $name")
+            }
+        }
+        if (!source.exploreUrl.isNullOrBlank() &&
+            ScriptableObject.getProperty(scope, "explore") !is Function
+        ) {
+            throw NoStackTraceException("JS源声明了 exploreUrl,缺少配对的 explore 函数")
+        }
+        source.mainJs = text
+        return source
+    }
+
+    private fun normalizeExploreUrl(jsonObject: JsonObject) {
+        val element = jsonObject.get("exploreUrl") ?: return
+        if (!element.isJsonArray) return
+        val array = element.asJsonArray
+        if (array.size() == 0) {
+            jsonObject.remove("exploreUrl")
+            return
+        }
+        array.forEachIndexed { index, item ->
+            val title = runCatching { item.asJsonObject.get("title")?.asString }.getOrNull()
+            if (title.isNullOrBlank()) {
+                throw NoStackTraceException("exploreUrl 第 ${index + 1} 项缺少 title")
+            }
+        }
+        jsonObject.addProperty("exploreUrl", GSON.toJson(array))
+    }
+
+    private val lastUpdateTimeRegex =
+        Regex("""(["']?lastUpdateTime["']?\s*:\s*)(Date\.now\(\)|\d+)""")
+
+    fun stampLastUpdateTime(text: String, stamp: Long): String? {
+        val match = lastUpdateTimeRegex.find(text) ?: return null
+        return text.replaceRange(match.range, "${match.groupValues[1]}$stamp")
+    }
+}

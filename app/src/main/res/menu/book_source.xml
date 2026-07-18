@@ -115,6 +115,12 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_add_js_source"
+        android:icon="@drawable/ic_add"
+        android:title="@string/js_source_new"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_import_local"
         android:icon="@drawable/ic_import"
         android:title="@string/import_local"

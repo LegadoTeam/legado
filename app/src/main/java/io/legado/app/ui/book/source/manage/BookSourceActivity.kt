@@ -41,6 +41,7 @@ import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.book.search.SearchScope
 import io.legado.app.ui.book.source.debug.BookSourceDebugActivity
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
+import io.legado.app.ui.book.source.edit.JsSourceEditActivity
 import io.legado.app.ui.config.CheckSourceConfig
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.qrcode.QrCodeResult
@@ -181,11 +182,12 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
     override fun onCompatOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.menu_add_book_source -> startActivity<BookSourceEditActivity>()
+            R.id.menu_add_js_source -> startActivity<JsSourceEditActivity>()
             R.id.menu_import_qr -> qrResult.launch()
             R.id.menu_group_manage -> showDialogFragment<GroupManageDialog>()
             R.id.menu_import_local -> importDoc.launch {
                 mode = HandleFileContract.FILE
-                allowExtensions = arrayOf("txt", "json")
+                allowExtensions = arrayOf("txt", "json", "js")
             }
 
             R.id.menu_import_onLine -> showImportDialog()
@@ -492,10 +494,11 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
             ) { file, name ->
                 exportDir.launch {
                     mode = HandleFileContract.EXPORT
+                    val isJs = file.name.endsWith(".js")
                     fileData = HandleFileContract.FileData(
                         name,
                         file,
-                        "application/json"
+                        if (isJs) "text/javascript" else "application/json"
                     )
                 }
             }
@@ -505,8 +508,8 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
                 searchView.query?.toString(),
                 sortAscending,
                 sort
-            ) { file, name ->
-                share(file)
+            ) { file, _ ->
+                share(file, if (file.name.endsWith(".js")) "text/javascript" else "text/*")
             }
 
             R.id.menu_check_selected_interval -> adapter.checkSelectedInterval()

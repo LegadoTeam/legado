@@ -55,6 +55,7 @@ import io.legado.app.utils.shareWithQr
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.showHelp
 import io.legado.app.utils.startActivity
+import io.legado.app.utils.StartActivityContract
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
@@ -77,6 +78,13 @@ class BookSourceEditActivity :
     private val infoEntities: ArrayList<EditEntity> = ArrayList()
     private val tocEntities: ArrayList<EditEntity> = ArrayList()
     private val contentEntities: ArrayList<EditEntity> = ArrayList()
+
+    private val jsSourceEdit = registerForActivityResult(
+        StartActivityContract(JsSourceEditActivity::class.java)
+    ) { result ->
+        setResult(result.resultCode, result.data)
+        super.finish()
+    }
 
     //    private val reviewEntities: ArrayList<EditEntity> = ArrayList()
     private val qrCodeResult = registerForActivityResult(QrCodeResult()) {
@@ -103,6 +111,12 @@ class BookSourceEditActivity :
         softKeyboardTool.attachToWindow(window)
         initView()
         viewModel.initData(intent) {
+            viewModel.bookSource?.takeIf { it.isJsSource() }?.let { source ->
+                jsSourceEdit.launch {
+                    putExtra("sourceUrl", source.bookSourceUrl)
+                }
+                return@initData
+            }
             upSourceView(viewModel.bookSource)
         }
     }

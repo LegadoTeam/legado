@@ -20,6 +20,7 @@ import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.source.SourceHelp
 import io.legado.app.model.RuleUpdate
+import io.legado.app.model.jsSource.JsSourceConfig
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
 import io.legado.app.utils.fromJsonObject
@@ -29,6 +30,7 @@ import io.legado.app.utils.isJsonArray
 import io.legado.app.utils.isJsonObject
 import io.legado.app.utils.isUri
 import io.legado.app.utils.splitNotBlank
+import kotlin.coroutines.coroutineContext
 
 
 class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
@@ -167,17 +169,17 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
                 mText.isUri() -> {
                     val uri = Uri.parse(mText)
                     uri.inputStream(context).getOrThrow().use { inputS ->
-                        GSON.fromJsonArray<BookSource>(inputS).getOrThrow().let {
-                            val source = it.firstOrNull() ?: return@let
-                            if (source.bookSourceUrl.isEmpty()) {
-                                throw NoStackTraceException("不是书源")
-                            }
-                            allSources.addAll(it)
-                        }
+                        importSourceText(inputS.bufferedReader().readText())
                     }
                 }
 
-                else -> throw NoStackTraceException(context.getString(R.string.wrong_format))
+                else -> runCatching {
+                    allSources.add(JsSourceConfig.extract(mText, coroutineContext))
+                }.getOrElse {
+                    throw NoStackTraceException(
+                        "${context.getString(R.string.wrong_format)}\n${it.localizedMessage}"
+                    )
+                }
             }
         }.onError {
             errorLiveData.postValue("ImportError:${it.localizedMessage}")
@@ -201,13 +203,29 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
                 url(url)
             }
         }.decompressed().byteStream().use {
-            GSON.fromJsonArray<BookSource>(it).getOrThrow().let { list ->
-                val source = list.firstOrNull() ?: return@let
+            importSourceText(it.bufferedReader().readText())
+        }
+    }
+
+    private suspend fun importSourceText(text: String) {
+        val content = text.trim()
+        when {
+            content.isJsonArray() -> GSON.fromJsonArray<BookSource>(content).getOrThrow().let { list ->
+                val source = list.firstOrNull() ?: return
                 if (source.bookSourceUrl.isEmpty()) {
                     throw NoStackTraceException("不是书源")
                 }
                 allSources.addAll(list)
             }
+
+            content.isJsonObject() -> GSON.fromJsonObject<BookSource>(content).getOrThrow().let {
+                if (it.bookSourceUrl.isEmpty()) {
+                    throw NoStackTraceException("不是书源")
+                }
+                allSources.add(it)
+            }
+
+            else -> allSources.add(JsSourceConfig.extract(content, coroutineContext))
         }
     }
 
