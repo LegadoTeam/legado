@@ -139,7 +139,7 @@
         android:layout_centerInParent="true"
         android:layout_marginTop="50dp"
         android:alpha="0"
-        android:background="@drawable/selector_fillet_btn_bg"
+        android:background="@drawable/bg_fillet_btn"
         android:elevation="4dp"
         android:gravity="center"
         android:padding="12dp"

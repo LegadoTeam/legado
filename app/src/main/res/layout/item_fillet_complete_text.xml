@@ -5,7 +5,7 @@
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:layout_margin="3dp"
-    android:background="@drawable/selector_fillet_btn_bg"
+    android:background="@drawable/bg_fillet_btn"
     android:ellipsize="end"
     android:gravity="start"
     android:maxLines="1"
