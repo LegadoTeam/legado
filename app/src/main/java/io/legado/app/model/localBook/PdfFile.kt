@@ -21,9 +21,9 @@ import java.io.InputStream
 import kotlin.math.ceil
 
 
-class PdfFile(var book: Book) {
+class PdfFile(var book: Book) : AutoCloseable {
     companion object : BaseLocalBookParse {
-        private var pFile: PdfFile? = null
+        private val cache = CloseableCache<PdfFile>()
 
         /**
          * pdf分页尺寸
@@ -32,12 +32,10 @@ class PdfFile(var book: Book) {
 
         @Synchronized
         private fun getPFile(book: Book): PdfFile {
-            if (pFile == null || pFile?.book?.bookUrl != book.bookUrl) {
-                pFile = PdfFile(book)
-                return pFile!!
-            }
-            pFile?.book = book
-            return pFile!!
+            return cache.getOrCreate(
+                matches = { it.book.bookUrl == book.bookUrl },
+                create = { PdfFile(book) },
+            ).also { it.book = book }
         }
 
         @Synchronized
@@ -58,6 +56,11 @@ class PdfFile(var book: Book) {
         @Synchronized
         override fun getImage(book: Book, href: String): InputStream? {
             return getPFile(book).getImage(href)
+        }
+
+        @Synchronized
+        fun clear() {
+            cache.clear()
         }
 
     }
@@ -85,19 +88,21 @@ class PdfFile(var book: Book) {
      * @return
      */
     private fun readPdf(): PdfRenderer? {
+        closePdf()
         val uri = book.getLocalUri()
-        if (uri.isContentScheme()) {
-            fileDescriptor = appCtx.contentResolver.openFileDescriptor(uri, "r")?.also {
-                pdfRenderer = PdfRenderer(it)
-            }
+        val descriptor = if (uri.isContentScheme()) {
+            appCtx.contentResolver.openFileDescriptor(uri, "r")
         } else {
-            fileDescriptor =
-                ParcelFileDescriptor.open(File(uri.path!!), ParcelFileDescriptor.MODE_READ_ONLY)
-                    ?.also {
-                        pdfRenderer = PdfRenderer(it)
-                    }
+            ParcelFileDescriptor.open(File(uri.path!!), ParcelFileDescriptor.MODE_READ_ONLY)
+        } ?: return null
+        return try {
+            PdfRenderer(descriptor).also {
+                fileDescriptor = descriptor
+            }
+        } catch (error: Throwable) {
+            descriptor.close()
+            throw error
         }
-        return pdfRenderer
     }
 
     /**
@@ -105,8 +110,19 @@ class PdfFile(var book: Book) {
      *
      */
     private fun closePdf() {
-        pdfRenderer?.close()
-        fileDescriptor?.close()
+        val renderer = pdfRenderer
+        val descriptor = fileDescriptor
+        pdfRenderer = null
+        fileDescriptor = null
+        kotlin.runCatching {
+            try {
+                renderer?.close()
+            } finally {
+                descriptor?.close()
+            }
+        }.onFailure {
+            it.printOnDebug()
+        }
     }
 
 
@@ -213,7 +229,7 @@ class PdfFile(var book: Book) {
 
     private fun upBookInfo() {
         if (pdfRenderer == null) {
-            pFile = null
+            cache.clearIf { it === this }
             book.intro = "书籍导入异常"
         } else {
             upBookCover()
@@ -224,7 +240,7 @@ class PdfFile(var book: Book) {
 
     }
 
-    protected fun finalize() {
+    override fun close() {
         closePdf()
     }
 }

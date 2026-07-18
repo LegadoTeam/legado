@@ -32,21 +32,17 @@ import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.Charset
 
-class EpubFile(var book: Book) {
+class EpubFile(var book: Book) : AutoCloseable {
 
     companion object : BaseLocalBookParse {
-        private var eFile: EpubFile? = null
+        private val cache = CloseableCache<EpubFile>()
 
         @Synchronized
         private fun getEFile(book: Book): EpubFile {
-            if (eFile == null || eFile?.book?.bookUrl != book.bookUrl) {
-                eFile = EpubFile(book)
-                //对于Epub文件默认不启用替换
-                //io.legado.app.data.entities.Book getUseReplaceRule
-                return eFile!!
-            }
-            eFile?.book = book
-            return eFile!!
+            return cache.getOrCreate(
+                matches = { it.book.bookUrl == book.bookUrl },
+                create = { EpubFile(book) },
+            ).also { it.book = book }
         }
 
         @Synchronized
@@ -72,8 +68,9 @@ class EpubFile(var book: Book) {
             return getEFile(book).upBookInfo()
         }
 
+        @Synchronized
         fun clear() {
-            eFile = null
+            cache.clear()
         }
     }
 
@@ -83,6 +80,7 @@ class EpubFile(var book: Book) {
      *持有引用，避免被回收
      */
     private var fileDescriptor: ParcelFileDescriptor? = null
+    private var zipFile: AndroidZipFile? = null
     private var epubBook: EpubBook? = null
         get() {
             if (field == null || fileDescriptor == null) {
@@ -107,16 +105,20 @@ class EpubFile(var book: Book) {
      */
     private fun readEpub(): EpubBook? {
         return kotlin.runCatching {
-            //ContentScheme拷贝到私有文件夹采用懒加载防止OOM
-            //val zipFile = BookHelp.getEpubFile(book)
-            BookHelp.getBookPFD(book)?.let {
-                fileDescriptor = it
-                val zipFile = AndroidZipFile(it, book.originName)
-                EpubReader().readEpubLazy(zipFile, "utf-8")
+            close()
+            BookHelp.getBookPFD(book)?.let { descriptor ->
+                val openedZip = try {
+                    AndroidZipFile(descriptor, book.originName)
+                } catch (error: Throwable) {
+                    descriptor.close()
+                    throw error
+                }
+                fileDescriptor = descriptor
+                zipFile = openedZip
+                EpubReader().readEpubLazy(openedZip, "utf-8")
             }
-
-
         }.onFailure {
+            close()
             AppLog.put("读取Epub文件失败\n${it.localizedMessage}", it)
             it.printOnDebug()
         }.getOrThrow()
@@ -283,7 +285,7 @@ class EpubFile(var book: Book) {
 
     private fun upBookInfo() {
         if (epubBook == null) {
-            eFile = null
+            cache.clearIf { it === this }
             book.intro = "书籍导入异常"
         } else {
             upBookCover()
@@ -434,8 +436,23 @@ class EpubFile(var book: Book) {
     }
 
 
-    protected fun finalize() {
-        fileDescriptor?.close()
+    override fun close() {
+        epubBookContents = null
+        epubBook = null
+        val openedZip = zipFile
+        val descriptor = fileDescriptor
+        zipFile = null
+        fileDescriptor = null
+        kotlin.runCatching {
+            if (openedZip != null) {
+                openedZip.close()
+            } else {
+                descriptor?.close()
+            }
+        }.onFailure {
+            kotlin.runCatching { descriptor?.close() }
+            it.printOnDebug()
+        }
     }
 
     private fun getWordCount(list: ArrayList<BookChapter>, book: Book) {
