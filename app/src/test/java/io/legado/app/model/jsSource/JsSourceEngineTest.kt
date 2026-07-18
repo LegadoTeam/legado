@@ -84,6 +84,37 @@ class JsSourceEngineTest {
         assertNull(JsSourceEngine.normalizeJsResult(result, scope))
     }
 
+    @Test
+    fun `optional function returns null when missing`() {
+        val source = BookSource(
+            bookSourceUrl = "https://example.com",
+            bookSourceName = "test",
+            mainJs = "var source = {};",
+        )
+
+        assertNull(JsSourceEngine(source).callFunctionIfExists("getBookInfo", emptyList()))
+    }
+
+    @Test
+    fun `optional function executes when present`() {
+        val source = BookSource(
+            bookSourceUrl = "https://example.com",
+            bookSourceName = "test",
+            mainJs = """
+                var source = {};
+                function getBookInfo() {
+                    return { intro: "optional result" };
+                }
+            """.trimIndent(),
+        )
+
+        val json = JsSourceEngine(source)
+            .callFunctionIfExists("getBookInfo", emptyList())
+            .orEmpty()
+
+        assertTrue(json.contains("optional result"))
+    }
+
     private fun evaluate(
         script: String,
         expression: String,
