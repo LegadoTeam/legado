@@ -41,6 +41,7 @@ import io.legado.app.utils.GSON
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.compress.ZipUtils
 import io.legado.app.utils.defaultSharedPreferences
+import io.legado.app.utils.externalFiles
 import io.legado.app.utils.fromJsonArray
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getPrefInt
@@ -297,6 +298,16 @@ object Restore {
             hideStatusBar = appCtx.getPrefBoolean(PreferKey.hideStatusBar)
             hideNavigationBar = appCtx.getPrefBoolean(PreferKey.hideNavigationBar)
             autoReadSpeed = appCtx.getPrefInt(PreferKey.autoReadSpeed, 46)
+        }
+        restoreBackupMediaDirectory(File(path), appCtx.externalFiles, "covers")
+            .onFailure {
+                AppLog.put("恢复封面图片出错\n${it.localizedMessage}", it)
+            }
+        if (!BackupConfig.ignoreReadConfig) {
+            restoreBackupMediaDirectory(File(path), appCtx.externalFiles, "bg")
+                .onFailure {
+                    AppLog.put("恢复阅读背景图片出错\n${it.localizedMessage}", it)
+                }
         }
         appCtx.toastOnUi(R.string.restore_success)
         withContext(Main) {
