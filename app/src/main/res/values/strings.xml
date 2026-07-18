@@ -600,6 +600,8 @@
     <string name="timer_m">%d min</string>
     <string name="brightness_auto">Auto-Brightness %s</string>
     <string name="read_aloud_by_page">Speak by pages</string>
+    <string name="read_aloud_follow_manual_page">Follow manual page turns</string>
+    <string name="read_aloud_follow_manual_page_summary">Restart speaking from the newly displayed page after a manual page turn; when disabled, speaking continues from its original position</string>
     <string name="speak_engine">Speak Engine</string>
     <string name="bg_image">Background images</string>
     <string name="bg_color">Background color</string>
