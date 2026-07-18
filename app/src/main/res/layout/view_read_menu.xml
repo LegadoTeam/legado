@@ -118,12 +118,12 @@
             android:layout_height="0dp"
             android:layout_weight="1">
 
-            <io.legado.app.ui.widget.seekbar.VerticalSeekBar
+            <androidx.appcompat.widget.AppCompatSeekBar
                 android:id="@+id/seek_brightness"
                 android:layout_width="wrap_content"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
                 android:max="255"
-                app:seekBarRotation="CW270" />
+                android:rotation="-90" />
 
         </io.legado.app.ui.widget.seekbar.VerticalSeekBarWrapper>
 
