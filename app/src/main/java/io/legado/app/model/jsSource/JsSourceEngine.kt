@@ -56,6 +56,7 @@ class JsSourceEngine(
         val bindings = buildScriptBindings {
             it["java"] = this
             it["source"] = source
+            it["sourceApi"] = source
             it["baseUrl"] = source.getKey()
             it["cookie"] = CookieStore
             it["cache"] = CacheManager

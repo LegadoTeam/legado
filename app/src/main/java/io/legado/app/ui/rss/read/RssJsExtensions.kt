@@ -107,7 +107,7 @@ open class RssJsExtensions(
                     val toSource = origin?.let { o ->
                         appDb.bookSourceDao.getBookSource(o)
                     } ?: source
-                    if (toSource.loginUrl.isNullOrBlank()) {
+                    if (!toSource.hasLogin()) {
                         activity.toastOnUi("源未配置登录")
                         return@launch
                     }

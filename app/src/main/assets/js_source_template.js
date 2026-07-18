@@ -10,9 +10,17 @@ var source = {
     bookSourceType: 0,
     bookSourceGroup: "",
     bookSourceComment: "",
+    // 表单登录示例: [{ name: "账号", type: "text" }, { name: "密码", type: "password" }]
+    loginUi: [],
     exploreUrl: [],
     lastUpdateTime: 0
 };
+
+// source.loginUi 非空时必须提供。sourceApi 是数据库中的书源对象，不会被配置对象覆盖。
+function login() {
+    var loginInfo = JSON.parse(sourceApi.getLoginInfo() || "{}");
+    // 执行登录请求；失败时 throw "错误信息"。
+}
 
 function search(key, page) {
     var html = java.ajax(source.bookSourceUrl + "/search?q=" + encodeURIComponent(key) + "&p=" + page);

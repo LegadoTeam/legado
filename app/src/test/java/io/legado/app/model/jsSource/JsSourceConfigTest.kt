@@ -1,6 +1,8 @@
 package io.legado.app.model.jsSource
 
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.data.entities.rule.RowUi
+import io.legado.app.utils.GSON
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -67,6 +69,82 @@ class JsSourceConfigTest {
 
         assertTrue(source.exploreUrl.orEmpty().contains("分类"))
         assertTrue(source.exploreUrl.orEmpty().contains("https://example.com/list"))
+    }
+
+    @Test
+    fun `normalizes login form array`() {
+        val source = JsSourceConfig.extract(
+            validScript.replace(
+                "header: \"{\\\"User-Agent\\\":\\\"test\\\"}\"",
+                """loginUi: [
+                    { name: "账号", type: "text" },
+                    { name: "密码", type: "password" }
+                ]""".trimIndent(),
+            ) + "\nfunction login() {}"
+        )
+
+        val rows = GSON.fromJson(source.loginUi, Array<RowUi>::class.java)
+        assertEquals(2, rows.size)
+        assertEquals("账号", rows[0].name)
+        assertEquals("password", rows[1].type)
+    }
+
+    @Test
+    fun `empty login form does not require login function`() {
+        val source = JsSourceConfig.extract(
+            validScript.replace(
+                "header: \"{\\\"User-Agent\\\":\\\"test\\\"}\"",
+                "loginUi: []",
+            )
+        )
+
+        assertNull(source.loginUi)
+    }
+
+    @Test
+    fun `empty login form json string folds to none`() {
+        val source = JsSourceConfig.extract(
+            validScript.replace(
+                "header: \"{\\\"User-Agent\\\":\\\"test\\\"}\"",
+                "loginUi: \"[ ]\"",
+            )
+        )
+
+        assertNull(source.loginUi)
+    }
+
+    @Test
+    fun `login form item requires name`() {
+        assertExtractError(
+            validScript.replace(
+                "header: \"{\\\"User-Agent\\\":\\\"test\\\"}\"",
+                "loginUi: [{ type: \"text\" }]",
+            ) + "\nfunction login() {}",
+            "缺少 name",
+        )
+    }
+
+    @Test
+    fun `login form requires login function`() {
+        assertExtractError(
+            validScript.replace(
+                "header: \"{\\\"User-Agent\\\":\\\"test\\\"}\"",
+                "loginUi: [{ name: \"账号\", type: \"text\" }]",
+            ),
+            "login",
+        )
+    }
+
+    @Test
+    fun `web login url does not require login function`() {
+        val source = JsSourceConfig.extract(
+            validScript.replace(
+                "header: \"{\\\"User-Agent\\\":\\\"test\\\"}\"",
+                "loginUrl: \"https://example.com/login\"",
+            )
+        )
+
+        assertEquals("https://example.com/login", source.loginUrl)
     }
 
     @Test

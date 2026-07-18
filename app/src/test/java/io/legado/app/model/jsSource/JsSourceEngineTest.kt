@@ -34,6 +34,28 @@ class JsSourceEngineTest {
     }
 
     @Test
+    fun `keeps persisted source available through source api`() {
+        val source = BookSource(
+            bookSourceUrl = "https://persisted.example",
+            bookSourceName = "测试源",
+            mainJs = """
+                var source = { bookSourceUrl: 'https://script.example' };
+                function identity() {
+                    return {
+                        configUrl: source.bookSourceUrl,
+                        persistedUrl: sourceApi.bookSourceUrl
+                    };
+                }
+            """.trimIndent(),
+        )
+
+        val json = JsSourceEngine(source).callFunction("identity", emptyList()).orEmpty()
+
+        assertTrue(json.contains("https://script.example"))
+        assertTrue(json.contains("https://persisted.example"))
+    }
+
+    @Test
     fun `normalizes object and lazy strings with current rhino`() {
         val (result, scope) = evaluate(
             "function search(key, page) { return [{name: key, bookUrl: 'u' + page}]; }",

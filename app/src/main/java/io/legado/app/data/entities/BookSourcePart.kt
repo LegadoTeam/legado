@@ -9,7 +9,11 @@ import io.legado.app.utils.splitNotBlank
 
 @DatabaseView(
     """select bookSourceUrl, bookSourceName, bookSourceGroup, customOrder, enabled, enabledExplore, 
-    (loginUrl is not null and trim(loginUrl) <> '') hasLoginUrl, lastUpdateTime, respondTime, weight, 
+    (loginUrl is not null and trim(loginUrl) <> ''
+     or (mainJs is not null and trim(mainJs) <> ''
+         and loginUi is not null and trim(loginUi) <> ''
+         and replace(trim(loginUi), ' ', '') <> '[]')) hasLoginUrl,
+    lastUpdateTime, respondTime, weight,
     (exploreUrl is not null and trim(exploreUrl) <> '') hasExploreUrl, eventListener, bookSourceType
     from book_sources""",
     viewName = "book_sources_part"
@@ -27,7 +31,7 @@ data class BookSourcePart(
     var enabled: Boolean = true,
     // 启用发现
     var enabledExplore: Boolean = true,
-    // 是否有登录地址
+    // 是否有登录地址或 JS 表单登录
     var hasLoginUrl: Boolean = false,
     // 最后更新时间，用于排序
     var lastUpdateTime: Long = 0,
