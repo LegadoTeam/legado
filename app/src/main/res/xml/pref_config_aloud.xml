@@ -43,6 +43,13 @@
 
         <io.legado.app.lib.prefs.SwitchPreference
             android:defaultValue="false"
+            android:key="readAloudFollowManualPage"
+            android:summary="@string/read_aloud_follow_manual_page_summary"
+            android:title="@string/read_aloud_follow_manual_page"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="false"
             android:title="@string/stream_read_aloud_audio"
             android:summary="@string/stream_read_aloud_audio_summary"
             android:key="streamReadAloudAudio"

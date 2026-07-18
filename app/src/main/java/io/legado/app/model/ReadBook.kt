@@ -304,6 +304,24 @@ object ReadBook : CoroutineScope by MainScope() {
         }
     }
 
+    private fun prepareReadAloudPageNavigation(syncReadAloudFollow: Boolean): Boolean {
+        val restartReadAloud = ReadAloudManualPagePolicy.shouldRestartFromVisiblePage(
+            isReadAloudRunning = BaseReadAloudService.isRun,
+            speechDrivenNavigation = syncReadAloudFollow,
+            followManualPageTurns = AppConfig.readAloudFollowManualPage
+        )
+        if (BaseReadAloudService.isRun && !syncReadAloudFollow) {
+            if (restartReadAloud) {
+                if (!ReadAloud.followReadAloudPosition) {
+                    ReadAloud.restoreReadAloudFollow()
+                }
+            } else {
+                ReadAloud.detachReadAloudFollow()
+            }
+        }
+        return restartReadAloud
+    }
+
     fun moveToNextPage(syncReadAloudFollow: Boolean = false): Boolean {
         if (BaseReadAloudService.isRun && !syncReadAloudFollow) {
             ReadAloud.detachReadAloudFollow()
@@ -351,13 +369,11 @@ object ReadBook : CoroutineScope by MainScope() {
         upContentInPlace: Boolean = true,
         syncReadAloudFollow: Boolean = false
     ): Boolean {
-        if (BaseReadAloudService.isRun && !syncReadAloudFollow) {
-            ReadAloud.detachReadAloudFollow()
-        }
         if (syncReadAloudFollow && !BaseReadAloudService.shouldSyncSpeechNavigation()) {
             return false
         }
         if (durChapterIndex < simulatedChapterSize - 1) {
+            val restartReadAloud = prepareReadAloudPageNavigation(syncReadAloudFollow)
             durChapterPos = 0
             durChapterIndex++
             clearExpiredChapterLoadingJob()
@@ -376,7 +392,10 @@ object ReadBook : CoroutineScope by MainScope() {
             saveRead()
             callBack?.upMenuView()
             AppLog.putDebug("moveToNextChapter-curPageChanged()")
-            curPageChanged(syncReadAloudFollow = syncReadAloudFollow)
+            curPageChanged(
+                syncReadAloudFollow = syncReadAloudFollow,
+                restartReadAloudFromVisiblePage = restartReadAloud
+            )
             return true
         } else {
             AppLog.putDebug("跳转下一章失败,没有下一章")
@@ -428,13 +447,11 @@ object ReadBook : CoroutineScope by MainScope() {
         upContentInPlace: Boolean = true,
         syncReadAloudFollow: Boolean = false
     ): Boolean {
-        if (BaseReadAloudService.isRun && !syncReadAloudFollow) {
-            ReadAloud.detachReadAloudFollow()
-        }
         if (syncReadAloudFollow && !BaseReadAloudService.shouldSyncSpeechNavigation()) {
             return false
         }
         if (durChapterIndex > 0) {
+            val restartReadAloud = prepareReadAloudPageNavigation(syncReadAloudFollow)
             durChapterPos = if (toLast) prevTextChapter?.lastReadLength ?: Int.MAX_VALUE else 0
             durChapterIndex--
             clearExpiredChapterLoadingJob()
@@ -450,7 +467,10 @@ object ReadBook : CoroutineScope by MainScope() {
             loadContent(durChapterIndex.minus(1), upContent, false)
             saveRead()
             callBack?.upMenuView()
-            curPageChanged(syncReadAloudFollow = syncReadAloudFollow)
+            curPageChanged(
+                syncReadAloudFollow = syncReadAloudFollow,
+                restartReadAloudFromVisiblePage = restartReadAloud
+            )
             return true
         } else {
             return false
@@ -470,16 +490,18 @@ object ReadBook : CoroutineScope by MainScope() {
     }
 
     fun setPageIndex(index: Int, syncReadAloudFollow: Boolean = false) {
-        if (BaseReadAloudService.isRun && !syncReadAloudFollow) {
-            ReadAloud.detachReadAloudFollow()
-        }
         if (syncReadAloudFollow && !BaseReadAloudService.shouldSyncSpeechNavigation()) {
             return
         }
+        val restartReadAloud = prepareReadAloudPageNavigation(syncReadAloudFollow)
         recycleRecorders(durPageIndex, index)
         durChapterPos = curTextChapter?.getReadLength(index) ?: index
         saveRead(true)
-        curPageChanged(true, syncReadAloudFollow = syncReadAloudFollow)
+        curPageChanged(
+            pageChanged = true,
+            syncReadAloudFollow = syncReadAloudFollow,
+            restartReadAloudFromVisiblePage = restartReadAloud
+        )
     }
 
     fun recycleRecorders(beforeIndex: Int, afterIndex: Int) {
@@ -521,19 +543,29 @@ object ReadBook : CoroutineScope by MainScope() {
     /**
      * 当前页面变化
      */
-    private fun curPageChanged(pageChanged: Boolean = false, syncReadAloudFollow: Boolean = false) {
+    private fun curPageChanged(
+        pageChanged: Boolean = false,
+        syncReadAloudFollow: Boolean = false,
+        restartReadAloudFromVisiblePage: Boolean = false
+    ) {
         callBack?.pageChanged()
         curTextChapter?.let {
             if (BaseReadAloudService.isRun && it.isCompleted) {
                 if (!syncReadAloudFollow) {
-                    ReadAloud.detachReadAloudFollow()
-                    return@let
+                    if (!restartReadAloudFromVisiblePage) {
+                        ReadAloud.detachReadAloudFollow()
+                        return@let
+                    }
                 }
-                val scrollPageAnim = pageAnim() == 3
-                if (scrollPageAnim && pageChanged) {
-                    ReadAloud.pause(appCtx)
-                } else {
+                if (restartReadAloudFromVisiblePage) {
                     readAloud(!BaseReadAloudService.pause)
+                } else {
+                    val scrollPageAnim = pageAnim() == 3
+                    if (scrollPageAnim && pageChanged) {
+                        ReadAloud.pause(appCtx)
+                    } else {
+                        readAloud(!BaseReadAloudService.pause)
+                    }
                 }
             }
         }
