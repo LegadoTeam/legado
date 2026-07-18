@@ -155,6 +155,11 @@ object BookChapterList {
                 }
             }
         }
+        updateBookTocInfo(book, list)
+        return list
+    }
+
+    suspend fun updateBookTocInfo(book: Book, list: ArrayList<BookChapter>) {
         val replaceRules = ContentProcessor.get(book).getTitleReplaceRules()
         val replaceBook = book.toReplaceBook()
         book.durChapterTitle = list.getOrElse(book.durChapterIndex) { list.last() }
@@ -178,7 +183,6 @@ object BookChapterList {
                 )
         currentCoroutineContext().ensureActive()
         upChapterInfo(list, book)
-        return list
     }
 
     private suspend fun analyzeChapterList(

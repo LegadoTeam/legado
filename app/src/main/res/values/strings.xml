@@ -1377,4 +1377,6 @@
     <string name="drag_to_reorder">Drag to reorder</string>
     <string name="move_to_more">Move to More</string>
     <string name="move_to_floating_bar">Move to floating bar</string>
+    <string name="js_source_new">新建 JS 书源</string>
+    <string name="js_source_edit">编辑 JS 书源</string>
 </resources>

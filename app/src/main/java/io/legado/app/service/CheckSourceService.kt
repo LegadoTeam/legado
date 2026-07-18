@@ -191,7 +191,7 @@ class CheckSourceService : BaseService() {
         //校验搜索书籍
         if (CheckSource.checkSearch) {
             val searchWord = source.getCheckKeyword(CheckSource.keyword)
-            if (!source.searchUrl.isNullOrBlank()) {
+            if (source.isJsSource() || !source.searchUrl.isNullOrBlank()) {
                 source.removeGroup("搜索链接规则为空")
                 val searchBooks = WebBook.searchBookAwait(source, searchWord)
                 if (searchBooks.isEmpty()) {

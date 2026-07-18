@@ -1,0 +1,77 @@
+package io.legado.app.model.jsSource
+
+import com.script.buildScriptBindings
+import com.script.rhino.RhinoScriptEngine
+import io.legado.app.data.entities.BookSource
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.mozilla.javascript.Scriptable
+
+class JsSourceEngineTest {
+
+    @Test
+    fun `calls source function through complete engine`() {
+        val source = BookSource(
+            bookSourceUrl = "https://example.com",
+            bookSourceName = "测试源",
+            mainJs = """
+                var source = { bookSourceUrl: 'https://script.example' };
+                function search(key, page) {
+                    return [{ name: key, bookUrl: source.bookSourceUrl + '/book/' + page }];
+                }
+            """.trimIndent(),
+        )
+
+        val json = JsSourceEngine(source).callFunction(
+            "search",
+            listOf("key" to "书名", "page" to 3),
+        ).orEmpty()
+
+        assertTrue(json.contains("书名"))
+        assertTrue(json.contains("https://script.example/book/3"))
+    }
+
+    @Test
+    fun `normalizes object and lazy strings with current rhino`() {
+        val (result, scope) = evaluate(
+            "function search(key, page) { return [{name: key, bookUrl: 'u' + page}]; }",
+            "search(key, page)",
+            listOf("key" to "测试", "page" to 2),
+        )
+
+        val json = JsSourceEngine.normalizeJsResult(result, scope).orEmpty()
+        assertTrue(json.contains("测试"))
+        assertTrue(json.contains("u2"))
+    }
+
+    @Test
+    fun `passes content string through unchanged`() {
+        val (result, scope) = evaluate(
+            "function content() { return '第一段\\n第二段'; }",
+            "content()",
+        )
+
+        assertEquals("第一段\n第二段", JsSourceEngine.normalizeJsResult(result, scope))
+    }
+
+    @Test
+    fun `maps undefined to null`() {
+        val (result, scope) = evaluate("function noop() {}", "noop()")
+        assertNull(JsSourceEngine.normalizeJsResult(result, scope))
+    }
+
+    private fun evaluate(
+        script: String,
+        expression: String,
+        args: List<Pair<String, Any?>> = emptyList(),
+    ): Pair<Any?, Scriptable> {
+        val bindings = buildScriptBindings { target ->
+            args.forEach { (key, value) -> target[key] = value }
+        }
+        val scope = RhinoScriptEngine.getRuntimeScope(bindings)
+        RhinoScriptEngine.eval(script, scope)
+        return RhinoScriptEngine.eval(expression, scope) to scope
+    }
+}

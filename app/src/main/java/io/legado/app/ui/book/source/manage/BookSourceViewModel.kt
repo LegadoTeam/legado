@@ -128,15 +128,23 @@ class BookSourceViewModel(application: Application) : BaseViewModel(application)
 
     private fun saveToFile(sources: List<BookSource>, name: String, success: (file: File, name: String) -> Unit) {
         execute {
-            val path = "${context.filesDir}/shareBookSource.json"
-            FileUtils.delete(path)
-            val file = FileUtils.createFileWithReplace(path)
-            file.outputStream().buffered().use {
-                GSON.writeToOutputStream(it, sources)
+            val single = sources.singleOrNull()
+            if (single != null && single.isJsSource()) {
+                val outputName = "${single.bookSourceName.normalizeFileName()}.js"
+                val file = File(context.cacheDir, outputName)
+                file.writeText(single.mainJs.orEmpty())
+                file to outputName
+            } else {
+                val path = "${context.filesDir}/shareBookSource.json"
+                FileUtils.delete(path)
+                val file = FileUtils.createFileWithReplace(path)
+                file.outputStream().buffered().use {
+                    GSON.writeToOutputStream(it, sources)
+                }
+                file to name
             }
-            file
         }.onSuccess {
-            success.invoke(it, name)
+            success.invoke(it.first, it.second)
         }.onError {
             context.toastOnUi(it.stackTraceStr)
         }

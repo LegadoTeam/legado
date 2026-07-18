@@ -109,8 +109,13 @@ class CodeEditActivity :
         val cursorPos = editor.cursor?.left ?: 0
         when {
             text == viewModel.initialText -> {
-                if (cursorPos > 0) {
+                val returnText = !check &&
+                    intent.getBooleanExtra("returnUnchangedText", false)
+                if (returnText || cursorPos > 0) {
                     val result = Intent().apply {
+                        if (returnText) {
+                            putExtra("text", text)
+                        }
                         putExtra("cursorPosition", cursorPos)
                     }
                     setResult(RESULT_OK, result)
