@@ -79,6 +79,12 @@ interface BaseSource : JsExtensions {
         }
     }
 
+    fun hasLogin(): Boolean {
+        val form = loginUi?.trim().orEmpty()
+        val hasForm = form.isNotEmpty() && form.filterNot { it.isWhitespace() } != "[]"
+        return !loginUrl.isNullOrBlank() || hasForm
+    }
+
     /**
      * 调用login函数 实现登录请求
      */
@@ -326,6 +332,7 @@ interface BaseSource : JsExtensions {
         val bindings = buildScriptBindings { bindings ->
             bindings["java"] = this
             bindings["source"] = this
+            bindings["sourceApi"] = this
             bindings["baseUrl"] = getKey()
             bindings["cookie"] = CookieStore
             bindings["cache"] = CacheManager

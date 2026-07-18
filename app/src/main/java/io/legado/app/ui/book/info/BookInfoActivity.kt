@@ -264,7 +264,7 @@ class BookInfoActivity :
         menu.findItem(R.id.menu_split_long_chapter)?.isChecked =
             viewModel.bookData.value?.getSplitLongChapter() ?: true
         menu.findItem(R.id.menu_login)?.isVisible =
-            !viewModel.bookSource?.loginUrl.isNullOrBlank()
+            viewModel.bookSource?.hasLogin() == true
         menu.findItem(R.id.menu_set_source_variable)?.isVisible =
             viewModel.bookSource != null
         menu.findItem(R.id.menu_set_book_variable)?.isVisible =

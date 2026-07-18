@@ -622,7 +622,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     }
 
     override fun onMenuOpened(featureId: Int, menu: Menu): Boolean {
-        menu.findItem(R.id.menu_login)?.isVisible = !VideoPlay.source?.loginUrl.isNullOrBlank()
+        menu.findItem(R.id.menu_login)?.isVisible = VideoPlay.source?.hasLogin() == true
         return super.onMenuOpened(featureId, menu)
     }
 

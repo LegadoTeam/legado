@@ -237,6 +237,10 @@ data class BookSource(
 
     fun isJsSource(): Boolean = !mainJs.isNullOrBlank()
 
+    override fun getLoginJs(): String? {
+        return if (isJsSource()) mainJs else super.getLoginJs()
+    }
+
     fun equal(source: BookSource): Boolean {
         return equal(bookSourceName, source.bookSourceName)
                 && equal(bookSourceUrl, source.bookSourceUrl)

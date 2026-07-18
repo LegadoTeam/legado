@@ -48,6 +48,7 @@ object JsSourceConfig {
             ?: throw NoStackTraceException("source 配置对象不是合法对象")
         strippedKeys.forEach(jsonObject::remove)
         normalizeExploreUrl(jsonObject)
+        normalizeLoginUi(jsonObject)
         val source = runCatching { GSON.fromJson(jsonObject, BookSource::class.java) }.getOrNull()
             ?: throw NoStackTraceException("source 配置对象字段类型不符")
         if (source.bookSourceUrl.isBlank()) {
@@ -65,6 +66,11 @@ object JsSourceConfig {
             ScriptableObject.getProperty(scope, "explore") !is Function
         ) {
             throw NoStackTraceException("JS源声明了 exploreUrl,缺少配对的 explore 函数")
+        }
+        if (!source.loginUi.isNullOrBlank() &&
+            ScriptableObject.getProperty(scope, "login") !is Function
+        ) {
+            throw NoStackTraceException("JS源声明了 loginUi,缺少配对的 login 函数")
         }
         source.mainJs = text
         return source
@@ -85,6 +91,29 @@ object JsSourceConfig {
             }
         }
         jsonObject.addProperty("exploreUrl", GSON.toJson(array))
+    }
+
+    private fun normalizeLoginUi(jsonObject: JsonObject) {
+        val element = jsonObject.get("loginUi") ?: return
+        if (element.isJsonPrimitive && element.asJsonPrimitive.isString) {
+            if (element.asString.filterNot { it.isWhitespace() } == "[]") {
+                jsonObject.remove("loginUi")
+            }
+            return
+        }
+        if (!element.isJsonArray) return
+        val array = element.asJsonArray
+        if (array.size() == 0) {
+            jsonObject.remove("loginUi")
+            return
+        }
+        array.forEachIndexed { index, item ->
+            val name = runCatching { item.asJsonObject.get("name")?.asString }.getOrNull()
+            if (name.isNullOrBlank()) {
+                throw NoStackTraceException("loginUi 第 ${index + 1} 项缺少 name")
+            }
+        }
+        jsonObject.addProperty("loginUi", GSON.toJson(array))
     }
 
     private val lastUpdateTimeRegex =
