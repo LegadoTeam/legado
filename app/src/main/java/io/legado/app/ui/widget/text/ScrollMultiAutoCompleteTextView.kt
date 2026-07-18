@@ -12,6 +12,8 @@ import android.view.animation.Interpolator
 import android.widget.OverScroller
 import androidx.appcompat.widget.AppCompatMultiAutoCompleteTextView
 import androidx.core.view.ViewCompat
+import io.legado.app.lib.theme.accentColor
+import io.legado.app.utils.ColorUtils
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -81,6 +83,7 @@ open class ScrollMultiAutoCompleteTextView @JvmOverloads constructor(
         mTouchSlop = vc.scaledTouchSlop
         mMinFlingVelocity = vc.scaledMinimumFlingVelocity
         mMaxFlingVelocity = vc.scaledMaximumFlingVelocity
+        highlightColor = ColorUtils.adjustAlpha(context.accentColor, 0.35f)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
             isLocalePreferredLineHeightForMinimumUsed = false
         }
