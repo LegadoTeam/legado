@@ -2,6 +2,7 @@ package io.legado.app.help.http
 
 import okhttp3.Headers
 import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType
 import java.nio.charset.StandardCharsets
 import java.util.Locale
@@ -33,7 +34,11 @@ internal object HttpLogSanitizer {
     private val parameterSecretPattern = Regex(
         "(?i)((?:^|[?&\\s])(?:password|passwd|token|access[_-]?token|refresh[_-]?token|secret|authorization|cookie|api[_-]?key|sign|signature)=)([^&\\s]*)"
     )
+    private val headerSecretPattern = Regex(
+        "(?i)((?:^|[\\r\\n\\s])(?:authorization|proxy-authorization|cookie|set-cookie)\\s*:\\s*)([^\\r\\n]*)"
+    )
     private val bearerPattern = Regex("(?i)(bearer\\s+)[A-Za-z0-9._~+/-]+={0,2}")
+    private val basicPattern = Regex("(?i)(basic\\s+)[A-Za-z0-9+/]+={0,2}")
 
     fun redactUrl(url: HttpUrl): String {
         return redactHttpUrl(url).toString()
@@ -78,15 +83,25 @@ internal object HttpLogSanitizer {
         return if (truncated) "$text\n$TRUNCATED" else text
     }
 
+    fun redactUrlOrFreeText(text: String): String {
+        return text.toHttpUrlOrNull()?.let(::redactUrl) ?: redactFreeText(text)
+    }
+
     fun redactFreeText(text: String): String {
         return text
+            .replace(headerSecretPattern) { match ->
+                "${match.groupValues[1]}$REDACTED"
+            }
+            .replace(bearerPattern) { match ->
+                "${match.groupValues[1]}$REDACTED"
+            }
+            .replace(basicPattern) { match ->
+                "${match.groupValues[1]}$REDACTED"
+            }
             .replace(jsonSecretPattern) { match ->
                 "${match.groupValues[1]}$REDACTED${match.groupValues[3]}"
             }
             .replace(parameterSecretPattern) { match ->
-                "${match.groupValues[1]}$REDACTED"
-            }
-            .replace(bearerPattern) { match ->
                 "${match.groupValues[1]}$REDACTED"
             }
     }

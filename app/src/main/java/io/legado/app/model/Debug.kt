@@ -70,6 +70,10 @@ object Debug {
         }
     }
 
+    internal fun isDebugging(sourceUrl: String): Boolean {
+        return callback != null && debugSource == sourceUrl
+    }
+
     @Synchronized
     fun log(msg: String?) {
         log(debugSource, msg ?: "", true)

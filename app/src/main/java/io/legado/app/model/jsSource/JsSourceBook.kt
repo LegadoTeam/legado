@@ -26,12 +26,13 @@ object JsSourceBook {
         val engine = JsSourceEngine(source, coroutineContext)
         val json = engine.callFunction("search", listOf("key" to key, "page" to (page ?: 1)))
         Debug.log(source.bookSourceUrl, json.orEmpty(), state = 10)
-        return JsSourceMarshaller.parseSearchBooks(json, source).apply {
-            if (filter != null) {
-                removeAll { !filter(it.name, it.author, it.kind) }
-            }
-            Debug.log(source.bookSourceUrl, "◇JS源搜索完成,共${size}条")
+        val books = JsSourceMarshaller.parseSearchBooks(json, source)
+        if (filter != null) {
+            books.removeAll { !filter(it.name, it.author, it.kind) }
         }
+        Debug.log(source.bookSourceUrl, "◇JS源搜索完成,共${books.size}条")
+        logSummary(source.bookSourceUrl) { JsSourceDebugFormatter.bookList(books) }
+        return books
     }
 
     suspend fun exploreAwait(
@@ -42,9 +43,10 @@ object JsSourceBook {
         val engine = JsSourceEngine(source, coroutineContext)
         val json = engine.callFunction("explore", listOf("url" to url, "page" to (page ?: 1)))
         Debug.log(source.bookSourceUrl, json.orEmpty(), state = 10)
-        return JsSourceMarshaller.parseSearchBooks(json, source).apply {
-            Debug.log(source.bookSourceUrl, "◇JS源发现完成,共${size}条")
-        }
+        val books = JsSourceMarshaller.parseSearchBooks(json, source)
+        Debug.log(source.bookSourceUrl, "◇JS源发现完成,共${books.size}条")
+        logSummary(source.bookSourceUrl) { JsSourceDebugFormatter.bookList(books) }
+        return books
     }
 
     suspend fun getBookInfoAwait(
@@ -56,11 +58,17 @@ object JsSourceBook {
         book.addType(source.getBookType())
         val engine = JsSourceEngine(source, coroutineContext)
         val json = engine.callFunctionIfExists("getBookInfo", listOf("book" to book))
+        if (json == null) {
+            logSummary(source.bookSourceUrl) {
+                listOf("≡getBookInfo 未定义或无返回,沿用搜索阶段字段")
+            }
+        }
         Debug.log(source.bookSourceUrl, json.orEmpty(), state = 20)
         JsSourceMarshaller.mergeBookInfo(book, json, source, canReName)
         if (book.tocUrl.isBlank()) {
             book.tocUrl = book.bookUrl
         }
+        logSummary(source.bookSourceUrl) { JsSourceDebugFormatter.bookInfo(book) }
         return book
     }
 
@@ -76,6 +84,7 @@ object JsSourceBook {
             val json = engine.callFunction("getChapters", listOf("book" to book))
             Debug.log(source.bookSourceUrl, json.orEmpty(), state = 30)
             val chapters = JsSourceMarshaller.parseChapters(json, book, source)
+            logSummary(source.bookSourceUrl) { JsSourceDebugFormatter.chapterList(chapters) }
             if (chapters.isEmpty()) {
                 throw TocEmptyException("JS源目录为空")
             }
@@ -111,9 +120,15 @@ object JsSourceBook {
             throw ContentEmptyException("JS源正文为空")
         }
         Debug.log(source.bookSourceUrl, content, state = 40)
+        logSummary(source.bookSourceUrl) { JsSourceDebugFormatter.content(chapter, content) }
         if (needSave) {
             BookHelp.saveContent(source, book, chapter, content)
         }
         return content
+    }
+
+    private inline fun logSummary(sourceUrl: String, lines: () -> List<String>) {
+        if (!Debug.isDebugging(sourceUrl)) return
+        lines().forEach { Debug.log(sourceUrl, it) }
     }
 }
