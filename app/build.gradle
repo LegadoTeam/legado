@@ -68,6 +68,17 @@ android {
         versionCode = versionCodeValue
         versionName version
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        // Keep app translations while dropping unused transitive dependency locales.
+        resourceConfigurations += [
+                'en',
+                'es-rES',
+                'ja-rJP',
+                'pt-rBR',
+                'vi',
+                'zh',
+                'zh-rHK',
+                'zh-rTW'
+        ]
         project.ext.set("archivesBaseName", name + "_" + version)
 
         if (armOnly) {
@@ -151,6 +162,13 @@ android {
     }
     packaging {
         resources.excludes.add('META-INF/*')
+        // R8 removes the transcode implementation; these bundled resources have no runtime reader.
+        resources.excludes.addAll([
+                'tables/Transcoder_*.bin',
+                '*.proto',
+                '**/*.proto',
+                'src/**'
+        ])
         jniLibs {
             // These dependencies already ship stripped; skip redundant strip attempts.
             keepDebugSymbols += [
