@@ -6,6 +6,9 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.LeadingMarginSpan
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
@@ -113,6 +116,7 @@ import io.noties.markwon.image.glide.GlideImagesPlugin
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 class BookInfoActivity :
     VMBaseActivity<ActivityBookInfoBinding, BookInfoViewModel>(toolBarTheme = Theme.Dark, showOpenMenuIcon = false),
@@ -646,7 +650,26 @@ class BookInfoActivity :
                 )
             }
         } else {
-            tvIntro.text = intro
+            setPlainBookIntro(tvIntro, intro)
+        }
+    }
+
+    private fun setPlainBookIntro(textView: ScrollTextView, intro: String) {
+        val ranges = introIndentRanges(intro)
+        if (ranges.isEmpty()) {
+            textView.text = intro
+            return
+        }
+        val indentWidth = textView.paint.measureText("　　").roundToInt().coerceAtLeast(1)
+        textView.text = SpannableString(intro).apply {
+            ranges.forEach { range ->
+                setSpan(
+                    LeadingMarginSpan.Standard(indentWidth, 0),
+                    range.start,
+                    range.endExclusive,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+                )
+            }
         }
     }
 
