@@ -22,6 +22,8 @@ import io.legado.app.ui.association.AddToBookshelfDialog
 import io.legado.app.ui.book.explore.ExploreShowActivity
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.login.SourceLoginActivity
+import io.legado.app.ui.login.createSourceLoginRoute
+import io.legado.app.ui.login.resolveLoginSource
 import io.legado.app.ui.rss.article.RssSortActivity
 import io.legado.app.ui.widget.dialog.PhotoDialog
 import io.legado.app.utils.isJsonObject
@@ -104,31 +106,30 @@ open class RssJsExtensions(
                         activity.toastOnUi("已在登录界面")
                         return@launch
                     }
-                    val toSource = origin?.let { o ->
-                        appDb.bookSourceDao.getBookSource(o)
-                    } ?: source
+                    val toSource = resolveLoginSource(
+                        origin = origin,
+                        currentSource = source,
+                        findBookSource = { appDb.bookSourceDao.getBookSource(it) },
+                        findRssSource = { appDb.rssSourceDao.getByKey(it) },
+                    )
+                    if (toSource == null) {
+                        activity.toastOnUi("未找到指定源")
+                        return@launch
+                    }
                     if (!toSource.hasLogin()) {
                         activity.toastOnUi("源未配置登录")
                         return@launch
                     }
-                    when (toSource) {
-                        is BookSource -> {
-                            withContext(Main) {
-                                activity.startActivity<SourceLoginActivity> {
-                                    putExtra("bookType", bookType)
-                                    putExtra("type", "bookSource")
-                                    putExtra("key", toSource.bookSourceUrl)
-                                }
-                            }
-                        }
-
-                        is RssSource -> {
-                            withContext(Main) {
-                                activity.startActivity<SourceLoginActivity> {
-                                    putExtra("type", "rssSource")
-                                    putExtra("key", toSource.sourceUrl)
-                                }
-                            }
+                    val route = createSourceLoginRoute(toSource, source, bookType)
+                    if (route == null) {
+                        activity.toastOnUi("不支持该源类型登录")
+                        return@launch
+                    }
+                    withContext(Main) {
+                        activity.startActivity<SourceLoginActivity> {
+                            putExtra("type", route.type)
+                            putExtra("key", route.key)
+                            route.bookType?.let { putExtra("bookType", it) }
                         }
                     }
                 }
