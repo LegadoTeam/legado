@@ -11,13 +11,16 @@ import io.legado.app.R
 import io.legado.app.databinding.ItemSourceEditBinding
 import io.legado.app.databinding.ItemSourceEditCheckBoxBinding
 import io.legado.app.help.config.AppConfig
+import io.legado.app.ui.widget.code.EditSafety
 import io.legado.app.ui.widget.code.addJsPattern
 import io.legado.app.ui.widget.code.addJsonPattern
 import io.legado.app.ui.widget.code.addLegadoPattern
 import io.legado.app.ui.widget.text.EditEntity
 import io.legado.app.utils.isTrue
 
-class RssSourceEditAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+class RssSourceEditAdapter(
+    private val onUnsafeTextEdit: (EditEntity) -> Unit
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     val editEntityMaxLine = AppConfig.sourceEditMaxLine
 
@@ -66,52 +69,94 @@ class RssSourceEditAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     inner class EditTextViewHolder(val binding: ItemSourceEditBinding) :
         RecyclerView.ViewHolder(binding.root) {
 
-        fun bind(editEntity: EditEntity) = binding.run {
-            editText.maxLines = editEntityMaxLine
-            if (editText.getTag(R.id.tag1) == null) {
-                val listener = object : View.OnAttachStateChangeListener {
+        private var isUnsafeText = false
+
+        init {
+            binding.editText.addOnAttachStateChangeListener(
+                object : View.OnAttachStateChangeListener {
                     override fun onViewAttachedToWindow(v: View) {
-                        editText.isCursorVisible = false
-                        editText.isCursorVisible = true
-                        editText.isFocusable = true
-                        editText.isFocusableInTouchMode = true
+                        applyInteractionState()
                     }
 
-                    override fun onViewDetachedFromWindow(v: View) {
-
-                    }
+                    override fun onViewDetachedFromWindow(v: View) = Unit
                 }
-                editText.addOnAttachStateChangeListener(listener)
-                editText.setTag(R.id.tag1, listener)
-            }
+            )
+        }
+
+        fun bind(editEntity: EditEntity) = binding.run {
+            val rawText = editEntity.value.orEmpty()
+            val presentation = EditSafety.presentation(
+                rawText,
+                itemView.context.getString(R.string.combining_text_placeholder)
+            )
+            isUnsafeText = !presentation.isInlineEditable
+
+            editText.setTag(R.id.tag, editEntity.key)
             editText.getTag(R.id.tag2)?.let {
                 if (it is TextWatcher) {
                     editText.removeTextChangedListener(it)
                 }
             }
-            editText.setText(editEntity.value)
+            editText.setTag(R.id.tag2, null)
+            editText.setOnClickListener(null)
+            editText.setOnLongClickListener(null)
+            editText.onFocusChangeListener = null
+            editText.isEnabled = true
+            editText.isClickable = true
+            editText.isLongClickable = true
+            editText.alpha = 1f
+            editText.contentDescription = null
+            editText.maxLines = if (isUnsafeText) {
+                EditSafety.PREVIEW_LINES
+            } else {
+                editEntityMaxLine
+            }
+            applyInteractionState()
+            editText.setText(presentation.text)
             textInputLayout.hint = editEntity.hint
-            val textWatcher = object : TextWatcher {
-                override fun beforeTextChanged(
-                    s: CharSequence,
-                    start: Int,
-                    count: Int,
-                    after: Int
-                ) {
 
+            if (presentation.isInlineEditable) {
+                val textWatcher = object : TextWatcher {
+                    override fun beforeTextChanged(
+                        s: CharSequence,
+                        start: Int,
+                        count: Int,
+                        after: Int
+                    ) = Unit
+
+                    override fun onTextChanged(
+                        s: CharSequence,
+                        start: Int,
+                        before: Int,
+                        count: Int
+                    ) = Unit
+
+                    override fun afterTextChanged(s: Editable?) {
+                        editEntity.value = s?.toString()
+                    }
                 }
-
-                override fun onTextChanged(s: CharSequence, start: Int, before: Int, count: Int) {
-
+                editText.addTextChangedListener(textWatcher)
+                editText.setTag(R.id.tag2, textWatcher)
+            } else {
+                editText.contentDescription = presentation.text
+                editText.setOnClickListener {
+                    onUnsafeTextEdit(editEntity)
                 }
-
-                override fun afterTextChanged(s: Editable?) {
-                    editEntity.value = (s?.toString())
+                editText.setOnLongClickListener {
+                    onUnsafeTextEdit(editEntity)
+                    true
                 }
             }
-            editText.addTextChangedListener(textWatcher)
-            editText.setTag(R.id.tag2, textWatcher)
             editText.clearFocus()
+        }
+
+        private fun applyInteractionState() = binding.editText.run {
+            isCursorVisible = false
+            isFocusable = !isUnsafeText
+            isFocusableInTouchMode = !isUnsafeText
+            if (!isUnsafeText) {
+                isCursorVisible = true
+            }
         }
     }
 
@@ -119,6 +164,10 @@ class RssSourceEditAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
         RecyclerView.ViewHolder(binding.root) {
 
         fun bind(editEntity: EditEntity) = binding.run {
+            checkBox.setOnUserCheckedChangeListener(null)
+            checkBox.isEnabled = true
+            checkBox.isClickable = true
+            checkBox.alpha = 1f
             checkBox.text = editEntity.hint
             checkBox.isChecked = editEntity.value.isTrue()
             checkBox.setOnUserCheckedChangeListener { isChecked ->

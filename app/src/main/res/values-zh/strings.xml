@@ -772,6 +772,10 @@
     <string name="starting_download">正在启动下载</string>
     <string name="already_in_download">该书已在下载列表</string>
     <string name="click_to_open">点击打开</string>
+    <string name="combining_text_placeholder">内容包含异常密集的组合字符，点击使用安全编辑器打开</string>
+    <string name="safe_code_editor">安全文本编辑器</string>
+    <string name="safe_code_editor_load_failed">安全编辑器尚未就绪，请稍候；如持续失败可返回并放弃修改</string>
+    <string name="safe_code_editor_read_failed">无法读取安全编辑器内容，请重试</string>
     <string name="follow_public_account_summary">关注【开源阅读】点击广告支持我</string>
     <string name="weChat_appreciation_code">微信赞赏码</string>
     <string name="alipay">支付宝</string>

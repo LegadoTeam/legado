@@ -13,13 +13,20 @@
         app:title="@string/edit_code"
         app:opaque="true" />
 
-    <io.github.rosemoe.sora.widget.CodeEditor
-        android:id="@+id/editText"
+    <FrameLayout
+        android:id="@+id/editorContainer"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        app:textSize="18sp"
-        tools:text="Hello, world!" />
+        android:layout_weight="1">
+
+        <io.github.rosemoe.sora.widget.CodeEditor
+            android:id="@+id/editText"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            app:textSize="18sp"
+            tools:text="Hello, world!" />
+
+    </FrameLayout>
 
     <LinearLayout
         android:id="@+id/search_group"
