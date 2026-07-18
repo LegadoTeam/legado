@@ -5,7 +5,6 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.core.view.indices
 import com.jaredrummler.android.colorpicker.ColorPickerDialog
-import com.google.android.material.chip.Chip
 import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.constant.EventBus
@@ -16,7 +15,9 @@ import io.legado.app.help.config.ReadTipConfig
 import io.legado.app.help.config.ReaderInfoTemplate
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
+import io.legado.app.ui.widget.text.AccentBgTextView
 import io.legado.app.utils.checkByIndex
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getIndexById
 import io.legado.app.utils.hexString
 import io.legado.app.utils.observeEvent
@@ -222,9 +223,11 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
         dialogBinding.editTemplate.setText(current)
         dialogBinding.editTemplate.setSelection(current.length)
         ReaderInfoTemplate.placeholders.forEach { placeholder ->
-            val chip = Chip(requireContext()).apply {
+            val placeholderView = AccentBgTextView(requireContext()).apply {
                 text = placeholder
-                isCheckable = false
+                setRadius(4)
+                includeFontPadding = false
+                setPadding(12.dpToPx(), 6.dpToPx(), 12.dpToPx(), 6.dpToPx())
                 setOnClickListener {
                     val edit = dialogBinding.editTemplate
                     val editable = edit.editableText
@@ -235,7 +238,7 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
                     editable.replace(start, end, placeholder)
                 }
             }
-            dialogBinding.chipPlaceholders.addView(chip)
+            dialogBinding.chipPlaceholders.addView(placeholderView)
         }
         alert(title) {
             customView { dialogBinding.root }
