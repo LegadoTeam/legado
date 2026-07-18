@@ -367,6 +367,8 @@
     <string name="pt_show_all_find">显示所有发现</string>
     <string name="ps_show_all_find">关闭则只显示勾选源的发现</string>
     <string name="update_toc">更新目录</string>
+    <string name="no_book_can_update">没有可更新的已选书籍（已过滤本地书籍和禁止更新的书籍）</string>
+    <string name="update_toc_submitted">已提交 %1$d 本书的目录更新请求</string>
     <string name="txt_toc_rule">TXT 目录规则</string>
     <string name="select_section_export">选择待导出章节</string>
     <string name="set_charset">设置编码</string>

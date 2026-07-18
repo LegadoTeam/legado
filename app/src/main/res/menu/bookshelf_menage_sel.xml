@@ -33,4 +33,8 @@
         android:id="@+id/menu_check_selected_interval"
         android:title="@string/check_selected_interval" />
 
+    <item
+        android:id="@+id/menu_update_toc"
+        android:title="@string/update_toc" />
+
 </menu>

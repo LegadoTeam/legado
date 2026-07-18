@@ -370,6 +370,8 @@
     <string name="pt_show_all_find">Display all Discovery</string>
     <string name="ps_show_all_find">Display the selected origin\'s Discovery if closed</string>
     <string name="update_toc">Update chapters</string>
+    <string name="no_book_can_update">No selected books can be updated (local and update-disabled books excluded)</string>
+    <string name="update_toc_submitted">Submitted chapter update requests for %1$d books</string>
     <string name="txt_toc_rule">Txt Catalog Rule</string>
     <string name="select_section_export">Choose some chapters to be exported</string>
     <string name="set_charset">Text encoding</string>

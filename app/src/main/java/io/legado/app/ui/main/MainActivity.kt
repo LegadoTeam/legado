@@ -23,6 +23,7 @@ import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.AppConst.appInfo
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
+import io.legado.app.data.entities.Book
 import io.legado.app.databinding.ActivityMainBinding
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.AppWebDav
@@ -401,6 +402,13 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         }
         observeEvent<String>(PreferKey.threadCount) {
             viewModel.upPool()
+        }
+        observeEvent<List<Book>>(EventBus.UP_BOOKS_TOC) {
+            viewModel.upToc(
+                it,
+                onlyUpdateRead = false,
+                policy = TocUpdatePolicy.SKIP_PRE_DOWNLOAD,
+            )
         }
     }
 
