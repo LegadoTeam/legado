@@ -255,6 +255,13 @@ interface BookSourceDao {
     @Query("SELECT EXISTS(select 1 from book_sources where bookSourceUrl = :key)")
     fun has(key: String): Boolean
 
+    @Query("select mainJs from book_sources where bookSourceUrl = :key")
+    fun getMainJs(key: String): String?
+
+    fun hasJsSource(key: String): Boolean {
+        return !getMainJs(key).isNullOrBlank()
+    }
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insert(vararg bookSource: BookSource)
 
