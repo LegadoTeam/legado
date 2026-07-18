@@ -1,6 +1,7 @@
 package me.ag2s.epublib.domain;
 
 import java.io.Serializable;
+import java.util.Locale;
 
 import me.ag2s.epublib.util.StringUtil;
 
@@ -87,7 +88,7 @@ public class GuideReference extends TitledResourceReference
     public GuideReference(Resource resource, String type, String title,
                           String fragmentId) {
         super(resource, title, fragmentId);
-        this.type = StringUtil.isNotBlank(type) ? type.toLowerCase() : null;
+        this.type = StringUtil.isNotBlank(type) ? type.toLowerCase(Locale.ROOT) : null;
     }
 
     public String getType() {

@@ -6,6 +6,7 @@
         <item>Âm thanh</item>
         <item>Hình ảnh</item>
         <item>Tập tin</item>
+        <item>Video</item>
     </string-array>
 	<string-array name="screen_direction_title">
 		<item>@string/screen_unspecified</item>
