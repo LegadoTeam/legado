@@ -8,30 +8,28 @@ import java.io.File
 class ReadAloudBackToSpeechActionTest {
 
     @Test
-    fun `read aloud dialog exposes back to speaking position control`() {
-        val xml = readProjectFile("src/main/res/layout/dialog_read_aloud.xml")
+    fun `floating bar owns back to speaking position control`() {
+        val floatingBar = readProjectFile("src/main/res/layout/view_read_aloud_float_bar.xml")
+        val dialog = readProjectFile("src/main/res/layout/dialog_read_aloud.xml")
 
-        assertTrue(xml.contains("@+id/iv_back_to_speech"))
-        assertTrue(xml.contains("@string/back_to_speaking_position"))
+        assertTrue(floatingBar.contains("@+id/ll_back_to_speech"))
+        assertTrue(floatingBar.contains("@string/back_to_speaking_position"))
+        assertFalse(dialog.contains("@+id/iv_back_to_speech"))
     }
 
     @Test
-    fun `back to speaking control is always shown, not gated on follow state`() {
+    fun `read aloud dialog does not bind a duplicate back action`() {
         val dialogKt = readProjectFile("src/main/java/io/legado/app/ui/book/read/config/ReadAloudDialog.kt")
 
-        // The control lives in the read-aloud dialog which only opens during playback,
-        // so it is always visible there instead of leaving an empty gap when attached.
-        assertFalse(dialogKt.contains("ivBackToSpeech.visible("))
-        assertFalse(dialogKt.contains("upBackToSpeechState"))
+        assertFalse(dialogKt.contains("ivBackToSpeech"))
+        assertFalse(dialogKt.contains("callBack?.backToSpeakingPosition()"))
     }
 
     @Test
-    fun `read aloud dialog callback restores follow and requests jump`() {
-        val dialogKt = readProjectFile("src/main/java/io/legado/app/ui/book/read/config/ReadAloudDialog.kt")
+    fun `floating back action restores follow and requests jump`() {
         val activityKt = readProjectFile("src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
 
-        assertTrue(dialogKt.contains("fun backToSpeakingPosition()"))
-        assertTrue(dialogKt.contains("callBack?.backToSpeakingPosition()"))
+        assertTrue(activityKt.contains("llBackToSpeech.setOnClickListener"))
         assertTrue(activityKt.contains("override fun backToSpeakingPosition()"))
         assertTrue(activityKt.contains("ReadAloud.restoreReadAloudFollow()"))
     }
