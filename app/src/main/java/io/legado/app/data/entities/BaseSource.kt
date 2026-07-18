@@ -79,10 +79,13 @@ interface BaseSource : JsExtensions {
         }
     }
 
-    fun hasLogin(): Boolean {
+    fun hasLoginForm(): Boolean {
         val form = loginUi?.trim().orEmpty()
-        val hasForm = form.isNotEmpty() && form.filterNot { it.isWhitespace() } != "[]"
-        return !loginUrl.isNullOrBlank() || hasForm
+        return form.isNotEmpty() && form.filterNot { it.isWhitespace() } != "[]"
+    }
+
+    fun hasLogin(): Boolean {
+        return !loginUrl.isNullOrBlank() || hasLoginForm()
     }
 
     /**

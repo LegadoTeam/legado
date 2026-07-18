@@ -35,15 +35,25 @@ class BookSourceMainJsTest {
     fun `login capability accepts url or form`() {
         val source = BookSource(bookSourceUrl = "https://example.com")
         assertFalse(source.hasLogin())
+        assertFalse(source.hasLoginForm())
 
         source.loginUi = "[]"
         assertFalse(source.hasLogin())
+        assertFalse(source.hasLoginForm())
+
+        source.loginUi = "[ \n ]"
+        assertFalse(source.hasLogin())
+        assertFalse(source.hasLoginForm())
 
         source.loginUi = "[{\"name\":\"账号\",\"type\":\"text\"}]"
         assertTrue(source.hasLogin())
+        assertTrue(source.hasLoginForm())
 
-        source.loginUi = null
         source.loginUrl = "https://example.com/login"
         assertTrue(source.hasLogin())
+
+        source.loginUi = "[]"
+        assertTrue(source.hasLogin())
+        assertFalse(source.hasLoginForm())
     }
 }

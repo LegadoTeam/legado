@@ -24,7 +24,7 @@ class SourceLoginActivity : VMBaseActivity<ActivitySourceLoginBinding, SourceLog
     }
 
     private fun initView(source: BaseSource) {
-        if (source.loginUi.isNullOrEmpty()) {
+        if (!source.hasLoginForm()) {
             supportFragmentManager.beginTransaction()
                 .replace(R.id.fl_fragment, WebViewLoginFragment(), "webViewLogin")
                 .commit()
