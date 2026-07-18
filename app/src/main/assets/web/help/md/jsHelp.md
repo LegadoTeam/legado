@@ -610,3 +610,205 @@ java.openUrl(url: String, mimeType: String = null)
 * @param isFloat 是否悬浮窗打开
 java.openVideoPlayer(url: String, title: String, isFloat: Boolean = false)
 ```
+
+<!-- js-source-guide:start -->
+## JavaScript 单文件书源
+
+JavaScript 单文件书源使用一个完整的 `.js` 文件描述书源。它不使用 `ruleSearch`、
+`ruleBookInfo`、`ruleToc` 等声明式规则，而是由固定名称的函数返回搜索、详情、目录和正文数据。
+
+### 文件结构
+
+脚本顶层必须声明一个名为 `source` 的配置对象，以及 `search`、`getChapters`、
+`getContent` 三个必选函数。`getBookInfo`、`explore` 和 `login` 按需声明。
+
+保存或导入时，应用会先在不含 `java`、`sourceApi` 等运行时绑定的安全作用域中执行脚本，
+提取 `source` 并检查函数。网络请求、数据库访问和其他运行时代码必须写在函数内部，
+不要在顶层直接调用。
+
+<!-- js-source-example:start -->
+```js
+var source = {
+    bookSourceUrl: "https://example.com",
+    bookSourceName: "示例 JS 书源",
+    bookSourceType: 0,
+    bookSourceGroup: "",
+    bookSourceComment: "JavaScript 单文件书源示例",
+    loginUi: [
+        { name: "账号", type: "text" },
+        { name: "密码", type: "password" }
+    ],
+    exploreUrl: [
+        { title: "分类", url: "https://example.com/list" }
+    ],
+    lastUpdateTime: 0
+};
+
+function login() {
+    var loginInfo = JSON.parse(sourceApi.getLoginInfo() || "{}");
+    // 发起登录请求，失败时可 throw "错误信息"。
+}
+
+function search(key, page) {
+    var html = java.ajax(source.bookSourceUrl + "/search?q=" + encodeURIComponent(key) + "&p=" + page);
+    return [];
+}
+
+function explore(url, page) {
+    var html = java.ajax(url + "?page=" + page);
+    return [];
+}
+
+function getBookInfo(book) {
+    return {
+        intro: "",
+        tocUrl: book.bookUrl
+    };
+}
+
+function getChapters(book) {
+    return [];
+}
+
+function getContent(chapter, book, nextChapterUrl) {
+    var html = java.ajax(chapter.url);
+    return java.htmlFormat(String(html || ""), chapter.url);
+}
+```
+<!-- js-source-example:end -->
+
+`bookSourceUrl` 和 `bookSourceName` 不能为空。配置中的 `mainJs`、`ruleSearch`、
+`ruleExplore`、`ruleBookInfo`、`ruleToc`、`ruleContent` 和 `ruleReview` 会被移除，
+不要在单文件书源中配置这些字段。
+
+### source 与 sourceApi
+
+- `source` 是脚本声明的普通配置对象，例如读取 `source.bookSourceUrl`。
+- `sourceApi` 是数据库中的书源对象，用于读取登录信息、登录请求头和持久化书源变量。
+
+运行环境原本同时提供 `source` 和 `sourceApi`；脚本自己的 `var source = {...}` 会覆盖
+`source` 绑定，但不会覆盖 `sourceApi`。表单登录信息应使用
+`sourceApi.getLoginInfo()` 读取。
+
+### source 常用字段
+
+|字段|说明|
+|---|---|
+|`bookSourceUrl`|必填，书源唯一标识|
+|`bookSourceName`|必填，书源名称|
+|`bookSourceType`|`0` 文本、`1` 音频、`2` 图片、`3` 下载站、`4` 视频|
+|`bookSourceGroup`|书源分组|
+|`bookSourceComment`|书源说明|
+|`lastUpdateTime`|更新时间戳，发布新版本时应增大|
+|`header`|请求头 JSON 字符串|
+|`enabledCookieJar`|是否自动保存请求 Cookie|
+|`concurrentRate`|并发限制|
+|`jsLib`|公共 JavaScript 库文本|
+|`exploreUrl`|发现分类，与 `explore` 函数配对|
+|`loginUrl`|WebView 登录地址|
+|`loginUi`|表单登录配置，与 `login` 函数配对|
+
+`bookSourceType` 的 `0` 到 `4` 是书源类型，不等于返回书籍对象中的 `type`。
+搜索结果和详情返回值里的 `type` 使用 `BookType` 位值：视频 `4`、文本 `8`、
+音频 `32`、图片 `64`、下载服务 `128`，也可以组合合法位值。
+
+### 函数契约
+
+|函数|要求|返回值|
+|---|---|---|
+|`search(key, page)`|必选，页码从 `1` 开始|书籍数组|
+|`explore(url, page)`|`exploreUrl` 非空时必选|与搜索相同的书籍数组|
+|`getBookInfo(book)`|可选|详情字段对象|
+|`getChapters(book)`|必选|非空章节数组|
+|`getContent(chapter, book, nextChapterUrl)`|必选|非空正文字符串|
+|`login()`|`loginUi` 非空时必选|返回值不限，失败时可 `throw`|
+
+返回值可以直接返回原生对象或数组，也可以返回 `JSON.stringify(...)` 生成的字符串。
+原生对象或数组会由引擎自动转换为 JSON，字符串则直接交给解析器。
+
+#### search 与 explore
+
+每条结果必须包含非空 `name` 和 `bookUrl`，缺少这些字段的条目会被跳过。常用可选字段有
+`author`、`kind`、`coverUrl`、`intro`、`wordCount`、`latestChapterTitle`、`tocUrl` 和
+`type`。`origin`、`originName`、`originOrder` 由应用写入，脚本返回的同名值不会生效。
+`bookUrl` 不会自动补全相对地址，建议直接返回绝对地址。
+
+`exploreUrl` 可直接写数组，也可使用书源原有的文本格式。数组中的每项必须具有非空
+`title`；空数组会被视为未配置发现，不要求实现 `explore`。
+
+#### getBookInfo
+
+未声明 `getBookInfo`，或者函数返回 `null`、`undefined` 时，会继续使用搜索阶段的字段。
+允许覆盖 `name`、`author`、`intro`、`coverUrl`、`kind`、`wordCount`、
+`latestChapterTitle`、`tocUrl`、`variable` 和 `type`，其他字段会被忽略。
+部分调用场景不允许通过详情重新命名书籍，此时 `name` 不会覆盖。`tocUrl` 最终仍为空时，
+会使用 `bookUrl`。
+
+`variable` 支持普通对象或 JSON 字符串，内容应为字符串键值：
+
+```js
+function getBookInfo(book) {
+    return {
+        tocUrl: book.bookUrl + "/chapters",
+        variable: { token: "abc", categoryId: "12" }
+    };
+}
+```
+
+#### getChapters
+
+每个章节必须包含非空 `title` 和 `url`，无效条目会被跳过；最终没有有效章节时视为目录失败。
+相对章节地址会以 `book.tocUrl` 为基准补全。常用可选字段有 `isVolume`、`isVip`、
+`isPay`、`resourceUrl`、`tag` 和 `wordCount`。
+
+卷名行推荐设置 `isVolume: true`，并令 `url` 与 `title` 完全相同。应用不会为这种行补全
+URL，打开时直接使用 `tag` 作为内容，不调用 `getContent`。
+
+#### getContent
+
+当前正文函数包含三个参数：
+
+```js
+function getContent(chapter, book, nextChapterUrl) {
+    var html = java.ajax(chapter.url);
+    return java.htmlFormat(String(html || ""), chapter.url);
+}
+```
+
+`nextChapterUrl` 是下一章地址，末章可能为 `null`。返回值必须是非空字符串。
+应用不会自动把任意网页 HTML 转换成正文，需要时应由脚本提取正文节点，或显式调用
+`java.htmlFormat`；第二个参数用于按当前页面地址补全正文中的相对图片链接。
+
+### 登录与发现
+
+- 只设置 `loginUrl` 时使用 WebView 登录，不要求实现 `login`。
+- 设置非空 `loginUi` 时必须实现顶层 `login` 函数。
+- 设置非空 `exploreUrl` 时必须实现顶层 `explore` 函数。
+- `loginUi` 和 `exploreUrl` 的空数组会被视为未配置，不要求对应函数。
+
+`loginUi` 可直接写数组，也可写 JSON 字符串；数组中的每项必须具有非空 `name`。
+登录函数内可通过 `sourceApi.getLoginInfo()` 读取用户填写的数据，并使用
+`sourceApi.putLoginHeader(...)` 保存后续请求需要的登录头。
+
+### 运行环境与并发
+
+函数运行时可使用 `java`、`sourceApi`、`baseUrl`、`cookie`、`cache` 和当前函数参数。
+每次调用都会建立新的脚本作用域并重新执行主脚本，编译缓存不会保留顶层变量值。
+
+- 不要依赖顶层可变变量在函数或请求之间传递状态。
+- 不要假设搜索、详情、目录和正文一定按固定顺序执行。
+- 同一个书源可能同时执行多个请求。
+- 持久状态使用 `cache.put/get`、`sourceApi.put/get` 或
+  `sourceApi.putVariable/getVariable`。
+
+脚本由 Rhino 执行。为保持兼容，优先使用模板中的 `function` 和 `var` 写法，
+不要依赖 `async/await`、Promise、`import`、`export` 等浏览器或模块运行时能力。
+
+### 导入、导出与分享
+
+- 书源管理菜单的“新建 JS 书源”会打开内置模板。
+- 本地 `.js`、`.txt` 文件、内容为脚本的在线地址和直接粘贴的脚本文本均可导入。
+- 导入时以 `bookSourceUrl` 匹配已有书源，并使用 `lastUpdateTime` 判断是否为更新。
+- 只选择一个 JavaScript 书源导出或分享时，生成以书源名称命名的 `.js` 原文。
+- 多选或混合选择 JavaScript 与声明式书源时，仍导出 JSON 书源容器。
+<!-- js-source-guide:end -->
