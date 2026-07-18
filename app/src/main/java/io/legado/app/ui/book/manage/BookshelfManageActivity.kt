@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.AppLog
+import io.legado.app.constant.EventBus
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
@@ -33,6 +34,7 @@ import io.legado.app.ui.book.group.GroupManageDialog
 import io.legado.app.ui.book.group.GroupSelectDialog
 import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.file.HandleFileContract
+import io.legado.app.ui.main.filterBooksForTocUpdate
 import io.legado.app.ui.widget.SelectActionBar
 import io.legado.app.ui.widget.dialog.WaitDialog
 import io.legado.app.ui.widget.recycler.DragSelectTouchHelper
@@ -42,10 +44,12 @@ import io.legado.app.utils.applyTint
 import io.legado.app.utils.cnCompare
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.isAbsUrl
+import io.legado.app.utils.postEvent
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.startActivity
+import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Job
@@ -311,8 +315,19 @@ class BookshelfManageActivity :
             R.id.menu_change_source -> showDialogFragment<SourcePickerDialog>()
             R.id.menu_clear_cache -> viewModel.clearCache(adapter.selection)
             R.id.menu_check_selected_interval -> adapter.checkSelectedInterval()
+            R.id.menu_update_toc -> updateBooksToc()
         }
         return false
+    }
+
+    private fun updateBooksToc() {
+        val books = filterBooksForTocUpdate(adapter.selection)
+        if (books.isEmpty()) {
+            toastOnUi(R.string.no_book_can_update)
+            return
+        }
+        postEvent(EventBus.UP_BOOKS_TOC, books)
+        toastOnUi(getString(R.string.update_toc_submitted, books.size))
     }
 
     private fun upMenu() {

@@ -1,7 +1,6 @@
 package io.legado.app.ui.main
 
 import android.app.Application
-import android.os.Build
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import androidx.recyclerview.widget.RecyclerView.RecycledViewPool
@@ -17,7 +16,6 @@ import io.legado.app.help.AppWebDav
 import io.legado.app.help.DefaultData
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
-import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isUpError
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.sync
@@ -28,6 +26,7 @@ import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.CacheBookService
 import io.legado.app.utils.onEachParallel
 import io.legado.app.utils.postEvent
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.currentCoroutineContext
@@ -40,7 +39,6 @@ import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.util.LinkedList
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import kotlin.collections.forEach
@@ -52,11 +50,11 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
     private var threadCount = AppConfig.threadCount
     private var poolSize = min(threadCount, AppConst.MAX_THREAD)
     private var upTocPool = Executors.newFixedThreadPool(poolSize).asCoroutineDispatcher()
-    private val waitUpTocBooks = LinkedList<String>()
-    private val onUpTocBooks = ConcurrentHashMap.newKeySet<String>()
+    private val tocUpdateRequests = TocUpdateRequests()
     private val eventListenerSource = ConcurrentHashMap<BookSource, Boolean>()
     val onUpBooksLiveData = MutableLiveData<Int>()
     private var upTocJob: Job? = null
+    private var upTocJobGeneration = 0L
     private var cacheBookJob: Job? = null
     val booksListRecycledViewPool = RecycledViewPool().apply {
         setMaxRecycledViews(0, 30)
@@ -74,6 +72,8 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
     }
 
     override fun onCleared() {
+        tocUpdateRequests.cancelAll()
+        finishShelfRefreshCallbacks()
         super.onCleared()
         upTocPool.close()
     }
@@ -93,7 +93,7 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
     }
 
     fun isUpdate(bookUrl: String): Boolean {
-        return onUpTocBooks.contains(bookUrl)
+        return tocUpdateRequests.isRunning(bookUrl)
     }
 
     fun upAllBookToc() {
@@ -116,117 +116,144 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
-    fun upToc(books: List<Book>, onlyUpdateRead: Boolean) {
+    fun upToc(
+        books: List<Book>,
+        onlyUpdateRead: Boolean,
+        policy: TocUpdatePolicy = TocUpdatePolicy.ALLOW_PRE_DOWNLOAD,
+    ) {
         execute(context = upTocPool) {
-            books.filter {
-                !it.isLocal && it.canUpdate
-            }.let {
-                addToWaitUp(it, onlyUpdateRead)
-            }
+            addToWaitUp(filterBooksForTocUpdate(books), onlyUpdateRead, policy)
         }
     }
 
     @Synchronized
-    private fun addToWaitUp(books: List<Book>, onlyUpdateRead: Boolean) {
+    private fun addToWaitUp(
+        books: List<Book>,
+        onlyUpdateRead: Boolean,
+        policy: TocUpdatePolicy = TocUpdatePolicy.ALLOW_PRE_DOWNLOAD,
+    ) {
         books.forEach { book ->
             if (onlyUpdateRead && book.getUnreadChapterNum() > 0) return@forEach
-            if (!waitUpTocBooks.contains(book.bookUrl) && !onUpTocBooks.contains(book.bookUrl)) {
-                waitUpTocBooks.add(book.bookUrl)
-            }
+            tocUpdateRequests.enqueue(book.bookUrl, policy)
         }
-        if (upTocJob == null) {
+        if (upTocJob == null && tocUpdateRequests.hasQueued()) {
             startUpTocJob()
         }
     }
 
+    @Synchronized
     private fun startUpTocJob() {
+        if (upTocJob != null || !tocUpdateRequests.hasQueued()) return
         upPool()
         postUpBooksLiveData()
-        upTocJob = viewModelScope.launch(upTocPool) {
+        val generation = ++upTocJobGeneration
+        val job = viewModelScope.launch(
+            context = upTocPool,
+            start = CoroutineStart.LAZY,
+        ) {
             flow {
                 while (true) {
-                    emit(waitUpTocBooks.poll() ?: break)
+                    emit(tocUpdateRequests.poll() ?: break)
                 }
-            }.onEachParallel(threadCount) {
-                onUpTocBooks.add(it)
-                postEvent(EventBus.UP_BOOKSHELF, it)
-                updateToc(it)
-            }.onEach {
-                onUpTocBooks.remove(it)
-                postEvent(EventBus.UP_BOOKSHELF, it)
+            }.onEachParallel(threadCount) { request ->
+                postEvent(EventBus.UP_BOOKSHELF, request.bookUrl)
+                updateToc(request)
+            }.onEach { request ->
+                postEvent(EventBus.UP_BOOKSHELF, request.bookUrl)
                 postUpBooksLiveData()
-            }.onCompletion {
-                upTocJob = null
-                if (waitUpTocBooks.isNotEmpty()) {
-                    startUpTocJob()
-                }
-                if (it == null && cacheBookJob == null && !CacheBookService.isRun) {
-                    //所有目录更新完再开始缓存章节
-                    cacheBook()
-                }
+            }.onCompletion { cause ->
+                completeUpTocJob(generation, cause)
             }.catch {
                 AppLog.put("更新目录出错\n${it.localizedMessage}", it)
             }.collect()
         }
+        upTocJob = job
+        job.start()
     }
 
-    private suspend fun updateToc(bookUrl: String) {
-        val book = appDb.bookDao.getBook(bookUrl) ?: return
-        val source = appDb.bookSourceDao.getBookSource(book.origin)
-        if (source == null) {
-            if (!book.isUpError) {
-                book.addType(BookType.updateError)
-                appDb.bookDao.update(book)
-            }
+    @Synchronized
+    private fun completeUpTocJob(generation: Long, cause: Throwable?) {
+        if (generation != upTocJobGeneration) return
+        upTocJob = null
+        if (cause != null) {
+            tocUpdateRequests.cancelAll()
+            finishShelfRefreshCallbacks()
+            postUpBooksLiveData()
             return
         }
-        if (source.eventListener) {
-            // 使用 putIfAbsent 确保只添加一次
-            if (eventListenerSource.putIfAbsent(source, true) == null) {
-                // 通知监听事件的书源，书架刷新开始
-                SourceCallBack.callBackSource(viewModelScope, SourceCallBack.START_SHELF_REFRESH, source)
-            }
+        if (tocUpdateRequests.hasQueued()) {
+            startUpTocJob()
+            return
         }
-        kotlin.runCatching {
-            val oldBook = book.copy()
-            if (book.tocUrl.isBlank()) {
-                WebBook.getBookInfoAwait(source, book)
-            } else {
-                WebBook.runPreUpdateJs(source, book)
+        if (tocUpdateRequests.isIdle() && cacheBookJob == null && !CacheBookService.isRun) {
+            //所有目录更新完再开始缓存章节
+            cacheBook()
+        }
+    }
+
+    private suspend fun updateToc(request: TocUpdateRequestToken) {
+        val bookUrl = request.bookUrl
+        try {
+            val book = appDb.bookDao.getBook(bookUrl) ?: return
+            val source = appDb.bookSourceDao.getBookSource(book.origin)
+            if (source == null) {
+                if (!book.isUpError) {
+                    book.addType(BookType.updateError)
+                    appDb.bookDao.update(book)
+                }
+                return
             }
-            val toc = WebBook.getChapterListAwait(source, book).getOrThrow()
-            book.sync(oldBook)
-            book.removeType(BookType.updateError)
-            if (book.bookUrl == bookUrl) {
-                appDb.bookDao.update(book)
-            } else {
-                appDb.bookDao.replace(oldBook, book)
-                BookHelp.updateCacheFolder(oldBook, book)
+            if (source.eventListener) {
+                // 使用 putIfAbsent 确保只添加一次
+                if (eventListenerSource.putIfAbsent(source, true) == null) {
+                    // 通知监听事件的书源，书架刷新开始
+                    SourceCallBack.callBackSource(
+                        viewModelScope,
+                        SourceCallBack.START_SHELF_REFRESH,
+                        source,
+                    )
+                }
             }
-            appDb.bookChapterDao.delByBook(bookUrl)
-            appDb.bookChapterDao.insert(*toc.toTypedArray())
-            ReadBook.onChapterListUpdated(book)
-            addDownload(source, book)
-        }.onFailure {
-            currentCoroutineContext().ensureActive()
-            AppLog.put("${book.name} 更新目录失败\n${it.localizedMessage}", it)
-            //这里可能因为时间太长书籍信息已经更改,所以重新获取
-            appDb.bookDao.getBook(book.bookUrl)?.let { book ->
-                book.addType(BookType.updateError)
-                appDb.bookDao.update(book)
+            kotlin.runCatching {
+                val oldBook = book.copy()
+                if (book.tocUrl.isBlank()) {
+                    WebBook.getBookInfoAwait(source, book)
+                } else {
+                    WebBook.runPreUpdateJs(source, book)
+                }
+                val toc = WebBook.getChapterListAwait(source, book).getOrThrow()
+                book.sync(oldBook)
+                book.removeType(BookType.updateError)
+                if (book.bookUrl == bookUrl) {
+                    appDb.bookDao.update(book)
+                } else {
+                    appDb.bookDao.replace(oldBook, book)
+                    BookHelp.updateCacheFolder(oldBook, book)
+                }
+                appDb.bookChapterDao.delByBook(bookUrl)
+                appDb.bookChapterDao.insert(*toc.toTypedArray())
+                ReadBook.onChapterListUpdated(book)
+                val policy = tocUpdateRequests.close(request)
+                if (policy == TocUpdatePolicy.ALLOW_PRE_DOWNLOAD) {
+                    addDownload(source, book)
+                }
+            }.onFailure {
+                currentCoroutineContext().ensureActive()
+                AppLog.put("${book.name} 更新目录失败\n${it.localizedMessage}", it)
+                //这里可能因为时间太长书籍信息已经更改,所以重新获取
+                appDb.bookDao.getBook(book.bookUrl)?.let { book ->
+                    book.addType(BookType.updateError)
+                    appDb.bookDao.update(book)
+                }
             }
+        } finally {
+            tocUpdateRequests.finish(request)
         }
     }
 
     fun postUpBooksLiveData(reset: Boolean = false) {
         if (AppConfig.showWaitUpCount) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                onUpBooksLiveData.postValue(waitUpTocBooks.size + onUpTocBooks.size)
-            } else {
-                var count = 0
-                onUpTocBooks.forEach { _ -> count++ }
-                onUpBooksLiveData.postValue(waitUpTocBooks.size + count)
-            }
+            onUpBooksLiveData.postValue(tocUpdateRequests.pendingCount())
         } else if (reset) {
             onUpBooksLiveData.postValue(0)
         }
@@ -247,32 +274,30 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
      * 缓存书籍
      */
     private fun cacheBook() {
-        //开始缓存前，通知监听事件的书源，书架刷新已完成
-        eventListenerSource.toList().forEach {
-            SourceCallBack.callBackSource(viewModelScope, SourceCallBack.END_SHELF_REFRESH, it.first)
-        }
-        eventListenerSource.clear()
+        finishShelfRefreshCallbacks()
         if (AppConfig.preDownloadNum == 0) return
         cacheBookJob?.cancel()
         cacheBookJob = viewModelScope.launch(upTocPool) {
             launch {
                 while (isActive && CacheBook.isRun) {
-                    val isOnUpTocBooksEmpty = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                        onUpTocBooks.isEmpty()
-                    } else {
-                        var isEmpty = true
-                        onUpTocBooks.forEach { _ ->
-                            isEmpty = false
-                            return@forEach
-                        }
-                        isEmpty
-                    }
                     //有目录更新是不缓存,优先更新目录,现在更多网站限制并发
-                    CacheBook.setWorkingState(waitUpTocBooks.isEmpty() && isOnUpTocBooksEmpty)
+                    CacheBook.setWorkingState(tocUpdateRequests.isIdle())
                     delay(1000)
                 }
             }
             CacheBook.startProcessJob(upTocPool)
+        }
+    }
+
+    private fun finishShelfRefreshCallbacks() {
+        eventListenerSource.keys.toList().forEach { source ->
+            if (eventListenerSource.remove(source) != null) {
+                SourceCallBack.callBackSource(
+                    viewModelScope,
+                    SourceCallBack.END_SHELF_REFRESH,
+                    source,
+                )
+            }
         }
     }
 
