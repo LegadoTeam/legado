@@ -121,6 +121,7 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
             binding.rvBookshelf.setRecycledViewPool(activityViewModel.booksListRecycledViewPool)
         }
         booksAdapter.stateRestorationPolicy = StateRestorationPolicy.PREVENT_WHEN_EMPTY
+        binding.rvBookshelf.itemAnimator = null
         binding.rvBookshelf.adapter = booksAdapter
         /**
          * 应该是当初没有使用override val keepScrollPosition = true 加的代码
