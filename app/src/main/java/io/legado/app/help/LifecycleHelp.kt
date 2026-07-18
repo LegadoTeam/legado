@@ -16,6 +16,7 @@ object LifecycleHelp : Application.ActivityLifecycleCallbacks {
     private const val TAG = "LifecycleHelp"
 
     private val activities: MutableList<WeakReference<Activity>> = arrayListOf()
+    private val resumedActivities: MutableList<WeakReference<Activity>> = arrayListOf()
     private val services: MutableList<WeakReference<BaseService>> = arrayListOf()
     private var appFinishedListener: (() -> Unit)? = null
 
@@ -57,20 +58,36 @@ object LifecycleHelp : Application.ActivityLifecycleCallbacks {
         this.appFinishedListener = appFinishedListener
     }
 
-    override fun onActivityPaused(activity: Activity) {
-        LogUtils.d(TAG, "${activity::class.simpleName} onPause")
+    @Synchronized
+    fun getTopActivity(): Activity? {
+        resumedActivities.removeAll {
+            val resumedActivity = it.get()
+            resumedActivity == null || resumedActivity.isFinishing || resumedActivity.isDestroyed
+        }
+        return resumedActivities.lastOrNull()?.get()
     }
 
+    @Synchronized
+    override fun onActivityPaused(activity: Activity) {
+        LogUtils.d(TAG, "${activity::class.simpleName} onPause")
+        resumedActivities.removeAll { it.get() == null || it.get() === activity }
+    }
+
+    @Synchronized
     override fun onActivityResumed(activity: Activity) {
         LogUtils.d(TAG, "${activity::class.simpleName} onResume")
+        resumedActivities.removeAll { it.get() == null || it.get() === activity }
+        resumedActivities.add(WeakReference(activity))
     }
 
     override fun onActivityStarted(activity: Activity) {
         LogUtils.d(TAG, "${activity::class.simpleName} onStart")
     }
 
+    @Synchronized
     override fun onActivityDestroyed(activity: Activity) {
         LogUtils.d(TAG, "${activity::class.simpleName} onDestroy")
+        resumedActivities.removeAll { it.get() == null || it.get() === activity }
         for (temp in activities) {
             if (temp.get() != null && temp.get() === activity) {
                 activities.remove(temp)

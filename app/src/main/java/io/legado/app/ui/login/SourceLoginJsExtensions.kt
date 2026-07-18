@@ -74,8 +74,12 @@ class SourceLoginJsExtensions(
         }
     }
 
-    @JvmOverloads
-    fun showBrowser(url: String, html: String? = null, preloadJs: String? = null, config: String? = null) {
+    override fun showBrowser(
+        url: String,
+        html: String?,
+        preloadJs: String?,
+        config: String?
+    ) {
         val activity = activityRef.get() ?: return
         val source = getSource() ?: return
         activity.showDialogFragment(

@@ -3,6 +3,7 @@ package io.legado.app.help
 import android.webkit.JavascriptInterface
 import android.webkit.WebSettings
 import androidx.annotation.Keep
+import androidx.appcompat.app.AppCompatActivity
 import cn.hutool.core.codec.Base64
 import cn.hutool.core.util.HexUtil
 import com.script.rhino.rhinoContext
@@ -27,6 +28,7 @@ import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.analyzeRule.QueryTTF
 import io.legado.app.ui.association.OnLineImportActivity
 import io.legado.app.ui.association.OpenUrlConfirmActivity
+import io.legado.app.ui.widget.dialog.BottomWebViewDialog
 import io.legado.app.utils.ArchiveUtils
 import io.legado.app.utils.ChineseUtils
 import io.legado.app.utils.EncoderUtils
@@ -46,6 +48,7 @@ import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.isMainThread
 import io.legado.app.utils.longToastOnUi
 import io.legado.app.utils.mapAsync
+import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.stackTraceStr
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.toStringArray
@@ -1190,6 +1193,36 @@ interface JsExtensions : JsEncodeUtils {
             putExtra("sourceOrigin", source.getKey())
             putExtra("sourceName", source.getTag())
             putExtra("sourceType", source.getSourceType())
+        }
+    }
+
+    fun showBrowser(url: String) = showBrowser(url, null, null, null)
+
+    fun showBrowser(url: String, html: String?) = showBrowser(url, html, null, null)
+
+    fun showBrowser(url: String, html: String?, preloadJs: String?) =
+        showBrowser(url, html, preloadJs, null)
+
+    fun showBrowser(
+        url: String,
+        html: String?,
+        preloadJs: String?,
+        config: String?
+    ) {
+        rhinoContextOrNull?.ensureActive()
+        val activity = LifecycleHelp.getTopActivity() as? AppCompatActivity ?: return
+        val source = getSource() ?: return
+        activity.runOnUiThread {
+            if (
+                activity.isFinishing ||
+                activity.isDestroyed ||
+                activity.supportFragmentManager.isStateSaved
+            ) {
+                return@runOnUiThread
+            }
+            activity.showDialogFragment(
+                BottomWebViewDialog(source.getKey(), 0, url, html, preloadJs, config)
+            )
         }
     }
 
