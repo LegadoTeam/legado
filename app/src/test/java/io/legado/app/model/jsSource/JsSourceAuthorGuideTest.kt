@@ -19,6 +19,16 @@ class JsSourceAuthorGuideTest {
     }
 
     @Test
+    fun `built in template remains importable`() {
+        val script = source("app/src/main/assets/js_source_template.js")
+        val source = JsSourceConfig.extract(script)
+
+        assertTrue(script.contains("var config ="))
+        assertEquals("https://example.com", source.bookSourceUrl)
+        assertEquals("示例 JS 书源", source.bookSourceName)
+    }
+
+    @Test
     fun `documented example remains importable`() {
         val match = Regex(
             """<!-- js-source-example:start -->\s*```js\s*(.*?)\s*```\s*<!-- js-source-example:end -->""",
@@ -29,6 +39,7 @@ class JsSourceAuthorGuideTest {
         val script = match!!.groupValues[1].trim()
         val source = JsSourceConfig.extract(script)
 
+        assertTrue(script.contains("var config ="))
         assertEquals("https://example.com", source.bookSourceUrl)
         assertEquals("示例 JS 书源", source.bookSourceName)
         assertTrue(source.loginUi.orEmpty().contains("账号"))
@@ -39,20 +50,25 @@ class JsSourceAuthorGuideTest {
     @Test
     fun `guide describes current JavaScript source contracts`() {
         val requiredText = listOf(
+            "`config` 是脚本声明的普通配置对象",
+            "`source` 是数据库中的运行时书源对象",
+            "`sourceApi` 是 `source` 的兼容别名",
+            "旧版脚本",
+            "无关或未定义的 `config` 不影响旧版 `source` 导入",
+            "source.getLoginInfo()",
             "sourceApi.getLoginInfo()",
             "function explore(url, page)",
             "function getContent(chapter, book, nextChapterUrl)",
             "`4` 视频",
             "`loginUi` 非空时必选",
             "`exploreUrl` 非空时必选",
-            "sourceApi.putVariable/getVariable",
+            "source.putVariable/getVariable",
             "只选择一个 JavaScript 书源导出或分享",
         )
 
         requiredText.forEach { text ->
             assertTrue("Missing current JS source contract: $text", guide.contains(text))
         }
-        assertFalse(guide.contains("source.getLoginInfo()"))
         assertFalse(guide.contains("getReviewSummary"))
     }
 

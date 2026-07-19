@@ -44,7 +44,7 @@ class FileAssociationViewModel(application: Application) : BaseAssociationViewMo
 
     private fun dispatch(fileDoc: FileDoc) {
         kotlin.runCatching {
-            if (fileDoc.openInputStream().getOrNull().isJson()) {
+            if (fileDoc.openInputStream().getOrNull().looksLikeJson()) {
                 importJson(fileDoc.uri)
                 return
             }

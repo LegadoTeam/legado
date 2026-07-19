@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.core.net.toUri
 import io.legado.app.R
 import io.legado.app.constant.AppConst
+import io.legado.app.help.DefaultData
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.http.decompressed
 import io.legado.app.help.http.newCallResponseBody
@@ -57,14 +58,13 @@ class OnLineImportViewModel(app: Application) : BaseAssociationViewModel(app) {
     fun importReadConfig(bytes: ByteArray, finally: (title: String, msg: String) -> Unit) {
         execute {
             val config = ReadBookConfig.import(bytes)
-            ReadBookConfig.configList.forEachIndexed { index, c ->
-                if (c.name == config.name) {
-                    ReadBookConfig.configList[index] = config
-                    return@execute config.name
-                }
-                ReadBookConfig.configList.add(config)
-                return@execute config.name
-            }
+            applyImportedReadConfig(
+                configs = ReadBookConfig.configList,
+                imported = config,
+                defaultConfigs = { DefaultData.readConfigs },
+                save = ReadBookConfig::saveNow,
+                transactionLock = ReadBookConfig,
+            )
         }.onSuccess {
             finally.invoke(context.getString(R.string.success), "导入排版成功")
         }.onError {

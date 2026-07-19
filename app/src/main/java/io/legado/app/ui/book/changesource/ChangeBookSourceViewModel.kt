@@ -29,6 +29,7 @@ import io.legado.app.utils.internString
 import io.legado.app.utils.mapParallel
 import io.legado.app.utils.mapParallelSafe
 import io.legado.app.utils.onEachIndexed
+import io.legado.app.utils.runCatchingCancellable
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers.IO
@@ -470,7 +471,7 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
     }
 
     suspend fun getToc(book: Book): Result<Pair<List<BookChapter>, BookSource>> {
-        return kotlin.runCatching {
+        return runCatchingCancellable {
             val source = appDb.bookSourceDao.getBookSource(book.origin)
                 ?: throw NoStackTraceException("书源不存在")
             if (book.tocUrl.isEmpty()) {
