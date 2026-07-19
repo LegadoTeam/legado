@@ -11,6 +11,8 @@ import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import android.view.Window
 import android.widget.PopupWindow
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.R
@@ -34,7 +36,6 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import splitties.systemservices.layoutInflater
 import splitties.systemservices.windowManager
-import kotlin.math.abs
 
 /**
  * 键盘帮助浮窗
@@ -75,14 +76,10 @@ class KeyboardToolPop(
     }
 
     override fun onGlobalLayout() {
-        val rect = Rect()
-        // 获取当前页面窗口的显示范围
-        rootView.getWindowVisibleDisplayFrame(rect)
-        val screenHeight = windowManager.windowSize.heightPixels
-        val keyboardHeight = screenHeight - rect.bottom // 输入法的高度
+        val keyboardHeight = resolveKeyboardHeight()
         val preShowing = mIsSoftKeyBoardShowing
-        if (abs(keyboardHeight) > screenHeight / 5) {
-            mIsSoftKeyBoardShowing = true // 超过屏幕五分之一则表示弹出了输入法
+        if (keyboardHeight > 0) {
+            mIsSoftKeyBoardShowing = true
             rootView.setPadding(0, 0, 0, initialPadding + contentView.measuredHeight)
             if (!isShowing) {
                 showAtLocation(rootView, Gravity.BOTTOM, 0, 0)
@@ -94,6 +91,27 @@ class KeyboardToolPop(
                 dismiss()
             }
         }
+    }
+
+    private fun resolveKeyboardHeight(): Int {
+        ViewCompat.getRootWindowInsets(rootView)?.let { insets ->
+            return resolveKeyboardToolHeight(
+                imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime()),
+                imeInsetBottom = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom,
+                screenHeight = 0,
+                visibleFrameBottom = 0,
+            )
+        }
+
+        val rect = Rect()
+        rootView.getWindowVisibleDisplayFrame(rect)
+        val screenHeight = windowManager.windowSize.heightPixels
+        return resolveKeyboardToolHeight(
+            imeVisible = null,
+            imeInsetBottom = 0,
+            screenHeight = screenHeight,
+            visibleFrameBottom = rect.bottom,
+        )
     }
 
     @SuppressLint("SetTextI18n")
@@ -210,4 +228,21 @@ class KeyboardToolPop(
         fun onRedoClicked()
     }
 
+}
+
+internal fun resolveKeyboardToolHeight(
+    imeVisible: Boolean?,
+    imeInsetBottom: Int,
+    screenHeight: Int,
+    visibleFrameBottom: Int,
+): Int {
+    if (imeVisible != null) {
+        return if (imeVisible) imeInsetBottom.coerceAtLeast(0) else 0
+    }
+
+    if (screenHeight <= 0 || visibleFrameBottom !in 1..screenHeight) {
+        return 0
+    }
+    val hiddenHeight = screenHeight - visibleFrameBottom
+    return hiddenHeight.takeIf { it > screenHeight / 5 } ?: 0
 }
