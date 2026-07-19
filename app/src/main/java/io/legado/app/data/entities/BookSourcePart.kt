@@ -6,6 +6,8 @@ import io.legado.app.constant.AppPattern
 import io.legado.app.data.appDb
 import io.legado.app.utils.splitNotBlank
 
+// Keep enough headroom below SQLite's host parameter limit.
+internal const val BOOK_SOURCE_QUERY_CHUNK_SIZE = 900
 
 @DatabaseView(
     """select bookSourceUrl, bookSourceName, bookSourceGroup, customOrder, enabled, enabledExplore, 
@@ -85,5 +87,23 @@ data class BookSourcePart(
 }
 
 fun List<BookSourcePart>.toBookSource(): List<BookSource> {
-    return mapNotNull { it.getBookSource() }
+    val resolvedSources = bookSourceKeyChunks().flatMap { keys ->
+        appDb.bookSourceDao.getBookSources(keys)
+    }
+    return orderResolvedBookSources(resolvedSources)
+}
+
+internal fun List<BookSourcePart>.bookSourceKeyChunks(): List<List<String>> {
+    return asSequence()
+        .map { it.bookSourceUrl }
+        .distinct()
+        .toList()
+        .chunked(BOOK_SOURCE_QUERY_CHUNK_SIZE)
+}
+
+internal fun List<BookSourcePart>.orderResolvedBookSources(
+    resolvedSources: List<BookSource>
+): List<BookSource> {
+    val sourcesByUrl = resolvedSources.associateBy { it.bookSourceUrl }
+    return mapNotNull { sourcesByUrl[it.bookSourceUrl] }
 }

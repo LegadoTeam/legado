@@ -11,6 +11,16 @@ import kotlin.coroutines.resumeWithException
 
 class TimeoutCancellationException(msg: String) : CancellationException(msg)
 
+inline fun <T> runCatchingCancellable(block: () -> T): Result<T> {
+    return try {
+        Result.success(block())
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Throwable) {
+        Result.failure(e)
+    }
+}
+
 suspend fun <T> withTimeoutAsync(delayMillis: Long, block: suspend CoroutineScope.() -> T): T {
     return suspendCancellableCoroutine { cout ->
         Coroutine.async(context = cout.context) {
