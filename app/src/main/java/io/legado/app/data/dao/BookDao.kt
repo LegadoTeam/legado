@@ -125,6 +125,9 @@ interface BookDao {
     @get:Query("SELECT bookUrl FROM books")
     val allBookUrls: List<String>
 
+    @Query("SELECT bookUrl FROM books WHERE bookUrl IN (:bookUrls)")
+    fun findExistingBookUrls(bookUrls: List<String>): List<String>
+
     @get:Query("SELECT COUNT(*) FROM books")
     val allBookCount: Int
 
