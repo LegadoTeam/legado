@@ -1,8 +1,8 @@
 package com.script
 
-import org.mozilla.javascript.Context
-import org.mozilla.javascript.NativeObject
-import org.mozilla.javascript.ScriptableObject
+import org.htmlunit.corejs.javascript.Context
+import org.htmlunit.corejs.javascript.NativeObject
+import org.htmlunit.corejs.javascript.ScriptableObject
 
 class ScriptBindings : NativeObject() {
 

@@ -12,11 +12,11 @@ import io.legado.app.help.JsExtensions
 import io.legado.app.help.http.CookieStore
 import io.legado.app.help.source.getShareScope
 import io.legado.app.utils.GSON
-import org.mozilla.javascript.Function
-import org.mozilla.javascript.Scriptable
-import org.mozilla.javascript.ScriptableObject
-import org.mozilla.javascript.Undefined
-import org.mozilla.javascript.Wrapper
+import org.htmlunit.corejs.javascript.Function
+import org.htmlunit.corejs.javascript.Scriptable
+import org.htmlunit.corejs.javascript.ScriptableObject
+import org.htmlunit.corejs.javascript.Undefined
+import org.htmlunit.corejs.javascript.Wrapper
 import kotlin.coroutines.CoroutineContext
 
 class JsSourceEngine(

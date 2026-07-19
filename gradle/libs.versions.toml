@@ -54,9 +54,8 @@ jsoup = "1.16.2"
 #noinspection GradleDependency,NewerVersionAvailable
 commonsText = "1.13.1"
 
-# 新版本使用了 Android 8 以下无法编译的 VarHandle.compareAndExchange 方法
-#noinspection GradleDependency
-rhino = "1.8.1"
+# Rhino-compatible JavaScript engine
+htmlunitCoreJs = "4.21.0"
 
 #noinspection GradleDependency,NewerVersionAvailable
 media3 = "1.10.1"
@@ -199,7 +198,7 @@ kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref =
 liveeventbus = { module = "com.github.michaellee123:LiveEventBus", version.ref = "liveeventbus" }
 material = { module = "com.google.android.material:material", version.ref = "material" }
 
-mozilla-rhino = { module = "org.mozilla:rhino", version.ref = "rhino" }
+htmlunit-core-js = { module = "org.htmlunit:htmlunit-core-js", version.ref = "htmlunitCoreJs" }
 
 renderscript-intrinsics-replacement-toolkit = { module = "com.github.TomasValenta:renderscript-intrinsics-replacement-toolkit", version = "8eaa829ddd" }
 zxing-lite = { module = "com.github.jenly1314:zxing-lite", version.ref = "zxingLite" }

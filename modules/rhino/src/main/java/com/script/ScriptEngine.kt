@@ -3,7 +3,7 @@
  */
 package com.script
 
-import org.mozilla.javascript.Scriptable
+import org.htmlunit.corejs.javascript.Scriptable
 import java.io.Reader
 import kotlin.coroutines.CoroutineContext
 

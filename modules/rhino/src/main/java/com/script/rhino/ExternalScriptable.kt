@@ -25,8 +25,8 @@
 package com.script.rhino
 
 import com.script.ScriptContext
-import org.mozilla.javascript.*
-import org.mozilla.javascript.Function
+import org.htmlunit.corejs.javascript.*
+import org.htmlunit.corejs.javascript.Function
 
 /**
  * ExternalScriptable is an implementation of Scriptable

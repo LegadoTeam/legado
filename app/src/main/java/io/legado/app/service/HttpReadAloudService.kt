@@ -55,7 +55,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import okhttp3.Response
-import org.mozilla.javascript.WrappedException
+import org.htmlunit.corejs.javascript.WrappedException
 import splitties.init.appCtx
 import java.io.File
 import java.io.InputStream

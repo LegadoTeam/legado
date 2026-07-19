@@ -9,7 +9,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.mozilla.javascript.Scriptable
+import org.htmlunit.corejs.javascript.Scriptable
 
 class JsSourceEngineTest {
 
@@ -58,6 +58,38 @@ class JsSourceEngineTest {
 
         assertTrue(json.contains("书名"))
         assertTrue(json.contains("https://script.example/book/3"))
+    }
+
+    @Test
+    fun `executes source functions with const for in loops`() {
+        val source = BookSource(
+            bookSourceUrl = "https://audio.example",
+            bookSourceName = "Audio source",
+            mainJs = """
+                const config = { bookSourceUrl: 'https://audio.example' };
+                function normalize(params) {
+                    const output = {};
+                    for (const key in params) output[key] = String(params[key]);
+                    if (String(params.mode) === 'free') {
+                        const result = 'free';
+                        output.result = result;
+                    } else {
+                        const result = 'paid';
+                        output.result = result;
+                    }
+                    return output;
+                }
+            """.trimIndent(),
+        )
+
+        val json = JsSourceEngine(source).callFunction(
+            "normalize",
+            listOf("params" to mapOf("page" to 3, "mode" to "free")),
+        ).orEmpty()
+        val result = GSON.fromJson(json, JsonObject::class.java)
+
+        assertEquals("3", result.get("page").asString)
+        assertEquals("free", result.get("result").asString)
     }
 
     @Test
