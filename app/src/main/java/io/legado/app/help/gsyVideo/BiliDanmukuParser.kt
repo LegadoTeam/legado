@@ -233,7 +233,7 @@ class BiliDanmukuParser : BaseDanmakuParser() {
                             val pointStrArray: Array<String?> =
                                 motionPathString.split("L".toRegex()).dropLastWhile { it.isEmpty() }
                                     .toTypedArray()
-                            if (pointStrArray != null && pointStrArray.size > 0) {
+                            if (pointStrArray.isNotEmpty()) {
                                 val points =
                                     Array<FloatArray?>(pointStrArray.size) { FloatArray(2) }
                                 for (i in pointStrArray.indices) {

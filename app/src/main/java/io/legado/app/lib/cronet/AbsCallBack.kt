@@ -475,18 +475,15 @@ abstract class AbsCallBack(
             return when (result.callbackStep) {
                 CallbackStep.ON_FAILED -> {
                     finished.set(true)
-                    buffer = null
                     throw IOException(result.exception)
                 }
 
                 CallbackStep.ON_SUCCESS -> {
                     finished.set(true)
-                    buffer = null
                     -1
                 }
 
                 CallbackStep.ON_CANCELED -> {
-                    buffer = null
                     throw IOException("Request Canceled")
                 }
 
