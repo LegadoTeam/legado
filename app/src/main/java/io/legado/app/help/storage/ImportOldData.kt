@@ -301,7 +301,7 @@ object ImportOldData {
         return newRule
     }
 
-    private fun toNewUrls(oldUrls: String?): String? {
+    internal fun toNewUrls(oldUrls: String?): String? {
         if (oldUrls.isNullOrBlank()) return null
         if (oldUrls.startsWith("@js:") || oldUrls.startsWith("<js>")) {
             return oldUrls
@@ -310,9 +310,9 @@ object ImportOldData {
             return toNewUrl(oldUrls)
         }
         val urls = oldUrls.split("(&&|\r?\n)+".toRegex())
-        return urls.map {
+        return urls.mapNotNull {
             toNewUrl(it)?.replace("\n\\s*".toRegex(), "")
-        }.joinToString("\n")
+        }.joinToString("\n").takeIf { it.isNotBlank() }
     }
 
     private fun toNewUrl(oldUrl: String?): String? {
