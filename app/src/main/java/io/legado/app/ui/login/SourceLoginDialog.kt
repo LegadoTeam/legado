@@ -29,6 +29,7 @@ import io.legado.app.utils.GSON
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.fromJsonArray
+import io.legado.app.utils.gone
 import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.openUrl
 import io.legado.app.utils.printOnDebug
@@ -36,9 +37,11 @@ import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.toastOnUi
+import io.legado.app.utils.visible
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -70,6 +73,8 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
     private var rowUiName = arrayListOf<String>()
     private var hasChange = false
     private var loginUrl: String? = null
+    private var renderJob: Job? = null
+    private var isRenderingLoginUi = false
     private val sourceLoginJsExtensions by lazy {
         SourceLoginJsExtensions(
             activity as AppCompatActivity,
@@ -102,6 +107,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
     }
 
     private fun handleReUiView(deltaUp: Boolean) {
+        if (view == null) return
         val source = viewModel.source ?: return
         val loginUiStr = source.loginUi ?: return
         val codeStr = loginUiStr.let {
@@ -113,14 +119,9 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
         }
         if (codeStr != null) {
             hasChange = true
-            lifecycleScope.launch(Main) {
-                withContext(IO) {
-                    val loginUiJson = evalUiJs(codeStr)
-                    rowUis = loginUi(loginUiJson)
-                }
-                rowUiBuilder(source, rowUis, deltaUp)
-            }
+            renderLoginUi(source, codeStr, deltaUp, installMenu = false)
         } else {
+            cancelLoginUiRender()
             rowUis = loginUi(loginUiStr)
             rowUiBuilder(source, rowUis, deltaUp)
         }
@@ -128,6 +129,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
 
     @SuppressLint("SetTextI18n")
     private fun handleUpUiData(data: Map<String, Any?>?) {
+        if (view == null) return
         hasChange = true
         if (data == null) {
             val newLoginInfo: MutableMap<String, String> = mutableMapOf()
@@ -222,29 +224,44 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
     }
 
     suspend fun evalUiJs(jsStr: String): String? {
-        val source = viewModel.source ?: return null
+        return evalUiJsResult(jsStr).getOrNull()
+    }
+
+    private suspend fun evalUiJsResult(jsStr: String): Result<String> {
+        val source = viewModel.source
+            ?: return Result.failure(IllegalStateException("Missing login source"))
         val loginJS = loginUrl ?: ""
         val result = rowUis?.let {
             getLoginData(it)
         } ?: viewModel.loginInfo.toMutableMap()
-        return try {
-            runScriptWithContext {
-                source.evalJS("$loginJS\n$jsStr") {
-                    put("result", result)
-                    put("book", viewModel.book)
-                    put("chapter", viewModel.chapter)
-                }.toString()
-            }
-        } catch (e: Exception) {
-            AppLog.put(source.getTag() + " loginUi err:" + (e.localizedMessage ?: e.toString()), e)
-            null
-        }
+        return evaluateLoginUiScript(
+            block = {
+                runScriptWithContext {
+                    source.evalJS("$loginJS\n$jsStr") {
+                        put("result", result)
+                        put("book", viewModel.book)
+                        put("chapter", viewModel.chapter)
+                    }.toString()
+                }
+            },
+            onFailure = { error ->
+                AppLog.put(
+                    source.getTag() + " loginUi err:" +
+                        (error.localizedMessage ?: error.toString()),
+                    error,
+                )
+            },
+        )
     }
 
     fun loginUi(json: String?): List<RowUi>? {
+        return parseLoginUi(json).getOrNull()
+    }
+
+    private fun parseLoginUi(json: String?): Result<List<RowUi>> {
         return GSON.fromJsonArray<RowUi>(json).onFailure {
             AppLog.put("loginUi json parse err:" + it.localizedMessage, it)
-        }.getOrNull()
+        }
     }
 
     @SuppressLint("SetTextI18n", "ClickableViewAccessibility")
@@ -641,11 +658,16 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
 
     private fun buttonUi(source: BaseSource, rowUis: List<RowUi>?) {
         rowUiBuilder(source, rowUis, false)
+    }
+
+    private fun installToolbarActions(source: BaseSource) {
         binding.toolBar.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 R.id.menu_ok -> {
-                    oKToClose = true
-                    login(source)
+                    if (!isRenderingLoginUi && rowUis != null) {
+                        oKToClose = true
+                        login(source)
+                    }
                 }
 
                 R.id.menu_show_login_header -> alert {
@@ -677,13 +699,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
             }
         }
         if (codeStr != null) {
-            lifecycleScope.launch(Main) {
-                withContext(IO) {
-                    val loginUiJson = evalUiJs(codeStr)
-                    rowUis = loginUi(loginUiJson)
-                }
-                buttonUi(source, rowUis)
-            }
+            renderLoginUi(source, codeStr, deltaUp = false, installMenu = true)
         } else {
             rowUis = loginUi(loginUiStr)
             buttonUi(source, rowUis)
@@ -692,6 +708,53 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
         binding.toolBar.title = getString(R.string.login_source, source.getTag())
         binding.toolBar.inflateMenu(R.menu.source_login)
         binding.toolBar.menu.applyTint(requireContext())
+        installToolbarActions(source)
+    }
+
+    private fun renderLoginUi(
+        source: BaseSource,
+        codeStr: String,
+        deltaUp: Boolean,
+        installMenu: Boolean,
+    ) {
+        renderJob?.cancel()
+        isRenderingLoginUi = true
+        binding.rotateLoading.visible()
+        renderJob = viewLifecycleOwner.lifecycleScope.launch(Main) {
+            val renderedRowsResult = withContext(IO) {
+                evalUiJsResult(codeStr).fold(
+                    onSuccess = ::parseLoginUi,
+                    onFailure = { Result.failure(it) },
+                )
+            }
+            ensureActive()
+            isRenderingLoginUi = false
+            renderJob = null
+            binding.rotateLoading.gone()
+            val renderDecision = resolveLoginUiRender(rowUis, renderedRowsResult)
+            if (!renderDecision.shouldApply) return@launch
+            val renderedRows = requireNotNull(renderDecision.value)
+            rowUis = renderedRows
+            if (installMenu) {
+                buttonUi(source, renderedRows)
+            } else {
+                rowUiBuilder(source, renderedRows, deltaUp)
+            }
+        }
+    }
+
+    private fun cancelLoginUiRender() {
+        renderJob?.cancel()
+        renderJob = null
+        isRenderingLoginUi = false
+        binding.rotateLoading.gone()
+    }
+
+    override fun onDestroyView() {
+        renderJob?.cancel()
+        renderJob = null
+        isRenderingLoginUi = false
+        super.onDestroyView()
     }
 
     private fun handleButtonClick(source: BaseSource, action: String?, name: String, isLongClick: Boolean) {

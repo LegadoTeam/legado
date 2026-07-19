@@ -10,6 +10,7 @@ import io.legado.app.help.source.SourceHelp
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.normalizeFileName
+import io.legado.app.utils.renameGroupExact
 import io.legado.app.utils.splitNotBlank
 import io.legado.app.utils.stackTraceStr
 import io.legado.app.utils.toastOnUi
@@ -133,16 +134,14 @@ class RssSourceViewModel(application: Application) : BaseViewModel(application) 
 
     fun upGroup(oldGroup: String, newGroup: String?) {
         execute {
-            val sources = appDb.rssSourceDao.getByGroup(oldGroup)
-            sources.forEach { source ->
-                source.sourceGroup?.splitNotBlank(",")?.toHashSet()?.let {
-                    it.remove(oldGroup)
-                    if (!newGroup.isNullOrEmpty())
-                        it.add(newGroup)
-                    source.sourceGroup = TextUtils.join(",", it)
+            val sources = appDb.rssSourceDao.getByGroup(oldGroup).mapNotNull { source ->
+                source.sourceGroup.renameGroupExact(oldGroup, newGroup)?.let { groups ->
+                    source.apply { sourceGroup = groups }
                 }
             }
-            appDb.rssSourceDao.update(*sources.toTypedArray())
+            if (sources.isNotEmpty()) {
+                appDb.rssSourceDao.update(*sources.toTypedArray())
+            }
         }
     }
 

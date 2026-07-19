@@ -1,7 +1,6 @@
 package io.legado.app.ui.book.source.manage
 
 import android.app.Application
-import android.text.TextUtils
 import io.legado.app.R
 import io.legado.app.base.BaseViewModel
 import io.legado.app.data.appDb
@@ -14,7 +13,7 @@ import io.legado.app.utils.GSON
 import io.legado.app.utils.cnCompare
 import io.legado.app.utils.normalizeFileName
 import io.legado.app.utils.outputStream
-import io.legado.app.utils.splitNotBlank
+import io.legado.app.utils.renameGroupExact
 import io.legado.app.utils.stackTraceStr
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.writeToOutputStream
@@ -278,16 +277,14 @@ class BookSourceViewModel(application: Application) : BaseViewModel(application)
 
     fun upGroup(oldGroup: String, newGroup: String?) {
         execute {
-            val sources = appDb.bookSourceDao.getByGroup(oldGroup)
-            sources.forEach { source ->
-                source.bookSourceGroup?.splitNotBlank(",")?.toHashSet()?.let {
-                    it.remove(oldGroup)
-                    if (!newGroup.isNullOrEmpty())
-                        it.add(newGroup)
-                    source.bookSourceGroup = TextUtils.join(",", it)
+            val sources = appDb.bookSourceDao.getByGroup(oldGroup).mapNotNull { source ->
+                source.bookSourceGroup.renameGroupExact(oldGroup, newGroup)?.let { groups ->
+                    source.apply { bookSourceGroup = groups }
                 }
             }
-            appDb.bookSourceDao.update(*sources.toTypedArray())
+            if (sources.isNotEmpty()) {
+                appDb.bookSourceDao.update(*sources.toTypedArray())
+            }
         }
     }
 
