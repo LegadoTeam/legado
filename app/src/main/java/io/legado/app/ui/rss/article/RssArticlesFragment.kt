@@ -83,7 +83,16 @@ class RssArticlesFragment() : VMBaseFragment<RssArticlesViewModel>(R.layout.frag
         recyclerView.applyNavigationBarPadding()
         loadMoreView.setOnClickListener {
             if (!loadMoreView.isLoading) {
-                scrollToBottom(true)
+                val result = viewModel.loadResultLiveData.value
+                if (result == null || viewModel.isLatestResult(result)) {
+                    when (result) {
+                        is RssArticlesLoadResult.Error -> when (result.retryTarget) {
+                            RssRetryTarget.Refresh -> retryRefresh(result)
+                            RssRetryTarget.NextPage -> scrollToBottom(true)
+                        }
+                        else -> scrollToBottom(true)
+                    }
+                }
             }
         }
         val layoutManager = when (activityViewModel.articleStyle) {
@@ -125,7 +134,9 @@ class RssArticlesFragment() : VMBaseFragment<RssArticlesViewModel>(R.layout.frag
             ViewLoadMoreBinding.bind(loadMoreView)
         }
         refreshLayout.setOnRefreshListener {
-            loadArticles()
+            if (!loadArticles()) {
+                refreshLayout.isRefreshing = false
+            }
         }
         recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
@@ -148,14 +159,18 @@ class RssArticlesFragment() : VMBaseFragment<RssArticlesViewModel>(R.layout.frag
         if (isPreload) {
             refreshLayout.post {
                 refreshLayout.isRefreshing = true
-                loadArticles()
+                if (!loadArticles()) {
+                    refreshLayout.isRefreshing = false
+                }
             }
             return@run
         }
         viewLifecycleOwner.lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 refreshLayout.isRefreshing = true
-                loadArticles()
+                if (!loadArticles()) {
+                    refreshLayout.isRefreshing = false
+                }
                 this@launch.cancel()
             }
         } //只刷新可见页面,非预加载时使用
@@ -213,10 +228,17 @@ class RssArticlesFragment() : VMBaseFragment<RssArticlesViewModel>(R.layout.frag
         super.onPause()
     }
 
-    private fun loadArticles() {
+    private fun loadArticles(): Boolean {
+        val rssSource = activityViewModel.rssSource ?: return false
+        if (!viewModel.loadArticles(rssSource)) return false
         fullRefresh = true
-        activityViewModel.rssSource?.let {
-            viewModel.loadArticles(it)
+        return true
+    }
+
+    private fun retryRefresh(error: RssArticlesLoadResult.Error) {
+        loadMoreView.hasMore()
+        if (!loadArticles() && viewModel.isLatestResult(error)) {
+            loadMoreView.error(error.message)
         }
     }
 
@@ -225,20 +247,28 @@ class RssArticlesFragment() : VMBaseFragment<RssArticlesViewModel>(R.layout.frag
         fullRefresh = false
         if ((loadMoreView.hasMore && adapter.getActualItemCount() > 0) || forceLoad) {
             loadMoreView.hasMore()
-            activityViewModel.rssSource?.let {
-                viewModel.loadMore(it)
+            val rssSource = activityViewModel.rssSource
+            if (rssSource == null || !viewModel.loadMore(rssSource)) {
+                loadMoreView.stopLoad()
             }
         }
     }
 
     override fun observeLiveBus() {
-        viewModel.loadErrorLiveData.observe(viewLifecycleOwner) {
-            loadMoreView.error(it)
-        }
-        viewModel.loadFinallyLiveData.observe(viewLifecycleOwner) { hasMore ->
-            binding.refreshLayout.isRefreshing = false
-            if (!hasMore) {
-                loadMoreView.noMore()
+        viewModel.loadResultLiveData.observe(viewLifecycleOwner) { result ->
+            if (viewModel.isLatestResult(result)) {
+                binding.refreshLayout.isRefreshing = false
+                when (result) {
+                    is RssArticlesLoadResult.Success -> {
+                        if (result.hasMore) {
+                            loadMoreView.hasMore()
+                            loadMoreView.stopLoad()
+                        } else {
+                            loadMoreView.noMore()
+                        }
+                    }
+                    is RssArticlesLoadResult.Error -> loadMoreView.error(result.message)
+                }
             }
         }
     }

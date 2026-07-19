@@ -116,7 +116,7 @@ object Debug {
         cancelDebug()
         debugSource = rssSource.sourceUrl
         log(debugSource, "︾开始解析")
-        val sort = rssSource.sortUrls().first()
+        val sort = rssSource.sortUrls().firstOrNull() ?: ("" to rssSource.sourceUrl)
         Rss.getArticles(scope, sort.first, sort.second, rssSource, 1)
             .onSuccess {
                 if (it.first.isEmpty()) {

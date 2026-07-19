@@ -14,16 +14,35 @@ import io.legado.app.utils.stackTraceStr
 import kotlinx.coroutines.Dispatchers.IO
 
 
+internal sealed interface RssArticlesLoadResult {
+    val requestId: Long
+
+    data class Success(
+        override val requestId: Long,
+        val hasMore: Boolean,
+    ) : RssArticlesLoadResult
+    data class Error(
+        override val requestId: Long,
+        val message: String,
+        val retryTarget: RssRetryTarget,
+    ) : RssArticlesLoadResult
+}
+
 class RssArticlesViewModel(application: Application) : BaseViewModel(application) {
-    val loadFinallyLiveData = MutableLiveData<Boolean>()
-    val loadErrorLiveData = MutableLiveData<String>()
-    var isLoading = true
+    internal val loadResultLiveData = MutableLiveData<RssArticlesLoadResult>()
+    private val paginationState = RssPaginationState()
+    val isLoading: Boolean
+        get() = paginationState.isLoading
     var order = System.currentTimeMillis()
-    private var nextPageUrl: String? = null
     var sortName: String = ""
     var sortUrl: String = ""
     var searchKey: String? = null
-    var page = 1
+    val page: Int
+        get() = paginationState.page
+
+    internal fun isLatestResult(result: RssArticlesLoadResult): Boolean {
+        return paginationState.isLatestResult(result.requestId)
+    }
 
     fun init(bundle: Bundle?) {
         bundle?.let {
@@ -33,12 +52,21 @@ class RssArticlesViewModel(application: Application) : BaseViewModel(application
         }
     }
 
-    fun loadArticles(rssSource: RssSource) {
-        isLoading = true
-        page = 1
+    fun loadArticles(rssSource: RssSource): Boolean {
+        val request = when (val action = paginationState.startRefresh()) {
+            RssRefreshAction.InProgress -> return false
+            is RssRefreshAction.Request -> action
+        }
         order = System.currentTimeMillis()
-        Rss.getArticles(viewModelScope, sortName, sortUrl, rssSource, page, searchKey).onSuccess(IO) {
-            nextPageUrl = it.second
+        Rss.getArticles(
+            viewModelScope,
+            sortName,
+            sortUrl,
+            rssSource,
+            request.page,
+            searchKey
+        ).onSuccess(IO) {
+            if (!paginationState.isActive(request)) return@onSuccess
             val articles = it.first
             articles.forEach { rssArticle ->
                 rssArticle.order = order--
@@ -47,52 +75,83 @@ class RssArticlesViewModel(application: Application) : BaseViewModel(application
             if (!rssSource.ruleNextPage.isNullOrEmpty()) {
                 appDb.rssArticleDao.clearOld(rssSource.sourceUrl, sortName, order)
             }
-            val hasMore = articles.isNotEmpty() && !rssSource.ruleNextPage.isNullOrEmpty()
-            loadFinallyLiveData.postValue(hasMore)
-            isLoading = false
+            val hasMore = articles.isNotEmpty() && !it.second.isNullOrBlank()
+            if (!paginationState.completeRefresh(request, it.second)) return@onSuccess
+            loadResultLiveData.postValue(
+                RssArticlesLoadResult.Success(request.requestId, hasMore)
+            )
         }.onError {
-            loadFinallyLiveData.postValue(false)
+            if (!paginationState.failRefresh(request)) return@onError
+            loadResultLiveData.postValue(
+                RssArticlesLoadResult.Error(
+                    request.requestId,
+                    it.stackTraceStr,
+                    RssRetryTarget.Refresh
+                )
+            )
             AppLog.put("rss获取内容失败", it)
-            loadErrorLiveData.postValue(it.stackTraceStr)
         }
+        return true
     }
 
-    fun loadMore(rssSource: RssSource) {
-        isLoading = true
-        page++
-        val pageUrl = nextPageUrl
-        if (pageUrl.isNullOrEmpty()) {
-            loadFinallyLiveData.postValue(false)
-            return
+    fun loadMore(rssSource: RssSource): Boolean {
+        val request = when (val action = paginationState.startNextPage()) {
+            RssNextPageAction.InProgress -> return false
+            is RssNextPageAction.NoMore -> {
+                loadResultLiveData.postValue(
+                    RssArticlesLoadResult.Success(action.resultId, false)
+                )
+                return true
+            }
+            is RssNextPageAction.Request -> action
         }
-        Rss.getArticles(viewModelScope, sortName, pageUrl, rssSource, page, searchKey).onSuccess(IO) {
-            nextPageUrl = it.second
-            loadMoreSuccess(it.first)
-            isLoading = false
+        Rss.getArticles(
+            viewModelScope,
+            sortName,
+            request.url,
+            rssSource,
+            request.page,
+            searchKey
+        ).onSuccess(IO) {
+            if (!paginationState.isActive(request)) return@onSuccess
+            val addedArticles = loadMoreSuccess(it.first)
+            val hasMore = addedArticles && !it.second.isNullOrBlank()
+            if (!paginationState.completeNextPage(request, it.second)) return@onSuccess
+            loadResultLiveData.postValue(
+                RssArticlesLoadResult.Success(request.requestId, hasMore)
+            )
         }.onError {
-            loadFinallyLiveData.postValue(false)
+            if (!paginationState.failNextPage(request)) return@onError
+            loadResultLiveData.postValue(
+                RssArticlesLoadResult.Error(
+                    request.requestId,
+                    it.stackTraceStr,
+                    RssRetryTarget.NextPage
+                )
+            )
             AppLog.put("rss获取内容失败", it)
-            loadErrorLiveData.postValue(it.stackTraceStr)
         }
+        return true
     }
 
-    private fun loadMoreSuccess(articles: MutableList<RssArticle>) {
+    private fun loadMoreSuccess(articles: MutableList<RssArticle>): Boolean {
         if (articles.isEmpty()) {
-            loadFinallyLiveData.postValue(false)
-            return
+            return false
         }
         val firstArticle = articles.first()
-        val dbFirstArticle = appDb.rssArticleDao.get(firstArticle.origin, firstArticle.link, firstArticle.sort)
+        val dbFirstArticle =
+            appDb.rssArticleDao.get(firstArticle.origin, firstArticle.link, firstArticle.sort)
         val lastArticle = articles.last()
-        val dbLastArticle = appDb.rssArticleDao.get(lastArticle.origin, lastArticle.link, firstArticle.sort)
+        val dbLastArticle =
+            appDb.rssArticleDao.get(lastArticle.origin, lastArticle.link, firstArticle.sort)
         if (dbFirstArticle != null && dbLastArticle != null) {
-            loadFinallyLiveData.postValue(false)
-        } else {
-            articles.forEach {
-                it.order = order--
-            }
-            appDb.rssArticleDao.append(*articles.toTypedArray())
+            return false
         }
+        articles.forEach {
+            it.order = order--
+        }
+        appDb.rssArticleDao.append(*articles.toTypedArray())
+        return true
     }
 
 }
