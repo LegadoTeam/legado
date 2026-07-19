@@ -27,6 +27,7 @@ import io.legado.app.utils.getPrefString
 import io.legado.app.utils.isJson
 import io.legado.app.utils.normalizeFileName
 import io.legado.app.utils.removePref
+import io.legado.app.utils.runCatchingCancellable
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -138,7 +139,7 @@ object AppWebDav {
     }
 
     suspend fun lastBackUp(): Result<WebDavFile?> {
-        return kotlin.runCatching {
+        return runCatchingCancellable {
             authorization?.let {
                 var lastBackupFile: WebDavFile? = null
                 WebDav(rootWebDavUrl, it).listFiles().reversed().forEach { webDavFile ->
