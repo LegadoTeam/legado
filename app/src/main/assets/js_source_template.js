@@ -1,10 +1,11 @@
 /**
  * JavaScript 单文件书源模板。
  * search、getChapters、getContent 为必需函数，getBookInfo 和 explore 为可选函数。
- * 可使用 java、source、cookie、cache、baseUrl 等现有书源脚本绑定。
+ * config 保存脚本配置；source 是运行时书源实体，sourceApi 是兼容旧脚本的别名。
+ * 可使用 java、source、sourceApi、cookie、cache、baseUrl 等现有书源脚本绑定。
  */
 
-var source = {
+var config = {
     bookSourceUrl: "https://example.com",
     bookSourceName: "示例 JS 书源",
     bookSourceType: 0,
@@ -16,20 +17,20 @@ var source = {
     lastUpdateTime: 0
 };
 
-// source.loginUi 非空时必须提供。sourceApi 是数据库中的书源对象，不会被配置对象覆盖。
+// config.loginUi 非空时必须提供。
 function login() {
-    var loginInfo = JSON.parse(sourceApi.getLoginInfo() || "{}");
+    var loginInfo = JSON.parse(source.getLoginInfo() || "{}");
     // 执行登录请求；失败时 throw "错误信息"。
 }
 
 function search(key, page) {
-    var html = java.ajax(source.bookSourceUrl + "/search?q=" + encodeURIComponent(key) + "&p=" + page);
+    var html = java.ajax(config.bookSourceUrl + "/search?q=" + encodeURIComponent(key) + "&p=" + page);
     var books = [];
     // books.push({ name: "书名", bookUrl: "https://example.com/book/1", author: "作者" });
     return books;
 }
 
-// source.exploreUrl 非空时必须提供。
+// config.exploreUrl 非空时必须提供。
 function explore(url, page) {
     var html = java.ajax(url);
     return [];
