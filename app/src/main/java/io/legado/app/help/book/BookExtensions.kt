@@ -320,6 +320,10 @@ internal fun normalizeExportFileName(name: String, suffix: String): String {
     return "$name.$suffix".normalizeFileName()
 }
 
+internal fun parseExportFileNameResult(result: Any?): String? {
+    return result?.toString()?.takeIf { it.isNotBlank() }
+}
+
 fun Book.getExportFileName(suffix: String): String {
     val default = normalizeExportFileName("$name 作者：${getRealAuthor()}", suffix)
     val jsStr = AppConfig.bookExportFileName
@@ -332,7 +336,9 @@ fun Book.getExportFileName(suffix: String): String {
         bindings["author"] = getRealAuthor()
     }
     return kotlin.runCatching {
-        normalizeExportFileName(RhinoScriptEngine.eval(jsStr, bindings).toString(), suffix)
+        val customName = parseExportFileNameResult(RhinoScriptEngine.eval(jsStr, bindings))
+            ?: return@runCatching default
+        normalizeExportFileName(customName, suffix)
     }.onFailure {
         AppLog.put("导出书名规则错误,使用默认规则\n${it.localizedMessage}", it)
     }.getOrDefault(default)
@@ -360,7 +366,9 @@ fun Book.getExportFileName(
         bindings["epubIndex"] = epubIndex
     }
     return kotlin.runCatching {
-        normalizeExportFileName(RhinoScriptEngine.eval(jsStr, bindings).toString(), suffix)
+        val customName = parseExportFileNameResult(RhinoScriptEngine.eval(jsStr, bindings))
+            ?: return@runCatching default
+        normalizeExportFileName(customName, suffix)
     }.onFailure {
         AppLog.put("导出书名规则错误,使用默认规则\n${it.localizedMessage}", it)
     }.getOrDefault(default)
@@ -399,7 +407,6 @@ fun tryParesExportFileName(jsStr: String): Boolean {
         bindings["epubIndex"] = "epubIndex"
     }
     return runCatching {
-        RhinoScriptEngine.eval(jsStr, bindings)
-        true
+        parseExportFileNameResult(RhinoScriptEngine.eval(jsStr, bindings)) != null
     }.getOrDefault(false)
 }
