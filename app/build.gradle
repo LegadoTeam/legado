@@ -258,7 +258,9 @@ dependencies {
 
     //videoPlayer
     implementation(libs.gsyVideoPlayer.java)
-    implementation(libs.gsyVideoPlayer.exo2)
+    implementation(libs.gsyVideoPlayer.exo2) {
+        exclude(group: 'androidx.media3', module: 'media3-cast')
+    }
     //弹幕
     implementation (libs.danmakuFlameMaster)
 
