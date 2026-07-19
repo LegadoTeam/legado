@@ -10,7 +10,7 @@ class TocListStateTest {
 
     @Test
     fun `book without volumes stays flat`() {
-        val state = stateOf(listOf(chapter(0), chapter(1), chapter(2)), current = 1)
+        val state = stateOf(listOf(chapter(0), chapter(1), chapter(2)))
 
         val items = state.showNormal(currentChapterIndex = 1)
 
@@ -19,28 +19,29 @@ class TocListStateTest {
     }
 
     @Test
-    fun `default collapse only keeps current volume expanded`() {
+    fun `default keeps all volumes expanded`() {
         val state = stateOf(
             listOf(
                 volume(0, "First"), chapter(1), chapter(2),
                 volume(3, "Second"), chapter(4), chapter(5),
             ),
-            current = 4,
         )
 
         val items = state.showNormal(currentChapterIndex = 4)
 
-        assertTrue(state.isVolumeCollapsed(0))
+        assertFalse(state.isVolumeCollapsed(0))
         assertFalse(state.isVolumeCollapsed(3))
-        assertEquals(listOf("volume:0", "volume:3", "chapter:4", "chapter:5"), items.keys())
-        assertEquals(2, state.findVisiblePositionByChapterIndex(4))
+        assertEquals(
+            listOf("volume:0", "chapter:1", "chapter:2", "volume:3", "chapter:4", "chapter:5"),
+            items.keys(),
+        )
+        assertEquals(4, state.findVisiblePositionByChapterIndex(4))
     }
 
     @Test
     fun `toggle changes visible rows and preserves current group marker`() {
         val state = stateOf(
             listOf(volume(0, "First"), chapter(1), chapter(2)),
-            current = 1,
         )
 
         assertTrue(state.toggleVolume(0))
@@ -54,7 +55,6 @@ class TocListStateTest {
     fun `empty volume remains actionable instead of pretending to collapse`() {
         val state = stateOf(
             listOf(volume(0, "Empty"), volume(1, "Second"), chapter(2)),
-            current = 2,
         )
 
         val items = state.showNormal(currentChapterIndex = 2)
@@ -71,8 +71,8 @@ class TocListStateTest {
     fun `hidden chapter falls back to parent and can expand it`() {
         val state = stateOf(
             listOf(volume(0, "First"), chapter(1), volume(2, "Second"), chapter(3)),
-            current = 1,
         )
+        assertTrue(state.toggleVolume(2))
         state.showNormal(currentChapterIndex = 1)
 
         assertEquals(2, state.findFallbackVisiblePositionForChapterIndex(3))
@@ -87,7 +87,8 @@ class TocListStateTest {
             volume(0, "First"), chapter(1), chapter(2),
             volume(3, "Second"), chapter(4), chapter(5),
         )
-        val state = stateOf(all, current = 1)
+        val state = stateOf(all)
+        assertTrue(state.toggleVolume(3))
         assertTrue(state.isVolumeCollapsed(3))
 
         val items = state.showSearch(listOf(4, 5), currentChapterIndex = 1)
@@ -103,7 +104,7 @@ class TocListStateTest {
     @Test
     fun `search volume title and child does not duplicate parent`() {
         val all = listOf(volume(0, "First"), chapter(1), chapter(2))
-        val state = stateOf(all, current = 1)
+        val state = stateOf(all)
 
         val items = state.showSearch(listOf(0, 2), currentChapterIndex = 1)
 
@@ -116,7 +117,7 @@ class TocListStateTest {
     @Test
     fun `volume title match can stand without child matches`() {
         val onlyVolume = volume(0, "First")
-        val state = stateOf(listOf(onlyVolume, chapter(1)), current = 1)
+        val state = stateOf(listOf(onlyVolume, chapter(1)))
 
         val items = state.showSearch(listOf(onlyVolume.index), currentChapterIndex = 1)
 
@@ -130,7 +131,6 @@ class TocListStateTest {
     fun `loose chapters stay at depth zero`() {
         val state = stateOf(
             listOf(chapter(0), volume(1, "First"), chapter(2), chapter(3)),
-            current = 2,
         )
 
         val items = state.showNormal(currentChapterIndex = 2)
@@ -145,30 +145,32 @@ class TocListStateTest {
             volume(0, "First"), chapter(1),
             volume(2, "Second"), chapter(3),
         )
-        val state = stateOf(chapters, current = 1)
+        val state = stateOf(chapters)
         assertTrue(state.toggleVolume(2))
 
-        state.setFullChapters(chapters, 1, reverseOrder = false, resetCollapse = false)
+        state.setFullChapters(chapters, reverseOrder = false, resetCollapse = false)
         state.showNormal(currentChapterIndex = 1)
-        assertFalse(state.isVolumeCollapsed(2))
+        assertTrue(state.isVolumeCollapsed(2))
 
-        state.setFullChapters(chapters, 3, reverseOrder = false, resetCollapse = true)
+        state.setFullChapters(chapters, reverseOrder = false, resetCollapse = true)
         state.showNormal(currentChapterIndex = 3)
-        assertTrue(state.isVolumeCollapsed(0))
+        assertFalse(state.isVolumeCollapsed(0))
         assertFalse(state.isVolumeCollapsed(2))
     }
 
     @Test
-    fun `new volume defaults to collapsed during a non resetting refresh`() {
+    fun `new volume defaults to expanded during a non resetting refresh`() {
         val initial = listOf(volume(0, "First"), chapter(1))
-        val state = stateOf(initial, current = 1)
+        val state = stateOf(initial)
+        assertTrue(state.toggleVolume(0))
         val refreshed = initial + listOf(volume(2, "Second"), chapter(3))
 
-        state.setFullChapters(refreshed, 1, reverseOrder = false, resetCollapse = false)
+        state.setFullChapters(refreshed, reverseOrder = false, resetCollapse = false)
         val items = state.showNormal(currentChapterIndex = 1)
 
-        assertTrue(state.isVolumeCollapsed(2))
-        assertEquals(listOf("volume:0", "chapter:1", "volume:2"), items.keys())
+        assertTrue(state.isVolumeCollapsed(0))
+        assertFalse(state.isVolumeCollapsed(2))
+        assertEquals(listOf("volume:0", "volume:2", "chapter:3"), items.keys())
     }
 
     @Test
@@ -180,11 +182,14 @@ class TocListStateTest {
             chapter(3, "C1"),
             volume(4, "V1"),
         )
-        val state = stateOf(reversed, current = 0, reverse = true)
+        val state = stateOf(reversed, reverse = true)
 
         val items = state.showNormal(currentChapterIndex = 0)
 
-        assertEquals(listOf("volume:1", "chapter:0", "volume:4"), items.keys())
+        assertEquals(
+            listOf("volume:1", "chapter:0", "volume:4", "chapter:2", "chapter:3"),
+            items.keys(),
+        )
         assertEquals(1, state.parentVolumeIndexOf(0))
         assertEquals(4, state.parentVolumeIndexOf(2))
         assertEquals(4, state.parentVolumeIndexOf(3))
@@ -199,7 +204,7 @@ class TocListStateTest {
             chapter(3, "C1"),
             volume(4, "V1"),
         )
-        val state = stateOf(reversed, current = 0, reverse = true)
+        val state = stateOf(reversed, reverse = true)
 
         val items = state.showSearch(listOf(reversed[3].index), currentChapterIndex = 0)
 
@@ -207,23 +212,23 @@ class TocListStateTest {
     }
 
     @Test
-    fun `switching direction rebuilds groups and collapse defaults`() {
+    fun `switching direction rebuilds groups and expands all volumes`() {
         val forward = listOf(volume(0, "V1"), chapter(1), volume(2, "V2"), chapter(3))
-        val state = stateOf(forward, current = 1)
+        val state = stateOf(forward)
         val reversed = listOf(chapter(0, "C2"), volume(1, "V2"), chapter(2, "C1"), volume(3, "V1"))
 
-        state.setFullChapters(reversed, 0, reverseOrder = true, resetCollapse = false)
+        state.setFullChapters(reversed, reverseOrder = true, resetCollapse = false)
         val items = state.showNormal(currentChapterIndex = 0)
 
-        assertEquals(listOf("volume:1", "chapter:0", "volume:3"), items.keys())
-        assertTrue(state.isVolumeCollapsed(3))
+        assertEquals(listOf("volume:1", "chapter:0", "volume:3", "chapter:2"), items.keys())
+        assertFalse(state.isVolumeCollapsed(1))
+        assertFalse(state.isVolumeCollapsed(3))
     }
 
     @Test
     fun `item keys remain unique across a mixed list`() {
         val state = stateOf(
             listOf(chapter(0), volume(1, "V1"), chapter(2), volume(3, "Empty")),
-            current = 2,
         )
 
         val keys = state.showNormal(currentChapterIndex = 2).keys()
@@ -233,7 +238,7 @@ class TocListStateTest {
 
     @Test
     fun `clear invalidates full and visible directory state`() {
-        val state = stateOf(listOf(volume(0, "V1"), chapter(1)), current = 1)
+        val state = stateOf(listOf(volume(0, "V1"), chapter(1)))
         state.showNormal(currentChapterIndex = 1)
 
         state.clear()
@@ -245,13 +250,11 @@ class TocListStateTest {
 
     private fun stateOf(
         chapters: List<BookChapter>,
-        current: Int,
         reverse: Boolean = false,
     ): TocListState {
         return TocListState().apply {
             setFullChapters(
                 chapters = chapters,
-                currentChapterIndex = current,
                 reverseOrder = reverse,
                 resetCollapse = true,
             )
