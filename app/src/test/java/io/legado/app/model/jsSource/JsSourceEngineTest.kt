@@ -1,8 +1,10 @@
 package io.legado.app.model.jsSource
 
+import com.google.gson.JsonObject
 import com.script.buildScriptBindings
 import com.script.rhino.RhinoScriptEngine
 import io.legado.app.data.entities.BookSource
+import io.legado.app.utils.GSON
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -10,6 +12,31 @@ import org.junit.Test
 import org.mozilla.javascript.Scriptable
 
 class JsSourceEngineTest {
+
+    @Test
+    fun `keeps runtime source available when config object is declared`() {
+        val source = BookSource(
+            bookSourceUrl = "https://persisted.example",
+            bookSourceName = "测试源",
+            mainJs = """
+                var config = { bookSourceUrl: 'https://config.example' };
+                function identity() {
+                    return {
+                        configUrl: config.bookSourceUrl,
+                        runtimeUrl: source.bookSourceUrl,
+                        aliasUrl: sourceApi.bookSourceUrl
+                    };
+                }
+            """.trimIndent(),
+        )
+
+        val json = JsSourceEngine(source).callFunction("identity", emptyList()).orEmpty()
+        val result = GSON.fromJson(json, JsonObject::class.java)
+
+        assertEquals("https://config.example", result.get("configUrl").asString)
+        assertEquals("https://persisted.example", result.get("runtimeUrl").asString)
+        assertEquals("https://persisted.example", result.get("aliasUrl").asString)
+    }
 
     @Test
     fun `calls source function through complete engine`() {
