@@ -12,7 +12,7 @@ import org.junit.Test
 class JsSourceConfigTest {
 
     private val validScript = """
-        var source = {
+        var config = {
             bookSourceUrl: "https://example.com",
             bookSourceName: "示例源",
             header: "{\"User-Agent\":\"test\"}"
@@ -34,10 +34,86 @@ class JsSourceConfigTest {
     }
 
     @Test
+    fun `accepts legacy source config object`() {
+        val source = JsSourceConfig.extract(
+            validScript.replaceFirst("var config =", "var source =")
+        )
+
+        assertEquals("https://example.com", source.bookSourceUrl)
+        assertEquals("示例源", source.bookSourceName)
+    }
+
+    @Test
+    fun `prefers config object over legacy source object`() {
+        val source = JsSourceConfig.extract(
+            """
+                var source = {
+                    bookSourceUrl: "https://legacy.example",
+                    bookSourceName: "旧配置"
+                };
+                var config = {
+                    bookSourceUrl: "https://config.example",
+                    bookSourceName: "新配置"
+                };
+                function search(key, page) { return []; }
+                function getChapters(book) { return []; }
+                function getContent(chapter, book) { return "content"; }
+            """.trimIndent()
+        )
+
+        assertEquals("https://config.example", source.bookSourceUrl)
+        assertEquals("新配置", source.bookSourceName)
+    }
+
+    @Test
+    fun `ignores unrelated config object for legacy source`() {
+        val source = JsSourceConfig.extract(
+            "var config = { timeout: 10000 };\n" +
+                validScript.replaceFirst("var config =", "var source =")
+        )
+
+        assertEquals("https://example.com", source.bookSourceUrl)
+        assertEquals("示例源", source.bookSourceName)
+    }
+
+    @Test
+    fun `ignores incomplete config object for legacy source`() {
+        val source = JsSourceConfig.extract(
+            "var config = { bookSourceUrl: 'https://partial.example' };\n" +
+                validScript.replaceFirst("var config =", "var source =")
+        )
+
+        assertEquals("https://example.com", source.bookSourceUrl)
+        assertEquals("示例源", source.bookSourceName)
+    }
+
+    @Test
+    fun `ignores undefined config for legacy source`() {
+        val source = JsSourceConfig.extract(
+            "var config;\n" + validScript.replaceFirst("var config =", "var source =")
+        )
+
+        assertEquals("https://example.com", source.bookSourceUrl)
+        assertEquals("示例源", source.bookSourceName)
+    }
+
+    @Test
+    fun `requires config or legacy source object`() {
+        assertExtractError(
+            """
+                function search(key, page) { return []; }
+                function getChapters(book) { return []; }
+                function getContent(chapter, book) { return "content"; }
+            """.trimIndent(),
+            "config",
+        )
+    }
+
+    @Test
     fun `requires core functions`() {
         assertExtractError(
             """
-                var source = { bookSourceUrl: "https://a.com", bookSourceName: "缺函数" };
+                var config = { bookSourceUrl: "https://a.com", bookSourceName: "缺函数" };
                 function search(key, page) { return []; }
                 function getChapters(book) { return []; }
             """.trimIndent(),
@@ -163,7 +239,7 @@ class JsSourceConfigTest {
         assertExtractError(
             """
                 var probe = new java.net.URL("https://example.com");
-                var source = { bookSourceUrl: "https://a.com", bookSourceName: "越权" };
+                var config = { bookSourceUrl: "https://a.com", bookSourceName: "越权" };
             """.trimIndent(),
             "执行失败",
         )
@@ -171,9 +247,9 @@ class JsSourceConfigTest {
 
     @Test
     fun `stamps declared update time`() {
-        val script = "var source = { lastUpdateTime: Date.now() };"
+        val script = "var config = { lastUpdateTime: Date.now() };"
         assertEquals(
-            "var source = { lastUpdateTime: 123456 };",
+            "var config = { lastUpdateTime: 123456 };",
             JsSourceConfig.stampLastUpdateTime(script, 123456),
         )
     }

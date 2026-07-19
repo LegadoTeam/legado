@@ -246,6 +246,9 @@ interface BookSourceDao {
     @Query("select * from book_sources where bookSourceUrl = :key")
     fun getBookSource(key: String): BookSource?
 
+    @Query("select * from book_sources where bookSourceUrl in (:keys)")
+    fun getBookSources(keys: List<String>): List<BookSource>
+
     @Query("select * from book_sources_part where bookSourceUrl = :key")
     fun getBookSourcePart(key: String): BookSourcePart?
 
