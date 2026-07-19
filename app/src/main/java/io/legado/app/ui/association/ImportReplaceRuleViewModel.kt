@@ -135,10 +135,12 @@ class ImportReplaceRuleViewModel(app: Application) : BaseViewModel(app) {
 
     private fun comparisonSource() {
         execute {
-            allRules.forEach {
-                val rule = appDb.replaceRuleDao.findById(it.id)
-                checkRules.add(rule)
-                selectStatus.add(rule == null)
+            appDb.runInTransaction {
+                val comparison = compareImportedReplaceRules(allRules) { ids ->
+                    appDb.replaceRuleDao.findByIds(*ids.toLongArray())
+                }
+                checkRules.addAll(comparison.existingRules)
+                selectStatus.addAll(comparison.selectStatus)
             }
         }.onSuccess {
             successLiveData.postValue(allRules.size)
