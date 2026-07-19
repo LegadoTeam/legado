@@ -5,6 +5,7 @@
 		<item>Audio</item>
 		<item>Image</item>
 		<item>File</item>
+		<item>Vídeo</item>
 	</string-array>
 
 	<string-array name="group_style">

@@ -107,8 +107,13 @@ public class StringUtil {
         if (suffix.length() > source.length()) {
             return false;
         }
-        return source.substring(source.length() - suffix.length())
-                .toLowerCase().endsWith(suffix.toLowerCase());
+        return source.regionMatches(
+                true,
+                source.length() - suffix.length(),
+                suffix,
+                0,
+                suffix.length()
+        );
     }
 
     public static boolean startsWithIgnoreCase(String source, String prefix) {
@@ -121,8 +126,7 @@ public class StringUtil {
         if (prefix.length() > source.length()) {
             return false;
         }
-        return source.substring(0, prefix.length())
-                .toLowerCase().startsWith(prefix.toLowerCase());
+        return source.regionMatches(true, 0, prefix, 0, prefix.length());
     }
 
     /**
