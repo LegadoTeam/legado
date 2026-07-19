@@ -27,7 +27,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.mozilla.javascript.NativeObject
+import org.htmlunit.corejs.javascript.NativeObject
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException

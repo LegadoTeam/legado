@@ -1,10 +1,10 @@
 package com.script.rhino
 
-import org.mozilla.javascript.NativeJavaObject
-import org.mozilla.javascript.Scriptable
+import org.htmlunit.corejs.javascript.Scriptable
+import org.htmlunit.corejs.javascript.lc.type.TypeInfo
 
-class ReadOnlyJavaObject(scope: Scriptable?, javaObject: Any, staticType: Class<*>?) :
-    NativeJavaObject(scope, javaObject, staticType) {
+class ReadOnlyJavaObject(scope: Scriptable?, javaObject: Any, staticType: TypeInfo) :
+    CatchableNativeJavaObject(scope, javaObject, staticType) {
 
     override fun has(name: String, start: Scriptable): Boolean {
         if (name.length > 3 && name.startsWith("set")) {
@@ -27,8 +27,8 @@ class ReadOnlyJavaObject(scope: Scriptable?, javaObject: Any, staticType: Class<
     }
 
     override fun put(
-        name: String?,
-        start: Scriptable?,
+        name: String,
+        start: Scriptable,
         value: Any?
     ) {
         // do nothing

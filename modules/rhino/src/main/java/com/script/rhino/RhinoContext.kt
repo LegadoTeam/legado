@@ -2,8 +2,8 @@ package com.script.rhino
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
-import org.mozilla.javascript.Context
-import org.mozilla.javascript.ContextFactory
+import org.htmlunit.corejs.javascript.Context
+import org.htmlunit.corejs.javascript.ContextFactory
 import kotlin.coroutines.CoroutineContext
 
 class RhinoContext(factory: ContextFactory) : Context(factory) {

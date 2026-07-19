@@ -5,7 +5,7 @@ package com.script
 
 import com.script.ScriptContext.Companion.ENGINE_SCOPE
 import com.script.ScriptContext.Companion.GLOBAL_SCOPE
-import org.mozilla.javascript.Scriptable
+import org.htmlunit.corejs.javascript.Scriptable
 import kotlin.coroutines.CoroutineContext
 
 abstract class CompiledScript {

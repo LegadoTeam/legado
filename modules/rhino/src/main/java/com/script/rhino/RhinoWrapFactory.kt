@@ -24,11 +24,13 @@
  */
 package com.script.rhino
 
-import org.mozilla.javascript.Context
-import org.mozilla.javascript.NativeJavaPackage
-import org.mozilla.javascript.ScriptRuntime
-import org.mozilla.javascript.Scriptable
-import org.mozilla.javascript.WrapFactory
+import org.htmlunit.corejs.javascript.Context
+import org.htmlunit.corejs.javascript.NativeJavaPackage
+import org.htmlunit.corejs.javascript.ScriptRuntime
+import org.htmlunit.corejs.javascript.Scriptable
+import org.htmlunit.corejs.javascript.WrapFactory
+import org.htmlunit.corejs.javascript.lc.type.TypeInfo
+import org.htmlunit.corejs.javascript.lc.type.TypeInfoFactory
 
 /**
  * This wrap factory is used for security reasons. JSR 223 script
@@ -47,17 +49,58 @@ object RhinoWrapFactory : WrapFactory() {
 
     private val factories = hashMapOf<Class<*>, JavaObjectWrapFactory>()
 
+    override fun wrap(
+        cx: Context,
+        scope: Scriptable?,
+        javaObject: Any?,
+        staticType: Class<*>?,
+    ): Any? {
+        return wrap(cx, scope, javaObject, staticType.toTypeInfo())
+    }
+
+    override fun wrap(
+        cx: Context,
+        scope: Scriptable?,
+        javaObject: Any?,
+        staticType: TypeInfo,
+    ): Any? {
+        return super.wrap(cx, scope, javaObject, staticType)
+    }
+
     override fun wrapAsJavaObject(
         cx: Context,
         scope: Scriptable?,
         javaObject: Any,
-        staticType: Class<*>?
+        staticType: Class<*>?,
+    ): Scriptable? {
+        return wrapAsJavaObject(cx, scope, javaObject, staticType.toTypeInfo())
+    }
+
+    override fun wrapAsJavaObject(
+        cx: Context,
+        scope: Scriptable?,
+        javaObject: Any,
+        staticType: TypeInfo,
     ): Scriptable? {
         if (!RhinoClassShutter.visibleToScripts(javaObject)) {
             return null
         }
-        return wrapOrNull(scope, javaObject, staticType)
-            ?: super.wrapAsJavaObject(cx, scope, javaObject, staticType)
+        val resolvedType = if (staticType.shouldReplace()) {
+            TypeInfoFactory.getOrElse(scope, TypeInfoFactory.GLOBAL).create(javaObject.javaClass)
+        } else {
+            staticType
+        }
+        return wrapOrNull(scope, javaObject, resolvedType)
+            ?: when {
+                List::class.java.isAssignableFrom(resolvedType.asClass()) ->
+                    CatchableNativeJavaList(scope, javaObject, resolvedType)
+
+                Map::class.java.isAssignableFrom(resolvedType.asClass()) ->
+                    CatchableNativeJavaMap(scope, javaObject, resolvedType)
+
+                resolvedType.isArray -> CatchableNativeJavaArray(scope, javaObject, resolvedType)
+                else -> CatchableNativeJavaObject(scope, javaObject, resolvedType)
+            }
     }
 
     override fun wrapJavaClass(
@@ -77,7 +120,7 @@ object RhinoWrapFactory : WrapFactory() {
     private fun wrapOrNull(
         scope: Scriptable?,
         javaObject: Any,
-        staticType: Class<*>?
+        staticType: TypeInfo,
     ): Scriptable? {
         return factories[javaObject.javaClass]?.wrap(scope, javaObject, staticType)
     }

@@ -27,12 +27,12 @@ package com.script.rhino
 import com.script.Bindings
 import com.script.ScriptContext
 import com.script.SimpleScriptContext
-import org.mozilla.javascript.Context
-import org.mozilla.javascript.Function
-import org.mozilla.javascript.ImporterTopLevel
-import org.mozilla.javascript.Scriptable
-import org.mozilla.javascript.Synchronizer
-import org.mozilla.javascript.Wrapper
+import org.htmlunit.corejs.javascript.Context
+import org.htmlunit.corejs.javascript.Function
+import org.htmlunit.corejs.javascript.ImporterTopLevel
+import org.htmlunit.corejs.javascript.Scriptable
+import org.htmlunit.corejs.javascript.Synchronizer
+import org.htmlunit.corejs.javascript.Wrapper
 import java.security.AccessControlContext
 
 /**

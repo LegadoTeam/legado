@@ -1,14 +1,19 @@
 package io.legado.app
 
+import com.script.ScriptBindings
 import com.script.rhino.RhinoContext
+import com.script.rhino.RhinoScriptEngine
 import com.script.rhino.rhinoContext
 import com.script.rhino.rhinoContextOrNull
 import com.script.rhino.runScriptWithContext
+import com.script.rhino.suspendContinuation
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.ui.book.read.page.entities.TextChapter
 import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -35,6 +40,21 @@ class RuntimeConcurrencyTest {
         assertEquals(RhinoContext::class.java, explicitContext.first)
         assertEquals("explicit-script", explicitContext.second)
         assertNull(rhinoContextOrNull)
+    }
+
+    @Test
+    fun suspendedScriptsCanResumeAcrossDispatcherHandoffs() = runBlocking {
+        repeat(50) {
+            val bindings = ScriptBindings().apply {
+                this["bridge"] = SuspendBridge()
+            }
+            val result = withContext(Dispatchers.Default) {
+                RhinoScriptEngine.evalSuspend("bridge.hop()", bindings)
+            }
+
+            assertEquals("resumed", result)
+            assertNull(rhinoContextOrNull)
+        }
     }
 
     @Test
@@ -66,5 +86,19 @@ class RuntimeConcurrencyTest {
         }
         writer.join()
         assertEquals(2_000, pages.size)
+    }
+
+    class SuspendBridge {
+        fun hop(): String = suspendContinuation {
+            repeat(4) {
+                withContext(Dispatchers.IO) {
+                    yield()
+                }
+                withContext(Dispatchers.Default) {
+                    yield()
+                }
+            }
+            "resumed"
+        }
     }
 }

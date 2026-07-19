@@ -1,12 +1,19 @@
 package io.legado.app
 
 import com.script.ScriptBindings
+import com.script.rhino.CatchableNativeJavaObject
+import com.script.rhino.ProtectedNativeJavaClass
+import com.script.rhino.ReadOnlyJavaObject
 import com.script.rhino.RhinoScriptEngine
+import com.script.rhino.RhinoWrapFactory
 import org.intellij.lang.annotations.Language
 import org.junit.Assert
 import org.junit.Test
-import org.mozilla.javascript.Scriptable
-import org.mozilla.javascript.ScriptableObject
+import org.htmlunit.corejs.javascript.Context
+import org.htmlunit.corejs.javascript.NativeJavaClass
+import org.htmlunit.corejs.javascript.Scriptable
+import org.htmlunit.corejs.javascript.ScriptableObject
+import org.htmlunit.corejs.javascript.Wrapper
 
 class JsEngineCapabilitiesTest {
 
@@ -43,6 +50,113 @@ class JsEngineCapabilitiesTest {
                 Scriptable.NOT_FOUND,
                 ScriptableObject.getProperty(scope, "source"),
             )
+        }
+    }
+
+    @Test
+    fun constForInAndBlockScopesRemainIndependent() {
+        val script = """
+            const params = { first: 1, second: 2 };
+            const values = [];
+            for (const key in params) {
+                values.push(key + ':' + params[key]);
+            }
+            if (params.first === 1) {
+                const result = 'left';
+                values.push(result);
+            } else {
+                const result = 'right';
+                values.push(result);
+            }
+            values.join('|');
+        """.trimIndent()
+
+        Assert.assertEquals(
+            "first:1|second:2|left",
+            RhinoScriptEngine.eval(script, ScriptBindings()),
+        )
+    }
+
+    @Test
+    fun javaInvocationFailuresRemainCatchableByScripts() {
+        RhinoWrapFactory.register(FactoryBridge::class.java, ReadOnlyJavaObject.factory)
+        val bindings = ScriptBindings().apply {
+            this["bridge"] = ThrowingBridge()
+        }
+        Context.enter()
+        try {
+            bindings.put(
+                "staticBridge",
+                bindings,
+                ProtectedNativeJavaClass(bindings, StaticThrowingBridge::class.java),
+            )
+        } finally {
+            Context.exit()
+        }
+        Assert.assertTrue(
+            ScriptableObject.getProperty(bindings, "bridge") is CatchableNativeJavaObject
+        )
+        val cases = listOf(
+            "bridge.fail()",
+            "bridge.child().fail()",
+            "bridge.children()[0].fail()",
+            "bridge.childMap().item.fail()",
+            "bridge.childArray()[0].fail()",
+            "staticBridge.failure = 'changed'",
+            "java.lang.Integer.parseInt('invalid')",
+        )
+
+        cases.forEach { expression ->
+            val script = """
+                try {
+                    $expression
+                    'missed'
+                } catch (error) {
+                    'caught'
+                }
+            """.trimIndent()
+            Assert.assertEquals(expression, "caught", RhinoScriptEngine.eval(script, bindings))
+        }
+
+        Assert.assertEquals(
+            true,
+            RhinoScriptEngine.eval("bridge.hidden() === null", bindings),
+        )
+        Assert.assertEquals(
+            "undefined",
+            RhinoScriptEngine.eval("typeof bridge.factoryChild().setValue", bindings),
+        )
+    }
+
+    @Test
+    fun typeInfoWrappingUsesRegisteredFactories() {
+        RhinoWrapFactory.register(FactoryBridge::class.java, ReadOnlyJavaObject.factory)
+        val bindings = ScriptBindings().apply {
+            this["factoryBridge"] = FactoryBridge()
+        }
+
+        Assert.assertTrue(
+            ScriptableObject.getProperty(bindings, "factoryBridge") is ReadOnlyJavaObject
+        )
+        Assert.assertEquals(
+            "undefined",
+            RhinoScriptEngine.eval("typeof factoryBridge.setValue", bindings),
+        )
+    }
+
+    @Test
+    fun nestedJavaClassesKeepWrapperSemantics() {
+        RhinoScriptEngine.initialize()
+        val context = Context.enter()
+        try {
+            val scope = context.initStandardObjects()
+            val mapClass = ProtectedNativeJavaClass(scope, Class.forName("java.util.Map"))
+            val entry = mapClass.get("Entry", mapClass)
+
+            Assert.assertTrue(entry is Wrapper)
+            Assert.assertTrue(entry is NativeJavaClass)
+        } finally {
+            Context.exit()
         }
     }
 
@@ -93,5 +207,43 @@ class JsEngineCapabilitiesTest {
     private fun assertUnsupported(js: String) {
         val result = runCatching { RhinoScriptEngine.eval(js, ScriptBindings()) }
         Assert.assertTrue("Current Rhino unexpectedly accepted: $js", result.isFailure)
+    }
+
+    class ThrowingBridge {
+        fun fail(): Nothing = throw IllegalStateException("expected failure")
+
+        fun child() = ThrowingChild()
+
+        fun children(): List<ThrowingChild> = listOf(ThrowingChild())
+
+        fun childMap(): Map<String, ThrowingChild> = mapOf("item" to ThrowingChild())
+
+        fun childArray(): Array<ThrowingChild> = arrayOf(ThrowingChild())
+
+        fun factoryChild() = FactoryBridge()
+
+        fun hidden(): Any = HiddenClassLoader()
+    }
+
+    class ThrowingChild {
+        fun fail(): Nothing = throw IllegalStateException("expected child failure")
+    }
+
+    class HiddenClassLoader : ClassLoader()
+
+    class FactoryBridge {
+        var value: String = "initial"
+    }
+
+    class StaticThrowingBridge {
+        companion object {
+            @get:JvmStatic
+            @set:JvmStatic
+            var failure: String
+                get() = "initial"
+                set(@Suppress("UNUSED_PARAMETER") value) {
+                    throw IllegalStateException("expected static setter failure")
+                }
+        }
     }
 }

@@ -24,8 +24,8 @@
  */
 package com.script.rhino
 
-import org.mozilla.javascript.*
-import org.mozilla.javascript.Function
+import org.htmlunit.corejs.javascript.*
+import org.htmlunit.corejs.javascript.Function
 
 /**
  * JSAdapter is java.lang.reflect.Proxy equivalent for JavaScript. JSAdapter
@@ -192,7 +192,7 @@ class JSAdapter private constructor(var adaptee: Scriptable) : Scriptable, Funct
                     res
                 }
                 !is NativeJavaArray -> {
-                    Context.emptyArgs
+                    EMPTY_ARGS
                 }
                 else -> {
                     val tmp = val1.unwrap()
@@ -203,7 +203,7 @@ class JSAdapter private constructor(var adaptee: Scriptable) : Scriptable, Funct
                             res[index] = mapToId(array[index])
                         }
                     } else {
-                        res = Context.emptyArgs
+                        res = EMPTY_ARGS
                     }
                     res
                 }
@@ -285,6 +285,7 @@ class JSAdapter private constructor(var adaptee: Scriptable) : Scriptable, Funct
     }
 
     companion object {
+        private val EMPTY_ARGS = emptyArray<Any?>()
         private const val GET_PROP = "__get__"
         private const val HAS_PROP = "__has__"
         private const val PUT_PROP = "__put__"

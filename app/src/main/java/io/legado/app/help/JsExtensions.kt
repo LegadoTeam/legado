@@ -61,7 +61,7 @@ import kotlinx.coroutines.runBlocking
 import okio.use
 import org.jsoup.Connection
 import org.jsoup.Jsoup
-import org.mozilla.javascript.Function
+import org.htmlunit.corejs.javascript.Function
 import splitties.init.appCtx
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream

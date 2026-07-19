@@ -13,8 +13,8 @@ import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.isJsonObject
 import kotlinx.coroutines.runBlocking
-import org.mozilla.javascript.Scriptable
-import org.mozilla.javascript.ScriptableObject
+import org.htmlunit.corejs.javascript.Scriptable
+import org.htmlunit.corejs.javascript.ScriptableObject
 import splitties.init.appCtx
 import java.io.File
 import java.lang.ref.WeakReference

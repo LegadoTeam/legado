@@ -41,7 +41,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
-import org.mozilla.javascript.WrappedException
+import org.htmlunit.corejs.javascript.WrappedException
 import splitties.init.appCtx
 import splitties.systemservices.notificationManager
 import java.net.InetSocketAddress

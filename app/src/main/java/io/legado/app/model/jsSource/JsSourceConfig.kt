@@ -5,10 +5,10 @@ import com.script.rhino.RhinoScriptEngine
 import io.legado.app.data.entities.BookSource
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.utils.GSON
-import org.mozilla.javascript.Context
-import org.mozilla.javascript.Function
-import org.mozilla.javascript.Scriptable
-import org.mozilla.javascript.ScriptableObject
+import org.htmlunit.corejs.javascript.Context
+import org.htmlunit.corejs.javascript.Function
+import org.htmlunit.corejs.javascript.Scriptable
+import org.htmlunit.corejs.javascript.ScriptableObject
 import kotlin.coroutines.CoroutineContext
 
 object JsSourceConfig {

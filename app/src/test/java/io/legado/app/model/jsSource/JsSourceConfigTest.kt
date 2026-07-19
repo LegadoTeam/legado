@@ -34,6 +34,44 @@ class JsSourceConfigTest {
     }
 
     @Test
+    fun `extracts modern source configuration without rewriting declarations`() {
+        val script = """
+            const config = {
+                bookSourceUrl: "https://audio.example",
+                bookSourceName: "Audio source",
+                loginUi: [{ name: "token", type: "text" }],
+                exploreUrl: [{ title: "Daily", url: "daily" }]
+            };
+            function copy(params) {
+                const result = {};
+                for (const key in params) result[key] = String(params[key]);
+                if (params.mode === "free") {
+                    const value = "free";
+                    result.value = value;
+                } else {
+                    const value = "paid";
+                    result.value = value;
+                }
+                return result;
+            }
+            function search(key, page) { return [copy({ key: key, page: page })]; }
+            function explore(url, page) { return search(url, page); }
+            function getBookInfo(book) { return book; }
+            function getChapters(book) { return []; }
+            function getContent(chapter, book) { return "content"; }
+            function login() { return true; }
+        """.trimIndent()
+
+        val source = JsSourceConfig.extract(script)
+
+        assertEquals("https://audio.example", source.bookSourceUrl)
+        assertEquals("Audio source", source.bookSourceName)
+        assertTrue(source.loginUi.orEmpty().contains("token"))
+        assertTrue(source.exploreUrl.orEmpty().contains("Daily"))
+        assertEquals(script, source.mainJs)
+    }
+
+    @Test
     fun `accepts legacy source config object`() {
         val source = JsSourceConfig.extract(
             validScript.replaceFirst("var config =", "var source =")

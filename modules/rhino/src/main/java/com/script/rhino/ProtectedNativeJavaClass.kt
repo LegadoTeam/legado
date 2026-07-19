@@ -1,13 +1,15 @@
 package com.script.rhino
 
-import org.mozilla.javascript.NativeJavaClass
-import org.mozilla.javascript.Scriptable
+import org.htmlunit.corejs.javascript.NativeJavaClass
+import org.htmlunit.corejs.javascript.Scriptable
 
 class ProtectedNativeJavaClass(
     scope: Scriptable,
     javaClass: Class<*>,
     private val protectedName: Set<String> = emptySet()
 ) : NativeJavaClass(scope, javaClass) {
+
+    private val methodCache = CatchableJavaMethodCache()
 
     override fun has(
         name: String,
@@ -23,7 +25,9 @@ class ProtectedNativeJavaClass(
         if (protectedName.contains(name)) {
             return NOT_FOUND
         }
-        return super.get(name, start)
+        return catchJavaInvocation {
+            methodCache.wrap(name, super.get(name, start))
+        }
     }
 
     override fun put(
@@ -34,7 +38,9 @@ class ProtectedNativeJavaClass(
         if (protectedName.contains(name)) {
             return
         }
-        super.put(name, start, value)
+        catchJavaInvocation {
+            super.put(name, start, value)
+        }
     }
 
     override fun unwrap(): Any? {

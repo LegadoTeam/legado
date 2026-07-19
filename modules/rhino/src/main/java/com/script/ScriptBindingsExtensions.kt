@@ -1,6 +1,6 @@
 package com.script
 
-import org.mozilla.javascript.Context
+import org.htmlunit.corejs.javascript.Context
 
 inline fun buildScriptBindings(block: (bindings: ScriptBindings) -> Unit): ScriptBindings {
     val bindings = ScriptBindings()

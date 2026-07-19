@@ -25,8 +25,8 @@
 package com.script.rhino
 
 import com.script.Invocable
-import org.mozilla.javascript.*
-import org.mozilla.javascript.Function
+import org.htmlunit.corejs.javascript.*
+import org.htmlunit.corejs.javascript.Function
 
 /**
  * This class implements Rhino-like JavaAdapter to help implement a Java
