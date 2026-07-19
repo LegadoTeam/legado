@@ -9,20 +9,17 @@
 	var uploadQueue		= [];//上传队列集合
 	var isUploading		= false;//是否正在上传
 	
-	var XHR;
-	try{ 
-		XHR = new XMLHttpRequest(); 
-	}catch(e){}
+	var XHR = null;
 	
 (function(isSupportFileUpload){
 	
 	//不支持拖拽上传，或者 不支持FormData ，显示WiFi表示
 	if(!isSupportFileUpload){
-		$("#drag tbody tr:last-child td span").html('您的浏览器不支持拖拽上传');
+		setElementText(getDropMessageElement(), '您的浏览器不支持拖拽上传');
 		return;
 	//更换样式
 	}else{
-		$("#drag tbody tr:last-child td span").html('请将图书或字体拖拽至此即可上传');
+		setElementText(getDropMessageElement(), '请将图书或字体拖拽至此即可上传');
 	}
 
 	addEvent();
@@ -31,8 +28,8 @@
 	 * 添加事件
 	 */
 	function addEvent(){
-		var click = $('#click')[0];
-		var dropArea = $('#drag')[0];
+		var click = document.getElementById('click');
+		var dropArea = document.getElementById('drag');
 		click.addEventListener('change', handleDrop, false);
 		dropArea.addEventListener('dragover', handleDragOver, false);
 		dropArea.addEventListener('dragleave', handleDragLeave, false);
@@ -47,7 +44,7 @@
 		evt.stopPropagation();
 		evt.preventDefault();
 
-		$('#drag').removeClass('active');
+		removeElementClass(document.getElementById('drag'), 'active');
 		
 		isDragOver = false;
 		
@@ -112,7 +109,7 @@
 		evt.preventDefault();
 		//防止多次DOM操作
 		if (!isDragOver) {
-            $('#drag').addClass('active');
+			addElementClass(document.getElementById('drag'), 'active');
 			isDragOver = true;
 		}
 		
@@ -124,13 +121,12 @@
 		evt.stopPropagation();
 		evt.preventDefault();
 		isDragOver = false;
-		$('#drag').removeClass('active');
+		removeElementClass(document.getElementById('drag'), 'active');
 	}
 
 
 
 	function uploadFiles(file){
-		console.log(file);
 		//正在上传
 		isUploading = true;
 		//设置上传的数据
@@ -143,67 +139,41 @@
             fd.append("fileData", file);
             //设置当前的上传对象
             currUploadfile = file;
-            if(XHR.readyState>0){
-                XHR = new XMLHttpRequest();
+            var request = new XMLHttpRequest();
+            var finished = false;
+            XHR = request;
+
+            function finishUpload(success){
+                if(finished){
+                    return;
+                }
+                finished = true;
+                if(success){
+                    uploadSuccess(file, {}, request.status);
+                }else{
+                    uploadError(file);
+                }
+                nextUpload();
             }
 
-            XHR.upload.addEventListener("progress", progress, false);
-            XHR.upload.addEventListener("load", requestLoad, false);
-            XHR.upload.addEventListener("error", error, false);
-            XHR.upload.addEventListener("abort", abort, false);
-            XHR.upload.addEventListener("loadend", loadend, false);
-            XHR.upload.addEventListener("loadstart", loadstart, false);
-            XHR.open("POST", config.url);
-    //		XHR.setRequestHeader("Content-Type","application/octet-stream");
-            XHR.send(fd);
-            XHR.onreadystatechange = function() {
-
-                //只要上传完成不管成功失败
-                if (XHR.readyState == 4 ){
-
-                    if(XHR.status == 200){
-                        uploadSuccess(currUploadfile, {}, XHR.status)
-                    }else{
-                        uploadError()
-                    }
-
-                    //进行下一个上传
-                    nextUpload()
+            request.upload.addEventListener("progress", function(evt){
+                uploadProgress(file, evt.loaded || evt.position, evt.total);
+            }, false);
+            request.upload.addEventListener("error", function(){
+                finishUpload(false);
+            }, false);
+            request.upload.addEventListener("abort", function(){
+                finishUpload(false);
+            }, false);
+            request.onreadystatechange = function() {
+                if(request.readyState == 4){
+                    finishUpload(request.status == 200);
                 }
             };
+            request.open("POST", config.url);
+    //		XHR.setRequestHeader("Content-Type","application/octet-stream");
+            request.send(fd);
 //		};
-	}
-
-	//请求完成，无论失败或成功
-	function loadend(evt){
-	//	console.log("loadend",+new Date(),evt);
-	}
-	//请求开始
-	function loadstart(evt){
-	//	console.log("loadstart",evt);
-	}
-	
-	//在请求发送或接收数据期间，在服务器指定的时间间隔触发。
-	function progress(evt){
-		uploadProgress(currUploadfile,  evt.loaded || evt.position , evt.total)
-	}
-	
-	//在请求被取消时触发，例如，在调用 abort() 方法时。
-	function abort(evt){
-	//	console.log("abort",evt);
-	}
-	
-	//在请求失败时触发。
-	function error(evt){
-		//终止ajax请求
-		XHR.abort();
-		uploadError();
-		nextUpload();
-	}
-	
-	//在请求成功完成时触发。
-	function requestLoad(evt){
-	//	console.log("requestLoad", +new Date(),evt);
 	}
 	
 	//进行下一个上传
@@ -212,17 +182,22 @@
 		if(uploadQueue.length>0){
 			 uploadFiles(uploadQueue.shift());		
 		}else{
-			 //米有正在上传的了
+			 //没有正在上传的了
 			 currUploadfile  = {}
 		}
 	}
 	
 	//上传出错误了，比如断网，
-	function uploadError(){
+	function uploadError(file){
 		//移除全局变量中的，上传出错的
-		removeFileFromFilesUpload(filesUpload, currUploadfile.id);
-		var file = currUploadfile;
-		fileMap[file.name].removeClass('red').addClass('op_wrong').html('');
+		removeFileFromFilesUpload(filesUpload, file.id);
+		var progressElement = fileMap[file.name];
+		if(!progressElement){
+			return;
+		}
+		removeElementClass(progressElement, 'red');
+		addElementClass(progressElement, 'op_wrong');
+		setElementText(progressElement, '');
 	}
 	
 	
