@@ -16,7 +16,9 @@ internal const val BOOK_SOURCE_QUERY_CHUNK_SIZE = 900
          and loginUi is not null and trim(loginUi) <> ''
          and replace(trim(loginUi), ' ', '') <> '[]')) hasLoginUrl,
     lastUpdateTime, respondTime, weight,
-    (exploreUrl is not null and trim(exploreUrl) <> '') hasExploreUrl, eventListener, bookSourceType
+    (exploreUrl is not null and trim(exploreUrl) <> '') hasExploreUrl,
+    eventListener, bookSourceType,
+    (mainJs is not null and trim(mainJs) <> '') hasJs
     from book_sources""",
     viewName = "book_sources_part"
 )
@@ -46,7 +48,9 @@ data class BookSourcePart(
     // 是否启用事件监听
     var eventListener: Boolean = false,
     // 书源类型
-    var bookSourceType: Int = 0
+    var bookSourceType: Int = 0,
+    // 是否为纯 JS 单文件源
+    var hasJs: Boolean = false
 ) {
 
     override fun hashCode(): Int {
