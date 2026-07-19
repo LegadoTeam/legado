@@ -29,6 +29,7 @@ import io.legado.app.utils.splitNotBlank
 import splitties.init.appCtx
 
 class ImportRssSourceViewModel(app: Application) : BaseViewModel(app) {
+    private val importRequestGate = RssSourceImportRequestGate()
     var isAddGroup = false
     var groupName: String? = null
     val errorLiveData = MutableLiveData<String>()
@@ -103,6 +104,7 @@ class ImportRssSourceViewModel(app: Application) : BaseViewModel(app) {
     }
 
     fun importSource(text: String) {
+        if (!importRequestGate.tryStart()) return
         execute {
             importSourceAwait(text)
         }.onError {
@@ -166,10 +168,12 @@ class ImportRssSourceViewModel(app: Application) : BaseViewModel(app) {
 
     private fun comparisonSource() {
         execute {
-            allSources.forEach {
-                val has = appDb.rssSourceDao.getByKey(it.sourceUrl)
-                checkSources.add(has)
-                selectStatus.add(has == null || has.lastUpdateTime < it.lastUpdateTime)
+            appDb.runInTransaction {
+                val comparison = compareImportedRssSources(allSources) { sourceUrls ->
+                    appDb.rssSourceDao.getRssSources(*sourceUrls.toTypedArray())
+                }
+                checkSources.addAll(comparison.existingSources)
+                selectStatus.addAll(comparison.selectStatus)
             }
             successLiveData.postValue(allSources.size)
         }
