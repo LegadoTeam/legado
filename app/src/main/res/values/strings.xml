@@ -776,6 +776,10 @@
     <string name="starting_download">Starting download</string>
     <string name="already_in_download">This book is already in Download list</string>
     <string name="click_to_open">Click to open</string>
+    <string name="combining_text_placeholder">This content contains unusually dense combining characters. Tap to open the safe editor.</string>
+    <string name="safe_code_editor">Safe text editor</string>
+    <string name="safe_code_editor_load_failed">The safe editor is not ready. Please wait, or go back to discard changes if loading keeps failing.</string>
+    <string name="safe_code_editor_read_failed">Unable to read the safe editor content. Please try again.</string>
     <string name="follow_public_account_summary">Follow [开源阅读] to support me by clicking on ads</string>
     <string name="weChat_appreciation_code">WeChat Tipping Code</string>
     <string name="alipay">AliPay</string>
