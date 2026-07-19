@@ -244,11 +244,10 @@ class CheckSourceService : BaseService() {
                 return
             }
             //校验目录
-            val toc = WebBook.getChapterListAwait(source, book).getOrThrow().asSequence()
-                .filter { !(it.isVolume && it.url.startsWith(it.title)) }
-                .take(2)
-                .toList()
-            val nextChapterUrl = toc.getOrNull(1)?.url ?: toc.first().url
+            val chapterSelection = selectCheckSourceChapter(
+                chapters = WebBook.getChapterListAwait(source, book).getOrThrow(),
+                emptyMessage = getString(R.string.chapter_list_empty),
+            )
             if (!CheckSource.checkContent) {
                 return
             }
@@ -256,8 +255,8 @@ class CheckSourceService : BaseService() {
             WebBook.getContentAwait(
                 bookSource = source,
                 book = book,
-                bookChapter = toc.first(),
-                nextChapterUrl = nextChapterUrl,
+                bookChapter = chapterSelection.chapter,
+                nextChapterUrl = chapterSelection.nextChapterUrl,
                 needSave = false
             )
         }.onFailure {
