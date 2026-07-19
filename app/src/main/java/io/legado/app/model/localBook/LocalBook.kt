@@ -43,7 +43,6 @@ import io.legado.app.utils.GSON
 import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.externalFiles
 import io.legado.app.utils.fromJsonObject
-import io.legado.app.utils.getFile
 import io.legado.app.utils.inputStream
 import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.isContentScheme
@@ -61,6 +60,25 @@ import java.io.InputStream
 import java.util.regex.Pattern
 import androidx.core.net.toUri
 import kotlinx.coroutines.currentCoroutineContext
+
+internal fun resolveLocalBookOutputFile(root: File, relativePath: String): File {
+    val canonicalRoot = root.canonicalFile
+    val outputFile = File(canonicalRoot, relativePath).canonicalFile
+    if (!outputFile.toPath().startsWith(canonicalRoot.toPath())) {
+        throw SecurityException("书籍文件只能保存到指定路径")
+    }
+    return outputFile
+}
+
+internal fun prepareLocalBookOutputFile(root: File, relativePath: String): File {
+    var outputFile = resolveLocalBookOutputFile(root, relativePath)
+    val parent = outputFile.parentFile
+    if (parent != null && !parent.exists() && !parent.mkdirs()) {
+        throw FileNotFoundException("Unable to create book directory: $parent")
+    }
+    outputFile = resolveLocalBookOutputFile(root, relativePath)
+    return outputFile
+}
 
 /**
  * 书籍文件导入 目录正文解析
@@ -442,7 +460,10 @@ object LocalBook {
                 val treeDoc = DocumentFile.fromTreeUri(appCtx, treeUri)
                 var doc = treeDoc!!.findFile(fileName)
                 if (doc == null) {
-                    doc = treeDoc.createFile(FileUtils.getMimeType(fileName), fileName)
+                    doc = treeDoc.createFile(
+                        FileUtils.getMimeType(fileName),
+                        fileName
+                    )
                         ?: throw SecurityException("请重新设置书籍保存位置\nPermission Denial")
                 }
                 appCtx.contentResolver.openOutputStream(doc.uri)!!.use { oStream ->
@@ -452,7 +473,7 @@ object LocalBook {
             } else {
                 try {
                     val treeFile = File(treeUri.path!!)
-                    val file = treeFile.getFile(fileName)
+                    val file = prepareLocalBookOutputFile(treeFile, fileName)
                     FileOutputStream(file).use { oStream ->
                         it.copyTo(oStream)
                     }

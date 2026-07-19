@@ -248,25 +248,12 @@ object ZipUtils {
         var entry: ZipEntry?
         while (zipInputStream.nextEntry.also { entry = it } != null) {
             val entryName = entry!!.name
-            val entryFile = File(dir, entryName)
-            if (!entryFile.canonicalPath.startsWith(dir.canonicalPath)) {
-                throw SecurityException("压缩文件只能解压到指定路径")
-            }
             if (entry.isDirectory) {
-                if (!entryFile.exists()) {
-                    entryFile.mkdirs()
-                }
+                prepareArchiveEntryFile(dir, entryName, isDirectory = true)
                 continue
             }
-            if (entryFile.parentFile?.exists() != true) {
-                entryFile.parentFile?.mkdirs()
-            }
             if (filter != null && !filter.invoke(entryName)) continue
-            if (!entryFile.exists()) {
-                entryFile.createNewFile()
-                entryFile.setReadable(true)
-                entryFile.setExecutable(true)
-            }
+            val entryFile = prepareArchiveEntryFile(dir, entryName, isDirectory = false)
             FileOutputStream(entryFile).use {
                 zipInputStream.copyTo(it)
                 files.add(entryFile)

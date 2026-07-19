@@ -33,6 +33,19 @@ import java.io.File
 import java.util.WeakHashMap
 import java.util.concurrent.TimeUnit
 
+private val windowsDrivePrefix = Regex("^[A-Za-z]:")
+
+internal fun requireSafeUploadedBookFileName(fileName: String): String {
+    val isUnsafe = fileName.isBlank() ||
+            fileName == "." ||
+            fileName == ".." ||
+            fileName.indexOfAny(charArrayOf('/', '\\')) >= 0 ||
+            windowsDrivePrefix.containsMatchIn(fileName) ||
+            fileName.any { Character.isISOControl(it) }
+    require(!isUnsafe) { "Invalid uploaded book file name" }
+    return fileName
+}
+
 object BookController {
 
     private lateinit var book: Book
@@ -285,8 +298,13 @@ object BookController {
         files: Map<String, String>
     ): ReturnData {
         val returnData = ReturnData()
-        val fileName = parameters["fileName"]?.firstOrNull()
+        val rawFileName = parameters["fileName"]?.firstOrNull()
             ?: return returnData.setErrorMsg("fileName 不能为空")
+        val fileName = kotlin.runCatching {
+            requireSafeUploadedBookFileName(rawFileName)
+        }.getOrElse {
+            return returnData.setErrorMsg("fileName 格式不正确")
+        }
         val fileData = files["fileData"]
             ?: return returnData.setErrorMsg("fileData 不能为空")
         kotlin.runCatching {
