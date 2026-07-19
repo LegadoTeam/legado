@@ -14,7 +14,6 @@ class TocListState {
     private var parentVolumeByChapterIndex: Map<Int, Int> = emptyMap()
     private var volumeGroupByIndex: Map<Int, VolumeGroup> = emptyMap()
     private val collapsedVolumeIndexes = mutableSetOf<Int>()
-    private var collapseInitialized = false
     private var reverseOrder = false
 
     var visibleItems: List<TocListItem> = emptyList()
@@ -28,21 +27,16 @@ class TocListState {
         parentVolumeByChapterIndex = emptyMap()
         volumeGroupByIndex = emptyMap()
         collapsedVolumeIndexes.clear()
-        collapseInitialized = false
         reverseOrder = false
         visibleItems = emptyList()
     }
 
     fun setFullChapters(
         chapters: List<BookChapter>,
-        currentChapterIndex: Int,
         reverseOrder: Boolean,
         resetCollapse: Boolean = false,
     ) {
         val directionChanged = this.reverseOrder != reverseOrder
-        val previousCollapsibleVolumeIndexes = volumeGroupByIndex
-            .filterValues { it.chapters.isNotEmpty() }
-            .keys
         this.reverseOrder = reverseOrder
         fullChapters = chapters
         groups = buildGroups(chapters, reverseOrder)
@@ -50,17 +44,10 @@ class TocListState {
         val collapsibleVolumeIndexes = groups
             .filter { it.volume != null && it.chapters.isNotEmpty() }
             .mapTo(mutableSetOf()) { it.volume!!.index }
-        if (resetCollapse || directionChanged || !collapseInitialized) {
-            resetDefaultCollapse(currentChapterIndex)
-            collapseInitialized = true
+        if (resetCollapse || directionChanged) {
+            collapsedVolumeIndexes.clear()
         } else {
             collapsedVolumeIndexes.retainAll(collapsibleVolumeIndexes)
-            val currentVolumeIndex = volumeIndexContaining(currentChapterIndex)
-            (collapsibleVolumeIndexes - previousCollapsibleVolumeIndexes).forEach { volumeIndex ->
-                if (volumeIndex != currentVolumeIndex) {
-                    collapsedVolumeIndexes.add(volumeIndex)
-                }
-            }
         }
     }
 
@@ -272,17 +259,6 @@ class TocListState {
         }
         parentVolumeByChapterIndex = parentMap
         volumeGroupByIndex = volumeMap
-    }
-
-    private fun resetDefaultCollapse(currentChapterIndex: Int) {
-        collapsedVolumeIndexes.clear()
-        val currentVolumeIndex = volumeIndexContaining(currentChapterIndex)
-        groups.forEach { group ->
-            val volumeIndex = group.volume?.index ?: return@forEach
-            if (group.chapters.isNotEmpty() && volumeIndex != currentVolumeIndex) {
-                collapsedVolumeIndexes.add(volumeIndex)
-            }
-        }
     }
 
     private fun volumeIndexContaining(chapterIndex: Int): Int? {

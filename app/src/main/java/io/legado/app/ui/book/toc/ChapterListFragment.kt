@@ -122,7 +122,6 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
             chapterList = chapters
             tocListState.setFullChapters(
                 chapters = chapters,
-                currentChapterIndex = durChapterIndex,
                 reverseOrder = book.getReverseToc(),
                 resetCollapse = true,
             )
@@ -164,7 +163,6 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                     chapterList = chapters
                     tocListState.setFullChapters(
                         chapters = chapters,
-                        currentChapterIndex = durChapterIndex,
                         reverseOrder = reverseOrder,
                         resetCollapse = resetCollapse,
                     )
@@ -180,7 +178,6 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                     chapterList = chapters
                     tocListState.setFullChapters(
                         chapters = chapters,
-                        currentChapterIndex = durChapterIndex,
                         reverseOrder = reverseOrder,
                         resetCollapse = resetCollapse,
                     )
