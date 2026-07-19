@@ -4,7 +4,6 @@
     <meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no">
     <title>WiFi 传输</title>
     <link rel="stylesheet" href="./css/wifi_send.css">
-    <script src="./js/jquery-1.4.2.min.js"></script>
 </head><body>
 <div style="display: none"><img src="./img/wrong.png"></div>
 <div id="pc" class="pc" style="display: block;">
@@ -160,12 +159,15 @@
         maskDom2.style.display="block";
         if(ios){
             maskDom.style.display="none";
-            $("#safari").addClass("safariWarn");
+            var safariDom = document.getElementById("safari");
+            if ((" " + safariDom.className + " ").indexOf(" safariWarn ") === -1) {
+                safariDom.className += (safariDom.className ? " " : "") + "safariWarn";
+            }
         }
     }
 
     document.getElementById("close").addEventListener("click", function () {
         maskDom.style.display="none"
     })
-</script><script src="./js/html5_fun.js"></script><script src="./js/common.js"></script>
+</script><script src="./js/common.js"></script><script src="./js/html5_fun.js"></script>
 </body></html>
