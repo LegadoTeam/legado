@@ -128,7 +128,6 @@ object ThemeConfig {
         val bgImgBlu = when (themeMode) {
             Theme.Light -> context.getPrefInt(PreferKey.bgImageBlurring, 0)
             Theme.Dark -> context.getPrefInt(PreferKey.bgImageNBlurring, 0)
-            else -> 0
         }
         val bgImage = BitmapUtils
             .decodeBitmap(path, metrics.widthPixels, metrics.heightPixels)

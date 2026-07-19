@@ -34,8 +34,7 @@ internal object RequestManager : OnPermissionsResultCallback {
             if (index >= 0) {
                 val to = it.size - 1
                 if (index != to) {
-                    @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
-                    Collections.swap(requests, index, to)
+                    Collections.swap(it, index, to)
                 }
             } else {
                 it.push(request)
