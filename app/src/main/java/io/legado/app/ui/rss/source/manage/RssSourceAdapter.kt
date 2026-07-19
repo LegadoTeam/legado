@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import android.widget.PopupMenu
-import androidx.core.os.bundleOf
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.R
@@ -130,7 +129,9 @@ class RssSourceAdapter(context: Context, val callBack: CallBack) :
         getItems().forEach {
             selected.add(it)
         }
-        notifyItemRangeChanged(0, itemCount, bundleOf(Pair("selected", null)))
+        notifyItemRangeChanged(0, itemCount, Bundle().apply {
+            putString("selected", null)
+        })
         callBack.upCountView()
     }
 
@@ -142,7 +143,9 @@ class RssSourceAdapter(context: Context, val callBack: CallBack) :
                 selected.add(it)
             }
         }
-        notifyItemRangeChanged(0, itemCount, bundleOf(Pair("selected", null)))
+        notifyItemRangeChanged(0, itemCount, Bundle().apply {
+            putString("selected", null)
+        })
         callBack.upCountView()
     }
 
@@ -161,7 +164,9 @@ class RssSourceAdapter(context: Context, val callBack: CallBack) :
                 selected.add(it)
             }
         }
-        notifyItemRangeChanged(minPosition, itemCount, bundleOf(Pair("selected", null)))
+        notifyItemRangeChanged(minPosition, itemCount, Bundle().apply {
+            putString("selected", null)
+        })
         callBack.upCountView()
     }
 
@@ -227,7 +232,9 @@ class RssSourceAdapter(context: Context, val callBack: CallBack) :
                     } else {
                         selected.remove(it)
                     }
-                    notifyItemChanged(position, bundleOf(Pair("selected", null)))
+                    notifyItemChanged(position, Bundle().apply {
+                        putString("selected", null)
+                    })
                     callBack.upCountView()
                     return true
                 }

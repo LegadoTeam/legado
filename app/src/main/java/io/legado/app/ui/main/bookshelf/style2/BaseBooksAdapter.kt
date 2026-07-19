@@ -1,9 +1,9 @@
 package io.legado.app.ui.main.bookshelf.style2
 
 import android.content.Context
+import android.os.Bundle
 import android.os.Parcelable
 import android.view.LayoutInflater
-import androidx.core.os.bundleOf
 import androidx.recyclerview.widget.AsyncListDiffer
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
@@ -66,7 +66,7 @@ abstract class BaseBooksAdapter<VH : RecyclerView.ViewHolder>(
         }
 
         override fun getChangePayload(oldItem: Any, newItem: Any): Any? {
-            val bundle = bundleOf()
+            val bundle = Bundle()
             when {
                 oldItem is Book && newItem is Book -> {
                     if (oldItem.name != newItem.name) {
@@ -132,7 +132,9 @@ abstract class BaseBooksAdapter<VH : RecyclerView.ViewHolder>(
         for (i in 0 until itemCount) {
             getItem(i).let {
                 if (it is Book && it.bookUrl == bookUrl) {
-                    notifyItemChanged(i, bundleOf(Pair("refresh", null)))
+                    notifyItemChanged(i, Bundle().apply {
+                        putString("refresh", null)
+                    })
                     return
                 }
             }
