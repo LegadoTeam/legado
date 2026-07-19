@@ -316,10 +316,15 @@ fun Book.isSameNameAuthor(other: Any?): Boolean {
     return false
 }
 
+internal fun normalizeExportFileName(name: String, suffix: String): String {
+    return "$name.$suffix".normalizeFileName()
+}
+
 fun Book.getExportFileName(suffix: String): String {
+    val default = normalizeExportFileName("$name 作者：${getRealAuthor()}", suffix)
     val jsStr = AppConfig.bookExportFileName
     if (jsStr.isNullOrBlank()) {
-        return "$name 作者：${getRealAuthor()}.$suffix"
+        return default
     }
     val bindings = buildScriptBindings { bindings ->
         bindings["epubIndex"] = ""// 兼容老版本,修复可能存在的错误
@@ -327,10 +332,10 @@ fun Book.getExportFileName(suffix: String): String {
         bindings["author"] = getRealAuthor()
     }
     return kotlin.runCatching {
-        RhinoScriptEngine.eval(jsStr, bindings).toString() + "." + suffix
+        normalizeExportFileName(RhinoScriptEngine.eval(jsStr, bindings).toString(), suffix)
     }.onFailure {
         AppLog.put("导出书名规则错误,使用默认规则\n${it.localizedMessage}", it)
-    }.getOrDefault("$name 作者：${getRealAuthor()}.$suffix")
+    }.getOrDefault(default)
 }
 
 /**
@@ -342,7 +347,10 @@ fun Book.getExportFileName(
     jsStr: String? = AppConfig.episodeExportFileName
 ): String {
     // 默认规则
-    val default = "$name 作者：${getRealAuthor()} [${epubIndex}].$suffix"
+    val default = normalizeExportFileName(
+        "$name 作者：${getRealAuthor()} [${epubIndex}]",
+        suffix,
+    )
     if (jsStr.isNullOrBlank()) {
         return default
     }
@@ -352,10 +360,10 @@ fun Book.getExportFileName(
         bindings["epubIndex"] = epubIndex
     }
     return kotlin.runCatching {
-        RhinoScriptEngine.eval(jsStr, bindings).toString() + "." + suffix
+        normalizeExportFileName(RhinoScriptEngine.eval(jsStr, bindings).toString(), suffix)
     }.onFailure {
         AppLog.put("导出书名规则错误,使用默认规则\n${it.localizedMessage}", it)
-    }.getOrDefault(default).normalizeFileName()
+    }.getOrDefault(default)
 }
 
 // 根据当前日期计算章节总数
