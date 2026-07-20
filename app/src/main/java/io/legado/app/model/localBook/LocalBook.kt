@@ -316,7 +316,7 @@ object LocalBook {
         return withParserCacheInvalidated(book.bookUrl, book.originName, action)
     }
 
-    private fun <T> withParserCacheInvalidated(
+    internal fun <T> withParserCacheInvalidated(
         bookUrl: String,
         fileName: String,
         action: () -> T,
