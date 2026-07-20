@@ -121,10 +121,6 @@ cn.hutool.core.util.**{*;}
 -keep class org.jsoup.**{*;}
 -dontwarn org.jspecify.annotations.NullMarked
 
-## ExoPlayer 反射设置ua 保证该私有变量不被混淆
--keepclassmembers class androidx.media3.datasource.cache.CacheDataSource$Factory {
-    *** upstreamDataSourceFactory;
-}
 ## ExoPlayer 如果还不能播放就取消注释这个
 # -keep class com.google.android.exoplayer2.** {*;}
 
@@ -136,7 +132,16 @@ cn.hutool.core.util.**{*;}
 -keepclassmembernames,allowobfuscation class * extends java.lang.Throwable{*;}
 
 # GSYVideoPlayer
--keep class com.shuyu.gsyvideoplayer.** { *; }
+-keepclassmembers,allowoptimization,allowobfuscation class * extends com.shuyu.gsyvideoplayer.video.base.GSYBaseVideoPlayer {
+    public <init>(android.content.Context);
+    public <init>(android.content.Context, java.lang.Boolean);
+}
+-keepclassmembers,allowoptimization,allowobfuscation class * implements com.shuyu.gsyvideoplayer.player.IPlayerManager {
+    public <init>();
+}
+-keepclassmembers,allowoptimization,allowobfuscation class * implements com.shuyu.gsyvideoplayer.cache.ICacheManager {
+    public <init>();
+}
 -dontwarn com.shuyu.gsyvideoplayer.**
 #-keep class com.shuyu.gsyvideoplayer.video.** { *; }
 #-dontwarn com.shuyu.gsyvideoplayer.video.**
