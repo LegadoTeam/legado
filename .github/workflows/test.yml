@@ -70,6 +70,10 @@ jobs:
         if: ${{ matrix.type == 'release' }}
         run: bash .github/scripts/test-extract-latest-update.sh
 
+      - name: Verify Help Highlight Bundle
+        if: ${{ matrix.type == 'release' }}
+        run: node .github/scripts/test-help-highlight.js
+
       - name: Setup JDK 17
         uses: actions/setup-java@v5
         with:
