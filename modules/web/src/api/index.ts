@@ -76,6 +76,11 @@ export const parseLeagdoHttpUrlWithDefault = (
   if (validatorHttpUrl(http_url)) {
     url = new URL(http_url)
   }
+  url.search = ''
+  url.hash = ''
+  if (!url.pathname.endsWith('/')) {
+    url.pathname += '/'
+  }
   const { protocol, port } = url
   // websocket服务端口 为http服务端口 + 1
   let legado_webSocket_port
@@ -86,8 +91,8 @@ export const parseLeagdoHttpUrlWithDefault = (
   }
   // websocket协议是否为加密版本
   const legado_webSocket_protocol = protocol.startsWith('https:')
-    ? 'wss://'
-    : 'ws://'
+    ? 'wss:'
+    : 'ws:'
 
   const http_entry_point = url.toString()
 

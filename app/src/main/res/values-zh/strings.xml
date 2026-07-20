@@ -575,6 +575,9 @@
     <string name="web_menu">Web 服务</string>
     <string name="web_port_title">Web 端口</string>
     <string name="web_port_summary">当前端口 %s</string>
+    <string name="js_source_api_token_title">Web 书源访问令牌</string>
+    <string name="js_source_api_token_summary">纯 JS、书源写入、搜索和调试接口均需要</string>
+    <string name="js_source_api_token_configured">已配置</string>
     <string name="qr_share">二维码分享</string>
     <string name="str_share">字符串分享</string>
     <string name="wifi_share">WiFi 分享</string>

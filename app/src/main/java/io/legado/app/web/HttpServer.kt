@@ -13,6 +13,7 @@ import io.legado.app.utils.GSON
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.stackTraceStr
 import io.legado.app.web.utils.AssetsWeb
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import okio.Pipe
 import okio.buffer
@@ -25,6 +26,7 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
     override fun serve(session: IHTTPSession): Response {
         WebService.serve()
         var returnData: ReturnData? = null
+        var shouldCloseConnection = false
         val ct = ContentType(session.headers["content-type"]).tryUTF8()
         session.headers["content-type"] = ct.contentTypeHeader
         var uri = session.uri
@@ -37,36 +39,61 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
         try {
             when (session.method) {
                 Method.OPTIONS -> {
-                    val response = newFixedLengthResponse("")
+                    val response = newFixedLengthResponse(
+                        Response.Status.OK,
+                        "text/plain; charset=utf-8",
+                        ""
+                    )
                     response.addHeader("Access-Control-Allow-Methods", "POST")
-                    response.addHeader("Access-Control-Allow-Headers", "content-type")
-                    response.addHeader("Access-Control-Allow-Origin", session.headers["origin"])
+                    response.addHeader("Access-Control-Allow-Headers", "content-type, x-legado-token")
+                    response.addWebHeaders(session.headers["origin"], uri)
                     //response.addHeader("Access-Control-Max-Age", "3600");
                     return response
                 }
 
                 Method.POST -> {
-                    val files = HashMap<String, String>()
-                    session.parseBody(files)
-                    val postData = files["postData"]
+                    val requestError = when {
+                        uri == "/saveJsSource" -> {
+                            BookSourceController.validateJsSourceRequest(session.headers)
+                        }
 
-                    returnData = runBlocking {
-                        when (uri) {
-                            "/saveBookSource" -> BookSourceController.saveSource(postData)
-                            "/saveBookSources" -> BookSourceController.saveSources(postData)
-                            "/deleteBookSources" -> BookSourceController.deleteSources(postData)
-                            "/saveBook" -> BookController.saveBook(postData)
-                            "/deleteBook" -> BookController.deleteBook(postData)
-                            "/saveBookProgress" -> BookController.saveBookProgress(postData)
-                            "/addLocalBook" -> BookController.addLocalBook(session.parameters, files)
-                            "/saveReadConfig" -> BookController.saveWebReadConfig(postData)
-                            "/saveRssSource" -> RssSourceController.saveSource(postData)
-                            "/saveRssSources" -> RssSourceController.saveSources(postData)
-                            "/deleteRssSources" -> RssSourceController.deleteSources(postData)
-                            "/saveReplaceRule" -> ReplaceRuleController.saveRule(postData)
-                            "/deleteReplaceRule" -> ReplaceRuleController.delete(postData)
-                            "/testReplaceRule" -> ReplaceRuleController.testRule(postData)
-                            else -> null
+                        uri in PROTECTED_SOURCE_WRITE_ROUTES &&
+                            !BookSourceController.hasValidJsSourceApiToken(session.headers) -> {
+                            ReturnData().setErrorMsg("Web 书源访问令牌未配置或不正确")
+                        }
+
+                        else -> null
+                    }
+                    if (requestError != null) {
+                        returnData = requestError
+                        shouldCloseConnection = true
+                    } else {
+                        val files = HashMap<String, String>()
+                        session.parseBody(files)
+                        val postData = files["postData"]
+
+                        returnData = runBlocking {
+                            when (uri) {
+                                "/saveBookSource" -> BookSourceController.saveSource(postData)
+                                "/saveBookSources" -> BookSourceController.saveSources(postData)
+                                "/saveJsSource" -> BookSourceController.saveJsSource(postData)
+                                "/deleteBookSources" -> BookSourceController.deleteSources(postData)
+                                "/saveBook" -> BookController.saveBook(postData)
+                                "/deleteBook" -> BookController.deleteBook(postData)
+                                "/saveBookProgress" -> BookController.saveBookProgress(postData)
+                                "/addLocalBook" -> BookController.addLocalBook(
+                                    session.parameters,
+                                    files,
+                                )
+                                "/saveReadConfig" -> BookController.saveWebReadConfig(postData)
+                                "/saveRssSource" -> RssSourceController.saveSource(postData)
+                                "/saveRssSources" -> RssSourceController.saveSources(postData)
+                                "/deleteRssSources" -> RssSourceController.deleteSources(postData)
+                                "/saveReplaceRule" -> ReplaceRuleController.saveRule(postData)
+                                "/deleteReplaceRule" -> ReplaceRuleController.delete(postData)
+                                "/testReplaceRule" -> ReplaceRuleController.testRule(postData)
+                                else -> null
+                            }
                         }
                     }
                 }
@@ -97,7 +124,9 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
             if (returnData == null) {
                 if (uri.endsWith("/"))
                     uri += "index.html"
-                return assetsWeb.getResponse(uri)
+                return assetsWeb.getResponse(uri).apply {
+                    addWebHeaders(session.headers["origin"], uri)
+                }
             }
 
             val response = if (returnData.data is Bitmap) {
@@ -123,30 +152,71 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
                     }
                     newChunkedResponse(
                         Response.Status.OK,
-                        "application/json",
+                        JSON_MIME,
                         pipe.source.buffer().inputStream()
                     )
                 } else {
-                    newFixedLengthResponse(GSON.toJson(returnData))
+                    newFixedLengthResponse(
+                        Response.Status.OK,
+                        JSON_MIME,
+                        GSON.toJson(returnData)
+                    )
                 }
             }
             response.addHeader("Access-Control-Allow-Methods", "GET, POST")
-            response.addHeader("Access-Control-Allow-Origin", session.headers["origin"])
+            response.addWebHeaders(session.headers["origin"], uri)
+            if (shouldCloseConnection) {
+                response.closeConnection(true)
+            }
             LogUtils.d(TAG) {
                 "${session.method.name} - $uri - ${session.queryParameterString} - End($startAt)"
             }
             return response
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             LogUtils.d(TAG) {
                 "${session.method.name} - $uri - ${session.queryParameterString} - Error End($startAt)\n$e\n${e.stackTraceStr}"
             }
-            return newFixedLengthResponse(e.message)
+            return newFixedLengthResponse(
+                Response.Status.INTERNAL_ERROR,
+                "text/plain; charset=utf-8",
+                e.message ?: "Internal server error"
+            ).apply {
+                addWebHeaders(session.headers["origin"], uri)
+                closeConnection(true)
+            }
         }
 
     }
 
     companion object {
         private const val TAG = "HttpServer"
+        private const val JSON_MIME = "application/json; charset=utf-8"
+        private const val VUE_CONTENT_SECURITY_POLICY =
+            "default-src 'self' data: blob:; " +
+                "script-src 'self'; style-src 'self' 'unsafe-inline'; " +
+                "img-src * data: blob:; font-src 'self' data: http: https:; " +
+                "connect-src * ws: wss:; object-src 'none'; base-uri 'self'"
+        private val PROTECTED_SOURCE_WRITE_ROUTES = setOf(
+            "/saveBookSource",
+            "/saveBookSources",
+            "/deleteBookSources",
+            "/saveRssSource",
+            "/saveRssSources",
+            "/deleteRssSources",
+            "/saveReplaceRule",
+            "/deleteReplaceRule",
+            "/testReplaceRule",
+        )
+    }
+
+    private fun Response.addWebHeaders(origin: String?, uri: String) {
+        addHeader("X-Content-Type-Options", "nosniff")
+        origin?.let { addHeader("Access-Control-Allow-Origin", it) }
+        if (uri.startsWith("/vue/") && uri.endsWith(".html")) {
+            addHeader("Content-Security-Policy", VUE_CONTENT_SECURITY_POLICY)
+        }
     }
 
 }

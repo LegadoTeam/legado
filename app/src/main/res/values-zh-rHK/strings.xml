@@ -549,6 +549,9 @@
     <string name="web_menu">Web 服務</string>
     <string name="web_port_title">web 端口</string>
     <string name="web_port_summary">當前端口 %s</string>
+    <string name="js_source_api_token_title">Web 書源存取權杖</string>
+    <string name="js_source_api_token_summary">純 JS、書源寫入、搜尋和偵錯介面均需要</string>
+    <string name="js_source_api_token_configured">已設定</string>
     <string name="qr_share">二維碼分享</string>
     <string name="str_share">字符串分享</string>
     <string name="wifi_share">wifi 分享</string>

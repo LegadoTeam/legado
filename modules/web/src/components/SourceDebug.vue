@@ -47,7 +47,7 @@ const startDebug = async () => {
     store.debugFinish()
     throw e
   }
-  API.debug(
+  await API.debug(
     store.currentSourceUrl,
     searchKey.value || store.searchKey,
     appendDebugMsg,

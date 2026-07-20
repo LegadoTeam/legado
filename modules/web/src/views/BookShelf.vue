@@ -86,6 +86,7 @@ import githubUrl from '@/assets/imgs/github.png'
 import { useLoading } from '@/hooks/loading'
 import { Search as SearchIcon } from '@element-plus/icons-vue'
 import { baseURL_localStorage_key } from '@/api/axios'
+import { requestSourceApiToken } from '@/api/sourceToken'
 import API, {
   legado_http_entry_point,
   parseLeagdoHttpUrlWithDefault,
@@ -144,14 +145,22 @@ watchEffect(() => {
   })
 })
 //搜索在线书籍
-const searchBook = () => {
+let searchToken: string | undefined
+const searchBook = async () => {
   if (searchWord.value == '') return
+  try {
+    searchToken ||= await requestSourceApiToken({ remember: false })
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') return
+    throw error
+  }
   books.value = []
   store.clearSearchBooks()
   showLoading()
   isSearching.value = true
   API.search(
     searchWord.value,
+    searchToken,
     searcBooks => {
       if (isLoading) {
         closeLoading()
@@ -171,6 +180,10 @@ const searchBook = () => {
         ElMessage.info('搜索结果为空')
       }
     },
+    () => {
+      searchToken = undefined
+      ElMessage.error('WebSocket 访问被拒绝，请重新输入访问令牌')
+    },
   )
 }
 
@@ -178,50 +191,42 @@ const searchBook = () => {
 const connectionStore = useConnectionStore()
 const { connectStatus, connectType, newConnect } = storeToRefs(connectionStore)
 
-const setLegadoRetmoteUrl = () => {
-  ElMessageBox.prompt(
-    '请输入 后端地址 ( 如：http://127.0.0.1:9527 或者通过内网穿透的地址)',
-    '提示',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      inputPlaceholder: legado_http_entry_point,
-      inputValidator: value => validatorHttpUrl(value),
-      inputErrorMessage: '输入的格式不对',
-      beforeClose: (action, instance, done) => {
-        if (action === 'confirm') {
-          connectionStore.setNewConnect(true)
-          instance.confirmButtonLoading = true
-          instance.confirmButtonText = '校验中……'
-          // instance.inputValue
-          const url = new URL(instance.inputValue).toString()
-          API.getReadConfig(url)
-            .then(function (config) {
-              connectionStore.setNewConnect(false)
-              applyReadConfig(config)
-              instance.confirmButtonLoading = false
-              store.clearSearchBooks()
-              setApiEntryPoint(...parseLeagdoHttpUrlWithDefault(url))
-              if (url === location.origin) {
-                localStorage.removeItem(baseURL_localStorage_key)
-              } else {
-                localStorage.setItem(baseURL_localStorage_key, url)
-              }
-              store.loadBookShelf()
-              done()
-            })
-            .catch(function (error) {
-              connectionStore.setNewConnect(false)
-              instance.confirmButtonLoading = false
-              instance.confirmButtonText = '确定'
-              throw error
-            })
-        } else {
-          done()
-        }
+const setLegadoRetmoteUrl = async () => {
+  try {
+    const { value: inputUrl } = await ElMessageBox.prompt(
+      '请输入 后端地址 ( 如：http://127.0.0.1:9527 或者通过内网穿透的地址)',
+      '提示',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        inputValue: legado_http_entry_point,
+        inputPlaceholder: legado_http_entry_point,
+        inputValidator: value => validatorHttpUrl(value),
+        inputErrorMessage: '输入的格式不对',
       },
-    },
-  )
+    )
+    const url = new URL(inputUrl).toString()
+    const [httpEntryPoint, webSocketEntryPoint] =
+      parseLeagdoHttpUrlWithDefault(url)
+    connectionStore.setNewConnect(true)
+    const config = await API.getReadConfig(httpEntryPoint)
+    applyReadConfig(config)
+    store.clearSearchBooks()
+    searchToken = undefined
+    setApiEntryPoint(httpEntryPoint, webSocketEntryPoint)
+    if (httpEntryPoint === new URL(`${location.origin}/`).toString()) {
+      localStorage.removeItem(baseURL_localStorage_key)
+    } else {
+      localStorage.setItem(baseURL_localStorage_key, httpEntryPoint)
+    }
+    store.loadBookShelf()
+  } catch (error) {
+    connectionStore.setNewConnect(false)
+    if (error === 'cancel' || error === 'close') return
+    throw error
+  } finally {
+    connectionStore.setNewConnect(false)
+  }
 }
 
 const router = useRouter()

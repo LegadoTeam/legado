@@ -577,6 +577,9 @@
     <string name="web_menu">Web service</string>
     <string name="web_port_title">Web port</string>
     <string name="web_port_summary">Current port %s</string>
+    <string name="js_source_api_token_title">Web source access token</string>
+    <string name="js_source_api_token_summary">Required by raw JS, source write, search, and debug APIs</string>
+    <string name="js_source_api_token_configured">Configured</string>
     <string name="qr_share">QR code sharing</string>
     <string name="str_share">Strings sharing</string>
     <string name="wifi_share">Wifi sharing</string>

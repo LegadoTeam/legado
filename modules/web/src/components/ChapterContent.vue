@@ -13,7 +13,7 @@
       @error.once="proxyImage"
       loading="lazy"
     />
-    <p v-else :style="{ fontFamily, fontSize }" v-html="replaceImage(para)" @error.capture="handleImgLoadError" />
+    <p v-else :style="{ fontFamily, fontSize }" v-html="sanitizeContent(para)" @error.capture="handleImgLoadError" />
   </div>
 </template>
 
@@ -22,6 +22,7 @@ import { isLegadoUrl, lazyRegex } from '@/utils/utils'
 import API from '@api'
 import jump from '@/plugins/jump'
 import type { webReadConfig } from '@/web'
+import DOMPurify from 'dompurify'
 
 const store = useBookStore()
 const readWidth = computed(() => store.config.readWidth)
@@ -59,6 +60,13 @@ const replaceImage = (content: string) => {
     return match
   })
 }
+
+const sanitizeContent = (content: string) =>
+  DOMPurify.sanitize(replaceImage(content), {
+    USE_PROFILES: { html: true },
+    FORBID_TAGS: ['form', 'iframe', 'object', 'embed', 'style'],
+    FORBID_ATTR: ['srcdoc'],
+  })
 
 const getImageSrc = (content: string) => {
   const src = content.match(imgPattern())![1] //reg tested in template

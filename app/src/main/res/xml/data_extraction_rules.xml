@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude
+            domain="sharedpref"
+            path="js_source_api_credentials.xml" />
+        <exclude
+            domain="sharedpref"
+            path="js_source_api_credentials.xml.bak" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude
+            domain="sharedpref"
+            path="js_source_api_credentials.xml" />
+        <exclude
+            domain="sharedpref"
+            path="js_source_api_credentials.xml.bak" />
+    </device-transfer>
+</data-extraction-rules>

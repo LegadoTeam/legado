@@ -3,6 +3,12 @@
 
 import type { webReadConfig } from '@/web'
 import ajax from './axios'
+import {
+  clearSourceApiToken,
+  getSourceApiToken,
+  requestSourceApiToken,
+  sourceApiTokenWebSocketProtocol,
+} from './sourceToken'
 import type {
   BaseBook,
   Book,
@@ -36,6 +42,7 @@ export const setApiEntryPoint = (
 ) => {
   legado_http_entry_point = new URL(http_entry_point).toString()
   legado_webSocket_entry_point = new URL(webSocket_entry_point).toString()
+  clearSourceApiToken()
   ajax.defaults.baseURL = legado_http_entry_point
 }
 
@@ -90,16 +97,32 @@ const getBookContent = (
 // webSocket
 const search = (
   searchKey: string,
+  token: string,
   onReceive: (data: SeachBook[]) => void,
   onFinish: () => void,
+  onAuthFailure?: () => void,
 ) => {
+  let handshakeFailureReported = false
+  const reportHandshakeFailure = () => {
+    if (handshakeFailureReported) return
+    handshakeFailureReported = true
+    onAuthFailure?.()
+  }
   const socket = new WebSocket(
     new URL('searchBook', legado_webSocket_entry_point),
+    ['legado', sourceApiTokenWebSocketProtocol(token)],
   )
-  socket.onerror = wsOnError
+  socket.onerror = event => {
+    reportHandshakeFailure()
+    wsOnError?.call(socket, event)
+  }
 
   socket.onopen = () => {
-    socket.send(`{"key":"${searchKey}"}`)
+    socket.send(
+      JSON.stringify({
+        key: searchKey,
+      }),
+    )
   }
   socket.onmessage = event => {
     try {
@@ -110,7 +133,8 @@ const search = (
     }
   }
 
-  socket.onclose = () => {
+  socket.onclose = event => {
+    if (event.code === 1008) reportHandshakeFailure()
     onFinish()
   }
 }
@@ -143,28 +167,41 @@ const deleteSource = (data: Source[]) =>
     : ajax.post<LeagdoApiResponse<string>>('deleteRssSources', data)
 
 // webSocket
-const debug = (
+const debug = async (
   /** @type {string} */ sourceUrl: string,
   /** @type {string} */ searchKey: string,
   /** @type {(data: string) => void} */ onReceive: (data: string) => void,
   /** @type {() => void} */ onFinish: () => void,
 ) => {
+  const token = getSourceApiToken() || (await requestSourceApiToken())
   const url = new URL(
     `${isBookSource ? 'bookSource' : 'rssSource'}Debug`,
     legado_webSocket_entry_point,
   )
 
-  const socket = new WebSocket(url)
-  socket.onerror = wsOnError
+  const socket = new WebSocket(url, [
+    'legado',
+    sourceApiTokenWebSocketProtocol(token),
+  ])
+  socket.onerror = event => {
+    clearSourceApiToken()
+    wsOnError?.call(socket, event)
+  }
   socket.onopen = () => {
-    socket.send(JSON.stringify({ tag: sourceUrl, key: searchKey }))
+    socket.send(
+      JSON.stringify({
+        tag: sourceUrl,
+        key: searchKey,
+      }),
+    )
   }
   socket.onmessage = event => {
     onReceive(event.data)
     wsOnMessage?.call(socket, event)
   }
 
-  socket.onclose = () => {
+  socket.onclose = event => {
+    if (event.code === 1008) clearSourceApiToken()
     onFinish()
   }
 }
