@@ -42,10 +42,26 @@
         android:textColor="@color/primaryText"
         app:layout_constraintBottom_toTopOf="@id/iv_debug_text"
         app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toLeftOf="@id/swt_enabled"
+        app:layout_constraintRight_toLeftOf="@id/tv_js_badge"
         app:layout_constraintTop_toBottomOf="@id/barrier"
         tools:ignore="TouchTargetSizeCheck"
         tools:text="@string/book_source" />
+
+    <io.legado.app.ui.widget.text.AccentTextView
+        android:id="@+id/tv_js_badge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="8dp"
+        android:paddingHorizontal="4dp"
+        android:singleLine="true"
+        android:text="@string/js_source_badge"
+        android:textSize="10sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/cb_book_source"
+        app:layout_constraintRight_toLeftOf="@id/swt_enabled"
+        app:layout_constraintTop_toTopOf="@id/cb_book_source"
+        tools:visibility="visible" />
 
     <io.legado.app.lib.theme.view.ThemeSwitch
         android:id="@+id/swt_enabled"
