@@ -16,7 +16,7 @@ class UmdFile(var book: Book) {
 
         @Synchronized
         private fun getUFile(book: Book): UmdFile {
-            if (uFile == null || uFile?.book?.bookUrl != book.bookUrl) {
+            if (uFile == null || uFile?.openedBookUrl != book.bookUrl) {
                 uFile = UmdFile(book)
                 return uFile!!
             }
@@ -47,8 +47,16 @@ class UmdFile(var book: Book) {
         override fun upBookInfo(book: Book) {
             return getUFile(book).upBookInfo()
         }
+
+        @Synchronized
+        fun clear(bookUrl: String) {
+            if (uFile?.openedBookUrl == bookUrl) {
+                uFile = null
+            }
+        }
     }
 
+    private val openedBookUrl = book.bookUrl
 
     private var umdBook: UmdBook? = null
         get() {
@@ -64,8 +72,9 @@ class UmdFile(var book: Book) {
     }
 
     private fun readUmd(): UmdBook? {
-        val input = LocalBook.getBookInputStream(book)
-        return UmdReader().read(input)
+        return LocalBook.getBookInputStream(book).use {
+            UmdReader().read(it)
+        }
     }
 
     private fun upBookCover(fastCheck: Boolean = false) {

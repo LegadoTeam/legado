@@ -40,7 +40,7 @@ class EpubFile(var book: Book) : AutoCloseable {
         @Synchronized
         private fun getEFile(book: Book): EpubFile {
             return cache.getOrCreate(
-                matches = { it.book.bookUrl == book.bookUrl },
+                matches = { it.openedBookUrl == book.bookUrl },
                 create = { EpubFile(book) },
             ).also { it.book = book }
         }
@@ -72,7 +72,14 @@ class EpubFile(var book: Book) : AutoCloseable {
         fun clear() {
             cache.clear()
         }
+
+        @Synchronized
+        fun clear(bookUrl: String) {
+            cache.clearIf { it.openedBookUrl == bookUrl }
+        }
     }
+
+    private val openedBookUrl = book.bookUrl
 
     private var mCharset: Charset = Charset.defaultCharset()
 

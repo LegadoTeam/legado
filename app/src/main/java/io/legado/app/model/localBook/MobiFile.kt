@@ -30,7 +30,7 @@ class MobiFile(var book: Book) : AutoCloseable {
         @Synchronized
         private fun getMFile(book: Book): MobiFile {
             return cache.getOrCreate(
-                matches = { it.book.bookUrl == book.bookUrl },
+                matches = { it.openedBookUrl == book.bookUrl },
                 create = { MobiFile(book) },
             ).also { it.book = book }
         }
@@ -59,7 +59,14 @@ class MobiFile(var book: Book) : AutoCloseable {
         fun clear() {
             cache.clear()
         }
+
+        @Synchronized
+        fun clear(bookUrl: String) {
+            cache.clearIf { it.openedBookUrl == bookUrl }
+        }
     }
+
+    private val openedBookUrl = book.bookUrl
 
     private var fileDescriptor: ParcelFileDescriptor? = null
     private var openedMobiBook: MobiBook? = null

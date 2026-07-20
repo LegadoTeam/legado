@@ -33,7 +33,7 @@ class PdfFile(var book: Book) : AutoCloseable {
         @Synchronized
         private fun getPFile(book: Book): PdfFile {
             return cache.getOrCreate(
-                matches = { it.book.bookUrl == book.bookUrl },
+                matches = { it.openedBookUrl == book.bookUrl },
                 create = { PdfFile(book) },
             ).also { it.book = book }
         }
@@ -63,7 +63,14 @@ class PdfFile(var book: Book) : AutoCloseable {
             cache.clear()
         }
 
+        @Synchronized
+        fun clear(bookUrl: String) {
+            cache.clearIf { it.openedBookUrl == bookUrl }
+        }
+
     }
+
+    private val openedBookUrl = book.bookUrl
 
     /**
      *持有引用，避免被回收
