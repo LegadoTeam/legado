@@ -56,6 +56,8 @@ class PackagedLocalesTest {
                 "*.proto",
                 "**/*.proto",
                 "src/**",
+                "kotlin/*.kotlin_builtins",
+                "kotlin/**/*.kotlin_builtins",
             ),
             configuredExclusions,
         )

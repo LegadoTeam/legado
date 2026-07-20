@@ -167,7 +167,10 @@ android {
                 'tables/Transcoder_*.bin',
                 '*.proto',
                 '**/*.proto',
-                'src/**'
+                'src/**',
+                // kotlin-reflect and its builtins loaders are not part of the release runtime.
+                'kotlin/*.kotlin_builtins',
+                'kotlin/**/*.kotlin_builtins'
         ])
         jniLibs {
             // These dependencies already ship stripped; skip redundant strip attempts.
