@@ -3,8 +3,13 @@ package io.legado.app.model.jsSource
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.data.entities.rule.RowUi
 import io.legado.app.utils.GSON
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -270,6 +275,19 @@ class JsSourceConfigTest {
         )
 
         assertEquals("https://example.com/login", source.loginUrl)
+    }
+
+    @Test(timeout = 5_000)
+    fun `cancellation escapes infinite top level script`() {
+        JsSourceConfig.extract(validScript)
+
+        assertThrows(TimeoutCancellationException::class.java) {
+            runBlocking {
+                withTimeout(500) {
+                    JsSourceConfig.extract("while (true) {}", currentCoroutineContext())
+                }
+            }
+        }
     }
 
     @Test

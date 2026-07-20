@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class ImportBookSourceStateTest {
 
@@ -45,5 +46,24 @@ class ImportBookSourceStateTest {
         assertFalse(resolveImportSourceSelection(existing, manualSelection = false))
         assertFalse(resolveImportSourceSelection(newSource, manualSelection = false))
         assertTrue(resolveImportSourceSelection(existing, manualSelection = true))
+    }
+
+    @Test
+    fun `direct JS source import preserves coroutine cancellation`() {
+        val source = readProjectFile(
+            "src/main/java/io/legado/app/ui/association/ImportBookSourceViewModel.kt"
+        )
+        assertTrue(source.contains("else -> runCatchingCancellable"))
+        val directImport = source.substringAfter("else -> runCatchingCancellable")
+            .substringBefore("}.getOrElse")
+
+        assertTrue(directImport.contains("JsSourceConfig.extract(mText, coroutineContext)"))
+    }
+
+    private fun readProjectFile(pathInApp: String): String {
+        val file = sequenceOf(File(pathInApp), File("app/$pathInApp"))
+            .firstOrNull(File::isFile)
+        requireNotNull(file) { "Project file not found: $pathInApp" }
+        return file.readText()
     }
 }

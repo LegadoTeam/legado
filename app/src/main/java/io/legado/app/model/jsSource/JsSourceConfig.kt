@@ -1,11 +1,13 @@
 package io.legado.app.model.jsSource
 
 import com.google.gson.JsonObject
+import com.script.rhino.RhinoInterruptError
 import com.script.rhino.RhinoScriptEngine
 import io.legado.app.data.entities.BookSource
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.model.SharedJsScope
 import io.legado.app.utils.GSON
+import kotlinx.coroutines.CancellationException
 import org.htmlunit.corejs.javascript.Context
 import org.htmlunit.corejs.javascript.Function
 import org.htmlunit.corejs.javascript.Scriptable
@@ -30,6 +32,21 @@ object JsSourceConfig {
     )
 
     fun extract(text: String, coroutineContext: CoroutineContext? = null): BookSource {
+        try {
+            return extractInternal(text, coroutineContext)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: RhinoInterruptError) {
+            val cancellation = error.cause as? CancellationException
+            if (cancellation != null) throw cancellation
+            throw error
+        }
+    }
+
+    private fun extractInternal(
+        text: String,
+        coroutineContext: CoroutineContext?,
+    ): BookSource {
         val scope = Context.enter().let { context ->
             try {
                 context.initSafeStandardObjects()
@@ -40,6 +57,8 @@ object JsSourceConfig {
         SharedJsScope.installCryptoJs(scope, coroutineContext)
         try {
             RhinoScriptEngine.eval(text, scope, coroutineContext)
+        } catch (error: CancellationException) {
+            throw error
         } catch (error: Exception) {
             throw NoStackTraceException("JS源脚本执行失败: ${error.message}")
         }

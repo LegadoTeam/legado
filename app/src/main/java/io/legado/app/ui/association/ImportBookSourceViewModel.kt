@@ -29,6 +29,7 @@ import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.isJsonArray
 import io.legado.app.utils.isJsonObject
 import io.legado.app.utils.isUri
+import io.legado.app.utils.runCatchingCancellable
 import io.legado.app.utils.splitNotBlank
 import kotlin.coroutines.coroutineContext
 
@@ -203,7 +204,7 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
                     }
                 }
 
-                else -> runCatching {
+                else -> runCatchingCancellable {
                     allSources.add(JsSourceConfig.extract(mText, coroutineContext))
                 }.getOrElse {
                     throw NoStackTraceException(
