@@ -16,11 +16,14 @@ import io.legado.app.R
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.databinding.DialogEditTextBinding
+import io.legado.app.help.book.BookHelp
+import io.legado.app.help.book.removeLocalUriCache
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.permission.Permissions
 import io.legado.app.lib.permission.PermissionsCompat
 import io.legado.app.lib.theme.backgroundColor
+import io.legado.app.model.localBook.LocalBook
 import io.legado.app.ui.book.import.BaseImportBookActivity
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.widget.SelectActionBar
@@ -51,6 +54,7 @@ class ImportBookActivity : BaseImportBookActivity<ImportBookViewModel>(),
     override val viewModel by viewModels<ImportBookViewModel>()
     private val adapter by lazy { ImportBookAdapter(this, this) }
     private var scanDocJob: Job? = null
+    private var startReadJob: Job? = null
 
     private val selectFolder = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
@@ -311,13 +315,32 @@ class ImportBookActivity : BaseImportBookActivity<ImportBookViewModel>(),
 
     override fun startRead(fileDoc: FileDoc) {
         if (!ArchiveUtils.isArchive(fileDoc.name)) {
-            appDb.bookDao.getBookByFileName(fileDoc.name)?.let {
+            if (startReadJob?.isActive == true) return
+            startReadJob = lifecycleScope.launch(IO) {
                 val filePath = fileDoc.toString()
-                if (it.bookUrl != filePath) {
-                    it.bookUrl = filePath
-                    appDb.bookDao.insert(it)
+                val book = appDb.bookDao.getBook(filePath)
+                    ?: appDb.bookDao.getBookByFileName(fileDoc.name)
+                    ?: return@launch
+                val oldBook = book.copy()
+                val pathChanged = oldBook.bookUrl != filePath
+                LocalBook.withParserCacheInvalidated(
+                    oldBook.bookUrl,
+                    oldBook.originName,
+                ) {
+                    oldBook.removeLocalUriCache()
+                    if (pathChanged) {
+                        book.bookUrl = filePath
+                        appDb.bookDao.replace(oldBook, book)
+                    }
                 }
-                startReadBook(it)
+                if (pathChanged) {
+                    BookHelp.updateCacheFolder(oldBook, book)
+                }
+                withContext(Main) {
+                    if (!isFinishing && !isDestroyed) {
+                        startReadBook(book)
+                    }
+                }
             }
         } else {
             onArchiveFileClick(fileDoc)
