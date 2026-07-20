@@ -275,3 +275,4 @@
 -keep class org.chromium.net.impl.HttpEngineNativeProvider {
     public <init>(android.content.Context);
 }
+
