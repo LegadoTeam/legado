@@ -5,10 +5,10 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody
 import okhttp3.ResponseBody.Companion.asResponseBody
-import okhttp3.brotli.Brotli
 import okhttp3.internal.http.promisesBody
 import okio.buffer
 import okio.source
+import org.brotli.dec.BrotliInputStream
 import java.util.zip.GZIPInputStream
 import java.util.zip.Inflater
 import java.util.zip.InflaterInputStream
@@ -29,7 +29,7 @@ internal fun decompressResponse(response: Response): Response {
         when (response.header("Content-Encoding")?.lowercase()) {
             "gzip" -> GZIPInputStream(body.byteStream()).source().buffer()
             "deflate" -> InflaterInputStream(body.byteStream(), Inflater(true)).source().buffer()
-            "br" -> Brotli.decompress(body.source()).buffer()
+            "br" -> BrotliInputStream(body.byteStream()).source().buffer()
             else -> return response
         }
     } catch (throwable: Throwable) {

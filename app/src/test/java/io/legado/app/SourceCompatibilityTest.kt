@@ -125,12 +125,14 @@ class SourceCompatibilityTest {
                 "5cb384cd0912aeb5b5dd9555f2dd1a9b20688201"
             ).decodeHex().toByteArray()
 
-        val response = decompressResponse(encodedResponse("br", compressed))
+        val originalBody = TrackingResponseBody(compressed)
+        val response = decompressResponse(encodedResponse("br", originalBody))
 
-        val responseText = response.body.string()
+        val responseText = response.body.use { it.string() }
         assertTrue(responseText.contains("\"brotli\": true"))
         assertNull(response.header("Content-Encoding"))
         assertNull(response.header("Content-Length"))
+        assertTrue("brotli response body was not closed", originalBody.closed)
     }
 
     @Test
