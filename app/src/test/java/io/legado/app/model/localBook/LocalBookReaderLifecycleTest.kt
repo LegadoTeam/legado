@@ -45,6 +45,105 @@ class LocalBookReaderLifecycleTest {
         assertTrue(checkBlock.contains("LocalBook.getBookInputStream(book).use {}"))
     }
 
+    @Test
+    fun `parser caches support targeted invalidation`() {
+        listOf("EpubFile", "MobiFile", "PdfFile").forEach { parser ->
+            val source = readProjectFile(
+                "src/main/java/io/legado/app/model/localBook/$parser.kt"
+            )
+            val clearBlock = source.substringAfter("fun clear(bookUrl: String)")
+                .substringBefore("\n        }")
+
+            assertTrue(source.contains("private val openedBookUrl = book.bookUrl"))
+            assertTrue(source.contains("matches = { it.openedBookUrl == book.bookUrl }"))
+            assertTrue(clearBlock.contains("cache.clearIf"))
+            assertTrue(clearBlock.contains("it.openedBookUrl == bookUrl"))
+        }
+
+        val umdSource = readProjectFile(
+            "src/main/java/io/legado/app/model/localBook/UmdFile.kt"
+        )
+        val umdClearBlock = umdSource.substringAfter("fun clear(bookUrl: String)")
+            .substringBefore("\n        }")
+        assertTrue(umdSource.contains("private val openedBookUrl = book.bookUrl"))
+        assertTrue(umdSource.contains("uFile?.openedBookUrl != book.bookUrl"))
+        assertTrue(umdClearBlock.contains("uFile?.openedBookUrl == bookUrl"))
+        assertTrue(umdClearBlock.contains("uFile = null"))
+    }
+
+    @Test
+    fun `local book refresh invalidates parser before parsing again`() {
+        val source = readProjectFile(
+            "src/main/java/io/legado/app/model/localBook/LocalBook.kt"
+        )
+        val importFileBlock = source.substringAfter("fun importFile(uri: Uri)")
+            .substringBefore("fun upBookInfo(book: Book)")
+        val existingBookBlock = importFileBlock.substringAfter("} else {")
+
+        assertTrue(existingBookBlock.contains("withParserCacheInvalidated(book)"))
+        assertTrue(existingBookBlock.contains("deleteBook(book, false)"))
+        assertTrue(existingBookBlock.contains("upBookInfo(book)"))
+        assertTrue(
+            existingBookBlock.indexOf("deleteBook(book, false)") <
+                    existingBookBlock.indexOf("upBookInfo(book)")
+        )
+    }
+
+    @Test
+    fun `local book files invalidate parser before overwrite`() {
+        val localBookSource = readProjectFile(
+            "src/main/java/io/legado/app/model/localBook/LocalBook.kt"
+        )
+        assertInvalidationBeforeOutput(
+            localBookSource,
+            "withParserCacheInvalidated(doc.uri, fileName)",
+            "appCtx.contentResolver.openOutputStream(doc.uri)"
+        )
+        assertInvalidationBeforeOutput(
+            localBookSource,
+            "withParserCacheInvalidated(Uri.fromFile(file), fileName)",
+            "FileOutputStream(file)"
+        )
+
+        val associationSource = readProjectFile(
+            "src/main/java/io/legado/app/ui/association/FileAssociationActivity.kt"
+        )
+        assertInvalidationBeforeOutput(
+            associationSource,
+            "LocalBook.withParserCacheInvalidated(doc.uri, name)",
+            "contentResolver.openOutputStream(doc.uri)"
+        )
+        assertInvalidationBeforeOutput(
+            associationSource,
+            "LocalBook.withParserCacheInvalidated(Uri.fromFile(file), name)",
+            "FileOutputStream(file)"
+        )
+    }
+
+    @Test
+    fun `umd parsing closes source stream after eager read`() {
+        val source = readProjectFile(
+            "src/main/java/io/legado/app/model/localBook/UmdFile.kt"
+        )
+        val readBlock = source.substringAfter("private fun readUmd()")
+            .substringBefore("private fun upBookCover")
+
+        assertTrue(readBlock.contains("LocalBook.getBookInputStream(book).use"))
+        assertTrue(readBlock.contains("UmdReader().read(it)"))
+    }
+
+    private fun assertInvalidationBeforeOutput(
+        source: String,
+        invalidation: String,
+        output: String,
+    ) {
+        val invalidationIndex = source.indexOf(invalidation)
+        val outputIndex = source.indexOf(output, invalidationIndex)
+
+        assertTrue("Missing parser invalidation: $invalidation", invalidationIndex >= 0)
+        assertTrue("Missing output after parser invalidation: $output", outputIndex > invalidationIndex)
+    }
+
     private fun readProjectFile(pathInApp: String): String {
         val file = sequenceOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull(File::isFile)

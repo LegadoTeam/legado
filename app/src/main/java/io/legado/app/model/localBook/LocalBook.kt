@@ -279,12 +279,14 @@ object LocalBook {
             upBookInfo(book)
             appDb.bookDao.insert(book)
         } else {
-            deleteBook(book, false)
-            upBookInfo(book)
-            // 触发 isLocalModified
-            book.latestChapterTime = 0
-            //已有书籍说明是更新,删除原有目录
-            appDb.bookChapterDao.delByBook(bookUrl)
+            withParserCacheInvalidated(book) {
+                deleteBook(book, false)
+                upBookInfo(book)
+                // 触发 isLocalModified
+                book.latestChapterTime = 0
+                //已有书籍说明是更新,删除原有目录
+                appDb.bookChapterDao.delByBook(bookUrl)
+            }
         }
         return book
     }
@@ -295,6 +297,54 @@ object LocalBook {
             book.isUmd -> UmdFile.upBookInfo(book)
             book.isPdf -> PdfFile.upBookInfo(book)
             book.isMobi -> MobiFile.upBookInfo(book)
+        }
+    }
+
+    fun <T> withParserCacheInvalidated(
+        uri: Uri,
+        fileName: String,
+        action: () -> T,
+    ): T {
+        return withParserCacheInvalidated(
+            FileDoc.fromUri(uri, false).toString(),
+            fileName,
+            action,
+        )
+    }
+
+    private fun <T> withParserCacheInvalidated(book: Book, action: () -> T): T {
+        return withParserCacheInvalidated(book.bookUrl, book.originName, action)
+    }
+
+    private fun <T> withParserCacheInvalidated(
+        bookUrl: String,
+        fileName: String,
+        action: () -> T,
+    ): T {
+        return when {
+            fileName.endsWith(".epub", true) -> synchronized(EpubFile) {
+                EpubFile.clear(bookUrl)
+                action()
+            }
+
+            fileName.endsWith(".umd", true) -> synchronized(UmdFile) {
+                UmdFile.clear(bookUrl)
+                action()
+            }
+
+            fileName.endsWith(".pdf", true) -> synchronized(PdfFile) {
+                PdfFile.clear(bookUrl)
+                action()
+            }
+
+            fileName.endsWith(".mobi", true) ||
+                fileName.endsWith(".azw3", true) ||
+                fileName.endsWith(".azw", true) -> synchronized(MobiFile) {
+                MobiFile.clear(bookUrl)
+                action()
+            }
+
+            else -> action()
         }
     }
 
@@ -466,16 +516,20 @@ object LocalBook {
                     )
                         ?: throw SecurityException("请重新设置书籍保存位置\nPermission Denial")
                 }
-                appCtx.contentResolver.openOutputStream(doc.uri)!!.use { oStream ->
-                    it.copyTo(oStream)
+                withParserCacheInvalidated(doc.uri, fileName) {
+                    appCtx.contentResolver.openOutputStream(doc.uri)!!.use { oStream ->
+                        it.copyTo(oStream)
+                    }
                 }
                 doc.uri
             } else {
                 try {
                     val treeFile = File(treeUri.path!!)
                     val file = prepareLocalBookOutputFile(treeFile, fileName)
-                    FileOutputStream(file).use { oStream ->
-                        it.copyTo(oStream)
+                    withParserCacheInvalidated(Uri.fromFile(file), fileName) {
+                        FileOutputStream(file).use { oStream ->
+                            it.copyTo(oStream)
+                        }
                     }
                     Uri.fromFile(file)
                 } catch (e: FileNotFoundException) {

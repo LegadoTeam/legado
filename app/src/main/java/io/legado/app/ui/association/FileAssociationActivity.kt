@@ -15,6 +15,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.permission.Permissions
 import io.legado.app.lib.permission.PermissionsCompat
+import io.legado.app.model.localBook.LocalBook
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.buildMainHandler
@@ -169,9 +170,11 @@ class FileAssociationActivity :
                                             "请重新设置书籍保存位置\nPermission Denial"
                                         )
                                 }
-                                contentResolver.openOutputStream(doc.uri)!!.use { oStream ->
-                                    inputStream.copyTo(oStream)
-                                    oStream.flush()
+                                LocalBook.withParserCacheInvalidated(doc.uri, name) {
+                                    contentResolver.openOutputStream(doc.uri)!!.use { oStream ->
+                                        inputStream.copyTo(oStream)
+                                        oStream.flush()
+                                    }
                                 }
                             }
                             viewModel.importBook(doc.uri)
@@ -187,9 +190,11 @@ class FileAssociationActivity :
                             val name = fileDoc.name
                             val file = treeFile.getFile(name)
                             if (!file.exists() || fileDoc.lastModified > file.lastModified()) {
-                                FileOutputStream(file).use { oStream ->
-                                    inputStream.copyTo(oStream)
-                                    oStream.flush()
+                                LocalBook.withParserCacheInvalidated(Uri.fromFile(file), name) {
+                                    FileOutputStream(file).use { oStream ->
+                                        inputStream.copyTo(oStream)
+                                        oStream.flush()
+                                    }
                                 }
                             }
                             viewModel.importBook(Uri.fromFile(file))
