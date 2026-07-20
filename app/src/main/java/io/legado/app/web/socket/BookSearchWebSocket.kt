@@ -25,16 +25,34 @@ class BookSearchWebSocket(handshakeRequest: NanoHTTPD.IHTTPSession) :
     SearchModel.CallBack {
 
     private val normalClosure = NanoWSD.WebSocketFrame.CloseCode.NormalClosure
-    private val searchModel = SearchModel(this, this)
+    private var searchModel: SearchModel? = null
+
+    @Volatile
+    private var requestReceived = false
 
     private val SEARCH_FINISH = "Search finish"
 
     override fun onOpen() {
         launch(IO) {
+            delay(AUTH_TIMEOUT_MILLIS)
+            if (!requestReceived && isOpen) {
+                close(
+                    NanoWSD.WebSocketFrame.CloseCode.PolicyViolation,
+                    "认证超时",
+                    false
+                )
+            }
+        }
+    }
+
+    private fun startHeartbeat() {
+        launch(IO) {
             kotlin.runCatching {
-                while (isOpen) {
-                    ping("ping".toByteArray())
-                    delay(30000)
+                while (requestReceived && isOpen) {
+                    delay(30_000)
+                    if (isOpen) {
+                        ping("ping".toByteArray())
+                    }
                 }
             }
         }
@@ -46,15 +64,19 @@ class BookSearchWebSocket(handshakeRequest: NanoHTTPD.IHTTPSession) :
         initiatedByRemote: Boolean
     ) {
         cancel()
-        searchModel.close()
+        searchModel?.close()
     }
 
     override fun onMessage(message: NanoWSD.WebSocketFrame) {
         launch(IO) {
             kotlin.runCatching {
+                if (requestReceived) return@launch
                 if (!message.textPayload.isJson()) {
-                    send("数据必须为Json格式")
-                    close(normalClosure, SEARCH_FINISH, false)
+                    close(
+                        NanoWSD.WebSocketFrame.CloseCode.PolicyViolation,
+                        "认证数据格式错误",
+                        false
+                    )
                     return@launch
                 }
                 val searchMap =
@@ -66,7 +88,18 @@ class BookSearchWebSocket(handshakeRequest: NanoHTTPD.IHTTPSession) :
                         close(normalClosure, SEARCH_FINISH, false)
                         return@launch
                     }
-                    searchModel.search(System.currentTimeMillis(), key)
+                    requestReceived = true
+                    startHeartbeat()
+                    SearchModel(this@BookSearchWebSocket, this@BookSearchWebSocket).also {
+                        searchModel = it
+                        it.search(System.currentTimeMillis(), key)
+                    }
+                } else {
+                    close(
+                        NanoWSD.WebSocketFrame.CloseCode.PolicyViolation,
+                        "认证数据格式错误",
+                        false
+                    )
                 }
             }
         }
@@ -77,7 +110,7 @@ class BookSearchWebSocket(handshakeRequest: NanoHTTPD.IHTTPSession) :
     }
 
     override fun onException(exception: IOException) {
-
+        searchModel?.close()
     }
 
     override fun getSearchScope(): SearchScope = SearchScope(AppConfig.searchScope)
@@ -97,5 +130,9 @@ class BookSearchWebSocket(handshakeRequest: NanoHTTPD.IHTTPSession) :
     override fun onSearchFinish(isEmpty: Boolean, hasMore: Boolean) = close(normalClosure, SEARCH_FINISH, false)
 
     override fun onSearchCancel(exception: Throwable?) = close(normalClosure, exception?.toString() ?: SEARCH_FINISH, false)
+
+    companion object {
+        private const val AUTH_TIMEOUT_MILLIS = 10_000L
+    }
 
 }

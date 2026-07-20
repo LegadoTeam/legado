@@ -1,5 +1,6 @@
 package io.legado.app.help.config
 
+import android.content.Context.MODE_PRIVATE
 import android.content.SharedPreferences
 import android.os.Build
 import io.legado.app.BuildConfig
@@ -27,6 +28,9 @@ import java.net.InetAddress
 
 @Suppress("MemberVisibilityCanBePrivate", "ConstPropertyName")
 object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
+    private const val JS_SOURCE_API_PREFS = "js_source_api_credentials"
+    private const val JS_SOURCE_API_TOKEN = "token"
+
     val isCronet = appCtx.getPrefBoolean(PreferKey.cronet)
     var useAntiAlias = appCtx.getPrefBoolean(PreferKey.antiAlias)
     var userAgent: String = getPrefUserAgent()
@@ -461,6 +465,23 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefInt(PreferKey.webPort, value)
         }
 
+    var jsSourceApiToken: String?
+        get() = appCtx.getSharedPreferences(JS_SOURCE_API_PREFS, MODE_PRIVATE)
+            .getString(JS_SOURCE_API_TOKEN, null)
+        set(value) {
+            val normalizedValue = normalizeJsSourceApiToken(value)
+            appCtx.getSharedPreferences(JS_SOURCE_API_PREFS, MODE_PRIVATE)
+                .edit()
+                .apply {
+                    if (normalizedValue == null) {
+                        remove(JS_SOURCE_API_TOKEN)
+                    } else {
+                        putString(JS_SOURCE_API_TOKEN, normalizedValue)
+                    }
+                }
+                .apply()
+        }
+
     var tocUiUseReplace: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.tocUiUseReplace)
         set(value) {
@@ -834,5 +855,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         }
 
     val autoUpdateVariant get() = appCtx.getPrefBoolean("autoUpdateVariant", true)
+}
+
+internal fun normalizeJsSourceApiToken(value: String?): String? {
+    return value?.trim()?.takeIf { it.isNotEmpty() }
 }
 

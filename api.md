@@ -4,6 +4,10 @@
 
 您需要先在设置中启用"Web 服务"。
 
+> Web 服务默认监听手机网络接口，多数接口不提供身份认证，请仅在可信局域网中启用，使用后及时关闭。书源写入、搜索和调试接口使用“Web 书源访问令牌”；纯 JavaScript 书源接口同样必须提供令牌。
+
+旧 JSON 书源写入接口也必须通过 `X-Legado-Token` 提供令牌。搜索和调试 WebSocket 在 Upgrade 握手时使用 `Sec-WebSocket-Protocol: legado, legado.token.<令牌 UTF-8 字节的 base64url，无填充>`；固定协议必须位于第一项，服务端会在读取任何 WebSocket 帧前完成验证。浏览器同源状态不作为身份凭据；Web 页面中的令牌只保存在当前页面内存中，页面重载后需要重新输入。
+
 ## 使用
 
 ### Web
@@ -19,6 +23,23 @@
 ```
 URL = http://127.0.0.1:1234/saveBookSource
 Method = POST
+```
+
+#### 插入纯 JavaScript 单文件书源
+
+请求 BODY 为纯 JavaScript 书源脚本文本，`Content-Type` 使用 `text/plain; charset=utf-8`，最大 1 MiB，并且必须提供正确的 `Content-Length`。HTTP 层会去除脚本文本首尾空白，应用随后复用编辑器的提取、校验和保存逻辑；等待其他保存和解析脚本各自最多 30 秒。
+
+请先在“设置 > 其他设置 > Web 书源访问令牌”中配置令牌，并通过 `X-Legado-Token` 请求头提供完全相同的值。令牌验证会在读取请求体之前完成。令牌不会进入应用备份，恢复或更换设备后需要重新配置。该接口无论是否同源都必须发送令牌；使用明文 HTTP 时仍只能在可信网络中使用。
+
+覆盖已有书源时会保留启用状态、发现开关、排序、权重、响应时间，以及脚本未声明时的原分组。书源有实质变化时会更新时间并回写脚本中的 `lastUpdateTime`；内容未变化时保留原时间。
+
+接口按脚本声明的 `bookSourceUrl` 新建或覆盖，不提供书源 URL 改名能力；需要改名时请在应用内编辑器中操作。
+
+```
+URL = http://127.0.0.1:1234/saveJsSource
+Method = POST
+Content-Type = text/plain; charset=utf-8
+X-Legado-Token = 设置中配置的令牌
 ```
 
 #### 插入多个书源or订阅源

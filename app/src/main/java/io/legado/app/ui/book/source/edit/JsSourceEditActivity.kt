@@ -11,12 +11,7 @@ import io.legado.app.base.BaseActivity
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
 import io.legado.app.databinding.ActivityJsSourceEditBinding
-import io.legado.app.help.ConcurrentRateLimiter.Companion.concurrentRecordMap
-import io.legado.app.help.config.SourceConfig
-import io.legado.app.help.source.SourceHelp
-import io.legado.app.help.source.clearExploreKindsCache
-import io.legado.app.model.SharedJsScope
-import io.legado.app.model.jsSource.JsSourceConfig
+import io.legado.app.model.jsSource.JsSourceUpsert
 import io.legado.app.ui.book.source.debug.BookSourceDebugActivity
 import io.legado.app.ui.code.CodeEditActivity
 import io.legado.app.utils.StartActivityContract
@@ -144,37 +139,8 @@ class JsSourceEditActivity : BaseActivity<ActivityJsSourceEditBinding>(imageBg =
     ) {
         lifecycleScope.launch {
             try {
-                val source = withContext(Dispatchers.IO) {
-                    val source = JsSourceConfig.extract(text, coroutineContext)
-                    val old = openedSourceUrl?.let { appDb.bookSourceDao.getBookSource(it) }
-                        ?: appDb.bookSourceDao.getBookSource(source.bookSourceUrl)
-                    preserveUserState(source, old)
-                    if (old == null || !source.equal(old)) {
-                        stampSource(source)
-                    } else {
-                        source.lastUpdateTime = old.lastUpdateTime
-                    }
-                    old?.let {
-                        if (it.exploreUrl != source.exploreUrl) {
-                            it.clearExploreKindsCache()
-                        }
-                        if (it.jsLib != source.jsLib) {
-                            SharedJsScope.remove(it.jsLib)
-                        }
-                        if (it.bookSourceUrl != source.bookSourceUrl) {
-                            SourceHelp.deleteBookSource(it.bookSourceUrl)
-                        } else {
-                            appDb.bookSourceDao.delete(it)
-                            SourceConfig.removeSource(it.bookSourceUrl)
-                        }
-                    } ?: openedSourceUrl?.takeIf { it != source.bookSourceUrl }?.let {
-                        SourceHelp.deleteBookSource(it)
-                    }
-                    appDb.bookSourceDao.insert(source)
-                    concurrentRecordMap.remove(source.bookSourceUrl)
-                    openedSourceUrl = source.bookSourceUrl
-                    source
-                }
+                val source = JsSourceUpsert.save(text, openedSourceUrl)
+                openedSourceUrl = source.bookSourceUrl
                 stage = stage.afterSuccessfulSave()
                 pendingText = source.mainJs ?: text
                 if (showSuccessToast) {
@@ -195,23 +161,4 @@ class JsSourceEditActivity : BaseActivity<ActivityJsSourceEditBinding>(imageBg =
         }
     }
 
-    private fun preserveUserState(source: BookSource, old: BookSource?) {
-        old ?: return
-        source.enabled = old.enabled
-        source.enabledExplore = old.enabledExplore
-        source.customOrder = old.customOrder
-        source.weight = old.weight
-        source.respondTime = old.respondTime
-        if (source.bookSourceGroup.isNullOrBlank()) {
-            source.bookSourceGroup = old.bookSourceGroup
-        }
-    }
-
-    private fun stampSource(source: BookSource) {
-        val stamp = System.currentTimeMillis()
-        source.lastUpdateTime = stamp
-        source.mainJs?.let { script ->
-            JsSourceConfig.stampLastUpdateTime(script, stamp)?.let { source.mainJs = it }
-        }
-    }
 }

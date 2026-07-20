@@ -2,6 +2,7 @@ package io.legado.app.help.config
 
 import android.content.Context.MODE_PRIVATE
 import androidx.core.content.edit
+import io.legado.app.data.appDb
 import splitties.init.appCtx
 
 object SourceConfig {
@@ -30,8 +31,11 @@ object SourceConfig {
 
 
     fun removeSource(origin: String) {
+        val protectedOrigins = appDb.bookSourceDao.allPart
+            .map { it.bookSourceUrl }
+            .filterNot { it == origin }
         sp.all.keys.filter {
-            it.startsWith(origin)
+            belongsToSource(it, origin, protectedOrigins)
         }.let {
             sp.edit {
                 it.forEach {
@@ -42,4 +46,17 @@ object SourceConfig {
     }
 
 
+}
+
+internal fun belongsToSource(
+    key: String,
+    origin: String,
+    protectedOrigins: Collection<String>,
+): Boolean {
+    val owner = (protectedOrigins.asSequence() + sequenceOf(origin))
+        .filter { candidate ->
+            key == candidate || key.startsWith("${candidate}_")
+        }
+        .maxByOrNull(String::length)
+    return owner == origin
 }

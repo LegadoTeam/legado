@@ -5,9 +5,11 @@ import android.content.ComponentName
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.text.InputType
 import android.view.View
 import androidx.core.view.postDelayed
 import androidx.fragment.app.activityViewModels
+import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
 import com.jeremyliao.liveeventbus.LiveEventBus
@@ -20,6 +22,7 @@ import io.legado.app.help.AppFreezeMonitor
 import io.legado.app.help.DispatchersMonitor
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
+import io.legado.app.help.config.normalizeJsSourceApiToken
 import io.legado.app.help.http.Cronet
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.prefs.fragment.PreferenceFragment
@@ -71,6 +74,22 @@ class OtherConfigFragment : PreferenceFragment(),
         upPreferenceSummary(PreferKey.preDownloadNum, AppConfig.preDownloadNum.toString())
         upPreferenceSummary(PreferKey.threadCount, AppConfig.threadCount.toString())
         upPreferenceSummary(PreferKey.webPort, AppConfig.webPort.toString())
+        findPreference<EditTextPreference>(PreferKey.jsSourceApiToken)?.let {
+            it.isPersistent = false
+            it.text = AppConfig.jsSourceApiToken
+            it.setOnPreferenceChangeListener { _, newValue ->
+                val token = normalizeJsSourceApiToken(newValue?.toString())
+                AppConfig.jsSourceApiToken = token
+                upPreferenceSummary(PreferKey.jsSourceApiToken, token)
+                true
+            }
+            it.setOnBindEditTextListener { editText ->
+                editText.inputType =
+                    InputType.TYPE_TEXT_VARIATION_PASSWORD or InputType.TYPE_CLASS_TEXT
+                editText.setSelection(editText.text.length)
+            }
+        }
+        upPreferenceSummary(PreferKey.jsSourceApiToken, AppConfig.jsSourceApiToken)
         AppConfig.defaultBookTreeUri?.let {
             upPreferenceSummary(PreferKey.defaultBookTreeUri, it)
         }
@@ -253,6 +272,11 @@ class OtherConfigFragment : PreferenceFragment(),
 
             PreferKey.threadCount -> preference.summary = getString(R.string.threads_num, value)
             PreferKey.webPort -> preference.summary = getString(R.string.web_port_summary, value)
+            PreferKey.jsSourceApiToken -> preference.summary = if (value.isNullOrBlank()) {
+                getString(R.string.js_source_api_token_summary)
+            } else {
+                getString(R.string.js_source_api_token_configured)
+            }
             PreferKey.bitmapCacheSize -> preference.summary =
                 getString(R.string.bitmap_cache_size_summary, value)
             PreferKey.imageRetainNum -> preference.summary =

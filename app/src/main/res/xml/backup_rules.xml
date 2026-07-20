@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <exclude
+        domain="sharedpref"
+        path="js_source_api_credentials.xml" />
+    <exclude
+        domain="sharedpref"
+        path="js_source_api_credentials.xml.bak" />
+</full-backup-content>
