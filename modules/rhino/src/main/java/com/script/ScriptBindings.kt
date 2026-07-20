@@ -3,10 +3,13 @@ package com.script
 import org.htmlunit.corejs.javascript.Context
 import org.htmlunit.corejs.javascript.NativeObject
 import org.htmlunit.corejs.javascript.ScriptableObject
+import org.htmlunit.corejs.javascript.xmlimpl.XMLLoaderImpl
 
 class ScriptBindings : NativeObject() {
 
     companion object {
+        private val xmlLoader = XMLLoaderImpl()
+
         private val topLevelScope: ScriptableObject by lazy {
             val cx = Context.enter()
             try {
@@ -19,6 +22,7 @@ class ScriptBindings : NativeObject() {
 
     init {
         prototype = topLevelScope
+        xmlLoader.load(this, false)
     }
 
     operator fun set(key: String, value: Any?) {

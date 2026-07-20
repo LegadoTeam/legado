@@ -85,15 +85,23 @@ object RhinoWrapFactory : WrapFactory() {
         if (!RhinoClassShutter.visibleToScripts(javaObject)) {
             return null
         }
-        val resolvedType = if (staticType.shouldReplace()) {
-            TypeInfoFactory.getOrElse(scope, TypeInfoFactory.GLOBAL).create(javaObject.javaClass)
-        } else {
-            staticType
+        val useRuntimeListType = javaObject.javaClass.name == JSoupElementsClassName &&
+            List::class.java.isAssignableFrom(staticType.asClass())
+        val resolvedType = when {
+            staticType.shouldReplace() -> runtimeType(scope, javaObject)
+            useRuntimeListType -> runtimeType(scope, javaObject)
+
+            else -> staticType
         }
         return wrapOrNull(scope, javaObject, resolvedType)
             ?: when {
                 List::class.java.isAssignableFrom(resolvedType.asClass()) ->
-                    CatchableNativeJavaList(scope, javaObject, resolvedType)
+                    CatchableNativeJavaList(
+                        scope = scope,
+                        javaObject = javaObject,
+                        staticType = resolvedType,
+                        declaredElementType = if (useRuntimeListType) staticType.param(0) else null,
+                    )
 
                 Map::class.java.isAssignableFrom(resolvedType.asClass()) ->
                     CatchableNativeJavaMap(scope, javaObject, resolvedType)
@@ -125,10 +133,17 @@ object RhinoWrapFactory : WrapFactory() {
         return factories[javaObject.javaClass]?.wrap(scope, javaObject, staticType)
     }
 
+    private fun runtimeType(scope: Scriptable?, javaObject: Any): TypeInfo {
+        return TypeInfoFactory.getOrElse(scope, TypeInfoFactory.GLOBAL)
+            .create(javaObject.javaClass)
+    }
+
     fun register(clazz: Class<*>, factory: JavaObjectWrapFactory) {
         if (!factories.contains(clazz)) {
             factories.put(clazz, factory)
         }
     }
+
+    private const val JSoupElementsClassName = "org.jsoup.select.Elements"
 
 }

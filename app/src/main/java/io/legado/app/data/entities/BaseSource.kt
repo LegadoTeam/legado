@@ -27,6 +27,26 @@ import io.legado.app.utils.isMainThread
 import kotlinx.coroutines.runBlocking
 import org.intellij.lang.annotations.Language
 
+internal object LoginInfoMapInitialization {
+    private val initializingSourceKeys = ThreadLocal<MutableSet<String>>()
+
+    fun <T> run(sourceKey: String, onReentry: () -> T, block: () -> T): T {
+        val activeKeys = initializingSourceKeys.get()
+            ?: mutableSetOf<String>().also(initializingSourceKeys::set)
+        if (!activeKeys.add(sourceKey)) {
+            return onReentry()
+        }
+        return try {
+            block()
+        } finally {
+            activeKeys.remove(sourceKey)
+            if (activeKeys.isEmpty()) {
+                initializingSourceKeys.remove()
+            }
+        }
+    }
+}
+
 /**
  * 可在js里调用,source.xxx()
  */
@@ -195,33 +215,37 @@ interface BaseSource : JsExtensions {
     }
 
     fun getLoginInfoMap(): MutableMap<String, String> {
-        val json = getLoginInfo() ?: if (loginUi.isNullOrBlank()) {
-            return mutableMapOf()
-        } else {
-            val loginUiJson = loginUi?.let {
-                when {
-                    it.startsWith("@js:") -> evalJS(
-                        "${getLoginJs() ?: ""}\n${it.substring(4)}",
-                        configureScriptBindings()
-                    ).toString()
+        getLoginInfo()?.let { json ->
+            return GSON.fromJsonObject<MutableMap<String, String>>(json).getOrNull()
+                ?: mutableMapOf()
+        }
+        val loginUiRule = loginUi?.takeUnless { it.isBlank() } ?: return mutableMapOf()
+        return LoginInfoMapInitialization.run(
+            sourceKey = getKey(),
+            onReentry = { mutableMapOf<String, String>() },
+        ) {
+            // Dynamic login UI scripts can read login info while their defaults are being derived.
+            val loginUiJson = when {
+                loginUiRule.startsWith("@js:") -> evalJS(
+                    "${getLoginJs() ?: ""}\n${loginUiRule.substring(4)}",
+                    configureScriptBindings()
+                ).toString()
 
-                    it.startsWith("<js>") -> evalJS(
-                        "${getLoginJs() ?: ""}\n${it.substring(4, it.lastIndexOf("<"))}",
-                        configureScriptBindings()
-                    ).toString()
+                loginUiRule.startsWith("<js>") -> evalJS(
+                    "${getLoginJs() ?: ""}\n${loginUiRule.substring(4, loginUiRule.lastIndexOf("<"))}",
+                    configureScriptBindings()
+                ).toString()
 
-                    else -> it
-                }
+                else -> loginUiRule
             }
-            val longinInfo = GSON.fromJsonArray<RowUi>(loginUiJson).getOrNull()
+            val loginInfo = GSON.fromJsonArray<RowUi>(loginUiJson).getOrNull()
                 ?.filter { it.type != "button" }
                 ?.associate { it.name to (it.default ?: "") }
                 ?.takeIf { it.isNotEmpty() }?.also {
                     putLoginInfo(GSON.toJson(it))
                 }
-            return longinInfo?.toMutableMap() ?: mutableMapOf()
+            loginInfo?.toMutableMap() ?: mutableMapOf()
         }
-        return GSON.fromJsonObject<MutableMap<String, String>>(json).getOrNull() ?: mutableMapOf()
     }
 
     /**

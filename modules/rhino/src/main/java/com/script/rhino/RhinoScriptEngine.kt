@@ -104,7 +104,7 @@ object RhinoScriptEngine : AbstractScriptEngine(), Invocable, Compilable {
             cx.checkRecursive()
             var filename = this["javax.script.filename"] as? String
             filename = filename ?: "<Unknown source>"
-            ret = cx.evaluateReader(scope, reader, filename, 1, null)
+            ret = cx.evaluateString(scope, reader.readText(), filename, 1, null)
         } catch (re: RhinoException) {
             val line = if (re.lineNumber() == 0) -1 else re.lineNumber()
             val msg: String = if (re is JavaScriptException) {
@@ -138,7 +138,7 @@ object RhinoScriptEngine : AbstractScriptEngine(), Invocable, Compilable {
                 cx.checkRecursive()
                 var filename = this@RhinoScriptEngine["javax.script.filename"] as? String
                 filename = filename ?: "<Unknown source>"
-                val script = cx.compileReader(reader, filename, 1, null)
+                val script = cx.compileString(reader.readText(), filename, 1, null)
                 try {
                     ret = cx.executeScriptWithContinuations(script, scope)
                 } catch (e: ContinuationPending) {
@@ -284,7 +284,7 @@ object RhinoScriptEngine : AbstractScriptEngine(), Invocable, Compilable {
             if (fileName == null) {
                 fileName = "<Unknown Source>"
             }
-            val scr = cx.compileReader(script, fileName, 1, null)
+            val scr = cx.compileString(script.readText(), fileName, 1, null)
             ret = RhinoCompiledScript(this, scr)
         } catch (var9: Exception) {
             throw ScriptException(var9)

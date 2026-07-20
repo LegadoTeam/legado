@@ -129,6 +129,95 @@ class JsEngineCapabilitiesTest {
     }
 
     @Test
+    fun javaMethodsRemainCallableInsideWithAndEvalScopes() {
+        val bindings = ScriptBindings().apply {
+            this["bridge"] = ThrowingBridge()
+        }
+        val script = """
+            var directType = typeof bridge.child;
+            var directCall = bridge.child() != null;
+            var evalType = (function() {
+                with (bridge) {
+                    return eval('typeof child');
+                }
+            })();
+            var evalCall = (function() {
+                with (bridge) {
+                    return eval('child() != null');
+                }
+            })();
+            [directType, directCall, evalType, evalCall].join(':');
+        """.trimIndent()
+
+        Assert.assertEquals(
+            "function:true:function:true",
+            RhinoScriptEngine.eval(script, bindings),
+        )
+    }
+
+    @Test
+    fun nestedEvalKeepsDynamicallyLoadedFunctionsVisible() {
+        val cases = listOf(
+            "eval(\"function gzip(value) { return 'fn:' + value; }\"); gzip('ok')" to
+                "fn:ok",
+            "eval(\"var gzip = function(value) { return 'var:' + value; };\"); " +
+                "eval(\"gzip('ok')\")" to "var:ok",
+            "eval(\"let gzip = function(value) { return 'let:' + value; };\"); " +
+                "eval(\"gzip('ok')\")" to "let:ok",
+            "eval(\"const gzip = function(value) { return 'const:' + value; };\"); " +
+                "eval(\"gzip('ok')\")" to "const:ok",
+        )
+
+        cases.forEach { (script, expected) ->
+            Assert.assertEquals(expected, RhinoScriptEngine.eval(script, ScriptBindings()))
+        }
+    }
+
+    @Test
+    fun withScopedConstRemainsVisibleForLegacySources() {
+        val script = """
+            var javaImport = {};
+            with (javaImport) {
+                const gzip = function(value) { return 'gzip:' + value; };
+            }
+            gzip('ok');
+        """.trimIndent()
+
+        Assert.assertEquals("gzip:ok", RhinoScriptEngine.eval(script, ScriptBindings()))
+    }
+
+    @Test
+    fun withCompatibilityOnlyRewritesDirectDeclarations() {
+        val script = """
+            var javaImport = {};
+            with (javaImport) {
+                function scoped() {
+                    var before = typeof value;
+                    { const value = 'inner'; }
+                    return before + ':' + typeof value;
+                }
+                for (const key in { first: 1, second: 2 }) {}
+            }
+            scoped() + '|' + typeof key;
+        """.trimIndent()
+
+        Assert.assertEquals(
+            "undefined:undefined|undefined",
+            RhinoScriptEngine.eval(script, ScriptBindings()),
+        )
+    }
+
+    @Test
+    fun e4xDescendantExpressionsRemainSupported() {
+        val script = """
+            var data = <root><item_null><text>ok</text></item_null></root>;
+            String(data..item_null.text);
+        """.trimIndent()
+
+        Assert.assertEquals("ok", RhinoScriptEngine.eval(script, ScriptBindings()))
+    }
+
+    @Test
     fun typeInfoWrappingUsesRegisteredFactories() {
         RhinoWrapFactory.register(FactoryBridge::class.java, ReadOnlyJavaObject.factory)
         val bindings = ScriptBindings().apply {

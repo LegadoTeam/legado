@@ -9,7 +9,7 @@ class ProtectedNativeJavaClass(
     private val protectedName: Set<String> = emptySet()
 ) : NativeJavaClass(scope, javaClass) {
 
-    private val methodCache = CatchableJavaMethodCache()
+    private val methodCache = CatchableJavaMethodCache(this)
 
     override fun has(
         name: String,

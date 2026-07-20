@@ -8,6 +8,8 @@ import org.htmlunit.corejs.javascript.NativeJavaMap
 import org.htmlunit.corejs.javascript.NativeJavaMethod
 import org.htmlunit.corejs.javascript.NativeJavaObject
 import org.htmlunit.corejs.javascript.Scriptable
+import org.htmlunit.corejs.javascript.Undefined
+import org.htmlunit.corejs.javascript.Wrapper
 import org.htmlunit.corejs.javascript.lc.type.TypeInfo
 import org.htmlunit.corejs.javascript.lc.type.TypeInfoFactory
 
@@ -20,7 +22,7 @@ open class CatchableNativeJavaObject(
     constructor(scope: Scriptable?, javaObject: Any, staticType: Class<*>?) :
         this(scope, javaObject, staticType.toTypeInfo())
 
-    private val methodCache = CatchableJavaMethodCache()
+    private val methodCache = CatchableJavaMethodCache(this)
 
     override fun get(name: String, start: Scriptable): Any? {
         return catchJavaInvocation {
@@ -39,9 +41,13 @@ internal class CatchableNativeJavaList(
     scope: Scriptable?,
     javaObject: Any,
     staticType: TypeInfo,
+    private val declaredElementType: TypeInfo? = null,
 ) : NativeJavaList(scope, javaObject, staticType) {
 
-    private val methodCache = CatchableJavaMethodCache()
+    private val methodCache = CatchableJavaMethodCache(this)
+
+    @Suppress("UNCHECKED_CAST")
+    private val mutableList = javaObject as MutableList<Any?>
 
     override fun get(name: String, start: Scriptable): Any? {
         return catchJavaInvocation {
@@ -54,6 +60,33 @@ internal class CatchableNativeJavaList(
             super.put(name, start, value)
         }
     }
+
+    override fun get(index: Int, start: Scriptable): Any? {
+        val elementType = declaredElementType ?: return super.get(index, start)
+        if (index !in mutableList.indices) return Undefined.instance
+        val value = mutableList[index]
+        val context = Context.getCurrentContext() ?: return value
+        return context.wrapFactory.wrap(context, this, value, elementType)
+    }
+
+    override fun put(index: Int, start: Scriptable, value: Any?) {
+        val elementType = declaredElementType ?: return super.put(index, start, value)
+        if (index < 0) return super.put(index, start, value)
+        val javaValue = Context.jsToJava(value, elementType)
+        if (index == mutableList.size) {
+            mutableList.add(javaValue)
+            return
+        }
+        ensureCapacity(index + 1)
+        mutableList[index] = javaValue
+    }
+
+    private fun ensureCapacity(minCapacity: Int) {
+        (mutableList as? ArrayList<Any?>)?.ensureCapacity(minCapacity)
+        while (mutableList.size < minCapacity) {
+            mutableList.add(null)
+        }
+    }
 }
 
 internal class CatchableNativeJavaMap(
@@ -62,7 +95,7 @@ internal class CatchableNativeJavaMap(
     staticType: TypeInfo,
 ) : NativeJavaMap(scope, javaObject, staticType) {
 
-    private val methodCache = CatchableJavaMethodCache()
+    private val methodCache = CatchableJavaMethodCache(this)
 
     override fun get(name: String, start: Scriptable): Any? {
         return catchJavaInvocation {
@@ -83,7 +116,7 @@ internal class CatchableNativeJavaArray(
     staticType: TypeInfo,
 ) : NativeJavaArray(scope, javaObject, staticType) {
 
-    private val methodCache = CatchableJavaMethodCache()
+    private val methodCache = CatchableJavaMethodCache(this)
 
     override fun get(name: String, start: Scriptable): Any? {
         return catchJavaInvocation {
@@ -98,7 +131,9 @@ internal class CatchableNativeJavaArray(
     }
 }
 
-internal class CatchableJavaMethodCache {
+internal class CatchableJavaMethodCache(
+    private val receiver: Scriptable,
+) {
 
     private val wrappers = HashMap<String, Pair<NativeJavaMethod, Function>>()
 
@@ -109,7 +144,7 @@ internal class CatchableJavaMethodCache {
             if (cached?.first === value) {
                 cached.second
             } else {
-                CatchableJavaFunction(value).also { wrappers[name] = value to it }
+                CatchableJavaFunction(value, receiver).also { wrappers[name] = value to it }
             }
         }
     }
@@ -117,6 +152,7 @@ internal class CatchableJavaMethodCache {
 
 private class CatchableJavaFunction(
     private val function: Function,
+    private val receiver: Scriptable,
 ) : Function by function {
 
     override fun call(
@@ -126,7 +162,8 @@ private class CatchableJavaFunction(
         arguments: Array<Any>,
     ): Any? {
         return catchJavaInvocation {
-            function.call(context, scope, thisObject, arguments)
+            val target = if (thisObject.hasJavaReceiver()) thisObject else receiver
+            function.call(context, scope, target, arguments)
         }
     }
 
@@ -139,6 +176,15 @@ private class CatchableJavaFunction(
             function.construct(context, scope, arguments)
         }
     }
+}
+
+private fun Scriptable.hasJavaReceiver(): Boolean {
+    var current: Scriptable? = this
+    while (current != null) {
+        if (current is Wrapper) return true
+        current = current.prototype
+    }
+    return false
 }
 
 internal inline fun <T> catchJavaInvocation(block: () -> T): T {
