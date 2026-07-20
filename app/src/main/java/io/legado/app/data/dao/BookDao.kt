@@ -9,6 +9,8 @@ import androidx.room.Transaction
 import androidx.room.Update
 import io.legado.app.constant.BookType
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.BookCacheCleanupSnapshot
+import io.legado.app.data.entities.BookCacheInfo
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookSource
 import io.legado.app.help.book.isNotShelf
@@ -115,6 +117,20 @@ interface BookDao {
 
     @get:Query("SELECT * FROM books")
     val all: List<Book>
+
+    @Query("SELECT bookUrl, name, origin, originName, type FROM books")
+    fun getCacheCleanupBooks(): List<BookCacheInfo>
+
+    @Query("SELECT * FROM books WHERE (type & ${BookType.image}) > 0")
+    fun getCacheCleanupImageBooks(): List<Book>
+
+    @Transaction
+    fun getCacheCleanupSnapshot(includeImageBooks: Boolean): BookCacheCleanupSnapshot {
+        return BookCacheCleanupSnapshot(
+            books = getCacheCleanupBooks(),
+            imageBooks = if (includeImageBooks) getCacheCleanupImageBooks() else emptyList(),
+        )
+    }
 
     @Query("SELECT * FROM books where type & :type > 0 and type & ${BookType.local} = 0")
     fun getByTypeOnLine(type: Int): List<Book>
