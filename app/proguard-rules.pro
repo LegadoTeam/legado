@@ -135,10 +135,6 @@ cn.hutool.core.util.**{*;}
 -keepnames class * extends java.lang.Throwable
 -keepclassmembernames,allowobfuscation class * extends java.lang.Throwable{*;}
 
-# Sora Editor
--keep class org.eclipse.tm4e.** { *; }
--keep class org.joni.** { *; }
-
 # GSYVideoPlayer
 -keep class com.shuyu.gsyvideoplayer.** { *; }
 -dontwarn com.shuyu.gsyvideoplayer.**
