@@ -16,6 +16,7 @@ import io.legado.app.help.crypto.SymmetricCryptoAndroid
 import io.legado.app.help.http.CookieStore
 import io.legado.app.help.source.clearExploreKindsCache
 import io.legado.app.help.source.getShareScope
+import io.legado.app.model.SharedJsScope
 import io.legado.app.model.SharedJsScope.remove
 import io.legado.app.utils.GSON
 import io.legado.app.utils.GSONStrict
@@ -341,7 +342,7 @@ interface BaseSource : JsExtensions {
             bindings["cache"] = CacheManager
             bindings.apply(bindingsConfig)
         }
-        val sharedScope = getShareScope()
+        val sharedScope = getShareScope() ?: SharedJsScope.getCryptoScope(this, null)
         val scope = if (sharedScope == null) {
             RhinoScriptEngine.getRuntimeScope(bindings)
         } else {

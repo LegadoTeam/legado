@@ -11,6 +11,7 @@ import io.legado.app.help.CacheManager
 import io.legado.app.help.JsExtensions
 import io.legado.app.help.http.CookieStore
 import io.legado.app.help.source.getShareScope
+import io.legado.app.model.SharedJsScope
 import io.legado.app.utils.GSON
 import org.htmlunit.corejs.javascript.Function
 import org.htmlunit.corejs.javascript.Scriptable
@@ -62,9 +63,8 @@ class JsSourceEngine(
             it["cache"] = CacheManager
             args.forEach { (key, value) -> it[key] = value }
         }
-        val sharedScope = source.jsLib?.takeIf { it.isNotBlank() }?.let {
-            source.getShareScope(coroutineContext)
-        }
+        val sharedScope = source.getShareScope(coroutineContext)
+            ?: SharedJsScope.getCryptoScope(source, coroutineContext)
         val scope = if (sharedScope == null) {
             RhinoScriptEngine.getRuntimeScope(bindings)
         } else {
