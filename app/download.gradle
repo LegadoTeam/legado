@@ -111,7 +111,7 @@ tasks.register('downloadCronet') {
     doLast {
         def hashes = new LinkedHashMap<String, String>()
         CRONET_ABIS.each { abi ->
-            def file = new File(soPath, "$abi.so")
+            def file = new File(soPath, "${abi}.so")
             if (!file.isFile()) {
                 throw new GradleException("Missing Cronet library for $abi: $file")
             }
