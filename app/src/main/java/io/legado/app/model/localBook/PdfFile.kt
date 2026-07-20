@@ -69,13 +69,14 @@ class PdfFile(var book: Book) : AutoCloseable {
      *持有引用，避免被回收
      */
     private var fileDescriptor: ParcelFileDescriptor? = null
-    private var pdfRenderer: PdfRenderer? = null
+    private var openedPdfRenderer: PdfRenderer? = null
+    private val pdfRenderer: PdfRenderer?
         get() {
-            if (field != null && fileDescriptor != null) {
-                return field
+            if (openedPdfRenderer != null && fileDescriptor != null) {
+                return openedPdfRenderer
             }
-            field = readPdf()
-            return field
+            openedPdfRenderer = readPdf()
+            return openedPdfRenderer
         }
 
     init {
@@ -110,9 +111,9 @@ class PdfFile(var book: Book) : AutoCloseable {
      *
      */
     private fun closePdf() {
-        val renderer = pdfRenderer
+        val renderer = openedPdfRenderer
         val descriptor = fileDescriptor
-        pdfRenderer = null
+        openedPdfRenderer = null
         fileDescriptor = null
         kotlin.runCatching {
             try {

@@ -62,12 +62,13 @@ class MobiFile(var book: Book) : AutoCloseable {
     }
 
     private var fileDescriptor: ParcelFileDescriptor? = null
-    private var mobiBook: MobiBook? = null
+    private var openedMobiBook: MobiBook? = null
+    private val mobiBook: MobiBook?
         get() {
-            if (field == null || fileDescriptor == null) {
-                field = readMobi()
+            if (openedMobiBook == null || fileDescriptor == null) {
+                openedMobiBook = readMobi()
             }
-            return field
+            return openedMobiBook
         }
 
     init {
@@ -317,9 +318,9 @@ class MobiFile(var book: Book) : AutoCloseable {
     }
 
     override fun close() {
-        val openedBook = mobiBook
+        val openedBook = openedMobiBook
         val descriptor = fileDescriptor
-        mobiBook = null
+        openedMobiBook = null
         fileDescriptor = null
         kotlin.runCatching {
             if (openedBook != null) {
