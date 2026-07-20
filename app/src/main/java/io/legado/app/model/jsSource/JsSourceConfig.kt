@@ -4,6 +4,7 @@ import com.google.gson.JsonObject
 import com.script.rhino.RhinoScriptEngine
 import io.legado.app.data.entities.BookSource
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.model.SharedJsScope
 import io.legado.app.utils.GSON
 import org.htmlunit.corejs.javascript.Context
 import org.htmlunit.corejs.javascript.Function
@@ -36,6 +37,7 @@ object JsSourceConfig {
                 Context.exit()
             }
         }
+        SharedJsScope.installCryptoJs(scope, coroutineContext)
         try {
             RhinoScriptEngine.eval(text, scope, coroutineContext)
         } catch (error: Exception) {

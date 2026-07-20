@@ -164,7 +164,7 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
 
     private fun checkLocalBookFileExist(book: Book): Boolean {
         try {
-            LocalBook.getBookInputStream(book)
+            LocalBook.getBookInputStream(book).use {}
             return true
         } catch (e: Throwable) {
             ReadBook.upMsg("打开本地书籍出错: ${e.localizedMessage}")

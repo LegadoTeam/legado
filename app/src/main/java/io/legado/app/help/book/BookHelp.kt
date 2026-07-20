@@ -11,6 +11,8 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.getFolderName
+import io.legado.app.data.entities.isEpub
 import io.legado.app.help.config.AppConfig
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.localBook.LocalBook
@@ -97,8 +99,11 @@ object BookHelp {
         withContext(IO) {
             val bookFolderNames = hashSetOf<String>()
             val originNames = hashSetOf<String>()
-            appDb.bookDao.all.forEach {
-                clearComicCache(it)
+            val cleanupSnapshot = appDb.bookDao.getCacheCleanupSnapshot(
+                includeImageBooks = AppConfig.imageRetainNum > 0,
+            )
+            cleanupSnapshot.imageBooks.forEach(::clearComicCache)
+            cleanupSnapshot.books.forEach {
                 bookFolderNames.add(it.getFolderName())
                 if (it.isEpub) originNames.add(it.originName)
             }
