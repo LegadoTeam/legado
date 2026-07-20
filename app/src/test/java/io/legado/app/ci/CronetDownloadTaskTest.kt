@@ -8,13 +8,7 @@ import java.io.File
 class CronetDownloadTaskTest {
 
     private val downloadTask by lazy {
-        val userDir = requireNotNull(System.getProperty("user.dir"))
-        val downloadFile = generateSequence(File(userDir)) {
-            it.parentFile
-        }.map {
-            File(it, "app/download.gradle")
-        }.first { it.isFile }
-        downloadFile.readText().replace("\r\n", "\n")
+        readProjectFile("app/download.gradle").replace("\r\n", "\n")
     }
 
     @Test
@@ -24,5 +18,25 @@ class CronetDownloadTaskTest {
 
         assertTrue(downloadTask.contains("new File(soPath, $safeFileName)"))
         assertFalse(downloadTask.contains("new File(soPath, $ambiguousFileName)"))
+    }
+
+    @Test
+    fun `cronet future platform reference has release shrinker suppression`() {
+        val proguardRules = readProjectFile("app/proguard-rules.pro")
+
+        assertTrue(
+            proguardRules.contains(
+                "-dontwarn android.app.privatecompute.PccSandboxManager"
+            )
+        )
+    }
+
+    private fun readProjectFile(path: String): String {
+        val userDir = requireNotNull(System.getProperty("user.dir"))
+        return generateSequence(File(userDir)) {
+            it.parentFile
+        }.map {
+            File(it, path)
+        }.first { it.isFile }.readText()
     }
 }
