@@ -86,15 +86,35 @@
 
     <TextView
         android:id="@+id/tv_sub_title"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="2"
+        android:paddingStart="24dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="2dp"
+        android:textColor="@color/md_white_1000"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toTopOf="@+id/ll_player_progress"
+        app:layout_constraintEnd_toStartOf="@+id/tv_chapter_index"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <TextView
+        android:id="@+id/tv_chapter_index"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:gravity="center"
-        android:paddingStart="16dp"
-        android:paddingTop="6dp"
-        android:paddingEnd="16dp"
-        android:paddingBottom="6dp"
-        android:textColor="@color/md_white_1000"
-        app:layout_constraintBottom_toTopOf="@+id/ll_player_progress" />
+        android:paddingEnd="24dp"
+        android:textColor="@color/md_dark_secondary"
+        android:textSize="12sp"
+        android:visibility="gone"
+        app:layout_constraintBaseline_toBaselineOf="@+id/tv_sub_title"
+        app:layout_constraintEnd_toEndOf="parent"
+        tools:text="第 12 集 · 共 320 集"
+        tools:visibility="visible" />
 
     <LinearLayout
         android:id="@+id/ll_player_progress"
