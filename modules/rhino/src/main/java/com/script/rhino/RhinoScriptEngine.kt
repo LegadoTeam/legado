@@ -72,7 +72,7 @@ object RhinoScriptEngine {
         try {
             cx.checkRecursive()
             val source = reader.readText()
-            val script = cx.compileWithCompatibility(source, SOURCE_NAME, 1)
+            val script = cx.compileWithCompatibility(source, SOURCE_NAME, 1, scope)
             ret = script.exec(cx, scope, Undefined.SCRIPTABLE_UNDEFINED)
         } catch (re: RhinoException) {
             val line = if (re.lineNumber() == 0) -1 else re.lineNumber()
@@ -111,7 +111,7 @@ object RhinoScriptEngine {
             try {
                 cx.checkRecursive()
                 val source = reader.readText()
-                val script = cx.compileWithCompatibility(source, SOURCE_NAME, 1)
+                val script = cx.compileWithCompatibility(source, SOURCE_NAME, 1, scope)
                 try {
                     ret = cx.executeScriptWithContinuations(script, scope)
                 } catch (e: ContinuationPending) {
