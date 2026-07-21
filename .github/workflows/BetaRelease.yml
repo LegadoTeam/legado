@@ -76,7 +76,7 @@ jobs:
 
       - name: Install forked htmlunit-core-js
         working-directory: htmlunit-core-js
-        run: mvn --batch-mode -U clean install -Dmaven.test.skip=true -Dgpg.skip=true -Dmaven.javadoc.skip=true
+        run: mvn --batch-mode -U clean install -Dmaven.test.skip=true -Dgpg.skip=true -Dmaven.javadoc.skip=true -Dmaven.compiler.showWarnings=false
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
