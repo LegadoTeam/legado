@@ -87,7 +87,26 @@ object JsSourceConfig {
         ) {
             throw NoStackTraceException("JS源声明了 loginUi,缺少配对的 login 函数")
         }
+        val reviewSummary = ScriptableObject.getProperty(scope, "getReviewSummary")
+        val reviewDetail = ScriptableObject.getProperty(scope, "getReviewDetail")
+        val declaresReviewSummary = reviewSummary !== Scriptable.NOT_FOUND
+        val declaresReviewDetail = reviewDetail !== Scriptable.NOT_FOUND
+        if (declaresReviewSummary && reviewSummary !is Function) {
+            throw NoStackTraceException("JS源 getReviewSummary 必须是函数")
+        }
+        if (declaresReviewDetail && reviewDetail !is Function) {
+            throw NoStackTraceException("JS源 getReviewDetail 必须是函数")
+        }
+        if (declaresReviewSummary && !declaresReviewDetail) {
+            throw NoStackTraceException("JS源声明了 getReviewSummary,缺少配对的 getReviewDetail 函数")
+        }
+        if (declaresReviewDetail && !declaresReviewSummary) {
+            throw NoStackTraceException("JS源声明了 getReviewDetail,缺少配对的 getReviewSummary 函数")
+        }
         source.mainJs = text
+        if (declaresReviewSummary) {
+            JsSourceReview.rememberReviewCapability(source, enabled = true)
+        }
         return source
     }
 
