@@ -149,3 +149,11 @@ val Context.filletBackground: GradientDrawable
         background.setColor(backgroundColor)
         return background
     }
+
+val Context.popupBackground: GradientDrawable
+    get() {
+        val background = GradientDrawable()
+        background.cornerRadius = 12f.dpToPx()
+        background.setColor(bottomBackground)
+        return background
+    }

@@ -10,6 +10,7 @@ import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.databinding.ItemTextBinding
 import io.legado.app.databinding.PopupActionBinding
 import io.legado.app.lib.dialogs.SelectItem
+import io.legado.app.utils.applyMd3PopupStyle
 import io.legado.app.utils.resolveDropDownYOffset
 import splitties.systemservices.layoutInflater
 
@@ -26,6 +27,7 @@ class PopupAction(private val context: Context) :
 
     init {
         contentView = binding.root
+        applyMd3PopupStyle()
 
         isTouchable = true
         isOutsideTouchable = false
