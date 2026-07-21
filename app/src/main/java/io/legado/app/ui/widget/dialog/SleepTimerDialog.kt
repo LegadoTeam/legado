@@ -25,6 +25,7 @@ class SleepTimerDialog : BaseDialogFragment(R.layout.dialog_sleep_timer) {
     private var minute = 0
     private var chapter = 0
     private var chapterMode = false
+    private var useEpisodes = false
 
     override fun onStart() {
         super.onStart()
@@ -34,9 +35,14 @@ class SleepTimerDialog : BaseDialogFragment(R.layout.dialog_sleep_timer) {
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         minute = arguments?.getInt(ARG_MINUTE)?.coerceIn(0, MAX_MINUTES) ?: 0
         chapter = arguments?.getInt(ARG_CHAPTER)?.coerceIn(0, MAX_CHAPTER_STOP_COUNT) ?: 0
+        useEpisodes = arguments?.getBoolean(ARG_EPISODES) == true
         chapterMode = chapter > 0
 
         binding.run {
+            rbChapter.setText(
+                if (useEpisodes) R.string.sleep_timer_by_episode
+                else R.string.sleep_timer_by_chapter
+            )
             rbTime.isChecked = !chapterMode
             rbChapter.isChecked = chapterMode
             rgMode.setOnCheckedChangeListener { _, checkedId ->
@@ -74,7 +80,11 @@ class SleepTimerDialog : BaseDialogFragment(R.layout.dialog_sleep_timer) {
 
     private fun upValueText() {
         binding.tvValue.text = if (chapterMode) {
-            getString(R.string.sleep_timer_chapters, chapter)
+            getString(
+                if (useEpisodes) R.string.audio_stop_chapters
+                else R.string.sleep_timer_chapters,
+                chapter,
+            )
         } else {
             getString(R.string.timer_m, minute)
         }
@@ -83,12 +93,18 @@ class SleepTimerDialog : BaseDialogFragment(R.layout.dialog_sleep_timer) {
     companion object {
         private const val ARG_MINUTE = "minute"
         private const val ARG_CHAPTER = "chapter"
+        private const val ARG_EPISODES = "episodes"
         private const val MAX_MINUTES = 180
 
-        fun newInstance(minute: Int, chapter: Int) = SleepTimerDialog().apply {
+        fun newInstance(
+            minute: Int,
+            chapter: Int,
+            useEpisodes: Boolean = false,
+        ) = SleepTimerDialog().apply {
             arguments = Bundle().apply {
                 putInt(ARG_MINUTE, minute)
                 putInt(ARG_CHAPTER, chapter)
+                putBoolean(ARG_EPISODES, useEpisodes)
             }
         }
     }

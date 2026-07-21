@@ -219,6 +219,7 @@ class AudioPlayActivity :
                 SleepTimerDialog.newInstance(
                     AudioPlayService.timeMinute,
                     AudioPlayService.chapterToStop,
+                    useEpisodes = true,
                 )
             )
         }
@@ -417,7 +418,7 @@ class AudioPlayActivity :
         val minute = AudioPlayService.timeMinute
         when {
             chapter > 0 -> {
-                binding.tvTimer.text = getString(R.string.sleep_timer_chapters, chapter)
+                binding.tvTimer.text = getString(R.string.audio_stop_chapters, chapter)
                 binding.tvTimer.visible()
             }
 
