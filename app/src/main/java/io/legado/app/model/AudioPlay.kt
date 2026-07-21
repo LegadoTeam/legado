@@ -3,6 +3,7 @@ package io.legado.app.model
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 import io.legado.app.R
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.EventBus
@@ -31,6 +32,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancelChildren
 import splitties.init.appCtx
+import java.util.concurrent.Future
 import kotlin.text.trim
 
 internal data class AudioPlayUrlKey(
@@ -92,6 +94,39 @@ internal class AudioPlayUrlPreloadStore {
     }
 }
 
+internal class AudioReadTimeTracker {
+
+    private var record = ReadRecord()
+    private var activeRecord: ReadRecord? = null
+    private var startedAt: Long? = null
+
+    @Synchronized
+    fun setRecord(record: ReadRecord) {
+        this.record = record
+    }
+
+    @Synchronized
+    fun start(now: Long) {
+        if (startedAt == null) {
+            activeRecord = record
+            startedAt = now
+        }
+    }
+
+    @Synchronized
+    fun stop(now: Long, lastRead: Long): ReadRecord? {
+        val start = startedAt ?: return null
+        val record = activeRecord ?: return null
+        activeRecord = null
+        startedAt = null
+        val elapsed = (now - start).coerceAtLeast(0)
+        if (elapsed == 0L) return null
+        record.readTime += elapsed
+        record.lastRead = lastRead
+        return record.copy()
+    }
+}
+
 @SuppressLint("StaticFieldLeak")
 @Suppress("unused")
 object AudioPlay : CoroutineScope by MainScope() {
@@ -134,8 +169,9 @@ object AudioPlay : CoroutineScope by MainScope() {
         private set
     val loadingChapters = arrayListOf<Int>()
     private val playUrlPreloadStore = AudioPlayUrlPreloadStore()
-    private val readRecord = ReadRecord()
-    var readStartTime: Long = System.currentTimeMillis()
+    private val readTimeTracker = AudioReadTimeTracker()
+    @Volatile
+    private var readTimeWrite: Future<*>? = null
     val executor = globalExecutor
 
     fun changePlayMode() {
@@ -167,8 +203,7 @@ object AudioPlay : CoroutineScope by MainScope() {
         stop()
         playUrlPreloadStore.reset()
         AudioPlay.book = book
-        readRecord.bookName = book.name
-        readRecord.readTime = appDb.readRecordDao.getReadTime(book.name) ?: 0
+        resetReadRecord(book)
         chapterSize = appDb.bookChapterDao.getChapterCount(book.bookUrl)
         simulatedChapterSize = if (book.readSimulating()) {
             book.simulatedTotalChapterNum()
@@ -193,21 +228,48 @@ object AudioPlay : CoroutineScope by MainScope() {
         postEvent(EventBus.AUDIO_BUFFER_PROGRESS, 0)
     }
 
+    @Synchronized
+    fun replaceBook(book: Book) {
+        AudioPlay.book = book
+        resetReadRecord(book, resumeIfPlaying = true)
+    }
+
+    @Synchronized
+    private fun resetReadRecord(book: Book, resumeIfPlaying: Boolean = false) {
+        upReadTime()
+        kotlin.runCatching { readTimeWrite?.get() }.onFailure {
+            AppLog.put("保存听书时长失败\n${it.localizedMessage}", it)
+        }
+        readTimeTracker.setRecord(
+            ReadRecord(
+                bookName = book.name,
+                readTime = appDb.readRecordDao.getReadTime(book.name) ?: 0,
+            )
+        )
+        if (resumeIfPlaying && AudioPlayService.isPlaying) {
+            markReadTimeStart()
+        }
+    }
+
     fun setBookSource(source: BookSource?) {
         bookSource = source
         playUrlPreloadStore.reset()
     }
 
+    @Synchronized
+    fun markReadTimeStart() {
+        if (AppConfig.enableReadRecord) {
+            readTimeTracker.start(SystemClock.elapsedRealtime())
+        }
+    }
+
+    @Synchronized
     fun upReadTime() {
-        if (!AppConfig.enableReadRecord) {
-            return
-        }
-        executor.execute {
-            readRecord.readTime = readRecord.readTime + System.currentTimeMillis() - readStartTime
-            readStartTime = System.currentTimeMillis()
-            readRecord.lastRead = System.currentTimeMillis()
-            appDb.readRecordDao.insert(readRecord)
-        }
+        val record = readTimeTracker.stop(
+            now = SystemClock.elapsedRealtime(),
+            lastRead = System.currentTimeMillis(),
+        ) ?: return
+        readTimeWrite = executor.submit { appDb.readRecordDao.insert(record) }
     }
 
     private fun addLoading(index: Int): Boolean {
@@ -379,7 +441,6 @@ object AudioPlay : CoroutineScope by MainScope() {
 
     fun pause(context: Context) {
         if (AudioPlayService.isRun) {
-            readStartTime = System.currentTimeMillis()
             context.startService<AudioPlayService> {
                 action = IntentAction.pause
             }
@@ -456,7 +517,6 @@ object AudioPlay : CoroutineScope by MainScope() {
 
     fun next() {
         stopPlay()
-        upReadTime()
         when (playMode) {
             PlayMode.LIST_END_STOP -> {
                 if (durChapterIndex + 1 < simulatedChapterSize) {
