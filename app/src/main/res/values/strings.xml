@@ -177,6 +177,17 @@
     <string name="sleep_timer_chapters">%d chapters</string>
     <string name="audio_stop_chapters">Stop after %d chapters</string>
     <string name="audio_chapter_progress">Chapter %1$d / %2$d</string>
+    <string name="sleep_timer_minute_short">%dm</string>
+    <string name="sleep_timer_chapter_short">%d ch</string>
+    <string name="sleep_timer_episode_short">%d ch</string>
+    <string name="sleep_timer_custom">Custom</string>
+    <string name="sleep_timer_minute_hint">Custom minutes</string>
+    <string name="sleep_timer_chapter_hint">Custom chapters</string>
+    <string name="sleep_timer_episode_hint">Custom chapters</string>
+    <string name="sleep_timer_status_time">Stop in %d min</string>
+    <string name="sleep_timer_status_none">Not set</string>
+    <string name="sleep_timer_off">Turn off</string>
+    <string name="sleep_timer_range_hint">Enter a value from 1 to %d</string>
     <string name="ps_hide_navigation_bar">Hide virtual buttons when reading</string>
     <string name="pt_hide_navigation_bar">Hide navigation bar</string>
     <string name="re_navigation_bar_color">Navigation bar color</string>

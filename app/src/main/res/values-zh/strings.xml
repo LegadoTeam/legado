@@ -175,6 +175,17 @@
     <string name="sleep_timer_chapters">%d 章</string>
     <string name="audio_stop_chapters">听完 %d 集</string>
     <string name="audio_chapter_progress">第 %1$d 集 · 共 %2$d 集</string>
+    <string name="sleep_timer_minute_short">%d分</string>
+    <string name="sleep_timer_chapter_short">%d章</string>
+    <string name="sleep_timer_episode_short">%d集</string>
+    <string name="sleep_timer_custom">自定义</string>
+    <string name="sleep_timer_minute_hint">自定义分钟</string>
+    <string name="sleep_timer_chapter_hint">自定义章节数</string>
+    <string name="sleep_timer_episode_hint">自定义集数</string>
+    <string name="sleep_timer_status_time">%d 分钟后停止</string>
+    <string name="sleep_timer_status_none">未设置</string>
+    <string name="sleep_timer_off">关闭定时</string>
+    <string name="sleep_timer_range_hint">请输入 1 到 %d</string>
     <string name="ps_hide_navigation_bar">阅读界面隐藏虚拟按键</string>
     <string name="pt_hide_navigation_bar">隐藏导航栏</string>
     <string name="re_navigation_bar_color">导航栏颜色</string>
