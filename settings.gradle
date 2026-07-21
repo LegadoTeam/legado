@@ -34,6 +34,11 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        mavenLocal {
+            content {
+                includeModule("org.htmlunit", "htmlunit-core-js")
+            }
+        }
         //原仓库
         google {
             content {

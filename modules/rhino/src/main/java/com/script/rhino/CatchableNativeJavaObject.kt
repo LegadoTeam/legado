@@ -9,18 +9,23 @@ import org.htmlunit.corejs.javascript.NativeJavaMethod
 import org.htmlunit.corejs.javascript.NativeJavaObject
 import org.htmlunit.corejs.javascript.Scriptable
 import org.htmlunit.corejs.javascript.Undefined
+import org.htmlunit.corejs.javascript.VarScope
 import org.htmlunit.corejs.javascript.Wrapper
 import org.htmlunit.corejs.javascript.lc.type.TypeInfo
 import org.htmlunit.corejs.javascript.lc.type.TypeInfoFactory
 
 open class CatchableNativeJavaObject(
-    scope: Scriptable?,
+    scope: VarScope?,
     javaObject: Any,
     staticType: TypeInfo,
 ) : NativeJavaObject(scope, javaObject, staticType) {
 
-    constructor(scope: Scriptable?, javaObject: Any, staticType: Class<*>?) :
-        this(scope, javaObject, staticType.toTypeInfo())
+    constructor(scope: VarScope?, javaObject: Any, staticType: Class<*>?) :
+        this(
+            scope,
+            javaObject,
+            staticType?.let(TypeInfoFactory.GLOBAL::create) ?: TypeInfo.NONE,
+        )
 
     private val methodCache = CatchableJavaMethodCache(this)
 
@@ -38,7 +43,7 @@ open class CatchableNativeJavaObject(
 }
 
 internal class CatchableNativeJavaList(
-    scope: Scriptable?,
+    scope: VarScope?,
     javaObject: Any,
     staticType: TypeInfo,
     private val declaredElementType: TypeInfo? = null,
@@ -66,7 +71,7 @@ internal class CatchableNativeJavaList(
         if (index !in mutableList.indices) return Undefined.instance
         val value = mutableList[index]
         val context = Context.getCurrentContext() ?: return value
-        return context.wrapFactory.wrap(context, this, value, elementType)
+        return context.wrapFactory.wrap(context, parentScope, value, elementType)
     }
 
     override fun put(index: Int, start: Scriptable, value: Any?) {
@@ -90,7 +95,7 @@ internal class CatchableNativeJavaList(
 }
 
 internal class CatchableNativeJavaMap(
-    scope: Scriptable?,
+    scope: VarScope?,
     javaObject: Any,
     staticType: TypeInfo,
 ) : NativeJavaMap(scope, javaObject, staticType) {
@@ -111,7 +116,7 @@ internal class CatchableNativeJavaMap(
 }
 
 internal class CatchableNativeJavaArray(
-    scope: Scriptable?,
+    scope: VarScope?,
     javaObject: Any,
     staticType: TypeInfo,
 ) : NativeJavaArray(scope, javaObject, staticType) {
@@ -157,7 +162,7 @@ private class CatchableJavaFunction(
 
     override fun call(
         context: Context,
-        scope: Scriptable,
+        scope: VarScope,
         thisObject: Scriptable,
         arguments: Array<Any>,
     ): Any? {
@@ -169,7 +174,7 @@ private class CatchableJavaFunction(
 
     override fun construct(
         context: Context,
-        scope: Scriptable,
+        scope: VarScope,
         arguments: Array<Any>,
     ): Scriptable {
         return catchJavaInvocation {
@@ -197,8 +202,4 @@ internal inline fun <T> catchJavaInvocation(block: () -> T): T {
         }
         throw error
     }
-}
-
-internal fun Class<*>?.toTypeInfo(): TypeInfo {
-    return this?.let { TypeInfoFactory.GLOBAL.create(it) } ?: TypeInfo.NONE
 }

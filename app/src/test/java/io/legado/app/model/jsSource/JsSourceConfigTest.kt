@@ -291,14 +291,18 @@ class JsSourceConfigTest {
     }
 
     @Test
-    fun `rejects top level capability access`() {
-        assertExtractError(
+    fun `allows top level capability access`() {
+        val source = JsSourceConfig.extract(
             """
                 var probe = new java.net.URL("https://example.com");
                 var config = { bookSourceUrl: "https://a.com", bookSourceName: "越权" };
+                function search(key, page) { return []; }
+                function getChapters(book) { return []; }
+                function getContent(chapter, book) { return ""; }
             """.trimIndent(),
-            "执行失败",
         )
+
+        assertEquals("越权", source.bookSourceName)
     }
 
     @Test

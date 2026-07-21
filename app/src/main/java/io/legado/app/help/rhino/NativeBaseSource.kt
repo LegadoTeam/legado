@@ -3,9 +3,9 @@ package io.legado.app.help.rhino
 import com.script.rhino.CatchableNativeJavaObject
 import com.script.rhino.JavaObjectWrapFactory
 import org.htmlunit.corejs.javascript.Scriptable
-import org.htmlunit.corejs.javascript.lc.type.TypeInfo
+import org.htmlunit.corejs.javascript.VarScope
 
-class NativeBaseSource(scope: Scriptable?, javaObject: Any, staticType: TypeInfo) :
+class NativeBaseSource(scope: VarScope?, javaObject: Any, staticType: Class<*>?) :
     CatchableNativeJavaObject(scope, javaObject, staticType) {
 
     override fun has(name: String, start: Scriptable): Boolean {

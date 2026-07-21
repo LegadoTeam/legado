@@ -6,14 +6,15 @@
 
 package org.htmlunit.corejs.javascript.xmlimpl;
 
+import java.io.Serial;
 import java.io.Serializable;
 import org.htmlunit.corejs.javascript.Context;
 import org.htmlunit.corejs.javascript.Kit;
 import org.htmlunit.corejs.javascript.Node;
 import org.htmlunit.corejs.javascript.Ref;
 import org.htmlunit.corejs.javascript.ScriptRuntime;
-import org.htmlunit.corejs.javascript.Scriptable;
 import org.htmlunit.corejs.javascript.Undefined;
+import org.htmlunit.corejs.javascript.VarScope;
 import org.htmlunit.corejs.javascript.Wrapper;
 import org.htmlunit.corejs.javascript.xml.XMLLib;
 import org.htmlunit.corejs.javascript.xml.XMLObject;
@@ -25,7 +26,7 @@ public final class XMLLibImpl extends XMLLib implements Serializable {
     //    EXPERIMENTAL Java interface
     //
 
-    private static final long serialVersionUID = 1L;
+    @Serial private static final long serialVersionUID = -6301237868232033480L;
 
     /** This experimental interface is undocumented. */
     public static org.w3c.dom.Node toDomNode(Object xmlObject) {
@@ -38,11 +39,11 @@ public final class XMLLibImpl extends XMLLib implements Serializable {
         }
     }
 
-    public static void init(Context cx, Scriptable scope, boolean sealed) {
+    public static void init(Context cx, VarScope scope, boolean sealed) {
         XMLLibImpl lib = new XMLLibImpl(scope);
         XMLLib bound = lib.bindToScope(scope);
         if (bound == lib) {
-            lib.exportToScope(sealed);
+            lib.exportToScope(cx, scope, sealed);
         }
     }
 
@@ -96,7 +97,7 @@ public final class XMLLibImpl extends XMLLib implements Serializable {
         return options.getPrettyIndent();
     }
 
-    private Scriptable globalScope;
+    private VarScope globalScope;
 
     private XML xmlPrototype;
     private XMLList xmlListPrototype;
@@ -105,7 +106,7 @@ public final class XMLLibImpl extends XMLLib implements Serializable {
 
     private XmlProcessor options = new XmlProcessor();
 
-    private XMLLibImpl(Scriptable globalScope) {
+    private XMLLibImpl(VarScope globalScope) {
         this.globalScope = globalScope;
     }
 
@@ -121,7 +122,7 @@ public final class XMLLibImpl extends XMLLib implements Serializable {
      * @deprecated
      */
     @Deprecated
-    Scriptable globalScope() {
+    VarScope globalScope() {
         return globalScope;
     }
 
@@ -129,7 +130,7 @@ public final class XMLLibImpl extends XMLLib implements Serializable {
         return options;
     }
 
-    private void exportToScope(boolean sealed) {
+    private void exportToScope(Context cx, VarScope scope, boolean sealed) {
         xmlPrototype = newXML(XmlNode.createText(options, ""));
         xmlListPrototype = newXMLList();
         namespacePrototype = Namespace.create(this.globalScope, null, XmlNode.Namespace.GLOBAL);
@@ -140,10 +141,13 @@ public final class XMLLibImpl extends XMLLib implements Serializable {
                         null,
                         XmlNode.QName.create(XmlNode.Namespace.create(""), ""));
 
-        xmlPrototype.exportAsJSClass(sealed);
-        xmlListPrototype.exportAsJSClass(sealed);
-        namespacePrototype.exportAsJSClass(sealed);
-        qnamePrototype.exportAsJSClass(sealed);
+        XML.init(cx, scope, xmlPrototype, sealed, this);
+        var parent = xmlPrototype.getParentScope();
+        parent.put("__xml_lib__", parent, xmlPrototype.getLib());
+        XMLList.init(cx, scope, xmlListPrototype, sealed, this);
+
+        Namespace.init(cx, scope, namespacePrototype, sealed);
+        QName.init(cx, scope, qnamePrototype, sealed);
     }
 
     /**
@@ -307,14 +311,14 @@ public final class XMLLibImpl extends XMLLib implements Serializable {
         return listToAdd;
     }
 
-    private Ref xmlPrimaryReference(Context cx, XMLName xmlName, Scriptable scope) {
+    private Ref xmlPrimaryReference(Context cx, XMLName xmlName, VarScope scope) {
         XMLObjectImpl xmlObj;
         XMLObjectImpl firstXml = null;
         for (; ; ) {
             // XML object can only present on scope chain as a wrapper
             // of XMLWithScope
             if (scope instanceof XMLWithScope) {
-                xmlObj = (XMLObjectImpl) scope.getPrototype();
+                xmlObj = (XMLObjectImpl) ((XMLWithScope) scope).getObject();
                 if (xmlObj.hasXMLProperty(xmlName)) {
                     break;
                 }
@@ -622,18 +626,18 @@ public final class XMLLibImpl extends XMLLib implements Serializable {
     }
 
     @Override
-    public Ref nameRef(Context cx, Object name, Scriptable scope, int memberTypeFlags) {
+    public Ref nameRef(Context cx, Object name, VarScope scope, int memberTypeFlags) {
         if ((memberTypeFlags & Node.ATTRIBUTE_FLAG) == 0) {
             // should only be called for cases like @name or @[expr]
             throw Kit.codeBug();
         }
         XMLName xmlName = toAttributeName(cx, name);
-        return xmlPrimaryReference(cx, xmlName, scope);
+        return xmlPrimaryReference(cx, xmlName, (VarScope) scope);
     }
 
     @Override
     public Ref nameRef(
-            Context cx, Object namespace, Object name, Scriptable scope, int memberTypeFlags) {
+            Context cx, Object namespace, Object name, VarScope scope, int memberTypeFlags) {
         XMLName xmlName = XMLName.create(toNodeQName(cx, namespace, name), false, false);
 
         //    No idea what is coming in from the parser in this case; is it detecting the "@"?
@@ -643,6 +647,6 @@ public final class XMLLibImpl extends XMLLib implements Serializable {
             }
         }
 
-        return xmlPrimaryReference(cx, xmlName, scope);
+        return xmlPrimaryReference(cx, xmlName, (VarScope) scope);
     }
 }

@@ -55,8 +55,8 @@ jsoup = "1.16.2"
 #noinspection GradleDependency,NewerVersionAvailable
 commonsText = "1.13.1"
 
-# Rhino-compatible JavaScript engine
-htmlunitCoreJs = "4.21.0"
+# HtmlUnit fork of Rhino
+htmlunitCoreJs = "5.3.0-legado.3"
 
 #noinspection GradleDependency,NewerVersionAvailable
 media3 = "1.10.1"

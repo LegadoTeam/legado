@@ -8,7 +8,7 @@ import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.jsSource.JsSourceConfig
 import io.legado.app.model.jsSource.JsSourceEngine
-import org.htmlunit.corejs.javascript.Scriptable
+import org.htmlunit.corejs.javascript.TopLevel
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
@@ -163,7 +163,7 @@ class CryptoJsCompatibilityTest {
     }
 
     @Test
-    fun `js source config supports top level crypto initialization`() {
+    fun `js source config exposes the requested top level runtime`() {
         val source = JsSourceConfig.extract(
             """
                 var config = {
@@ -183,7 +183,7 @@ class CryptoJsCompatibilityTest {
         )
 
         assertEquals("900150983cd24fb0d6963f7d28e17f72", source.bookSourceName)
-        assertEquals("undefined|undefined|undefined|undefined", source.bookSourceComment)
+        assertEquals("object|object|function|undefined", source.bookSourceComment)
     }
 
     @Test
@@ -237,6 +237,23 @@ class CryptoJsCompatibilityTest {
         )
         assertEquals("first", evalInChildScope(first, "customScopeName"))
         assertEquals("second", evalInChildScope(second, "customScopeName"))
+    }
+
+    @Test
+    fun `custom library properties remain deletable after initialization`() {
+        val scope = requireNotNull(
+            SharedJsScope.getScope("removableLibraryValue = 'ready';", null),
+        )
+
+        assertEquals(
+            "undefined",
+            RhinoScriptEngine.eval(
+                "delete globalThis.removableLibraryValue; " +
+                    "typeof globalThis.removableLibraryValue",
+                scope,
+                null,
+            ),
+        )
     }
 
     @Test
@@ -351,19 +368,19 @@ class CryptoJsCompatibilityTest {
         )
     }
 
-    private fun evalInChildScope(prototype: Scriptable, script: String): Any? {
-        val scope: Scriptable = ScriptBindings().apply { this.prototype = prototype }
+    private fun evalInChildScope(parent: TopLevel, script: String): Any? {
+        val scope = ScriptBindings().apply { chainTo(parent) }
         return RhinoScriptEngine.eval(script, scope, null)
     }
 
-    private fun requestConcurrently(factory: () -> Scriptable?): List<Scriptable> {
+    private fun requestConcurrently(factory: () -> ScriptBindings?): List<ScriptBindings> {
         return requestConcurrently(24) { factory() }
     }
 
     private fun requestConcurrently(
         count: Int,
-        factory: (Int) -> Scriptable?,
-    ): List<Scriptable> {
+        factory: (Int) -> ScriptBindings?,
+    ): List<ScriptBindings> {
         val executor = Executors.newFixedThreadPool(8)
         val start = CountDownLatch(1)
         return try {

@@ -1,10 +1,10 @@
 package com.script.rhino
 
 import org.htmlunit.corejs.javascript.Scriptable
-import org.htmlunit.corejs.javascript.lc.type.TypeInfo
+import org.htmlunit.corejs.javascript.VarScope
 
 fun interface JavaObjectWrapFactory {
 
-    fun wrap(scope: Scriptable?, javaObject: Any, staticType: TypeInfo): Scriptable
+    fun wrap(scope: VarScope?, javaObject: Any, staticType: Class<*>?): Scriptable
 
 }

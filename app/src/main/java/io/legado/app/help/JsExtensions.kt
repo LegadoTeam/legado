@@ -62,6 +62,10 @@ import okio.use
 import org.jsoup.Connection
 import org.jsoup.Jsoup
 import org.htmlunit.corejs.javascript.Function
+import org.htmlunit.corejs.javascript.Scriptable
+import org.htmlunit.corejs.javascript.ScriptableObject
+import org.htmlunit.corejs.javascript.TopLevel
+import org.htmlunit.corejs.javascript.Undefined
 import splitties.init.appCtx
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -1233,8 +1237,14 @@ interface JsExtensions : JsEncodeUtils {
     ) {
         SourceLock.singleFlight(sourceConcurrencyKey(name), timeoutMs) {
             val cx = rhinoContext
-            action.call(cx, action.parentScope, action.parentScope, emptyArray<Any?>())
+            action.call(cx, action.parentScope, functionThisObj(action), emptyArray<Any?>())
         }
+    }
+
+    private fun functionThisObj(action: Function): Scriptable {
+        val top = action.parentScope?.let { ScriptableObject.getTopLevelScope(it) }
+        return (top as? TopLevel)?.globalThis
+            ?: Undefined.SCRIPTABLE_UNDEFINED
     }
 
     fun singleFlight(
@@ -1249,7 +1259,7 @@ interface JsExtensions : JsEncodeUtils {
     ) {
         SourceLock.lock(sourceConcurrencyKey(name), timeoutMs) {
             val cx = rhinoContext
-            action.call(cx, action.parentScope, action.parentScope, emptyArray<Any?>())
+            action.call(cx, action.parentScope, functionThisObj(action), emptyArray<Any?>())
         }
     }
 

@@ -6,14 +6,20 @@
 
 package org.htmlunit.corejs.javascript.xmlimpl;
 
+import static org.htmlunit.corejs.javascript.Symbol.Kind.REGULAR;
+
 import java.util.ArrayList;
 import org.htmlunit.corejs.javascript.Callable;
+import org.htmlunit.corejs.javascript.ClassDescriptor;
 import org.htmlunit.corejs.javascript.Context;
 import org.htmlunit.corejs.javascript.Function;
+import org.htmlunit.corejs.javascript.JSFunction;
 import org.htmlunit.corejs.javascript.ScriptRuntime;
 import org.htmlunit.corejs.javascript.Scriptable;
 import org.htmlunit.corejs.javascript.ScriptableObject;
+import org.htmlunit.corejs.javascript.SymbolKey;
 import org.htmlunit.corejs.javascript.Undefined;
+import org.htmlunit.corejs.javascript.VarScope;
 import org.htmlunit.corejs.javascript.xml.XMLObject;
 
 class XMLList extends XMLObjectImpl implements Function {
@@ -23,7 +29,58 @@ class XMLList extends XMLObjectImpl implements Function {
     private XMLObjectImpl targetObject = null;
     private XmlNode.QName targetProperty = null;
 
-    XMLList(XMLLibImpl lib, Scriptable scope, XMLObject prototype) {
+    private static final ClassDescriptor DESCRIPTOR;
+    private static final SymbolKey LIB_KEY = new SymbolKey("__xml_lib__", REGULAR);
+
+    static {
+        DESCRIPTOR =
+                XMLObjectImpl.populatePrototypeDescriptor(
+                                new ClassDescriptor.Builder(
+                                        "XMLList",
+                                        1,
+                                        XMLList::js_constructorCall,
+                                        XMLList::js_constructor))
+                        .build();
+    }
+
+    public static void init(
+            Context cx, VarScope scope, XMLObjectImpl proto, boolean sealdd, XMLLibImpl lib) {
+        DESCRIPTOR.buildConstructor(
+                cx,
+                (VarScope) scope,
+                proto,
+                sealdd,
+                (ctx, ctor) -> {
+                    ctor.put(LIB_KEY, ctor, lib);
+                });
+    }
+
+    private static Object js_constructor(
+            Context cx, JSFunction f, Object nt, VarScope s, Object thisObj, Object[] args) {
+        XMLLibImpl lib = (XMLLibImpl) f.get(LIB_KEY, f);
+        if (args.length == 0) {
+            return lib.newXMLList();
+        } else {
+            return lib.newXMLListFrom(args[0]);
+        }
+    }
+
+    private static Object js_constructorCall(
+            Context cx, JSFunction f, Object nt, VarScope s, Object thisObj, Object[] args) {
+        XMLLibImpl lib = (XMLLibImpl) f.get(LIB_KEY, f);
+        if (args.length == 0) {
+            return lib.newXMLList();
+        } else {
+            Object arg0 = args[0];
+            if (arg0 instanceof XMLList) {
+                // XMLList(XMLList) returns the same object.
+                return arg0;
+            }
+            return lib.newXMLListFrom(arg0);
+        }
+    }
+
+    XMLList(XMLLibImpl lib, VarScope scope, XMLObject prototype) {
         super(lib, scope, prototype);
         _annos = new XmlNode.InternalList();
     }
@@ -476,12 +533,7 @@ class XMLList extends XMLObjectImpl implements Function {
 
     @Override
     boolean hasOwnProperty(XMLName xmlName) {
-        if (isPrototype()) {
-            String property = xmlName.localName();
-            return (findPrototypeId(property) != 0);
-        } else {
-            return (getPropertyList(xmlName).length() > 0);
-        }
+        return (getPropertyList(xmlName).length() > 0);
     }
 
     @Override
@@ -713,7 +765,7 @@ class XMLList extends XMLObjectImpl implements Function {
     }
 
     private Object applyOrCall(
-            boolean isApply, Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+            boolean isApply, Context cx, VarScope scope, Scriptable thisObj, Object[] args) {
         String methodName = isApply ? "apply" : "call";
         if (!(thisObj instanceof XMLList) || ((XMLList) thisObj).targetProperty == null)
             throw ScriptRuntime.typeErrorById("msg.isnt.function", methodName);
@@ -745,7 +797,7 @@ class XMLList extends XMLObjectImpl implements Function {
     }
 
     @Override
-    public Object call(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+    public Object call(Context cx, VarScope scope, Scriptable thisObj, Object[] args) {
         // This XMLList is being called as a Function.
         // Let's find the real Function object.
         if (targetProperty == null) throw ScriptRuntime.notFunctionError(this);
@@ -784,7 +836,7 @@ class XMLList extends XMLObjectImpl implements Function {
     }
 
     @Override
-    public Scriptable construct(Context cx, Scriptable scope, Object[] args) {
+    public Scriptable construct(Context cx, VarScope scope, Object[] args) {
         throw ScriptRuntime.typeErrorById("msg.not.ctor", "XMLList");
     }
 }

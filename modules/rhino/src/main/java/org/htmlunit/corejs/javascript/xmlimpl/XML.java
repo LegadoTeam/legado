@@ -6,10 +6,18 @@
 
 package org.htmlunit.corejs.javascript.xmlimpl;
 
+import static org.htmlunit.corejs.javascript.ClassDescriptor.Destination.CTOR;
+import static org.htmlunit.corejs.javascript.Symbol.Kind.REGULAR;
+
+import org.htmlunit.corejs.javascript.ClassDescriptor;
 import org.htmlunit.corejs.javascript.Context;
+import org.htmlunit.corejs.javascript.JSFunction;
 import org.htmlunit.corejs.javascript.ScriptRuntime;
 import org.htmlunit.corejs.javascript.Scriptable;
+import org.htmlunit.corejs.javascript.ScriptableObject;
+import org.htmlunit.corejs.javascript.SymbolKey;
 import org.htmlunit.corejs.javascript.Undefined;
+import org.htmlunit.corejs.javascript.VarScope;
 import org.htmlunit.corejs.javascript.xml.XMLObject;
 
 class XML extends XMLObjectImpl {
@@ -17,7 +25,93 @@ class XML extends XMLObjectImpl {
 
     private XmlNode node;
 
-    XML(XMLLibImpl lib, Scriptable scope, XMLObject prototype, XmlNode node) {
+    private static final ClassDescriptor DESCRIPTOR;
+    static final SymbolKey LIB_KEY = new SymbolKey("__xml_lib__", REGULAR);
+
+    static {
+        DESCRIPTOR =
+                XMLObjectImpl.populatePrototypeDescriptor(
+                                new ClassDescriptor.Builder(
+                                        "XML", 1, XML::js_constructorCall, XML::js_constructor))
+                        .withMethod(CTOR, SymbolKey.HAS_INSTANCE, 1, XML::js_hasInstance)
+                        .build();
+    }
+
+    public static void init(
+            Context cx, VarScope scope, XMLObjectImpl proto, boolean sealed, XMLLibImpl lib) {
+        DESCRIPTOR.buildConstructor(
+                cx,
+                scope,
+                proto,
+                sealed,
+                (ctx, ctor) -> {
+                    ctor.put(LIB_KEY, ctor, lib);
+                });
+    }
+
+    private static Object js_constructor(
+            Context cx, JSFunction f, Object nt, VarScope s, Object thisObj, Object[] args) {
+        XMLLibImpl lib = (XMLLibImpl) f.get(LIB_KEY, f);
+        if (args.length == 0 || args[0] == null || args[0] == Undefined.instance) {
+            args = new Object[] {""};
+        }
+        //    ECMA 13.4.2 does not appear to specify what to do if multiple arguments are sent.
+        XML toXml = lib.ecmaToXml(args[0]);
+        return toXml.copy();
+    }
+
+    private static Object js_constructorCall(
+            Context cx, JSFunction f, Object nt, VarScope s, Object thisObj, Object[] args) {
+        XMLLibImpl lib = (XMLLibImpl) f.get(LIB_KEY, f);
+        if (args.length == 0 || args[0] == null || args[0] == Undefined.instance) {
+            args = new Object[] {""};
+        }
+        //    ECMA 13.4.2 does not appear to specify what to do if multiple arguments are sent.
+        XML toXml = lib.ecmaToXml(args[0]);
+        return toXml;
+    }
+
+    static Object js_hasInstance(
+            Context cx, JSFunction f, Object nt, VarScope s, Object thisObj, Object[] args) {
+        if (args.length == 0 || !(args[0] instanceof Scriptable)) {
+            Object v = args.length == 0 ? null : args[0];
+            throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeof(v));
+        }
+
+        Scriptable obj = (Scriptable) args[0];
+
+        var topLevel = ScriptableObject.getTopLevelScope(f.getDeclarationScope());
+
+        var xmlCtor = topLevel.get("XML", topLevel);
+        var xmlListCtor = topLevel.get("XMLList", topLevel);
+        var xmlProto =
+                xmlCtor instanceof JSFunction
+                        ? ((JSFunction) xmlCtor).getPrototypeProperty()
+                        : null;
+        var xmlListProto =
+                xmlListCtor instanceof JSFunction
+                        ? ((JSFunction) xmlListCtor).getPrototypeProperty()
+                        : null;
+
+        if (!(xmlProto instanceof XML)) {
+            throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeof(xmlProto));
+        }
+        if (!(xmlListProto instanceof XMLList)) {
+            throw ScriptRuntime.typeErrorById(
+                    "msg.arg.not.object", ScriptRuntime.typeof(xmlListProto));
+        }
+
+        Scriptable objProto = obj.getPrototype();
+        while (objProto != null) {
+            if (xmlProto == objProto || xmlListProto == objProto) {
+                return true;
+            }
+            objProto = objProto.getPrototype();
+        }
+        return false;
+    }
+
+    XML(XMLLibImpl lib, VarScope scope, XMLObject prototype, XmlNode node) {
         super(lib, scope, prototype);
         initialize(node);
     }
@@ -170,13 +264,7 @@ class XML extends XMLObjectImpl {
     @Override
     boolean hasOwnProperty(XMLName xmlName) {
         boolean hasProperty = false;
-
-        if (isPrototype()) {
-            String property = xmlName.localName();
-            hasProperty = (0 != findPrototypeId(property));
-        } else {
-            hasProperty = (getPropertyList(xmlName).length() > 0);
-        }
+        hasProperty = (getPropertyList(xmlName).length() > 0);
 
         return hasProperty;
     }
