@@ -791,6 +791,51 @@ function getContent(chapter, book, nextChapterUrl) {
 `source.putLoginHeader(...)` 保存后续请求需要的登录头。旧版脚本可继续使用
 `sourceApi.getLoginInfo()` 和 `sourceApi.putLoginHeader(...)`。
 
+### 段评
+
+段评由两个成对的顶层函数提供。只有同时声明 `getReviewSummary` 和 `getReviewDetail` 才会启用，缺少任意一个
+函数时导入/保存会提示配对错误。章节加载后先调用统计函数，点击正文段评图标时再调用详情函数。
+
+```js
+function getReviewSummary(chapter, book) {
+    var json = JSON.parse(java.ajax(config.bookSourceUrl + "/review/summary?url=" + chapter.url));
+    return json.map(function (item) {
+        return {
+            paraIndex: item.paraIndex,
+            count: item.count,
+            paraData: item.paraData
+        };
+    });
+}
+
+function getReviewDetail(chapter, book, paraIndex, paraData, page) {
+    var json = JSON.parse(java.ajax(
+        config.bookSourceUrl + "/review/detail?para=" + paraIndex + "&data=" + paraData + "&page=" + page
+    ));
+    return {
+        items: json.items.map(function (item) {
+            return {
+                id: item.id,
+                name: item.name,
+                avatar: item.avatar,
+                badge: item.badge,
+                content: item.content,
+                replies: item.replies || []
+            };
+        }),
+        nextPageUrl: json.hasNext ? "more" : null
+    };
+}
+```
+
+- `getReviewSummary(chapter, book)` 返回数组，每项包含 `paraIndex`（正文段落序号，`-1` 表示章节标题）、`count`（评论数）和可选的
+  `paraData`。`count` 小于等于 0 的条目不会显示图标；缺少 `paraData` 时默认使用段落序号字符串。
+- `getReviewDetail(chapter, book, paraIndex, paraData, page)` 返回 `{items, nextPageUrl}`。每项的 `content` 必填，
+  可选 `id`、`name`、`avatar`、`badge` 和递归 `replies`；缺少内容的条目会被忽略，递归回复会在界面中按顺序展示。
+- `nextPageUrl` 只是是否继续请求的信号，不会作为 URL 使用。返回任意非空值表示还有下一页，返回 `null` 或省略表示结束；
+  下一次调用会把 `page` 加一。
+- 段评函数异常会记录到日志，详情加载错误同时显示在弹窗中；返回空数组表示没有内容。
+
 ### 运行环境与并发
 
 函数运行时可使用 `java`、`source`、`sourceApi`、`baseUrl`、`cookie`、`cache` 和当前函数参数。

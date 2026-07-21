@@ -36,6 +36,7 @@ import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.analyzeRule.AnalyzeUrl.Companion.getMediaItem
 import io.legado.app.model.analyzeRule.ReviewRuleParser
 import io.legado.app.model.analyzeRule.ReviewRuleParser.DetailItem as ReviewDetailItem
+import io.legado.app.model.jsSource.JsSourceReview
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.gone
 import io.legado.app.utils.isAbsUrl
@@ -328,6 +329,26 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
         Coroutine.async(lifecycleScope, IO) {
             val source = ReadBook.bookSource ?: return@async null
             if (source.getKey() != sourceKey) return@async null
+            val book = ReadBook.book ?: return@async null
+            if (book.bookUrl != bookUrl) return@async null
+            val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex) ?: return@async null
+            if (source.isJsSource()) {
+                if (source.mainJs.hashCode() != ruleHash) return@async null
+                val result = JsSourceReview.getReviewDetailAwait(
+                    source = source,
+                    book = book,
+                    chapter = chapter,
+                    paragraphIndex = paragraphNum,
+                    paragraphData = paragraphData,
+                    page = page,
+                ) ?: return@async null
+                return@async ReviewResult(
+                    items = result.items,
+                    nextPageUrl = result.nextPageUrl,
+                    hasNextPageRule = true,
+                    source = source,
+                )
+            }
             val rule = source.ruleReview ?: return@async null
             if (!rule.enabled || rule.hashCode() != ruleHash) return@async null
             val firstPageUrlRule = rule.reviewDetailUrl?.takeIf { it.isNotBlank() } ?: return@async null
@@ -342,9 +363,6 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
             if (rule.detailListRule.isNullOrBlank() || rule.detailContentRule.isNullOrBlank()) {
                 return@async null
             }
-            val book = ReadBook.book ?: return@async null
-            if (book.bookUrl != bookUrl) return@async null
-            val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex) ?: return@async null
             val paraIndex = paragraphNum.toString()
             val paraData = paragraphData
             val analyzeUrl = AnalyzeUrl(
