@@ -28,6 +28,21 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_audio_cache_folder"
+        android:title="@string/audio_cache_select_folder"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_audio_cache_range"
+        android:title="@string/audio_cache_range"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_clear_current_audio_cache"
+        android:title="@string/audio_cache_clear_current_chapter"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_edit_source"
         android:title="@string/edit_book_source"
         app:showAsAction="never" />

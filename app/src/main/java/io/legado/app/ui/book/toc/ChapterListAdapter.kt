@@ -21,6 +21,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.lib.theme.ThemeUtils
 import io.legado.app.lib.theme.accentColor
+import io.legado.app.model.AudioCacheKey
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.gone
@@ -36,6 +37,7 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
     DiffRecyclerAdapter<TocListItem, ItemChapterListBinding>(context) {
 
     val cacheFileNames = hashSetOf<String>()
+    val audioCacheKeys = hashSetOf<AudioCacheKey>()
     private val displayTitleMap = ConcurrentHashMap<String, String>()
     private val handler = Handler(Looper.getMainLooper())
     private val baseStartPadding = 12.dpToPx()
@@ -179,7 +181,12 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
             val isVolume = item is TocListItem.Volume
             val isCurrentChapter = callback.durChapterIndex() == chapter.index
             val cached = callback.isLocalBook || isVolume ||
-                    cacheFileNames.contains(chapter.getFileName())
+                    if (callback.isAudioBook) {
+                        !callback.isAudioCacheStateReady ||
+                                audioCacheKeys.contains(AudioCacheKey.from(chapter))
+                    } else {
+                        cacheFileNames.contains(chapter.getFileName())
+                    }
             tvChapterName.text = getDisplayTitle(chapter)
 
             if (payloads.isEmpty()) {
@@ -314,6 +321,12 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
         }
     }
 
+    fun findVisiblePositionByAudioCacheKey(key: AudioCacheKey): Int {
+        return getItems().indexOfFirst {
+            it is TocListItem.Chapter && AudioCacheKey.from(it.chapter) == key
+        }
+    }
+
     fun findVisiblePositionByItemKey(key: String): Int {
         return getItems().indexOfFirst { it.key == key }
     }
@@ -332,6 +345,8 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
         val scope: CoroutineScope
         val book: Book?
         val isLocalBook: Boolean
+        val isAudioBook: Boolean
+        val isAudioCacheStateReady: Boolean
         fun openChapter(bookChapter: BookChapter)
         fun durChapterIndex(): Int
         fun onListChanged()

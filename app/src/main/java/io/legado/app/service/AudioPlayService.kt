@@ -18,8 +18,10 @@ import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.annotation.OptIn
 import androidx.core.app.NotificationCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import androidx.media.AudioFocusRequestCompat
+import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -62,6 +64,7 @@ import splitties.systemservices.audioManager
 import splitties.systemservices.notificationManager
 import splitties.systemservices.powerManager
 import splitties.systemservices.wifiManager
+import java.io.File
 
 /**
  * 音频播放服务
@@ -184,7 +187,7 @@ class AudioPlayService : BaseService(),
                         IntentAction.playNew -> 0
                         else -> AudioPlay.book?.durChapterPos ?: 0
                     }
-                    url = AudioPlay.durPlayUrl
+                    url = AudioPlay.durMediaUrl
                     if (playSpeed != 1f) {
                         upSpeed(playSpeed)
                     }
@@ -285,7 +288,7 @@ class AudioPlayService : BaseService(),
                     chapter = AudioPlay.durChapter,
                     coroutineContext = coroutineContext
                 )
-                exoPlayer.setMediaItem(analyzeUrl.getMediaItem())
+                exoPlayer.setMediaItem(localMediaItem(url) ?: analyzeUrl.getMediaItem())
             }
             exoPlayer.playWhenReady = true
             //获取片头设定
@@ -297,6 +300,27 @@ class AudioPlayService : BaseService(),
             AppLog.put("播放出错\n${it.localizedMessage}", it)
             toastOnUi("$url ${it.localizedMessage}")
             stopSelf()
+        }
+    }
+
+    /**
+     * Build local media items without URL analysis or request headers.
+     */
+    private fun localMediaItem(url: String): MediaItem? {
+        return when {
+            url.startsWith("content://", true) -> MediaItem.fromUri(url.toUri())
+            url.startsWith("file:", true) -> {
+                val uri = url.toUri()
+                val path = uri.path
+                if (!path.isNullOrBlank() && File(path).exists()) {
+                    MediaItem.fromUri(File(path).toUri())
+                } else {
+                    MediaItem.fromUri(uri)
+                }
+            }
+
+            File(url).exists() -> MediaItem.fromUri(File(url).toUri())
+            else -> null
         }
     }
 
@@ -471,6 +495,18 @@ class AudioPlayService : BaseService(),
     override fun onPlayerError(error: PlaybackException) {
         super.onPlayerError(error)
         AudioPlay.upReadTime()
+        val resumePosition = exoPlayer.currentPosition
+            .coerceAtLeast(0L)
+            .coerceAtMost(Int.MAX_VALUE.toLong())
+            .toInt()
+        if (AudioPlay.retryAfterCachedPlaybackError(resumePosition)) {
+            exoPlayer.stop()
+            upPlayProgressJob?.cancel()
+            AudioPlay.upLoading(true)
+            AppLog.put("Broken audio cache detected, retrying from source", error)
+            toastOnUi(R.string.audio_cache_corrupted_retry)
+            return
+        }
         AudioPlay.status = Status.STOP
         postEvent(EventBus.AUDIO_STATE, Status.STOP)
         AudioPlay.upLoading(false)

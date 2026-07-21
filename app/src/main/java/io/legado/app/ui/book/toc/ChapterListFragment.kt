@@ -15,12 +15,17 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.databinding.FragmentChapterListBinding
+import io.legado.app.help.audio.AudioCacheManager
 import io.legado.app.help.book.BookHelp
+import io.legado.app.help.book.isAudio
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isVideo
 import io.legado.app.help.book.simulatedTotalChapterNum
+import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.getPrimaryTextColor
+import io.legado.app.model.AudioCacheKey
+import io.legado.app.model.AudioCacheStateChanged
 import io.legado.app.ui.widget.recycler.UpLinearLayoutManager
 import io.legado.app.ui.widget.recycler.VerticalDivider
 import io.legado.app.utils.ColorUtils
@@ -49,6 +54,8 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     private var currentSearchKey: String? = null
     private var chapterListJob: Job? = null
     private var cacheFileJob: Job? = null
+    private var audioCacheStateReady = false
+    private val pendingAudioCacheChanges = linkedMapOf<AudioCacheKey, Boolean>()
     private var pendingScrollItemKey: String? = null
     private var pendingChapterScroll: Int? = null
 
@@ -111,6 +118,9 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
         binding.tvCurrentChapterInfo.text =
             "${book.durChapterTitle}(${book.durChapterIndex + 1}/${book.simulatedTotalChapterNum()})"
         adapter.cacheFileNames.clear()
+        adapter.audioCacheKeys.clear()
+        audioCacheStateReady = !book.isAudio
+        pendingAudioCacheChanges.clear()
         tocListState.clear()
         chapterList = emptyList()
         adapter.setItems(emptyList())
@@ -128,7 +138,34 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
             adapter.setItems(tocListState.showNormal(durChapterIndex))
         }
         cacheFileJob = viewLifecycleOwner.lifecycleScope.launch {
-            adapter.cacheFileNames.addAll(withContext(IO) { BookHelp.getChapterFiles(book) })
+            if (book.isAudio) {
+                var treeUri = AppConfig.audioCacheTreeUri
+                var cachedKeys: Set<AudioCacheKey>
+                while (true) {
+                    cachedKeys = withContext(IO) {
+                        runCatching {
+                            AudioCacheManager.listCachedChapterKeys(
+                                treeUri,
+                                book.bookUrl,
+                            )
+                        }.getOrDefault(emptySet())
+                    }
+                    if (viewModel.bookData.value?.bookUrl != book.bookUrl) return@launch
+                    val currentTreeUri = AppConfig.audioCacheTreeUri
+                    if (treeUri == currentTreeUri) break
+                    pendingAudioCacheChanges.clear()
+                    treeUri = currentTreeUri
+                }
+                adapter.audioCacheKeys.addAll(cachedKeys)
+                pendingAudioCacheChanges.forEach { (key, cached) ->
+                    if (cached) adapter.audioCacheKeys.add(key)
+                    else adapter.audioCacheKeys.remove(key)
+                }
+                pendingAudioCacheChanges.clear()
+                audioCacheStateReady = true
+            } else {
+                adapter.cacheFileNames.addAll(withContext(IO) { BookHelp.getChapterFiles(book) })
+            }
             adapter.notifyItemRangeChanged(0, adapter.itemCount, true)
         }
     }
@@ -136,10 +173,23 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     override fun observeLiveBus() {
         observeEvent<Pair<Book, BookChapter>>(EventBus.SAVE_CONTENT) { (book, chapter) ->
             viewModel.bookData.value?.bookUrl?.let { bookUrl ->
-                if (book.bookUrl == bookUrl) {
+                if (viewModel.bookData.value?.isAudio != true && book.bookUrl == bookUrl) {
                     adapter.cacheFileNames.add(chapter.getFileName())
                     notifyVisibleChapterChanged(chapter.index)
                 }
+            }
+        }
+        observeEvent<AudioCacheStateChanged>(EventBus.AUDIO_CACHE_CHANGED) { event ->
+            val currentBook = viewModel.bookData.value ?: return@observeEvent
+            if (!currentBook.isAudio || currentBook.bookUrl != event.bookUrl) return@observeEvent
+            if (event.treeUri != AppConfig.audioCacheTreeUri) return@observeEvent
+            if (!audioCacheStateReady) {
+                pendingAudioCacheChanges[event.key] = event.cached
+            } else {
+                if (event.cached) adapter.audioCacheKeys.add(event.key)
+                else adapter.audioCacheKeys.remove(event.key)
+                val position = adapter.findVisiblePositionByAudioCacheKey(event.key)
+                if (position >= 0) adapter.notifyItemChanged(position, true)
             }
         }
     }
@@ -315,6 +365,12 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
 
     override val isLocalBook: Boolean
         get() = viewModel.bookData.value?.isLocal == true
+
+    override val isAudioBook: Boolean
+        get() = viewModel.bookData.value?.isAudio == true
+
+    override val isAudioCacheStateReady: Boolean
+        get() = audioCacheStateReady
 
     override fun durChapterIndex(): Int {
         return durChapterIndex
