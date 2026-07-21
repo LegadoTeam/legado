@@ -572,6 +572,8 @@
     <string name="select_file">Select a file</string>
     <string name="no_find">No Discovery, you can add it in BookSource</string>
     <string name="restore_default">Restore default</string>
+    <string name="reset_region_padding_confirm">Restore default paddings of %s?</string>
+    <string name="lock_left_right_padding">Sync left and right padding</string>
     <string name="set_download_per">Custom cache path requires Storage permission</string>
     <string name="black">Black</string>
     <string name="content_empty">No content</string>
