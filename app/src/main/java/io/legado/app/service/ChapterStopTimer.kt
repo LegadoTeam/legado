@@ -7,6 +7,11 @@ internal data class ChapterStopResult(
     val shouldStop: Boolean,
 )
 
+internal data class SleepTimerIncrement(
+    val minute: Int = 0,
+    val chapter: Int = 0,
+)
+
 internal class ChapterStopTimer(initialCount: Int = 0) {
 
     var remaining: Int = normalizeChapterStopCount(initialCount)
@@ -30,4 +35,22 @@ internal class ChapterStopTimer(initialCount: Int = 0) {
 
 internal fun normalizeChapterStopCount(count: Int): Int {
     return count.coerceIn(0, MAX_CHAPTER_STOP_COUNT)
+}
+
+internal fun nextSleepTimerIncrement(
+    timeMinute: Int,
+    chapterToStop: Int,
+    preferChapter: Boolean,
+): SleepTimerIncrement {
+    val minute = timeMinute.coerceIn(0, 180)
+    val chapter = normalizeChapterStopCount(chapterToStop)
+    return when {
+        chapter > 0 -> SleepTimerIncrement(
+            chapter = (chapter + 1).coerceAtMost(MAX_CHAPTER_STOP_COUNT)
+        )
+
+        minute == 0 && preferChapter -> SleepTimerIncrement(chapter = 1)
+        minute == 180 -> SleepTimerIncrement()
+        else -> SleepTimerIncrement(minute = (minute + 10).coerceAtMost(180))
+    }
 }

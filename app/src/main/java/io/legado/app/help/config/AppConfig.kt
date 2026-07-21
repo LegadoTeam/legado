@@ -365,6 +365,12 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefInt(PreferKey.ttsTimer, value)
         }
 
+    var sleepTimerPreferChapter: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.sleepTimerPreferChapter, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.sleepTimerPreferChapter, value)
+        }
+
     val speechRatePlay: Int get() = if (ttsFlowSys) defaultSpeechRate else ttsSpeechRate
 
     var chineseConverterType: Int

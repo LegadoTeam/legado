@@ -7,6 +7,7 @@ import android.widget.SeekBar
 import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.databinding.DialogSleepTimerBinding
+import io.legado.app.help.config.AppConfig
 import io.legado.app.service.MAX_CHAPTER_STOP_COUNT
 import io.legado.app.ui.widget.seekbar.SeekBarChangeListener
 import io.legado.app.utils.setLayout
@@ -61,8 +62,10 @@ class SleepTimerDialog : BaseDialogFragment(R.layout.dialog_sleep_timer) {
             tvCancel.setOnClickListener { dismissAllowingStateLoss() }
             tvOk.setOnClickListener {
                 if (chapterMode) {
+                    if (chapter > 0) AppConfig.sleepTimerPreferChapter = true
                     callBack?.onSleepTimerChapter(chapter)
                 } else {
+                    if (minute > 0) AppConfig.sleepTimerPreferChapter = false
                     callBack?.onSleepTimerMinute(minute)
                 }
                 dismissAllowingStateLoss()

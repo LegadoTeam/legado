@@ -450,16 +450,10 @@ class AudioPlayService : BaseService(),
     }
 
     private fun addTimer() {
-        if (timeMinute == 180) {
-            timeMinute = 0
-        } else {
-            timeMinute += 10
-            if (timeMinute > 180) timeMinute = 180
-        }
-        chapterStopTimer.clear()
-        chapterToStop = 0
-        postEvent(EventBus.AUDIO_CHAPTER_STOP, 0)
-        doDs()
+        val next = nextSleepTimerIncrement(
+            timeMinute, chapterToStop, AppConfig.sleepTimerPreferChapter
+        )
+        if (next.chapter > 0) setChapterStop(next.chapter) else setTimer(next.minute)
     }
 
     private fun setChapterStop(count: Int) {
