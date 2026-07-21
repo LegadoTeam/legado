@@ -27,6 +27,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.utils.activity
+import io.legado.app.utils.applyMd3PopupStyle
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.windowSize
 import kotlinx.coroutines.CoroutineScope
@@ -58,6 +59,7 @@ class KeyboardToolPop(
 
     init {
         contentView = binding.root
+        applyMd3PopupStyle()
 
         isTouchable = true
         isOutsideTouchable = false

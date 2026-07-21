@@ -16,6 +16,7 @@ import androidx.appcompat.widget.AppCompatAutoCompleteTextView
 import com.google.android.material.textfield.TextInputLayout as MaterialTextInputLayout
 import io.legado.app.R
 import io.legado.app.lib.theme.accentColor
+import io.legado.app.lib.theme.popupBackground
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.gone
 import io.legado.app.utils.visible
@@ -31,6 +32,7 @@ class AutoCompleteTextView @JvmOverloads constructor(
 
     init {
         applyTint(context.accentColor)
+        setDropDownBackgroundDrawable(context.popupBackground)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
             isLocalePreferredLineHeightForMinimumUsed = false
         }
