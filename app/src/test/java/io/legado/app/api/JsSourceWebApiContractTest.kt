@@ -163,6 +163,35 @@ class JsSourceWebApiContractTest {
     }
 
     @Test
+    fun `HTTP log read routes require the source API token`() {
+        val server = readProjectFile("app/src/main/java/io/legado/app/web/HttpServer.kt")
+        val tokenCheck = server.indexOf("uri in PROTECTED_HTTP_LOG_READ_ROUTES")
+        val logsRoute = server.indexOf("\"/getHttpLogs\" -> HttpLogController.getLogs")
+        val detailRoute = server.indexOf("\"/getHttpLog\" -> HttpLogController.getLog")
+
+        assertTrue(tokenCheck >= 0)
+        assertTrue(logsRoute > tokenCheck)
+        assertTrue(detailRoute > tokenCheck)
+        assertTrue(server.contains("BookSourceController.hasValidJsSourceApiToken(session.headers)"))
+        assertTrue(server.contains("PROTECTED_HTTP_LOG_READ_ROUTES"))
+        val getBranch = server.substringAfter("Method.GET ->")
+            .substringBefore("else -> Unit")
+        val rejectionBranch = getBranch.substringAfter("if (requestError != null)")
+            .substringBefore("} else")
+        assertTrue(rejectionBranch.contains("shouldCloseConnection = true"))
+        val optionsBranch = server.substringAfter("Method.OPTIONS ->")
+            .substringBefore("Method.POST ->")
+        assertTrue(
+            optionsBranch.contains(
+                "response.addHeader(\"Access-Control-Allow-Methods\", \"GET, POST\")"
+            )
+        )
+        val webHeaders = server.substringAfter("private fun Response.addWebHeaders")
+        assertTrue(webHeaders.contains("addHeader(\"Cache-Control\", \"no-store\")"))
+        assertFalse(server.contains("/setHttpLogRecording"))
+    }
+
+    @Test
     fun `editor delegates persistence to shared upsert`() {
         val activity = readProjectFile(
             "app/src/main/java/io/legado/app/ui/book/source/edit/JsSourceEditActivity.kt"
@@ -209,6 +238,10 @@ class JsSourceWebApiContractTest {
         assertTrue(api.contains("旧 JSON 书源写入接口"))
         assertTrue(api.contains("页面重载后需要重新输入"))
         assertTrue(api.contains("可信局域网"))
+        assertTrue(api.contains("/getHttpLogs?limit=50"))
+        assertTrue(api.contains("/getHttpLog?id=1"))
+        assertTrue(api.contains("8 KiB"))
+        assertTrue(api.contains("X-Legado-Token = 设置中配置的令牌"))
         assertTrue(updateLog.contains("Web API 新增带令牌保护的纯 JavaScript 单文件书源保存接口"))
         assertTrue(backupConfig.contains("PreferKey.jsSourceApiToken"))
         assertTrue(manifest.contains("@xml/backup_rules"))

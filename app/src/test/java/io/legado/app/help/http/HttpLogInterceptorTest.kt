@@ -1,5 +1,6 @@
 package io.legado.app.help.http
 
+import io.legado.app.constant.AppLog
 import okhttp3.Headers
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -108,6 +109,39 @@ class HttpLogInterceptorTest {
         assertTrue(logger >= 0)
         assertTrue(cronet > logger)
         assertTrue(decompressor > logger)
+    }
+
+    @Test
+    fun storeReturnsNewestRecordsWithAClampedLimit() {
+        HttpLogStore.clear()
+        try {
+            repeat(60) { index ->
+                HttpLogStore.add(
+                    HttpLogRecord(
+                        id = index.toLong(),
+                        time = index.toLong(),
+                        method = "GET",
+                        path = "/$index",
+                        url = "https://example.test/$index",
+                        statusCode = 200,
+                        duration = index.toLong(),
+                        requestHeaders = "",
+                        requestBody = "",
+                        responseHeaders = "",
+                        responseBody = "",
+                        error = null,
+                    )
+                )
+            }
+
+            assertEquals(listOf(59L, 58L), HttpLogStore.latest(2).map { it.id })
+            assertEquals(1, HttpLogStore.latest(0).size)
+            assertEquals(50, HttpLogStore.latest(100).size)
+            assertNotNull(HttpLogStore.get(59L))
+        } finally {
+            HttpLogStore.clear()
+            AppLog.clear()
+        }
     }
 
     private fun gzip(bytes: ByteArray): ByteArray {
