@@ -1,5 +1,6 @@
 package io.legado.app
 
+import com.script.CompiledScript
 import com.script.ScriptBindings
 import com.script.rhino.ProtectedNativeJavaClass
 import com.script.rhino.ReadOnlyJavaObject
@@ -72,6 +73,98 @@ class JsEngineCapabilitiesTest {
 
         Assert.assertEquals(
             "first:1|second:2|left",
+            RhinoScriptEngine.eval(script, ScriptBindings()),
+        )
+    }
+
+    @Test
+    fun legacyNestedConstReadAfterBlockRemainsVisible() {
+        val script = """
+            with ({}) {}
+            function getParagraphsReviewByPage(comments) {
+                var html = '';
+                var refferContent = '';
+                if (comments.length > 0) {
+                    const paraContent = comments[0].expand.para_src_content || '';
+                    refferContent = paraContent;
+                }
+                return JSON.stringify({
+                    html: html,
+                    paraContent: paraContent,
+                    refferContent: refferContent
+                });
+            }
+            getParagraphsReviewByPage([{
+                expand: { para_src_content: 'paragraph' }
+            }]);
+        """.trimIndent()
+
+        Assert.assertEquals(
+            """{"html":"","paraContent":"paragraph","refferContent":"paragraph"}""",
+            RhinoScriptEngine.eval(script, ScriptBindings()),
+        )
+    }
+
+    @Test
+    fun legacyConstDoesNotShadowRuntimeBindings() {
+        val bindings = ScriptBindings().apply {
+            this["book"] = "global"
+        }
+        val script = """
+            with ({}) {}
+            function readBook() {
+                if (false) {
+                    const book = 'local';
+                }
+                return book;
+            }
+            readBook();
+        """.trimIndent()
+
+        Assert.assertEquals("global", RhinoScriptEngine.eval(script, bindings))
+    }
+
+    @Test
+    fun cachedCompilationDoesNotCaptureCallerBindings() {
+        val bridge = CompileBridge()
+        val compileScope = ScriptBindings().apply {
+            this["bridge"] = bridge
+            this["source"] = """
+                with ({}) {}
+                function readBook() {
+                    if (false) {
+                        const book = 'local';
+                    }
+                    return book;
+                }
+                readBook();
+            """.trimIndent()
+        }
+        RhinoScriptEngine.eval("bridge.compile(source)", compileScope)
+
+        val runScope = ScriptBindings().apply {
+            this["book"] = "global"
+        }
+        Assert.assertEquals("global", bridge.compiled.eval(runScope))
+    }
+
+    @Test
+    fun legacyConstRewriteSkipsResolvedAndNonValueNames() {
+        val script = """
+            with ({}) {}
+            function scopedValues() {
+                let value = 'outer';
+                if (true) {
+                    const value = 'inner';
+                    const hidden = 'block';
+                }
+                return ({value: 1}).value + ':' + value + ':' + typeof (hidden);
+            }
+            scopedValues();
+        """.trimIndent()
+
+        Assert.assertEquals(
+            "1:outer:undefined",
             RhinoScriptEngine.eval(script, ScriptBindings()),
         )
     }
@@ -392,6 +485,14 @@ class JsEngineCapabilitiesTest {
         fun factoryChild() = FactoryBridge()
 
         fun hidden(): Any = HiddenClassLoader()
+    }
+
+    class CompileBridge {
+        lateinit var compiled: CompiledScript
+
+        fun compile(source: String) {
+            compiled = RhinoScriptEngine.compile(source)
+        }
     }
 
     class ThrowingChild {
