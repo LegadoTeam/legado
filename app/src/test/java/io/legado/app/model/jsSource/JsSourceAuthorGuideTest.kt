@@ -24,6 +24,7 @@ class JsSourceAuthorGuideTest {
         val source = JsSourceConfig.extract(script)
 
         assertTrue(script.contains("var config ="))
+        assertTrue(script.contains("var Jsoup = org.jsoup.Jsoup;"))
         assertEquals("https://example.com", source.bookSourceUrl)
         assertEquals("示例 JS 书源", source.bookSourceName)
     }
