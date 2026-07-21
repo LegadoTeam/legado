@@ -1405,4 +1405,16 @@
     <string name="js_source_new">新建 JS 书源</string>
     <string name="js_source_edit">编辑 JS 书源</string>
     <string name="js_source_badge">JS</string>
+    <string name="audio_cache_select_folder">Select audio cache folder</string>
+    <string name="audio_cache_range">Cache chapter range</string>
+    <string name="audio_cache_clear_current_chapter">Clear current chapter cache</string>
+    <string name="audio_cache_folder_selected">Audio cache folder selected</string>
+    <string name="audio_cache_folder_invalid">Audio cache folder is unavailable, please select it again</string>
+    <string name="audio_cache_folder_not_set">Please select an audio cache folder first</string>
+    <string name="audio_cache_start_range">Audio cache task queued</string>
+    <string name="audio_cache_current_chapter_cleared">Current chapter cache cleared</string>
+    <string name="audio_cache_current_chapter_not_found">Current chapter is not cached</string>
+    <string name="audio_cache_notification_title">Audio cache</string>
+    <string name="audio_cache_notification_text">\"%1$s\" cached %2$d/%3$d, failed %4$d</string>
+    <string name="audio_cache_corrupted_retry">Corrupted cache detected, switched to the online source and retried</string>
 </resources>

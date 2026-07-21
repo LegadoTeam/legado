@@ -613,6 +613,16 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     val streamReadAloudAudio get() = appCtx.getPrefBoolean(PreferKey.streamReadAloudAudio, false)
 
+    var audioCacheTreeUri: String?
+        get() = appCtx.getPrefString(PreferKey.audioCacheTreeUri)
+        set(value) {
+            if (value.isNullOrBlank()) {
+                appCtx.removePref(PreferKey.audioCacheTreeUri)
+            } else {
+                appCtx.putPrefString(PreferKey.audioCacheTreeUri, value)
+            }
+        }
+
     val doublePageHorizontal: String?
         get() = appCtx.getPrefString(PreferKey.doublePageHorizontal)
 

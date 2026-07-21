@@ -1296,4 +1296,16 @@
     <string name="drag_to_reorder">拖动排序</string>
     <string name="move_to_more">移至更多</string>
     <string name="move_to_floating_bar">移至浮动条</string>
+    <string name="audio_cache_select_folder">选择音频缓存文件夹</string>
+    <string name="audio_cache_range">缓存章节范围</string>
+    <string name="audio_cache_clear_current_chapter">清除本章缓存</string>
+    <string name="audio_cache_folder_selected">已设置音频缓存文件夹</string>
+    <string name="audio_cache_folder_invalid">当前音频缓存文件夹不可用，请重新选择</string>
+    <string name="audio_cache_folder_not_set">请先选择音频缓存文件夹</string>
+    <string name="audio_cache_start_range">已加入音频缓存队列</string>
+    <string name="audio_cache_current_chapter_cleared">已清除本章缓存</string>
+    <string name="audio_cache_current_chapter_not_found">本章没有缓存</string>
+    <string name="audio_cache_notification_title">音频缓存</string>
+    <string name="audio_cache_notification_text">《%1$s》已缓存 %2$d/%3$d，失败 %4$d</string>
+    <string name="audio_cache_corrupted_retry">检测到缓存损坏，已自动回源重试</string>
 </resources>

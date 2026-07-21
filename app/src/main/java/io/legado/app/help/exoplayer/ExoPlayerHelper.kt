@@ -96,13 +96,20 @@ object ExoPlayerHelper {
         //使用自定义的CacheDataSource以支持设置UA
         CacheDataSource.Factory()
             .setCache(cache)
-            .setUpstreamDataSourceFactory(okhttpDataFactory)
+            .setUpstreamDataSourceFactory(defaultDataSourceFactory)
             .setCacheReadDataSourceFactory(FileDataSource.Factory())
             .setCacheWriteDataSinkFactory(
                 CacheDataSink.Factory()
                     .setCache(cache)
                     .setFragmentSize(CacheDataSink.DEFAULT_FRAGMENT_SIZE)
             )
+    }
+
+    /**
+     * Dispatches content/file URIs locally while keeping OkHttp for network requests.
+     */
+    private val defaultDataSourceFactory by lazy {
+        DefaultDataSource.Factory(appCtx, okhttpDataFactory)
     }
 
     /**
