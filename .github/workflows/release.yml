@@ -45,6 +45,8 @@ jobs:
       play: ${{ needs.prepare.outputs.play }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Checkout htmlunit-rhino-fork
         uses: actions/checkout@v7
