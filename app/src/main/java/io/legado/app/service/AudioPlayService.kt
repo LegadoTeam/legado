@@ -240,7 +240,7 @@ class AudioPlayService : BaseService(),
      */
     @OptIn(UnstableApi::class)
     @SuppressLint("WakelockTimeout")
-    private fun play() {
+    private fun play(preservePosition: Boolean = false) {
         if (useWakeLock) {
             wakeLock.acquire()
             wifiLock?.acquire()
@@ -261,7 +261,9 @@ class AudioPlayService : BaseService(),
                     return@execute
                 }
                 exoPlayer.setMediaSource(mediaSource)
-                position = 0
+                if (!preservePosition) {
+                    position = 0
+                }
             } else {
                 val analyzeUrl = AnalyzeUrl(
                     url,
@@ -300,6 +302,7 @@ class AudioPlayService : BaseService(),
             }
             upPlayProgressJob?.cancel()
             position = exoPlayer.currentPosition.toInt()
+            AudioPlay.playPositionChanged(position)
             if (exoPlayer.isPlaying) exoPlayer.pause()
             upMediaSessionPlaybackState(PlaybackStateCompat.STATE_PAUSED)
             AudioPlay.status = Status.PAUSE
@@ -326,9 +329,8 @@ class AudioPlayService : BaseService(),
                 return
             }
             if (exoPlayer.playbackState == Player.STATE_IDLE) {
-                // 如果播放器处于空闲状态，重新开始播放
-                position = 0
-                play()
+                position = AudioPlay.book?.let { AudioPlay.durChapterPos } ?: position
+                play(preservePosition = true)
                 return
             }
             if (!exoPlayer.isPlaying) {
@@ -563,6 +565,7 @@ class AudioPlayService : BaseService(),
         mediaSessionCompat.setCallback(object : MediaSessionCompat.Callback() {
             override fun onSeekTo(pos: Long) {
                 position = pos.toInt()
+                AudioPlay.playPositionChanged(position)
                 exoPlayer.seekTo(pos)
             }
 
