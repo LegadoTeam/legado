@@ -110,7 +110,7 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
             AudioPlay.replaceBook(book)
             AudioPlay.setBookSource(source)
             appDb.bookChapterDao.insert(*toc.toTypedArray())
-            AudioPlay.upDurChapter()
+            AudioPlay.upData(book)
         }.onFinally {
             postEvent(EventBus.SOURCE_CHANGED, book.bookUrl)
         }

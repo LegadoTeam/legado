@@ -174,6 +174,7 @@
     <string name="sleep_timer_by_episode">按集数</string>
     <string name="sleep_timer_chapters">%d 章</string>
     <string name="audio_stop_chapters">听完 %d 集</string>
+    <string name="audio_chapter_progress">第 %1$d 集 · 共 %2$d 集</string>
     <string name="ps_hide_navigation_bar">阅读界面隐藏虚拟按键</string>
     <string name="pt_hide_navigation_bar">隐藏导航栏</string>
     <string name="re_navigation_bar_color">导航栏颜色</string>

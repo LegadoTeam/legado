@@ -37,6 +37,63 @@ class AudioPlayLayoutTest {
         assertEquals("#FFFFFFFF", vectorFillColor("ic_pause_24dp.xml"))
     }
 
+    @Test
+    fun chapterInfoIsBoundedAndPresentInBothOrientations() {
+        val portraitPath = "src/main/res/layout/activity_audio_play.xml"
+        val landscapePath = "src/main/res/layout-land/activity_audio_play.xml"
+        val layouts = listOf(portraitPath, landscapePath).associateWith(::parseProjectXml)
+
+        layouts.forEach { (path, document) ->
+            val title = findViewById(document, "@+id/tv_sub_title")
+            val chapterIndex = findViewById(document, "@+id/tv_chapter_index")
+
+            assertEquals(path, "end", title.getAttributeNS(androidNamespace, "ellipsize"))
+            assertEquals(path, "2", title.getAttributeNS(androidNamespace, "maxLines"))
+            assertEquals(path, "bold", title.getAttributeNS(androidNamespace, "textStyle"))
+            assertEquals(path, "gone", chapterIndex.getAttributeNS(androidNamespace, "visibility"))
+            assertEquals(path, "12sp", chapterIndex.getAttributeNS(androidNamespace, "textSize"))
+            assertEquals(
+                path,
+                "@color/md_dark_secondary",
+                chapterIndex.getAttributeNS(androidNamespace, "textColor"),
+            )
+        }
+
+        val portraitTitle = findViewById(layouts.getValue(portraitPath), "@+id/tv_sub_title")
+        val portraitIndex = findViewById(layouts.getValue(portraitPath), "@+id/tv_chapter_index")
+        assertEquals(
+            "@+id/tv_chapter_index",
+            portraitTitle.getAttributeNS(appNamespace, "layout_constraintBottom_toTopOf"),
+        )
+        assertEquals(
+            "@+id/tv_sub_title",
+            portraitIndex.getAttributeNS(appNamespace, "layout_constraintTop_toBottomOf"),
+        )
+        assertEquals(
+            "@+id/ll_player_progress",
+            portraitIndex.getAttributeNS(appNamespace, "layout_constraintBottom_toTopOf"),
+        )
+
+        val landscapeTitle = findViewById(layouts.getValue(landscapePath), "@+id/tv_sub_title")
+        val landscapeIndex = findViewById(layouts.getValue(landscapePath), "@+id/tv_chapter_index")
+        assertEquals(
+            "@+id/ll_player_progress",
+            landscapeTitle.getAttributeNS(appNamespace, "layout_constraintBottom_toTopOf"),
+        )
+        assertEquals(
+            "@+id/tv_chapter_index",
+            landscapeTitle.getAttributeNS(appNamespace, "layout_constraintEnd_toStartOf"),
+        )
+        assertEquals(
+            "@+id/tv_sub_title",
+            landscapeIndex.getAttributeNS(appNamespace, "layout_constraintBaseline_toBaselineOf"),
+        )
+        assertEquals(
+            "parent",
+            landscapeIndex.getAttributeNS(appNamespace, "layout_constraintEnd_toEndOf"),
+        )
+    }
+
     private fun findPlayButton(document: Document): Element {
         return document.getElementsByTagName(
             "com.google.android.material.floatingactionbutton.FloatingActionButton"
@@ -45,6 +102,13 @@ class AudioPlayLayoutTest {
                 .map { nodes.item(it) as Element }
                 .single { it.getAttributeNS(androidNamespace, "id") == "@+id/fab_play_stop" }
         }
+    }
+
+    private fun findViewById(document: Document, id: String): Element {
+        val nodes = document.getElementsByTagName("*")
+        return (0 until nodes.length)
+            .map { nodes.item(it) as Element }
+            .single { it.getAttributeNS(androidNamespace, "id") == id }
     }
 
     private fun vectorFillColor(fileName: String): String {

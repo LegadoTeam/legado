@@ -17,6 +17,8 @@ class AudioEpisodeUnitTest {
         assertEquals("听完 %d 集", chineseString("audio_stop_chapters"))
         assertEquals("按集数", chineseString("sleep_timer_by_episode"))
         assertEquals("Chapters", defaultString("sleep_timer_by_episode"))
+        assertEquals("第 %1\$d 集 · 共 %2\$d 集", chineseString("audio_chapter_progress"))
+        assertEquals("Chapter %1\$d / %2\$d", defaultString("audio_chapter_progress"))
     }
 
     @Test
@@ -30,8 +32,16 @@ class AudioEpisodeUnitTest {
         val dialog = projectFile(
             "src/main/java/io/legado/app/ui/widget/dialog/SleepTimerDialog.kt"
         ).readText()
+        val viewModel = projectFile(
+            "src/main/java/io/legado/app/ui/book/audio/AudioPlayViewModel.kt"
+        ).readText()
 
         assertTrue(activity.contains("R.string.audio_stop_chapters"))
+        assertTrue(activity.contains("R.string.audio_chapter_progress"))
+        assertTrue(activity.contains("AudioPlay.durChapterIndex + 1"))
+        assertTrue(activity.contains("binding.tvChapterIndex.visible()"))
+        assertTrue(activity.contains("binding.tvChapterIndex.gone()"))
+        assertEquals(2, Regex("AudioPlay\\.upData\\(book\\)").findAll(viewModel).count())
         assertTrue(
             Regex(
                 "SleepTimerDialog\\.newInstance\\(\\s*" +
