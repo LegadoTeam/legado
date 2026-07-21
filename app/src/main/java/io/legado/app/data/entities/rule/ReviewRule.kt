@@ -19,6 +19,26 @@ data class ReviewRule(
     var postReviewUrl: String? = null,      // 发送回复URL
     var postQuoteUrl: String? = null,       // 发送回复段评URL
     var deleteUrl: String? = null,          // 删除段评URL
+    var enabled: Boolean = false,
+    var reviewSummaryUrl: String? = null,
+    var summaryListRule: String? = null,
+    var summaryParagraphIndexRule: String? = null,
+    var summaryParagraphDataRule: String? = null,
+    var summaryCountRule: String? = null,
+    var reviewDetailUrl: String? = null,
+    var reviewDetailNextPageUrl: String? = null,
+    var detailListRule: String? = null,
+    var detailIdRule: String? = null,
+    var detailAvatarRule: String? = null,
+    var detailNameRule: String? = null,
+    var detailBadgeRule: String? = null,
+    var detailContentRule: String? = null,
+    var replyListRule: String? = null,
+    var replyIdRule: String? = null,
+    var replyAvatarRule: String? = null,
+    var replyNameRule: String? = null,
+    var replyBadgeRule: String? = null,
+    var replyContentRule: String? = null,
 ) : Parcelable {
 
     companion object {

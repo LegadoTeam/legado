@@ -92,7 +92,8 @@ class AnalyzeUrl(
     private var coroutineContext: CoroutineContext = EmptyCoroutineContext,
     headerMapF: Map<String, String>? = null,
     hasLoginHeader: Boolean = true,
-    private val infoMap: MutableMap<String, String>? = null
+    private val infoMap: MutableMap<String, String>? = null,
+    private val extraParams: Map<String, String>? = null
 ) : JsExtensions {
     constructor(mUrl: String) : this(mUrl, null)
 
@@ -382,6 +383,9 @@ class AnalyzeUrl(
             bindings["book"] = ruleData as? Book
             bindings["source"] = source
             bindings["result"] = result
+            extraParams?.forEach { (name, value) ->
+                bindings[name] = if (name == "page") value.toIntOrNull() ?: value else value
+            }
             bindings["infoMap"] = infoMap
         }
         val sharedScope = source?.getShareScope(coroutineContext)
@@ -406,6 +410,7 @@ class AnalyzeUrl(
     }
 
     fun get(key: String): String {
+        extraParams?.get(key)?.let { return it }
         when (key) {
             "bookName" -> (ruleData as? Book)?.let {
                 return it.name

@@ -28,7 +28,8 @@ data class TextChapter(
     val isVip: Boolean,
     val isPay: Boolean,
     //起效的替换规则
-    val effectiveReplaceRules: List<ReplaceRule>?
+    val effectiveReplaceRules: List<ReplaceRule>?,
+    val hasBodyContent: Boolean = true,
 ) : LayoutProgressListener {
 
     // Layout appends from IO while reading, navigation and progress query from the main thread.
@@ -316,7 +317,8 @@ data class TextChapter(
             sameTitleRemoved = false,
             isVip = false,
             isPay = false,
-            null
+            effectiveReplaceRules = null,
+            hasBodyContent = false,
         ).apply { isCompleted = true }
     }
 

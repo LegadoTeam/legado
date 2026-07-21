@@ -585,6 +585,7 @@
     <string name="source_tab_info">详情</string>
     <string name="source_tab_toc">目录</string>
     <string name="source_tab_content">正文</string>
+    <string name="source_tab_review">段评</string>
 
     <string name="e_ink_mode">E-Ink 模式</string>
     <string name="e_ink_mode_detail">去除动画，优化电纸书使用体验</string>
@@ -1085,6 +1086,25 @@
     <string name="show_add_to_shelf_alert_title">返回时提示放入书架</string>
     <string name="show_add_to_shelf_alert_summary">阅读未放入书架的书籍在返回时提示放入书架</string>
     <string name="review">段评</string>
+    <string name="rule_review_summary_url">段评统计 URL（reviewSummaryUrl）</string>
+    <string name="rule_review_summary_list">段评统计列表（summaryListRule）</string>
+    <string name="rule_review_summary_id">段落索引（summaryParagraphIndexRule）</string>
+    <string name="rule_review_summary_count">段评数量（summaryCountRule）</string>
+    <string name="rule_review_summary_key">段落数据（summaryParagraphDataRule）</string>
+    <string name="rule_review_detail_url">段评详情 URL（reviewDetailUrl）</string>
+    <string name="rule_review_detail_next_url">段评下一页 URL（reviewDetailNextPageUrl）</string>
+    <string name="rule_review_detail_list">段评详情列表（detailListRule）</string>
+    <string name="rule_review_detail_id">段评 ID（detailIdRule）</string>
+    <string name="rule_review_detail_avatar">头像（detailAvatarRule）</string>
+    <string name="rule_review_detail_name">昵称（detailNameRule）</string>
+    <string name="rule_review_detail_badge">徽章（detailBadgeRule）</string>
+    <string name="rule_review_detail_content">评论内容协议（detailContentRule：text/img/audio/time/likeCount/replyCount）</string>
+    <string name="rule_review_reply_list">子评论列表（replyListRule）</string>
+    <string name="rule_review_reply_id">子评论 ID（replyIdRule）</string>
+    <string name="rule_review_reply_avatar">子评论头像（replyAvatarRule）</string>
+    <string name="rule_review_reply_name">子评论昵称（replyNameRule）</string>
+    <string name="rule_review_reply_badge">子评论徽章（replyBadgeRule）</string>
+    <string name="rule_review_reply_content">子评论内容协议（replyContentRule：text/img/audio/time）</string>
     <string name="rule_review_url">段评URL（reviewUrl）</string>
     <string name="rule_avatar">段评发布者头像（avatarRule）</string>
     <string name="rule_review_content">段评内容（contentRule）</string>
@@ -1308,4 +1328,12 @@
     <string name="audio_cache_notification_title">音频缓存</string>
     <string name="audio_cache_notification_text">《%1$s》已缓存 %2$d/%3$d，失败 %4$d</string>
     <string name="audio_cache_corrupted_retry">检测到缓存损坏，已自动回源重试</string>
+    <string name="review_total_count">共 %1$d 条评论</string>
+    <string name="review_more_replies">查看更多 %1$d 条回复</string>
+    <string name="review_play_audio">播放语音</string>
+    <string name="review_pause_audio">暂停语音</string>
+    <string name="review_empty">暂无段评</string>
+    <string name="review_rule_missing">未配置段评规则</string>
+    <string name="review_detail_url_missing">未配置段评详情 URL</string>
+    <string name="review_detail_rule_missing">未配置段评详情规则</string>
 </resources>

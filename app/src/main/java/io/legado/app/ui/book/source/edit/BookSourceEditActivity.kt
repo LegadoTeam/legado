@@ -21,6 +21,7 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.rule.BookInfoRule
 import io.legado.app.data.entities.rule.ContentRule
 import io.legado.app.data.entities.rule.ExploreRule
+import io.legado.app.data.entities.rule.ReviewRule
 import io.legado.app.data.entities.rule.SearchRule
 import io.legado.app.data.entities.rule.TocRule
 import io.legado.app.databinding.ActivityBookSourceEditBinding
@@ -82,6 +83,7 @@ class BookSourceEditActivity :
     private val infoEntities: ArrayList<EditEntity> = ArrayList()
     private val tocEntities: ArrayList<EditEntity> = ArrayList()
     private val contentEntities: ArrayList<EditEntity> = ArrayList()
+    private val reviewEntities: ArrayList<EditEntity> = ArrayList()
     private var redirectJsSourceUrl: String? = null
     private var pendingEditKey: String? = null
     private var pendingEditTabPosition = 0
@@ -96,7 +98,6 @@ class BookSourceEditActivity :
         super.finish()
     }
 
-    //    private val reviewEntities: ArrayList<EditEntity> = ArrayList()
     private val qrCodeResult = registerForActivityResult(QrCodeResult()) {
         it ?: return@registerForActivityResult
         viewModel.importSource(it) { source ->
@@ -220,6 +221,7 @@ class BookSourceEditActivity :
             3 -> infoEntities
             4 -> tocEntities
             5 -> contentEntities
+            6 -> reviewEntities
             else -> sourceEntities
         }
         return entities.find { it.key == key }
@@ -306,6 +308,9 @@ class BookSourceEditActivity :
         binding.tabLayout.addTab(binding.tabLayout.newTab().apply {
             setText(R.string.source_tab_content)
         })
+        binding.tabLayout.addTab(binding.tabLayout.newTab().apply {
+            setText(R.string.source_tab_review)
+        })
         binding.recyclerView.setEdgeEffectColor(primaryColor)
         if (adapter.editEntityMaxLine < 999) {
             binding.recyclerView.layoutManager = NoChildScrollLinearLayoutManager(this) //启用后会阻止RecyclerView跟随光标滚动,行数少时,用的TextView跟随
@@ -371,7 +376,7 @@ class BookSourceEditActivity :
             3 -> infoEntities
             4 -> tocEntities
             5 -> contentEntities
-//            6 -> reviewEntities
+            6 -> reviewEntities
             else -> sourceEntities
         }
         binding.recyclerView.scrollToPosition(0)
@@ -384,6 +389,7 @@ class BookSourceEditActivity :
             binding.cbIsEnable.isChecked = it.enabled
             binding.cbIsEnableExplore.isChecked = it.enabledExplore
             binding.cbIsEnableCookie.isChecked = it.enabledCookieJar ?: false
+            binding.cbIsEnableReview.isChecked = it.ruleReview?.enabled ?: false
             binding.spType.setSelection(
                 when (it.bookSourceType) {
                     BookSourceType.video -> 4
@@ -492,20 +498,31 @@ class BookSourceEditActivity :
             add(EditEntity("callBackJs", cr.callBackJs, R.string.rule_call_back))
         }
         // 段评
-//        val rr = bs.getReviewRule()
-//        reviewEntities.clear()
-//        reviewEntities.apply {
-//            add(EditEntity("reviewUrl", rr.reviewUrl, R.string.rule_review_url))
-//            add(EditEntity("avatarRule", rr.avatarRule, R.string.rule_avatar))
-//            add(EditEntity("contentRule", rr.contentRule, R.string.rule_review_content))
-//            add(EditEntity("postTimeRule", rr.postTimeRule, R.string.rule_post_time))
-//            add(EditEntity("reviewQuoteUrl", rr.reviewQuoteUrl, R.string.rule_review_quote))
-//            add(EditEntity("voteUpUrl", rr.voteUpUrl, R.string.review_vote_up))
-//            add(EditEntity("voteDownUrl", rr.voteDownUrl, R.string.review_vote_down))
-//            add(EditEntity("postReviewUrl", rr.postReviewUrl, R.string.post_review_url))
-//            add(EditEntity("postQuoteUrl", rr.postQuoteUrl, R.string.post_quote_url))
-//            add(EditEntity("deleteUrl", rr.deleteUrl, R.string.delete_review_url))
-//        }
+        val rr = bs.ruleReview ?: ReviewRule()
+        reviewEntities.clear()
+        reviewEntities.apply {
+            add(EditEntity("reviewSummaryUrl", rr.reviewSummaryUrl, R.string.rule_review_summary_url))
+            add(EditEntity("summaryListRule", rr.summaryListRule, R.string.rule_review_summary_list))
+            add(EditEntity("summaryParagraphIndexRule", rr.summaryParagraphIndexRule, R.string.rule_review_summary_id))
+            add(EditEntity("summaryCountRule", rr.summaryCountRule, R.string.rule_review_summary_count))
+            add(EditEntity("summaryParagraphDataRule", rr.summaryParagraphDataRule, R.string.rule_review_summary_key))
+
+            add(EditEntity("reviewDetailUrl", rr.reviewDetailUrl, R.string.rule_review_detail_url))
+            add(EditEntity("reviewDetailNextPageUrl", rr.reviewDetailNextPageUrl, R.string.rule_review_detail_next_url))
+            add(EditEntity("detailListRule", rr.detailListRule, R.string.rule_review_detail_list))
+            add(EditEntity("detailIdRule", rr.detailIdRule, R.string.rule_review_detail_id))
+            add(EditEntity("detailAvatarRule", rr.detailAvatarRule, R.string.rule_review_detail_avatar))
+            add(EditEntity("detailNameRule", rr.detailNameRule, R.string.rule_review_detail_name))
+            add(EditEntity("detailBadgeRule", rr.detailBadgeRule, R.string.rule_review_detail_badge))
+            add(EditEntity("detailContentRule", rr.detailContentRule, R.string.rule_review_detail_content))
+
+            add(EditEntity("replyListRule", rr.replyListRule, R.string.rule_review_reply_list))
+            add(EditEntity("replyIdRule", rr.replyIdRule, R.string.rule_review_reply_id))
+            add(EditEntity("replyAvatarRule", rr.replyAvatarRule, R.string.rule_review_reply_avatar))
+            add(EditEntity("replyNameRule", rr.replyNameRule, R.string.rule_review_reply_name))
+            add(EditEntity("replyBadgeRule", rr.replyBadgeRule, R.string.rule_review_reply_badge))
+            add(EditEntity("replyContentRule", rr.replyContentRule, R.string.rule_review_reply_content))
+        }
         binding.tabLayout.selectTab(binding.tabLayout.getTabAt(0))
         setEditEntities(0)
         applyPendingEditResult()
@@ -547,7 +564,8 @@ class BookSourceEditActivity :
         val bookInfoRule = BookInfoRule()
         val tocRule = TocRule()
         val contentRule = ContentRule()
-//        val reviewRule = ReviewRule()
+        val reviewRule = source.ruleReview?.copy() ?: ReviewRule()
+        reviewRule.enabled = binding.cbIsEnableReview.isChecked
         sourceEntities.forEach {
             it.value = it.value?.takeIf { s -> s.isNotBlank() }
             when (it.key) {
@@ -705,34 +723,40 @@ class BookSourceEditActivity :
                 "callBackJs" -> contentRule.callBackJs = it.value
             }
         }
-//        reviewEntities.forEach {
-//            when (it.key) {
-//                "reviewUrl" -> reviewRule.reviewUrl = it.value
-//                "avatarRule" -> reviewRule.avatarRule =
-//                    viewModel.ruleComplete(it.value, reviewRule.reviewUrl, 3)
-//
-//                "contentRule" -> reviewRule.contentRule =
-//                    viewModel.ruleComplete(it.value, reviewRule.reviewUrl)
-//
-//                "postTimeRule" -> reviewRule.postTimeRule =
-//                    viewModel.ruleComplete(it.value, reviewRule.reviewUrl)
-//
-//                "reviewQuoteUrl" -> reviewRule.reviewQuoteUrl =
-//                    viewModel.ruleComplete(it.value, reviewRule.reviewUrl, 2)
-//
-//                "voteUpUrl" -> reviewRule.voteUpUrl = it.value
-//                "voteDownUrl" -> reviewRule.voteDownUrl = it.value
-//                "postReviewUrl" -> reviewRule.postReviewUrl = it.value
-//                "postQuoteUrl" -> reviewRule.postQuoteUrl = it.value
-//                "deleteUrl" -> reviewRule.deleteUrl = it.value
-//            }
-//        }
+        reviewEntities.forEach {
+            it.value = it.value?.takeIf { value -> value.isNotBlank() }
+            when (it.key) {
+                "reviewSummaryUrl" -> reviewRule.reviewSummaryUrl = it.value
+                "summaryListRule" -> reviewRule.summaryListRule = it.value
+                "summaryParagraphIndexRule" -> reviewRule.summaryParagraphIndexRule = it.value
+                "summaryCountRule" -> reviewRule.summaryCountRule = it.value
+                "summaryParagraphDataRule" -> reviewRule.summaryParagraphDataRule = it.value
+                "reviewDetailUrl" -> reviewRule.reviewDetailUrl = it.value
+                "reviewDetailNextPageUrl" -> reviewRule.reviewDetailNextPageUrl = it.value
+                "detailListRule" -> reviewRule.detailListRule = it.value
+                "detailIdRule" -> reviewRule.detailIdRule = it.value
+                "detailAvatarRule" -> reviewRule.detailAvatarRule = it.value
+                "detailNameRule" -> reviewRule.detailNameRule = it.value
+                "detailBadgeRule" -> reviewRule.detailBadgeRule = it.value
+                "detailContentRule" -> reviewRule.detailContentRule = it.value
+                "replyListRule" -> reviewRule.replyListRule = it.value
+                "replyIdRule" -> reviewRule.replyIdRule = it.value
+                "replyAvatarRule" -> reviewRule.replyAvatarRule = it.value
+                "replyNameRule" -> reviewRule.replyNameRule = it.value
+                "replyBadgeRule" -> reviewRule.replyBadgeRule = it.value
+                "replyContentRule" -> reviewRule.replyContentRule = it.value
+            }
+        }
         source.ruleSearch = searchRule
         source.ruleExplore = exploreRule
         source.ruleBookInfo = bookInfoRule
         source.ruleToc = tocRule
         source.ruleContent = contentRule
-//        source.ruleReview = reviewRule
+        source.ruleReview = reviewRule.takeIf {
+            source.ruleReview != null || it.enabled || reviewEntities.any { entity ->
+                !entity.value.isNullOrBlank()
+            }
+        }
         return source
     }
 

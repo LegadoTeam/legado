@@ -42,4 +42,7 @@
 
     <!--statusBarBackground-->
     <color name="navigation_bar_bag">#222222</color>
+    <color name="reviewContentText">#E6FFFFFF</color>
+    <color name="reviewCardStroke">#33FFFFFF</color>
+    <color name="reviewBadgeBg">#26FFFFFF</color>
 </resources>
