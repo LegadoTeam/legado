@@ -156,6 +156,23 @@ class JsEngineCapabilitiesTest {
     }
 
     @Test
+    fun detachedCreateSymmetricCryptoRemainsCallable() {
+        RhinoScriptEngine.initialize()
+        val bindings = ScriptBindings().apply {
+            this["java"] = MethodBridge()
+        }
+
+        Assert.assertEquals(
+            "function:ok",
+            RhinoScriptEngine.eval(
+                "var createSymmetricCrypto = java.createSymmetricCrypto; " +
+                    "typeof createSymmetricCrypto + ':' + createSymmetricCrypto('ok')",
+                bindings,
+            ),
+        )
+    }
+
+    @Test
     fun nestedEvalKeepsDynamicallyLoadedFunctionsVisible() {
         val cases = listOf(
             "eval(\"function gzip(value) { return 'fn:' + value; }\"); gzip('ok')" to
@@ -316,6 +333,11 @@ class JsEngineCapabilitiesTest {
 
     class ThrowingChild {
         fun fail(): Nothing = throw IllegalStateException("expected child failure")
+    }
+
+    class MethodBridge {
+        fun createSymmetricCrypto(value: String): String = value
+        fun createSymmetricCrypto(value: String, suffix: String): String = value + suffix
     }
 
     class HiddenClassLoader : ClassLoader()
