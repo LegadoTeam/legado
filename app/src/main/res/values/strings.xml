@@ -173,7 +173,9 @@
     <string name="sleep_timer_title">Sleep timer</string>
     <string name="sleep_timer_by_time">Minutes</string>
     <string name="sleep_timer_by_chapter">Chapters</string>
+    <string name="sleep_timer_by_episode">Chapters</string>
     <string name="sleep_timer_chapters">%d chapters</string>
+    <string name="audio_stop_chapters">Stop after %d chapters</string>
     <string name="ps_hide_navigation_bar">Hide virtual buttons when reading</string>
     <string name="pt_hide_navigation_bar">Hide navigation bar</string>
     <string name="re_navigation_bar_color">Navigation bar color</string>
