@@ -17,6 +17,8 @@ var config = {
     lastUpdateTime: 0
 };
 
+var Jsoup = org.jsoup.Jsoup;
+
 // config.loginUi 非空时必须提供。
 function login() {
     var loginInfo = JSON.parse(source.getLoginInfo() || "{}");
