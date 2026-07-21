@@ -1,6 +1,7 @@
 package io.legado.app.ui.book.source.edit
 
 import android.content.Intent
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.view.Menu
@@ -23,6 +24,7 @@ import io.legado.app.data.entities.rule.ExploreRule
 import io.legado.app.data.entities.rule.SearchRule
 import io.legado.app.data.entities.rule.TocRule
 import io.legado.app.databinding.ActivityBookSourceEditBinding
+import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.dialogs.alert
@@ -30,6 +32,7 @@ import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryColor
+import io.legado.app.lib.theme.transparentNavBar
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.book.source.debug.BookSourceDebugActivity
@@ -313,7 +316,11 @@ class BookSourceEditActivity :
                 newFocus.postDelayed({ sendText("") }, 120)
             }
         }
-        binding.tabLayout.setBackgroundColor(backgroundColor)
+        val transparentBar = transparentNavBar && !AppConfig.isEInkMode
+        binding.tabLayout.setBackgroundColor(
+            if (transparentBar) Color.TRANSPARENT else backgroundColor
+        )
+        if (transparentBar) binding.tabLayout.elevation = 0f
         binding.tabLayout.setSelectedTabIndicatorColor(accentColor)
         binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabReselected(tab: TabLayout.Tab?) {
