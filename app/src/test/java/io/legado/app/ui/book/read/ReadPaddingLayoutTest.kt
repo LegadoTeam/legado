@@ -10,6 +10,21 @@ import javax.xml.parsers.DocumentBuilderFactory
 class ReadPaddingLayoutTest {
 
     @Test
+    fun `padding panel uses four shared controls`() {
+        val document = readPaddingLayout()
+
+        assertEquals(
+            "androidx.core.widget.NestedScrollView",
+            document.documentElement.tagName,
+        )
+        assertEquals("true", document.documentElement.androidAttribute("fillViewport"))
+        assertEquals(
+            4,
+            document.getElementsByTagName("io.legado.app.ui.widget.DetailSeekBar").length,
+        )
+    }
+
+    @Test
     fun `vertical padding supports the extended range`() {
         val document = readPaddingLayout()
         verticalPaddingIds.forEach { id ->
@@ -23,6 +38,35 @@ class ReadPaddingLayoutTest {
         horizontalPaddingIds.forEach { id ->
             assertEquals("100", document.findElementById(id).appAttribute("max"))
         }
+    }
+
+    @Test
+    fun `region controls are equal and touch sized`() {
+        val document = readPaddingLayout()
+        regionButtonIds.forEach { id ->
+            val button = document.findElementById(id)
+            assertEquals("0dp", button.androidAttribute("layout_width"))
+            assertEquals("1", button.androidAttribute("layout_weight"))
+            assertEquals("48dp", button.androidAttribute("layout_height"))
+            assertEquals("true", button.androidAttribute("clickable"))
+            assertEquals("true", button.androidAttribute("focusable"))
+        }
+
+        val reset = document.findElementById("@+id/iv_reset")
+        assertEquals("48dp", reset.androidAttribute("layout_width"))
+        assertEquals("48dp", reset.androidAttribute("layout_height"))
+        assertEquals("@string/restore_default", reset.androidAttribute("contentDescription"))
+    }
+
+    @Test
+    fun `binary options use accessible switches`() {
+        val document = readPaddingLayout()
+        val lock = document.findElementById("@+id/sw_lock_lr")
+        assertEquals("@string/lock_left_right_padding", lock.androidAttribute("text"))
+        assertEquals("48dp", lock.androidAttribute("minHeight"))
+        val showLine = document.findElementById("@+id/sw_show_line")
+        assertEquals("@string/showLine", showLine.androidAttribute("text"))
+        assertEquals("48dp", showLine.androidAttribute("minHeight"))
     }
 
     private fun readPaddingLayout(): Document {
@@ -54,21 +98,19 @@ class ReadPaddingLayoutTest {
         const val appNamespace = "http://schemas.android.com/apk/res-auto"
 
         val verticalPaddingIds = listOf(
-            "@+id/dsb_header_padding_top",
-            "@+id/dsb_header_padding_bottom",
-            "@+id/dsb_padding_top",
-            "@+id/dsb_padding_bottom",
-            "@+id/dsb_footer_padding_top",
-            "@+id/dsb_footer_padding_bottom",
+            "@+id/dsb_top",
+            "@+id/dsb_bottom",
         )
 
         val horizontalPaddingIds = listOf(
-            "@+id/dsb_header_padding_left",
-            "@+id/dsb_header_padding_right",
-            "@+id/dsb_padding_left",
-            "@+id/dsb_padding_right",
-            "@+id/dsb_footer_padding_left",
-            "@+id/dsb_footer_padding_right",
+            "@+id/dsb_left",
+            "@+id/dsb_right",
+        )
+
+        val regionButtonIds = listOf(
+            "@+id/btn_region_header",
+            "@+id/btn_region_body",
+            "@+id/btn_region_footer",
         )
     }
 }

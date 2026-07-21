@@ -1,115 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/root_view"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content">
+    android:layout_height="wrap_content"
+    android:fillViewport="true"
+    android:overScrollMode="never">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="10dp">
-
-        <LinearLayout
-            android:id="@+id/ll_header_padding"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingBottom="10dp">
-
-                <io.legado.app.ui.widget.text.AccentTextView
-                    android:id="@+id/tv_header_padding"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/header"
-                    android:textSize="18sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/showLine" />
-
-                <io.legado.app.ui.widget.checkbox.SmoothCheckBox
-                    android:id="@+id/cb_show_top_line"
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:layout_margin="6dp" />
-
-            </LinearLayout>
-
-            <io.legado.app.ui.widget.DetailSeekBar
-                android:id="@+id/dsb_header_padding_top"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:max="400"
-                app:title="@string/padding_top" />
-
-            <io.legado.app.ui.widget.DetailSeekBar
-                android:id="@+id/dsb_header_padding_bottom"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:max="400"
-                app:title="@string/padding_bottom" />
-
-            <io.legado.app.ui.widget.DetailSeekBar
-                android:id="@+id/dsb_header_padding_left"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:max="100"
-                app:title="@string/padding_left" />
-
-            <io.legado.app.ui.widget.DetailSeekBar
-                android:id="@+id/dsb_header_padding_right"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:max="100"
-                app:title="@string/padding_right" />
-
-        </LinearLayout>
-
-        <io.legado.app.ui.widget.text.AccentTextView
-            android:id="@+id/tv_body_padding"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingTop="10dp"
-            android:paddingBottom="10dp"
-            android:text="@string/main_body"
-            android:textSize="18sp" />
-
-        <io.legado.app.ui.widget.DetailSeekBar
-            android:id="@+id/dsb_padding_top"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:max="400"
-            app:title="@string/padding_top" />
-
-        <io.legado.app.ui.widget.DetailSeekBar
-            android:id="@+id/dsb_padding_bottom"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:max="400"
-            app:title="@string/padding_bottom" />
-
-        <io.legado.app.ui.widget.DetailSeekBar
-            android:id="@+id/dsb_padding_left"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:max="100"
-            app:title="@string/padding_left" />
-
-        <io.legado.app.ui.widget.DetailSeekBar
-            android:id="@+id/dsb_padding_right"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:max="100"
-            app:title="@string/padding_right" />
+        android:paddingStart="16dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="8dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -117,55 +23,128 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <io.legado.app.ui.widget.text.AccentTextView
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:paddingTop="10dp"
-                android:paddingBottom="10dp"
-                android:text="@string/footer"
-                android:textSize="18sp" />
+                android:orientation="horizontal">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/showLine" />
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btn_region_header"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_marginHorizontal="2dp"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?android:attr/selectableItemBackground"
+                    android:gravity="center"
+                    android:ellipsize="end"
+                    android:maxLines="2"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="4dp"
+                    android:text="@string/header"
+                    android:textAllCaps="false"
+                    android:textColor="@color/primaryText"
+                    android:textSize="14sp" />
 
-            <io.legado.app.ui.widget.checkbox.SmoothCheckBox
-                android:id="@+id/cb_show_bottom_line"
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:layout_margin="6dp" />
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btn_region_body"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_marginHorizontal="2dp"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?android:attr/selectableItemBackground"
+                    android:gravity="center"
+                    android:ellipsize="end"
+                    android:maxLines="2"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="4dp"
+                    android:text="@string/main_body"
+                    android:textAllCaps="false"
+                    android:textColor="@color/primaryText"
+                    android:textSize="14sp"
+                    tools:selected="true" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btn_region_footer"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_marginHorizontal="2dp"
+                    android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?android:attr/selectableItemBackground"
+                    android:gravity="center"
+                    android:ellipsize="end"
+                    android:maxLines="2"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="4dp"
+                    android:text="@string/footer"
+                    android:textAllCaps="false"
+                    android:textColor="@color/primaryText"
+                    android:textSize="14sp" />
+
+            </LinearLayout>
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/iv_reset"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/restore_default"
+                android:padding="12dp"
+                android:src="@drawable/ic_restore" />
 
         </LinearLayout>
 
         <io.legado.app.ui.widget.DetailSeekBar
-            android:id="@+id/dsb_footer_padding_top"
+            android:id="@+id/dsb_top"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            app:isBottomBackground="true"
             app:max="400"
             app:title="@string/padding_top" />
 
         <io.legado.app.ui.widget.DetailSeekBar
-            android:id="@+id/dsb_footer_padding_bottom"
+            android:id="@+id/dsb_bottom"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            app:isBottomBackground="true"
             app:max="400"
             app:title="@string/padding_bottom" />
 
         <io.legado.app.ui.widget.DetailSeekBar
-            android:id="@+id/dsb_footer_padding_left"
+            android:id="@+id/dsb_left"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            app:isBottomBackground="true"
             app:max="100"
             app:title="@string/padding_left" />
 
         <io.legado.app.ui.widget.DetailSeekBar
-            android:id="@+id/dsb_footer_padding_right"
+            android:id="@+id/dsb_right"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            app:isBottomBackground="true"
             app:max="100"
             app:title="@string/padding_right" />
+
+        <io.legado.app.lib.theme.view.ThemeSwitch
+            android:id="@+id/sw_lock_lr"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="@string/lock_left_right_padding" />
+
+        <io.legado.app.lib.theme.view.ThemeSwitch
+            android:id="@+id/sw_show_line"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="@string/showLine" />
 
     </LinearLayout>
 

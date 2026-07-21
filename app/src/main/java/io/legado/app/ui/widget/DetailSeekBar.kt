@@ -27,6 +27,9 @@ class DetailSeekBar @JvmOverloads constructor(
 
     var valueFormat: ((progress: Int) -> String)? = null
     var onChanged: ((progress: Int) -> Unit)? = null
+    var onTrackingStart: (() -> Unit)? = null
+    var onTrackingStop: (() -> Unit)? = null
+    var onDragging: ((progress: Int) -> Unit)? = null
     var progress: Int
         get() = binding.seekBar.progress
         set(value) {
@@ -79,14 +82,16 @@ class DetailSeekBar @JvmOverloads constructor(
 
     override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
         upValue(progress)
+        if (fromUser) onDragging?.invoke(progress)
     }
 
     override fun onStartTrackingTouch(seekBar: SeekBar) {
-
+        onTrackingStart?.invoke()
     }
 
     override fun onStopTrackingTouch(seekBar: SeekBar) {
         onChanged?.invoke(binding.seekBar.progress)
+        onTrackingStop?.invoke()
     }
 
 }
