@@ -107,7 +107,7 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
             book.removeType(BookType.updateError)
             AudioPlay.book?.delete()
             appDb.bookDao.insert(book)
-            AudioPlay.book = book
+            AudioPlay.replaceBook(book)
             AudioPlay.setBookSource(source)
             appDb.bookChapterDao.insert(*toc.toTypedArray())
             AudioPlay.upDurChapter()

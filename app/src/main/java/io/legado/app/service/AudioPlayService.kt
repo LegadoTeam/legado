@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.AudioManager
@@ -30,6 +31,7 @@ import io.legado.app.constant.AppLog
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.IntentAction
 import io.legado.app.constant.NotificationId
+import io.legado.app.constant.PreferKey
 import io.legado.app.constant.Status
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.MediaHelp
@@ -44,6 +46,7 @@ import io.legado.app.receiver.MediaButtonReceiver
 import io.legado.app.ui.book.audio.AudioPlayActivity
 import io.legado.app.utils.activityPendingIntent
 import io.legado.app.utils.broadcastPendingIntent
+import io.legado.app.utils.defaultSharedPreferences
 import io.legado.app.utils.isJsonArray
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.printOnDebug
@@ -65,7 +68,8 @@ import splitties.systemservices.wifiManager
  */
 class AudioPlayService : BaseService(),
     AudioManager.OnAudioFocusChangeListener,
-    Player.Listener {
+    Player.Listener,
+    SharedPreferences.OnSharedPreferenceChangeListener {
 
     companion object {
         @JvmStatic
@@ -74,6 +78,11 @@ class AudioPlayService : BaseService(),
 
         @JvmStatic
         var pause = true
+            private set
+
+        @JvmStatic
+        @Volatile
+        var isPlaying = false
             private set
 
         @JvmStatic
@@ -144,6 +153,7 @@ class AudioPlayService : BaseService(),
             timeMinute = 0
         }
         exoPlayer.addListener(this)
+        defaultSharedPreferences.registerOnSharedPreferenceChangeListener(this)
         AudioPlay.registerService(this)
         initMediaSession()
         initBroadcastReceiver()
@@ -212,6 +222,9 @@ class AudioPlayService : BaseService(),
 
     override fun onDestroy() {
         super.onDestroy()
+        isPlaying = false
+        AudioPlay.upReadTime()
+        defaultSharedPreferences.unregisterOnSharedPreferenceChangeListener(this)
         if (useWakeLock) {
             wakeLock.release()
             wifiLock?.release()
@@ -419,6 +432,28 @@ class AudioPlayService : BaseService(),
         upAudioPlayNotification()
     }
 
+    override fun onIsPlayingChanged(isPlaying: Boolean) {
+        super.onIsPlayingChanged(isPlaying)
+        AudioPlayService.isPlaying = isPlaying
+        if (isPlaying) {
+            AudioPlay.markReadTimeStart()
+        } else {
+            AudioPlay.upReadTime()
+        }
+    }
+
+    override fun onSharedPreferenceChanged(
+        sharedPreferences: SharedPreferences?,
+        key: String?,
+    ) {
+        if (key != PreferKey.enableReadRecord) return
+        if (AppConfig.enableReadRecord && exoPlayer.isPlaying) {
+            AudioPlay.markReadTimeStart()
+        } else {
+            AudioPlay.upReadTime()
+        }
+    }
+
     private fun upMediaMetadata() {
         val metadata = MediaMetadataCompat.Builder()
             .putBitmap(MediaMetadataCompat.METADATA_KEY_ART, cover)
@@ -435,6 +470,7 @@ class AudioPlayService : BaseService(),
      */
     override fun onPlayerError(error: PlaybackException) {
         super.onPlayerError(error)
+        AudioPlay.upReadTime()
         AudioPlay.status = Status.STOP
         postEvent(EventBus.AUDIO_STATE, Status.STOP)
         AudioPlay.upLoading(false)
