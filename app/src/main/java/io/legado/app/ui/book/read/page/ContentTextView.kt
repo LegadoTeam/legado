@@ -260,7 +260,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                 }
 
                 is ReviewColumn -> {
-                    context.toastOnUi("Button Pressed!")
+                    callBack.onReviewClick(resolveReviewId(textLine), column.count)
                     handled = true
                 }
 
@@ -411,8 +411,21 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
             val textPage = relativePage(relativePos)
             for ((lineIndex, textLine) in textPage.lines.withIndex()) {
                 if (textLine.isTouch(x, y, relativeOffset)) {
+                    val reviewIndex = textLine.columns.indexOfFirst {
+                        it is ReviewColumn && it.isTouch(x, y, relativeOffset)
+                    }
+                    if (reviewIndex >= 0) {
+                        touched.invoke(
+                            relativeOffset,
+                            TextPos(relativePos, lineIndex, reviewIndex),
+                            textPage,
+                            textLine,
+                            textLine.columns[reviewIndex]
+                        )
+                        return
+                    }
                     for ((charIndex, textColumn) in textLine.columns.withIndex()) {
-                        if (textColumn.isTouch(x)) {
+                        if (textColumn !is ReviewColumn && textColumn.isTouch(x)) {
                             touched.invoke(
                                 relativeOffset,
                                 TextPos(relativePos, lineIndex, charIndex),
@@ -666,6 +679,9 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
             textPos.relativePagePos = relativePos
             textPage.lines.forEachIndexed { lineIndex, textLine ->
                 textPos.lineIndex = lineIndex
+                val lastTextColumnIndex = textLine.columns.indexOfLast {
+                    it is TextBaseColumn
+                }
                 textLine.columns.forEachIndexed { charIndex, column ->
                     textPos.columnIndex = charIndex
                     val compareStart = textPos.compare(selectStart)
@@ -674,7 +690,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                         when {
                             compareStart == -1 -> if (
                                 selectStart.columnIndex == textLine.columns.size
-                                && charIndex == textLine.columns.lastIndex
+                                && charIndex == lastTextColumnIndex
                             ) {
                                 builder.append("\n")
                             }
@@ -687,7 +703,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                                 builder.append(column.charData)
                                 if (
                                     textLine.isParagraphEnd
-                                    && charIndex == textLine.columns.lastIndex
+                                    && charIndex == lastTextColumnIndex
                                     && compareEnd != 0
                                 ) {
                                     builder.append("\n")
@@ -783,5 +799,12 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         fun onLongScreenshotTouchEvent(event: MotionEvent): Boolean
         fun oldClickImg(src: String): Boolean
         fun clickImg(click: String, src: String)
+        fun onReviewClick(paragraphNum: Int, count: Int)
+    }
+
+    private fun resolveReviewId(textLine: TextLine): Int {
+        if (textLine.isTitle) return -1
+        val reviewId = textLine.paragraphNum - textLine.reviewTitleOffset
+        return if (reviewId > 0) reviewId else textLine.paragraphNum
     }
 }

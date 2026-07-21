@@ -1,5 +1,6 @@
 package io.legado.app.ui.book.read.page.provider
 
+import android.graphics.Paint
 import android.graphics.Paint.FontMetrics
 import android.graphics.RectF
 import android.graphics.Typeface
@@ -16,6 +17,9 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.page.entities.TextChapter
+import io.legado.app.ui.book.read.page.entities.TextLine
+import io.legado.app.ui.book.read.page.entities.column.ReviewColumn
+import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.RealPathUtil
 import io.legado.app.utils.buildMainHandler
 import io.legado.app.utils.dpToPx
@@ -142,6 +146,14 @@ object ChapterProvider {
 
     private var upViewSizeRunnable: Runnable? = null
 
+    @Volatile
+    private var reviewCountProvider: ((Int, Int) -> Int)? = null
+
+    @Volatile
+    private var reviewKeyProvider: ((Int, Int) -> String?)? = null
+
+    private const val reviewTitleOffset = 1
+
     init {
         upStyle()
     }
@@ -162,7 +174,8 @@ object ChapterProvider {
             bookContent.sameTitleRemoved,
             bookChapter.isVip,
             bookChapter.isPay,
-            bookContent.effectiveReplaceRules
+            bookContent.effectiveReplaceRules,
+            hasBodyContent = bookContent.textList.isNotEmpty(),
         ).apply {
             createLayout(scope, book, bookContent)
         }
@@ -178,10 +191,15 @@ object ChapterProvider {
         getPaints(typeface).let {
             titlePaint = it.first
             contentPaint = it.second
-//            reviewPaint.color = contentPaint.color
-//            reviewPaint.textSize = contentPaint.textSize * 0.45f
-//            reviewPaint.textAlign = Paint.Align.CENTER
         }
+        reviewPaint.color = if (AppConfig.isNightTheme) {
+            ColorUtils.lightenColor(contentPaint.color)
+        } else {
+            ColorUtils.darkenColor(contentPaint.color)
+        }
+        reviewPaint.textSize = contentPaint.textSize * 0.45f
+        reviewPaint.textAlign = Paint.Align.CENTER
+        reviewPaint.isAntiAlias = true
         //间距
         lineSpacingExtra = ReadBookConfig.lineSpacingExtra / 10f
         paragraphSpacing = ReadBookConfig.paragraphSpacing
@@ -202,6 +220,141 @@ object ChapterProvider {
         titlePaintFontMetrics = titlePaint.fontMetrics
         contentPaintFontMetrics = contentPaint.fontMetrics
         upLayout()
+    }
+
+    fun setReviewProviders(
+        countProvider: ((Int, Int) -> Int)?,
+        keyProvider: ((Int, Int) -> String?)?,
+    ) {
+        reviewCountProvider = countProvider
+        reviewKeyProvider = keyProvider
+        refreshReviewColumns()
+    }
+
+    fun clearReviewProviders() {
+        setReviewProviders(null, null)
+    }
+
+    fun setReviewCountProvider(provider: ((Int) -> Int)?) {
+        val wrappedProvider = provider?.let { count ->
+            { _: Int, reviewId: Int -> count(reviewId) }
+        }
+        setReviewProviders(wrappedProvider, reviewKeyProvider)
+    }
+
+    fun setReviewKeyProvider(provider: ((Int) -> String?)?) {
+        val wrappedProvider = provider?.let { key ->
+            { _: Int, reviewId: Int -> key(reviewId) }
+        }
+        setReviewProviders(reviewCountProvider, wrappedProvider)
+    }
+
+    fun getReviewKeyById(
+        reviewId: Int,
+        chapterIndex: Int = ReadBook.durChapterIndex,
+    ): String? {
+        return reviewKeyProvider?.invoke(chapterIndex, reviewId)?.takeIf { it.isNotBlank() }
+    }
+
+    private fun refreshReviewColumns() {
+        refreshReviewColumns(ReadBook.prevTextChapter)
+        refreshReviewColumns(ReadBook.curTextChapter)
+        refreshReviewColumns(ReadBook.nextTextChapter)
+    }
+
+    private fun refreshReviewColumns(textChapter: TextChapter?) {
+        textChapter ?: return
+        val chapterIndex = textChapter.chapter.index
+        textChapter.pages.forEach { page ->
+            page.lines.forEach { line ->
+                val count = getReviewCount(
+                    paragraphNum = line.paragraphNum,
+                    isTitle = line.isTitle,
+                    titleOffset = line.reviewTitleOffset,
+                    chapterIndex = chapterIndex,
+                )
+                val shouldShow = count > 0 && line.isParagraphEnd
+                var changed = false
+                if (!shouldShow) {
+                    changed = line.removeColumns { it is ReviewColumn }
+                } else {
+                    val reviewColumn =
+                        line.columns.firstOrNull { it is ReviewColumn } as? ReviewColumn
+                    if (reviewColumn == null) {
+                        appendReviewColumnIfNeeded(line, chapterIndex = chapterIndex)
+                        changed = true
+                    } else {
+                        if (reviewColumn.count != count) {
+                            reviewColumn.count = count
+                            changed = true
+                        }
+                        if (updateReviewColumnLayout(reviewColumn, line)) {
+                            changed = true
+                        }
+                    }
+                }
+                if (changed) line.invalidate()
+            }
+        }
+    }
+
+    fun getReviewCount(
+        paragraphNum: Int,
+        isTitle: Boolean = false,
+        titleOffset: Int = reviewTitleOffset,
+        chapterIndex: Int = ReadBook.durChapterIndex,
+    ): Int {
+        val provider = reviewCountProvider ?: return 0
+        if (isTitle) {
+            val titleCount = provider(chapterIndex, -1)
+            if (titleCount > 0) return titleCount
+        }
+        val reviewId = paragraphNum - titleOffset
+        if (reviewId <= 0) return 0
+        return provider(chapterIndex, reviewId)
+    }
+
+    fun appendReviewColumnIfNeeded(
+        textLine: TextLine,
+        titleOffset: Int? = null,
+        chapterIndex: Int = ReadBook.durChapterIndex,
+    ) {
+        if (textLine.columns.any { it is ReviewColumn }) return
+        val count = getReviewCount(
+            paragraphNum = textLine.paragraphNum,
+            isTitle = textLine.isTitle,
+            titleOffset = titleOffset ?: textLine.reviewTitleOffset,
+            chapterIndex = chapterIndex,
+        )
+        if (count <= 0) return
+        val reviewColumn = ReviewColumn(start = 0f, end = 0f, count = count)
+        updateReviewColumnLayout(reviewColumn, textLine)
+        textLine.addColumn(reviewColumn)
+    }
+
+    private fun updateReviewColumnLayout(
+        reviewColumn: ReviewColumn,
+        textLine: TextLine,
+    ): Boolean {
+        val width = getReviewWidth(textLine.isTitle)
+        val maxEnd = if (doublePage && textLine.isLeftLine) {
+            (viewWidth / 2 - paddingRight).toFloat()
+        } else {
+            visibleRight.toFloat()
+        }
+        val textEnd = textLine.columns.lastOrNull { it !is ReviewColumn }?.end
+            ?: textLine.lineEnd
+        val start = minOf(textEnd, maxEnd - width)
+        val end = start + width
+        if (reviewColumn.start == start && reviewColumn.end == end) return false
+        reviewColumn.start = start
+        reviewColumn.end = end
+        return true
+    }
+
+    fun getReviewWidth(isTitle: Boolean): Float {
+        val textSize = if (isTitle) titlePaint.textSize else contentPaint.textSize
+        return textSize * 0.9f
     }
 
     private fun getTypeface(fontPath: String): Typeface? {

@@ -81,6 +81,7 @@ class AnalyzeRule(
     private val stringRuleCache = hashMapOf<String, List<SourceRule>>()
     private val regexCache = hashMapOf<String, Regex?>()
     private val scriptCache = hashMapOf<String, CompiledScript>()
+    private val localBindings = HashMap<String, String>()
     private var topScopeRef: WeakReference<TopLevel>? = null
     private var evalJSCallCount = 0
 
@@ -414,6 +415,36 @@ class AnalyzeRule(
     /**
      * 获取列表
      */
+    internal fun getElementsRaw(ruleStr: String): Any? {
+        var result: Any? = null
+        val content = this.content
+        val ruleList = splitSourceRule(ruleStr, true)
+        if (content != null && ruleList.isNotEmpty()) {
+            result = content
+            for (sourceRule in ruleList) {
+                putRule(sourceRule.putMap)
+                result ?: continue
+                val rule = sourceRule.rule
+                result = when (sourceRule.mode) {
+                    Mode.Regex -> AnalyzeByRegex.getElements(
+                        result.toString(),
+                        rule.splitNotBlank("&&")
+                    )
+
+                    Mode.WebJs -> GSON.fromJsonArray<Map<String, Any?>>(
+                        getWebJsResult(rule, result)
+                    ).getOrNull()
+
+                    Mode.Js -> evalJS(rule, result)
+                    Mode.Json -> getAnalyzeByJSonPath(result).getList(rule)
+                    Mode.XPath -> getAnalyzeByXPath(result).getElements(rule)
+                    else -> getAnalyzeByJSoup(result).getElements(rule)
+                }
+            }
+        }
+        return result
+    }
+
     @Suppress("UNCHECKED_CAST")
     fun getElements(ruleStr: String): List<Any> {
         var result: Any? = null
@@ -808,10 +839,16 @@ class AnalyzeRule(
         return value
     }
 
+    fun setLocal(key: String, value: String): AnalyzeRule {
+        localBindings[key] = value
+        return this
+    }
+
     /**
      * 获取保存的数据
      */
     fun get(key: String): String {
+        localBindings[key]?.let { return it }
         when (key) {
             "bookName" -> book?.let {
                 return it.name
@@ -846,6 +883,9 @@ class AnalyzeRule(
             bindings["nextChapterUrl"] = nextChapterUrl
             bindings["rssArticle"] = rssArticle
             bindings["fromBookInfo"] = isFromBookInfo
+            localBindings["paraIndex"]?.let { bindings["paraIndex"] = it }
+            localBindings["paraData"]?.let { bindings["paraData"] = it }
+            localBindings["page"]?.let { bindings["page"] = it.toIntOrNull() ?: it }
         }
         val topScope: TopLevel? = source?.getShareScope(coroutineContext)
             ?: topScopeRef?.get()

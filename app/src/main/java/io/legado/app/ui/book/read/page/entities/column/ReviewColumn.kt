@@ -16,25 +16,44 @@ import io.legado.app.ui.book.read.page.provider.ChapterProvider
 data class ReviewColumn(
     override var start: Float,
     override var end: Float,
-    val count: Int = 0
+    var count: Int = 0
 ) : BaseColumn {
 
     override var textLine: TextLine = emptyTextLine
+
+    override fun isTouch(x: Float): Boolean {
+        if (count == 0) return false
+        val extraTouchWidth = if (textLine.isImage) {
+            0f
+        } else {
+            ((end - start) * 0.35f).coerceAtLeast(textLine.height * 0.15f)
+        }
+        return x > start - extraTouchWidth && x < end + extraTouchWidth
+    }
+
+    fun isTouch(x: Float, y: Float, relativeOffset: Float): Boolean {
+        if (!isTouch(x)) return false
+        if (!textLine.isImage) return true
+        val height = minOf(ChapterProvider.contentPaint.textSize, textLine.height)
+        val baseLine = textLine.lineBase - textLine.lineTop
+        val localY = y - textLine.lineTop - relativeOffset
+        return height > 0f && localY in (baseLine - height)..baseLine
+    }
+
     override fun draw(view: ContentTextView, canvas: Canvas) {
         val textPaint = if (textLine.isTitle) {
             ChapterProvider.titlePaint
         } else {
             ChapterProvider.contentPaint
         }
-        drawToCanvas(canvas, textLine.lineBase, textPaint.textSize)
+        val height = minOf(textPaint.textSize, textLine.height)
+        if (height > 0f) {
+            drawToCanvas(canvas, textLine.lineBase - textLine.lineTop, height)
+        }
     }
 
-    val countText by lazy {
-        if (count > 999) {
-            return@lazy "999"
-        }
-        return@lazy count.toString()
-    }
+    val countText: String
+        get() = if (count > 999) "999" else count.toString()
 
     val path by lazy { Path() }
 
