@@ -1,9 +1,9 @@
 package com.script.rhino
 
 import org.htmlunit.corejs.javascript.Scriptable
-import org.htmlunit.corejs.javascript.lc.type.TypeInfo
+import org.htmlunit.corejs.javascript.VarScope
 
-class ReadOnlyJavaObject(scope: Scriptable?, javaObject: Any, staticType: TypeInfo) :
+class ReadOnlyJavaObject(scope: VarScope?, javaObject: Any, staticType: Class<*>?) :
     CatchableNativeJavaObject(scope, javaObject, staticType) {
 
     override fun has(name: String, start: Scriptable): Boolean {

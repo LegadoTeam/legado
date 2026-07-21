@@ -1,14 +1,14 @@
 package io.legado.app.help.source
 
+import com.script.ScriptBindings
 import io.legado.app.constant.SourceType
 import io.legado.app.data.entities.BaseSource
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.RssSource
 import io.legado.app.model.SharedJsScope
-import org.htmlunit.corejs.javascript.Scriptable
 import kotlin.coroutines.CoroutineContext
 
-fun BaseSource.getShareScope(coroutineContext: CoroutineContext? = null): Scriptable? {
+fun BaseSource.getShareScope(coroutineContext: CoroutineContext? = null): ScriptBindings? {
     return SharedJsScope.getScope(jsLib, coroutineContext)
 }
 

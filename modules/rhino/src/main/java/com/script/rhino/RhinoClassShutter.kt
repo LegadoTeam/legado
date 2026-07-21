@@ -28,6 +28,7 @@ import android.os.Build
 import org.htmlunit.corejs.javascript.ClassShutter
 import org.htmlunit.corejs.javascript.Context
 import org.htmlunit.corejs.javascript.Scriptable
+import org.htmlunit.corejs.javascript.VarScope
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.lang.reflect.Member
@@ -113,7 +114,7 @@ object RhinoClassShutter : ClassShutter {
             "java.lang.invoke",
             "io.legado.app.data.dao",
             "com.script",
-            "org.htmlunit",
+            "org.mozilla",
             "sun",
             "libcore",
         ).let { ClassNameMatcher(it) }
@@ -173,7 +174,7 @@ object RhinoClassShutter : ClassShutter {
         return true
     }
 
-    fun wrapJavaClass(scope: Scriptable, javaClass: Class<*>): Scriptable {
+    fun wrapJavaClass(scope: VarScope, javaClass: Class<*>): Scriptable {
         return when (javaClass) {
             System::class.java -> {
                 ProtectedNativeJavaClass(scope, javaClass, systemClassProtectedName)

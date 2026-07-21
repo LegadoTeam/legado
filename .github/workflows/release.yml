@@ -46,11 +46,30 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Checkout htmlunit-rhino-fork
+        uses: actions/checkout@v7
+        with:
+          repository: skybbk1001/htmlunit-rhino-fork
+          ref: c758621a0df4ec5687901570dc355c1f98f32652
+          path: htmlunit-rhino-fork
+
+      - name: Checkout htmlunit-core-js
+        uses: actions/checkout@v7
+        with:
+          repository: skybbk1001/htmlunit-core-js
+          ref: e31799f290b50f99fe2cef1f14acd9725f69653c
+          path: htmlunit-core-js
+
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: 17
+          cache: maven
+
+      - name: Install forked htmlunit-core-js
+        working-directory: htmlunit-core-js
+        run: mvn --batch-mode -U clean install -Dmaven.test.skip=true -Dgpg.skip=true -Dmaven.javadoc.skip=true
 
       - name: Release Apk Sign
         run: |

@@ -1,7 +1,10 @@
 package io.legado.app
 
 import com.script.rhino.RhinoScriptEngine
+import com.script.rhino.RhinoWrapFactory
 import io.legado.app.data.entities.HttpTTS
+import io.legado.app.data.entities.RssSource
+import io.legado.app.help.rhino.NativeBaseSource
 import io.legado.app.help.parseJsRequestHeaders
 import io.legado.app.help.http.TRANSPARENT_ACCEPT_ENCODING
 import io.legado.app.help.http.canUseTransparentDecompression
@@ -28,6 +31,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.htmlunit.corejs.javascript.NativeObject
+import org.jsoup.Jsoup
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
@@ -68,6 +72,107 @@ class SourceCompatibilityTest {
             "plain",
             analyzeRule.getString(analyzeRule.splitSourceRule("@@$.literal"))
         )
+    }
+
+    @Test
+    fun jsoupElementsKeepLegacyAttributeAccessFromJavaBindings() {
+        val value = RhinoScriptEngine.eval(
+            """
+            const elements = java.getElements('#video-artist-name');
+            const summary = [
+                elements.attr('href'),
+                elements.text(),
+                elements.html(),
+                elements.length,
+                elements[0].tagName()
+            ];
+            elements[0] = 'replacement';
+            summary.push(String(elements[0]));
+            summary.join('|');
+            """.trimIndent(),
+            com.script.ScriptBindings().apply {
+                this["java"] = JsoupElementsBridge()
+            },
+        )
+
+        assertEquals("/artist/1|Artist|Artist|1|a|replacement", value)
+    }
+
+    @Test
+    fun ordinaryListSubclassesKeepExistingRuntimeMethods() {
+        val value = RhinoScriptEngine.eval(
+            "java.getValues().legacyValue()",
+            com.script.ScriptBindings().apply {
+                this["java"] = DeclaredListBridge()
+            },
+        )
+
+        assertEquals("legacy", value)
+    }
+
+    @Test
+    fun jsEncodeOverloadsRemainCallableInsideWithAndEvalScopes() {
+        val value = RhinoScriptEngine.eval(
+            """
+            const directType = typeof java.createSymmetricCrypto;
+            const directCall = java.createSymmetricCrypto(
+                'AES/CBC/PKCS5Padding',
+                '0123456789abcdef',
+                'abcdef0123456789'
+            ) != null;
+            const evalType = (function() {
+                with (java) {
+                    return eval('typeof createSymmetricCrypto');
+                }
+            })();
+            const evalCall = (function() {
+                with (java) {
+                    return eval("createSymmetricCrypto('AES/CBC/PKCS5Padding', " +
+                        "'0123456789abcdef', 'abcdef0123456789') != null");
+                }
+            })();
+            [directType, directCall, evalType, evalCall].join(':');
+            """.trimIndent(),
+            com.script.ScriptBindings().apply {
+                this["java"] = AnalyzeRule()
+            },
+        )
+
+        assertEquals("function:true:function:true", value)
+    }
+
+    @Test
+    fun rssSourceCryptoMethodsRemainCallableThroughNestedEval() {
+        RhinoWrapFactory.register(RssSource::class.java, NativeBaseSource.factory)
+        val source = RssSource(
+            sourceUrl = "https://example.com",
+            sourceName = "compatibility-test",
+        )
+        val value = RhinoScriptEngine.eval(
+            """
+            const nested = (function() {
+                with (java) {
+                    return eval("eval(\"var crypto = createSymmetricCrypto; " +
+                        "[typeof createSymmetricCrypto, typeof crypto, " +
+                        "crypto('AES/CBC/PKCS5Padding', '0123456789abcdef', " +
+                        "'abcdef0123456789') != null].join(':')\")");
+                }
+            })();
+            const method = java['create' + 'SymmetricCrypto'];
+            const dynamic = [typeof method, method.call(
+                java,
+                'AES/CBC/PKCS5Padding',
+                '0123456789abcdef',
+                'abcdef0123456789'
+            ) != null].join(':');
+            nested + '|' + dynamic;
+            """.trimIndent(),
+            com.script.ScriptBindings().apply {
+                this["java"] = source
+            },
+        )
+
+        assertEquals("function:function:true|function:true", value)
     }
 
     @Test
@@ -223,6 +328,28 @@ class SourceCompatibilityTest {
         override fun contentLength(): Long = length
 
         override fun source(): BufferedSource = bufferedSource
+    }
+
+    class JsoupElementsBridge {
+        @Suppress("UNCHECKED_CAST")
+        fun getElements(rule: String): List<Any> {
+            return Jsoup.parse(
+                "<a id='video-artist-name' href='/artist/1'>Artist</a>"
+            ).select(rule) as List<Any>
+        }
+    }
+
+    class DeclaredListBridge {
+        fun getValues(): List<String> = LegacyList()
+    }
+
+    class LegacyList : ArrayList<String>() {
+        init {
+            add("first")
+            add("second")
+        }
+
+        fun legacyValue(): String = "legacy"
     }
 
 }

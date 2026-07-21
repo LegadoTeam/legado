@@ -1,6 +1,7 @@
 package io.legado.app.model.jsSource
 
 import com.google.gson.JsonObject
+import com.script.ScriptBindings
 import com.script.rhino.RhinoInterruptError
 import com.script.rhino.RhinoScriptEngine
 import io.legado.app.data.entities.BookSource
@@ -8,7 +9,6 @@ import io.legado.app.exception.NoStackTraceException
 import io.legado.app.model.SharedJsScope
 import io.legado.app.utils.GSON
 import kotlinx.coroutines.CancellationException
-import org.htmlunit.corejs.javascript.Context
 import org.htmlunit.corejs.javascript.Function
 import org.htmlunit.corejs.javascript.Scriptable
 import org.htmlunit.corejs.javascript.ScriptableObject
@@ -47,13 +47,7 @@ object JsSourceConfig {
         text: String,
         coroutineContext: CoroutineContext?,
     ): BookSource {
-        val scope = Context.enter().let { context ->
-            try {
-                context.initSafeStandardObjects()
-            } finally {
-                Context.exit()
-            }
-        }
+        val scope = RhinoScriptEngine.getRuntimeScope(ScriptBindings())
         SharedJsScope.installCryptoJs(scope, coroutineContext)
         try {
             RhinoScriptEngine.eval(text, scope, coroutineContext)
@@ -63,7 +57,7 @@ object JsSourceConfig {
             throw NoStackTraceException("JS源脚本执行失败: ${error.message}")
         }
         val (configName, config) = findConfig(scope, coroutineContext)
-        val json = JsSourceEngine.normalizeJsResult(config, scope, coroutineContext)
+        val json = JsSourceEngine.normalizeJsResult(config, coroutineContext)
             ?: throw NoStackTraceException("$configName 配置对象无法解析")
         val jsonObject = runCatching { GSON.fromJson(json, JsonObject::class.java) }.getOrNull()
             ?: throw NoStackTraceException("$configName 配置对象不是合法对象")
@@ -98,14 +92,14 @@ object JsSourceConfig {
     }
 
     private fun findConfig(
-        scope: Scriptable,
+        scope: ScriptBindings,
         coroutineContext: CoroutineContext?,
     ): Pair<String, Any> {
         val config = ScriptableObject.getProperty(scope, CONFIG_PROPERTY)
         val legacyConfig = ScriptableObject.getProperty(scope, LEGACY_CONFIG_PROPERTY)
         val hasConfig = config != null && config !== Scriptable.NOT_FOUND
         val hasLegacyConfig = legacyConfig != null && legacyConfig !== Scriptable.NOT_FOUND
-        if (hasConfig && (!hasLegacyConfig || isCompleteConfig(config, scope, coroutineContext))) {
+        if (hasConfig && (!hasLegacyConfig || isCompleteConfig(config, coroutineContext))) {
             return CONFIG_PROPERTY to requireNotNull(config)
         }
         if (hasLegacyConfig) {
@@ -118,10 +112,9 @@ object JsSourceConfig {
 
     private fun isCompleteConfig(
         value: Any?,
-        scope: Scriptable,
         coroutineContext: CoroutineContext?,
     ): Boolean {
-        val json = JsSourceEngine.normalizeJsResult(value, scope, coroutineContext) ?: return false
+        val json = JsSourceEngine.normalizeJsResult(value, coroutineContext) ?: return false
         val jsonObject = runCatching { GSON.fromJson(json, JsonObject::class.java) }.getOrNull()
             ?: return false
         return runCatching {

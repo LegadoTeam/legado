@@ -19,6 +19,7 @@ import org.htmlunit.corejs.javascript.BaseFunction
 import org.htmlunit.corejs.javascript.Context
 import org.htmlunit.corejs.javascript.Scriptable
 import org.htmlunit.corejs.javascript.ScriptableObject
+import org.htmlunit.corejs.javascript.VarScope
 import splitties.init.appCtx
 import java.io.File
 import java.lang.ref.WeakReference
@@ -31,7 +32,7 @@ object SharedJsScope {
     private val cacheFolder by lazy { File(appCtx.cacheDir, "shareJs") }
     private val aCache by lazy { ACache.get(cacheFolder) }
 
-    private val scopeMap = LruCache<String, WeakReference<Scriptable>>(16)
+    private val scopeMap = LruCache<String, WeakReference<ScriptBindings>>(16)
     private val scopeLock = Any()
     private val scopeCreationLocks = ConcurrentHashMap<String, ScopeCreationLock>()
     private const val CRYPTO_JS_ASSET = "scripts/cryptojs.min.js"
@@ -45,7 +46,7 @@ object SharedJsScope {
     private var cryptoJsScript: CompiledScript? = null
     private val cryptoCompileLock = Any()
 
-    private val cryptoScopeMap = LruCache<CryptoScopeKey, WeakReference<Scriptable>>(16)
+    private val cryptoScopeMap = LruCache<CryptoScopeKey, WeakReference<ScriptBindings>>(16)
     private val cryptoScopeLock = Any()
     private val cryptoScopeCreationLocks =
         ConcurrentHashMap<CryptoScopeKey, ScopeCreationLock>()
@@ -70,7 +71,7 @@ object SharedJsScope {
         }
     }
 
-    fun getCryptoScope(owner: Any, coroutineContext: CoroutineContext?): Scriptable? {
+    fun getCryptoScope(owner: Any, coroutineContext: CoroutineContext?): ScriptBindings? {
         val cryptoJs = getCompiledCryptoJs() ?: return null
         val key = CryptoScopeKey(owner, Thread.currentThread())
         getCachedCryptoScope(key)?.let { return it }
@@ -91,7 +92,7 @@ object SharedJsScope {
     }
 
     internal fun installCryptoJs(
-        scope: Scriptable,
+        scope: ScriptBindings,
         coroutineContext: CoroutineContext?,
     ): Boolean {
         val cryptoJs = getCompiledCryptoJs() ?: return false
@@ -99,7 +100,7 @@ object SharedJsScope {
         return true
     }
 
-    fun getScope(jsLib: String?, coroutineContext: CoroutineContext?): Scriptable? {
+    fun getScope(jsLib: String?, coroutineContext: CoroutineContext?): ScriptBindings? {
         if (jsLib.isNullOrBlank()) {
             return null
         }
@@ -155,7 +156,7 @@ object SharedJsScope {
         }
     }
 
-    private fun getCachedScope(key: String): Scriptable? {
+    private fun getCachedScope(key: String): ScriptBindings? {
         return synchronized(scopeLock) {
             val reference = scopeMap[key] ?: return@synchronized null
             reference.get() ?: run {
@@ -188,7 +189,7 @@ object SharedJsScope {
         }
     }
 
-    private fun getCachedCryptoScope(key: CryptoScopeKey): Scriptable? {
+    private fun getCachedCryptoScope(key: CryptoScopeKey): ScriptBindings? {
         return synchronized(cryptoScopeLock) {
             val reference = cryptoScopeMap[key] ?: return@synchronized null
             reference.get() ?: run {
@@ -207,20 +208,20 @@ object SharedJsScope {
         }
     }
 
-    private fun createScope(): Scriptable {
+    private fun createScope(): ScriptBindings {
         return RhinoScriptEngine.getRuntimeScope(ScriptBindings())
     }
 
     private fun evaluateCryptoJs(
         cryptoJs: CompiledScript,
-        scope: Scriptable,
+        scope: ScriptBindings,
         coroutineContext: CoroutineContext?,
     ) {
         cryptoJs.eval(scope, coroutineContext)
         val secureRandomFunction = object : BaseFunction() {
             override fun call(
                 cx: Context,
-                callScope: Scriptable,
+                callScope: VarScope,
                 thisObj: Scriptable,
                 args: Array<Any>,
             ): Any = secureRandom.nextInt().toDouble()
@@ -232,13 +233,13 @@ object SharedJsScope {
         try {
             RhinoScriptEngine.eval(SECURE_RANDOM_PATCH, scope, coroutineContext)
         } finally {
-            ScriptableObject.deleteProperty(scope, SECURE_RANDOM_BINDING)
+            scope.delete(SECURE_RANDOM_BINDING)
         }
     }
 
     private fun evaluateJsLib(
         jsLib: String,
-        scope: Scriptable,
+        scope: ScriptBindings,
         coroutineContext: CoroutineContext?,
     ) {
         if (jsLib.isJsonObject()) {
@@ -274,8 +275,8 @@ object SharedJsScope {
         }
     }
 
-    private fun preventExtensions(scope: Scriptable) {
-        (scope as? ScriptableObject)?.preventExtensions()
+    private fun preventExtensions(scope: ScriptBindings) {
+        scope.globalThis.preventExtensions()
     }
 
     private class CryptoScopeKey(

@@ -1,7 +1,6 @@
 package io.legado.app
 
 import com.script.ScriptBindings
-import com.script.rhino.CatchableNativeJavaObject
 import com.script.rhino.ProtectedNativeJavaClass
 import com.script.rhino.ReadOnlyJavaObject
 import com.script.rhino.RhinoScriptEngine
@@ -93,9 +92,6 @@ class JsEngineCapabilitiesTest {
         } finally {
             Context.exit()
         }
-        Assert.assertTrue(
-            ScriptableObject.getProperty(bindings, "bridge") is CatchableNativeJavaObject
-        )
         val cases = listOf(
             "bridge.fail()",
             "bridge.child().fail()",
@@ -129,6 +125,158 @@ class JsEngineCapabilitiesTest {
     }
 
     @Test
+    fun javaMethodsRemainCallableInsideWithAndEvalScopes() {
+        val bindings = ScriptBindings().apply {
+            this["bridge"] = ThrowingBridge()
+        }
+        val script = """
+            var directType = typeof bridge.child;
+            var directCall = bridge.child() != null;
+            var evalType = (function() {
+                with (bridge) {
+                    return eval('typeof child');
+                }
+            })();
+            var evalCall = (function() {
+                with (bridge) {
+                    return eval('child() != null');
+                }
+            })();
+            [directType, directCall, evalType, evalCall].join(':');
+        """.trimIndent()
+
+        Assert.assertEquals(
+            "function:true:function:true",
+            RhinoScriptEngine.eval(script, bindings),
+        )
+    }
+
+    @Test
+    fun dynamicEvalRealmKeepsJavaCryptoCallable() {
+        val bindings = ScriptBindings().apply {
+            this["java"] = MethodBridge()
+        }
+        val script = """
+            var indirect = eval;
+            [
+                (0, eval)("var crypto = java.createSymmetricCrypto; crypto('tuple')"),
+                indirect("java.createSymmetricCrypto('alias')"),
+                new Function("var crypto = java.createSymmetricCrypto; return crypto('ctor')")()
+            ].join(':');
+        """.trimIndent()
+
+        Assert.assertEquals(
+            "tuple:alias:ctor",
+            RhinoScriptEngine.eval(script, bindings),
+        )
+    }
+
+    @Test
+    fun optionalCatchBindingCompilesWithLegacyWithConst() {
+        RhinoScriptEngine.compile(
+            """
+                with ({}) { const marker = 1; }
+                try { throw marker; } catch {}
+            """.trimIndent()
+        )
+    }
+
+    @Test
+    fun dynamicCompilationNormalizesNestedLegacyWithConst() {
+        val script = """
+            var indirect = eval;
+            var viaEval = indirect(
+                "function legacyEval() { " +
+                "if (true) { with ({}) { const marker = 21; } } " +
+                "try { throw 1; } catch {} return marker * 2; } legacyEval()"
+            );
+            var viaFunction = new Function(
+                "if (true) { with ({}) { const marker = 6; } } " +
+                "try { throw 1; } catch {} return marker * 7;"
+            )();
+            viaEval + ':' + viaFunction;
+        """.trimIndent()
+
+        Assert.assertEquals("42:42", RhinoScriptEngine.eval(script, ScriptBindings()))
+    }
+
+    @Test
+    fun dynamicCompatibilityParsingPreservesEvalSyntaxErrors() {
+        val script = """
+            try {
+                eval("with ({}) { const broken = ; }");
+                'not-caught';
+            } catch (error) {
+                error.name;
+            }
+        """.trimIndent()
+
+        Assert.assertEquals("SyntaxError", RhinoScriptEngine.eval(script, ScriptBindings()))
+    }
+
+    @Test
+    fun nestedEvalKeepsDynamicallyLoadedFunctionsVisible() {
+        val cases = listOf(
+            "eval(\"function gzip(value) { return 'fn:' + value; }\"); gzip('ok')" to
+                "fn:ok",
+            "eval(\"var gzip = function(value) { return 'var:' + value; };\"); " +
+                "eval(\"gzip('ok')\")" to "var:ok",
+            "eval(\"let gzip = function(value) { return 'let:' + value; };\"); " +
+                "eval(\"gzip('ok')\")" to "let:ok",
+            "eval(\"const gzip = function(value) { return 'const:' + value; };\"); " +
+                "eval(\"gzip('ok')\")" to "const:ok",
+        )
+
+        cases.forEach { (script, expected) ->
+            Assert.assertEquals(expected, RhinoScriptEngine.eval(script, ScriptBindings()))
+        }
+    }
+
+    @Test
+    fun withScopedConstRemainsVisibleForLegacySources() {
+        val script = """
+            var javaImport = {};
+            with (javaImport) {
+                const gzip = function(value) { return 'gzip:' + value; };
+            }
+            gzip('ok');
+        """.trimIndent()
+
+        Assert.assertEquals("gzip:ok", RhinoScriptEngine.eval(script, ScriptBindings()))
+    }
+
+    @Test
+    fun withCompatibilityOnlyRewritesDirectDeclarations() {
+        val script = """
+            var javaImport = {};
+            with (javaImport) {
+                function scoped() {
+                    var before = typeof value;
+                    { const value = 'inner'; }
+                    return before + ':' + typeof value;
+                }
+                for (const key in { first: 1, second: 2 }) {}
+            }
+            scoped() + '|' + typeof key;
+        """.trimIndent()
+
+        Assert.assertEquals(
+            "undefined:undefined|undefined",
+            RhinoScriptEngine.eval(script, ScriptBindings()),
+        )
+    }
+
+    @Test
+    fun e4xDescendantExpressionsRemainSupported() {
+        val script = """
+            var data = <root><item_null><text>ok</text></item_null></root>;
+            String(data..item_null.text);
+        """.trimIndent()
+
+        Assert.assertEquals("ok", RhinoScriptEngine.eval(script, ScriptBindings()))
+    }
+
+    @Test
     fun typeInfoWrappingUsesRegisteredFactories() {
         RhinoWrapFactory.register(FactoryBridge::class.java, ReadOnlyJavaObject.factory)
         val bindings = ScriptBindings().apply {
@@ -146,10 +294,9 @@ class JsEngineCapabilitiesTest {
 
     @Test
     fun nestedJavaClassesKeepWrapperSemantics() {
-        RhinoScriptEngine.initialize()
+        val scope = RhinoScriptEngine.newStandardTopLevel()
         val context = Context.enter()
         try {
-            val scope = context.initStandardObjects()
             val mapClass = ProtectedNativeJavaClass(scope, Class.forName("java.util.Map"))
             val entry = mapClass.get("Entry", mapClass)
 
@@ -161,7 +308,7 @@ class JsEngineCapabilitiesTest {
     }
 
     @Test
-    fun restParametersDoNotImplySpreadSyntaxSupport() {
+    fun restAndSpreadSyntaxRemainSupported() {
         val supported = """
             function collect(head, ...tail) {
                 return head + ':' + tail.join('-')
@@ -171,7 +318,29 @@ class JsEngineCapabilitiesTest {
         Assert.assertEquals("x:1-2", RhinoScriptEngine.eval(supported, ScriptBindings()))
 
         assertUnsupported("function add(a, b) { return a + b }; add(...[1, 2])")
-        assertUnsupported("var [head, ...tail] = [1, 2, 3]; tail.length")
+        Assert.assertEquals(
+            2.0,
+            RhinoScriptEngine.eval(
+                "var [head, ...tail] = [1, 2, 3]; tail.length",
+                ScriptBindings(),
+            ),
+        )
+    }
+
+    @Test
+    fun readOnlyJavaMethodsKeepTheirDetachedReceiver() {
+        RhinoWrapFactory.register(FactoryBridge::class.java, ReadOnlyJavaObject.factory)
+        val bindings = ScriptBindings().apply {
+            this["factoryBridge"] = FactoryBridge()
+        }
+
+        Assert.assertEquals(
+            "initial",
+            RhinoScriptEngine.eval(
+                "var readValue = factoryBridge.getValue; readValue()",
+                bindings,
+            ),
+        )
     }
 
     @Test
@@ -227,6 +396,11 @@ class JsEngineCapabilitiesTest {
 
     class ThrowingChild {
         fun fail(): Nothing = throw IllegalStateException("expected child failure")
+    }
+
+    class MethodBridge {
+        fun createSymmetricCrypto(value: String): String = value
+        fun createSymmetricCrypto(value: String, suffix: String): String = value + suffix
     }
 
     class HiddenClassLoader : ClassLoader()

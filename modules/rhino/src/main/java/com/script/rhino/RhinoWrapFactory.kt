@@ -28,6 +28,7 @@ import org.htmlunit.corejs.javascript.Context
 import org.htmlunit.corejs.javascript.NativeJavaPackage
 import org.htmlunit.corejs.javascript.ScriptRuntime
 import org.htmlunit.corejs.javascript.Scriptable
+import org.htmlunit.corejs.javascript.VarScope
 import org.htmlunit.corejs.javascript.WrapFactory
 import org.htmlunit.corejs.javascript.lc.type.TypeInfo
 import org.htmlunit.corejs.javascript.lc.type.TypeInfoFactory
@@ -49,51 +50,32 @@ object RhinoWrapFactory : WrapFactory() {
 
     private val factories = hashMapOf<Class<*>, JavaObjectWrapFactory>()
 
-    override fun wrap(
-        cx: Context,
-        scope: Scriptable?,
-        javaObject: Any?,
-        staticType: Class<*>?,
-    ): Any? {
-        return wrap(cx, scope, javaObject, staticType.toTypeInfo())
-    }
-
-    override fun wrap(
-        cx: Context,
-        scope: Scriptable?,
-        javaObject: Any?,
-        staticType: TypeInfo,
-    ): Any? {
-        return super.wrap(cx, scope, javaObject, staticType)
-    }
-
     override fun wrapAsJavaObject(
         cx: Context,
-        scope: Scriptable?,
+        scope: VarScope?,
         javaObject: Any,
-        staticType: Class<*>?,
-    ): Scriptable? {
-        return wrapAsJavaObject(cx, scope, javaObject, staticType.toTypeInfo())
-    }
-
-    override fun wrapAsJavaObject(
-        cx: Context,
-        scope: Scriptable?,
-        javaObject: Any,
-        staticType: TypeInfo,
+        staticType: TypeInfo?
     ): Scriptable? {
         if (!RhinoClassShutter.visibleToScripts(javaObject)) {
             return null
         }
-        val resolvedType = if (staticType.shouldReplace()) {
-            TypeInfoFactory.getOrElse(scope, TypeInfoFactory.GLOBAL).create(javaObject.javaClass)
-        } else {
-            staticType
+        val declaredType = staticType ?: TypeInfo.NONE
+        val useRuntimeListType = javaObject.javaClass.name == JSoupElementsClassName &&
+            List::class.java.isAssignableFrom(declaredType.asClass())
+        val resolvedType = when {
+            declaredType.shouldReplace() -> runtimeType(scope, javaObject)
+            useRuntimeListType -> runtimeType(scope, javaObject)
+            else -> declaredType
         }
-        return wrapOrNull(scope, javaObject, resolvedType)
+        return wrapOrNull(scope, javaObject, resolvedType.asClass())
             ?: when {
                 List::class.java.isAssignableFrom(resolvedType.asClass()) ->
-                    CatchableNativeJavaList(scope, javaObject, resolvedType)
+                    CatchableNativeJavaList(
+                        scope = scope,
+                        javaObject = javaObject,
+                        staticType = resolvedType,
+                        declaredElementType = if (useRuntimeListType) declaredType.param(0) else null,
+                    )
 
                 Map::class.java.isAssignableFrom(resolvedType.asClass()) ->
                     CatchableNativeJavaMap(scope, javaObject, resolvedType)
@@ -105,7 +87,7 @@ object RhinoWrapFactory : WrapFactory() {
 
     override fun wrapJavaClass(
         cx: Context,
-        scope: Scriptable,
+        scope: VarScope,
         javaClass: Class<*>
     ): Scriptable {
         if (!RhinoClassShutter.visibleToScripts(javaClass)) {
@@ -118,11 +100,18 @@ object RhinoWrapFactory : WrapFactory() {
     }
 
     private fun wrapOrNull(
-        scope: Scriptable?,
+        scope: VarScope?,
         javaObject: Any,
-        staticType: TypeInfo,
+        staticType: Class<*>?
     ): Scriptable? {
         return factories[javaObject.javaClass]?.wrap(scope, javaObject, staticType)
+    }
+
+    private fun runtimeType(scope: VarScope?, javaObject: Any): TypeInfo {
+        val typeFactory = scope?.let {
+            TypeInfoFactory.getOrElse(it, TypeInfoFactory.GLOBAL)
+        } ?: TypeInfoFactory.GLOBAL
+        return typeFactory.create(javaObject.javaClass)
     }
 
     fun register(clazz: Class<*>, factory: JavaObjectWrapFactory) {
@@ -130,5 +119,7 @@ object RhinoWrapFactory : WrapFactory() {
             factories.put(clazz, factory)
         }
     }
+
+    private const val JSoupElementsClassName = "org.jsoup.select.Elements"
 
 }

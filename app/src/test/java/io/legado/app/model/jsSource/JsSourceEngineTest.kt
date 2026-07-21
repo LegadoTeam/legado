@@ -1,15 +1,18 @@
 package io.legado.app.model.jsSource
 
 import com.google.gson.JsonObject
+import com.script.ScriptBindings
 import com.script.buildScriptBindings
 import com.script.rhino.RhinoScriptEngine
 import io.legado.app.data.entities.BookSource
 import io.legado.app.utils.GSON
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.htmlunit.corejs.javascript.Scriptable
 
 class JsSourceEngineTest {
 
@@ -116,31 +119,71 @@ class JsSourceEngineTest {
 
     @Test
     fun `normalizes object and lazy strings with current rhino`() {
-        val (result, scope) = evaluate(
+        val (result, _) = evaluate(
             "function search(key, page) { return [{name: key, bookUrl: 'u' + page}]; }",
             "search(key, page)",
             listOf("key" to "测试", "page" to 2),
         )
 
-        val json = JsSourceEngine.normalizeJsResult(result, scope).orEmpty()
+        val json = JsSourceEngine.normalizeJsResult(result).orEmpty()
         assertTrue(json.contains("测试"))
         assertTrue(json.contains("u2"))
     }
 
     @Test
+    fun `normalizes custom toJSON and getters in the source scope`() {
+        val source = BookSource(
+            bookSourceUrl = "https://example.com",
+            bookSourceName = "custom json",
+            mainJs = """
+                var prefix = 'scope';
+                function search() {
+                    var result = {};
+                    Object.defineProperty(result, 'computed', {
+                        enumerable: true,
+                        get: function() { return prefix + '-getter'; }
+                    });
+                    result.toJSON = function() {
+                        return { transformed: this.computed };
+                    };
+                    return result;
+                }
+            """.trimIndent(),
+        )
+
+        val json = JsSourceEngine(source).callFunction("search", emptyList()).orEmpty()
+
+        assertEquals("scope-getter", GSON.fromJson(json, JsonObject::class.java)
+            .get("transformed").asString)
+    }
+
+    @Test
+    fun `preserves cancellation while normalizing custom toJSON`() {
+        val (result, _) = evaluate(
+            "function value() { return { toJSON: function() { return { ok: true }; } }; }",
+            "value()",
+        )
+        val job = Job().apply { cancel() }
+
+        assertThrows(CancellationException::class.java) {
+            JsSourceEngine.normalizeJsResult(result, job)
+        }
+    }
+
+    @Test
     fun `passes content string through unchanged`() {
-        val (result, scope) = evaluate(
+        val (result, _) = evaluate(
             "function content() { return '第一段\\n第二段'; }",
             "content()",
         )
 
-        assertEquals("第一段\n第二段", JsSourceEngine.normalizeJsResult(result, scope))
+        assertEquals("第一段\n第二段", JsSourceEngine.normalizeJsResult(result))
     }
 
     @Test
     fun `maps undefined to null`() {
-        val (result, scope) = evaluate("function noop() {}", "noop()")
-        assertNull(JsSourceEngine.normalizeJsResult(result, scope))
+        val (result, _) = evaluate("function noop() {}", "noop()")
+        assertNull(JsSourceEngine.normalizeJsResult(result))
     }
 
     @Test
@@ -178,7 +221,7 @@ class JsSourceEngineTest {
         script: String,
         expression: String,
         args: List<Pair<String, Any?>> = emptyList(),
-    ): Pair<Any?, Scriptable> {
+    ): Pair<Any?, ScriptBindings> {
         val bindings = buildScriptBindings { target ->
             args.forEach { (key, value) -> target[key] = value }
         }
