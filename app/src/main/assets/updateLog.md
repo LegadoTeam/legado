@@ -2,8 +2,10 @@
 
 ## cronet版本: 151.0.7922.29
 
-**2026/07/20**
+**2026/07/22**
 - 恢复旧版 JavaScript 书源的块内 `const` 作用域兼容，修复部分段评页面持续加载的问题
+
+**2026/07/20**
 - 修复动态登录表单初始化时脚本反向读取登录信息导致 Rhino 递归溢出的问题
 - 恢复 JavaScript 规则中 `java.getElements(...)` 返回结果的 Jsoup 链式调用兼容，支持继续使用 `attr`、`text`、`html` 等旧式写法
 - 恢复旧版 JavaScript 源对 `with` 作用域、E4X XML 后代选择和嵌套 `eval` Java 方法调用的兼容
