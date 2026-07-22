@@ -12,6 +12,7 @@ import io.legado.app.databinding.DialogClickActionConfigBinding
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.ui.book.read.ReadBookActivity
+import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.putPrefInt
 import io.legado.app.utils.viewbindingdelegate.viewBinding
@@ -57,6 +58,7 @@ class ClickActionConfigDialog : BaseDialogFragment(R.layout.dialog_click_action_
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         (activity as ReadBookActivity).bottomDialog++
         view.setBackgroundColor(getCompatColor(R.color.translucent))
+        binding.rootView.applyNavigationBarPadding(withInitialPadding = true)
         initData()
         initViewEvent()
     }
