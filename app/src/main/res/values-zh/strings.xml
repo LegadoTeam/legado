@@ -1348,4 +1348,18 @@
     <string name="review_detail_rule_missing">未配置段评详情规则</string>
     <string name="review_icon_color_title">段评图标颜色</string>
     <string name="review_icon_color_reset">段评图标颜色已恢复跟随主题</string>
+    <string name="bottom_bar_skin">底栏图集</string>
+    <string name="bottom_bar_skin_summary">导入 zip 自定义底栏图标</string>
+    <string name="bottom_bar_skin_assign">分配图集</string>
+    <string name="bottom_bar_skin_name">图集名</string>
+    <string name="bottom_bar_skin_slot_selected">选中</string>
+    <string name="bottom_bar_skin_slot_normal">未选</string>
+    <string name="bottom_bar_skin_no_images">压缩包内没有图片</string>
+    <string name="bottom_bar_skin_need_selected">请至少为一个按钮设置选中图</string>
+    <string name="bottom_bar_skin_save">保存</string>
+    <string name="bottom_bar_skin_pick_image_desc">图片</string>
+    <string name="bottom_bar_skin_default">默认</string>
+    <string name="bottom_bar_skin_import">导入图集</string>
+    <string name="bottom_bar_skin_invalid">无效的图集文件</string>
+    <string name="bottom_bar_skin_delete_confirm">删除该图集？</string>
 </resources>

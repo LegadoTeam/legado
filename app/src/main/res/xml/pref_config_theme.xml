@@ -59,6 +59,14 @@
         app:allowDividerBelow="false"
         app:iconSpaceReserved="false" />
 
+    <io.legado.app.lib.prefs.Preference
+        android:key="bottomBarSkin"
+        android:summary="@string/bottom_bar_skin_summary"
+        android:title="@string/bottom_bar_skin"
+        app:allowDividerAbove="false"
+        app:allowDividerBelow="false"
+        app:iconSpaceReserved="false" />
+
     <io.legado.app.lib.prefs.PreferenceCategory
         android:key="dayThemeCategory"
         android:title="@string/day"

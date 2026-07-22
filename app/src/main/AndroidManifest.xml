@@ -215,6 +215,13 @@
         <activity
             android:name=".ui.config.ConfigActivity"
             android:launchMode="standard" />
+        <!-- 底栏图集 -->
+        <activity
+            android:name=".ui.config.BottomBarSkinActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.config.BottomBarSkinAssignActivity"
+            android:exported="false" />
         <!-- 搜索界面 -->
         <activity
             android:name=".ui.book.search.SearchActivity"
