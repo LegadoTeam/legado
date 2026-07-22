@@ -129,23 +129,13 @@ class BookInfoActivity :
 
     private val tocActivityResult = registerForActivityResult(TocActivityResult()) {
         it?.let {
-            viewModel.getBook(false)?.let { book ->
-                lifecycleScope.launch {
-                    withContext(IO) {
-                        val durChapterIndex = it[0] as Int
-                        val durChapterPos = it[1] as Int
-                        val durVolumeIndex = it[3] as Int
-                        val chapterInVolumeIndex = it[4] as Int
-                        book.durChapterIndex = durChapterIndex
-                        book.durChapterPos = durChapterPos
-                        chapterChanged = it[2] as Boolean
-                        book.durVolumeIndex = durVolumeIndex
-                        book.chapterInVolumeIndex = chapterInVolumeIndex
-                        appDb.bookDao.update(book)
-                    }
-                    startReadActivity(book)
-                }
-            }
+            readFromChapter(
+                index = it[0] as Int,
+                pos = it[1] as Int,
+                changed = it[2] as Boolean,
+                volumeIndex = it[3] as Int,
+                chapterInVolumeIndex = it[4] as Int,
+            )
         } ?: let {
             if (!viewModel.inBookshelf) {
                 viewModel.delBook() //进目录会保存book，此时退出目录触发的book删除，不通知书源回调
@@ -1160,6 +1150,37 @@ class BookInfoActivity :
     private fun openChapterList() {
         viewModel.getBook()?.let {
             tocActivityResult.launch(it.bookUrl)
+        }
+    }
+
+    private fun readFromChapter(
+        index: Int,
+        pos: Int,
+        changed: Boolean,
+        volumeIndex: Int,
+        chapterInVolumeIndex: Int,
+    ) {
+        viewModel.getBook(false)?.let { book ->
+            book.durChapterIndex = index
+            book.durChapterPos = pos
+            chapterChanged = changed
+            book.durVolumeIndex = volumeIndex
+            book.chapterInVolumeIndex = chapterInVolumeIndex
+            if (!viewModel.inBookshelf) {
+                book.addType(BookType.notShelf)
+                viewModel.saveBook(book) {
+                    viewModel.saveChapterList {
+                        startReadActivity(book)
+                    }
+                }
+            } else {
+                lifecycleScope.launch {
+                    withContext(IO) {
+                        appDb.bookDao.update(book)
+                    }
+                    startReadActivity(book)
+                }
+            }
         }
     }
 
