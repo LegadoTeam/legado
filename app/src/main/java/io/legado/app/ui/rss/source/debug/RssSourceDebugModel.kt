@@ -27,14 +27,25 @@ class RssSourceDebugModel(application: Application) : BaseViewModel(application)
         this.callback = callback
     }
 
-    fun startDebug(key: String, start: (() -> Unit)? = null, error: (() -> Unit)? = null) {
+    fun startDebug(
+        key: String,
+        start: (() -> Unit)? = null,
+        error: ((Throwable) -> Unit)? = null
+    ) {
         execute {
-            Debug.callback = this@RssSourceDebugModel
-            Debug.startDebug(this, rssSource!!, key)
+            check(Debug.tryAcquireCallback(this@RssSourceDebugModel)) {
+                "调试通道占用中，请稍后重试"
+            }
+            try {
+                Debug.startDebug(this, rssSource!!, key)
+            } catch (throwable: Throwable) {
+                Debug.cancelDebug(this@RssSourceDebugModel)
+                throw throwable
+            }
         }.onStart {
             start?.invoke()
         }.onError {
-            error?.invoke()
+            error?.invoke(it)
         }
     }
 
@@ -42,13 +53,18 @@ class RssSourceDebugModel(application: Application) : BaseViewModel(application)
         when (state) {
             10 -> listSrc = msg
             20 -> contentSrc = msg
-            else -> callback?.invoke(state, msg)
+            else -> {
+                callback?.invoke(state, msg)
+                if (state == -1 || state == 1000) {
+                    Debug.cancelDebug(this)
+                }
+            }
         }
     }
 
     override fun onCleared() {
         super.onCleared()
-        Debug.cancelDebug(true)
+        Debug.cancelDebug(this)
     }
 
 }

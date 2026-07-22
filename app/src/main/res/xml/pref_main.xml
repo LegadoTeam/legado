@@ -51,6 +51,15 @@
         app:allowDividerBelow="false"
         app:iconSpaceReserved="false" />
 
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:defaultValue="false"
+        android:icon="@drawable/ic_cfg_web"
+        android:key="mcpService"
+        android:summary="@string/mcp_service_desc"
+        android:title="@string/mcp_service"
+        app:allowDividerBelow="false"
+        app:iconSpaceReserved="false" />
+
     <io.legado.app.lib.prefs.PreferenceCategory
         android:title="@string/setting"
         app:allowDividerAbove="false"

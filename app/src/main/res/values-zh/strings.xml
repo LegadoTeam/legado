@@ -92,6 +92,11 @@
     <string name="retry">重试</string>
     <string name="web_service">Web 服务</string>
     <string name="web_service_desc">用浏览器写源或看书</string>
+    <string name="mcp_service">MCP 服务</string>
+    <string name="mcp_service_desc">带令牌保护的书源开发工具</string>
+    <string name="mcp_service_token_required">请先配置 Web 书源访问令牌</string>
+    <string name="mcp_service_token_invalid">MCP 访问令牌未配置或不正确</string>
+    <string name="mcp_service_start_failed">MCP 服务启动失败</string>
     <string name="web_edit_source">Web 编辑书源</string>
     <string name="offline_cache">离线缓存</string>
     <string name="offline_cache_t">离线缓存</string>
@@ -592,8 +597,10 @@
     <string name="web_menu">Web 服务</string>
     <string name="web_port_title">Web 端口</string>
     <string name="web_port_summary">当前端口 %s</string>
+    <string name="mcp_port_title">MCP 端口</string>
+    <string name="mcp_port_summary">当前端口 %s</string>
     <string name="js_source_api_token_title">Web 书源访问令牌</string>
-    <string name="js_source_api_token_summary">纯 JS、书源写入、搜索和调试接口均需要</string>
+    <string name="js_source_api_token_summary">MCP、纯 JS、书源写入、搜索和调试接口均需要</string>
     <string name="js_source_api_token_configured">已配置</string>
     <string name="qr_share">二维码分享</string>
     <string name="str_share">字符串分享</string>

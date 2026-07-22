@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.net.ConnectivityManager
+import android.net.LinkProperties
 import android.net.Network
 import android.os.Build
 import splitties.systemservices.connectivityManager
@@ -14,7 +15,10 @@ import splitties.systemservices.connectivityManager
  * 监测网络变化
  */
 @SuppressLint("ObsoleteSdkInt")
-class NetworkChangedListener(private val context: Context) {
+class NetworkChangedListener(
+    private val context: Context,
+    private val includeDetailedChanges: Boolean = false,
+) {
 
     var onNetworkChanged: (() -> Unit)? = null
 
@@ -30,6 +34,18 @@ class NetworkChangedListener(private val context: Context) {
             return@lazy object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
                     onNetworkChanged?.invoke()
+                }
+
+                override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
+                    if (includeDetailedChanges) {
+                        onNetworkChanged?.invoke()
+                    }
+                }
+
+                override fun onLost(network: Network) {
+                    if (includeDetailedChanges) {
+                        onNetworkChanged?.invoke()
+                    }
                 }
             }
         }

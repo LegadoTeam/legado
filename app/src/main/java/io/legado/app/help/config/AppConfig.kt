@@ -471,6 +471,12 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefInt(PreferKey.webPort, value)
         }
 
+    var mcpPort: Int
+        get() = appCtx.getPrefInt(PreferKey.mcpPort, 1236)
+        set(value) {
+            appCtx.putPrefInt(PreferKey.mcpPort, value)
+        }
+
     var jsSourceApiToken: String?
         get() = appCtx.getSharedPreferences(JS_SOURCE_API_PREFS, MODE_PRIVATE)
             .getString(JS_SOURCE_API_TOKEN, null)
