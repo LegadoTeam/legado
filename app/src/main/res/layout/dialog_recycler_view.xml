@@ -35,14 +35,30 @@
             android:layout_gravity="center"
             app:loading_width="2dp" />
 
-        <TextView
-            android:id="@+id/tv_msg"
+        <LinearLayout
+            android:id="@+id/ll_empty"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="16dp"
             android:layout_gravity="center"
-            android:visibility="gone"
-            android:textColor="@color/secondaryText" />
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/iv_empty"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/ic_description"
+                android:visibility="gone"
+                app:tint="@color/secondaryText" />
+
+            <TextView
+                android:id="@+id/tv_msg"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="16dp"
+                android:visibility="gone"
+                android:textColor="@color/secondaryText" />
+        </LinearLayout>
 
     </FrameLayout>
 

@@ -60,6 +60,35 @@ class ImportBookSourceStateTest {
         assertTrue(directImport.contains("JsSourceConfig.extract(mText, coroutineContext)"))
     }
 
+    @Test
+    fun `book source import shows icon for empty states and hides it for results`() {
+        val dialog = readProjectFile(
+            "src/main/java/io/legado/app/ui/association/ImportBookSourceDialog.kt"
+        )
+        val errorState = dialog.substringAfter("viewModel.errorLiveData.observe")
+            .substringBefore("viewModel.successLiveData.observe")
+        assertTrue(errorState.contains("binding.ivEmpty.visible()"))
+        val successState = dialog.substringAfter("viewModel.successLiveData.observe")
+            .substringBefore("viewModel.sourceUpdatePending.observe")
+        val populatedState = successState.substringAfter("if (it > 0)")
+            .substringBefore("} else {")
+        assertTrue(populatedState.contains("binding.ivEmpty.gone()"))
+        assertTrue(populatedState.contains("binding.tvMsg.gone()"))
+        assertTrue(successState.substringAfter("} else {").contains("binding.ivEmpty.visible()"))
+
+        val layout = readProjectFile("src/main/res/layout/dialog_recycler_view.xml")
+        assertTrue(layout.contains("@+id/ll_empty"))
+        val emptyIcon = layout.substringAfter("@+id/iv_empty").substringBefore("/>")
+        assertTrue(emptyIcon.contains("@drawable/ic_description"))
+        assertTrue(emptyIcon.contains("android:visibility=\"gone\""))
+        val message = layout.substringAfter("@+id/tv_msg").substringBefore("/>")
+        assertTrue(message.contains("android:layout_width=\"match_parent\""))
+        assertTrue(message.contains("android:visibility=\"gone\""))
+
+        val icon = readProjectFile("src/main/res/drawable/ic_description.xml")
+        assertTrue(icon.contains("android:pathData="))
+    }
+
     private fun readProjectFile(pathInApp: String): String {
         val file = sequenceOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull(File::isFile)
