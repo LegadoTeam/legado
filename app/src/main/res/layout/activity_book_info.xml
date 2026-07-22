@@ -29,11 +29,15 @@
             app:themeMode="dark"
             app:title="@string/book_info" />
 
-        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-            android:id="@+id/refresh_layout"
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1">
+
+            <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+                android:id="@+id/refresh_layout"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
 
             <io.legado.app.ui.widget.NoChildScrollNestedScrollView
                 android:id="@+id/scroll_view"
@@ -385,7 +389,15 @@
 
             </io.legado.app.ui.widget.NoChildScrollNestedScrollView>
 
-        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+            </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+            <io.legado.app.ui.widget.anima.RefreshProgressBar
+                android:id="@+id/refresh_progress_bar"
+                android:layout_width="match_parent"
+                android:layout_height="2dp"
+                android:layout_gravity="top" />
+
+        </FrameLayout>
 
         <View
             android:layout_width="match_parent"
