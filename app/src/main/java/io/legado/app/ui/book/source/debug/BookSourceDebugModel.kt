@@ -31,14 +31,25 @@ class BookSourceDebugModel(application: Application) : BaseViewModel(application
         this.callback = callback
     }
 
-    fun startDebug(key: String, start: (() -> Unit)? = null, error: (() -> Unit)? = null) {
+    fun startDebug(
+        key: String,
+        start: (() -> Unit)? = null,
+        error: ((Throwable) -> Unit)? = null
+    ) {
         execute {
-            Debug.callback = this@BookSourceDebugModel
-            Debug.startDebug(this, bookSource!!, key)
+            check(Debug.tryAcquireCallback(this@BookSourceDebugModel)) {
+                "调试通道占用中，请稍后重试"
+            }
+            try {
+                Debug.startDebug(this, bookSource!!, key)
+            } catch (throwable: Throwable) {
+                Debug.cancelDebug(this@BookSourceDebugModel)
+                throw throwable
+            }
         }.onStart {
             start?.invoke()
         }.onError {
-            error?.invoke()
+            error?.invoke(it)
         }
     }
 
@@ -48,13 +59,18 @@ class BookSourceDebugModel(application: Application) : BaseViewModel(application
             20 -> bookSrc = msg
             30 -> tocSrc = msg
             40 -> contentSrc = msg
-            else -> callback?.invoke(state, msg)
+            else -> {
+                callback?.invoke(state, msg)
+                if (state == -1 || state == 1000) {
+                    Debug.cancelDebug(this)
+                }
+            }
         }
     }
 
     override fun onCleared() {
         super.onCleared()
-        Debug.cancelDebug(true)
+        Debug.cancelDebug(this)
     }
 
 }

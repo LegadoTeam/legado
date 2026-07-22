@@ -17,6 +17,7 @@ import io.legado.app.lib.prefs.NameListPreference
 import io.legado.app.lib.prefs.SwitchPreference
 import io.legado.app.lib.prefs.fragment.PreferenceFragment
 import io.legado.app.lib.theme.primaryColor
+import io.legado.app.service.McpService
 import io.legado.app.service.WebService
 import io.legado.app.ui.about.AboutActivity
 import io.legado.app.ui.about.ReadRecordActivity
@@ -79,6 +80,7 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
 
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             putPrefBoolean(PreferKey.webService, WebService.isRun)
+            putPrefBoolean(PreferKey.mcpService, McpService.isRun)
             addPreferencesFromResource(R.xml.pref_main)
             findPreference<SwitchPreference>("webService")?.onLongClick {
                 if (!WebService.isRun) {
@@ -99,6 +101,29 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
                         WebService.hostAddress
                     } else {
                         getString(R.string.web_service_desc)
+                    }
+                }
+            }
+            findPreference<SwitchPreference>(PreferKey.mcpService)?.let {
+                it.isChecked = McpService.isRun
+                it.summary = if (McpService.isRun) {
+                    McpService.hostAddress
+                } else {
+                    getString(R.string.mcp_service_desc)
+                }
+                it.onLongClick {
+                    if (!McpService.isRun) return@onLongClick false
+                    context?.sendToClip(it.summary.toString())
+                    true
+                }
+            }
+            observeEventSticky<String>(EventBus.MCP_SERVICE) {
+                findPreference<SwitchPreference>(PreferKey.mcpService)?.let {
+                    it.isChecked = McpService.isRun
+                    it.summary = if (McpService.isRun) {
+                        McpService.hostAddress
+                    } else {
+                        getString(R.string.mcp_service_desc)
                     }
                 }
             }
@@ -135,6 +160,14 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
                         WebService.start(requireContext())
                     } else {
                         WebService.stop(requireContext())
+                    }
+                }
+
+                PreferKey.mcpService -> {
+                    if (requireContext().getPrefBoolean(PreferKey.mcpService)) {
+                        McpService.start(requireContext())
+                    } else {
+                        McpService.stop(requireContext())
                     }
                 }
 

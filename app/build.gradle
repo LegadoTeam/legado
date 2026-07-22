@@ -312,6 +312,17 @@ dependencies {
     implementation(libs.nanohttpd.nanohttpd)
     implementation(libs.nanohttpd.websocket)
 
+    //MCP server (Streamable HTTP)
+    implementation(libs.mcp.sdk.server) {
+        exclude group: 'org.jetbrains.kotlin', module: 'kotlin-reflect'
+    }
+    implementation(libs.ktor.server.cio) {
+        exclude group: 'org.jetbrains.kotlin', module: 'kotlin-reflect'
+    }
+    testImplementation(libs.ktor.server.test.host) {
+        exclude group: 'org.jetbrains.kotlin', module: 'kotlin-reflect'
+    }
+
     //二维码
     //noinspection GradleDependency
     implementation(libs.zxing.lite)

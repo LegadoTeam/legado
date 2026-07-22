@@ -74,4 +74,21 @@ class HttpLogControllerTest {
         assertTrue(result.isSuccess)
         assertEquals(7L, (result.data as HttpLogRecord).id)
     }
+
+    @Test
+    fun `recording toggle updates persistence and runtime`() {
+        var persisted: Boolean? = null
+        var runtime: Boolean? = null
+
+        val result = HttpLogController.setRecording(
+            enabled = true,
+            persist = { persisted = it },
+            updateRuntime = { runtime = it },
+        )
+
+        assertTrue(result.isSuccess)
+        assertEquals(true, persisted)
+        assertEquals(true, runtime)
+        assertEquals(true, (result.data as Map<*, *>)["recording"])
+    }
 }

@@ -39,13 +39,8 @@ object JsSourceUpsert {
         openedSourceUrl: String? = null,
         timeoutMillis: Long? = null,
     ): BookSource {
-        if (timeoutMillis == null) {
-            saveMutex.lock()
-        } else {
-            withTimeout(timeoutMillis) { saveMutex.lock() }
-        }
-        try {
-            return withContext(IO) {
+        return withSaveLock(timeoutMillis) {
+            withContext(IO) {
                 val source = if (timeoutMillis == null) {
                     JsSourceConfig.extract(text, currentCoroutineContext())
                 } else {
@@ -88,6 +83,20 @@ object JsSourceUpsert {
                 concurrentRecordMap.remove(source.bookSourceUrl)
                 source
             }
+        }
+    }
+
+    internal suspend fun <T> withSaveLock(
+        timeoutMillis: Long? = null,
+        block: suspend () -> T,
+    ): T {
+        if (timeoutMillis == null) {
+            saveMutex.lock()
+        } else {
+            withTimeout(timeoutMillis) { saveMutex.lock() }
+        }
+        return try {
+            block()
         } finally {
             saveMutex.unlock()
         }

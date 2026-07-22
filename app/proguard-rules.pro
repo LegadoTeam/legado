@@ -124,6 +124,10 @@ cn.hutool.core.util.**{*;}
 # Cronet 151 references the API 37 private compute service behind an SDK check.
 -dontwarn android.app.privatecompute.PccSandboxManager
 
+# Ktor's optional IDE debugger detector references JDK-only management APIs.
+-dontwarn java.lang.management.ManagementFactory
+-dontwarn java.lang.management.RuntimeMXBean
+
 ## ExoPlayer 如果还不能播放就取消注释这个
 # -keep class com.google.android.exoplayer2.** {*;}
 

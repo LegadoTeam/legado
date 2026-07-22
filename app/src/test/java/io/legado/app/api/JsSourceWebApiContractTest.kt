@@ -151,15 +151,63 @@ class JsSourceWebApiContractTest {
         val bookDebugWebSocket = readProjectFile(
             "app/src/main/java/io/legado/app/web/socket/BookSourceDebugWebSocket.kt"
         )
+        val rssDebugWebSocket = readProjectFile(
+            "app/src/main/java/io/legado/app/web/socket/RssSourceDebugWebSocket.kt"
+        )
         assertFalse(bookSearchWebSocket.contains("matchesJsSourceApiToken"))
         assertFalse(bookSearchWebSocket.contains("searchMap[\"token\"]"))
         assertTrue(bookSearchWebSocket.contains("AUTH_TIMEOUT_MILLIS"))
         assertFalse(bookSearchWebSocket.contains("tokenRequired"))
         assertFalse(bookDebugWebSocket.contains("matchesJsSourceApiToken"))
         assertFalse(bookDebugWebSocket.contains("debugBean[\"token\"]"))
-        assertTrue(bookDebugWebSocket.contains("Debug.callback === this"))
+        assertTrue(bookDebugWebSocket.contains("Debug.tryAcquireCallback"))
+        assertTrue(bookDebugWebSocket.contains("Debug.cancelDebug(this)"))
         assertTrue(bookDebugWebSocket.contains("cancelOwnedDebug()"))
         assertFalse(bookDebugWebSocket.contains("tokenRequired"))
+        assertDebugSocketFailureReleasesOwner(bookDebugWebSocket)
+        assertDebugSocketFailureReleasesOwner(rssDebugWebSocket)
+
+        val bookDebugModel = readProjectFile(
+            "app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugModel.kt"
+        )
+        val rssDebugModel = readProjectFile(
+            "app/src/main/java/io/legado/app/ui/rss/source/debug/RssSourceDebugModel.kt"
+        )
+        assertTrue(bookDebugModel.contains("state == -1 || state == 1000"))
+        assertTrue(rssDebugModel.contains("state == -1 || state == 1000"))
+        assertTrue(bookDebugModel.contains("Debug.cancelDebug(this)"))
+        assertTrue(rssDebugModel.contains("Debug.cancelDebug(this)"))
+        assertTrue(bookDebugModel.contains("error: ((Throwable) -> Unit)?"))
+        assertTrue(rssDebugModel.contains("error: ((Throwable) -> Unit)?"))
+        assertTrue(bookDebugModel.contains("error?.invoke(it)"))
+        assertTrue(rssDebugModel.contains("error?.invoke(it)"))
+
+        val bookDebugActivity = readProjectFile(
+            "app/src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugActivity.kt"
+        )
+        val rssDebugActivity = readProjectFile(
+            "app/src/main/java/io/legado/app/ui/rss/source/debug/RssSourceDebugActivity.kt"
+        )
+        assertTrue(bookDebugActivity.contains("error.localizedMessage ?: \"调试失败\""))
+        assertTrue(rssDebugActivity.contains("error.localizedMessage ?: \"调试失败\""))
+
+        val debugModel = readProjectFile("app/src/main/java/io/legado/app/model/Debug.kt")
+        assertTrue(debugModel.contains("withActiveDebugSession"))
+        assertTrue(debugModel.contains("trackDebugTask"))
+        assertTrue(debugModel.contains("debugSessionId"))
+        assertTrue(debugModel.contains("没有正文章节\", state = -1"))
+        assertTrue(
+            debugModel.substringAfter("private fun trackDebugTask")
+                .contains("tasks.add(task)")
+        )
+        val sourceActivity = readProjectFile(
+            "app/src/main/java/io/legado/app/ui/book/source/manage/BookSourceActivity.kt"
+        )
+        assertFalse(
+            sourceActivity.contains(
+                "CheckSource.stop(this)\n                        Debug.finishChecking()"
+            )
+        )
     }
 
     @Test
@@ -279,5 +327,22 @@ class JsSourceWebApiContractTest {
         val file = File(repositoryRoot, path)
         require(file.isFile) { "Project file not found: $file" }
         return file.readText()
+    }
+
+    private fun assertDebugSocketFailureReleasesOwner(source: String) {
+        val heartbeat = source.substringAfter("private fun startHeartbeat()")
+            .substringBefore("override fun onClose")
+        val printLog = source.substringAfter("override fun printLog")
+            .substringBefore("private fun cancelOwnedDebug")
+
+        listOf(heartbeat, printLog).forEach { section ->
+            val failure = section.substringAfter("}.onFailure {")
+            val releaseIndex = failure.indexOf("cancelOwnedDebug()")
+            val cancellationIndex = failure.indexOf("if (it is CancellationException) throw it")
+            val closeIndex = failure.indexOf("CloseCode.InternalServerError")
+            assertTrue(releaseIndex >= 0)
+            assertTrue(cancellationIndex > releaseIndex)
+            assertTrue(closeIndex > cancellationIndex)
+        }
     }
 }

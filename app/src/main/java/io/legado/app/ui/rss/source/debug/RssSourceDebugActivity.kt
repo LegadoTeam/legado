@@ -167,10 +167,10 @@ class RssSourceDebugActivity : VMBaseActivity<ActivityRssSourceDebugBinding, Rss
         viewModel.startDebug(key, {
             loading = true
             if (binding.help.visibility != View.VISIBLE) binding.rotateLoading.visible()
-        }, {
+        }, { error ->
             loading = false
             binding.rotateLoading.gone()
-            toastOnUi("未获取到书源")
+            toastOnUi(error.localizedMessage ?: "调试失败")
         })
     }
 }

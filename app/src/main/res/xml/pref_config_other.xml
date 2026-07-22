@@ -202,6 +202,11 @@
             android:title="@string/web_port_title"
             app:iconSpaceReserved="false" />
 
+        <io.legado.app.lib.prefs.Preference
+            android:key="mcpPort"
+            android:title="@string/mcp_port_title"
+            app:iconSpaceReserved="false" />
+
         <io.legado.app.lib.prefs.EditTextPreference
             android:key="jsSourceApiToken"
             android:summary="@string/js_source_api_token_summary"

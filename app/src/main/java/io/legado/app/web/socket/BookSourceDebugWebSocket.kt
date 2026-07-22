@@ -48,6 +48,17 @@ class BookSourceDebugWebSocket(handshakeRequest: NanoHTTPD.IHTTPSession) :
                         ping("ping".toByteArray())
                     }
                 }
+            }.onFailure {
+                cancelOwnedDebug()
+                if (it is CancellationException) throw it
+                it.printOnDebug()
+                runCatching {
+                    close(
+                        NanoWSD.WebSocketFrame.CloseCode.InternalServerError,
+                        "调试连接异常",
+                        false
+                    )
+                }
             }
         }
     }
@@ -89,12 +100,18 @@ class BookSourceDebugWebSocket(handshakeRequest: NanoHTTPD.IHTTPSession) :
                         close(NanoWSD.WebSocketFrame.CloseCode.NormalClosure, "调试结束", false)
                         return@launch
                     }
+                    if (!Debug.tryAcquireCallback(this@BookSourceDebugWebSocket)) {
+                        send("调试通道占用中，请稍后重试")
+                        close(
+                            NanoWSD.WebSocketFrame.CloseCode.NormalClosure,
+                            "调试结束",
+                            false
+                        )
+                        return@launch
+                    }
                     requestReceived = true
                     startHeartbeat()
-                    source.let {
-                        Debug.callback = this@BookSourceDebugWebSocket
-                        Debug.startDebug(this, it, key)
-                    }
+                    Debug.startDebug(this, source, key)
                 } else {
                     close(
                         NanoWSD.WebSocketFrame.CloseCode.PolicyViolation,
@@ -102,6 +119,17 @@ class BookSourceDebugWebSocket(handshakeRequest: NanoHTTPD.IHTTPSession) :
                         false
                     )
                     return@launch
+                }
+            }.onFailure {
+                if (it is CancellationException) throw it
+                cancelOwnedDebug()
+                it.printOnDebug()
+                runCatching {
+                    close(
+                        NanoWSD.WebSocketFrame.CloseCode.InternalServerError,
+                        "调试失败",
+                        false
+                    )
                 }
             }
         }
@@ -127,15 +155,22 @@ class BookSourceDebugWebSocket(handshakeRequest: NanoHTTPD.IHTTPSession) :
                     close(NanoWSD.WebSocketFrame.CloseCode.NormalClosure, "调试结束", false)
                 }
             }.onFailure {
+                cancelOwnedDebug()
+                if (it is CancellationException) throw it
                 it.printOnDebug()
+                runCatching {
+                    close(
+                        NanoWSD.WebSocketFrame.CloseCode.InternalServerError,
+                        "调试连接异常",
+                        false
+                    )
+                }
             }
         }
     }
 
     private fun cancelOwnedDebug() {
-        if (Debug.callback === this) {
-            Debug.cancelDebug(true)
-        }
+        Debug.cancelDebug(this)
     }
 
     companion object {
