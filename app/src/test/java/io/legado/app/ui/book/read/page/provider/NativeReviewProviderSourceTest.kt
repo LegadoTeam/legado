@@ -56,6 +56,18 @@ class NativeReviewProviderSourceTest {
         assertTrue(layout.contains("reviewTitleOffset = reviewTitleOffset"))
     }
 
+    @Test
+    fun `review overflow remains inside the screen clip`() {
+        val provider = projectFile(
+            "src/main/java/io/legado/app/ui/book/read/page/provider/ChapterProvider.kt"
+        ).readText().normalizeLines()
+        val layoutBlock = provider.substringAfter("fun upLayout()")
+            .substringBefore("private fun setFallbackLayout()")
+        val visibleRectBlock = layoutBlock.substringAfter("visibleRect.set(")
+
+        assertTrue(visibleRectBlock.contains("viewWidth.toFloat(),"))
+    }
+
     private fun String.normalizeLines(): String = replace("\r\n", "\n")
 
     private fun projectFile(pathInApp: String): File {

@@ -32,6 +32,24 @@ import kotlinx.coroutines.CoroutineScope
 import splitties.init.appCtx
 import androidx.core.net.toUri
 
+internal object ReviewColumnGeometry {
+    fun start(
+        textEnd: Float,
+        width: Float,
+        viewWidth: Int,
+        isDoublePage: Boolean,
+        isLeftLine: Boolean,
+        edgeInset: Float,
+    ): Float {
+        val pageRight = if (isDoublePage && isLeftLine) {
+            (viewWidth / 2).toFloat()
+        } else {
+            viewWidth.toFloat()
+        }
+        return minOf(textEnd, pageRight - edgeInset - width)
+    }
+}
+
 /**
  * 解析内容生成章节和页面
  */
@@ -337,14 +355,16 @@ object ChapterProvider {
         textLine: TextLine,
     ): Boolean {
         val width = getReviewWidth(textLine.isTitle)
-        val maxEnd = if (doublePage && textLine.isLeftLine) {
-            (viewWidth / 2 - paddingRight).toFloat()
-        } else {
-            visibleRight.toFloat()
-        }
         val textEnd = textLine.columns.lastOrNull { it !is ReviewColumn }?.end
             ?: textLine.lineEnd
-        val start = minOf(textEnd, maxEnd - width)
+        val start = ReviewColumnGeometry.start(
+            textEnd = textEnd,
+            width = width,
+            viewWidth = viewWidth,
+            isDoublePage = doublePage,
+            isLeftLine = textLine.isLeftLine,
+            edgeInset = 1.dpToPx().toFloat(),
+        )
         val end = start + width
         if (reviewColumn.start == start && reviewColumn.end == end) return false
         reviewColumn.start = start
@@ -504,7 +524,7 @@ object ChapterProvider {
         visibleRect.set( //留余，让溢出时也显示
             paddingLeft.toFloat() - 10,
             paddingTop.toFloat() - 10,
-            visibleRight.toFloat() + 10,
+            viewWidth.toFloat(),
             visibleBottom.toFloat() + 10f.dpToPx() //下划线最远10dp
         )
 
