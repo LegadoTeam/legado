@@ -64,6 +64,7 @@ import org.jsoup.Jsoup
 import org.htmlunit.corejs.javascript.Function
 import org.htmlunit.corejs.javascript.Scriptable
 import org.htmlunit.corejs.javascript.ScriptableObject
+import org.htmlunit.corejs.javascript.TopLevel
 import org.htmlunit.corejs.javascript.Undefined
 import splitties.init.appCtx
 import java.io.ByteArrayInputStream
@@ -1242,7 +1243,7 @@ interface JsExtensions : JsEncodeUtils {
 
     private fun functionThisObj(action: Function): Scriptable {
         val top = action.parentScope?.let { ScriptableObject.getTopLevelScope(it) }
-        return top?.globalThis
+        return (top as? TopLevel)?.globalThis
             ?: Undefined.SCRIPTABLE_UNDEFINED
     }
 

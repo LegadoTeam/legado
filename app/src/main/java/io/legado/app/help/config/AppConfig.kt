@@ -365,12 +365,6 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefInt(PreferKey.ttsTimer, value)
         }
 
-    var sleepTimerPreferChapter: Boolean
-        get() = appCtx.getPrefBoolean(PreferKey.sleepTimerPreferChapter, false)
-        set(value) {
-            appCtx.putPrefBoolean(PreferKey.sleepTimerPreferChapter, value)
-        }
-
     val speechRatePlay: Int get() = if (ttsFlowSys) defaultSpeechRate else ttsSpeechRate
 
     var chineseConverterType: Int
@@ -612,16 +606,6 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val updateToVariant get() = appCtx.getPrefString(PreferKey.updateToVariant, "default_version")
 
     val streamReadAloudAudio get() = appCtx.getPrefBoolean(PreferKey.streamReadAloudAudio, false)
-
-    var audioCacheTreeUri: String?
-        get() = appCtx.getPrefString(PreferKey.audioCacheTreeUri)
-        set(value) {
-            if (value.isNullOrBlank()) {
-                appCtx.removePref(PreferKey.audioCacheTreeUri)
-            } else {
-                appCtx.putPrefString(PreferKey.audioCacheTreeUri, value)
-            }
-        }
 
     val doublePageHorizontal: String?
         get() = appCtx.getPrefString(PreferKey.doublePageHorizontal)

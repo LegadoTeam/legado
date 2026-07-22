@@ -277,62 +277,6 @@ class JsSourceConfigTest {
         assertEquals("https://example.com/login", source.loginUrl)
     }
 
-    @Test
-    fun `review functions are accepted as a pair`() {
-        val source = JsSourceConfig.extract(
-            validScript + "\n" + """
-                function getReviewSummary(chapter, book) { return []; }
-                function getReviewDetail(chapter, book, paraIndex, paraData, page) {
-                    return { items: [] };
-                }
-            """.trimIndent()
-        )
-
-        assertTrue(source.mainJs.orEmpty().contains("getReviewSummary"))
-    }
-
-    @Test
-    fun `review summary requires matching detail function`() {
-        assertExtractError(
-            validScript + "\nfunction getReviewSummary(chapter, book) { return []; }",
-            "getReviewDetail",
-        )
-    }
-
-    @Test
-    fun `review detail requires matching summary function`() {
-        assertExtractError(
-            validScript + "\n" + """
-                function getReviewDetail(chapter, book, paraIndex, paraData, page) {
-                    return { items: [] };
-                }
-            """.trimIndent(),
-            "getReviewSummary",
-        )
-    }
-
-    @Test
-    fun `review properties must be functions`() {
-        assertExtractError(
-            validScript + "\n" + """
-                var getReviewSummary = [];
-                function getReviewDetail() { return { items: [] }; }
-            """.trimIndent(),
-            "getReviewSummary",
-        )
-    }
-
-    @Test
-    fun `both review properties must be functions`() {
-        assertExtractError(
-            validScript + "\n" + """
-                var getReviewSummary = [];
-                var getReviewDetail = {};
-            """.trimIndent(),
-            "getReviewSummary",
-        )
-    }
-
     @Test(timeout = 5_000)
     fun `cancellation escapes infinite top level script`() {
         JsSourceConfig.extract(validScript)

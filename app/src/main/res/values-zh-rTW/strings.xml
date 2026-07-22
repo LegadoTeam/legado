@@ -538,8 +538,6 @@
     <string name="select_file">選擇文件</string>
     <string name="no_find">沒有發現，可以在書源裡新增。</string>
     <string name="restore_default">復原預設</string>
-    <string name="reset_region_padding_confirm">確定恢復%s的預設邊距嗎？</string>
-    <string name="lock_left_right_padding">左右邊距聯動</string>
     <string name="set_download_per">自訂快取路徑需要儲存權限</string>
     <string name="black">黑色</string>
     <string name="content_empty">文章內容為空</string>

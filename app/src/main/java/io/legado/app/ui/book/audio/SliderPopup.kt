@@ -13,7 +13,6 @@ import io.legado.app.databinding.PopupSeekBarBinding
 import io.legado.app.model.AudioPlay
 import io.legado.app.service.AudioPlayService
 import io.legado.app.ui.widget.seekbar.SeekBarChangeListener
-import io.legado.app.utils.applyMd3PopupStyle
 import kotlin.math.roundToInt
 
 class SliderPopup(private val context: Context, private val name: Int) :
@@ -26,7 +25,6 @@ class SliderPopup(private val context: Context, private val name: Int) :
     private val binding = PopupSeekBarBinding.inflate(LayoutInflater.from(context))
     init {
         contentView = binding.root
-        applyMd3PopupStyle()
         isTouchable = true
         isOutsideTouchable = false
         isFocusable = true

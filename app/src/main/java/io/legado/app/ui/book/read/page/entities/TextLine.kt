@@ -47,7 +47,6 @@ data class TextLine(
     var wordSpacing: Float = 0f,
     var exceed: Boolean = false,
     var onlyTextColumn: Boolean = true,
-    var reviewTitleOffset: Int = 0,
 ) {
 
     val columns: List<BaseColumn> get() = textColumns
@@ -77,14 +76,6 @@ data class TextLine(
         }
         column.textLine = this
         textColumns.add(column)
-    }
-
-    fun removeColumns(predicate: (BaseColumn) -> Boolean): Boolean {
-        val removed = textColumns.removeAll(predicate)
-        if (removed) {
-            onlyTextColumn = textColumns.all { it is TextColumn }
-        }
-        return removed
     }
 
     fun addColumns(columns: Collection<BaseColumn>) {

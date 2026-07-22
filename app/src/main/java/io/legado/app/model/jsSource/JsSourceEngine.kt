@@ -54,29 +54,14 @@ class JsSourceEngine(
 
     /** 调用可选顶层函数:缺失返回 null(单次 eval,不做 hasFunction 预探测) */
     fun callFunctionIfExists(name: String, args: List<Pair<String, Any?>>): String? {
-        return callOptionalFunction(name, args).value
-    }
-
-    internal fun callOptionalFunction(
-        name: String,
-        args: List<Pair<String, Any?>>,
-    ): OptionalCallResult {
         val scope = buildScope(args)
         if (ScriptableObject.getProperty(scope, name) !is JsFunction) {
-            return OptionalCallResult(exists = false, value = null)
+            return null
         }
         val callExpr = "$name(${args.joinToString(", ") { it.first }})"
         val raw = compile(callExpr).eval(scope, coroutineContext)
-        return OptionalCallResult(
-            exists = true,
-            value = normalizeJsResult(raw, coroutineContext),
-        )
+        return normalizeJsResult(raw, coroutineContext)
     }
-
-    internal data class OptionalCallResult(
-        val exists: Boolean,
-        val value: String?,
-    )
 
     private fun buildScope(args: List<Pair<String, Any?>>): ScriptBindings {
         val mainJs = source.mainJs

@@ -3,7 +3,6 @@ package io.legado.app.model
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.os.SystemClock
 import io.legado.app.R
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.EventBus
@@ -21,7 +20,6 @@ import io.legado.app.help.book.simulatedTotalChapterNum
 import io.legado.app.help.book.update
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
-import io.legado.app.help.audio.AudioCacheManager
 import io.legado.app.help.globalExecutor
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.AudioPlayService
@@ -33,7 +31,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancelChildren
 import splitties.init.appCtx
-import java.util.concurrent.Future
 import kotlin.text.trim
 
 internal data class AudioPlayUrlKey(
@@ -74,13 +71,11 @@ internal class AudioPlayUrlPreloadStore {
         requestGeneration: Long,
         url: String,
         lyric: String? = null,
-    ): Boolean {
+    ) {
         loadingKeys.remove(key)
         if (requestGeneration == generation && url.isNotBlank()) {
             entry = Entry(key, PreloadedAudioPlayUrl(url, lyric))
-            return true
         }
-        return false
     }
 
     @Synchronized
@@ -89,53 +84,11 @@ internal class AudioPlayUrlPreloadStore {
     }
 
     @Synchronized
-    fun invalidate(key: AudioPlayUrlKey) {
-        generation++
-        if (entry?.key == key) {
-            entry = null
-        }
-        loadingKeys.clear()
-    }
-
-    @Synchronized
     fun consume(key: AudioPlayUrlKey): PreloadedAudioPlayUrl? {
         val current = entry ?: return null
         if (current.key != key) return null
         entry = null
         return current.value
-    }
-}
-
-internal class AudioReadTimeTracker {
-
-    private var record = ReadRecord()
-    private var activeRecord: ReadRecord? = null
-    private var startedAt: Long? = null
-
-    @Synchronized
-    fun setRecord(record: ReadRecord) {
-        this.record = record
-    }
-
-    @Synchronized
-    fun start(now: Long) {
-        if (startedAt == null) {
-            activeRecord = record
-            startedAt = now
-        }
-    }
-
-    @Synchronized
-    fun stop(now: Long, lastRead: Long): ReadRecord? {
-        val start = startedAt ?: return null
-        val record = activeRecord ?: return null
-        activeRecord = null
-        startedAt = null
-        val elapsed = (now - start).coerceAtLeast(0)
-        if (elapsed == 0L) return null
-        record.readTime += elapsed
-        record.lastRead = lastRead
-        return record.copy()
     }
 }
 
@@ -174,7 +127,6 @@ object AudioPlay : CoroutineScope by MainScope() {
     var durChapterPos = 0
     var durChapter: BookChapter? = null
     var durPlayUrl = ""
-    var durMediaUrl = ""
     var durLyric: String? = null
     var durAudioSize = 0
     var inBookshelf = false
@@ -182,14 +134,8 @@ object AudioPlay : CoroutineScope by MainScope() {
         private set
     val loadingChapters = arrayListOf<Int>()
     private val playUrlPreloadStore = AudioPlayUrlPreloadStore()
-    private val skipCacheOnceKeys = hashSetOf<AudioCacheKey>()
-    @Volatile
-    private var playingCacheKey: AudioCacheKey? = null
-    private var playingCacheBookUrl: String? = null
-    private var playingCacheTreeUri: String? = null
-    private val readTimeTracker = AudioReadTimeTracker()
-    @Volatile
-    private var readTimeWrite: Future<*>? = null
+    private val readRecord = ReadRecord()
+    var readStartTime: Long = System.currentTimeMillis()
     val executor = globalExecutor
 
     fun changePlayMode() {
@@ -211,10 +157,8 @@ object AudioPlay : CoroutineScope by MainScope() {
             durChapterIndex = book.durChapterIndex
             durChapterPos = book.durChapterPos
             durPlayUrl = ""
-            durMediaUrl = ""
             durLyric = null
             durAudioSize = 0
-            clearPlayingCache()
         }
         upDurChapter()
     }
@@ -223,7 +167,8 @@ object AudioPlay : CoroutineScope by MainScope() {
         stop()
         playUrlPreloadStore.reset()
         AudioPlay.book = book
-        resetReadRecord(book)
+        readRecord.bookName = book.name
+        readRecord.readTime = appDb.readRecordDao.getReadTime(book.name) ?: 0
         chapterSize = appDb.bookChapterDao.getChapterCount(book.bookUrl)
         simulatedChapterSize = if (book.readSimulating()) {
             book.simulatedTotalChapterNum()
@@ -241,63 +186,28 @@ object AudioPlay : CoroutineScope by MainScope() {
         AudioPlayService.playSpeed = playSpeed
         postEvent(EventBus.AUDIO_SPEED, playSpeed)
         durPlayUrl = ""
-        durMediaUrl = ""
         durLyric = null
         durAudioSize = 0
-        synchronized(this) {
-            skipCacheOnceKeys.clear()
-            clearPlayingCache()
-        }
         upDurChapter()
         SourceCallBack.callBackBook(SourceCallBack.START_READ, bookSource, book, durChapter)
         postEvent(EventBus.AUDIO_BUFFER_PROGRESS, 0)
     }
 
-    @Synchronized
-    fun replaceBook(book: Book) {
-        AudioPlay.book = book
-        resetReadRecord(book, resumeIfPlaying = true)
-    }
-
-    @Synchronized
-    private fun resetReadRecord(book: Book, resumeIfPlaying: Boolean = false) {
-        upReadTime()
-        kotlin.runCatching { readTimeWrite?.get() }.onFailure {
-            AppLog.put("保存听书时长失败\n${it.localizedMessage}", it)
-        }
-        readTimeTracker.setRecord(
-            ReadRecord(
-                bookName = book.name,
-                readTime = appDb.readRecordDao.getReadTime(book.name) ?: 0,
-            )
-        )
-        if (resumeIfPlaying && AudioPlayService.isPlaying) {
-            markReadTimeStart()
-        }
-    }
-
     fun setBookSource(source: BookSource?) {
         bookSource = source
         playUrlPreloadStore.reset()
-        synchronized(this) {
-            skipCacheOnceKeys.clear()
-        }
     }
 
-    @Synchronized
-    fun markReadTimeStart() {
-        if (AppConfig.enableReadRecord) {
-            readTimeTracker.start(SystemClock.elapsedRealtime())
-        }
-    }
-
-    @Synchronized
     fun upReadTime() {
-        val record = readTimeTracker.stop(
-            now = SystemClock.elapsedRealtime(),
-            lastRead = System.currentTimeMillis(),
-        ) ?: return
-        readTimeWrite = executor.submit { appDb.readRecordDao.insert(record) }
+        if (!AppConfig.enableReadRecord) {
+            return
+        }
+        executor.execute {
+            readRecord.readTime = readRecord.readTime + System.currentTimeMillis() - readStartTime
+            readStartTime = System.currentTimeMillis()
+            readRecord.lastRead = System.currentTimeMillis()
+            appDb.readRecordDao.insert(readRecord)
+        }
     }
 
     private fun addLoading(index: Int): Boolean {
@@ -314,20 +224,8 @@ object AudioPlay : CoroutineScope by MainScope() {
         }
     }
 
-    @Synchronized
-    private fun consumeSkipCacheOnce(key: AudioCacheKey): Boolean {
-        return skipCacheOnceKeys.remove(key)
-    }
-
-    @Synchronized
-    private fun clearPlayingCache() {
-        playingCacheKey = null
-        playingCacheBookUrl = null
-        playingCacheTreeUri = null
-    }
-
     fun loadOrUpPlayUrl() {
-        if (durMediaUrl.isEmpty()) {
+        if (durPlayUrl.isEmpty()) {
             loadPlayUrl()
         } else {
             upPlayUrl()
@@ -341,7 +239,8 @@ object AudioPlay : CoroutineScope by MainScope() {
         val index = durChapterIndex
         if (addLoading(index)) {
             val book = book
-            if (book != null) {
+            val bookSource = bookSource
+            if (book != null && bookSource != null) {
                 upDurChapter()
                 val chapter = durChapter
                 if (chapter == null) {
@@ -353,110 +252,44 @@ object AudioPlay : CoroutineScope by MainScope() {
                     removeLoading(index)
                     return
                 }
-                val cacheKey = AudioCacheKey.from(chapter)
-                val source = bookSource
-                val preloadKey = source?.let {
-                    AudioPlayUrlKey(book.bookUrl, it.bookSourceUrl, chapter.index)
-                }
-                val cacheTreeUri = AppConfig.audioCacheTreeUri
-                val skipCache = consumeSkipCacheOnce(cacheKey)
-                Coroutine.async(this) {
-                    if (skipCache) null else AudioCacheManager.getCachedAudio(
-                        cacheTreeUri,
-                        book.bookUrl,
-                        chapter,
-                    )
-                }.onSuccess { cachedAudio ->
-                    if (!isCurrentChapter(book.bookUrl, chapter, cacheKey)) {
-                        removeLoading(index)
-                        return@onSuccess
-                    }
-                    if (cachedAudio != null) {
-                        preloadKey?.let(playUrlPreloadStore::invalidate)
-                        synchronized(AudioPlay) {
-                            playingCacheKey = cacheKey
-                            playingCacheBookUrl = book.bookUrl
-                            playingCacheTreeUri = cacheTreeUri
-                        }
-                        durPlayUrl = cachedAudio.playUrl ?: chapter.resourceUrl.orEmpty()
-                        durMediaUrl = cachedAudio.mediaUri
-                        durLyric = chapter.getVariable("lyric")
-                        removeLoading(index)
-                        upLoading(false)
-                        callback?.upLyric(durLyric)
-                        upPlayUrl()
-                        preloadNextPlayUrl(index)
-                    } else if (source != null && preloadKey != null) {
-                        loadRemotePlayUrl(book, source, chapter, preloadKey)
-                    } else {
-                        removeLoading(index)
-                        appCtx.toastOnUi("book source is null")
-                    }
-                }.onError {
-                    AppLog.put("Read audio cache failed\n${it.localizedMessage}", it)
-                    if (isCurrentChapter(book.bookUrl, chapter, cacheKey) &&
-                        source != null && preloadKey != null
-                    ) {
-                        loadRemotePlayUrl(book, source, chapter, preloadKey)
-                    } else {
-                        removeLoading(index)
-                    }
-                }.onCancel {
+                val preloadKey = AudioPlayUrlKey(
+                    book.bookUrl,
+                    bookSource.bookSourceUrl,
+                    chapter.index,
+                )
+                playUrlPreloadStore.consume(preloadKey)?.let { preloaded ->
+                    durPlayUrl = preloaded.url
+                    durLyric = preloaded.lyric
                     removeLoading(index)
+                    upLoading(false)
+                    callback?.upLyric(durLyric)
+                    upPlayUrl()
+                    preloadNextPlayUrl(index)
+                    return
                 }
+                upLoading(true)
+                WebBook.getContent(this, bookSource, book, chapter)
+                    .onSuccess { content ->
+                        val content = content.trim()
+                        if (content.isEmpty()) {
+                            appCtx.toastOnUi("未获取到资源链接")
+                        } else {
+                            contentLoadFinish(chapter, content)
+                        }
+                    }.onError {
+                        AppLog.put("获取资源链接出错\n$it", it, true)
+                        upLoading(false)
+                    }.onCancel {
+                        removeLoading(index)
+                    }.onFinally {
+                        callback?.upLyric(durLyric)
+                        removeLoading(index)
+                    }
             } else {
                 removeLoading(index)
-                appCtx.toastOnUi("book is null")
+                appCtx.toastOnUi("book or source is null")
             }
         }
-    }
-
-    private fun loadRemotePlayUrl(
-        book: Book,
-        bookSource: BookSource,
-        chapter: BookChapter,
-        preloadKey: AudioPlayUrlKey,
-    ) {
-        clearPlayingCache()
-        playUrlPreloadStore.consume(preloadKey)?.let { preloaded ->
-            durPlayUrl = preloaded.url
-            durMediaUrl = preloaded.url
-            durLyric = preloaded.lyric
-            removeLoading(chapter.index)
-            upLoading(false)
-            callback?.upLyric(durLyric)
-            upPlayUrl()
-            preloadNextPlayUrl(chapter.index)
-            return
-        }
-        upLoading(true)
-        WebBook.getContent(this, bookSource, book, chapter)
-            .onSuccess { content ->
-                val content = content.trim()
-                if (content.isEmpty()) {
-                    appCtx.toastOnUi("未获取到资源链接")
-                } else {
-                    contentLoadFinish(chapter, content)
-                }
-            }.onError {
-                AppLog.put("获取资源链接出错\n$it", it, true)
-                upLoading(false)
-            }.onCancel {
-                removeLoading(chapter.index)
-            }.onFinally {
-                callback?.upLyric(durLyric)
-                removeLoading(chapter.index)
-            }
-    }
-
-    private fun isCurrentChapter(
-        bookUrl: String,
-        chapter: BookChapter,
-        cacheKey: AudioCacheKey,
-    ): Boolean {
-        return book?.bookUrl == bookUrl &&
-                durChapterIndex == chapter.index &&
-                durChapter?.let(AudioCacheKey::from) == cacheKey
     }
 
     /**
@@ -464,9 +297,7 @@ object AudioPlay : CoroutineScope by MainScope() {
      */
     private fun contentLoadFinish(chapter: BookChapter, content: String) {
         if (chapter.index == book?.durChapterIndex) {
-            clearPlayingCache()
             durPlayUrl = content
-            durMediaUrl = content
             durLyric = chapter.getVariable("lyric")
             upPlayUrl()
             preloadNextPlayUrl(chapter.index)
@@ -479,102 +310,22 @@ object AudioPlay : CoroutineScope by MainScope() {
         val source = bookSource ?: return
         val nextChapter = findNextPlayableChapter(book.bookUrl, currentIndex + 1) ?: return
         val key = AudioPlayUrlKey(book.bookUrl, source.bookSourceUrl, nextChapter.index)
-        Coroutine.async(this) {
-            AudioCacheManager.getCachedUriString(
-                AppConfig.audioCacheTreeUri,
-                book.bookUrl,
-                nextChapter,
-            )
-        }.onSuccess { cachedUri ->
-            if (book.bookUrl != AudioPlay.book?.bookUrl ||
-                source.bookSourceUrl != bookSource?.bookSourceUrl
-            ) {
-                return@onSuccess
-            }
-            if (cachedUri != null) {
-                playUrlPreloadStore.invalidate(key)
-                return@onSuccess
-            }
-            val requestGeneration = playUrlPreloadStore.begin(key) ?: return@onSuccess
-            WebBook.getContent(this, source, book, nextChapter, needSave = false)
-                .onSuccess { content ->
-                    val resolvedPlayUrl = content.trim()
-                    playUrlPreloadStore.complete(
-                        key,
-                        requestGeneration,
-                        resolvedPlayUrl,
-                        nextChapter.getVariable("lyric"),
-                    )
-                }
-                .onError {
-                    playUrlPreloadStore.finish(key)
-                }
-                .onCancel {
-                    playUrlPreloadStore.finish(key)
-                }
-        }.onError {
-            AppLog.put("Read next audio cache failed\n${it.localizedMessage}", it)
-        }
-    }
-
-    fun retryAfterCachedPlaybackError(resumePosition: Int): Boolean {
-        val book = book ?: return false
-        val chapter = durChapter ?: return false
-        val currentCacheKey = AudioCacheKey.from(chapter)
-        val cachedRef = synchronized(this) {
-            val cachedKey = playingCacheKey ?: return false
-            val ref = Triple(
-                playingCacheBookUrl ?: book.bookUrl,
-                playingCacheTreeUri,
-                cachedKey,
-            )
-            playingCacheKey = null
-            playingCacheBookUrl = null
-            playingCacheTreeUri = null
-            skipCacheOnceKeys.add(cachedKey)
-            ref
-        }
-        book.durChapterPos = resumePosition.coerceAtLeast(0)
-        durChapterPos = book.durChapterPos
-        bookSource?.let { source ->
-            playUrlPreloadStore.invalidate(
-                AudioPlayUrlKey(book.bookUrl, source.bookSourceUrl, chapter.index)
-            )
-        }
-        durPlayUrl = ""
-        durMediaUrl = ""
-        val cachedBookUrl = cachedRef.first
-        val cacheTreeUri = cachedRef.second
-        val cachedKey = cachedRef.third
-        Coroutine.async(this) {
-            AudioCacheManager.removeCachedChapter(
-                cacheTreeUri,
-                cachedBookUrl,
-                cachedKey,
-            )
-        }.onSuccess { removed ->
-            if (removed) {
-                postEvent(
-                    EventBus.AUDIO_CACHE_CHANGED,
-                    AudioCacheStateChanged(cachedBookUrl, cachedKey, false, cacheTreeUri),
+        val requestGeneration = playUrlPreloadStore.begin(key) ?: return
+        WebBook.getContent(this, source, book, nextChapter, needSave = false)
+            .onSuccess { content ->
+                playUrlPreloadStore.complete(
+                    key,
+                    requestGeneration,
+                    content.trim(),
+                    nextChapter.getVariable("lyric"),
                 )
             }
-            if (cachedKey != currentCacheKey) {
-                synchronized(AudioPlay) { skipCacheOnceKeys.remove(cachedKey) }
+            .onError {
+                playUrlPreloadStore.finish(key)
             }
-            if (isCurrentChapter(book.bookUrl, chapter, currentCacheKey)) {
-                loadPlayUrl()
+            .onCancel {
+                playUrlPreloadStore.finish(key)
             }
-        }.onError {
-            AppLog.put("Remove broken audio cache failed\n${it.localizedMessage}", it)
-            if (cachedKey != currentCacheKey) {
-                synchronized(AudioPlay) { skipCacheOnceKeys.remove(cachedKey) }
-            }
-            if (isCurrentChapter(book.bookUrl, chapter, currentCacheKey)) {
-                loadPlayUrl()
-            }
-        }
-        return true
     }
 
     private fun findNextPlayableChapter(bookUrl: String, startIndex: Int): BookChapter? {
@@ -628,6 +379,7 @@ object AudioPlay : CoroutineScope by MainScope() {
 
     fun pause(context: Context) {
         if (AudioPlayService.isRun) {
+            readStartTime = System.currentTimeMillis()
             context.startService<AudioPlayService> {
                 action = IntentAction.pause
             }
@@ -681,9 +433,7 @@ object AudioPlay : CoroutineScope by MainScope() {
                 durChapterIndex = index
                 durChapterPos = 0
                 durPlayUrl = ""
-                durMediaUrl = ""
                 durLyric = null
-                clearPlayingCache()
                 saveRead()
                 loadPlayUrl()
             }
@@ -697,9 +447,7 @@ object AudioPlay : CoroutineScope by MainScope() {
                 durChapterIndex -= 1
                 durChapterPos = 0
                 durPlayUrl = ""
-                durMediaUrl = ""
                 durLyric = null
-                clearPlayingCache()
                 saveRead()
                 loadPlayUrl()
             }
@@ -708,15 +456,14 @@ object AudioPlay : CoroutineScope by MainScope() {
 
     fun next() {
         stopPlay()
+        upReadTime()
         when (playMode) {
             PlayMode.LIST_END_STOP -> {
                 if (durChapterIndex + 1 < simulatedChapterSize) {
                     durChapterIndex += 1
                     durChapterPos = 0
                     durPlayUrl = ""
-                    durMediaUrl = ""
                     durLyric = null
-                    clearPlayingCache()
                     saveRead()
                     loadPlayUrl()
                 }
@@ -725,9 +472,7 @@ object AudioPlay : CoroutineScope by MainScope() {
             PlayMode.SINGLE_LOOP -> {
                 durChapterPos = 0
                 durPlayUrl = ""
-                durMediaUrl = ""
                 durLyric = null
-                clearPlayingCache()
                 saveRead()
                 loadPlayUrl()
             }
@@ -736,9 +481,7 @@ object AudioPlay : CoroutineScope by MainScope() {
                 durChapterIndex = (0 until simulatedChapterSize).random()
                 durChapterPos = 0
                 durPlayUrl = ""
-                durMediaUrl = ""
                 durLyric = null
-                clearPlayingCache()
                 saveRead()
                 loadPlayUrl()
             }
@@ -747,9 +490,7 @@ object AudioPlay : CoroutineScope by MainScope() {
                 durChapterIndex = (durChapterIndex + 1) % simulatedChapterSize
                 durChapterPos = 0
                 durPlayUrl = ""
-                durMediaUrl = ""
                 durLyric = null
-                clearPlayingCache()
                 saveRead()
                 loadPlayUrl()
             }

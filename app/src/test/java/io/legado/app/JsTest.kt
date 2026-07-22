@@ -120,43 +120,6 @@ class JsTest {
         Assert.assertEquals(result, 6.0)
     }
 
-    class ElementsProvider {
-        private val document = org.jsoup.Jsoup.parse(
-            """<div id="video-artist-name"><a href="/artist/1">n</a></div>"""
-        )
-
-        fun getElements(rule: String): List<Any> = document.select("$rule a")
-    }
-
-    @Test
-    fun javaListSubclassMethods() {
-        val provider = ElementsProvider()
-        val bindings = ScriptBindings()
-        bindings["java"] = provider
-        bindings["result"] = provider.getElements("#video-artist-name")
-
-        val viaMethod = RhinoScriptEngine.eval(
-            "java.getElements('#video-artist-name').attr('href')", bindings
-        )
-        Assert.assertEquals("/artist/1", viaMethod)
-        val viaBinding = RhinoScriptEngine.eval("result.attr('href')", bindings)
-        Assert.assertEquals("/artist/1", viaBinding)
-    }
-
-    @Test
-    fun analyzeRuleGetElementsKeepsCollectionMethods() {
-        val analyzeRule = io.legado.app.model.analyzeRule.AnalyzeRule()
-        analyzeRule.setContent(
-            """<div id="video-artist-name"><a href="/artist/1">n</a></div>"""
-        )
-        val bindings = ScriptBindings()
-        bindings["java"] = analyzeRule
-        val result = RhinoScriptEngine.eval(
-            "java.getElements('#video-artist-name a').attr('href')", bindings
-        )
-        Assert.assertEquals("/artist/1", result)
-    }
-
     @Test
     fun javaStringInteropBoundary() {
         val chapter = BookChapter(

@@ -190,6 +190,7 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
             }
 
             R.id.menu_import_onLine -> showImportDialog()
+            R.id.menu_import_paste -> showPasteImportDialog()
 
             R.id.menu_sort_desc -> {
                 sortAscending = !sortAscending
@@ -601,6 +602,39 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
         menu.removeGroup(R.id.source_group)
         groups.forEach {
             menu.add(R.id.source_group, Menu.NONE, Menu.NONE, it)
+        }
+    }
+
+    @SuppressLint("InflateParams")
+    private fun showPasteImportDialog() {
+        val editText = android.widget.EditText(this).apply {
+            hint = getString(R.string.import_book_source)
+            isVerticalScrollBarEnabled = true
+            isHorizontalScrollBarEnabled = false
+            setMinHeight(200.dpToPx())
+            gravity = android.view.Gravity.TOP or android.view.Gravity.START
+            setLines(8)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        }
+        val scrollView = android.widget.ScrollView(this).apply {
+            addView(editText, android.view.ViewGroup.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+            ))
+            setPadding(24.dpToPx(), 0, 24.dpToPx(), 0)
+        }
+        alert(titleResource = R.string.import_by_paste) {
+            customView { scrollView }
+            okButton {
+                val text = editText.text?.toString()
+                text?.let {
+                    if (it.isNotBlank()) {
+                        showDialogFragment(ImportBookSourceDialog(it))
+                    }
+                }
+            }
+            cancelButton()
         }
     }
 

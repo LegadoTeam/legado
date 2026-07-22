@@ -1,9 +1,7 @@
 package io.legado.app.model
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AudioPlayUrlPreloadStoreTest {
@@ -43,22 +41,5 @@ class AudioPlayUrlPreloadStoreTest {
         assertNull(store.begin(firstKey))
         store.finish(firstKey)
         assertEquals(generation, store.begin(firstKey))
-    }
-
-    @Test
-    fun `invalidating a chapter clears stored and late preload results`() {
-        val store = AudioPlayUrlPreloadStore()
-        val generation = store.begin(firstKey)!!
-        store.invalidate(firstKey)
-        assertFalse(store.complete(firstKey, generation, "https://example.com/stale.mp3"))
-
-        assertNull(store.consume(firstKey))
-
-        val freshGeneration = store.begin(firstKey)!!
-        assertTrue(store.complete(firstKey, freshGeneration, "https://example.com/fresh.mp3"))
-        assertEquals(
-            PreloadedAudioPlayUrl("https://example.com/fresh.mp3", null),
-            store.consume(firstKey),
-        )
     }
 }

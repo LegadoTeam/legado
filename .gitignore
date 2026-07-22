@@ -1,5 +1,7 @@
 *.iml
 .gradle
+htmlunit-core-js
+htmlunit-rhino-fork
 local.properties
 .DS_Store
 /build

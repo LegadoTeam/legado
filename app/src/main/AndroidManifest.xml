@@ -505,9 +505,6 @@
             android:name=".service.AudioPlayService"
             android:foregroundServiceType="mediaPlayback" />
         <service
-            android:name=".service.AudioCacheService"
-            android:foregroundServiceType="dataSync" />
-        <service
             android:name=".service.VideoPlayService"
             android:foregroundServiceType="mediaPlayback" />
         <service

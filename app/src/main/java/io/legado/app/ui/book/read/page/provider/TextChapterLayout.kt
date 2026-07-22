@@ -110,13 +110,6 @@ class TextChapterLayout(
     private val textFullJustify = ReadBookConfig.textFullJustify
     private val adaptSpecialStyle = AppConfig.adaptSpecialStyle
     private val pageAnim = book.getPageAnim()
-    private val reviewTitleOffset = if (
-        titleMode != 2 || bookChapter.isVolume || !textChapter.hasBodyContent
-    ) {
-        1
-    } else {
-        0
-    }
 
     private var pendingTextPage = TextPage()
 
@@ -317,7 +310,7 @@ class TextChapterLayout(
                     emptyContent = contents.isEmpty(),
                     isVolumeTitle = bookChapter.isVolume
                 )
-                pendingTextPage.lines.lastOrNull()?.isParagraphEnd = true
+                pendingTextPage.lines.last().isParagraphEnd = true
                 stringBuilder.append("\n")
             }
             durY += titleBottomSpacing
@@ -496,13 +489,7 @@ class TextChapterLayout(
                     )
                 }
             }
-            pendingTextPage.lines.lastOrNull()?.let { line ->
-                line.isParagraphEnd = true
-                ChapterProvider.appendReviewColumnIfNeeded(
-                    line,
-                    chapterIndex = bookChapter.index,
-                )
-            }
+            pendingTextPage.lines.last().isParagraphEnd = true
             stringBuilder.append("\n")
         }
         val chapterWordCount = StringUtils.wordCountFormat(wordCount.toString())
@@ -580,18 +567,11 @@ class TextChapterLayout(
                     prepareNextPageIfNeed(durY + height)
                 }
             }
-            val textLine = TextLine(
-                isImage = true,
-                reviewTitleOffset = reviewTitleOffset,
-            )
-            if (doublePage) {
-                textLine.isLeftLine = absStartX < viewWidth / 2
-            }
+            val textLine = TextLine(isImage = true)
             textLine.text = " "
             textLine.lineTop = durY + paddingTop
             durY += height
             textLine.lineBottom = durY + paddingTop
-            textLine.lineBase = textLine.lineBottom
             val (start, end) = if (visibleWidth > width) {
                 when (imageStyle?.uppercase()) {
                     "RIGHT" -> Pair(visibleWidth - width, visibleWidth)
@@ -654,10 +634,7 @@ class TextChapterLayout(
             if (lineStart == lineEnd) { //这一行没有内容，跳过
                 continue
             }
-            val textLine = TextLine(
-                isHtml = true,
-                reviewTitleOffset = reviewTitleOffset,
-            )
+            val textLine = TextLine(isHtml = true)
             val lineText = StringBuilder()
             val lineLeft = staticLayout.getLineLeft(lineIndex)
             textLine.startX = absStartX + lineLeft //x坐标
@@ -665,9 +642,6 @@ class TextChapterLayout(
             val mLineBottom = staticLayout.getLineBottom(lineIndex).toFloat()
             val lineHeight = mLineBottom - mLineTop
             prepareNextPageIfNeed(durY + lineHeight)
-            if (doublePage) {
-                textLine.isLeftLine = absStartX < viewWidth / 2
-            }
             textLine.upTopBottom(durY, lineHeight, textPaint.fontMetrics) //y坐标
 
             val columns = mutableListOf<BaseColumn>()
@@ -982,10 +956,7 @@ class TextChapterLayout(
             else -> durY
         }
         for (lineIndex in 0 until layout.lineCount) {
-            val textLine = TextLine(
-                isTitle = isTitle,
-                reviewTitleOffset = reviewTitleOffset,
-            )
+            val textLine = TextLine(isTitle = isTitle)
             prepareNextPageIfNeed(durY + textHeight)
             val lineStart = layout.getLineStart(lineIndex)
             val lineEnd = layout.getLineEnd(lineIndex)

@@ -40,5 +40,15 @@
     "loginUrl": "function login() {}\n\nfunction checkjk() {\n    let jk = result[\"api\"];\n    let fhd = apiM[jk];\n    java.toast(`\\n当前接口${fhd?\"✓支持\":\"X不支持\"}FHD发言人\\n正在测试延迟...`);\n    let url = apiurl(\"测试\", 10, jk);\n    let res = java.ajaxTestAll([url], 3000, true)[0];\n    let time = res.callTime();\n    if (time < 0) {\n        java.toast(java.log(`\\n接口：${jk}\\n无法访问 ${time}`));\n        return\n    }\n    java.toast(`\\n接口：${jk}\\n延迟时间为${time}`);\n}\n\nfunction clear() {\n    if (result[\"自动清除缓存\"] == \"🔳\") return;\n    java.clearTtsCache();\n}",
     "name": "🌈Next引擎-长按切换音色",
     "url": "@js:apiurl(speakText,speakSpeed);"
+  },
+  {
+    "concurrentRate": "0",
+    "contentType": "audio/mpeg",
+    "enabledCookieJar": false,
+    "header": "",
+    "id": -1,
+    "lastUpdateTime": 0,
+    "name": "Edge TTS (edge.metaxun.com)",
+    "url": "https://edge.metaxun.com/v1/audio/speech,{\"method\":\"POST\",\"body\":\"{\\\"model\\\":\\\"tts-1\\\",\\\"input\\\":\\\"{{speakText}}\\\",\\\"voice\\\":\\\"zh-CN-XiaoxiaoNeural\\\"}\"}"
   }
 ]

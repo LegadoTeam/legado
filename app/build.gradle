@@ -13,6 +13,7 @@ plugins {
     alias libs.plugins.ksp
     alias libs.plugins.google.services
 }
+apply plugin: 'org.jetbrains.kotlin.kapt'
 apply from: 'download.gradle'
 
 static def releaseTime() {
@@ -43,7 +44,7 @@ android {
     namespace = 'io.legado.app'
     kotlin {
         jvmToolchain {
-            languageVersion.set(JavaLanguageVersion.of(17))
+            languageVersion.set(JavaLanguageVersion.of(21))
         }
     }
 
@@ -63,7 +64,7 @@ android {
     }
     defaultConfig {
         applicationId "com.legado.app"
-        minSdk 23
+        minSdk 26
         targetSdk 36
         versionCode = versionCodeValue
         versionName version
@@ -159,6 +160,9 @@ android {
         // Sets Java compatibility
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
     }
     packaging {
         resources.excludes.add('META-INF/*')
@@ -301,12 +305,11 @@ dependencies {
     //Glide
     implementation(libs.glide.glide)
     implementation(libs.glide.okhttp)
-    ksp(libs.glide.ksp)
+    kapt(libs.glide.compiler)
 
     //Svg
     implementation(libs.androidsvg)
-    //Glide svg plugin
-    implementation(libs.glide.svg)
+
 
     //webServer
     implementation(libs.nanohttpd.nanohttpd)

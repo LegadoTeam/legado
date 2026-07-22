@@ -2,11 +2,11 @@
 
 kotlin = "2.4.10"
 ksp = "2.3.10"
-agp = "8.13.2"
+agp = "9.3.0"
 appcompat = "1.7.1"
 colorpicker = "1.1.0"
 constraintlayout = "2.2.1"
-core = "1.18.0"
+core = "1.19.0"
 flexbox = "3.0.0"
 fragment = "1.8.9"
 documentfile = "1.1.0"
@@ -39,36 +39,37 @@ collection = "1.6.0"
 
 zxingLite = "3.5.0"
 
-#不要更新版本
+#涓嶈�鏇存柊鐗堟湰
 #noinspection NewerVersionAvailable
 hutool = "5.8.22"
 
 #noinspection NewerVersionAvailable
-protobufJavalite = "3.25.9"
+protobufJavalite = "4.26.1"
 
-# issue #3811，不要更新版本，新版引入了一个破坏性变更（详见https://github.com/jhy/jsoup/pull/2017）
-# 若要升级请确保相关代码不会受此变更影响（如AnalyzeByJSoup.kt、JsoupXpath库等）
+# issue #3811锛屼笉瑕佹洿鏂扮増鏈�紝鏂扮増寮曞叆浜嗕竴涓�牬鍧忔€у彉鏇达紙璇﹁�https://github.com/jhy/jsoup/pull/2017锛?
+# 鑻ヨ�鍗囩骇璇风‘淇濈浉鍏充唬鐮佷笉浼氬彈姝ゅ彉鏇村奖鍝嶏紙濡侫nalyzeByJSoup.kt銆丣soupXpath搴撶瓑锛?
 #noinspection NewerVersionAvailable
 jsoup = "1.16.2"
 
-# 新版本使用了 Android 6 以下缺少的 Arrays.setAll 方法，导致进入阅读界面会崩溃
+# 鏂扮増鏈�娇鐢ㄤ簡 Android 6 浠ヤ笅缂哄皯鐨?Arrays.setAll 鏂规硶锛屽�鑷磋繘鍏ラ槄璇荤晫闈�細宕╂簝
 #noinspection GradleDependency,NewerVersionAvailable
 commonsText = "1.13.1"
 
 # HtmlUnit fork of Rhino
+# 娉ㄦ剰: 璇?fork 鍖呭惈 FEATURE_LEGADO_DYNAMIC_DEFAULT_THIS 绛夎嚜瀹氫箟鐗规€? 涓嶈兘浣跨敤鏍囧噯鐗?
 htmlunitCoreJs = "5.3.0-legado.3"
 
 #noinspection GradleDependency,NewerVersionAvailable
 media3 = "1.10.1"
 #noinspection GradleDependency
-gsyvideoplayer = "13.1.0"
+gsyvideoplayer = "13.0.0"
 
 #noinspection GradleDependency
-webkit = "1.14.0"
+webkit = "1.16.0"
 #noinspection GradleDependency
 activity = "1.13.0"
 #noinspection GradleDependency
-lifecycle = "2.10.0"
+lifecycle = "2.11.0"
 #noinspection GradleDependency
 room = "2.8.4"
 #noinspection GradleDependency
@@ -76,7 +77,7 @@ recyclerview = "1.4.0"
 #noinspection GradleDependency
 viewpager2 = "1.1.0"
 #noinspection GradleDependency
-firebaseBom = "34.14.1"
+firebaseBom = "34.16.0"
 
 [libraries]
 
@@ -160,9 +161,8 @@ glide-compose = { module = "com.github.bumptech.glide:compose", version = "1.0.0
 glide-ksp = { module = "com.github.bumptech.glide:ksp", version.ref = "glide" }
 glide-avif = { module = "com.github.bumptech.glide:avif-integration", version.ref = "glide" }
 avif = { module = "org.aomedia.avif.android:avif", version = "1.1.1.14d8e3c4" }
-glide-svg = { module = "com.github.qoqa:glide-svg", version = "4.0.2" }
-androidsvg = { module = "com.caverock:androidsvg-aar", version = "1.4" }
 
+androidsvg = { module = "com.caverock:androidsvg-aar", version = "1.4" }
 soraEditor-bom = { module = "io.github.rosemoe:editor-bom", version.ref = "soraEditor" }
 soraEditor-core = { module = "io.github.rosemoe:editor" }
 soraEditor-language-textmate = { module = "io.github.rosemoe:language-textmate" }

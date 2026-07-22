@@ -1,7 +1,6 @@
 package io.legado.app.ui.book.source.debug
 
 import android.annotation.SuppressLint
-import android.graphics.Color
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
@@ -12,14 +11,11 @@ import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.databinding.ActivitySourceDebugBinding
-import io.legado.app.help.config.AppConfig
 import io.legado.app.help.source.clearExploreKindsCache
 import io.legado.app.help.source.exploreKinds
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.accentColor
-import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryColor
-import io.legado.app.lib.theme.transparentNavBar
 import io.legado.app.ui.qrcode.QrCodeResult
 import io.legado.app.ui.widget.dialog.TextDialog
 import io.legado.app.utils.applyNavigationBarPadding
@@ -39,7 +35,6 @@ class BookSourceDebugActivity : VMBaseActivity<ActivitySourceDebugBinding, BookS
     override val viewModel by viewModels<BookSourceDebugModel>()
 
     private val adapter by lazy { BookSourceDebugAdapter(this) }
-    private var loading = false
     private val searchView: SearchView by lazy {
         binding.titleBar.findViewById(R.id.search_view)
     }
@@ -50,9 +45,6 @@ class BookSourceDebugActivity : VMBaseActivity<ActivitySourceDebugBinding, BookS
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
-        binding.help.setBackgroundColor(
-            if (transparentNavBar && !AppConfig.isEInkMode) Color.TRANSPARENT else backgroundColor
-        )
         initRecyclerView()
         initSearchView()
         viewModel.init(intent.getStringExtra("key")) {
@@ -62,7 +54,6 @@ class BookSourceDebugActivity : VMBaseActivity<ActivitySourceDebugBinding, BookS
             lifecycleScope.launch {
                 adapter.addItem(msg)
                 if (state == -1 || state == 1000) {
-                    loading = false
                     binding.rotateLoading.gone()
                 }
             }
@@ -177,23 +168,16 @@ class BookSourceDebugActivity : VMBaseActivity<ActivitySourceDebugBinding, BookS
     private fun openOrCloseHelp(open: Boolean) {
         if (open) {
             binding.help.visibility = View.VISIBLE
-            binding.recyclerView.visibility = View.GONE
         } else {
             binding.help.visibility = View.GONE
-            binding.recyclerView.visibility = View.VISIBLE
         }
-        if (open || !loading) binding.rotateLoading.gone() else binding.rotateLoading.visible()
     }
 
     private fun startSearch(key: String) {
-        openOrCloseHelp(false)
         adapter.clearItems()
         viewModel.startDebug(key, {
-            loading = true
-            if (binding.help.visibility != View.VISIBLE) binding.rotateLoading.visible()
+            binding.rotateLoading.visible()
         }, {
-            loading = false
-            binding.rotateLoading.gone()
             toastOnUi("未获取到书源")
         })
     }

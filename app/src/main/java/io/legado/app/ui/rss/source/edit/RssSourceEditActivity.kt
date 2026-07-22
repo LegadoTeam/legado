@@ -1,7 +1,6 @@
 package io.legado.app.ui.rss.source.edit
 
 import android.content.Intent
-import android.graphics.Color
 import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
@@ -21,14 +20,12 @@ import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.data.entities.RssSource
 import io.legado.app.databinding.ActivityRssSourceEditBinding
-import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryColor
-import io.legado.app.lib.theme.transparentNavBar
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.code.CodeEditActivity
 import io.legado.app.ui.file.HandleFileContract
@@ -306,11 +303,7 @@ class RssSourceEditActivity :
                 newFocus.postDelayed({ sendText("") }, 120)
             }
         }
-        val transparentBar = transparentNavBar && !AppConfig.isEInkMode
-        binding.tabLayout.setBackgroundColor(
-            if (transparentBar) Color.TRANSPARENT else backgroundColor
-        )
-        if (transparentBar) binding.tabLayout.elevation = 0f
+        binding.tabLayout.setBackgroundColor(backgroundColor)
         binding.tabLayout.setSelectedTabIndicatorColor(accentColor)
         binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabReselected(tab: TabLayout.Tab?) {

@@ -5,7 +5,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.AudioManager
@@ -18,10 +17,8 @@ import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.annotation.OptIn
 import androidx.core.app.NotificationCompat
-import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import androidx.media.AudioFocusRequestCompat
-import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -33,7 +30,6 @@ import io.legado.app.constant.AppLog
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.IntentAction
 import io.legado.app.constant.NotificationId
-import io.legado.app.constant.PreferKey
 import io.legado.app.constant.Status
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.MediaHelp
@@ -48,7 +44,6 @@ import io.legado.app.receiver.MediaButtonReceiver
 import io.legado.app.ui.book.audio.AudioPlayActivity
 import io.legado.app.utils.activityPendingIntent
 import io.legado.app.utils.broadcastPendingIntent
-import io.legado.app.utils.defaultSharedPreferences
 import io.legado.app.utils.isJsonArray
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.printOnDebug
@@ -64,15 +59,13 @@ import splitties.systemservices.audioManager
 import splitties.systemservices.notificationManager
 import splitties.systemservices.powerManager
 import splitties.systemservices.wifiManager
-import java.io.File
 
 /**
  * 音频播放服务
  */
 class AudioPlayService : BaseService(),
     AudioManager.OnAudioFocusChangeListener,
-    Player.Listener,
-    SharedPreferences.OnSharedPreferenceChangeListener {
+    Player.Listener {
 
     companion object {
         @JvmStatic
@@ -81,11 +74,6 @@ class AudioPlayService : BaseService(),
 
         @JvmStatic
         var pause = true
-            private set
-
-        @JvmStatic
-        @Volatile
-        var isPlaying = false
             private set
 
         @JvmStatic
@@ -156,7 +144,6 @@ class AudioPlayService : BaseService(),
             timeMinute = 0
         }
         exoPlayer.addListener(this)
-        defaultSharedPreferences.registerOnSharedPreferenceChangeListener(this)
         AudioPlay.registerService(this)
         initMediaSession()
         initBroadcastReceiver()
@@ -187,7 +174,7 @@ class AudioPlayService : BaseService(),
                         IntentAction.playNew -> 0
                         else -> AudioPlay.book?.durChapterPos ?: 0
                     }
-                    url = AudioPlay.durMediaUrl
+                    url = AudioPlay.durPlayUrl
                     if (playSpeed != 1f) {
                         upSpeed(playSpeed)
                     }
@@ -225,9 +212,6 @@ class AudioPlayService : BaseService(),
 
     override fun onDestroy() {
         super.onDestroy()
-        isPlaying = false
-        AudioPlay.upReadTime()
-        defaultSharedPreferences.unregisterOnSharedPreferenceChangeListener(this)
         if (useWakeLock) {
             wakeLock.release()
             wifiLock?.release()
@@ -256,7 +240,7 @@ class AudioPlayService : BaseService(),
      */
     @OptIn(UnstableApi::class)
     @SuppressLint("WakelockTimeout")
-    private fun play(preservePosition: Boolean = false) {
+    private fun play() {
         if (useWakeLock) {
             wakeLock.acquire()
             wifiLock?.acquire()
@@ -277,9 +261,7 @@ class AudioPlayService : BaseService(),
                     return@execute
                 }
                 exoPlayer.setMediaSource(mediaSource)
-                if (!preservePosition) {
-                    position = 0
-                }
+                position = 0
             } else {
                 val analyzeUrl = AnalyzeUrl(
                     url,
@@ -288,7 +270,7 @@ class AudioPlayService : BaseService(),
                     chapter = AudioPlay.durChapter,
                     coroutineContext = coroutineContext
                 )
-                exoPlayer.setMediaItem(localMediaItem(url) ?: analyzeUrl.getMediaItem())
+                exoPlayer.setMediaItem(analyzeUrl.getMediaItem())
             }
             exoPlayer.playWhenReady = true
             //获取片头设定
@@ -300,27 +282,6 @@ class AudioPlayService : BaseService(),
             AppLog.put("播放出错\n${it.localizedMessage}", it)
             toastOnUi("$url ${it.localizedMessage}")
             stopSelf()
-        }
-    }
-
-    /**
-     * Build local media items without URL analysis or request headers.
-     */
-    private fun localMediaItem(url: String): MediaItem? {
-        return when {
-            url.startsWith("content://", true) -> MediaItem.fromUri(url.toUri())
-            url.startsWith("file:", true) -> {
-                val uri = url.toUri()
-                val path = uri.path
-                if (!path.isNullOrBlank() && File(path).exists()) {
-                    MediaItem.fromUri(File(path).toUri())
-                } else {
-                    MediaItem.fromUri(uri)
-                }
-            }
-
-            File(url).exists() -> MediaItem.fromUri(File(url).toUri())
-            else -> null
         }
     }
 
@@ -339,7 +300,6 @@ class AudioPlayService : BaseService(),
             }
             upPlayProgressJob?.cancel()
             position = exoPlayer.currentPosition.toInt()
-            AudioPlay.playPositionChanged(position)
             if (exoPlayer.isPlaying) exoPlayer.pause()
             upMediaSessionPlaybackState(PlaybackStateCompat.STATE_PAUSED)
             AudioPlay.status = Status.PAUSE
@@ -366,8 +326,9 @@ class AudioPlayService : BaseService(),
                 return
             }
             if (exoPlayer.playbackState == Player.STATE_IDLE) {
-                position = AudioPlay.book?.let { AudioPlay.durChapterPos } ?: position
-                play(preservePosition = true)
+                // 如果播放器处于空闲状态，重新开始播放
+                position = 0
+                play()
                 return
             }
             if (!exoPlayer.isPlaying) {
@@ -456,28 +417,6 @@ class AudioPlayService : BaseService(),
         upAudioPlayNotification()
     }
 
-    override fun onIsPlayingChanged(isPlaying: Boolean) {
-        super.onIsPlayingChanged(isPlaying)
-        AudioPlayService.isPlaying = isPlaying
-        if (isPlaying) {
-            AudioPlay.markReadTimeStart()
-        } else {
-            AudioPlay.upReadTime()
-        }
-    }
-
-    override fun onSharedPreferenceChanged(
-        sharedPreferences: SharedPreferences?,
-        key: String?,
-    ) {
-        if (key != PreferKey.enableReadRecord) return
-        if (AppConfig.enableReadRecord && exoPlayer.isPlaying) {
-            AudioPlay.markReadTimeStart()
-        } else {
-            AudioPlay.upReadTime()
-        }
-    }
-
     private fun upMediaMetadata() {
         val metadata = MediaMetadataCompat.Builder()
             .putBitmap(MediaMetadataCompat.METADATA_KEY_ART, cover)
@@ -494,19 +433,6 @@ class AudioPlayService : BaseService(),
      */
     override fun onPlayerError(error: PlaybackException) {
         super.onPlayerError(error)
-        AudioPlay.upReadTime()
-        val resumePosition = exoPlayer.currentPosition
-            .coerceAtLeast(0L)
-            .coerceAtMost(Int.MAX_VALUE.toLong())
-            .toInt()
-        if (AudioPlay.retryAfterCachedPlaybackError(resumePosition)) {
-            exoPlayer.stop()
-            upPlayProgressJob?.cancel()
-            AudioPlay.upLoading(true)
-            AppLog.put("Broken audio cache detected, retrying from source", error)
-            toastOnUi(R.string.audio_cache_corrupted_retry)
-            return
-        }
         AudioPlay.status = Status.STOP
         postEvent(EventBus.AUDIO_STATE, Status.STOP)
         AudioPlay.upLoading(false)
@@ -524,10 +450,16 @@ class AudioPlayService : BaseService(),
     }
 
     private fun addTimer() {
-        val next = nextSleepTimerIncrement(
-            timeMinute, chapterToStop, AppConfig.sleepTimerPreferChapter
-        )
-        if (next.chapter > 0) setChapterStop(next.chapter) else setTimer(next.minute)
+        if (timeMinute == 180) {
+            timeMinute = 0
+        } else {
+            timeMinute += 10
+            if (timeMinute > 180) timeMinute = 180
+        }
+        chapterStopTimer.clear()
+        chapterToStop = 0
+        postEvent(EventBus.AUDIO_CHAPTER_STOP, 0)
+        doDs()
     }
 
     private fun setChapterStop(count: Int) {
@@ -637,7 +569,6 @@ class AudioPlayService : BaseService(),
         mediaSessionCompat.setCallback(object : MediaSessionCompat.Callback() {
             override fun onSeekTo(pos: Long) {
                 position = pos.toInt()
-                AudioPlay.playPositionChanged(position)
                 exoPlayer.seekTo(pos)
             }
 

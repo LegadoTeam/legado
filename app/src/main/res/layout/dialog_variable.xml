@@ -18,7 +18,6 @@
             android:id="@+id/tool_bar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="3dp"
             android:background="@color/background_menu"
             android:elevation="5dp"
             android:theme="?attr/actionBarStyle"
@@ -28,34 +27,29 @@
             app:popupTheme="@style/AppTheme.PopupOverlay"
             app:titleTextAppearance="@style/ToolbarTitle" />
 
-        <io.legado.app.ui.widget.text.TextInputLayout
+        <io.legado.app.ui.widget.text.AccentTextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="16dp"
-            android:hint="variable"
-            tools:ignore="HardcodedText">
+            android:padding="3dp"
+            android:text="variable"
+            tools:ignore="HardcodedText" />
 
-            <io.legado.app.lib.theme.view.ThemeEditText
-                android:id="@+id/tv_variable"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                tools:ignore="SpeakableTextPresentCheck,TouchTargetSizeCheck" />
-
-        </io.legado.app.ui.widget.text.TextInputLayout>
+        <io.legado.app.lib.theme.view.ThemeEditText
+            android:id="@+id/tv_variable"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            tools:ignore="SpeakableTextPresentCheck,TouchTargetSizeCheck" />
 
         <androidx.core.widget.NestedScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:clipToPadding="false"
-            android:paddingTop="6dp"
-            android:paddingBottom="12dp"
+
             android:overScrollMode="ifContentScrolls">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingHorizontal="16dp">
+                android:orientation="vertical">
 
                 <io.legado.app.ui.widget.text.AccentTextView
                     android:layout_width="match_parent"

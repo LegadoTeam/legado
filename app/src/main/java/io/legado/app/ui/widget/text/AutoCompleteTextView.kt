@@ -8,15 +8,12 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewParent
 import android.widget.ArrayAdapter
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.widget.AppCompatAutoCompleteTextView
-import com.google.android.material.textfield.TextInputLayout as MaterialTextInputLayout
 import io.legado.app.R
 import io.legado.app.lib.theme.accentColor
-import io.legado.app.lib.theme.popupBackground
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.gone
 import io.legado.app.utils.visible
@@ -32,22 +29,8 @@ class AutoCompleteTextView @JvmOverloads constructor(
 
     init {
         applyTint(context.accentColor)
-        setDropDownBackgroundDrawable(context.popupBackground)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
             isLocalePreferredLineHeightForMinimumUsed = false
-        }
-    }
-
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-        val currentHint = hint ?: return
-        var ancestor: ViewParent? = parent
-        while (ancestor != null && ancestor !is MaterialTextInputLayout) {
-            ancestor = ancestor.parent
-        }
-        if (ancestor is MaterialTextInputLayout) {
-            ancestor.hint = currentHint
-            hint = null
         }
     }
 

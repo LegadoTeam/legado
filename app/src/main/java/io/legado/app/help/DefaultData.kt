@@ -2,6 +2,7 @@ package io.legado.app.help
 
 import io.legado.app.constant.AppConst
 import io.legado.app.data.appDb
+import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.DictRule
 import io.legado.app.data.entities.HttpTTS
 import io.legado.app.data.entities.KeyboardAssist
@@ -35,6 +36,9 @@ object DefaultData {
                 }
                 if (LocalConfig.needUpDictRule) {
                     importDefaultDictRules()
+                }
+                if (LocalConfig.needUpBookSources) {
+                    importDefaultBookSources()
                 }
             }.onError {
                 it.printOnDebug()
@@ -102,6 +106,16 @@ object DefaultData {
         GSON.fromJsonArray<DictRule>(json).getOrThrow()
     }
 
+    val bookSources: List<BookSource> by lazy {
+        val json = String(
+            appCtx.assets.open("defaultData${File.separator}bookSources.json")
+                .readBytes()
+        )
+        GSON.fromJsonArray<BookSource>(json).getOrElse {
+            emptyList()
+        }
+    }
+
     val keyboardAssists: List<KeyboardAssist> by lazy {
         val json = String(
             appCtx.assets.open("defaultData${File.separator}keyboardAssists.json")
@@ -127,6 +141,10 @@ object DefaultData {
 
     fun importDefaultDictRules() {
         appDb.dictRuleDao.insert(*dictRules.toTypedArray())
+    }
+
+    fun importDefaultBookSources() {
+        appDb.bookSourceDao.insert(*bookSources.toTypedArray())
     }
 
 }
