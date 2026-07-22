@@ -20,6 +20,7 @@ import io.legado.app.help.JsExtensions
 import io.legado.app.help.http.BackstageWebView
 import io.legado.app.help.http.CookieStore
 import io.legado.app.help.source.getShareScope
+import io.legado.app.help.source.getSharedGlobalStateKey
 import io.legado.app.model.Debug
 import io.legado.app.model.SharedJsScope
 import io.legado.app.model.webBook.WebBook
@@ -887,6 +888,7 @@ class AnalyzeRule(
             localBindings["paraData"]?.let { bindings["paraData"] = it }
             localBindings["page"]?.let { bindings["page"] = it.toIntOrNull() ?: it }
         }
+        val sharedGlobalStateKey = source?.getSharedGlobalStateKey()
         val topScope: TopLevel? = source?.getShareScope(coroutineContext)
             ?: topScopeRef?.get()
             ?: SharedJsScope.getCryptoScope(source ?: this, coroutineContext)
@@ -900,7 +902,7 @@ class AnalyzeRule(
             }
         } else {
             bindings.apply {
-                chainTo(topScope)
+                chainTo(topScope, sharedGlobalStateKey)
             }
         }
         val script = compileScriptCache(jsStr)

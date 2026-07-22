@@ -13,6 +13,7 @@ import io.legado.app.help.CacheManager
 import io.legado.app.help.JsExtensions
 import io.legado.app.help.http.CookieStore
 import io.legado.app.help.source.getShareScope
+import io.legado.app.help.source.getSharedGlobalStateKey
 import io.legado.app.model.SharedJsScope
 import io.legado.app.utils.GSON
 import kotlinx.coroutines.CancellationException
@@ -90,12 +91,13 @@ class JsSourceEngine(
             b["cache"] = CacheManager
             args.forEach { (k, v) -> b[k] = v }
         }
+        val sharedGlobalStateKey = source.getSharedGlobalStateKey()
         val shared = source.getShareScope(coroutineContext)
             ?: SharedJsScope.getCryptoScope(source, coroutineContext)
         val scope = if (shared == null) {
             RhinoScriptEngine.getRuntimeScope(bindings)
         } else {
-            bindings.apply { chainTo(shared) }
+            bindings.apply { chainTo(shared, sharedGlobalStateKey) }
         }
         compile(mainJs).eval(scope, coroutineContext)
         return scope

@@ -4,6 +4,8 @@ import androidx.collection.LruCache
 import com.script.ScriptBindings
 import com.script.rhino.RhinoScriptEngine
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.RssSource
+import io.legado.app.help.source.clearSharedGlobalState
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.jsSource.JsSourceConfig
@@ -160,6 +162,280 @@ class CryptoJsCompatibilityTest {
             expected,
             JsSourceEngine(source).callFunction("digest", emptyList()),
         )
+    }
+
+    @Test
+    fun `custom js library preserves explicit globals across entry points`() {
+        val jsLib = "var pixivLibraryMarker = 'ready';"
+        val source = BookSource(
+            bookSourceUrl = "https://127.0.0.1/pixiv",
+            bookSourceName = "Pixiv compatibility",
+            jsLib = jsLib,
+            mainJs = """
+                function readEnvironment() {
+                    return globalThis.environment.IS_LEGADO &&
+                        globalThis.settings.language === 'zh-CN';
+                }
+            """.trimIndent(),
+        )
+        val otherSource = BookSource(
+            bookSourceUrl = "https://127.0.0.1/other",
+            bookSourceName = "Other source",
+            jsLib = jsLib,
+        )
+
+        AnalyzeUrl(
+            "https://127.0.0.1/pixiv/login",
+            source = source,
+            headerMapF = emptyMap(),
+        ).evalJS(
+            """
+                globalThis.environment = { IS_LEGADO: true };
+                var requestOnly = 'private';
+                true;
+            """.trimIndent(),
+        )
+        source.evalJS("globalThis.settings = { language: 'zh-CN' };")
+
+        assertEquals(
+            "visible|undefined|true",
+            AnalyzeRule(source = source).evalJS(
+                """
+                    globalThis.sameTurn = 'visible';
+                    var observed = sameTurn;
+                    delete globalThis.sameTurn;
+                    [
+                        observed,
+                        typeof globalThis.sameTurn,
+                        globalThis === global
+                    ].join('|');
+                """.trimIndent(),
+            ),
+        )
+
+        assertEquals(
+            "true|zh-CN|undefined|ready|true",
+            AnalyzeRule(source = source).evalJS(
+                """
+                    [
+                        globalThis.environment.IS_LEGADO,
+                        globalThis.settings.language,
+                        typeof requestOnly,
+                        pixivLibraryMarker,
+                        globalThis.java !== java
+                    ].join('|');
+                """.trimIndent(),
+            ),
+        )
+        assertEquals("true", JsSourceEngine(source).callFunction("readEnvironment", emptyList()))
+        assertEquals(
+            "undefined",
+            AnalyzeRule(source = otherSource).evalJS("typeof globalThis.environment"),
+        )
+
+        source.evalJS("delete globalThis.settings;")
+        assertEquals(
+            "undefined",
+            AnalyzeRule(source = source).evalJS("typeof globalThis.settings"),
+        )
+
+        source.evalJS(
+            """
+                Object.defineProperty(globalThis, 'accessorValue', {
+                    configurable: true,
+                    get: function() { return this === globalThis ? 7 : -1; }
+                });
+                Object.defineProperty(globalThis, 'setterValue', {
+                    configurable: true,
+                    set: function(value) {
+                        globalThis.setterReceiver = this === globalThis;
+                        globalThis.setterStored = value;
+                    }
+                });
+                globalThis.setterValue = 11;
+                globalThis.ownValue = 3;
+            """.trimIndent(),
+        )
+        assertEquals(7.0, AnalyzeRule(source = source).evalJS("globalThis.accessorValue"))
+        assertEquals(
+            "function",
+            AnalyzeRule(source = source).evalJS(
+                "typeof Object.getOwnPropertyDescriptor(globalThis, 'accessorValue').get",
+            ),
+        )
+        assertEquals(
+            "true|11|true|true|true|3",
+            AnalyzeRule(source = source).evalJS(
+                """
+                    [
+                        globalThis.setterReceiver,
+                        globalThis.setterStored,
+                        globalThis.hasOwnProperty('ownValue'),
+                        Object.keys(globalThis).indexOf('ownValue') >= 0,
+                        Object.getOwnPropertyNames(globalThis).indexOf('ownValue') >= 0,
+                        globalThis.ownValue
+                    ].join('|');
+                """.trimIndent(),
+            ),
+        )
+        source.evalJS(
+            "globalThis.__defineGetter__('legacyAccessor', function() { return 9; });",
+        )
+        assertEquals(9.0, AnalyzeRule(source = source).evalJS("globalThis.legacyAccessor"))
+        source.evalJS("globalThis.__defineGetter__(0, function() { return 10; });")
+        assertEquals(10.0, AnalyzeRule(source = source).evalJS("globalThis[0]"))
+
+        val frozenSource = otherSource.copy(bookSourceUrl = "https://127.0.0.1/frozen")
+        assertEquals(
+            "undefined",
+            frozenSource.evalJS(
+                "Object.preventExtensions(globalThis);" +
+                    "globalThis.afterPreventExtensions = true;" +
+                    "typeof globalThis.afterPreventExtensions;",
+            ),
+        )
+    }
+
+    @Test
+    fun `shared global scopes observe current state without stale snapshots`() {
+        val firstParent = ScriptBindings()
+        RhinoScriptEngine.eval("var libraryGeneration = 'first';", firstParent)
+        val stateKeyValue = "library:source:same-source"
+        val stateKey = ScriptBindings.getSharedGlobalStateHandle(stateKeyValue)
+        val first = ScriptBindings().apply { chainTo(firstParent, stateKey) }
+        assertEquals(true, RhinoScriptEngine.eval("globalThis === global", first))
+        RhinoScriptEngine.eval("globalThis.counter = 'old';", first)
+        val earlierReader = ScriptBindings().apply { chainTo(firstParent, stateKey) }
+        assertEquals(true, RhinoScriptEngine.eval("globalThis === global", earlierReader))
+        assertEquals("old", RhinoScriptEngine.eval("globalThis.counter", earlierReader))
+
+        repeat(65) { index ->
+            val otherState = ScriptBindings.getSharedGlobalStateHandle(
+                "library:source:other-source-$index",
+            )
+            ScriptBindings().chainTo(firstParent, otherState)
+        }
+        val writer = ScriptBindings().apply { chainTo(firstParent, stateKey) }
+        RhinoScriptEngine.eval("globalThis.counter = 'new';", writer)
+
+        assertEquals("new", RhinoScriptEngine.eval("globalThis.counter", earlierReader))
+        assertEquals("first", RhinoScriptEngine.eval("libraryGeneration", earlierReader))
+        assertEquals("first", RhinoScriptEngine.eval("libraryGeneration", writer))
+        assertEquals(
+            "true|true|true",
+            RhinoScriptEngine.eval(
+                """
+                    [
+                        globalThis.hasOwnProperty('counter'),
+                        globalThis instanceof Object,
+                        Object.prototype.isPrototypeOf(globalThis)
+                    ].join('|');
+                """.trimIndent(),
+                writer,
+            ),
+        )
+
+        ScriptBindings.removeSharedGlobalStatesBySource("source", "same-source")
+        val staleScope = ScriptBindings().apply { chainTo(firstParent, stateKey) }
+        RhinoScriptEngine.eval("globalThis.counter = 'stale';", staleScope)
+        val refreshedState = ScriptBindings.getSharedGlobalStateHandle(stateKeyValue)
+        val afterRemoval = ScriptBindings().apply { chainTo(firstParent, refreshedState) }
+        assertEquals(
+            "undefined",
+            RhinoScriptEngine.eval("typeof globalThis.counter", afterRemoval),
+        )
+    }
+
+    @Test
+    fun `clearing shared globals invalidates existing handles`() {
+        val parent = ScriptBindings()
+        val stateKeyValue = "library:source:clear-generation"
+        val staleHandle = ScriptBindings.getSharedGlobalStateHandle(stateKeyValue)
+
+        ScriptBindings.clearSharedGlobalStates()
+        val staleScope = ScriptBindings().apply { chainTo(parent, staleHandle) }
+        RhinoScriptEngine.eval("globalThis.zombie = true;", staleScope)
+
+        val freshHandle = ScriptBindings.getSharedGlobalStateHandle(stateKeyValue)
+        val freshScope = ScriptBindings().apply { chainTo(parent, freshHandle) }
+        assertEquals(
+            "undefined",
+            RhinoScriptEngine.eval("typeof globalThis.zombie", freshScope),
+        )
+    }
+
+    @Test
+    fun `production state cleanup is source specific and refresh aware`() {
+        val jsLib = "var cleanupLibraryMarker = true;"
+        val sourceKey = "https://127.0.0.1/shared-key"
+        val bookSource = BookSource(
+            bookSourceUrl = sourceKey,
+            bookSourceName = "Book cleanup",
+            jsLib = jsLib,
+        )
+        val rssSource = RssSource(
+            sourceUrl = sourceKey,
+            sourceName = "RSS cleanup",
+            jsLib = jsLib,
+        )
+
+        bookSource.evalJS("globalThis.sourceKind = 'book';")
+        rssSource.evalJS("globalThis.sourceKind = 'rss';")
+        bookSource.clearSharedGlobalState()
+
+        assertEquals("undefined", bookSource.evalJS("typeof globalThis.sourceKind"))
+        assertEquals("rss", rssSource.evalJS("globalThis.sourceKind"))
+
+        bookSource.evalJS("globalThis.sourceKind = 'book-again';")
+        SharedJsScope.remove(jsLib)
+
+        assertEquals("undefined", bookSource.evalJS("typeof globalThis.sourceKind"))
+        assertEquals("undefined", rssSource.evalJS("typeof globalThis.sourceKind"))
+    }
+
+    @Test
+    fun `shared global supports concurrent writes and compound enumeration`() {
+        val parent = ScriptBindings()
+        val stateKeyValue = "library:source:concurrent"
+        val start = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(2)
+        try {
+            val futures = (0 until 2).map { worker ->
+                executor.submit(Callable {
+                    val handle = ScriptBindings.getSharedGlobalStateHandle(stateKeyValue)
+                    val scope = ScriptBindings().apply { chainTo(parent, handle) }
+                    start.await(5, TimeUnit.SECONDS)
+                    RhinoScriptEngine.eval(
+                        """
+                            for (var i = 0; i < 50; i++) {
+                                globalThis['worker_${worker}_' + i] = i;
+                                Object.getOwnPropertyNames(globalThis);
+                            }
+                        """.trimIndent(),
+                        scope,
+                    )
+                })
+            }
+            start.countDown()
+            futures.forEach { it.get(10, TimeUnit.SECONDS) }
+
+            val handle = ScriptBindings.getSharedGlobalStateHandle(stateKeyValue)
+            val verifier = ScriptBindings().apply { chainTo(parent, handle) }
+            assertEquals(
+                100.0,
+                RhinoScriptEngine.eval(
+                    """
+                        Object.keys(globalThis).filter(function(key) {
+                            return key.indexOf('worker_') === 0;
+                        }).length;
+                    """.trimIndent(),
+                    verifier,
+                ),
+            )
+        } finally {
+            executor.shutdownNow()
+            assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS))
+        }
     }
 
     @Test
@@ -403,6 +679,7 @@ class CryptoJsCompatibilityTest {
     private fun resetScopes() {
         clearCryptoScopes()
         clearCustomScopes()
+        ScriptBindings.clearSharedGlobalStates()
     }
 
     private fun clearCryptoScopes() {

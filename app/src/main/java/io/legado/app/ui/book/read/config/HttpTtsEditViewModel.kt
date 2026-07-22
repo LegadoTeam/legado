@@ -7,7 +7,9 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.HttpTTS
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.ConcurrentRateLimiter.Companion.concurrentRecordMap
+import io.legado.app.help.source.clearSharedGlobalState
 import io.legado.app.model.ReadAloud
+import io.legado.app.model.SharedJsScope
 import io.legado.app.utils.getClipText
 import io.legado.app.utils.isJsonArray
 import io.legado.app.utils.isJsonObject
@@ -38,9 +40,17 @@ class HttpTtsEditViewModel(app: Application) : BaseViewModel(app) {
     }
 
     fun save(httpTTS: HttpTTS, success: (() -> Unit)? = null) {
+        val oldSource = this.httpTTS
         id = httpTTS.id
         this.httpTTS = httpTTS
         execute {
+            oldSource?.let {
+                if (it.jsLib != httpTTS.jsLib) {
+                    SharedJsScope.remove(it.jsLib)
+                } else if (it.getKey() != httpTTS.getKey()) {
+                    it.clearSharedGlobalState()
+                }
+            }
             appDb.httpTTSDao.insert(httpTTS)
             concurrentRecordMap.remove(httpTTS.getKey()) //删除并发限制缓存
             if (ReadAloud.ttsEngine == httpTTS.id.toString()) ReadAloud.upReadAloudClass()

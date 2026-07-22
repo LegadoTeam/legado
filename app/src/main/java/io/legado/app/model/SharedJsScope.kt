@@ -150,6 +150,7 @@ object SharedJsScope {
                 synchronized(scopeLock) {
                     scopeMap.remove(key)
                 }
+                ScriptBindings.removeSharedGlobalStates("$key:")
             }
         } finally {
             releaseScopeCreationLock(scopeCreationLocks, key, creationLock)

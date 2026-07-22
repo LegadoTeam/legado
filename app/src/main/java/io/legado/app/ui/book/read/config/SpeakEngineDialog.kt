@@ -23,6 +23,7 @@ import io.legado.app.databinding.ItemHttpTtsBinding
 import io.legado.app.help.DirectLinkUpload
 import io.legado.app.help.SourceSharePassphrase
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.source.clearSharedGlobalState
 import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.sourceSharePassphraseButton
@@ -346,6 +347,7 @@ class SpeakEngineDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
                             setMessage(getString(R.string.sure_del) + "\n" + httpTTS.name)
                             noButton()
                             yesButton {
+                                httpTTS.clearSharedGlobalState()
                                 appDb.httpTTSDao.delete(httpTTS)
                             }
                         }
