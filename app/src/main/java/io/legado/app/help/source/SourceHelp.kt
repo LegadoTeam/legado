@@ -89,6 +89,7 @@ object SourceHelp {
     }
 
     private fun deleteBookSourceInternal(key: String) {
+        clearSharedGlobalStateBySourceKey(BookSource::class.java, key)
         appDb.bookSourceDao.delete(key)
         appDb.cacheDao.deleteSourceVariables(key)
         SourceConfig.removeSource(key)
@@ -109,6 +110,7 @@ object SourceHelp {
     }
 
     private fun deleteRssSourceInternal(key: String) {
+        clearSharedGlobalStateBySourceKey(RssSource::class.java, key)
         appDb.rssSourceDao.delete(key)
         appDb.rssArticleDao.delete(key)
         appDb.cacheDao.deleteSourceVariables(key)

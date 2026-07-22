@@ -11,6 +11,7 @@ import io.legado.app.help.AppCacheManager
 import io.legado.app.help.ConcurrentRateLimiter.Companion.concurrentRecordMap
 import io.legado.app.help.RuleComplete
 import io.legado.app.help.http.CookieStore
+import io.legado.app.help.source.clearSharedGlobalState
 import io.legado.app.help.source.removeSortCache
 import io.legado.app.model.SharedJsScope
 import io.legado.app.utils.GSON
@@ -58,6 +59,7 @@ class RssSourceEditViewModel(application: Application) : BaseViewModel(applicati
                 appDb.rssSourceDao.delete(it)
                 //更新收藏的源地址
                 if (it.sourceUrl != source.sourceUrl) {
+                    it.clearSharedGlobalState()
                     appDb.rssStarDao.updateOrigin(source.sourceUrl, it.sourceUrl)
                     appDb.rssArticleDao.updateOrigin(source.sourceUrl, it.sourceUrl)
                     appDb.cacheDao.deleteSourceVariables(it.sourceUrl)
