@@ -272,9 +272,9 @@ object McpToolServer {
                 val data = HttpLogController.getLogs(mapOf("limit" to listOf(limit.toString())))
                     .dataOrThrow() as Map<*, *>
                 val recording = data["recording"] as Boolean
-                @Suppress("UNCHECKED_CAST")
-                val logs = data["logs"] as List<Map<String, Any?>>
-                val lines = logs.map { log ->
+                val logs = data["logs"] as List<*>
+                val lines = logs.map { item ->
+                    val log = item as Map<*, *>
                     "#${log["id"]} ${Instant.ofEpochMilli(log["time"] as Long)} " +
                         "${log["method"]} ${log["url"]} -> ${log["statusCode"]} " +
                         "${log["duration"]}ms" +
