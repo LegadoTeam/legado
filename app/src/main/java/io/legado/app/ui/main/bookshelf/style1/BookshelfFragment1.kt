@@ -60,6 +60,7 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
     override var onlyUpdateRead = false
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         setSupportToolbar(binding.titleBar.toolbar)
+        bindShelfHeader(binding.shelfHeader)
         initView()
         initBookGroupData()
     }

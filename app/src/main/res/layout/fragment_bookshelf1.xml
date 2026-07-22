@@ -13,9 +13,16 @@
         app:contentLayout="@layout/view_tab_layout_min"
         app:title="@string/bookshelf" />
 
+    <include
+        android:id="@+id/shelf_header"
+        layout="@layout/view_bookshelf_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
     <androidx.viewpager.widget.ViewPager
         android:id="@+id/view_pager_bookshelf"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="0dp"
+        android:layout_weight="1" />
 
 </LinearLayout>

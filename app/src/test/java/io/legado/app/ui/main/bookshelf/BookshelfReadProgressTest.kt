@@ -82,6 +82,43 @@ class BookshelfReadProgressTest {
         )
     }
 
+    @Test
+    fun `bookshelf layouts expose the shared header and keep content below it`() {
+        val header = parseProjectXml("src/main/res/layout/view_bookshelf_header.xml")
+        assertEquals(
+            "gone",
+            header.findElementById("@+id/continue_reading").androidAttribute("visibility"),
+        )
+        listOf("tv_shelf_stats", "tv_continue_name", "tv_continue_chapter", "tv_continue_percent")
+            .forEach { id -> header.findElementById("@+id/$id") }
+        listOf("tv_continue_name", "tv_continue_chapter").forEach { id ->
+            val text = header.findElementById("@+id/$id")
+            assertEquals("0dp", text.androidAttribute("layout_width"))
+            assertEquals("1", text.androidAttribute("layout_weight"))
+        }
+
+        val style1 = parseProjectXml("src/main/res/layout/fragment_bookshelf1.xml")
+        assertEquals(
+            "@layout/view_bookshelf_header",
+            style1.findElementById("@+id/shelf_header").getAttribute("layout"),
+        )
+        val viewPager = style1.findElementById("@+id/view_pager_bookshelf")
+        assertEquals("0dp", viewPager.androidAttribute("layout_height"))
+        assertEquals("1", viewPager.androidAttribute("layout_weight"))
+
+        val style2 = parseProjectXml("src/main/res/layout/fragment_bookshelf2.xml")
+        assertEquals(
+            "@+id/shelf_header",
+            style2.findElementById("@+id/refresh_layout")
+                .appAttribute("layout_constraintTop_toBottomOf"),
+        )
+        assertEquals(
+            "@+id/shelf_header",
+            style2.findElementById("@+id/tv_empty_msg")
+                .appAttribute("layout_constraintTop_toBottomOf"),
+        )
+    }
+
     private fun parseProjectXml(pathInApp: String): Document {
         val file = listOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull { it.isFile }

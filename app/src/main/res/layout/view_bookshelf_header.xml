@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingLeft="16dp"
+    android:paddingTop="8dp"
+    android:paddingRight="16dp"
+    android:paddingBottom="12dp">
+
+    <TextView
+        android:id="@+id/tv_shelf_stats"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/tv_text_summary"
+        android:textSize="@dimen/font_size_normal"
+        tools:text="128 books · 23 reading" />
+
+    <LinearLayout
+        android:id="@+id/continue_reading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:background="?attr/selectableItemBackground"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:minHeight="48dp"
+        android:orientation="horizontal"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <TextView
+            android:id="@+id/tv_continue_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/continue_read"
+            android:textColor="@color/tv_text_summary"
+            android:textSize="@dimen/font_size_normal"
+            android:singleLine="true" />
+
+        <TextView
+            android:id="@+id/tv_continue_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:singleLine="true"
+            android:textColor="@color/primaryText"
+            android:textSize="@dimen/font_size_normal"
+            tools:text="A book" />
+
+        <TextView
+            android:id="@+id/tv_continue_chapter"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:singleLine="true"
+            android:textColor="@color/tv_text_summary"
+            android:textSize="@dimen/font_size_normal"
+            tools:text="Chapter 60" />
+
+        <TextView
+            android:id="@+id/tv_continue_percent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:singleLine="true"
+            android:textColor="@color/tv_text_summary"
+            android:textSize="@dimen/font_size_normal"
+            tools:text="59%" />
+
+        <ImageView
+            android:id="@+id/iv_continue_arrow"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_marginStart="4dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_arrow_right"
+            app:tint="@color/tv_text_summary" />
+
+    </LinearLayout>
+
+</LinearLayout>
