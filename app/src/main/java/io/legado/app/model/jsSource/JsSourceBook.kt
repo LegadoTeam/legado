@@ -1,13 +1,16 @@
 package io.legado.app.model.jsSource
 
+import io.legado.app.constant.BookSourceType
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.exception.ContentEmptyException
+import io.legado.app.exception.NoStackTraceException
 import io.legado.app.exception.TocEmptyException
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
+import io.legado.app.help.book.isWebFile
 import io.legado.app.help.book.removeAllBookType
 import io.legado.app.help.source.getBookType
 import io.legado.app.model.Debug
@@ -65,10 +68,16 @@ object JsSourceBook {
         }
         Debug.log(source.bookSourceUrl, json.orEmpty(), state = 20)
         JsSourceMarshaller.mergeBookInfo(book, json, source, canReName)
-        if (book.tocUrl.isBlank()) {
+        if (source.bookSourceType == BookSourceType.file) {
+            book.addType(source.getBookType())
+        }
+        if (!book.isWebFile && book.tocUrl.isBlank()) {
             book.tocUrl = book.bookUrl
         }
         logSummary(source.bookSourceUrl) { JsSourceDebugFormatter.bookInfo(book) }
+        if (book.isWebFile && book.downloadUrls.isNullOrEmpty()) {
+            throw NoStackTraceException("下载链接为空")
+        }
         return book
     }
 

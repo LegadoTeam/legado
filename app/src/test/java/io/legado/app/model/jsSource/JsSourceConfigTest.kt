@@ -1,5 +1,6 @@
 package io.legado.app.model.jsSource
 
+import io.legado.app.constant.BookSourceType
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.data.entities.rule.RowUi
 import io.legado.app.utils.GSON
@@ -161,6 +162,53 @@ class JsSourceConfigTest {
                 function getChapters(book) { return []; }
             """.trimIndent(),
             "getContent",
+        )
+    }
+
+    @Test
+    fun `file source requires only search and book info`() {
+        val source = JsSourceConfig.extract(
+            """
+                var config = {
+                    bookSourceUrl: "https://a.com",
+                    bookSourceName: "文件源",
+                    bookSourceType: 3
+                };
+                function search(key, page) { return []; }
+                function getBookInfo(book) { return {}; }
+            """.trimIndent()
+        )
+
+        assertEquals(BookSourceType.file, source.bookSourceType)
+    }
+
+    @Test
+    fun `file source requires book info`() {
+        assertExtractError(
+            """
+                var config = {
+                    bookSourceUrl: "https://a.com",
+                    bookSourceName: "文件源",
+                    bookSourceType: 3
+                };
+                function search(key, page) { return []; }
+            """.trimIndent(),
+            "getBookInfo",
+        )
+    }
+
+    @Test
+    fun `file source still requires search`() {
+        assertExtractError(
+            """
+                var config = {
+                    bookSourceUrl: "https://a.com",
+                    bookSourceName: "文件源",
+                    bookSourceType: 3
+                };
+                function getBookInfo(book) { return {}; }
+            """.trimIndent(),
+            "search",
         )
     }
 

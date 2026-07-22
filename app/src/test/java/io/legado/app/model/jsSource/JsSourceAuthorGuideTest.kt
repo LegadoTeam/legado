@@ -62,6 +62,8 @@ class JsSourceAuthorGuideTest {
             "`4` 视频",
             "`loginUi` 非空时必选",
             "`exploreUrl` 非空时必选",
+            "文件源必选",
+            "`downloadUrls`",
             "source.putVariable/getVariable",
             "只选择一个 JavaScript 书源导出或分享",
             "getReviewSummary(chapter, book)",
