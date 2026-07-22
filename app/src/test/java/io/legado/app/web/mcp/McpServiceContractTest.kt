@@ -76,6 +76,9 @@ class McpServiceContractTest {
         assertTrue(tools.contains("HttpLogRecord"))
         assertTrue(tools.contains("JsSourceUpsert.withSaveLock"))
         assertTrue(tools.contains("catch (error: CancellationException)"))
+        assertTrue(tools.contains("val logs = data[\"logs\"] as List<*>"))
+        assertTrue(tools.contains("val log = item as Map<*, *>"))
+        assertFalse(tools.contains("UNCHECKED_CAST"))
         assertFalse(tools.contains("HttpRecord"))
         assertFalse(tools.contains("HttpLogger"))
 
