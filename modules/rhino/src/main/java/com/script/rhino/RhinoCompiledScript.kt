@@ -9,7 +9,6 @@ import org.htmlunit.corejs.javascript.ContinuationPending
 import org.htmlunit.corejs.javascript.JavaScriptException
 import org.htmlunit.corejs.javascript.RhinoException
 import org.htmlunit.corejs.javascript.Script
-import org.htmlunit.corejs.javascript.Undefined
 import org.htmlunit.corejs.javascript.VarScope
 import java.io.IOException
 import kotlin.coroutines.CoroutineContext
@@ -29,7 +28,7 @@ internal class RhinoCompiledScript(
         val result: Any?
         try {
             cx.checkRecursive()
-            val ret = script.exec(cx, scope, Undefined.SCRIPTABLE_UNDEFINED)
+            val ret = script.exec(cx, scope, RhinoScriptEngine.topLevelThis(scope))
             result = RhinoScriptEngine.unwrapReturnValue(ret)
         } catch (re: RhinoException) {
             val line = if (re.lineNumber() == 0) -1 else re.lineNumber()
