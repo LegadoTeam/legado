@@ -165,6 +165,38 @@ class CryptoJsCompatibilityTest {
     }
 
     @Test
+    fun `js library receives runtime bindings through explicit top level this`() {
+        val source = BookSource(
+            bookSourceUrl = "https://127.0.0.1/runtime-this",
+            bookSourceName = "Runtime this compatibility",
+            jsLib = """
+                function requestApiUrl(path, data, runtime) {
+                    try {
+                        throw new Error('network');
+                    } catch (error) {
+                        return [
+                            typeof runtime.java,
+                            typeof runtime.java.log,
+                            typeof runtime.source,
+                            typeof runtime.cache
+                        ].join('|');
+                    }
+                }
+            """.trimIndent(),
+        )
+
+        assertEquals(
+            "object|function|object|object",
+            source.evalJS("requestApiUrl('/console/info', {}, this)"),
+        )
+        assertEquals(
+            "object|function|object|object",
+            AnalyzeRule(source = source)
+                .evalJS("requestApiUrl('/video/chap', {}, this)"),
+        )
+    }
+
+    @Test
     fun `custom js library preserves explicit globals across entry points`() {
         val jsLib = "var pixivLibraryMarker = 'ready';"
         val source = BookSource(

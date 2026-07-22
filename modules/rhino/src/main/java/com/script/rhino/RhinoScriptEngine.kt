@@ -14,6 +14,7 @@ import org.htmlunit.corejs.javascript.JavaScriptException
 import org.htmlunit.corejs.javascript.RhinoException
 import org.htmlunit.corejs.javascript.Script
 import org.htmlunit.corejs.javascript.Scriptable
+import org.htmlunit.corejs.javascript.ScriptableObject
 import org.htmlunit.corejs.javascript.TopLevel
 import org.htmlunit.corejs.javascript.Undefined
 import org.htmlunit.corejs.javascript.VarScope
@@ -73,7 +74,7 @@ object RhinoScriptEngine {
             cx.checkRecursive()
             val source = reader.readText()
             val script = cx.compileWithCompatibility(source, SOURCE_NAME, 1, scope)
-            ret = script.exec(cx, scope, Undefined.SCRIPTABLE_UNDEFINED)
+            ret = script.exec(cx, scope, topLevelThis(scope))
         } catch (re: RhinoException) {
             val line = if (re.lineNumber() == 0) -1 else re.lineNumber()
             val msg: String = if (re is JavaScriptException) {
@@ -194,6 +195,10 @@ object RhinoScriptEngine {
             result1 = result1.toString()
         }
         return if (result1 is Undefined) null else result1
+    }
+
+    internal fun topLevelThis(scope: VarScope): Scriptable {
+        return ScriptableObject.getTopLevelScope(scope).globalThis
     }
 
     init {
