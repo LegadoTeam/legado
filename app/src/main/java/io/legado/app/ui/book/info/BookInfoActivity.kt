@@ -250,6 +250,7 @@ class BookInfoActivity :
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         binding.titleBar.setBackgroundResource(R.color.transparent)
         binding.refreshLayout?.setColorSchemeColors(accentColor)
+        binding.refreshProgressBar.secondColor = accentColor
         binding.arcView?.setBgColor(backgroundColor)
         binding.llInfo.setBackgroundColor(backgroundColor)
         binding.ivCoverC.setCardBackgroundColor(backgroundColor)
@@ -258,7 +259,17 @@ class BookInfoActivity :
         binding.tvShelf.setTextColor(getPrimaryTextColor(ColorUtils.isColorLight(bottomBackground)))
         binding.tvToc.text = getString(R.string.toc_s, getString(R.string.loading))
         viewModel.bookData.observe(this) { showBook(it) }
-        viewModel.chapterListData.observe(this) { upLoading(false, it) }
+        viewModel.chapterListData.observe(this) {
+            upLoading(viewModel.loadingData.value == true, it)
+        }
+        viewModel.loadingData.observe(this) { isLoading ->
+            binding.refreshProgressBar.isAutoLoading = isLoading
+            if (isLoading) {
+                upLoading(true)
+            } else {
+                viewModel.chapterListData.value?.let { upLoading(false, it) }
+            }
+        }
         viewModel.waitDialogData.observe(this) { upWaitDialogStatus(it) }
         viewModel.initData(intent)
         initViewEvent()
