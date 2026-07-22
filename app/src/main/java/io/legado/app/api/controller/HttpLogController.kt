@@ -1,9 +1,12 @@
 package io.legado.app.api.controller
 
 import io.legado.app.api.ReturnData
+import io.legado.app.constant.PreferKey
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.HttpLogRecord
 import io.legado.app.help.http.HttpLogStore
+import io.legado.app.utils.putPrefBoolean
+import splitties.init.appCtx
 
 object HttpLogController {
 
@@ -33,6 +36,24 @@ object HttpLogController {
         val record = HttpLogStore.get(id)
             ?: return ReturnData().setErrorMsg("未找到 HTTP 记录 #$id")
         return ReturnData().setData(record)
+    }
+
+    internal fun setRecording(enabled: Boolean): ReturnData {
+        return setRecording(
+            enabled = enabled,
+            persist = { appCtx.putPrefBoolean(PreferKey.recordHttpLog, it) },
+            updateRuntime = { AppConfig.recordHttpLog = it },
+        )
+    }
+
+    internal fun setRecording(
+        enabled: Boolean,
+        persist: (Boolean) -> Unit,
+        updateRuntime: (Boolean) -> Unit,
+    ): ReturnData {
+        persist(enabled)
+        updateRuntime(enabled)
+        return ReturnData().setData(mapOf("recording" to enabled))
     }
 
     private fun summary(record: HttpLogRecord): Map<String, Any?> = mapOf(

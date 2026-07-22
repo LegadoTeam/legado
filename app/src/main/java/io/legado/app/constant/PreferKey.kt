@@ -63,6 +63,8 @@ object PreferKey {
     const val jsSourceApiToken = "jsSourceApiToken"
     const val keepLight = "keep_light"
     const val webService = "webService"
+    const val mcpService = "mcpService"
+    const val mcpPort = "mcpPort"
     const val webDavUrl = "web_dav_url"
     const val webDavAccount = "web_dav_account"
     const val webDavPassword = "web_dav_password"

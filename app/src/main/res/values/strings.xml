@@ -94,6 +94,11 @@
     <string name="retry">Retry</string>
     <string name="web_service">Web service</string>
     <string name="web_service_desc">Web edit source and read book</string>
+    <string name="mcp_service">MCP service</string>
+    <string name="mcp_service_desc">Token-protected source development tools</string>
+    <string name="mcp_service_token_required">Configure the Web source access token before starting MCP</string>
+    <string name="mcp_service_token_invalid">MCP access token is missing or incorrect</string>
+    <string name="mcp_service_start_failed">MCP service failed to start</string>
     <string name="web_edit_source">Edit book sources on the web</string>
     <string name="offline_cache">Offline cache</string>
     <string name="offline_cache_t">Offline cache</string>
@@ -594,8 +599,10 @@
     <string name="web_menu">Web service</string>
     <string name="web_port_title">Web port</string>
     <string name="web_port_summary">Current port %s</string>
+    <string name="mcp_port_title">MCP port</string>
+    <string name="mcp_port_summary">Current port %s</string>
     <string name="js_source_api_token_title">Web source access token</string>
-    <string name="js_source_api_token_summary">Required by raw JS, source write, search, and debug APIs</string>
+    <string name="js_source_api_token_summary">Required by MCP, raw JS, source write, search, and debug APIs</string>
     <string name="js_source_api_token_configured">Configured</string>
     <string name="qr_share">QR code sharing</string>
     <string name="str_share">Strings sharing</string>

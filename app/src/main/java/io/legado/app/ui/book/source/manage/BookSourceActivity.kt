@@ -532,11 +532,15 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
                     }
                 }
                 val selectItems = adapter.selection
-                CheckSource.start(this@BookSourceActivity, selectItems)
                 val adapterItems = adapter.getItems()
                 val firstItem = adapterItems.indexOf(selectItems.firstOrNull())
                 val lastItem = adapterItems.indexOf(selectItems.lastOrNull())
-                Debug.isChecking = firstItem >= 0 && lastItem >= 0
+                if (firstItem >= 0 && lastItem >= 0 && !Debug.tryStartChecking()) {
+                    keepScreenOn(false)
+                    toastOnUi("书源调试通道占用中，请稍后重试")
+                    return@okButton
+                }
+                CheckSource.start(this@BookSourceActivity, selectItems)
                 startCheckMessageRefreshJob(firstItem, lastItem)
             }
             neutralButton(R.string.check_source_config)
@@ -642,7 +646,6 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
                     .make(binding.root, msg, Snackbar.LENGTH_INDEFINITE)
                     .setAction(R.string.cancel) {
                         CheckSource.stop(this)
-                        Debug.finishChecking()
                     }.apply { show() }
             }
         }

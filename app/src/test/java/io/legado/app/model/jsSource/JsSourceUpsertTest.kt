@@ -7,8 +7,13 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertThrows
 import org.junit.Test
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 
 class JsSourceUpsertTest {
 
@@ -164,5 +169,32 @@ class JsSourceUpsertTest {
                 JsSourceUpsert.save("while (true) {}", timeoutMillis = 100)
             }
         }
+    }
+
+    @Test(timeout = 5_000)
+    fun `save lock serializes concurrent writers`() = runBlocking {
+        val firstEntered = CompletableDeferred<Unit>()
+        val secondEntered = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<Unit>()
+        val first = async(Dispatchers.Default) {
+            JsSourceUpsert.withSaveLock {
+                firstEntered.complete(Unit)
+                releaseFirst.await()
+                "first"
+            }
+        }
+        firstEntered.await()
+        val second = async(Dispatchers.Default) {
+            JsSourceUpsert.withSaveLock {
+                secondEntered.complete(Unit)
+                "second"
+            }
+        }
+
+        assertNull(withTimeoutOrNull(200) { secondEntered.await() })
+        releaseFirst.complete(Unit)
+        withTimeout(1_000) { secondEntered.await() }
+        assertEquals("first", first.await())
+        assertEquals("second", second.await())
     }
 }
