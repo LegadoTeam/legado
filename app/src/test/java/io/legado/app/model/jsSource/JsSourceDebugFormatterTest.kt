@@ -1,5 +1,6 @@
 package io.legado.app.model.jsSource
 
+import io.legado.app.constant.BookType
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.SearchBook
@@ -40,6 +41,18 @@ class JsSourceDebugFormatterTest {
         assertTrue(lines.contains("└书名"))
         assertTrue(lines.contains("└作者"))
         assertTrue(lines.contains("└https://example.com/toc"))
+    }
+
+    @Test
+    fun `file book info contains download urls instead of toc`() {
+        val book = Book(bookUrl = "https://example.com/book", type = BookType.webFile)
+        book.downloadUrls = listOf("https://example.com/1.epub")
+
+        val lines = JsSourceDebugFormatter.bookInfo(book)
+
+        assertTrue(lines.contains("┌获取文件下载链接"))
+        assertTrue(lines.contains("└https://example.com/1.epub"))
+        assertFalse(lines.contains("┌获取目录链接"))
     }
 
     @Test

@@ -85,6 +85,44 @@ class JsSourceMarshallerTest {
     }
 
     @Test
+    fun `merges and resolves download urls`() {
+        val book = Book(bookUrl = "https://source.example/book/1")
+
+        JsSourceMarshaller.mergeBookInfo(
+            book,
+            """{"downloadUrls":["/download/1.txt","https://cdn.example/2.epub","/download/1.txt","javascript:bad",""]}""",
+            textSource,
+            canReName = true,
+        )
+
+        assertEquals(
+            listOf("https://source.example/download/1.txt", "https://cdn.example/2.epub"),
+            book.downloadUrls,
+        )
+    }
+
+    @Test
+    fun `ignores invalid download urls`() {
+        val book = Book(bookUrl = "https://source.example/book/1")
+
+        JsSourceMarshaller.mergeBookInfo(
+            book,
+            """{"downloadUrls":"not-array"}""",
+            textSource,
+            canReName = true,
+        )
+        assertNull(book.downloadUrls)
+
+        JsSourceMarshaller.mergeBookInfo(
+            book,
+            """{"downloadUrls":[{"bad":true}]}""",
+            textSource,
+            canReName = true,
+        )
+        assertNull(book.downloadUrls)
+    }
+
+    @Test
     fun `injects chapter identity and resolves relative urls`() {
         val book = Book(bookUrl = "https://source.example/book")
         book.tocUrl = "https://source.example/toc/index"

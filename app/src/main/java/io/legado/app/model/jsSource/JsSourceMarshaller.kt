@@ -79,6 +79,23 @@ object JsSourceMarshaller {
                 "wordCount" -> book.wordCount = value.asString
                 "latestChapterTitle" -> book.latestChapterTitle = value.asString
                 "tocUrl" -> book.tocUrl = value.asString
+                "downloadUrls" -> {
+                    val urls = runCatching {
+                        value.asJsonArray.map {
+                            require(it.isJsonPrimitive && it.asJsonPrimitive.isString)
+                            it.asString.trim()
+                        }.filter {
+                            it.isNotEmpty() && !it.startsWith("javascript", ignoreCase = true)
+                        }.map {
+                            NetworkUtils.getAbsoluteURL(book.bookUrl, it)
+                        }.filter { it.isNotEmpty() }.distinct()
+                    }.getOrNull()
+                    if (urls == null) {
+                        debugLog(source.bookSourceUrl, "⇒downloadUrls 不是字符串数组,忽略")
+                    } else {
+                        book.downloadUrls = urls
+                    }
+                }
                 "variable" -> mergeVariable(book, value, source)
                 "type" -> {
                     val raw = runCatching { value.asInt }.getOrNull()

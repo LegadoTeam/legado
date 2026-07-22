@@ -3,6 +3,7 @@ package io.legado.app.model.jsSource
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.SearchBook
+import io.legado.app.help.book.isWebFile
 import io.legado.app.help.http.HttpLogSanitizer
 
 internal object JsSourceDebugFormatter {
@@ -34,7 +35,11 @@ internal object JsSourceDebugFormatter {
         addField("最新章节", book.latestChapterTitle)
         addField("简介", book.intro)
         addField("封面链接", book.coverUrl)
-        addField("目录链接", book.tocUrl)
+        if (book.isWebFile) {
+            addField("文件下载链接", book.downloadUrls?.joinToString("，\n"))
+        } else {
+            addField("目录链接", book.tocUrl)
+        }
     }
 
     fun chapterList(chapters: List<BookChapter>): List<String> = buildList {
