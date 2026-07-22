@@ -8,6 +8,19 @@ import java.io.File
 class BookIntroCollapseTest {
 
     @Test
+    fun `new introductions are expanded by default and remain manually collapsible`() {
+        val activity = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/info/BookInfoActivity.kt"
+        )
+        val newIntroState = activity
+            .substringAfter("if (intro != introContent) {")
+            .substringBefore("}")
+
+        assertTrue(newIntroState.contains("introExpanded = true"))
+        assertTrue(activity.contains("introExpanded = !introExpanded"))
+    }
+
+    @Test
     fun `short and exact four line introductions stay expanded`() {
         assertFalse(hasOverflow(lineCount = 3, lastLineEnd = 30, textLength = 30))
         assertFalse(hasOverflow(lineCount = 4, lastLineEnd = 40, textLength = 40))
