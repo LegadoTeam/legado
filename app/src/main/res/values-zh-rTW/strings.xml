@@ -239,6 +239,8 @@
     <string name="data_loading">載入資料中…</string>
     <string name="load_error_retry">載入失敗，點擊重試</string>
     <string name="book_intro">內容簡介</string>
+    <string name="book_intro_expand">展開</string>
+    <string name="book_intro_collapse">收合</string>
     <string name="intro_show">簡介：%s</string>
     <string name="intro_show_null">簡介：暫無簡介</string>
     <string name="open_from_other">打開外部書籍</string>

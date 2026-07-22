@@ -240,6 +240,8 @@
     <string name="data_loading">Carregando…</string>
     <string name="load_error_retry">Falha ao carregar, toque para tentar novamente</string>
     <string name="book_intro">Descrição do livro</string>
+    <string name="book_intro_expand">Expandir</string>
+    <string name="book_intro_collapse">Recolher</string>
     <string name="intro_show">Descrição:%s</string>
     <string name="intro_show_null">Descrição: sem introdução</string>
     <string name="open_from_other">Abrir o livro externo</string>

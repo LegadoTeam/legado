@@ -25,6 +25,18 @@ import kotlin.math.min
 class ScrollTextView(context: Context, attrs: AttributeSet?) :
     AppCompatTextView(context, attrs) {
 
+    var onTextLayoutChanged: (() -> Unit)? = null
+    var internalScrollEnabled = true
+    var maxMeasuredHeight: Int? = null
+        set(value) {
+            if (field != value) {
+                field = value
+                requestLayout()
+            }
+        }
+    var isMeasuredHeightLimited = false
+        private set
+
     //是否到顶或者到底的标志
     private var disallowIntercept = true
 
@@ -88,7 +100,15 @@ class ScrollTextView(context: Context, attrs: AttributeSet?) :
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        isMeasuredHeightLimited = false
+        maxMeasuredHeight?.let { heightLimit ->
+            if (measuredHeight > heightLimit) {
+                isMeasuredHeightLimited = true
+                setMeasuredDimension(measuredWidth, heightLimit)
+            }
+        }
         initOffsetHeight()
+        postTextLayoutChanged()
     }
 
     override fun onTextChanged(
@@ -99,9 +119,22 @@ class ScrollTextView(context: Context, attrs: AttributeSet?) :
     ) {
         super.onTextChanged(text, start, lengthBefore, lengthAfter)
         initOffsetHeight()
+        postTextLayoutChanged()
+    }
+
+    private fun postTextLayoutChanged() {
+        val callback = onTextLayoutChanged ?: return
+        post {
+            if (onTextLayoutChanged === callback) {
+                callback()
+            }
+        }
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (!internalScrollEnabled) {
+            return super.dispatchTouchEvent(event)
+        }
         if (lineCount > maxLines) {
             gestureDetector.onTouchEvent(event)
         }
@@ -154,7 +187,7 @@ class ScrollTextView(context: Context, attrs: AttributeSet?) :
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val result = super.onTouchEvent(event)
         //如果是需要拦截，则再拦截，这个方法会在onScrollChanged方法之后再调用一次
-        if (disallowIntercept && lineCount > maxLines) {
+        if (internalScrollEnabled && disallowIntercept && lineCount > maxLines) {
             parent.requestDisallowInterceptTouchEvent(true)
         }
 
@@ -162,7 +195,7 @@ class ScrollTextView(context: Context, attrs: AttributeSet?) :
     }
 
     override fun scrollTo(x: Int, y: Int) {
-        super.scrollTo(x, min(y, mOffsetHeight))
+        super.scrollTo(x, if (internalScrollEnabled) min(y, mOffsetHeight) else 0)
     }
 
     private fun initOffsetHeight() {
