@@ -210,11 +210,12 @@ object ChapterProvider {
             titlePaint = it.first
             contentPaint = it.second
         }
-        reviewPaint.color = if (AppConfig.isNightTheme) {
-            ColorUtils.lightenColor(contentPaint.color)
-        } else {
-            ColorUtils.darkenColor(contentPaint.color)
-        }
+        reviewPaint.color = ReadBookConfig.reviewIconColor.takeIf { it != 0 }
+            ?: if (AppConfig.isNightTheme) {
+                ColorUtils.lightenColor(contentPaint.color)
+            } else {
+                ColorUtils.darkenColor(contentPaint.color)
+            }
         reviewPaint.textSize = contentPaint.textSize * 0.45f
         reviewPaint.textAlign = Paint.Align.CENTER
         reviewPaint.isAntiAlias = true
