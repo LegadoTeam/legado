@@ -586,6 +586,7 @@
     <string name="content_empty">No content</string>
     <string name="on_change_source">Changing source, wait please</string>
     <string name="chapter_list_empty">Chapters is empty</string>
+    <string name="book_not_exist">Book does not exist</string>
     <string name="text_letter_spacing">Word spacing</string>
 
     <string name="source_tab_base">Basic</string>

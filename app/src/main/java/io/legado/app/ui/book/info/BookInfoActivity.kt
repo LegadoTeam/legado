@@ -973,16 +973,19 @@ class BookInfoActivity :
                 toastOnUi(R.string.chapter_list_empty)
                 return@setOnClickListener
             }
-            viewModel.getBook()?.let { book ->
-                if (!viewModel.inBookshelf) {
-                    viewModel.saveBook(book) { //点击目录会保存book
-                        viewModel.saveChapterList {
-                            openChapterList()
-                        }
+            val book = viewModel.getBook(false)
+            if (book == null) {
+                toastOnUi(R.string.book_not_exist)
+                return@setOnClickListener
+            }
+            if (!viewModel.inBookshelf) {
+                viewModel.saveBook(book) { //点击目录会保存book
+                    viewModel.saveChapterList {
+                        openChapterList()
                     }
-                } else {
-                    openChapterList()
                 }
+            } else {
+                openChapterList()
             }
         }
         tvChangeGroup.setOnClickListener {
