@@ -5,6 +5,7 @@ import fi.iki.elonen.NanoHTTPD
 import io.legado.app.api.ReturnData
 import io.legado.app.api.controller.BookController
 import io.legado.app.api.controller.BookSourceController
+import io.legado.app.api.controller.HttpLogController
 import io.legado.app.api.controller.ReplaceRuleController
 import io.legado.app.api.controller.RssSourceController
 import io.legado.app.help.coroutine.Coroutine
@@ -44,7 +45,7 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
                         "text/plain; charset=utf-8",
                         ""
                     )
-                    response.addHeader("Access-Control-Allow-Methods", "POST")
+                    response.addHeader("Access-Control-Allow-Methods", "GET, POST")
                     response.addHeader("Access-Control-Allow-Headers", "content-type, x-legado-token")
                     response.addWebHeaders(session.headers["origin"], uri)
                     //response.addHeader("Access-Control-Max-Age", "3600");
@@ -100,21 +101,35 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
 
                 Method.GET -> {
                     val parameters = session.parameters
-
-                    returnData = when (uri) {
-                        "/getBookSource" -> BookSourceController.getSource(parameters)
-                        "/getBookSources" -> BookSourceController.sources
-                        "/getBookshelf" -> BookController.bookshelf
-                        "/getChapterList" -> BookController.getChapterList(parameters)
-                        "/refreshToc" -> BookController.refreshToc(parameters)
-                        "/getBookContent" -> BookController.getBookContent(parameters)
-                        "/cover" -> BookController.getCover(parameters)
-                        "/image" -> BookController.getImg(parameters)
-                        "/getReadConfig" -> BookController.getWebReadConfig()
-                        "/getRssSource" -> RssSourceController.getSource(parameters)
-                        "/getRssSources" -> RssSourceController.sources
-                        "/getReplaceRules" -> ReplaceRuleController.allRules
-                        else -> null
+                    val requestError = if (
+                        uri in PROTECTED_HTTP_LOG_READ_ROUTES &&
+                        !BookSourceController.hasValidJsSourceApiToken(session.headers)
+                    ) {
+                        ReturnData().setErrorMsg("Web 书源访问令牌未配置或不正确")
+                    } else {
+                        null
+                    }
+                    if (requestError != null) {
+                        returnData = requestError
+                        shouldCloseConnection = true
+                    } else {
+                        returnData = when (uri) {
+                            "/getBookSource" -> BookSourceController.getSource(parameters)
+                            "/getBookSources" -> BookSourceController.sources
+                            "/getHttpLogs" -> HttpLogController.getLogs(parameters)
+                            "/getHttpLog" -> HttpLogController.getLog(parameters)
+                            "/getBookshelf" -> BookController.bookshelf
+                            "/getChapterList" -> BookController.getChapterList(parameters)
+                            "/refreshToc" -> BookController.refreshToc(parameters)
+                            "/getBookContent" -> BookController.getBookContent(parameters)
+                            "/cover" -> BookController.getCover(parameters)
+                            "/image" -> BookController.getImg(parameters)
+                            "/getReadConfig" -> BookController.getWebReadConfig()
+                            "/getRssSource" -> RssSourceController.getSource(parameters)
+                            "/getRssSources" -> RssSourceController.sources
+                            "/getReplaceRules" -> ReplaceRuleController.allRules
+                            else -> null
+                        }
                     }
                 }
 
@@ -209,11 +224,18 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
             "/deleteReplaceRule",
             "/testReplaceRule",
         )
+        private val PROTECTED_HTTP_LOG_READ_ROUTES = setOf(
+            "/getHttpLogs",
+            "/getHttpLog",
+        )
     }
 
     private fun Response.addWebHeaders(origin: String?, uri: String) {
         addHeader("X-Content-Type-Options", "nosniff")
         origin?.let { addHeader("Access-Control-Allow-Origin", it) }
+        if (uri in PROTECTED_HTTP_LOG_READ_ROUTES) {
+            addHeader("Cache-Control", "no-store")
+        }
         if (uri.startsWith("/vue/") && uri.endsWith(".html")) {
             addHeader("Content-Security-Policy", VUE_CONTENT_SECURITY_POLICY)
         }

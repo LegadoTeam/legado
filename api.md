@@ -90,6 +90,21 @@ URL = ws://127.0.0.1:1235/rssSourceDebug
 Message = { key: [String], tag: [String] }
 ```
 
+#### HTTP 请求日志
+
+HTTP 日志仅在设置中启用“记录 HTTP 日志”后写入内存，最多保留最近 50 条；请求和响应正文单次最多记录 8 KiB，
+记录会在写入时脱敏认证信息、Cookie 和常见密钥字段。完整日志仍可能包含敏感业务数据，因此两个接口都要求通过
+`X-Legado-Token` 提供“Web 书源访问令牌”，并且只应在可信局域网中使用。
+
+```text
+URL = http://127.0.0.1:1234/getHttpLogs?limit=50
+URL = http://127.0.0.1:1234/getHttpLog?id=1
+Method = GET
+X-Legado-Token = 设置中配置的令牌
+```
+
+`getHttpLogs` 返回 `{ recording, logs }`，其中 `logs` 为摘要列表；`getHttpLog` 按 id 返回完整的已脱敏记录。
+
 #### 获取替换规则
 
 ```

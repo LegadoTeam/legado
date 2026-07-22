@@ -67,7 +67,7 @@ data class HttpLogRecord(
 
 object HttpLogStore {
 
-    private const val MAX_RECORDS = 50
+    internal const val MAX_RECORDS = 50
     private val idGenerator = AtomicLong()
     private val records = ArrayDeque<HttpLogRecord>(MAX_RECORDS)
 
@@ -85,6 +85,11 @@ object HttpLogStore {
     @Synchronized
     fun get(id: Long): HttpLogRecord? {
         return records.firstOrNull { it.id == id }
+    }
+
+    @Synchronized
+    fun latest(limit: Int): List<HttpLogRecord> {
+        return records.take(limit.coerceIn(1, MAX_RECORDS))
     }
 
     @Synchronized
