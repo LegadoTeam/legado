@@ -1345,4 +1345,6 @@
     <string name="review_rule_missing">未配置段评规则</string>
     <string name="review_detail_url_missing">未配置段评详情 URL</string>
     <string name="review_detail_rule_missing">未配置段评详情规则</string>
+    <string name="review_icon_color_title">段评图标颜色</string>
+    <string name="review_icon_color_reset">段评图标颜色已恢复跟随主题</string>
 </resources>

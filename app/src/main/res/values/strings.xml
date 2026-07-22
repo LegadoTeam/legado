@@ -1454,4 +1454,6 @@
     <string name="review_rule_missing">Paragraph review rules are not configured</string>
     <string name="review_detail_url_missing">Paragraph review detail URL is not configured</string>
     <string name="review_detail_rule_missing">Paragraph review detail rules are not configured</string>
+    <string name="review_icon_color_title">Icon color</string>
+    <string name="review_icon_color_reset">Icon color reset to follow theme</string>
 </resources>

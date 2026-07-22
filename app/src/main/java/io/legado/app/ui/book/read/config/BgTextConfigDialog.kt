@@ -36,6 +36,7 @@ import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.lib.theme.getSecondaryTextColor
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.ReadBookActivity
+import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.widget.seekbar.SeekBarChangeListener
 import io.legado.app.utils.ColorUtils
@@ -80,6 +81,7 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
         const val TEXT_COLOR = 121
         const val BG_COLOR = 122
         const val TEXT_ACCENT_COLOR = 123
+        const val REVIEW_ICON_COLOR = 124
     }
 
     private val binding by viewBinding(DialogReadBgTextBinding::bind)
@@ -259,6 +261,25 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
                 .setDialogType(ColorPickerDialog.TYPE_CUSTOM)
                 .setDialogId(TEXT_ACCENT_COLOR)
                 .show(requireActivity())
+        }
+        binding.tvReviewIconColor.setOnClickListener {
+            ColorPickerDialog.newBuilder()
+                .setColor(
+                    ReadBookConfig.reviewIconColor.takeIf { it != 0 }
+                        ?: ChapterProvider.reviewPaint.color
+                )
+                .setShowAlphaSlider(false)
+                .setDialogType(ColorPickerDialog.TYPE_CUSTOM)
+                .setDialogId(REVIEW_ICON_COLOR)
+                .show(requireActivity())
+        }
+        binding.tvReviewIconColor.setOnLongClickListener {
+            if (ReadBookConfig.reviewIconColor != 0) {
+                ReadBookConfig.reviewIconColor = 0
+                postEvent(EventBus.UP_CONFIG, arrayListOf(8, 9, 11))
+                toastOnUi(R.string.review_icon_color_reset)
+            }
+            true
         }
         binding.tvBgColor.setOnClickListener {
             val bgColor =
