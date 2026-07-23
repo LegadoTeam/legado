@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
-import android.widget.PopupMenu
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.R
@@ -13,6 +12,7 @@ import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.databinding.ItemReplaceRuleBinding
 import io.legado.app.lib.theme.backgroundColor
+import io.legado.app.ui.widget.popupActionMenu
 import io.legado.app.ui.widget.recycler.DragSelectTouchHelper
 import io.legado.app.ui.widget.recycler.ItemTouchCallback
 import io.legado.app.utils.ColorUtils
@@ -157,20 +157,21 @@ class ReplaceRuleAdapter(context: Context, var callBack: CallBack) :
 
     private fun showMenu(view: View, position: Int) {
         val item = getItem(position) ?: return
-        val popupMenu = PopupMenu(context, view)
-        popupMenu.inflate(R.menu.replace_rule_item)
-        popupMenu.setOnMenuItemClickListener { menuItem ->
-            when (menuItem.itemId) {
-                R.id.menu_top -> callBack.toTop(item)
-                R.id.menu_bottom -> callBack.toBottom(item)
-                R.id.menu_del -> {
+        popupActionMenu(context) {
+            item(context.getString(R.string.to_top), "top")
+            item(context.getString(R.string.to_bottom), "bottom")
+            item(context.getString(R.string.delete), "delete")
+            danger("delete")
+        }.show(view) { action ->
+            when (action) {
+                "top" -> callBack.toTop(item)
+                "bottom" -> callBack.toBottom(item)
+                "delete" -> {
                     callBack.delete(item)
                     selected.remove(item)
                 }
             }
-            true
         }
-        popupMenu.show()
     }
 
     override fun swap(srcPosition: Int, targetPosition: Int): Boolean {
