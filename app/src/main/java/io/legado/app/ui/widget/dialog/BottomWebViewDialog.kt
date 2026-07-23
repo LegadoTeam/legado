@@ -2,7 +2,6 @@ package io.legado.app.ui.widget.dialog
 
 import android.annotation.SuppressLint
 import android.app.Dialog
-import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.graphics.Bitmap
@@ -84,9 +83,11 @@ import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.get
 import io.legado.app.utils.writeBytes
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
 import java.lang.ref.WeakReference
 import java.net.URLDecoder
@@ -285,8 +286,9 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             saveImage(it.value, uri)
         }
     }
-    private lateinit var pooledWebView: PooledWebView
-    private lateinit var currentWebView: WebView
+    private var pooledWebView: PooledWebView? = null
+    private val currentWebView: WebView
+        get() = checkNotNull(pooledWebView).realWebView
     private var source: BaseSource? = null
     private var preloadJs: String? = null
     private var isFullScreen = false
@@ -299,12 +301,6 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     private var maxHeightTracksHeightMode = false
     private var sheetSizeBeforeFullScreen: SheetSizeSnapshot? = null
     private val pendingFullScreenConfigs = ArrayDeque<Config>()
-
-    override fun onAttach(context: Context) {
-        super.onAttach(context)
-        pooledWebView = WebViewPool.acquire(context)
-        currentWebView = pooledWebView.realWebView
-    }
 
     @Suppress("DEPRECATION")
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
@@ -672,31 +668,35 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        pooledWebView = WebViewPool.acquire(requireContext())
+        needClearHistory = true
         view.setBackgroundColor(0)
         binding.webViewContainer.addView(currentWebView)
-        lifecycleScope.launch(IO) {
-            val args = arguments
-            if (args == null) {
-                dismiss()
-                return@launch
-            }
-            val sourceKey = args.getString("sourceKey") ?: return@launch
-            val url = args.getString("url") ?: return@launch
+        val args = arguments
+        if (args == null) {
+            dismiss()
+            return
+        }
+        val sourceKey = args.getString("sourceKey") ?: return
+        val url = args.getString("url") ?: return
+        viewLifecycleOwner.lifecycleScope.launch(IO) {
             kotlin.runCatching {
                 args.getString("config")?.let { json ->
                     try {
                         GSON.fromJsonObject<Config>(json).getOrThrow().let { config ->
-                            activity?.runOnUiThread {
+                            withContext(Dispatchers.Main) {
                                 setConfig(config, true)
                             }
                         }
                         true
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (e: Exception) {
                         AppLog.put("config err", e)
                         null
                     }
                 } ?: run {
-                    activity?.runOnUiThread {
+                    withContext(Dispatchers.Main) {
                         bottomSheet?.let { sheet ->
                             val layoutParams = sheet.layoutParams
                             layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT
@@ -735,25 +735,28 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                 }
                 appDb.bookSourceDao.getBookSource(sourceKey).let {
                     if (it == null) {
-                        activity?.toastOnUi("no find bookSource")
-                        dismiss()
+                        withContext(Dispatchers.Main) {
+                            activity?.toastOnUi("no find bookSource")
+                            dismiss()
+                        }
                         return@launch
                     }
                     source = it
                 }
                 val bookType = args.getInt("bookType", 0)
-                currentWebView.post {
+                withContext(Dispatchers.Main) {
                     currentWebView.onResume() //缓存库拿的需要激活
                     initWebView(analyzeUrl.url, spliceHtml, analyzeUrl.headerMap, bookType)
                     currentWebView.clearHistory()
                 }
-            }.onFailure {
-                currentWebView.post {
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                withContext(Dispatchers.Main) {
                     currentWebView.resumeTimers()
                     currentWebView.onResume()
                     currentWebView.loadDataWithBaseURL(
                         url,
-                        it.stackTraceToString(),
+                        error.stackTraceToString(),
                         "text/html",
                         "utf-8",
                         url
@@ -878,7 +881,8 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
 
     override fun onDestroyView() {
         customWebViewCallback?.onCustomViewHidden()
-        WebViewPool.release(pooledWebView)
+        pooledWebView?.let(WebViewPool::release)
+        pooledWebView = null
         originOrientation?.let {
             activity?.requestedOrientation = it
         }
@@ -893,8 +897,9 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     }
 
     override fun upConfig(config: String) {
+        val owner = viewLifecycleOwnerLiveData.value ?: return
         try {
-            lifecycleScope.launch(Dispatchers.Main) {
+            owner.lifecycleScope.launch(Dispatchers.Main) {
                 GSON.fromJsonObject<Config>(config).getOrThrow().let { config ->
                     if (isFullScreen) {
                         pendingFullScreenConfigs.addLast(config)
