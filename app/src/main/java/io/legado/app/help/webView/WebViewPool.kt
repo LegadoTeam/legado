@@ -69,10 +69,7 @@ object WebViewPool {
     // 释放WebView回池
     @Synchronized
     fun release(pooledWebView: PooledWebView) {
-        if (inUsePool.remove(pooledWebView.id) == null) {
-            pooledWebView.realWebView.destroy()
-            return
-        }
+        if (inUsePool.remove(pooledWebView.id) == null) return
         // 重置WebView状态
         pooledWebView.realWebView.run {
             (parent as? ViewGroup)?.removeView(this)
