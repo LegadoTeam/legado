@@ -11,8 +11,8 @@ class CronSchedule private constructor(
     private val daysOfMonth: BooleanArray,
     private val months: BooleanArray,
     private val daysOfWeek: BooleanArray,
-    private val domAny: Boolean,
-    private val dowAny: Boolean
+    private val domStartsWithStar: Boolean,
+    private val dowStartsWithStar: Boolean
 ) {
 
     fun nextTimeAfter(fromEpochMs: Long, zoneId: ZoneId = ZoneId.systemDefault()): Long? {
@@ -36,11 +36,10 @@ class CronSchedule private constructor(
         if (!months[date.monthValue]) return null
         val domMatch = daysOfMonth[date.dayOfMonth]
         val dowMatch = daysOfWeek[date.dayOfWeek.value % 7]
-        val dayMatches = when {
-            domAny && dowAny -> true
-            domAny -> dowMatch
-            dowAny -> domMatch
-            else -> domMatch || dowMatch
+        val dayMatches = if (domStartsWithStar || dowStartsWithStar) {
+            domMatch && dowMatch
+        } else {
+            domMatch || dowMatch
         }
         if (!dayMatches) return null
 
@@ -82,12 +81,12 @@ class CronSchedule private constructor(
                 dayOfMonth.allowed,
                 month.allowed,
                 dayOfWeek.allowed,
-                dayOfMonth.isAny,
-                dayOfWeek.isAny
+                dayOfMonth.startsWithStar,
+                dayOfWeek.startsWithStar
             )
         }
 
-        private data class Field(val allowed: BooleanArray, val isAny: Boolean)
+        private data class Field(val allowed: BooleanArray, val startsWithStar: Boolean)
 
         private fun parseField(
             text: String,
@@ -126,7 +125,7 @@ class CronSchedule private constructor(
                 }
             }
             if (allowed.none { it }) return null
-            return Field(allowed, text == "*")
+            return Field(allowed, text.startsWith('*'))
         }
     }
 }

@@ -45,6 +45,21 @@ class CronScheduleTest {
     }
 
     @Test
+    fun starStepDayFieldsKeepWildcardSemantics() {
+        val dayOfMonthStep = CronSchedule.parse("0 9 */2 * 1")!!
+        assertEquals(
+            time(2026, 6, 15, 9, 0),
+            dayOfMonthStep.nextTimeAfter(time(2026, 6, 1, 9, 0), utc)
+        )
+
+        val dayOfWeekStep = CronSchedule.parse("0 9 13 * */2")!!
+        assertEquals(
+            time(2026, 8, 13, 9, 0),
+            dayOfWeekStep.nextTimeAfter(time(2026, 7, 1, 9, 0), utc)
+        )
+    }
+
+    @Test
     fun explicitFullDayOfMonthRangeIsNotAWildcard() {
         val schedule = CronSchedule.parse("0 9 1-31 * 1")!!
         assertEquals(
