@@ -301,6 +301,17 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             }
         }
 
+    // 音频缓存目录
+    var audioCacheTreeUri: String?
+        get() = appCtx.getPrefString(PreferKey.audioCacheTreeUri)
+        set(value) {
+            if (value.isNullOrEmpty()) {
+                appCtx.removePref(PreferKey.audioCacheTreeUri)
+            } else {
+                appCtx.putPrefString(PreferKey.audioCacheTreeUri, value)
+            }
+        }
+
     val showDiscovery: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.showDiscovery, true)
 

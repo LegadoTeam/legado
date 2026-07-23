@@ -2,7 +2,6 @@ plugins {
     //d 'com.android.library'
     //id 'org.jetbrains.kotlin.android'
     alias libs.plugins.android.library
-    alias libs.plugins.kotlin.android
 }
 
 android {
@@ -24,9 +23,6 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
     lint {
         checkDependencies = true
     }
@@ -34,6 +30,12 @@ android {
         configureEach {
             options.compilerArgs << "-Xlint:deprecation"
         }
+    }
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+    kotlinOptions {
+        jvmTarget = "17"
     }
 }
 

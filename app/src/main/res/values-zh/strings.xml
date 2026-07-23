@@ -1069,6 +1069,7 @@
     <string name="show_add_to_shelf_alert_title">返回时提示放入书架</string>
     <string name="show_add_to_shelf_alert_summary">阅读未放入书架的书籍在返回时提示放入书架</string>
     <string name="review">段评</string>
+    <string name="review_play_audio">播放音频</string>
     <string name="rule_review_url">段评URL（reviewUrl）</string>
     <string name="rule_avatar">段评发布者头像（avatarRule）</string>
     <string name="rule_review_content">段评内容（contentRule）</string>
@@ -1280,4 +1281,9 @@
     <string name="drag_to_reorder">拖动排序</string>
     <string name="move_to_more">移至更多</string>
     <string name="move_to_floating_bar">移至浮动条</string>
+    <string name="review_total_count">共 %d 条</string>
+    <string name="review_more_replies">查看 %d 条回复</string>
+    <string name="review_pause_audio">暂停</string>
+    <string name="audio_cache_notification_title">音频缓存</string>
+    <string name="audio_cache_notification_text">%1$s %2$d/%3$d (失败: %4$d)</string>
 </resources>

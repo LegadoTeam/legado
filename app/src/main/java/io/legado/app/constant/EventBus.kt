@@ -43,4 +43,5 @@ object EventBus {
     const val REFRESH_BOOK_CONTENT = "refreshBookContent"
     const val REFRESH_BOOK_TOC = "refreshBookToc"
     const val UP_VIDEO_INFO = "upVideoInfo"
+    const val AUDIO_CACHE_CHANGED = "audioCacheChanged"
 }

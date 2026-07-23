@@ -7,13 +7,13 @@ plugins {
 //    id "com.google.gms.google-services"
 
     alias libs.plugins.android.application
-    alias libs.plugins.kotlin.android
     alias libs.plugins.kotlin.parcelize
     alias libs.plugins.room
     alias libs.plugins.ksp
     alias libs.plugins.google.services
 }
-apply plugin: 'org.jetbrains.kotlin.kapt'
+// Built-in Kotlin in AGP 9.0 replaces kapt; Glide uses annotationProcessor instead
+//apply plugin: 'org.jetbrains.kotlin.kapt'
 apply from: 'download.gradle'
 
 static def releaseTime() {
@@ -161,9 +161,6 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
     packaging {
         resources.excludes.add('META-INF/*')
         // R8 removes the transcode implementation; these bundled resources have no runtime reader.
@@ -204,6 +201,12 @@ android {
     }
     lint { //忽略string翻译缺失，后面需要翻译时去掉，todo
         disable 'MissingTranslation'
+    }
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+    kotlinOptions {
+        jvmTarget = "17"
     }
 }
 
@@ -305,7 +308,7 @@ dependencies {
     //Glide
     implementation(libs.glide.glide)
     implementation(libs.glide.okhttp)
-    kapt(libs.glide.compiler)
+    annotationProcessor(libs.glide.compiler)
 
     //Svg
     implementation(libs.androidsvg)
@@ -359,4 +362,7 @@ dependencies {
     implementation(platform(libs.soraEditor.bom))
     implementation(libs.soraEditor.core)
     implementation(libs.soraEditor.language.textmate)
+
+    // 强制 androidTest 使用项目声明的协程版本，覆盖传递依赖的旧版本
+    androidTestImplementation(libs.kotlinx.coroutines.core)
 }

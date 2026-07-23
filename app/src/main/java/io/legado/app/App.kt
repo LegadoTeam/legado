@@ -93,6 +93,7 @@ class App : Application() {
                 .enableLogger(BuildConfig.DEBUG || AppConfig.recordLog)
                 .setLogger(EventLogger())
             DefaultData.upVersion()
+            DefaultData.importDefaultHttpTTS()
             AppFreezeMonitor.init(this@App)
             DispatchersMonitor.init()
             URL.setURLStreamHandlerFactory(ObsoleteUrlFactory(okHttpClient))
@@ -178,7 +179,6 @@ class App : Application() {
      * 创建通知ID
      */
     private fun createNotificationChannels() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val downloadChannel = NotificationChannel(
             channelIdDownload,
             getString(R.string.action_download),

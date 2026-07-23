@@ -446,6 +446,36 @@ class AnalyzeRule(
     }
 
     /**
+     * 获取 Element，返回原始 Any? 类型，不强制转换为 List
+     */
+    fun getElementsRaw(ruleStr: String): Any? {
+        var result: Any? = null
+        val content = this.content
+        val ruleList = splitSourceRule(ruleStr, true)
+        if (content != null && ruleList.isNotEmpty()) {
+            result = content
+            for (sourceRule in ruleList) {
+                putRule(sourceRule.putMap)
+                result ?: continue
+                val rule = sourceRule.rule
+                result = when (sourceRule.mode) {
+                    Mode.Regex -> AnalyzeByRegex.getElements(
+                        result.toString(),
+                        rule.splitNotBlank("&&")
+                    )
+
+                    Mode.WebJs -> GSON.fromJsonArray<Map<String, Any?>>(getWebJsResult(rule, result)).getOrNull()
+                    Mode.Js -> evalJS(rule, result)
+                    Mode.Json -> getAnalyzeByJSonPath(result).getList(rule)
+                    Mode.XPath -> getAnalyzeByXPath(result).getElements(rule)
+                    else -> getAnalyzeByJSoup(result).getElements(rule)
+                }
+            }
+        }
+        return result
+    }
+
+    /**
      * 保存变量
      */
     private fun putRule(map: Map<String, String>) {
@@ -826,6 +856,16 @@ class AnalyzeRule(
             ?: ruleData?.getVariable(key)?.takeIf { it.isNotEmpty() }
             ?: source?.get(key)?.takeIf { it.isNotEmpty() }
             ?: ""
+    }
+
+    /**
+     * 设置本地变量(用于规则解析时传递上下文参数)
+     */
+    fun setLocal(key: String, value: Any?): AnalyzeRule {
+        if (value != null) {
+            put(key, value.toString())
+        }
+        return this
     }
 
     /**

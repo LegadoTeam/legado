@@ -45,10 +45,13 @@
     "concurrentRate": "0",
     "contentType": "audio/mpeg",
     "enabledCookieJar": false,
-    "header": "",
+    "header": "{\"Authorization\":\"Bearer W2pLIKgtWz4XunL9pja\"}",
     "id": -1,
+    "jsLib": "var fyrM = {\n  \"晓晓\": \"zh-CN-XiaoxiaoNeural\",\n  \"晓亦\": \"zh-CN-XiaoyiNeural\",\n  \"晓辰\": \"zh-CN-XiaochenNeural\",\n  \"晓涵\": \"zh-CN-XiaohanNeural\",\n  \"晓梦\": \"zh-CN-XiaomengNeural\",\n  \"晓墨\": \"zh-CN-XiaomoNeural\",\n  \"晓秋\": \"zh-CN-XiaoqiuNeural\",\n  \"晓柔\": \"zh-CN-XiaorouNeural\",\n  \"晓睿\": \"zh-CN-XiaoruiNeural\",\n  \"晓双\": \"zh-CN-XiaoshuangNeural\",\n  \"晓颜\": \"zh-CN-XiaoyanNeural\",\n  \"晓悠\": \"zh-CN-XiaoyouNeural\",\n  \"晓甄\": \"zh-CN-XiaozhenNeural\",\n  \"云溪\": \"zh-CN-YunxiNeural\",\n  \"云间\": \"zh-CN-YunjianNeural\",\n  \"云扬\": \"zh-CN-YunyangNeural\",\n  \"云枫\": \"zh-CN-YunfengNeural\",\n  \"云皓\": \"zh-CN-YunhaoNeural\",\n  \"云杰\": \"zh-CN-YunjieNeural\",\n  \"云夏\": \"zh-CN-YunxiaNeural\",\n  \"云野\": \"zh-CN-YunyeNeural\",\n  \"云泽\": \"zh-CN-YunzeNeural\"\n};\n\nfunction apiurl(speakText, speakSpeed) {\n  var info = this.source.getLoginInfoMap();\n  var fyr = info[\"发言人\"] || \"晓晓\";\n  var fyrk = fyrM[fyr] || \"zh-CN-XiaoxiaoNeural\";\n  var bodyObj = {model:\"tts-1\",input:speakText,voice:fyrk,speed:speakSpeed/10};\n  return \"http://118.31.79.174:7999/v1/audio/speech,\" + JSON.stringify({method:\"POST\",body:JSON.stringify(bodyObj)});\n}",
     "lastUpdateTime": 0,
+    "loginUi": "@js:\nvar fyrArr = Object.keys(fyrM);\nvar chars = fyrArr.map(function(k){return '\"' + k + '\"';}).join(',');\n'[{\"name\":\"发言人\",\"viewName\":\"'发言人：'\",\"action\":\"clear()\",\"type\":\"select\",\"chars\":[' + chars + '],\"style\":{\"layout_flexGrow\":1,\"layout_flexBasisPercent\":0.4}}]';",
+    "loginUrl": "function login(){}\nfunction clear(){java.clearTtsCache();}",
     "name": "Edge TTS (edge.metaxun.com)",
-    "url": "https://edge.metaxun.com/v1/audio/speech,{\"method\":\"POST\",\"body\":\"{\\\"model\\\":\\\"tts-1\\\",\\\"input\\\":\\\"{{speakText}}\\\",\\\"voice\\\":\\\"zh-CN-XiaoxiaoNeural\\\"}\"}"
+    "url": "@js:apiurl(speakText,speakSpeed);"
   }
 ]

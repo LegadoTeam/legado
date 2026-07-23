@@ -150,6 +150,7 @@
     <string name="pt_hide_status_bar">Hide status bar</string>
     <string name="ps_hide_status_bar">Hide system navigation bar when reading</string>
     <string name="read_aloud">Speech</string>
+    <string name="voice">音色</string>
     <string name="read_aloud_t">Speaking</string>
     <string name="read_aloud_s">Click to open the Reading</string>
     <string name="back_to_speaking_position">Back to speaking position</string>
@@ -1077,6 +1078,7 @@
     <string name="show_add_to_shelf_alert_title">Prompt to add to bookshelf when return</string>
     <string name="show_add_to_shelf_alert_summary">Prompt to add to bookshelf when return from reading books that are not on the bookshelf</string>
     <string name="review">Review</string>
+    <string name="review_play_audio">Play audio</string>
     <string name="rule_avatar">段评发布者头像（avatarRule）</string>
     <string name="rule_review_url">段评URL（reviewUrl）</string>
     <string name="rule_review_content">Paragraph review content（contentRule）</string>
@@ -1390,4 +1392,9 @@
     <string name="js_source_new">新建 JS 书源</string>
     <string name="js_source_edit">编辑 JS 书源</string>
     <string name="js_source_badge">JS</string>
+    <string name="review_total_count">Total: %d</string>
+    <string name="review_more_replies">%d more replies</string>
+    <string name="review_pause_audio">Pause</string>
+    <string name="audio_cache_notification_title">Audio Cache</string>
+    <string name="audio_cache_notification_text">%1$s %2$d/%3$d (Failed: %4$d)</string>
 </resources>

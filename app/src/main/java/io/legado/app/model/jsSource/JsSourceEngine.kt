@@ -63,6 +63,22 @@ class JsSourceEngine(
         return normalizeJsResult(raw, coroutineContext)
     }
 
+    data class OptionalCallResult(
+        val exists: Boolean,
+        val value: String?,
+    )
+
+    /** 调用可选顶层函数:返回 exist+value 结构体,区分"函数不存在"与"函数返回 null" */
+    fun callOptionalFunction(name: String, args: List<Pair<String, Any?>>): OptionalCallResult {
+        val scope = buildScope(args)
+        if (ScriptableObject.getProperty(scope, name) !is JsFunction) {
+            return OptionalCallResult(false, null)
+        }
+        val callExpr = "$name(${args.joinToString(", ") { it.first }})"
+        val raw = compile(callExpr).eval(scope, coroutineContext)
+        return OptionalCallResult(true, normalizeJsResult(raw, coroutineContext))
+    }
+
     private fun buildScope(args: List<Pair<String, Any?>>): ScriptBindings {
         val mainJs = source.mainJs
         if (mainJs.isNullOrBlank()) throw NoStackTraceException("mainJs 为空,不是JS源")
