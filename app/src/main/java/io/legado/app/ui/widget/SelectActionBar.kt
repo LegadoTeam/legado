@@ -1,17 +1,22 @@
 package io.legado.app.ui.widget
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
 import android.graphics.PorterDuff
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.Menu
+import android.view.MenuItem
 import android.widget.FrameLayout
 import androidx.annotation.MenuRes
 import androidx.annotation.StringRes
+import androidx.appcompat.view.SupportMenuInflater
+import androidx.appcompat.view.menu.MenuBuilder
 import androidx.appcompat.widget.PopupMenu
 import io.legado.app.R
 import io.legado.app.databinding.ViewSelectActionBarBinding
+import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.theme.TintHelper
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.bottomBackground
@@ -21,6 +26,7 @@ import io.legado.app.lib.theme.getSecondaryDisabledTextColor
 import io.legado.app.lib.theme.transparentNavBar
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.applyNavigationBarPadding
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.visible
 
 
@@ -35,7 +41,8 @@ class SelectActionBar @JvmOverloads constructor(
     private val disabledColor = context.getSecondaryDisabledTextColor(bgIsLight)
 
     private var callBack: CallBack? = null
-    private var selMenu: PopupMenu? = null
+    private var selMenu: Menu? = null
+    private var menuItemClickListener: PopupMenu.OnMenuItemClickListener? = null
     private val binding = ViewSelectActionBarBinding
         .inflate(LayoutInflater.from(context), this, true)
 
@@ -56,7 +63,7 @@ class SelectActionBar @JvmOverloads constructor(
             }
             binding.btnRevertSelection.setOnClickListener { callBack?.revertSelection() }
             binding.btnSelectActionMain.setOnClickListener { callBack?.onClickSelectBarMainAction() }
-            binding.ivMenuMore.setOnClickListener { selMenu?.show() }
+            binding.ivMenuMore.setOnClickListener { showMoreMenu() }
             applyNavigationBarPadding()
         }
     }
@@ -71,11 +78,13 @@ class SelectActionBar @JvmOverloads constructor(
         btnSelectActionMain.visible()
     }
 
+    @SuppressLint("RestrictedApi")
     fun inflateMenu(@MenuRes resId: Int): Menu? {
-        selMenu = PopupMenu(context, binding.ivMenuMore)
-        selMenu?.inflate(resId)
+        selMenu = MenuBuilder(context).apply {
+            SupportMenuInflater(context).inflate(resId, this)
+        }
         binding.ivMenuMore.visible()
-        return selMenu?.menu
+        return selMenu
     }
 
     fun setCallBack(callBack: CallBack) {
@@ -83,7 +92,55 @@ class SelectActionBar @JvmOverloads constructor(
     }
 
     fun setOnMenuItemClickListener(listener: PopupMenu.OnMenuItemClickListener) {
-        selMenu?.setOnMenuItemClickListener(listener)
+        menuItemClickListener = listener
+    }
+
+    private fun showMoreMenu() {
+        val menuItems = selMenu?.visibleItems().orEmpty()
+        if (menuItems.isEmpty()) {
+            return
+        }
+        val binding = this@SelectActionBar.binding
+        PopupAction(context).apply {
+            setVertical(true)
+            setDangerValues(
+                menuItems
+                    .filter { it.itemId in dangerMenuItemIds }
+                    .map { it.itemId.toString() }
+                    .toSet()
+            )
+            setDisabledValues(
+                menuItems
+                    .filterNot { it.isEnabled }
+                    .map { it.itemId.toString() }
+                    .toSet()
+            )
+            setItems(
+                menuItems.map { item ->
+                    SelectItem(item.title.toString(), item.itemId.toString())
+                }
+            )
+            onActionClick = { action ->
+                dismiss()
+                menuItems.firstOrNull {
+                    it.isEnabled && it.itemId.toString() == action
+                }?.let { menuItem ->
+                    menuItemClickListener?.onMenuItemClick(menuItem)
+                }
+            }
+            showAsDropDown(binding.ivMenuMore, 0, 4.dpToPx())
+        }
+    }
+
+    private fun Menu.visibleItems(): List<MenuItem> {
+        val result = arrayListOf<MenuItem>()
+        for (index in 0 until size()) {
+            val item = getItem(index)
+            if (item.isVisible) {
+                result.add(item)
+            }
+        }
+        return result
     }
 
     fun upCountView(selectCount: Int, allCount: Int) = binding.run {
@@ -122,6 +179,13 @@ class SelectActionBar @JvmOverloads constructor(
         }
         ivMenuMore.isEnabled = isClickable
         ivMenuMore.isClickable = isClickable
+    }
+
+    companion object {
+        private val dangerMenuItemIds = setOf(
+            R.id.menu_del_selection,
+            R.id.menu_del
+        )
     }
 
     interface CallBack {
