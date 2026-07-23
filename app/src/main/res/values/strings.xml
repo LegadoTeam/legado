@@ -1457,4 +1457,18 @@
     <string name="review_detail_rule_missing">Paragraph review detail rules are not configured</string>
     <string name="review_icon_color_title">Icon color</string>
     <string name="review_icon_color_reset">Icon color reset to follow theme</string>
+    <string name="bottom_bar_skin">Bottom Bar Skin</string>
+    <string name="bottom_bar_skin_summary">Customize bottom bar icons from a zip</string>
+    <string name="bottom_bar_skin_assign">Assign Icons</string>
+    <string name="bottom_bar_skin_name">Skin name</string>
+    <string name="bottom_bar_skin_slot_selected">Selected</string>
+    <string name="bottom_bar_skin_slot_normal">Unselected</string>
+    <string name="bottom_bar_skin_no_images">No images in the zip</string>
+    <string name="bottom_bar_skin_need_selected">Set a selected icon for at least one button</string>
+    <string name="bottom_bar_skin_save">Save</string>
+    <string name="bottom_bar_skin_pick_image_desc">Image</string>
+    <string name="bottom_bar_skin_default">Default</string>
+    <string name="bottom_bar_skin_import">Import Skin</string>
+    <string name="bottom_bar_skin_invalid">Invalid skin file</string>
+    <string name="bottom_bar_skin_delete_confirm">Delete this skin?</string>
 </resources>
