@@ -1,5 +1,6 @@
 package io.legado.app.help
 
+import java.net.URI
 import kotlin.random.Random
 
 object SourceSharePassphrase {
@@ -9,6 +10,7 @@ object SourceSharePassphrase {
     private const val EXPIRY_PRECISION = 1_000_000L
     private const val HTTPS_MARKER = "#L:"
     private const val HTTP_MARKER = "#L0:"
+    private const val PREFIX = "复制口令到阅读导入"
     private const val CUSTOM_WORD = "Legado"
 
     private val mappings = linkedMapOf(
@@ -34,6 +36,7 @@ object SourceSharePassphrase {
     private val reverseMappings = mappings.flatMap { (original, replacements) ->
         replacements.map { replacement -> replacement to original }
     }.sortedByDescending { it.first.length }
+    private val unsafeUrlTokens = mappings.values.flatten() + listOf("！", "©", "¥", "^")
 
     enum class Type(val code: String) {
         BOOK_SOURCE("sy"),
@@ -62,13 +65,17 @@ object SourceSharePassphrase {
         data object Expired : DecodeResult
     }
 
+    fun canEncode(url: String): Boolean {
+        return isSupportedUrl(url) && unsafeUrlTokens.none(url::contains)
+    }
+
     fun encode(
         url: String,
         type: Type,
         expiryDays: Int,
         time: Long = System.currentTimeMillis(),
     ): String {
-        require(isSupportedUrl(url)) { "Only HTTP and HTTPS links can be shared" }
+        require(canEncode(url)) { "URL cannot be safely shared as a passphrase" }
         val random = Random(time)
         val encodedUrl = buildString {
             var index = 0
@@ -91,20 +98,23 @@ object SourceSharePassphrase {
             time + safeExpiryDays * MILLIS_PER_DAY
         }
         val expiryToken = expiresAt.toString().take(7)
-        return "复制口令到阅读导入${encodedUrl}！${type.code}©${expiryToken}¥${CUSTOM_WORD}^"
+        return "$PREFIX${encodedUrl}！${type.code}©${expiryToken}¥${CUSTOM_WORD}^"
     }
 
     fun decode(
         text: String,
         time: Long = System.currentTimeMillis(),
     ): DecodeResult {
-        val markerIndex = listOf(HTTP_MARKER, HTTPS_MARKER)
-            .map { text.indexOf(it) }
-            .filter { it >= 0 }
-            .minOrNull()
-            ?: return DecodeResult.NotFound
-        val typeSeparator = text.indexOf('！', markerIndex)
-        if (typeSeparator <= markerIndex) return DecodeResult.Invalid
+        val prefixIndex = text.indexOf(PREFIX)
+        if (prefixIndex < 0) return DecodeResult.NotFound
+        val urlStart = prefixIndex + PREFIX.length
+        if (!text.startsWith(HTTPS_MARKER, urlStart) &&
+            !text.startsWith(HTTP_MARKER, urlStart)
+        ) {
+            return DecodeResult.Invalid
+        }
+        val typeSeparator = text.indexOf('！', urlStart)
+        if (typeSeparator <= urlStart) return DecodeResult.Invalid
         val metadataSeparator = text.indexOf('©', typeSeparator + 1)
         if (metadataSeparator <= typeSeparator + 1) return DecodeResult.Invalid
         val expirySeparator = text.indexOf('¥', metadataSeparator + 1)
@@ -115,12 +125,15 @@ object SourceSharePassphrase {
         val type = Type.fromCode(text.substring(typeSeparator + 1, metadataSeparator))
             ?: return DecodeResult.Invalid
         val expiryToken = text.substring(metadataSeparator + 1, expirySeparator)
-        val expiresAt = expiryToken.toLongOrNull()?.let {
-            runCatching { Math.multiplyExact(it, EXPIRY_PRECISION) }.getOrNull()
-        } ?: return DecodeResult.Invalid
+        if (expiryToken != "0" &&
+            (expiryToken.length != 7 || expiryToken.any { it !in '0'..'9' })
+        ) {
+            return DecodeResult.Invalid
+        }
+        val expiresAt = expiryToken.toLong() * EXPIRY_PRECISION
         if (expiresAt > 0 && expiresAt < time) return DecodeResult.Expired
 
-        val url = decodeUrl(text.substring(markerIndex, typeSeparator))
+        val url = decodeUrl(text.substring(urlStart, typeSeparator))
         if (!isSupportedUrl(url)) return DecodeResult.Invalid
         return DecodeResult.Success(
             Value(
@@ -147,7 +160,7 @@ object SourceSharePassphrase {
     }
 
     private fun isSupportedUrl(url: String): Boolean {
-        return url.startsWith("https://") && url.length > "https://".length ||
-            url.startsWith("http://") && url.length > "http://".length
+        if (!url.startsWith("https://") && !url.startsWith("http://")) return false
+        return runCatching { URI(url).toURL().host.isNotBlank() }.getOrDefault(false)
     }
 }

@@ -13,6 +13,7 @@ fun AlertBuilder<DialogInterface>.sourceSharePassphraseButton(
     url: String,
     type: SourceSharePassphrase.Type,
 ) {
+    if (!SourceSharePassphrase.canEncode(url)) return
     neutralButton(R.string.shibboleth) {
         val passphrase = SourceSharePassphrase.encode(
             url = url,
