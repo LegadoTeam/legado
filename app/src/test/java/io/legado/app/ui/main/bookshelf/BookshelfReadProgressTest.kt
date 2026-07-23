@@ -119,13 +119,29 @@ class BookshelfReadProgressTest {
         )
     }
 
+    @Test
+    fun `continue reading query includes every shelf media type`() {
+        val source = projectFile("src/main/java/io/legado/app/data/dao/BookDao.kt").readText()
+        val propertyIndex = source.indexOf("val lastReadBookOnShelf")
+        val queryStart = source.lastIndexOf("@get:Query(", propertyIndex)
+        val query = source.substring(queryStart, propertyIndex)
+
+        assertTrue(query.contains("type & \${BookType.notShelf} = 0"))
+        assertFalse(query.replace("BookType.notShelf", "").contains("BookType."))
+        assertTrue(query.contains("durChapterIndex > 0 OR durChapterPos > 0"))
+        assertTrue(query.contains("durChapterTime DESC limit 1"))
+    }
+
     private fun parseProjectXml(pathInApp: String): Document {
-        val file = listOf(File(pathInApp), File("app/$pathInApp"))
-            .firstOrNull { it.isFile }
-            ?: error("Missing project file: $pathInApp")
         return DocumentBuilderFactory.newInstance().apply {
             isNamespaceAware = true
-        }.newDocumentBuilder().parse(file)
+        }.newDocumentBuilder().parse(projectFile(pathInApp))
+    }
+
+    private fun projectFile(pathInApp: String): File {
+        return listOf(File(pathInApp), File("app/$pathInApp"))
+            .firstOrNull { it.isFile }
+            ?: error("Missing project file: $pathInApp")
     }
 
     private fun Document.findElementById(id: String): Element =
