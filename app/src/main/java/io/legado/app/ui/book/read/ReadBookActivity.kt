@@ -1072,12 +1072,14 @@ class ReadBookActivity : BaseReadBookActivity(),
      * 内容加载完成
      */
     override fun contentLoadFinish() {
-        if (intent.getBooleanExtra("readAloud", false)) {
-            intent.removeExtra("readAloud")
-            ReadBook.readAloud()
+        lifecycleScope.launch(Main.immediate) {
+            if (intent.getBooleanExtra("readAloud", false)) {
+                intent.removeExtra("readAloud")
+                ReadBook.readAloud()
+            }
+            loadStates = true
+            loadReviewSummaryIfNeeded()
         }
-        loadStates = true
-        loadReviewSummaryIfNeeded()
     }
 
     /**
@@ -1778,7 +1780,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             }
         )
         reviewSummaryAppliedKey = key
-        ReadBook.loadContent(resetPageOffset = false)
+        binding.readView.upContent(relativePosition = 0, resetPageOffset = false)
     }
 
     private fun prefetchAdjacentReviewSummary(
