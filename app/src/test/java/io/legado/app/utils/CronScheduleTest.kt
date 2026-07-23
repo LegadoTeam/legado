@@ -29,6 +29,8 @@ class CronScheduleTest {
         assertNull(CronSchedule.parse("0 0 * * * extra"))
         assertNull(CronSchedule.parse("60 0 * * *"))
         assertNull(CronSchedule.parse("*/0 * * * *"))
+        assertNull(CronSchedule.parse("*/x * * * *"))
+        assertNull(CronSchedule.parse("*/ * * * *"))
     }
 
     @Test

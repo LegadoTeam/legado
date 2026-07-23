@@ -100,7 +100,11 @@ class CronSchedule private constructor(
                 if (segment.isBlank()) return null
                 val stepParts = segment.split('/')
                 if (stepParts.size > 2) return null
-                val step = stepParts.getOrNull(1)?.toIntOrNull() ?: 1
+                val step = if (stepParts.size == 1) {
+                    1
+                } else {
+                    stepParts[1].toIntOrNull() ?: return null
+                }
                 if (step <= 0) return null
                 val base = stepParts[0]
                 val range = when {
