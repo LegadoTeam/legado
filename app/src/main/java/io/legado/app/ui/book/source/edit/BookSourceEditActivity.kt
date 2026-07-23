@@ -6,6 +6,8 @@ import android.os.Build
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
+import android.widget.AdapterView
 import android.widget.EditText
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -290,6 +292,7 @@ class BookSourceEditActivity :
     }
 
     private fun initView() {
+        initOptionPanel()
         binding.tabLayout.addTab(binding.tabLayout.newTab().apply {
             setText(R.string.source_tab_base)
         })
@@ -349,6 +352,59 @@ class BookSourceEditActivity :
         }
     }
 
+    private fun initOptionPanel() {
+        binding.optionsHeader.setOnClickListener {
+            updateOptionPanel(binding.optionsContent.visibility != View.VISIBLE)
+        }
+        listOf(
+            binding.cbIsEnable,
+            binding.cbIsEnableExplore,
+            binding.cbIsEnableCookie,
+            binding.cbIsEnableReview,
+            binding.cbIsEventListener,
+            binding.cbIsCustomButton
+        ).forEach { checkBox ->
+            checkBox.setOnCheckedChangeListener { _, _ -> updateOptionPanel() }
+        }
+        binding.spType.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(
+                parent: AdapterView<*>?,
+                view: View?,
+                position: Int,
+                id: Long
+            ) = updateOptionPanel()
+
+            override fun onNothingSelected(parent: AdapterView<*>?) = updateOptionPanel()
+        }
+        updateOptionPanel(false)
+    }
+
+    private fun updateOptionPanel(expanded: Boolean = binding.optionsContent.visibility == View.VISIBLE) {
+        binding.optionsContent.visibility = if (expanded) View.VISIBLE else View.GONE
+        binding.ivOptionsExpand.setImageResource(
+            if (expanded) R.drawable.ic_expand_less else R.drawable.ic_expand_more
+        )
+        val summary = mutableListOf(
+            binding.spType.selectedItem?.toString() ?: getString(R.string.book_type)
+        )
+        listOf(
+            getString(R.string.is_enable) to binding.cbIsEnable.isChecked,
+            getString(R.string.discovery) to binding.cbIsEnableExplore.isChecked,
+            getString(R.string.auto_save_cookie) to binding.cbIsEnableCookie.isChecked,
+            getString(R.string.review) to binding.cbIsEnableReview.isChecked,
+            getString(R.string.is_event_listener) to binding.cbIsEventListener.isChecked,
+            getString(R.string.custom_button) to binding.cbIsCustomButton.isChecked
+        ).forEach { (label, checked) ->
+            if (checked) summary.add(label)
+        }
+        binding.tvOptionsSummary.text = summary.joinToString(" | ")
+        val action = getString(
+            if (expanded) R.string.book_intro_collapse else R.string.book_intro_expand
+        )
+        binding.optionsHeader.contentDescription =
+            "${getString(R.string.setting)}, ${binding.tvOptionsSummary.text}, $action"
+    }
+
     override fun finish() {
         val source = getSource()
         if (!source.equal(viewModel.bookSource ?: BookSource())) {
@@ -402,6 +458,7 @@ class BookSourceEditActivity :
             binding.cbIsEventListener.isChecked = it.eventListener
             binding.cbIsCustomButton.isChecked = it.customButton
         }
+        updateOptionPanel()
         // 基本信息
         sourceEntities.clear()
         sourceEntities.apply {
