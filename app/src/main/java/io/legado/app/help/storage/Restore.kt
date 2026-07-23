@@ -10,6 +10,7 @@ import io.legado.app.constant.AppConst.androidId
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
+import io.legado.app.data.entities.AutoTaskRule
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookSource
@@ -35,6 +36,7 @@ import io.legado.app.help.config.ThemeConfig
 import io.legado.app.model.VideoPlay.VIDEO_PREF_NAME
 import io.legado.app.model.BookCover
 import io.legado.app.model.localBook.LocalBook
+import io.legado.app.service.AutoTaskScheduler
 import io.legado.app.utils.ACache
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
@@ -101,6 +103,7 @@ object Restore {
 
     private suspend fun restore(path: String) {
         val aes = BackupAES()
+        val restoredAutoTasks = fileToListT<AutoTaskRule>(path, "autoTask.json")
         fileToListT<Book>(path, "bookshelf.json")?.let {
             it.forEach { book ->
                 book.upType()
@@ -309,6 +312,10 @@ object Restore {
                     AppLog.put("恢复阅读背景图片出错\n${it.localizedMessage}", it)
                 }
         }
+        if (!restoredAutoTasks.isNullOrEmpty()) {
+            appDb.autoTaskRuleDao.upsert(*restoredAutoTasks.toTypedArray())
+        }
+        AutoTaskScheduler.refresh(appCtx)
         appCtx.toastOnUi(R.string.restore_success)
         withContext(Main) {
             delay(100)
