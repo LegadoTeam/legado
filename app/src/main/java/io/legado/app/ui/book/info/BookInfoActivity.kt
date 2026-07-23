@@ -1168,18 +1168,12 @@ class BookInfoActivity :
             book.chapterInVolumeIndex = chapterInVolumeIndex
             if (!viewModel.inBookshelf) {
                 book.addType(BookType.notShelf)
-                viewModel.saveBook(book) {
-                    viewModel.saveChapterList {
-                        startReadActivity(book)
-                    }
+            }
+            lifecycleScope.launch {
+                withContext(IO) {
+                    appDb.bookDao.update(book)
                 }
-            } else {
-                lifecycleScope.launch {
-                    withContext(IO) {
-                        appDb.bookDao.update(book)
-                    }
-                    startReadActivity(book)
-                }
+                startReadActivity(book)
             }
         }
     }

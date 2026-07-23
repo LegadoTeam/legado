@@ -47,7 +47,7 @@ class BookInfoTocEntryTest {
     }
 
     @Test
-    fun `toc result saves temporary books before reading and preserves all progress`() {
+    fun `toc result preserves the selected chapter before reading`() {
         val activity = readProjectFile(
             "src/main/java/io/legado/app/ui/book/info/BookInfoActivity.kt"
         )
@@ -57,11 +57,6 @@ class BookInfoTocEntryTest {
         val readFlow = activity
             .substringAfter("private fun readFromChapter(")
             .substringBefore("private fun showWebFileDownloadAlert")
-        val notShelfFlow = readFlow
-            .substringAfter("if (!viewModel.inBookshelf) {")
-            .substringBefore("} else {")
-        val shelfFlow = readFlow.substringAfter("} else {")
-
         assertTrue(callback.contains("index = it[0] as Int"))
         assertTrue(callback.contains("pos = it[1] as Int"))
         assertTrue(callback.contains("changed = it[2] as Boolean"))
@@ -72,13 +67,12 @@ class BookInfoTocEntryTest {
         assertTrue(readFlow.contains("chapterChanged = changed"))
         assertTrue(readFlow.contains("book.durVolumeIndex = volumeIndex"))
         assertTrue(readFlow.contains("book.chapterInVolumeIndex = chapterInVolumeIndex"))
-        assertTrue(notShelfFlow.contains("book.addType(BookType.notShelf)"))
-        assertTrue(notShelfFlow.contains("viewModel.saveBook(book)"))
-        assertTrue(notShelfFlow.contains("viewModel.saveChapterList"))
-        assertTrue(notShelfFlow.contains("startReadActivity(book)"))
-        assertTrue(shelfFlow.contains("withContext(IO)"))
-        assertTrue(shelfFlow.contains("appDb.bookDao.update(book)"))
-        assertTrue(shelfFlow.contains("startReadActivity(book)"))
+        assertTrue(readFlow.contains("book.addType(BookType.notShelf)"))
+        assertTrue(!readFlow.contains("viewModel.saveBook(book)"))
+        assertTrue(!readFlow.contains("viewModel.saveChapterList"))
+        assertTrue(readFlow.contains("withContext(IO)"))
+        assertTrue(readFlow.contains("appDb.bookDao.update(book)"))
+        assertTrue(readFlow.contains("startReadActivity(book)"))
     }
 
     private fun readProjectFile(pathInApp: String): String {
