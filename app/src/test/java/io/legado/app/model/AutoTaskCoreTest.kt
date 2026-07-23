@@ -3,6 +3,7 @@ package io.legado.app.model
 import com.script.rhino.RhinoInterruptError
 import com.google.gson.annotations.SerializedName
 import io.legado.app.data.entities.AutoTaskRule
+import io.legado.app.data.entities.BookChapter
 import kotlinx.coroutines.CancellationException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -178,6 +179,28 @@ class AutoTaskCoreTest {
         assertEquals(
             AutoTaskProtocol.MAX_NOTIFICATION_CONTENT_LENGTH,
             AutoTaskProtocol.trimNotificationContent("x".repeat(8_000)).length
+        )
+    }
+
+    @Test
+    fun volumeRowsDoNotAffectNewChapterCount() {
+        val volume = BookChapter(title = "Volume", isVolume = true)
+        val chapter1 = BookChapter(title = "Chapter 1")
+        val chapter2 = BookChapter(title = "Chapter 2")
+
+        assertEquals(
+            0,
+            AutoTaskProtocol.countNewChapters(
+                before = listOf(chapter1),
+                after = listOf(volume, chapter1)
+            )
+        )
+        assertEquals(
+            1,
+            AutoTaskProtocol.countNewChapters(
+                before = listOf(volume, chapter1),
+                after = listOf(chapter1, chapter2)
+            )
         )
     }
 }

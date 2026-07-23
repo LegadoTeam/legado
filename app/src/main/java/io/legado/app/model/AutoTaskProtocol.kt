@@ -99,9 +99,9 @@ object AutoTaskProtocol {
         require(bookUrl.isNotBlank()) { "refreshToc requires bookUrl" }
         val book = appDb.bookDao.getBook(bookUrl)
             ?: error("refreshToc book was not found")
-        val beforeCount = appDb.bookChapterDao.getChapterList(bookUrl).size
+        val chaptersBefore = appDb.bookChapterDao.getChapterList(bookUrl)
         val chapters = refreshBookToc(book)
-        val newCount = (chapters.size - beforeCount).coerceAtLeast(0)
+        val newCount = countNewChapters(chaptersBefore, chapters)
 
         val notify = map(action, "notify")
         val notifyEnabled = notify?.let { boolean(it, "enable", true) } ?: false
@@ -270,6 +270,14 @@ object AutoTaskProtocol {
     internal fun bookUpdateNotificationId(bookUrl: String): Int {
         return NotificationId.AutoTaskBookUpdateBase +
             (bookUrl.hashCode() and Int.MAX_VALUE) % 10_000
+    }
+
+    internal fun countNewChapters(
+        before: List<BookChapter>,
+        after: List<BookChapter>
+    ): Int {
+        return (after.count { !it.isVolume } - before.count { !it.isVolume })
+            .coerceAtLeast(0)
     }
 
     private fun latestChapterTitle(chapters: List<BookChapter>): String? {
