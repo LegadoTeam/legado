@@ -3,7 +3,6 @@ package io.legado.app.ui.main.rss
 import android.content.Context
 import android.view.View
 import android.view.ViewGroup
-import androidx.appcompat.widget.PopupMenu
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import com.bumptech.glide.request.RequestOptions
@@ -14,6 +13,7 @@ import io.legado.app.data.entities.RssSource
 import io.legado.app.databinding.ItemRssBinding
 import io.legado.app.help.glide.ImageLoader
 import io.legado.app.help.glide.OkHttpModelLoader
+import io.legado.app.ui.widget.popupActionMenu
 import splitties.views.onLongClick
 
 class RssAdapter(
@@ -62,20 +62,22 @@ class RssAdapter(
     }
 
     private fun showMenu(view: View, rssSource: RssSource) {
-        val popupMenu = PopupMenu(context, view)
-        popupMenu.inflate(R.menu.rss_main_item)
-        popupMenu.menu.findItem(R.id.menu_login).isVisible = !rssSource.loginUrl.isNullOrBlank()
-        popupMenu.setOnMenuItemClickListener {
-            when (it.itemId) {
-                R.id.menu_edit -> callBack.edit(rssSource)
-                R.id.menu_top -> callBack.toTop(rssSource)
-                R.id.menu_login -> callBack.login(rssSource)
-                R.id.menu_del -> callBack.del(rssSource)
-                R.id.menu_disable -> callBack.disable(rssSource)
+        popupActionMenu(context) {
+            item(context.getString(R.string.edit), "edit")
+            item(context.getString(R.string.to_top), "top")
+            item(context.getString(R.string.login), "login", !rssSource.loginUrl.isNullOrBlank())
+            item(context.getString(R.string.disable_source), "disable")
+            item(context.getString(R.string.delete), "delete")
+            danger("delete")
+        }.show(view) { action ->
+            when (action) {
+                "edit" -> callBack.edit(rssSource)
+                "top" -> callBack.toTop(rssSource)
+                "login" -> callBack.login(rssSource)
+                "disable" -> callBack.disable(rssSource)
+                "delete" -> callBack.del(rssSource)
             }
-            true
         }
-        popupMenu.show()
     }
 
     interface CallBack {
