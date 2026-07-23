@@ -38,6 +38,9 @@ abstract class BaseAssociationViewModel(application: Application) : BaseViewMode
             map.containsKey("name") && map.containsKey("rule") ->
                 successLive.postValue("txtRule" to uri.toString())
 
+            map.containsKey("cron") && map.containsKey("script") ->
+                successLive.postValue("autoTask" to uri.toString())
+
             map.containsKey("name") && map.containsKey("url") ->
                 successLive.postValue("httpTts" to uri.toString())
 

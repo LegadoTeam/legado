@@ -1478,6 +1478,10 @@
     <string name="auto_task_service">Run automatic tasks</string>
     <string name="auto_task_service_desc">Persist schedules across restarts; Android may defer execution</string>
     <string name="auto_task_add">Add task</string>
+    <string name="import_auto_task">Import automatic tasks</string>
+    <string name="import_status_new">New</string>
+    <string name="import_status_update">Update</string>
+    <string name="import_status_exist">Exists</string>
     <string name="auto_task_edit">Edit automatic task</string>
     <string name="auto_task_debug">Debug task</string>
     <string name="auto_task_name">Task name</string>
