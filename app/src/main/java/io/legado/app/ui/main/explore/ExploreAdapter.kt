@@ -12,7 +12,6 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
 import android.widget.LinearLayout
-import android.widget.PopupMenu
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatSpinner
@@ -39,6 +38,7 @@ import io.legado.app.help.source.clearExploreKindsCache
 import io.legado.app.help.source.exploreKinds
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.ui.login.SourceLoginActivity
+import io.legado.app.ui.widget.popupActionMenu
 import io.legado.app.ui.login.SourceLoginJsExtensions
 import io.legado.app.ui.widget.dialog.TextDialog
 import io.legado.app.ui.widget.text.AccentTextView
@@ -639,26 +639,29 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
 
     private fun showMenu(binding: ItemFindBookBinding, position: Int): Boolean {
         val source = getItem(position) ?: return true
-        val popupMenu = PopupMenu(context, binding.llTitle)
-        popupMenu.inflate(R.menu.explore_item)
-        popupMenu.menu.findItem(R.id.menu_login).isVisible = source.hasLoginUrl
-        popupMenu.setOnMenuItemClickListener {
-            when (it.itemId) {
-                R.id.menu_edit -> callBack.editSource(source.bookSourceUrl)
-                R.id.menu_top -> callBack.toTop(source)
-                R.id.menu_search -> callBack.searchBook(source)
-                R.id.menu_login -> context.startActivity<SourceLoginActivity> {
+        popupActionMenu(context) {
+            item(context.getString(R.string.edit), "edit")
+            item(context.getString(R.string.to_top), "top")
+            item(context.getString(R.string.login), "login", source.hasLoginUrl)
+            item(context.getString(R.string.search), "search")
+            item(context.getString(R.string.refresh), "refresh")
+            item(context.getString(R.string.delete), "delete")
+            danger("delete")
+        }.show(binding.llTitle) { action ->
+            when (action) {
+                "edit" -> callBack.editSource(source.bookSourceUrl)
+                "top" -> callBack.toTop(source)
+                "search" -> callBack.searchBook(source)
+                "login" -> context.startActivity<SourceLoginActivity> {
                     putExtra("type", "bookSource")
                     putExtra("key", source.bookSourceUrl)
                 }
 
-                R.id.menu_refresh -> refreshExplore(source, position, binding)
+                "refresh" -> refreshExplore(source, position, binding)
 
-                R.id.menu_del -> callBack.deleteSource(source)
+                "delete" -> callBack.deleteSource(source)
             }
-            true
         }
-        popupMenu.show()
         return true
     }
 
