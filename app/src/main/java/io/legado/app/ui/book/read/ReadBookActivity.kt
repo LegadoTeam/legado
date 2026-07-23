@@ -18,7 +18,6 @@ import android.view.View
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.widget.PopupMenu
 import androidx.core.view.get
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
@@ -118,13 +117,13 @@ import io.legado.app.ui.replace.ReplaceRuleActivity
 import io.legado.app.ui.replace.edit.ReplaceEditActivity
 import io.legado.app.ui.widget.PopupAction
 import io.legado.app.ui.widget.dialog.PhotoDialog
+import io.legado.app.ui.widget.popupActionMenu
 import io.legado.app.utils.ACache
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.Debounce
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.StartActivityContract
-import io.legado.app.utils.applyOpenTint
 import io.legado.app.utils.buildMainHandler
 import io.legado.app.utils.dismissDialogFragment
 import io.legado.app.utils.dpToPx
@@ -169,7 +168,6 @@ class ReadBookActivity : BaseReadBookActivity(),
     ReadView.CallBack,
     TextActionMenu.CallBack,
     ContentTextView.CallBack,
-    PopupMenu.OnMenuItemClickListener,
     ReadMenu.CallBack,
     SearchMenu.CallBack,
     ReadAloudDialog.CallBack,
@@ -436,18 +434,10 @@ class ReadBookActivity : BaseReadBookActivity(),
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.book_read, menu)
         menu.iconItemOnLongClick(R.id.menu_change_source) {
-            PopupMenu(this, it).apply {
-                inflate(R.menu.book_read_change_source)
-                this.menu.applyOpenTint(this@ReadBookActivity)
-                setOnMenuItemClickListener(this@ReadBookActivity)
-            }.show()
+            showChangeSourceMenu(it)
         }
         menu.iconItemOnLongClick(R.id.menu_refresh) {
-            PopupMenu(this, it).apply {
-                inflate(R.menu.book_read_refresh)
-                this.menu.applyOpenTint(this@ReadBookActivity)
-                setOnMenuItemClickListener(this@ReadBookActivity)
-            }.show()
+            showRefreshMenu(it)
         }
         binding.readMenu.refreshMenuColorFilter()
         return super.onCompatCreateOptionsMenu(menu)
@@ -502,67 +492,96 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
     }
 
+    private fun showChangeSourceMenu(anchor: View) {
+        popupActionMenu(this) {
+            item(getString(R.string.chapter_change_source), "chapter")
+            item(getString(R.string.book_change_source), "book")
+        }.show(anchor) { action ->
+            when (action) {
+                "chapter" -> showChapterChangeSource()
+                "book" -> showBookChangeSource()
+            }
+        }
+    }
+
+    private fun showRefreshMenu(anchor: View) {
+        popupActionMenu(this) {
+            item(getString(R.string.menu_refresh_dur), "dur")
+            item(getString(R.string.menu_refresh_after), "after")
+            item(getString(R.string.menu_refresh_all), "all")
+        }.show(anchor) { action ->
+            when (action) {
+                "dur" -> refreshDurChapter()
+                "after" -> refreshAfterChapters()
+                "all" -> refreshAllChapters()
+            }
+        }
+    }
+
+    private fun showBookChangeSource() {
+        binding.readMenu.runMenuOut()
+        ReadBook.book?.let {
+            showDialogFragment(ChangeBookSourceDialog(it.name, it.author))
+        }
+    }
+
+    private fun showChapterChangeSource() {
+        lifecycleScope.launch {
+            val book = ReadBook.book ?: return@launch
+            val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, ReadBook.durChapterIndex)
+                ?: return@launch
+            binding.readMenu.runMenuOut()
+            showDialogFragment(
+                ChangeChapterSourceDialog(book.name, book.author, chapter.index, chapter.title)
+            )
+        }
+    }
+
+    private fun refreshDurChapter() {
+        resetReviewSummaryState()
+        if (ReadBook.bookSource == null) {
+            upContent()
+        } else {
+            ReadBook.book?.let {
+                ReadBook.curTextChapter = null
+                binding.readView.upContent()
+                viewModel.refreshContentDur(it)
+            }
+        }
+    }
+
+    private fun refreshAfterChapters() {
+        resetReviewSummaryState()
+        if (ReadBook.bookSource == null) {
+            upContent()
+        } else {
+            ReadBook.book?.let {
+                ReadBook.clearTextChapter()
+                binding.readView.upContent()
+                viewModel.refreshContentAfter(it)
+            }
+        }
+    }
+
+    private fun refreshAllChapters() {
+        if (ReadBook.bookSource == null) {
+            resetReviewSummaryState()
+            upContent()
+        } else {
+            ReadBook.book?.let {
+                refreshContentAll(it)
+            }
+        }
+    }
+
     /**
      * 菜单
      */
     override fun onCompatOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
-            R.id.menu_change_source,
-            R.id.menu_book_change_source -> {
-                binding.readMenu.runMenuOut()
-                ReadBook.book?.let {
-                    showDialogFragment(ChangeBookSourceDialog(it.name, it.author))
-                }
-            }
+            R.id.menu_change_source -> showBookChangeSource()
 
-            R.id.menu_chapter_change_source -> lifecycleScope.launch {
-                val book = ReadBook.book ?: return@launch
-                val chapter =
-                    appDb.bookChapterDao.getChapter(book.bookUrl, ReadBook.durChapterIndex)
-                        ?: return@launch
-                binding.readMenu.runMenuOut()
-                showDialogFragment(
-                    ChangeChapterSourceDialog(book.name, book.author, chapter.index, chapter.title)
-                )
-            }
-
-            R.id.menu_refresh,
-            R.id.menu_refresh_dur -> {
-                resetReviewSummaryState()
-                if (ReadBook.bookSource == null) {
-                    upContent()
-                } else {
-                    ReadBook.book?.let {
-                        ReadBook.curTextChapter = null
-                        binding.readView.upContent()
-                        viewModel.refreshContentDur(it)
-                    }
-                }
-            }
-
-            R.id.menu_refresh_after -> {
-                resetReviewSummaryState()
-                if (ReadBook.bookSource == null) {
-                    upContent()
-                } else {
-                    ReadBook.book?.let {
-                        ReadBook.clearTextChapter()
-                        binding.readView.upContent()
-                        viewModel.refreshContentAfter(it)
-                    }
-                }
-            }
-
-            R.id.menu_refresh_all -> {
-                if (ReadBook.bookSource == null) {
-                    resetReviewSummaryState()
-                    upContent()
-                } else {
-                    ReadBook.book?.let {
-                        refreshContentAll(it)
-                    }
-                }
-            }
+            R.id.menu_refresh -> refreshDurChapter()
 
             R.id.menu_download -> showDownloadDialog()
             R.id.menu_add_bookmark -> addBookmark()
@@ -698,10 +717,6 @@ class ReadBookActivity : BaseReadBookActivity(),
             reviewSummaryPrefetchingKeys.clear()
         }
         ChapterProvider.clearReviewProviders()
-    }
-
-    override fun onMenuItemClick(item: MenuItem): Boolean {
-        return onCompatOptionsItemSelected(item)
     }
 
     /**
