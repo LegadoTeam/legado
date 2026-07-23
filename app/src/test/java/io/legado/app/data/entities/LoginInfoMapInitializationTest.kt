@@ -139,11 +139,12 @@ class LoginInfoMapInitializationTest {
         override var loginUrl: String? = null
         override var loginUi: String? = """@js:
             var nestedLoginInfo = source.getLoginInfoMap();
-            JSON.stringify([{
+            var suffix = "default";
+            [{
                 name: "token",
                 type: "text",
-                default: nestedLoginInfo.get("token") || "rhino-default"
-            }]);
+                default: nestedLoginInfo.get("token") || "rhino-" + suffix
+            }];
         """.trimIndent()
         override var header: String? = null
         override var enabledCookieJar: Boolean? = true

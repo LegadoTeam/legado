@@ -24,6 +24,7 @@ import io.legado.app.databinding.ItemSourceEditBinding
 import io.legado.app.databinding.ItemSelectorSingleBinding
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
+import io.legado.app.model.jsSource.JsSourceEngine
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.utils.GSON
 import io.legado.app.utils.applyTint
@@ -237,11 +238,13 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
         return evaluateLoginUiScript(
             block = {
                 runScriptWithContext {
-                    source.evalJS("$loginJS\n$jsStr") {
-                        put("result", result)
-                        put("book", viewModel.book)
-                        put("chapter", viewModel.chapter)
-                    }.toString()
+                    JsSourceEngine.normalizeJsResult(
+                        source.evalJS("$loginJS\n$jsStr") {
+                            put("result", result)
+                            put("book", viewModel.book)
+                            put("chapter", viewModel.chapter)
+                        }
+                    ).orEmpty()
                 }
             },
             onFailure = { error ->
