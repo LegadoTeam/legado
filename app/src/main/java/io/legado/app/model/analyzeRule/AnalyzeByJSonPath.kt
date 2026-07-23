@@ -8,7 +8,10 @@ import io.legado.app.utils.printOnDebug
 
 @Suppress("RegExpRedundantEscape")
 @Keep
-class AnalyzeByJSonPath(json: Any) {
+class AnalyzeByJSonPath(
+    json: Any,
+    private val onError: ((Exception) -> Unit)? = null,
+) {
 
     companion object {
 
@@ -49,7 +52,7 @@ class AnalyzeByJSonPath(json: Any) {
                         ob.toString()
                     }
                 } catch (e: Exception) {
-                    e.printOnDebug()
+                    onError?.invoke(e) ?: e.printOnDebug()
                 }
             }
             return result
@@ -86,7 +89,7 @@ class AnalyzeByJSonPath(json: Any) {
                         result.add(obj.toString())
                     }
                 } catch (e: Exception) {
-                    e.printOnDebug()
+                    onError?.invoke(e) ?: e.printOnDebug()
                 }
             } else {
                 result.add(st)
@@ -136,7 +139,7 @@ class AnalyzeByJSonPath(json: Any) {
                 try {
                     return it.read<ArrayList<Any>>(rules[0])
                 } catch (e: Exception) {
-                    e.printOnDebug()
+                    onError?.invoke(e) ?: e.printOnDebug()
                 }
             }
         } else {
