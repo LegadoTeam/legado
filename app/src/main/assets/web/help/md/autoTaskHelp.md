@@ -2,7 +2,7 @@
 
 自动任务按五段 Cron 表达式运行 JavaScript：
 
-```text
+```txt
 分钟 小时 日期 月份 星期
 ```
 
@@ -10,7 +10,7 @@
 
 示例：
 
-```text
+```txt
 */30 * * * *    每 30 分钟
 0 9 * * 1-5     周一至周五 09:00
 0 9 1,15 * *    每月 1 日和 15 日 09:00
@@ -22,13 +22,13 @@
 
 脚本可返回一个动作对象、动作数组，或带有 `actions` 数组的对象。`notify` 用于发送通知，`{task}` 和 `{time}` 会替换为任务名与执行时间：
 
-```json
+```js
 {"type":"notify","title":"任务完成","content":"{task} 已于 {time} 完成"}
 ```
 
 `refreshToc` 按书籍地址刷新目录，并可在新增章节达到指定数量时通知：
 
-```json
+```js
 {"type":"refreshToc","bookUrl":"BOOK_URL","notify":{"enable":true,"minCount":1}}
 ```
 
