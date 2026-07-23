@@ -1,5 +1,9 @@
 package io.legado.app.config
 
+import io.legado.app.data.entities.AutoTaskRule
+import io.legado.app.utils.GSON
+import io.legado.app.utils.fromJsonArray
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -117,6 +121,54 @@ class AutoTaskPersistenceContractTest {
         assertTrue(runner.contains("runScriptWithContext {"))
         assertTrue(runner.contains("error.autoTaskCancellation()?.let { throw it }"))
         assertTrue(runner.contains("is RhinoInterruptError -> cause as? CancellationException"))
+    }
+
+    @Test
+    fun `backup and restore include persisted automatic tasks`() {
+        val backup = file("app/src/main/java/io/legado/app/help/storage/Backup.kt").readText()
+        val restore = file("app/src/main/java/io/legado/app/help/storage/Restore.kt").readText()
+
+        assertTrue(backup.contains("\"autoTask.json\""))
+        assertTrue(backup.contains("appDb.autoTaskRuleDao.all()"))
+        assertTrue(restore.contains("fileToListT<AutoTaskRule>(path, \"autoTask.json\")"))
+        assertTrue(restore.contains("appDb.autoTaskRuleDao.upsert"))
+        val preferenceRestore = restore.indexOf("appCtx.getSharedPreferences(path, \"config\")")
+        val taskUpsert = restore.indexOf("appDb.autoTaskRuleDao.upsert")
+        val scheduleRefresh = restore.indexOf("AutoTaskScheduler.refresh(appCtx)")
+        assertTrue(preferenceRestore >= 0)
+        assertTrue(taskUpsert > preferenceRestore)
+        assertTrue(scheduleRefresh > taskUpsert)
+        assertFalse(restore.contains("autoTaskRuleDao.delete"))
+    }
+
+    @Test
+    fun `automatic task backup json preserves every persisted field`() {
+        val rule = AutoTaskRule(
+            id = "task-id",
+            name = "task-name",
+            enable = false,
+            cron = "1 2 3 4 5",
+            loginUrl = "https://example.com/login",
+            loginUi = "login-ui",
+            loginCheckJs = "login-check",
+            comment = "comment",
+            script = "script",
+            header = "header",
+            jsLib = "library",
+            concurrentRate = "2/1000",
+            enabledCookieJar = false,
+            customOrder = 7,
+            lastRunAt = 8L,
+            lastResult = "result",
+            lastError = "error",
+            lastLog = "log",
+        )
+
+        val restored = GSON.fromJsonArray<AutoTaskRule>(GSON.toJson(listOf(rule)))
+            .getOrThrow()
+            .single()
+
+        assertEquals(rule, restored)
     }
 
     private fun file(path: String) = File(root, path)
