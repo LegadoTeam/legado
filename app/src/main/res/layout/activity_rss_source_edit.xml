@@ -14,54 +14,128 @@
         app:displayHomeAsUp="true"
         app:title="@string/rss_source_edit" />
 
-    <HorizontalScrollView
+    <androidx.cardview.widget.CardView
+        android:id="@+id/options_card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:scrollbars="none">
+        android:layout_marginHorizontal="8dp"
+        android:layout_marginTop="4dp"
+        app:cardBackgroundColor="@color/background_card"
+        app:cardCornerRadius="8dp"
+        app:cardElevation="0dp"
+        app:cardUseCompatPadding="false">
 
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingHorizontal="8dp"
-            tools:ignore="VisualLintBounds">
+            android:orientation="vertical">
 
-            <io.legado.app.lib.theme.view.ThemeCheckBox
-                android:id="@+id/cb_is_enable"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:id="@+id/options_header"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:checked="true"
-                android:text="@string/is_enable"
-                tools:ignore="TouchTargetSizeCheck" />
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
+                android:gravity="center_vertical"
+                android:minHeight="48dp"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingEnd="4dp">
 
-            <io.legado.app.lib.theme.view.ThemeCheckBox
-                android:id="@+id/cb_single_url"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:checked="false"
-                android:text="@string/single_url"
-                tools:ignore="TouchTargetSizeCheck" />
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:paddingVertical="4dp">
 
-            <io.legado.app.lib.theme.view.ThemeCheckBox
-                android:id="@+id/cb_is_enable_cookie"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:checked="true"
-                android:text="@string/auto_save_cookie"
-                tools:ignore="TouchTargetSizeCheck" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/setting"
+                        android:textColor="@color/primaryText"
+                        android:textSize="16sp" />
 
-            <io.legado.app.lib.theme.view.ThemeCheckBox
-                android:id="@+id/cb_is_enable_preload"
-                android:layout_width="wrap_content"
+                    <TextView
+                        android:id="@+id/tv_options_summary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:singleLine="true"
+                        android:textColor="@color/secondaryText"
+                        android:textSize="12sp"
+                        tools:text="Enable: Yes | Single URL: No | CookieJar: Yes | Preload: No" />
+
+                </LinearLayout>
+
+                <ImageView
+                    android:id="@+id/iv_options_expand"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:importantForAccessibility="no"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_expand_more"
+                    app:tint="@color/secondaryText" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/options_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:checked="false"
-                android:text="@string/enable_preload"
-                tools:ignore="TouchTargetSizeCheck" />
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <com.google.android.flexbox.FlexboxLayout
+                    android:id="@+id/options_switches"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="8dp"
+                    android:paddingBottom="4dp"
+                    app:alignItems="center"
+                    app:flexWrap="wrap"
+                    app:justifyContent="flex_start">
+
+                    <io.legado.app.lib.theme.view.ThemeCheckBox
+                        android:id="@+id/cb_is_enable"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:minHeight="48dp"
+                        android:text="@string/is_enable" />
+
+                    <io.legado.app.lib.theme.view.ThemeCheckBox
+                        android:id="@+id/cb_single_url"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="false"
+                        android:minHeight="48dp"
+                        android:text="@string/single_url" />
+
+                    <io.legado.app.lib.theme.view.ThemeCheckBox
+                        android:id="@+id/cb_is_enable_cookie"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:minHeight="48dp"
+                        android:text="@string/auto_save_cookie" />
+
+                    <io.legado.app.lib.theme.view.ThemeCheckBox
+                        android:id="@+id/cb_is_enable_preload"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="false"
+                        android:minHeight="48dp"
+                        android:text="@string/enable_preload" />
+
+                </com.google.android.flexbox.FlexboxLayout>
+
+            </LinearLayout>
 
         </LinearLayout>
 
-    </HorizontalScrollView>
+    </androidx.cardview.widget.CardView>
 
     <HorizontalScrollView
         android:layout_width="match_parent"

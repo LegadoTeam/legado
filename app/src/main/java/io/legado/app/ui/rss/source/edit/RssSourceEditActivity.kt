@@ -267,6 +267,7 @@ class RssSourceEditActivity :
     }
 
     private fun initView() {
+        initOptionPanel()
         binding.tabLayout.addTab(binding.tabLayout.newTab().apply {
             setText(R.string.source_tab_base)
         })
@@ -334,6 +335,41 @@ class RssSourceEditActivity :
         }
     }
 
+    private fun initOptionPanel() {
+        binding.optionsHeader.setOnClickListener {
+            updateOptionPanel(binding.optionsContent.visibility != View.VISIBLE)
+        }
+        listOf(
+            binding.cbIsEnable,
+            binding.cbSingleUrl,
+            binding.cbIsEnableCookie,
+            binding.cbIsEnablePreload
+        ).forEach { checkBox ->
+            checkBox.setOnCheckedChangeListener { _, _ -> updateOptionPanel() }
+        }
+        updateOptionPanel(false)
+    }
+
+    private fun updateOptionPanel(expanded: Boolean = binding.optionsContent.visibility == View.VISIBLE) {
+        binding.optionsContent.visibility = if (expanded) View.VISIBLE else View.GONE
+        binding.ivOptionsExpand.setImageResource(
+            if (expanded) R.drawable.ic_expand_less else R.drawable.ic_expand_more
+        )
+        val action = getString(
+            if (expanded) R.string.book_intro_collapse else R.string.book_intro_expand
+        )
+        binding.tvOptionsSummary.text = listOf(
+            getString(R.string.is_enable) to binding.cbIsEnable.isChecked,
+            getString(R.string.single_url) to binding.cbSingleUrl.isChecked,
+            getString(R.string.auto_save_cookie) to binding.cbIsEnableCookie.isChecked,
+            getString(R.string.enable_preload) to binding.cbIsEnablePreload.isChecked
+        ).joinToString(" | ") { (label, checked) ->
+            "$label: ${getString(if (checked) R.string.yes else R.string.no)}"
+        }
+        binding.optionsHeader.contentDescription =
+            "${getString(R.string.setting)}, ${binding.tvOptionsSummary.text}, $action"
+    }
+
     private fun setEditEntities(tabPosition: Int?) {
         when (tabPosition) {
             1 -> adapter.editEntities = startEntities
@@ -352,6 +388,7 @@ class RssSourceEditActivity :
             binding.cbSingleUrl.isChecked = rs.singleUrl
             binding.cbIsEnableCookie.isChecked = rs.enabledCookieJar == true
             binding.cbIsEnablePreload.isChecked = rs.preload
+            updateOptionPanel()
             if (rs.type !in 0..<binding.spType.count) {
                 rs.type = 0
             }
