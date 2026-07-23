@@ -24,6 +24,7 @@ import io.legado.app.utils.checkWrite
 import io.legado.app.utils.externalFiles
 import io.legado.app.utils.getJsonArray
 import io.legado.app.utils.isContentScheme
+import io.legado.app.utils.isSameOrDescendantOf
 import io.legado.app.utils.launch
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
@@ -267,7 +268,7 @@ class HandleFileActivity :
     }
 
     private fun isExternalStorage(path: File): Boolean {
-        if (path.canonicalPath.startsWith(appCtx.externalFiles.parent!!)) {
+        if (path.isSameOrDescendantOf(appCtx.externalFiles.parentFile!!)) {
             return false
         }
         try {
