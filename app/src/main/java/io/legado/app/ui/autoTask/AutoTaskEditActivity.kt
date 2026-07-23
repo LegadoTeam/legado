@@ -10,6 +10,7 @@ import io.legado.app.R
 import io.legado.app.base.BaseActivity
 import io.legado.app.data.entities.AutoTaskRule
 import io.legado.app.databinding.ActivityAutoTaskEditBinding
+import io.legado.app.lib.dialogs.alert
 import io.legado.app.model.AutoTask
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.utils.CronSchedule
@@ -25,6 +26,7 @@ class AutoTaskEditActivity : BaseActivity<ActivityAutoTaskEditBinding>() {
 
     override val binding by viewBinding(ActivityAutoTaskEditBinding::inflate)
     private var task = AutoTaskRule()
+    private var originTask: AutoTaskRule? = null
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         val id = intent.getStringExtra(EXTRA_ID)
@@ -69,19 +71,22 @@ class AutoTaskEditActivity : BaseActivity<ActivityAutoTaskEditBinding>() {
         return super.onCompatOptionsItemSelected(item)
     }
 
-    private fun bind(rule: AutoTaskRule) = binding.run {
-        cbEnable.isChecked = rule.enable
-        cbCookieJar.isChecked = rule.enabledCookieJar
-        etName.setText(rule.name)
-        etCron.setText(rule.cron ?: AutoTask.DEFAULT_CRON)
-        etComment.setText(rule.comment)
-        etScript.setText(rule.script)
-        etHeader.setText(rule.header)
-        etJsLib.setText(rule.jsLib)
-        etConcurrentRate.setText(rule.concurrentRate)
-        etLoginUrl.setText(rule.loginUrl)
-        etLoginUi.setText(rule.loginUi)
-        etLoginCheckJs.setText(rule.loginCheckJs)
+    private fun bind(rule: AutoTaskRule) {
+        binding.run {
+            cbEnable.isChecked = rule.enable
+            cbCookieJar.isChecked = rule.enabledCookieJar
+            etName.setText(rule.name)
+            etCron.setText(rule.cron ?: AutoTask.DEFAULT_CRON)
+            etComment.setText(rule.comment)
+            etScript.setText(rule.script)
+            etHeader.setText(rule.header)
+            etJsLib.setText(rule.jsLib)
+            etConcurrentRate.setText(rule.concurrentRate)
+            etLoginUrl.setText(rule.loginUrl)
+            etLoginUi.setText(rule.loginUi)
+            etLoginCheckJs.setText(rule.loginCheckJs)
+        }
+        originTask = buildDraft()
     }
 
     private fun save(after: (AutoTaskRule) -> Unit) {
@@ -90,34 +95,37 @@ class AutoTaskEditActivity : BaseActivity<ActivityAutoTaskEditBinding>() {
             val saved = AutoTask.upsert(draft, this@AutoTaskEditActivity)
             withContext(Dispatchers.Main) {
                 task = saved
+                originTask = buildDraft()
                 setResult(RESULT_OK)
                 after(saved)
             }
         }
     }
 
-    private fun buildRule(): AutoTaskRule? = binding.run {
-        val name = etName.text?.toString()?.trim().orEmpty()
-        if (name.isBlank()) {
+    private fun buildRule(): AutoTaskRule? {
+        val draft = buildDraft()
+        if (draft.name.isBlank()) {
             toastOnUi(R.string.auto_task_name_required)
             return null
         }
-        val cron = etCron.text?.toString()?.trim().orEmpty()
-        if (CronSchedule.parse(cron) == null) {
+        if (CronSchedule.parse(draft.cron.orEmpty()) == null) {
             toastOnUi(R.string.auto_task_cron_invalid)
             return null
         }
-        val script = etScript.text?.toString().orEmpty()
-        if (AutoTask.normalizeScript(script).isBlank()) {
+        if (AutoTask.normalizeScript(draft.script).isBlank()) {
             toastOnUi(R.string.auto_task_script_empty)
             return null
         }
+        return draft
+    }
+
+    private fun buildDraft(): AutoTaskRule = binding.run {
         task.copy(
-            name = name,
+            name = etName.text?.toString()?.trim().orEmpty(),
             enable = cbEnable.isChecked,
-            cron = cron,
+            cron = etCron.text?.toString()?.trim().orEmpty(),
             comment = textOrNull(etComment.text?.toString()),
-            script = script,
+            script = etScript.text?.toString().orEmpty(),
             header = textOrNull(etHeader.text?.toString()),
             jsLib = textOrNull(etJsLib.text?.toString()),
             concurrentRate = textOrNull(etConcurrentRate.text?.toString()),
@@ -126,6 +134,21 @@ class AutoTaskEditActivity : BaseActivity<ActivityAutoTaskEditBinding>() {
             loginCheckJs = textOrNull(etLoginCheckJs.text?.toString()),
             enabledCookieJar = cbCookieJar.isChecked
         )
+    }
+
+    override fun finish() {
+        val changed = originTask?.let { it != buildDraft() } == true
+        if (changed) {
+            alert(R.string.exit) {
+                setMessage(R.string.exit_no_save)
+                positiveButton(R.string.yes)
+                negativeButton(R.string.no) {
+                    super.finish()
+                }
+            }
+        } else {
+            super.finish()
+        }
     }
 
     private fun textOrNull(value: String?): String? = value?.trim()?.ifBlank { null }
