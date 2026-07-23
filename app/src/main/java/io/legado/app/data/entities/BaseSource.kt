@@ -19,6 +19,7 @@ import io.legado.app.help.source.getShareScope
 import io.legado.app.help.source.getSharedGlobalStateKey
 import io.legado.app.model.SharedJsScope
 import io.legado.app.model.SharedJsScope.remove
+import io.legado.app.model.jsSource.JsSourceEngine
 import io.legado.app.utils.GSON
 import io.legado.app.utils.GSONStrict
 import io.legado.app.utils.fromJsonArray
@@ -136,10 +137,12 @@ interface BaseSource : JsExtensions {
         header?.let {
             try {
                 val json = when {
-                    it.startsWith("@js:", true) -> evalJS(it.substring(4)).toString()
-                    it.startsWith("<js>", true) -> evalJS(
-                        it.substring(4, it.lastIndexOf("<"))
-                    ).toString()
+                    it.startsWith("@js:", true) ->
+                        JsSourceEngine.normalizeJsResult(evalJS(it.substring(4))).orEmpty()
+
+                    it.startsWith("<js>", true) -> JsSourceEngine.normalizeJsResult(
+                        evalJS(it.substring(4, it.lastIndexOf("<")))
+                    ).orEmpty()
 
                     else -> it
                 }
@@ -227,15 +230,19 @@ interface BaseSource : JsExtensions {
         ) {
             // Dynamic login UI scripts can read login info while their defaults are being derived.
             val loginUiJson = when {
-                loginUiRule.startsWith("@js:") -> evalJS(
-                    "${getLoginJs() ?: ""}\n${loginUiRule.substring(4)}",
-                    configureScriptBindings()
-                ).toString()
+                loginUiRule.startsWith("@js:") -> JsSourceEngine.normalizeJsResult(
+                    evalJS(
+                        "${getLoginJs() ?: ""}\n${loginUiRule.substring(4)}",
+                        configureScriptBindings()
+                    )
+                ).orEmpty()
 
-                loginUiRule.startsWith("<js>") -> evalJS(
-                    "${getLoginJs() ?: ""}\n${loginUiRule.substring(4, loginUiRule.lastIndexOf("<"))}",
-                    configureScriptBindings()
-                ).toString()
+                loginUiRule.startsWith("<js>") -> JsSourceEngine.normalizeJsResult(
+                    evalJS(
+                        "${getLoginJs() ?: ""}\n${loginUiRule.substring(4, loginUiRule.lastIndexOf("<"))}",
+                        configureScriptBindings()
+                    )
+                ).orEmpty()
 
                 else -> loginUiRule
             }

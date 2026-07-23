@@ -11,6 +11,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.help.book.isLocal
+import io.legado.app.model.jsSource.JsSourceEngine
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.utils.GSON
@@ -24,6 +25,7 @@ import kotlinx.coroutines.ensureActive
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.coroutines.CoroutineContext
 
 object AutoTaskProtocol {
 
@@ -36,7 +38,7 @@ object AutoTaskProtocol {
         taskName: String? = null,
         logger: ((String) -> Unit)? = null
     ): String? {
-        val actions = parseActions(result) ?: return null
+        val actions = parseActions(result, currentCoroutineContext()) ?: return null
         val summaries = mutableListOf<String>()
         for (action in actions) {
             currentCoroutineContext().ensureActive()
@@ -54,9 +56,17 @@ object AutoTaskProtocol {
         return summaries.joinToString(" | ").ifBlank { null }
     }
 
-    internal fun parseActions(result: Any?): List<Map<String, Any?>>? {
+    internal fun parseActions(
+        result: Any?,
+        coroutineContext: CoroutineContext? = null,
+    ): List<Map<String, Any?>>? {
         if (result == null) return null
-        val json = if (result is String) result else runCatching { GSON.toJson(result) }.getOrNull()
+        val json = try {
+            JsSourceEngine.normalizeJsResult(result, coroutineContext)
+        } catch (error: Throwable) {
+            error.autoTaskCancellation()?.let { throw it }
+            null
+        }
         val text = json?.trim().orEmpty()
         return when {
             text.isJsonArray() -> GSON.fromJsonArray<Map<String, Any?>>(text).getOrNull()

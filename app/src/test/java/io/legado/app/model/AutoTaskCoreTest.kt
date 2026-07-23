@@ -1,12 +1,17 @@
 package io.legado.app.model
 
 import com.script.rhino.RhinoInterruptError
+import com.script.rhino.RhinoScriptEngine
 import com.google.gson.annotations.SerializedName
 import io.legado.app.data.entities.AutoTaskRule
 import io.legado.app.data.entities.BookChapter
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import org.htmlunit.corejs.javascript.ConsString
+import org.htmlunit.corejs.javascript.Scriptable
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -24,6 +29,28 @@ class AutoTaskCoreTest {
         assertEquals(1, AutoTaskProtocol.parseActions("{\"type\":\"notify\"}")?.size)
         assertEquals(2, AutoTaskProtocol.parseActions("[{\"type\":\"notify\"},{\"type\":\"refreshToc\"}]")?.size)
         assertEquals(1, AutoTaskProtocol.parseActions("{\"actions\":[{\"type\":\"notify\"}]}")?.size)
+    }
+
+    @Test
+    fun parsesRhinoProtocolWithLazyStrings() {
+        val result = RhinoScriptEngine.eval("var n = 1; [{type: 'notify', title: 'Task ' + n}]")
+        val array = result as Scriptable
+        val action = array.get(0, array) as Scriptable
+
+        assertTrue(action.get("title", action) is ConsString)
+        assertEquals("Task 1", AutoTaskProtocol.parseActions(result)?.single()?.get("title"))
+    }
+
+    @Test
+    fun preservesCancellationWhileParsingRhinoProtocol() {
+        val result = RhinoScriptEngine.eval(
+            "[{type: 'notify', toJSON: function() { return this; }}]"
+        )
+        val job = Job().apply { cancel() }
+
+        assertThrows(CancellationException::class.java) {
+            AutoTaskProtocol.parseActions(result, job)
+        }
     }
 
     @Test(expected = IllegalArgumentException::class)
