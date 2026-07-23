@@ -49,6 +49,29 @@ class JsSourceReviewDispatchSourceTest {
         )
     }
 
+    @Test
+    fun `review summary refresh preserves read aloud position on the main thread`() {
+        val activity = projectFile(
+            "src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt"
+        ).readText().normalizeLines()
+        val applyBlock = activity.substringAfter("private fun applyReviewSummary(")
+            .substringBefore("private fun prefetchAdjacentReviewSummary(")
+        val contentLoadFinishBlock = activity.substringAfter("override fun contentLoadFinish()")
+            .substringBefore("override fun upContent(")
+
+        assertTrue(
+            applyBlock.contains(
+                "binding.readView.upContent(relativePosition = 0, resetPageOffset = false)"
+            )
+        )
+        assertTrue(
+            applyBlock.indexOf("ChapterProvider.setReviewProviders(") <
+                    applyBlock.indexOf("binding.readView.upContent(")
+        )
+        assertTrue(!applyBlock.contains("ReadBook.loadContent("))
+        assertTrue(contentLoadFinishBlock.contains("lifecycleScope.launch(Main.immediate)"))
+    }
+
     private fun String.normalizeLines(): String = replace("\r\n", "\n")
 
     private fun projectFile(pathInApp: String): File {
