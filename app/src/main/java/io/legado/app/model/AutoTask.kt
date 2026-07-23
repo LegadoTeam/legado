@@ -79,6 +79,20 @@ object AutoTask {
         return saved
     }
 
+    fun importRules(
+        rules: List<AutoTaskRule>,
+        context: Context = appCtx
+    ): List<AutoTaskRule> {
+        if (rules.isEmpty()) return emptyList()
+        val saved = synchronized(this) {
+            val imported = prepareImportedAutoTasks(all(), rules)
+            appDb.autoTaskRuleDao.upsert(*imported.toTypedArray())
+            imported
+        }
+        AutoTaskScheduler.refresh(context)
+        return saved
+    }
+
     fun delete(ids: Collection<String>, context: Context = appCtx) {
         if (ids.isEmpty()) return
         synchronized(this) {
@@ -114,6 +128,22 @@ object AutoTask {
         appDb.autoTaskRuleDao.updateRunState(id, lastRunAt, lastResult, lastError, lastLog)
     }
 
+}
+
+internal fun prepareImportedAutoTasks(
+    localTasks: List<AutoTaskRule>,
+    importedTasks: List<AutoTaskRule>
+): List<AutoTaskRule> {
+    val localById = localTasks.associateBy { it.id }
+    val importedById = linkedMapOf<String, AutoTaskRule>()
+    var nextOrder = (localTasks.maxOfOrNull { it.customOrder } ?: -1) + 1
+    importedTasks.forEach { imported ->
+        val order = localById[imported.id]?.customOrder
+            ?: importedById[imported.id]?.customOrder
+            ?: nextOrder++
+        importedById[imported.id] = imported.copy(customOrder = order)
+    }
+    return importedById.values.toList()
 }
 
 internal class LegacyAutoTaskRulesLoader {

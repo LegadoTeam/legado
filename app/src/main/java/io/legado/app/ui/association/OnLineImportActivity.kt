@@ -6,6 +6,7 @@ import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.databinding.ActivityTranslucenceBinding
 import io.legado.app.lib.dialogs.alert
+import io.legado.app.ui.autoTask.ImportAutoTaskDialog
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 
@@ -43,6 +44,9 @@ class OnLineImportActivity :
                 "dictRule" -> showDialogFragment(
                     ImportDictRuleDialog(it.second, true)
                 )
+                "autoTask" -> showDialogFragment(
+                    ImportAutoTaskDialog(it.second, true)
+                )
             }
         }
         viewModel.errorLive.observe(this) {
@@ -78,6 +82,10 @@ class OnLineImportActivity :
                 "/theme" -> showDialogFragment(
                     ImportThemeDialog(url, true)
                 )
+                "/autoTask" -> showDialogFragment(
+                    ImportAutoTaskDialog(url, true)
+                )
+                "/auto" -> viewModel.determineType(url, this::finallyDialog)
                 "/readConfig" -> viewModel.getBytes(url) { bytes ->
                     viewModel.importReadConfig(bytes, this::finallyDialog)
                 }

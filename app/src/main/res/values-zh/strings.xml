@@ -1369,6 +1369,10 @@
     <string name="auto_task_service">运行定时任务</string>
     <string name="auto_task_service_desc">重启后保留计划；Android 可能延后实际执行时间</string>
     <string name="auto_task_add">添加任务</string>
+    <string name="import_auto_task">导入定时任务</string>
+    <string name="import_status_new">新增</string>
+    <string name="import_status_update">更新</string>
+    <string name="import_status_exist">已有</string>
     <string name="auto_task_edit">编辑定时任务</string>
     <string name="auto_task_debug">调试任务</string>
     <string name="auto_task_name">任务名称</string>
