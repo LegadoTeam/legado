@@ -238,7 +238,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             loadChapter(book)
         } else {
             val bookSource = bookSource ?: let {
-                chapterListData.postValue(emptyList())
+                chapterListData.postValue(chapterListData.value.orEmpty())
                 context.toastOnUi(R.string.error_no_source)
                 return
             }
@@ -264,7 +264,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                         loadChapter(it, runPreUpdateJs, isFromBookInfo = true)
                     }
                 }.onError {
-                    chapterListData.postValue(emptyList())
+                    chapterListData.postValue(chapterListData.value.orEmpty())
                     AppLog.put("获取书籍信息失败\n${it.localizedMessage}", it)
                     context.toastOnUi(R.string.error_get_book_info)
                 }
@@ -289,12 +289,12 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     chapterListData.postValue(it)
                 }
             }.onError {
-                chapterListData.postValue(emptyList())
+                chapterListData.postValue(chapterListData.value.orEmpty())
                 context.toastOnUi("LoadTocError:${it.localizedMessage}")
             }
         } else {
             val bookSource = bookSource ?: let {
-                chapterListData.postValue(emptyList())
+                chapterListData.postValue(chapterListData.value.orEmpty())
                 context.toastOnUi(R.string.error_no_source)
                 return
             }
@@ -323,7 +323,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     bookData.postValue(book)
                     chapterListData.postValue(it)
                 }.onError {
-                    chapterListData.postValue(emptyList())
+                    chapterListData.postValue(chapterListData.value.orEmpty())
                     AppLog.put("获取目录失败\n${it.localizedMessage}", it)
                     context.toastOnUi(R.string.error_get_chapter_list)
                 }

@@ -1,6 +1,7 @@
 package io.legado.app.ui.book.info
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -65,6 +66,28 @@ class BookInfoLoadingIndicatorTest {
         assertEquals(
             2,
             viewModel.lineSequence().count { it.trim() == ".trackNetworkLoading()" },
+        )
+    }
+
+    @Test
+    fun `refresh failures preserve the last successful chapter list`() {
+        val viewModel = projectFile(VIEW_MODEL_PATH).readText()
+        val refreshSection = viewModel.substringBefore("private fun loadWebFile")
+        val webFileSection = viewModel
+            .substringAfter("private fun loadWebFile")
+            .substringBefore("fun <T> importOrDownloadWebFile")
+        val preserveCurrent =
+            "chapterListData.postValue(chapterListData.value.orEmpty())"
+        val clearChapters = "chapterListData.postValue(emptyList())"
+
+        assertEquals(
+            5,
+            refreshSection.lineSequence().count { it.trim() == preserveCurrent },
+        )
+        assertFalse(refreshSection.contains(clearChapters))
+        assertEquals(
+            2,
+            webFileSection.lineSequence().count { it.trim() == clearChapters },
         )
     }
 
