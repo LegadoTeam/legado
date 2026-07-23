@@ -1,5 +1,7 @@
 package io.legado.app.help
 
+import java.util.UUID
+
 object IntentData {
 
     private val bigData: MutableMap<String, Any> = mutableMapOf()
@@ -14,7 +16,7 @@ object IntentData {
 
     @Synchronized
     fun put(data: Any?): String {
-        val key = System.currentTimeMillis().toString()
+        val key = UUID.randomUUID().toString()
         data?.let {
             bigData[key] = data
         }
