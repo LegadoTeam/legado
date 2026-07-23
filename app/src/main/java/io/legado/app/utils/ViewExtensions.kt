@@ -2,7 +2,6 @@
 
 package io.legado.app.utils
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -28,8 +27,6 @@ import android.widget.TextView
 import androidx.annotation.ColorInt
 import androidx.annotation.DrawableRes
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.view.menu.MenuPopupHelper
-import androidx.appcompat.widget.PopupMenu
 import androidx.core.graphics.record
 import androidx.core.graphics.withTranslation
 import androidx.core.view.ViewCompat
@@ -47,7 +44,6 @@ import io.legado.app.utils.canvasrecorder.record
 import splitties.systemservices.inputMethodManager
 import splitties.views.bottomPadding
 import splitties.views.topPadding
-import java.lang.reflect.Field
 import androidx.core.graphics.createBitmap
 import androidx.core.text.HtmlCompat
 import androidx.core.view.isVisible
@@ -419,17 +415,6 @@ fun TextView.setMarkdown(markwon: Markwon, spanned: Spanned, imgOnLongClickListe
 fun TextView.setTextIfNotEqual(charSequence: CharSequence?) {
     if (text != charSequence) {
         text = charSequence
-    }
-}
-
-@SuppressLint("RestrictedApi")
-fun PopupMenu.show(x: Int, y: Int) {
-    kotlin.runCatching {
-        val field: Field = this.javaClass.getDeclaredField("mPopup")
-        field.isAccessible = true
-        (field.get(this) as MenuPopupHelper).show(x, y)
-    }.onFailure {
-        it.printOnDebug()
     }
 }
 

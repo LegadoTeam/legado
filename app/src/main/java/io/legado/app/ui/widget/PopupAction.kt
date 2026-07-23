@@ -16,6 +16,7 @@ import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.databinding.ItemTextBinding
 import io.legado.app.databinding.PopupActionBinding
 import io.legado.app.lib.dialogs.SelectItem
+import io.legado.app.lib.theme.secondaryDisabledTextColor
 import io.legado.app.utils.applyMd3PopupStyle
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getCompatColor
@@ -34,6 +35,7 @@ class PopupAction(private val context: Context) :
     var onActionClick: ((action: String) -> Unit)? = null
     private var isVertical = false
     private var dangerValues: Set<String> = emptySet()
+    private var disabledValues: Set<String> = emptySet()
 
     init {
         contentView = binding.root
@@ -67,6 +69,12 @@ class PopupAction(private val context: Context) :
     fun setDangerValues(values: Set<String>) {
         if (dangerValues == values) return
         dangerValues = values
+        if (adapter.itemCount > 0) adapter.notifyDataSetChanged()
+    }
+
+    fun setDisabledValues(values: Set<String>) {
+        if (disabledValues == values) return
+        disabledValues = values
         if (adapter.itemCount > 0) adapter.notifyDataSetChanged()
     }
 
@@ -112,6 +120,7 @@ class PopupAction(private val context: Context) :
             payloads: MutableList<Any>
         ) {
             with(binding) {
+                holder.itemView.isEnabled = item.value !in disabledValues
                 textView.text = item.title
                 if (isVertical) {
                     textView.minHeight = 48.dpToPx()
@@ -120,9 +129,13 @@ class PopupAction(private val context: Context) :
                     textView.setPadding(16.dpToPx(), 0, 16.dpToPx(), 0)
                 }
                 textView.setTextColor(
-                    context.getCompatColor(
-                        if (item.value in dangerValues) R.color.error else R.color.primaryText
-                    )
+                    if (holder.itemView.isEnabled) {
+                        context.getCompatColor(
+                            if (item.value in dangerValues) R.color.error else R.color.primaryText
+                        )
+                    } else {
+                        context.secondaryDisabledTextColor
+                    }
                 )
             }
         }
