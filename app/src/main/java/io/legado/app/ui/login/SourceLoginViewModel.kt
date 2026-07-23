@@ -12,6 +12,7 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.model.AudioPlay
+import io.legado.app.model.AutoTask
 import io.legado.app.model.ReadBook
 import io.legado.app.model.VideoPlay
 import io.legado.app.utils.toastOnUi
@@ -56,6 +57,7 @@ class SourceLoginViewModel(application: Application) : BaseViewModel(application
                         "bookSource" ->  appDb.bookSourceDao.getBookSource(sourceKey)
                         "rssSource" -> appDb.rssSourceDao.getByKey(sourceKey)
                         "httpTts" -> appDb.httpTTSDao.get(sourceKey.toLong())
+                        "autoTask" -> AutoTask.get(sourceKey)?.let(AutoTask::buildSource)
                         else -> null
                     }
                     val bookUrl = intent.getStringExtra("bookUrl")

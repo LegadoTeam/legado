@@ -114,6 +114,13 @@ object Debug {
         return debugSessionId
     }
 
+    @Synchronized
+    fun startSimpleDebug(owner: Callback, sourceUrl: String): Boolean {
+        if (!tryAcquireCallback(owner)) return false
+        beginDebugSession(sourceUrl)
+        return true
+    }
+
     private inline fun withActiveDebugSession(sessionId: Long, block: () -> Unit) {
         synchronized(this) {
             if (callback != null && debugSessionId == sessionId) {

@@ -50,6 +50,8 @@ import io.legado.app.help.rhino.NativeBaseSource
 import io.legado.app.help.source.SourceHelp
 import io.legado.app.help.storage.Backup
 import io.legado.app.model.BookCover
+import io.legado.app.model.AutoTask
+import io.legado.app.service.AutoTaskScheduler
 import io.legado.app.utils.ChineseUtils
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.defaultSharedPreferences
@@ -121,6 +123,8 @@ class App : Application() {
             }
             //调整排序序号
             SourceHelp.adjustSortNumber()
+            AutoTask.all()
+            AutoTaskScheduler.refresh(this@App)
             //同步阅读记录
             if (AppConfig.syncBookProgress) {
                 AppWebDav.downloadAllBookProgress()
