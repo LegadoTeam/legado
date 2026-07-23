@@ -7,7 +7,6 @@ import android.view.MenuItem
 import android.view.View
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.widget.PopupMenu
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.textfield.TextInputLayout
@@ -36,10 +35,10 @@ import io.legado.app.model.CacheBook
 import io.legado.app.service.ExportBookService
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.file.HandleFileContract
+import io.legado.app.ui.widget.popupActionMenu
 import io.legado.app.utils.ACache
 import io.legado.app.utils.FileDoc
 import io.legado.app.utils.applyNavigationBarPadding
-import io.legado.app.utils.applyOpenTint
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.checkWrite
 import io.legado.app.utils.cnCompare
@@ -69,7 +68,6 @@ import kotlin.math.max
  * cache/download 缓存界面
  */
 class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>(),
-    PopupMenu.OnMenuItemClickListener,
     CacheAdapter.CallBack {
 
     override val binding by viewBinding(ActivityCacheBookBinding::inflate)
@@ -126,11 +124,7 @@ class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>()
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.book_cache, menu)
         menu.iconItemOnLongClick(R.id.menu_download) {
-            PopupMenu(this, it).apply {
-                inflate(R.menu.book_cache_download)
-                this.menu.applyOpenTint(this@CacheActivity)
-                setOnMenuItemClickListener(this@CacheActivity)
-            }.show()
+            showDownloadMenu(it)
         }
         return super.onCompatCreateOptionsMenu(menu)
     }
@@ -139,6 +133,52 @@ class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>()
         this.menu = menu
         upMenu()
         return super.onPrepareOptionsMenu(menu)
+    }
+
+    private fun showDownloadMenu(anchor: View) {
+        popupActionMenu(this) {
+            item(getString(R.string.menu_download_after), "download_after")
+            item(getString(R.string.menu_download_all), "download_all")
+        }.show(anchor) { action ->
+            when (action) {
+                "download_after" -> startDownloadAfterCurrent()
+                "download_all" -> startDownloadAll()
+            }
+        }
+    }
+
+    private fun startDownloadAfterCurrent() {
+        if (!CacheBook.isRun) {
+            sureCacheBook {
+                adapter.getItems().forEach { book ->
+                    CacheBook.start(
+                        this@CacheActivity,
+                        book,
+                        book.durChapterIndex,
+                        book.lastChapterIndex
+                    )
+                }
+            }
+        } else {
+            CacheBook.stop(this@CacheActivity)
+        }
+    }
+
+    private fun startDownloadAll() {
+        if (!CacheBook.isRun) {
+            sureCacheBook {
+                adapter.getItems().forEach { book ->
+                    CacheBook.start(
+                        this@CacheActivity,
+                        book,
+                        0,
+                        book.lastChapterIndex
+                    )
+                }
+            }
+        } else {
+            CacheBook.stop(this@CacheActivity)
+        }
     }
 
     override fun onMenuOpened(featureId: Int, menu: Menu): Boolean {
@@ -170,36 +210,7 @@ class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>()
      */
     override fun onCompatOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
-            R.id.menu_download,
-            R.id.menu_download_after -> {
-                if (!CacheBook.isRun) sureCacheBook {
-                    adapter.getItems().forEach { book ->
-                        CacheBook.start(
-                            this@CacheActivity,
-                            book,
-                            book.durChapterIndex,
-                            book.lastChapterIndex
-                        )
-                    }
-                } else {
-                    CacheBook.stop(this@CacheActivity)
-                }
-            }
-
-            R.id.menu_download_all -> {
-                if (!CacheBook.isRun) sureCacheBook {
-                    adapter.getItems().forEach { book ->
-                        CacheBook.start(
-                            this@CacheActivity,
-                            book,
-                            0,
-                            book.lastChapterIndex
-                        )
-                    }
-                } else {
-                    CacheBook.stop(this@CacheActivity)
-                }
-            }
+            R.id.menu_download -> startDownloadAfterCurrent()
 
             R.id.menu_export_all -> exportAll()
             R.id.menu_enable_replace -> AppConfig.exportUseReplace = !item.isChecked
@@ -224,10 +235,6 @@ class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>()
             }
         }
         return super.onCompatOptionsItemSelected(item)
-    }
-
-    override fun onMenuItemClick(item: MenuItem): Boolean {
-        return onCompatOptionsItemSelected(item)
     }
 
     private fun initRecyclerView() {
