@@ -81,6 +81,10 @@ object WebViewPool {
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
             stopLoading()
+            removeJavascriptInterface(WebJsExtensions.nameBasic)
+            removeJavascriptInterface(WebJsExtensions.nameJava)
+            removeJavascriptInterface(WebJsExtensions.nameSource)
+            removeJavascriptInterface(WebJsExtensions.nameCache)
             clearFocus() //清除焦点
             setOnLongClickListener(null)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
