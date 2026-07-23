@@ -421,6 +421,8 @@
     <string name="add_loaded_books_to_bookshelf_in_progress">正在批量加入书架</string>
     <string name="no_loaded_books_to_add">暂无已加载的书籍</string>
     <string name="continue_read">继续阅读</string>
+    <string name="bookshelf_stats">共 %1$d 本 · 在读 %2$d 本</string>
+    <string name="read_not_started">尚未开始阅读</string>
     <string name="cover_path">封面地址</string>
     <string name="page_anim_cover">覆盖</string>
     <string name="page_anim_slide">滑动</string>

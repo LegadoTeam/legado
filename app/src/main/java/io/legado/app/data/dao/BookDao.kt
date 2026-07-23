@@ -138,6 +138,14 @@ interface BookDao {
     @get:Query("SELECT * FROM books where type & ${BookType.text} > 0 ORDER BY durChapterTime DESC limit 1")
     val lastReadBook: Book?
 
+    @get:Query(
+        "SELECT * FROM books where type & ${BookType.text} > 0 " +
+            "and type & ${BookType.notShelf} = 0 " +
+            "ORDER BY (durChapterIndex > 0 OR durChapterPos > 0) DESC, " +
+            "durChapterTime DESC limit 1"
+    )
+    val lastReadBookOnShelf: Book?
+
     @get:Query("SELECT bookUrl FROM books")
     val allBookUrls: List<String>
 
@@ -146,6 +154,16 @@ interface BookDao {
 
     @get:Query("SELECT COUNT(*) FROM books")
     val allBookCount: Int
+
+    @Query("SELECT COUNT(*) FROM books where type & ${BookType.notShelf} = 0")
+    fun flowShelfBookCount(): Flow<Int>
+
+    @get:Query(
+        "SELECT count(*) FROM books where " +
+            "(durChapterIndex > 0 OR durChapterPos > 0) " +
+            "and type & ${BookType.notShelf} = 0"
+    )
+    val readingCount: Int
 
     @get:Query("select min(`order`) from books")
     val minOrder: Int
