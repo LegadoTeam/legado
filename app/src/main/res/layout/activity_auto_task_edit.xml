@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    tools:context=".ui.autoTask.AutoTaskEditActivity">
+
+    <io.legado.app.ui.widget.TitleBar
+        android:id="@+id/title_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:displayHomeAsUp="true"
+        app:title="@string/auto_task_edit" />
+
+    <io.legado.app.ui.widget.NoChildScrollNestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <io.legado.app.lib.theme.view.ThemeCheckBox
+                    android:id="@+id/cb_enable"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:checked="true"
+                    android:text="@string/enable" />
+
+                <io.legado.app.lib.theme.view.ThemeCheckBox
+                    android:id="@+id/cb_cookie_jar"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="@string/auto_task_cookie_jar" />
+
+            </LinearLayout>
+
+            <io.legado.app.ui.widget.text.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/auto_task_name">
+
+                <io.legado.app.lib.theme.view.ThemeEditText
+                    android:id="@+id/et_name"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </io.legado.app.ui.widget.text.TextInputLayout>
+
+            <io.legado.app.ui.widget.text.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/auto_task_cron"
+                app:helperText="@string/auto_task_cron_hint">
+
+                <io.legado.app.lib.theme.view.ThemeEditText
+                    android:id="@+id/et_cron"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:singleLine="true" />
+            </io.legado.app.ui.widget.text.TextInputLayout>
+
+            <io.legado.app.ui.widget.text.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/auto_task_comment">
+
+                <io.legado.app.lib.theme.view.ThemeEditText
+                    android:id="@+id/et_comment"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textMultiLine"
+                    android:maxLines="4" />
+            </io.legado.app.ui.widget.text.TextInputLayout>
+
+            <io.legado.app.ui.widget.text.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/auto_task_script">
+
+                <io.legado.app.lib.theme.view.ThemeEditText
+                    android:id="@+id/et_script"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:gravity="top|start"
+                    android:inputType="textMultiLine|textNoSuggestions"
+                    android:minLines="10" />
+            </io.legado.app.ui.widget.text.TextInputLayout>
+
+            <io.legado.app.ui.widget.text.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/auto_task_header">
+
+                <io.legado.app.lib.theme.view.ThemeEditText
+                    android:id="@+id/et_header"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:inputType="textMultiLine"
+                    android:minLines="2" />
+            </io.legado.app.ui.widget.text.TextInputLayout>
+
+            <io.legado.app.ui.widget.text.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/auto_task_js_lib">
+
+                <io.legado.app.lib.theme.view.ThemeEditText
+                    android:id="@+id/et_js_lib"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:inputType="textMultiLine"
+                    android:minLines="2" />
+            </io.legado.app.ui.widget.text.TextInputLayout>
+
+            <io.legado.app.ui.widget.text.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/auto_task_concurrent_rate">
+
+                <io.legado.app.lib.theme.view.ThemeEditText
+                    android:id="@+id/et_concurrent_rate"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:singleLine="true" />
+            </io.legado.app.ui.widget.text.TextInputLayout>
+
+            <io.legado.app.ui.widget.text.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/login_url">
+
+                <io.legado.app.lib.theme.view.ThemeEditText
+                    android:id="@+id/et_login_url"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textUri" />
+            </io.legado.app.ui.widget.text.TextInputLayout>
+
+            <io.legado.app.ui.widget.text.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/login_ui">
+
+                <io.legado.app.lib.theme.view.ThemeEditText
+                    android:id="@+id/et_login_ui"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:inputType="textMultiLine"
+                    android:minLines="3" />
+            </io.legado.app.ui.widget.text.TextInputLayout>
+
+            <io.legado.app.ui.widget.text.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/login_check_js">
+
+                <io.legado.app.lib.theme.view.ThemeEditText
+                    android:id="@+id/et_login_check_js"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:inputType="textMultiLine"
+                    android:minLines="3" />
+            </io.legado.app.ui.widget.text.TextInputLayout>
+
+        </LinearLayout>
+
+    </io.legado.app.ui.widget.NoChildScrollNestedScrollView>
+
+</LinearLayout>

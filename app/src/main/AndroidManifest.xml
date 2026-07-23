@@ -4,6 +4,7 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
@@ -234,6 +235,19 @@
         <!-- 书源管理 -->
         <activity
             android:name=".ui.book.source.manage.BookSourceActivity"
+            android:launchMode="singleTop"
+            android:screenOrientation="behind" />
+        <activity
+            android:name=".ui.autoTask.AutoTaskActivity"
+            android:launchMode="singleTop"
+            android:screenOrientation="behind" />
+        <activity
+            android:name=".ui.autoTask.AutoTaskEditActivity"
+            android:configChanges="locale|keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+        <activity
+            android:name=".ui.autoTask.AutoTaskDebugActivity"
             android:launchMode="singleTop"
             android:screenOrientation="behind" />
         <!-- 订阅源管理 -->
@@ -528,6 +542,10 @@
         <service
             android:name=".service.DownloadService"
             android:foregroundServiceType="dataSync" />
+        <service
+            android:name=".service.AutoTaskJobService"
+            android:exported="true"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
 
         <receiver
             android:name=".receiver.MediaButtonReceiver"

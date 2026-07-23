@@ -9,6 +9,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.data.AppDatabase
 import org.junit.Rule
 import org.junit.Test
+import org.junit.Assert.assertTrue
 import org.junit.runner.RunWith
 import java.io.IOException
 
@@ -45,6 +46,29 @@ class MigrationTest {
         ).addMigrations(*ALL_MIGRATIONS)
             .build().apply {
                 openHelper.writableDatabase
+                close()
+            }
+    }
+
+    @Test
+    @Throws(IOException::class)
+    fun migrate93To94AddsAutomaticTasks() {
+        val databaseName = "migration-auto-task"
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        context.deleteDatabase(databaseName)
+        helper.createDatabase(databaseName, 93).close()
+
+        Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
+            .build().apply {
+                openHelper.writableDatabase.query("PRAGMA table_info(auto_task_rules)").use { cursor ->
+                    val nameIndex = cursor.getColumnIndexOrThrow("name")
+                    val columns = buildSet {
+                        while (cursor.moveToNext()) add(cursor.getString(nameIndex))
+                    }
+                    assertTrue(columns.contains("id"))
+                    assertTrue(columns.contains("customOrder"))
+                    assertTrue(columns.contains("lastLog"))
+                }
                 close()
             }
     }

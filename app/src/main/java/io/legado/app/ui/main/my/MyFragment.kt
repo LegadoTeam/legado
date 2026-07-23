@@ -11,6 +11,7 @@ import io.legado.app.base.BaseFragment
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
 import io.legado.app.databinding.FragmentMyConfigBinding
+import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.config.ThemeConfig
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.prefs.NameListPreference
@@ -18,9 +19,11 @@ import io.legado.app.lib.prefs.SwitchPreference
 import io.legado.app.lib.prefs.fragment.PreferenceFragment
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.service.McpService
+import io.legado.app.service.AutoTaskScheduler
 import io.legado.app.service.WebService
 import io.legado.app.ui.about.AboutActivity
 import io.legado.app.ui.about.ReadRecordActivity
+import io.legado.app.ui.autoTask.AutoTaskActivity
 import io.legado.app.ui.book.bookmark.AllBookmarkActivity
 import io.legado.app.ui.book.source.manage.BookSourceActivity
 import io.legado.app.ui.book.toc.rule.TxtTocRuleActivity
@@ -171,6 +174,15 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
                     }
                 }
 
+                PreferKey.autoTaskService -> {
+                    val appContext = requireContext().applicationContext
+                    if (appContext.getPrefBoolean(PreferKey.autoTaskService)) {
+                        Coroutine.async { AutoTaskScheduler.refresh(appContext) }
+                    } else {
+                        AutoTaskScheduler.cancelAll(appContext)
+                    }
+                }
+
                 "recordLog" -> LogUtils.upLevel()
             }
         }
@@ -178,6 +190,7 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
         override fun onPreferenceTreeClick(preference: Preference): Boolean {
             when (preference.key) {
                 "bookSourceManage" -> startActivity<BookSourceActivity>()
+                "autoTaskManage" -> startActivity<AutoTaskActivity>()
                 "replaceManage" -> startActivity<ReplaceRuleActivity>()
                 "dictRuleManage" -> startActivity<DictRuleActivity>()
                 "txtTocRuleManage" -> startActivity<TxtTocRuleActivity>()
