@@ -8,6 +8,7 @@ import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.constant.AppLog
 import io.legado.app.databinding.ItemFontBinding
+import io.legado.app.lib.theme.accentColor
 import io.legado.app.utils.*
 import java.io.File
 import java.net.URLDecoder
@@ -50,10 +51,11 @@ class FontAdapter(context: Context, curFilePath: String, val callBack: CallBack)
             }
             tvFont.text = item.name
             root.setOnClickListener { callBack.onFontSelect(item) }
-            if (item.name == curName) {
-                ivChecked.visible()
-            } else {
-                ivChecked.invisible()
+            val selected = item.name == curName
+            ivChecked.visible(selected)
+            rootCard.apply {
+                strokeWidth = if (selected) 2.dpToPx() else 0
+                setStrokeColor(context.accentColor)
             }
         }
     }
