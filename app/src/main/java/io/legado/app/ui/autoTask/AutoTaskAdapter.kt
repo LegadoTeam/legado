@@ -3,7 +3,6 @@ package io.legado.app.ui.autoTask
 import android.content.Context
 import android.view.View
 import android.view.ViewGroup
-import androidx.appcompat.widget.PopupMenu
 import androidx.recyclerview.widget.DiffUtil
 import io.legado.app.R
 import io.legado.app.base.adapter.ItemViewHolder
@@ -11,6 +10,7 @@ import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.constant.AppConst
 import io.legado.app.data.entities.AutoTaskRule
 import io.legado.app.databinding.ItemAutoTaskBinding
+import io.legado.app.ui.widget.popupActionMenu
 
 class AutoTaskAdapter(context: Context, private val callback: Callback) :
     RecyclerAdapter<AutoTaskRule, ItemAutoTaskBinding>(context) {
@@ -64,18 +64,19 @@ class AutoTaskAdapter(context: Context, private val callback: Callback) :
 
     private fun showMenu(anchor: View, position: Int) {
         val task = getItem(position) ?: return
-        PopupMenu(context, anchor).apply {
-            inflate(R.menu.auto_task_item)
-            setOnMenuItemClickListener { item ->
-                when (item.itemId) {
-                    R.id.menu_log -> callback.showLog(task)
-                    R.id.menu_move_up -> callback.move(task, -1)
-                    R.id.menu_move_down -> callback.move(task, 1)
-                    R.id.menu_del -> callback.delete(task)
-                }
-                true
+        popupActionMenu(context) {
+            item(context.getString(R.string.auto_task_log), "log")
+            item(context.getString(R.string.auto_task_move_up), "moveUp")
+            item(context.getString(R.string.auto_task_move_down), "moveDown")
+            item(context.getString(R.string.delete), "delete")
+            danger("delete")
+        }.show(anchor) { action ->
+            when (action) {
+                "log" -> callback.showLog(task)
+                "moveUp" -> callback.move(task, -1)
+                "moveDown" -> callback.move(task, 1)
+                "delete" -> callback.delete(task)
             }
-            show()
         }
     }
 
