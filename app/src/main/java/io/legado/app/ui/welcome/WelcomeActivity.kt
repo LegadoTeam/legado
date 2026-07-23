@@ -3,7 +3,7 @@ package io.legado.app.ui.welcome
 import android.content.Intent
 import android.os.Bundle
 import androidx.core.graphics.drawable.toDrawable
-import androidx.core.view.postDelayed
+import androidx.lifecycle.lifecycleScope
 import io.legado.app.base.BaseActivity
 import io.legado.app.constant.PreferKey
 import io.legado.app.constant.Theme
@@ -25,10 +25,14 @@ import io.legado.app.utils.startActivity
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.legado.app.utils.visible
 import io.legado.app.utils.windowSize
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 open class WelcomeActivity : BaseActivity<ActivityWelcomeBinding>() {
 
     override val binding by viewBinding(ActivityWelcomeBinding::inflate)
+    private var startMainJob: Job? = null
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         if (intent.flags and Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT != 0) {
@@ -39,7 +43,10 @@ open class WelcomeActivity : BaseActivity<ActivityWelcomeBinding>() {
             if (welcomeShowTime == 0) {
                 startMainActivity()
             } else {
-                binding.root.postDelayed(welcomeShowTime.toLong()) { startMainActivity() }
+                startMainJob = lifecycleScope.launch {
+                    delay(welcomeShowTime.toLong())
+                    startMainActivity()
+                }
             }
         }
         binding.ivBook.setColorFilter(accentColor)
@@ -50,6 +57,12 @@ open class WelcomeActivity : BaseActivity<ActivityWelcomeBinding>() {
         fullScreen()
         setStatusBarColorAuto(backgroundColor, true, fullScreen)
         upNavigationBarColor()
+    }
+
+    override fun finish() {
+        startMainJob?.cancel()
+        startMainJob = null
+        super.finish()
     }
 
     override fun upBackgroundImage() {
