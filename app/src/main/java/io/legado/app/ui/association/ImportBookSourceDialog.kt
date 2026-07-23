@@ -105,6 +105,7 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
         }
         viewModel.errorLiveData.observe(viewLifecycleOwner) {
             binding.rotateLoading.gone()
+            binding.ivEmpty.visible()
             binding.tvMsg.apply {
                 text = it
                 visible()
@@ -114,10 +115,13 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
             binding.rotateLoading.gone()
             if (it > 0) {
                 sourceListReady = true
+                binding.ivEmpty.gone()
+                binding.tvMsg.gone()
                 adapter.setItems(viewModel.allSources)
                 upSelectText()
                 updateInteractionState()
             } else {
+                binding.ivEmpty.visible()
                 binding.tvMsg.apply {
                     setText(R.string.wrong_format)
                     visible()
