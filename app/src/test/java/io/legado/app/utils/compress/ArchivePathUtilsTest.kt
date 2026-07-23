@@ -1,5 +1,6 @@
 package io.legado.app.utils.compress
 
+import io.legado.app.utils.isSameOrDescendantOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -24,9 +25,8 @@ class ArchivePathUtilsTest {
             resolveArchiveEntryFile(destDir, "../$siblingName/payload.txt")
         }
         assertFalse(
-            isSameOrDescendant(
-                destDir.canonicalFile.toPath(),
-                root.resolve(siblingName).canonicalFile.toPath(),
+            root.resolve(siblingName).canonicalFile.isSameOrDescendantOf(
+                destDir.canonicalFile
             )
         )
     }
@@ -72,10 +72,7 @@ class ArchivePathUtilsTest {
 
         assertEquals(destDir.resolve("payload.txt").canonicalFile, entryFile)
         assertTrue(
-            isSameOrDescendant(
-                destDir.canonicalFile.toPath(),
-                entryFile.canonicalFile.toPath(),
-            )
+            entryFile.canonicalFile.isSameOrDescendantOf(destDir.canonicalFile)
         )
     }
 
@@ -99,10 +96,7 @@ class ArchivePathUtilsTest {
             assertTrue(directory.isDirectory)
             assertEquals("payload", entryFile.readText())
             assertTrue(
-                isSameOrDescendant(
-                    destDir.canonicalFile.toPath(),
-                    entryFile.canonicalFile.toPath(),
-                )
+                entryFile.canonicalFile.isSameOrDescendantOf(destDir.canonicalFile)
             )
         }
 
@@ -133,10 +127,7 @@ class ArchivePathUtilsTest {
             resolveArchiveEntryFile(destDir, "nested/").canonicalFile,
         )
         assertTrue(
-            isSameOrDescendant(
-                destDir.canonicalFile.toPath(),
-                destDir.canonicalFile.toPath(),
-            )
+            destDir.canonicalFile.isSameOrDescendantOf(destDir.canonicalFile)
         )
     }
 

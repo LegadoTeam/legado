@@ -9,8 +9,10 @@ import io.legado.app.help.IntentData
 import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.utils.RealPathUtil
 import io.legado.app.utils.externalFiles
+import io.legado.app.utils.isSameOrDescendantOf
 import io.legado.app.utils.putJson
 import splitties.init.appCtx
+import java.io.File
 
 @Suppress("unused")
 class HandleFileContract :
@@ -46,7 +48,9 @@ class HandleFileContract :
     override fun parseResult(resultCode: Int, intent: Intent?): Result {
         val uri = if (resultCode != RESULT_OK || intent?.data == null ||
             RealPathUtil.getTreePath(intent.data!!)
-                ?.startsWith(appCtx.externalFiles.parent!!) == true
+                ?.let {
+                    File(it).isSameOrDescendantOf(appCtx.externalFiles.parentFile!!)
+                } == true
         ) {
             null
         } else {

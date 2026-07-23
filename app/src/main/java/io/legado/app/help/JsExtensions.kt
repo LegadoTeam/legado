@@ -46,6 +46,7 @@ import io.legado.app.utils.externalCache
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.isMainThread
+import io.legado.app.utils.isSameOrDescendantOf
 import io.legado.app.utils.longToastOnUi
 import io.legado.app.utils.mapAsync
 import io.legado.app.utils.showDialogFragment
@@ -742,8 +743,8 @@ interface JsExtensions : JsEncodeUtils {
             cachePath + File.separator + path
         }
         val file = File(aPath)
-        val safePath = appCtx.externalCache.parent!!
-        if (!file.canonicalPath.startsWith(safePath)) {
+        val safeDir = appCtx.externalCache.parentFile!!
+        if (!file.isSameOrDescendantOf(safeDir)) {
             throw SecurityException("非法路径")
         }
         return file

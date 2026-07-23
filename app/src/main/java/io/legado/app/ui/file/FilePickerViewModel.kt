@@ -6,6 +6,7 @@ import android.os.Environment
 import androidx.lifecycle.MutableLiveData
 import io.legado.app.base.BaseViewModel
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.utils.isSameOrDescendantOf
 import io.legado.app.utils.toastOnUi
 import java.io.File
 
@@ -62,7 +63,7 @@ class FilePickerViewModel(application: Application) : BaseViewModel(application)
         execute {
             val dir = lastDir ?: throw NoStackTraceException("父文件夹不存在")
             val folder = File(dir, name)
-            if (!folder.canonicalPath.contains(dir.canonicalPath)) {
+            if (!folder.isSameOrDescendantOf(dir)) {
                 throw NoStackTraceException("非法文件名")
             }
             folder.mkdir()

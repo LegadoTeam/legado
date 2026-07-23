@@ -15,6 +15,11 @@ fun File.exists(vararg subDirFiles: String): Boolean {
     return getFile(*subDirFiles).exists()
 }
 
+internal fun File.isSameOrDescendantOf(parent: File): Boolean {
+    val parentPath = parent.canonicalFile.toPath()
+    return canonicalFile.toPath().startsWith(parentPath)
+}
+
 @Throws(Exception::class)
 fun File.listFileDocs(filter: FileDocFilter? = null): ArrayList<FileDoc> {
     val docList = arrayListOf<FileDoc>()

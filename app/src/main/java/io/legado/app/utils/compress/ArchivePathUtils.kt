@@ -1,8 +1,8 @@
 package io.legado.app.utils.compress
 
+import io.legado.app.utils.isSameOrDescendantOf
 import java.io.File
 import java.io.FileNotFoundException
-import java.nio.file.Path
 
 private const val INVALID_ARCHIVE_PATH = "压缩文件只能解压到指定路径"
 private val windowsDrivePath = Regex("^[A-Za-z]:.*")
@@ -18,7 +18,7 @@ internal fun resolveArchiveEntryFile(destDir: File, entryName: String): File {
 
     val canonicalDestDir = destDir.canonicalFile
     val canonicalEntryFile = File(canonicalDestDir, entryName).canonicalFile
-    if (!isSameOrDescendant(canonicalDestDir.toPath(), canonicalEntryFile.toPath())) {
+    if (!canonicalEntryFile.isSameOrDescendantOf(canonicalDestDir)) {
         throw SecurityException(INVALID_ARCHIVE_PATH)
     }
     return canonicalEntryFile
@@ -47,8 +47,4 @@ internal fun prepareArchiveEntryFile(
         entryFile.setExecutable(true)
     }
     return resolveArchiveEntryFile(destDir, entryName)
-}
-
-internal fun isSameOrDescendant(parent: Path, candidate: Path): Boolean {
-    return candidate.normalize().startsWith(parent.normalize())
 }
