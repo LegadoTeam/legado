@@ -1480,6 +1480,9 @@
     <string name="auto_task_service">Run automatic tasks</string>
     <string name="auto_task_service_desc">Persist schedules across restarts; Android may defer execution</string>
     <string name="auto_task_add">Add task</string>
+    <string name="create_book_update_task">Create book update task</string>
+    <string name="auto_task_book_update_name">Update %1$s</string>
+    <string name="auto_task_book_update_disabled">%1$s: updates disabled</string>
     <string name="import_auto_task">Import automatic tasks</string>
     <string name="import_status_new">New</string>
     <string name="import_status_update">Update</string>

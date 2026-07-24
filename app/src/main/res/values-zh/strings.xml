@@ -1371,6 +1371,9 @@
     <string name="auto_task_service">运行定时任务</string>
     <string name="auto_task_service_desc">重启后保留计划；Android 可能延后实际执行时间</string>
     <string name="auto_task_add">添加任务</string>
+    <string name="create_book_update_task">生成书籍更新任务</string>
+    <string name="auto_task_book_update_name">更新 %1$s</string>
+    <string name="auto_task_book_update_disabled">%1$s：已停止更新</string>
     <string name="import_auto_task">导入定时任务</string>
     <string name="import_status_new">新增</string>
     <string name="import_status_update">更新</string>

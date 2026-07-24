@@ -108,8 +108,16 @@ object AutoTaskProtocol {
         val bookUrl = string(action, "bookUrl")?.trim().orEmpty()
         require(bookUrl.isNotBlank()) { "refreshToc requires bookUrl" }
         val book = appDb.bookDao.getBook(bookUrl)
+            ?: findMovedBook(action)
             ?: error("refreshToc book was not found")
-        val chaptersBefore = appDb.bookChapterDao.getChapterList(bookUrl)
+        val respectCanUpdate = boolean(action, "respectCanUpdate", false)
+        if (!canRefreshBookToc(book.canUpdate, respectCanUpdate)) {
+            return context.getString(
+                R.string.auto_task_book_update_disabled,
+                book.name.ifBlank { book.bookUrl }
+            )
+        }
+        val chaptersBefore = appDb.bookChapterDao.getChapterList(book.bookUrl)
         val chapters = refreshBookToc(book)
         val newCount = countNewChapters(chaptersBefore, chapters)
 
@@ -133,6 +141,13 @@ object AutoTaskProtocol {
             append(": +").append(newCount)
             if (notified) append(", notified")
         }
+    }
+
+    private fun findMovedBook(action: Map<String, Any?>): Book? {
+        if (string(action, "generatedBy") != AutoTask.BOOK_UPDATE_GENERATOR) return null
+        val name = string(action, "bookName") ?: return null
+        val author = string(action, "bookAuthor").orEmpty()
+        return appDb.bookDao.getBook(name, author)
     }
 
     private suspend fun refreshBookToc(book: Book): List<BookChapter> {
@@ -288,6 +303,10 @@ object AutoTaskProtocol {
     ): Int {
         return (after.count { !it.isVolume } - before.count { !it.isVolume })
             .coerceAtLeast(0)
+    }
+
+    internal fun canRefreshBookToc(canUpdate: Boolean, respectCanUpdate: Boolean): Boolean {
+        return canUpdate || !respectCanUpdate
     }
 
     private fun latestChapterTitle(chapters: List<BookChapter>): String? {

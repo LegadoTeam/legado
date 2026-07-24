@@ -4,12 +4,14 @@ import com.script.rhino.RhinoInterruptError
 import com.script.rhino.RhinoScriptEngine
 import com.google.gson.annotations.SerializedName
 import io.legado.app.data.entities.AutoTaskRule
+import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import org.htmlunit.corejs.javascript.ConsString
 import org.htmlunit.corejs.javascript.Scriptable
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -22,6 +24,59 @@ class AutoTaskCoreTest {
         assertEquals("return 1", AutoTask.normalizeScript(" @js: return 1 "))
         assertEquals("return 2", AutoTask.normalizeScript("<js> return 2 </js>"))
         assertEquals("return 3", AutoTask.normalizeScript(" return 3 "))
+    }
+
+    @Test
+    fun buildsEscapedBookUpdateTask() {
+        val bookUrl = "https://example.com/book?value=\");throw new Error('bad');//"
+        val book = Book(bookUrl = bookUrl, name = "Test", author = "Author")
+        val task = AutoTask.buildBookUpdateTask(book, "Update Test")
+
+        assertEquals("book_update:c67024bf54021613", task.id)
+        assertEquals("Update Test", task.name)
+        assertEquals(AutoTask.DEFAULT_CRON, task.cron)
+
+        val action = AutoTaskProtocol.parseActions(RhinoScriptEngine.eval(task.script))?.single()
+        assertEquals("refreshToc", action?.get("type"))
+        assertEquals(bookUrl, action?.get("bookUrl"))
+        assertEquals(book.name, action?.get("bookName"))
+        assertEquals(book.author, action?.get("bookAuthor"))
+        assertEquals(AutoTask.BOOK_UPDATE_GENERATOR, action?.get("generatedBy"))
+        assertEquals(true, action?.get("respectCanUpdate"))
+        val notify = action?.get("notify") as Map<*, *>
+        assertEquals(true, notify["enable"])
+        assertEquals(1, (notify["minCount"] as Number).toInt())
+    }
+
+    @Test
+    fun findsGeneratedBookUpdateTaskAfterSourceChange() {
+        val oldBook = Book(bookUrl = "old", name = "Test", author = "Author")
+        val oldTask = AutoTask.buildBookUpdateTask(oldBook, "Update Test")
+        val otherTask = AutoTask.buildBookUpdateTask(
+            Book(bookUrl = "other", name = "Test", author = "Other"),
+            "Update Other"
+        )
+
+        assertEquals(
+            oldTask,
+            AutoTask.findBookUpdateTask(
+                listOf(oldTask, otherTask),
+                Book(bookUrl = "new", name = "Test", author = "Author")
+            )
+        )
+        assertNull(
+            AutoTask.findBookUpdateTask(
+                listOf(oldTask),
+                Book(bookUrl = "new", name = "Test", author = "Changed")
+            )
+        )
+    }
+
+    @Test
+    fun generatedBookUpdateTaskRespectsStoppedUpdates() {
+        assertTrue(AutoTaskProtocol.canRefreshBookToc(true, true))
+        assertFalse(AutoTaskProtocol.canRefreshBookToc(false, true))
+        assertTrue(AutoTaskProtocol.canRefreshBookToc(false, false))
     }
 
     @Test

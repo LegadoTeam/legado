@@ -3,17 +3,21 @@ package io.legado.app.model
 import android.content.Context
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.AutoTaskRule
+import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookSource
 import io.legado.app.help.CacheManager
 import io.legado.app.service.AutoTaskScheduler
 import io.legado.app.utils.GSON
+import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.fromJsonArray
+import io.legado.app.utils.fromJsonObject
 import splitties.init.appCtx
 
 object AutoTask {
 
     const val SOURCE_KEY = "auto_task"
     const val DEFAULT_CRON = "*/30 * * * *"
+    internal const val BOOK_UPDATE_GENERATOR = "bookUpdate"
     private const val LEGACY_RULES_KEY = "autoTaskRules"
     private val legacyRulesLoader = LegacyAutoTaskRulesLoader()
 
@@ -25,6 +29,51 @@ object AutoTask {
                 trimmed.substring(4, trimmed.length - 5).trim()
             else -> trimmed
         }
+    }
+
+    internal fun buildBookUpdateTask(book: Book, name: String): AutoTaskRule {
+        val action = mapOf(
+            "type" to "refreshToc",
+            "bookUrl" to book.bookUrl,
+            "bookName" to book.name,
+            "bookAuthor" to book.author,
+            "generatedBy" to BOOK_UPDATE_GENERATOR,
+            "respectCanUpdate" to true,
+            "notify" to mapOf("enable" to true, "minCount" to 1)
+        )
+        return AutoTaskRule(
+            id = bookUpdateTaskId(book.bookUrl),
+            name = name,
+            cron = DEFAULT_CRON,
+            script = "(${GSON.toJson(action)})"
+        )
+    }
+
+    internal fun findBookUpdateTask(
+        tasks: List<AutoTaskRule>,
+        book: Book
+    ): AutoTaskRule? {
+        tasks.firstOrNull { it.id == bookUpdateTaskId(book.bookUrl) }?.let { return it }
+        val sameBook = tasks.mapNotNull { task ->
+            generatedBookIdentity(task)?.let { task to it }
+        }.filter { it.second == (book.name to book.author) }
+        return sameBook.singleOrNull()?.first
+    }
+
+    private fun bookUpdateTaskId(bookUrl: String): String {
+        return "book_update:${MD5Utils.md5Encode16(bookUrl)}"
+    }
+
+    private fun generatedBookIdentity(task: AutoTaskRule): Pair<String, String>? {
+        if (!task.id.startsWith("book_update:")) return null
+        val script = normalizeScript(task.script)
+        if (!script.startsWith('(') || !script.endsWith(')')) return null
+        val action = GSON.fromJsonObject<Map<String, Any?>>(
+            script.substring(1, script.length - 1)
+        ).getOrNull() ?: return null
+        if (action["generatedBy"] != BOOK_UPDATE_GENERATOR) return null
+        val name = action["bookName"] as? String ?: return null
+        return name to ((action["bookAuthor"] as? String).orEmpty())
     }
 
     fun buildSource(task: AutoTaskRule): BookSource {

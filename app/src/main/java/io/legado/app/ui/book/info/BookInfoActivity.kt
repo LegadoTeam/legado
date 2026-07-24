@@ -66,9 +66,12 @@ import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.getPrimaryTextColor
+import io.legado.app.model.AutoTask
 import io.legado.app.model.BookCover
 import io.legado.app.model.remote.RemoteBookWebDav
 import io.legado.app.ui.about.AppLogDialog
+import io.legado.app.ui.autoTask.AutoTaskEditActivity
+import io.legado.app.ui.autoTask.ImportAutoTaskDialog
 import io.legado.app.ui.book.audio.AudioPlayActivity
 import io.legado.app.ui.book.changecover.ChangeCoverDialog
 import io.legado.app.ui.book.changesource.ChangeBookSourceDialog
@@ -291,6 +294,13 @@ class BookInfoActivity :
             viewModel.bookData.value?.isLocalTxt ?: false
         menu.findItem(R.id.menu_upload)?.isVisible =
             viewModel.bookData.value?.isLocal ?: false
+        menu.findItem(R.id.menu_create_book_update_task)?.isVisible =
+            viewModel.bookData.value?.let {
+                viewModel.inBookshelf &&
+                    viewModel.bookSource != null &&
+                    !it.isLocal &&
+                    it.canUpdate
+            } == true
         menu.findItem(R.id.menu_delete_alert)?.isChecked =
             LocalConfig.bookInfoDeleteAlert
         return super.onMenuOpened(featureId, menu)
@@ -343,6 +353,10 @@ class BookInfoActivity :
 
             R.id.menu_refresh -> {
                 refreshBook()
+            }
+
+            R.id.menu_create_book_update_task -> viewModel.getBook()?.let {
+                openBookUpdateTask(it)
             }
 
             R.id.menu_login -> viewModel.bookSource?.let {
@@ -464,6 +478,23 @@ class BookInfoActivity :
         upLoading(true)
         viewModel.getBook()?.let {
             viewModel.refreshBook(it)
+        }
+    }
+
+    private fun openBookUpdateTask(book: Book) {
+        val task = AutoTask.buildBookUpdateTask(
+            book = book,
+            name = getString(R.string.auto_task_book_update_name, book.name)
+        )
+        lifecycleScope.launch {
+            val existingTask = withContext(IO) {
+                AutoTask.findBookUpdateTask(AutoTask.all(), book)
+            }
+            if (existingTask != null) {
+                startActivity(AutoTaskEditActivity.intent(this@BookInfoActivity, existingTask.id))
+            } else {
+                showDialogFragment(ImportAutoTaskDialog(GSON.toJson(task)))
+            }
         }
     }
 
