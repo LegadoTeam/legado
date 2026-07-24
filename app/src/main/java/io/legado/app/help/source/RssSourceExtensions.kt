@@ -12,7 +12,7 @@ import kotlinx.coroutines.withContext
 private val aCache by lazy { ACache.get("rssSortUrl") }
 
 internal fun RssSource.requireSourceUrl() {
-    if (sourceUrl.isNullOrEmpty()) {
+    if (sourceUrl.isNullOrBlank()) {
         throw NoStackTraceException("不是订阅源")
     }
 }
