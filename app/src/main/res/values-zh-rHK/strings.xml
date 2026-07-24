@@ -948,6 +948,7 @@
     <string name="search_content_empty">搜索内容为空，检查净化/简繁设置</string>
     <string name="open">打開</string>
     <string name="del_login_header">刪除登錄頭</string>
+    <string name="clear_login_info">清除登錄資訊</string>
     <string name="show_login_header">查看登錄頭</string>
     <string name="login_header">登錄頭</string>
     <string name="font_scale">字體大小</string>

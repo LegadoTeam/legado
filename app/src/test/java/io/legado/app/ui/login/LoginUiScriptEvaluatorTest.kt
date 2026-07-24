@@ -168,6 +168,34 @@ class LoginUiScriptEvaluatorTest {
         assertTrue(source.contains("if (!isRenderingLoginUi && rowUis != null)"))
     }
 
+    @Test
+    fun `clear login action confirms removal and closes the dialog`() {
+        val source = readProjectFile(
+            "src/main/java/io/legado/app/ui/login/SourceLoginDialog.kt"
+        )
+        val menu = readProjectFile("src/main/res/menu/source_login.xml")
+        val actionStart = source.indexOf("R.id.menu_clear_login_info -> alert(")
+        val actionEnd = source.indexOf("R.id.menu_log", actionStart)
+
+        assertTrue(menu.contains("android:id=\"@+id/menu_clear_login_info\""))
+        assertTrue(actionStart >= 0)
+        assertTrue(actionEnd > actionStart)
+        val action = source.substring(actionStart, actionEnd)
+        val confirmStart = action.indexOf("yesButton {")
+        val clearStart = action.indexOf("source.removeLoginInfo()")
+        val preventSaveStart = action.indexOf("oKToClose = true")
+        val dismissStart = action.indexOf("dismiss()")
+        assertTrue(action.contains("noButton()"))
+        assertTrue(confirmStart >= 0)
+        assertTrue(clearStart > confirmStart)
+        assertTrue(action.contains("source.removeLoginHeader()"))
+        assertTrue(action.contains("viewModel.loginInfo.clear()"))
+        assertFalse(action.contains("handleUpUiData(null)"))
+        assertTrue(preventSaveStart > clearStart)
+        assertTrue(dismissStart > preventSaveStart)
+        assertTrue(source.contains("if (!oKToClose && hasChange)"))
+    }
+
     private fun readProjectFile(pathInApp: String): String {
         val file = sequenceOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull(File::isFile)

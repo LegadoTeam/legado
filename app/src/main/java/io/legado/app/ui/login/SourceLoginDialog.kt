@@ -678,6 +678,21 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
                 }
 
                 R.id.menu_del_login_header -> source.removeLoginHeader()
+                R.id.menu_clear_login_info -> alert(
+                    R.string.clear_login_info,
+                    R.string.sure_del
+                ) {
+                    yesButton {
+                        source.removeLoginInfo()
+                        source.removeLoginHeader()
+                        viewModel.loginInfo.clear()
+                        oKToClose = true
+                        context?.toastOnUi(R.string.success)
+                        dismiss()
+                    }
+                    noButton()
+                }
+
                 R.id.menu_log -> showDialogFragment<AppLogDialog>()
             }
             return@setOnMenuItemClickListener true

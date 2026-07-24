@@ -1002,6 +1002,7 @@
     <string name="see">see</string>
     <string name="open">open</string>
     <string name="del_login_header">del login header</string>
+    <string name="clear_login_info">clear login info</string>
     <string name="show_login_header">show login header</string>
     <string name="login_header">login header</string>
     <string name="font_scale">font scale</string>

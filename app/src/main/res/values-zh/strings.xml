@@ -999,6 +999,7 @@
     <string name="see">查看</string>
     <string name="open">打开</string>
     <string name="del_login_header">删除登录头</string>
+    <string name="clear_login_info">清除登录信息</string>
     <string name="show_login_header">查看登录头</string>
     <string name="login_header">登录头</string>
     <string name="font_scale">字体大小</string>
