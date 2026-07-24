@@ -41,6 +41,12 @@ class SearchBookDaoGroupContractTest {
         assertTrue(searchBookDaoSource.contains("private const val GROUP_TRIM_CHARACTERS"))
         assertTrue(
             searchBookDaoSource.contains(
+                "internal const val NON_EMPTY_SOURCE_GROUP_CONDITION = " +
+                    "\"trim(:sourceGroup, \$GROUP_TRIM_CHARACTERS) <> ''\""
+            )
+        )
+        assertTrue(
+            searchBookDaoSource.contains(
                 "char(9,10,11,12,13,28,29,30,31,32,160,5760,8192,8193,8194,8195,8196,"
             )
         )
