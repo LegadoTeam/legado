@@ -1543,7 +1543,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
     }
 
-    override fun onReviewClick(paragraphNum: Int, count: Int) {
+    override fun onReviewClick(paragraphNum: Int, count: Int, chapterIndex: Int) {
         if (paragraphNum != -1 && paragraphNum <= 0) return
         if (count <= 0) {
             toastOnUi(R.string.review_empty)
@@ -1552,7 +1552,6 @@ class ReadBookActivity : BaseReadBookActivity(),
         val source = ReadBook.bookSource ?: return
         if (source.isJsSource()) {
             val book = ReadBook.book ?: return
-            val chapterIndex = ReadBook.durChapterIndex
             showDialogFragment(
                 ReviewDetailDialog(
                     paragraphNum = paragraphNum,
@@ -1583,7 +1582,6 @@ class ReadBookActivity : BaseReadBookActivity(),
             return
         }
         val book = ReadBook.book ?: return
-        val chapterIndex = ReadBook.durChapterIndex
         showDialogFragment(
             ReviewDetailDialog(
                 paragraphNum = paragraphNum,

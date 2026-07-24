@@ -1,5 +1,6 @@
 package io.legado.app.ui.book.read
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -19,6 +20,18 @@ class JsSourceReviewDispatchSourceTest {
             .substringBefore("private fun clearReviewSummaryProviders(")
 
         assertTrue(clickBlock.indexOf("if (source.isJsSource())") < clickBlock.indexOf("source.ruleReview"))
+        assertTrue(!clickBlock.contains("ReadBook.durChapterIndex"))
+        assertEquals(
+            2,
+            Regex("""chapterIndex\s*=\s*chapterIndex""").findAll(clickBlock).count()
+        )
+        assertEquals(
+            2,
+            Regex(
+                """paragraphData\s*=\s*ChapterProvider\.getReviewKeyById\(""" +
+                    """paragraphNum,\s*chapterIndex\)"""
+            ).findAll(clickBlock).count()
+        )
         assertTrue(summaryBlock.indexOf("if (source.isJsSource())") < summaryBlock.indexOf("source.ruleReview"))
         assertTrue(clickBlock.contains("ruleHash = source.mainJs.hashCode()"))
         assertTrue(jsSummaryBlock.contains("val sourceHash = source.mainJs.hashCode()"))

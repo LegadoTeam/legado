@@ -49,6 +49,17 @@ class NativeReviewProviderSourceTest {
         assertTrue(provider.contains("val reviewId = paragraphNum - titleOffset"))
         assertTrue(contentView.contains("textLine.paragraphNum - textLine.reviewTitleOffset"))
         assertTrue(
+            Regex(
+                """callBack\.onReviewClick\(\s*resolveReviewId\(textLine\),\s*""" +
+                    """column\.count,\s*textPage\.chapterIndex\s*\)"""
+            ).containsMatchIn(contentView)
+        )
+        assertTrue(
+            contentView.contains(
+                "fun onReviewClick(paragraphNum: Int, count: Int, chapterIndex: Int)"
+            )
+        )
+        assertTrue(
             layout.contains(
                 "titleMode != 2 || bookChapter.isVolume || !textChapter.hasBodyContent"
             )

@@ -260,7 +260,11 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                 }
 
                 is ReviewColumn -> {
-                    callBack.onReviewClick(resolveReviewId(textLine), column.count)
+                    callBack.onReviewClick(
+                        resolveReviewId(textLine),
+                        column.count,
+                        textPage.chapterIndex
+                    )
                     handled = true
                 }
 
@@ -799,7 +803,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         fun onLongScreenshotTouchEvent(event: MotionEvent): Boolean
         fun oldClickImg(src: String): Boolean
         fun clickImg(click: String, src: String)
-        fun onReviewClick(paragraphNum: Int, count: Int)
+        fun onReviewClick(paragraphNum: Int, count: Int, chapterIndex: Int)
     }
 
     private fun resolveReviewId(textLine: TextLine): Int {
