@@ -205,6 +205,24 @@ class JsTest {
     }
 
     @Test
+    fun indirectEvalDynamicRealm() {
+        val bindings = ScriptBindings()
+        bindings["cache"] = "EXEC_ENV"
+        Assert.assertEquals("EXEC_ENV", RhinoScriptEngine.eval("(0, eval)('cache')", bindings))
+        Assert.assertEquals("EXEC_ENV", RhinoScriptEngine.eval("new Function('return cache')()", bindings))
+        Assert.assertEquals("EXEC_ENV-L", RhinoScriptEngine.eval(
+            "function f() { var loc = '-L'; return eval('cache + loc') }; f()", bindings
+        ))
+
+        val shared = RhinoScriptEngine.getRuntimeScope(ScriptBindings())
+        RhinoScriptEngine.eval("function libEval(code) { return this.eval(code) }", shared)
+        val chained = ScriptBindings()
+        chained["cache"] = "EXEC_ENV2"
+        chained.chainTo(shared)
+        Assert.assertEquals("EXEC_ENV2", RhinoScriptEngine.eval("libEval('cache')", chained))
+    }
+
+    @Test
     fun typeofString() {
         val bindings = ScriptBindings()
         @Language("js")
