@@ -295,7 +295,7 @@ class AnalyzeRule(
      */
     @JvmOverloads
     fun getString(ruleStr: String?, mContent: Any? = null, isUrl: Boolean = false): String {
-        if (TextUtils.isEmpty(ruleStr)) return ""
+        if (ruleStr.isNullOrEmpty()) return ""
         val ruleList = splitSourceRuleCacheString(ruleStr)
         return getString(ruleList, mContent, isUrl)
     }
@@ -321,16 +321,13 @@ class AnalyzeRule(
                 val sourceRule = ruleList.first()
                 putRule(sourceRule.putMap)
                 sourceRule.makeUpRule(result)
-                result = if (sourceRule.mode == Mode.Json) {
-                    getAnalyzeByJSonPath(result).getString(sourceRule.rule)
-                } else if (sourceRule.getParamSize() > 1) {
-                    // get {{}}
-                    sourceRule.rule
-                } else {
-                    // 键值直接访问
-                    result[sourceRule.rule]?.toString()
+                result = when {
+                    sourceRule.mode == Mode.Js -> evalJS(sourceRule.rule, result)
+                    sourceRule.mode == Mode.Json -> getAnalyzeByJSonPath(result).getString(sourceRule.rule)
+                    sourceRule.getParamSize() > 1 -> sourceRule.rule // get {{}}
+                    else -> result[sourceRule.rule] // 键值直接访问
                 }?.let {
-                    replaceRegex(it, sourceRule)
+                    replaceRegex(it.toString(), sourceRule)
                 }
             } else if (result is LinkedTreeMap<*, *>) {
                 // 键值直接访问

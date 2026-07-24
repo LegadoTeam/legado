@@ -7,6 +7,7 @@ import io.legado.app.data.entities.rule.ReviewRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -131,6 +132,96 @@ class ReviewRuleParserTest {
             }
         }
         assertEquals("{\"other\":\"kept\"}", result.items[1].content)
+    }
+
+    @Test
+    fun `detail JavaScript keeps grouped roots and replies when optional badges are missing`() {
+        val source = BookSource(
+            bookSourceUrl = "review-js://grouped-detail",
+            bookSourceName = "Review source",
+            jsLib = "function formatEmoji(value) { return value; }",
+        )
+        val book = Book(bookUrl = "https://example.com/book", origin = source.bookSourceUrl)
+        val chapter = BookChapter(
+            url = "https://example.com/chapter/1",
+            bookUrl = book.bookUrl,
+        )
+        val contentRule = """@js:
+            const J = (path) => java.getString(path);
+            JSON.stringify({text: formatEmoji(String(J("$.Content"))) });
+        """.trimIndent()
+
+        val result = ReviewRuleParser.parseDetailPage(
+            body = """
+                {
+                  "Data": {
+                    "DataList": [
+                      {
+                        "Id": "root-1",
+                        "RootReviewId": "root-1",
+                        "UserName": "Alice",
+                        "Content": "Root comment"
+                      },
+                      {
+                        "Id": "reply-1",
+                        "RootReviewId": "root-1",
+                        "UserName": "Bob",
+                        "Content": "Reply comment"
+                      }
+                    ]
+                  }
+                }
+            """.trimIndent(),
+            rule = ReviewRule(
+                detailListRule = """@js:
+                    const data = JSON.parse(result).Data.DataList;
+                    const roots = new Map();
+                    for (const item of data) {
+                      if (item.Id === item.RootReviewId) {
+                        item.replyList = [];
+                        roots.set(item.Id, item);
+                      } else {
+                        const root = roots.get(item.RootReviewId);
+                        if (root) root.replyList.push(item);
+                      }
+                    }
+                    [...roots.values()];
+                """.trimIndent(),
+                detailIdRule = "$.Id",
+                detailNameRule = "$.UserName",
+                detailBadgeRule = "$.TitleInfoList[*].TitleImage",
+                detailContentRule = contentRule,
+                replyListRule = "$.replyList[*]",
+                replyIdRule = "$.Id",
+                replyNameRule = "$.UserName",
+                replyBadgeRule = "$.TitleInfoList[*].TitleImage",
+                replyContentRule = contentRule,
+            ),
+            nextPageRule = null,
+            baseUrl = chapter.url,
+            source = source,
+            book = book,
+            chapter = chapter,
+            context = EmptyCoroutineContext,
+            paraIndex = "2",
+            paraData = "2",
+            page = "1",
+        )
+
+        assertEquals(1, result.items.size)
+        with(result.items.single()) {
+            assertEquals("root-1", id)
+            assertEquals("Alice", name)
+            assertEquals("Root comment", content)
+            assertTrue(badges.isEmpty())
+            assertEquals(1, replies.size)
+            with(replies.single()) {
+                assertEquals("reply-1", id)
+                assertEquals("Bob", name)
+                assertEquals("Reply comment", content)
+                assertTrue(badges.isEmpty())
+            }
+        }
     }
 
     @Test
