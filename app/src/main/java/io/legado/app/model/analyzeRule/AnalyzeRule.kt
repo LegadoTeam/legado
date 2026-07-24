@@ -41,6 +41,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.apache.commons.text.StringEscapeUtils
 import org.jsoup.nodes.Node
+import org.htmlunit.corejs.javascript.NativeArray
 import org.htmlunit.corejs.javascript.NativeObject
 import org.htmlunit.corejs.javascript.Scriptable
 import org.htmlunit.corejs.javascript.TopLevel
@@ -471,8 +472,29 @@ class AnalyzeRule(
                 }
             }
         }
-        result?.let {
-            return it as List<Any>
+        when (val value = result) {
+            is List<*> -> {
+                if (value.none { it == null || it === Scriptable.NOT_FOUND }) {
+                    @Suppress("UNCHECKED_CAST")
+                    return value as List<Any>
+                }
+                return value.mapNotNull { it?.takeUnless { item -> item === Scriptable.NOT_FOUND } }
+            }
+
+            is Array<*> -> {
+                return value.mapNotNull { it?.takeUnless { item -> item === Scriptable.NOT_FOUND } }
+            }
+
+            is NativeArray -> {
+                val values = ArrayList<Any>(value.length.toInt())
+                for (index in 0 until value.length.toInt()) {
+                    val item = value.get(index, value)
+                    if (item != null && item !== Scriptable.NOT_FOUND) {
+                        values.add(item)
+                    }
+                }
+                return values
+            }
         }
         return ArrayList()
     }
