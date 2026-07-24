@@ -90,4 +90,10 @@ class EditSafetyTest {
         assertEquals(original, presentation.text)
         assertTrue(presentation.isInlineEditable)
     }
+
+    @Test
+    fun `long text is routed away from inline editor`() {
+        assertFalse(EditSafety.isTooLongForInline("x".repeat(EditSafety.MAX_INLINE_TEXT_LENGTH)))
+        assertTrue(EditSafety.isTooLongForInline("x".repeat(EditSafety.MAX_INLINE_TEXT_LENGTH + 1)))
+    }
 }

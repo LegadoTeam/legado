@@ -234,7 +234,11 @@ class BookSourceEditActivity :
         if (index < 0) return
 
         adapter.notifyItemChanged(index)
-        if (cursorPosition < 0 || EditSafety.isCombiningHeavy(editEntity.value.orEmpty())) return
+        if (
+            cursorPosition < 0 ||
+            EditSafety.isCombiningHeavy(editEntity.value.orEmpty()) ||
+            EditSafety.isTooLongForInline(editEntity.value.orEmpty())
+        ) return
 
         binding.recyclerView.post {
             val holder = binding.recyclerView.findViewHolderForAdapterPosition(index)

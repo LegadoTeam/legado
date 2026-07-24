@@ -6,6 +6,7 @@ package io.legado.app.ui.widget.code
 object EditSafety {
 
     const val PREVIEW_LINES = 6
+    const val MAX_INLINE_TEXT_LENGTH = 12_000
 
     private const val DENSITY_WINDOW = 64
     private const val MAX_COMBINING_RUN = 8
@@ -15,6 +16,9 @@ object EditSafety {
         val text: String,
         val isInlineEditable: Boolean
     )
+
+    fun isTooLongForInline(text: CharSequence): Boolean =
+        text.length > MAX_INLINE_TEXT_LENGTH
 
     fun presentation(originalText: String, placeholder: String): Presentation {
         val isUnsafe = isCombiningHeavy(originalText)
