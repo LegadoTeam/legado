@@ -6,11 +6,78 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.rule.ReviewRule
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.coroutines.EmptyCoroutineContext
 
 class ReviewRuleParserFallbackTest {
+
+    @Test
+    fun `missing optional JSONPath fields stay empty without error logs`() {
+        val source = BookSource(
+            bookSourceUrl = "https://example.com",
+            bookSourceName = "Review source",
+        )
+        val book = Book(
+            bookUrl = "https://example.com/book",
+            origin = source.bookSourceUrl,
+        )
+        val chapter = BookChapter(
+            url = "https://example.com/chapter/1",
+            bookUrl = book.bookUrl,
+        )
+
+        AppLog.clear()
+        try {
+            val result = ReviewRuleParser.parseDetailPage(
+                body = """
+                    {
+                      "items": [
+                        {
+                          "UserName": "Alice",
+                          "Content": "Hello",
+                          "replies": [{"UserName": "Bob", "Content": "Reply"}]
+                        }
+                      ]
+                    }
+                """.trimIndent(),
+                rule = ReviewRule(
+                    detailListRule = "$.items",
+                    detailAvatarRule = "$.UserHeadIcon",
+                    detailNameRule = "$.UserName",
+                    detailBadgeRule = "$.TitleInfoList[*].TitleImage",
+                    detailContentRule = "$.Content",
+                    replyListRule = "$.replies",
+                    replyAvatarRule = "$.UserHeadIcon",
+                    replyNameRule = "$.UserName",
+                    replyBadgeRule = "$.TitleInfoList[*].TitleImage",
+                    replyContentRule = "$.Content",
+                ),
+                nextPageRule = null,
+                baseUrl = chapter.url,
+                source = source,
+                book = book,
+                chapter = chapter,
+                context = EmptyCoroutineContext,
+                paraIndex = "1",
+                paraData = "key",
+                page = "1",
+            )
+
+            assertEquals(listOf("Alice"), result.items.map { it.name })
+            with(result.items.single()) {
+                assertNull(avatar)
+                assertTrue(badges.isEmpty())
+                assertEquals(listOf("Bob"), replies.map { it.name })
+                assertNull(replies.single().avatar)
+                assertTrue(replies.single().badges.isEmpty())
+            }
+            assertTrue(AppLog.logs.isEmpty())
+        } finally {
+            AppLog.clear()
+        }
+    }
 
     @Test
     fun `rule failures keep empty fallback and are recorded`() {
@@ -83,7 +150,7 @@ class ReviewRuleParserFallbackTest {
                 body = """{"items":[{}]}""",
                 rule = ReviewRule(
                     detailListRule = "$.items",
-                    detailNameRule = "$.broken[",
+                    detailNameRule = "$.broken[foo]",
                 ),
                 nextPageRule = null,
                 baseUrl = chapter.url,
@@ -95,7 +162,7 @@ class ReviewRuleParserFallbackTest {
                 paraData = "key",
                 page = "1",
             )
-            assertTrue(AppLog.logs.any { it.second.contains("$.broken[") })
+            assertTrue(AppLog.logs.any { it.second.contains("$.broken[foo]") })
         } finally {
             AppLog.clear()
         }
