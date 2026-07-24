@@ -39,9 +39,9 @@ class BookSourcePartHasJsTest {
     }
 
     @Test
-    fun `schema 93 exposes js source projection`() {
-        assertTrue(databaseSource.contains("version = 94"))
-        assertTrue(databaseSource.contains("AutoMigration(from = 92, to = 93)"))
+    fun `schema history preserves js source projection`() {
+        assertTrue(databaseSource.contains("version = 95"))
+        assertTrue(databaseSource.contains("AutoMigration(from = 94, to = 95)"))
         assertTrue(schemaSource.contains("\"version\": 93"))
         assertTrue(
             schemaSource.contains("(mainJs is not null and trim(mainJs) <> '') hasJs")
