@@ -58,6 +58,22 @@ class BottomWebViewDialogLifecycleContractTest {
         assertTrue(upConfig.contains("owner.lifecycleScope.launch(Dispatchers.Main)"))
     }
 
+    @Test
+    fun `bottom sheet references follow the current dialog`() {
+        val fields = section("private val binding", "private val displayMetrics")
+
+        assertTrue(fields.contains("private val bottomSheet: View?"))
+        assertTrue(
+            fields.contains(
+                "get() = dialog?.findViewById(com.google.android.material.R.id.design_bottom_sheet)"
+            )
+        )
+        assertTrue(fields.contains("private val behavior: BottomSheetBehavior<View>?"))
+        assertTrue(fields.contains("BottomSheetBehavior.from(sheet)"))
+        assertFalse(fields.contains("private val bottomSheet by lazy"))
+        assertFalse(fields.contains("private val behavior by lazy"))
+    }
+
     private fun section(startMarker: String, endMarker: String): String {
         val start = source.indexOf(startMarker)
         val end = source.indexOf(endMarker, start)
