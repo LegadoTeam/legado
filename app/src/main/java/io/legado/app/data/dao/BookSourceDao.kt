@@ -162,15 +162,12 @@ interface BookSourceDao {
     fun getEnabledByGroup(group: String): List<BookSource>
 
     @Query(
-        """select * from book_sources_part 
-        where enabled = 1 
-        and (bookSourceGroup = :group
-            or bookSourceGroup like :group || ',%' 
-            or bookSourceGroup like  '%,' || :group
-            or bookSourceGroup like  '%,' || :group || ',%')
-        order by customOrder asc"""
+        """select t2.* from book_sources_part as t2
+        where t2.enabled = 1
+        """ + SOURCE_GROUP_MEMBERSHIP_FILTER + """
+        order by t2.customOrder asc"""
     )
-    fun getEnabledPartByGroup(group: String): List<BookSourcePart>
+    fun getEnabledPartByGroup(sourceGroup: String): List<BookSourcePart>
 
     @Query(
         """select * from book_sources 
