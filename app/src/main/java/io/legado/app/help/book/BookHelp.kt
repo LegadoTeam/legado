@@ -514,7 +514,7 @@ object BookHelp {
         val newChapterSize = newChapterList.size
         val durIndex =
             if (oldChapterListSize == 0) oldDurChapterIndex
-            else oldDurChapterIndex * oldChapterListSize / newChapterSize
+            else (oldDurChapterIndex.toLong() * newChapterSize / oldChapterListSize).toInt()
         val min = max(0, min(oldDurChapterIndex, durIndex) - 10)
         val max = min(newChapterSize - 1, max(oldDurChapterIndex, durIndex) + 10)
         var nameSim = 0.0
