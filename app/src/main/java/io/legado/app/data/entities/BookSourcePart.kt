@@ -13,8 +13,8 @@ internal const val BOOK_SOURCE_QUERY_CHUNK_SIZE = 900
     """select bookSourceUrl, bookSourceName, bookSourceGroup, customOrder, enabled, enabledExplore, 
     (loginUrl is not null and trim(loginUrl) <> ''
      or (mainJs is not null and trim(mainJs) <> ''
-         and loginUi is not null and trim(loginUi) <> ''
-         and replace(trim(loginUi), ' ', '') <> '[]')) hasLoginUrl,
+         and loginUi is not null
+         and replace(replace(replace(replace(loginUi, ' ', ''), char(9), ''), char(10), ''), char(13), '') not in ('', '[]'))) hasLoginUrl,
     lastUpdateTime, respondTime, weight,
     (exploreUrl is not null and trim(exploreUrl) <> '') hasExploreUrl,
     eventListener, bookSourceType,

@@ -32,6 +32,18 @@ class BookSourceMainJsTest {
     }
 
     @Test
+    fun `inline login scripts allow surrounding whitespace and mixed case`() {
+        val source = BookSource(
+            bookSourceUrl = "https://example.com",
+            loginUrl = "\n <JS>function login(){}</JS>\t",
+            loginUi = "  <jS>return []; </JS>\n",
+        )
+
+        assertEquals("function login(){}", source.getLoginJs())
+        assertEquals("return [];", source.getLoginUiJs())
+    }
+
+    @Test
     fun `login capability accepts url or form`() {
         val source = BookSource(bookSourceUrl = "https://example.com")
         assertFalse(source.hasLogin())

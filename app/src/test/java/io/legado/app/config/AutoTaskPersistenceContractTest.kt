@@ -21,8 +21,8 @@ class AutoTaskPersistenceContractTest {
         val activity = file(
             "app/src/main/java/io/legado/app/ui/autoTask/AutoTaskActivity.kt"
         ).readText()
-        assertTrue(database.contains("version = 94"))
-        assertTrue(database.contains("AutoMigration(from = 93, to = 94)"))
+        assertTrue(database.contains("version = 95"))
+        assertTrue(database.contains("AutoMigration(from = 94, to = 95)"))
         assertTrue(database.contains("AutoTaskRule::class"))
         assertTrue(dao.contains("ORDER BY customOrder"))
         assertTrue(dao.contains("@Upsert"))
@@ -48,10 +48,10 @@ class AutoTaskPersistenceContractTest {
 
     @Test
     fun `exported room schema contains automatic task table`() {
-        val schema = file("app/schemas/io.legado.app.data.AppDatabase/94.json")
-        assertTrue("Room schema 94 must be committed", schema.isFile)
+        val schema = file("app/schemas/io.legado.app.data.AppDatabase/95.json")
+        assertTrue("Room schema 95 must be committed", schema.isFile)
         val text = schema.readText()
-        assertTrue(text.contains("\"version\": 94"))
+        assertTrue(text.contains("\"version\": 95"))
         assertTrue(text.contains("\"tableName\": \"auto_task_rules\""))
         assertTrue(text.contains("\"columnName\": \"customOrder\""))
     }

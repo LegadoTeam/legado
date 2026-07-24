@@ -111,13 +111,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
         if (view == null) return
         val source = viewModel.source ?: return
         val loginUiStr = source.loginUi ?: return
-        val codeStr = loginUiStr.let {
-            when {
-                it.startsWith("@js:") -> it.substring(4)
-                it.startsWith("<js>") -> it.substring(4, it.lastIndexOf("<"))
-                else -> null
-            }
-        }
+        val codeStr = source.getLoginUiJs()
         if (codeStr != null) {
             hasChange = true
             renderLoginUi(source, codeStr, deltaUp, installMenu = false)
@@ -694,13 +688,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
         val source = viewModel.source ?: return
         loginUrl = source.getLoginJs()
         val loginUiStr = source.loginUi ?: return
-        val codeStr = loginUiStr.let {
-            when {
-                it.startsWith("@js:") -> it.substring(4)
-                it.startsWith("<js>") -> it.substring(4, it.lastIndexOf("<"))
-                else -> null
-            }
-        }
+        val codeStr = source.getLoginUiJs()
         if (codeStr != null) {
             renderLoginUi(source, codeStr, deltaUp = false, installMenu = true)
         } else {

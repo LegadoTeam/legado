@@ -7,6 +7,7 @@ import com.script.buildScriptBindings
 import com.script.rhino.RhinoScriptEngine
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
+import io.legado.app.constant.AppPattern.JS_PATTERN
 import io.legado.app.data.entities.rule.RowUi
 import io.legado.app.help.CacheManager
 import io.legado.app.help.ConcurrentRateLimiter.Companion.updateConcurrentRate
@@ -92,14 +93,22 @@ interface BaseSource : JsExtensions {
         return this
     }
 
+    private fun extractInlineJs(rule: String?): String? {
+        val text = rule?.trim().orEmpty()
+        if (text.isBlank()) return null
+        val matcher = JS_PATTERN.matcher(text)
+        if (!matcher.matches()) return null
+        return (matcher.group(1) ?: matcher.group(2))?.trim()
+    }
+
+    fun getLoginUiJs(): String? {
+        return extractInlineJs(loginUi)
+    }
+
     fun getLoginJs(): String? {
-        val loginJs = loginUrl
-        return when {
-            loginJs == null -> null
-            loginJs.startsWith("@js:") -> loginJs.substring(4)
-            loginJs.startsWith("<js>") -> loginJs.substring(4, loginJs.lastIndexOf("<"))
-            else -> loginJs
-        }
+        val loginRule = loginUrl?.trim()
+        if (loginRule.isNullOrBlank()) return null
+        return extractInlineJs(loginRule) ?: loginRule
     }
 
     fun hasLoginForm(): Boolean {
@@ -223,28 +232,22 @@ interface BaseSource : JsExtensions {
             return GSON.fromJsonObject<MutableMap<String, String>>(json).getOrNull()
                 ?: mutableMapOf()
         }
-        val loginUiRule = loginUi?.takeUnless { it.isBlank() } ?: return mutableMapOf()
+        val loginUiRule = loginUi?.trim().takeUnless { it.isNullOrBlank() } ?: return mutableMapOf()
         return LoginInfoMapInitialization.run(
             sourceKey = getKey(),
             onReentry = { mutableMapOf<String, String>() },
         ) {
             // Dynamic login UI scripts can read login info while their defaults are being derived.
-            val loginUiJson = when {
-                loginUiRule.startsWith("@js:") -> JsSourceEngine.normalizeJsResult(
+            val loginUiJs = extractInlineJs(loginUiRule)
+            val loginUiJson = if (loginUiJs != null) {
+                JsSourceEngine.normalizeJsResult(
                     evalJS(
-                        "${getLoginJs() ?: ""}\n${loginUiRule.substring(4)}",
+                        "${getLoginJs() ?: ""}\n$loginUiJs",
                         configureScriptBindings()
                     )
                 ).orEmpty()
-
-                loginUiRule.startsWith("<js>") -> JsSourceEngine.normalizeJsResult(
-                    evalJS(
-                        "${getLoginJs() ?: ""}\n${loginUiRule.substring(4, loginUiRule.lastIndexOf("<"))}",
-                        configureScriptBindings()
-                    )
-                ).orEmpty()
-
-                else -> loginUiRule
+            } else {
+                loginUiRule
             }
             val loginInfo = GSON.fromJsonArray<RowUi>(loginUiJson).getOrNull()
                 ?.filter { it.type != "button" }
