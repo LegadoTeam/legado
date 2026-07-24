@@ -894,8 +894,8 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
 
     override fun upConfig(config: String) {
         val owner = viewLifecycleOwnerLiveData.value ?: return
-        try {
-            owner.lifecycleScope.launch(Dispatchers.Main) {
+        owner.lifecycleScope.launch(Dispatchers.Main) {
+            try {
                 GSON.fromJsonObject<Config>(config).getOrThrow().let { config ->
                     if (isFullScreen) {
                         pendingFullScreenConfigs.addLast(config)
@@ -903,9 +903,11 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                         setConfig(config)
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.put("config err", e)
             }
-        } catch (e: Exception) {
-            AppLog.put("config err", e)
         }
     }
 

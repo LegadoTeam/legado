@@ -55,7 +55,22 @@ class BottomWebViewDialogLifecycleContractTest {
         assertTrue(errorPage > cancellationGuard)
 
         assertTrue(upConfig.contains("val owner = viewLifecycleOwnerLiveData.value ?: return"))
-        assertTrue(upConfig.contains("owner.lifecycleScope.launch(Dispatchers.Main)"))
+        val launch = upConfig.indexOf("owner.lifecycleScope.launch(Dispatchers.Main)")
+        val tryBlock = upConfig.indexOf("try {")
+        val parseConfig = upConfig.indexOf("GSON.fromJsonObject<Config>(config).getOrThrow()")
+        val applyConfig = upConfig.indexOf("setConfig(config)")
+        val cancellationCatch = upConfig.indexOf("catch (e: CancellationException)")
+        val rethrowCancellation = upConfig.indexOf("throw e", cancellationCatch)
+        val exceptionCatch = upConfig.indexOf("catch (e: Exception)")
+        val logError = upConfig.indexOf("AppLog.put(\"config err\", e)")
+        assertTrue(launch >= 0)
+        assertTrue(tryBlock > launch)
+        assertTrue(parseConfig > tryBlock)
+        assertTrue(applyConfig > parseConfig)
+        assertTrue(cancellationCatch > applyConfig)
+        assertTrue(rethrowCancellation > cancellationCatch)
+        assertTrue(exceptionCatch > rethrowCancellation)
+        assertTrue(logError > exceptionCatch)
     }
 
     @Test
