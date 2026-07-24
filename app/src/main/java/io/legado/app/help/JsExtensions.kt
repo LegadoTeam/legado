@@ -22,6 +22,7 @@ import io.legado.app.help.http.SSLHelper
 import io.legado.app.help.http.StrResponse
 import io.legado.app.help.source.SourceHelp
 import io.legado.app.help.source.SourceVerificationHelp
+import io.legado.app.help.source.VerificationResult
 import io.legado.app.help.source.getSourceType
 import io.legado.app.model.Debug
 import io.legado.app.model.analyzeRule.AnalyzeUrl
@@ -369,11 +370,20 @@ interface JsExtensions : JsEncodeUtils {
 
     fun startBrowserAwait(url: String, title: String, refetchAfterSuccess: Boolean, html: String?): StrResponse {
         rhinoContext.ensureActive()
-        val pair = SourceVerificationHelp.getVerificationResult(
-            getSource(), url, title, true, refetchAfterSuccess, html
-        )
-        val (url2, body) = pair
-        return StrResponse(url2.ifEmpty { url }, body)
+        return when (val result = SourceVerificationHelp.getVerificationResult(
+            getSource(), url, title, true, refetchAfterSuccess, html, context
+        )) {
+            is VerificationResult.Response -> {
+                val (url2, body) = result.value
+                StrResponse(url2.ifEmpty { url }, body)
+            }
+
+            VerificationResult.Refetch -> AnalyzeUrl(
+                url,
+                source = getSource(),
+                coroutineContext = context
+            ).getStrResponse(useWebView = false)
+        }
     }
 
     /**
@@ -381,7 +391,11 @@ interface JsExtensions : JsEncodeUtils {
      */
     fun getVerificationCode(imageUrl: String): String {
         rhinoContext.ensureActive()
-        return SourceVerificationHelp.getVerificationResult(getSource(), imageUrl, "", false).second
+        val result = SourceVerificationHelp.getVerificationResult(
+            getSource(), imageUrl, "", false, coroutineContext = context
+        )
+        check(result is VerificationResult.Response)
+        return result.value.second
     }
 
     /**

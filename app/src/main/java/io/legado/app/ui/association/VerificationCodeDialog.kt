@@ -31,9 +31,7 @@ import io.legado.app.utils.viewbindingdelegate.viewBinding
 
 /**
  * 图片验证码对话框
- * 结果保存在内存中
- * val key = "${sourceOrigin ?: ""}_verificationResult"
- * CacheManager.get(key)
+ * 验证结果通过本次请求的 verificationResultKey 返回给等待线程。
  */
 class VerificationCodeDialog() : BaseDialogFragment(R.layout.dialog_verification_code_view),
     Toolbar.OnMenuItemClickListener {
@@ -42,13 +40,15 @@ class VerificationCodeDialog() : BaseDialogFragment(R.layout.dialog_verification
         imageUrl: String,
         sourceOrigin: String? = null,
         sourceName: String? = null,
-        sourceType: Int
+        sourceType: Int,
+        verificationResultKey: String? = null,
     ) : this() {
         arguments = Bundle().apply {
             putString("imageUrl", imageUrl)
             putString("sourceOrigin", sourceOrigin)
             putString("sourceName", sourceName)
             putInt("sourceType", sourceType)
+            putString("verificationResultKey", verificationResultKey)
         }
     }
 
@@ -61,6 +61,8 @@ class VerificationCodeDialog() : BaseDialogFragment(R.layout.dialog_verification
     }
 
     private var sourceOrigin: String? = null
+    private val verificationResultKey: String?
+        get() = arguments?.getString("verificationResultKey")
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?): Unit = binding.run {
         initMenu()
@@ -122,7 +124,7 @@ class VerificationCodeDialog() : BaseDialogFragment(R.layout.dialog_verification
         when (item.itemId) {
             R.id.menu_ok -> {
                 val verificationCode = binding.verificationCode.text.toString()
-                SourceVerificationHelp.setResult(sourceOrigin!!, verificationCode)
+                SourceVerificationHelp.setResult(verificationResultKey, verificationCode)
                 dismiss()
             }
 
@@ -148,7 +150,7 @@ class VerificationCodeDialog() : BaseDialogFragment(R.layout.dialog_verification
     }
 
     override fun onDestroy() {
-        SourceVerificationHelp.checkResult(sourceOrigin!!)
+        SourceVerificationHelp.checkResult(verificationResultKey)
         super.onDestroy()
         activity?.finish()
     }

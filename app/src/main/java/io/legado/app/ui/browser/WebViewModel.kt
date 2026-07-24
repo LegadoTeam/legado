@@ -36,6 +36,7 @@ class WebViewModel(application: Application) : BaseViewModel(application) {
     val headerMap: HashMap<String, String> = hashMapOf()
     var sourceVerificationEnable: Boolean = false
     var refetchAfterSuccess: Boolean = true
+    var verificationResultKey: String? = null
     var sourceName: String = ""
     var sourceOrigin: String = ""
     var sourceType = SourceType.book
@@ -53,6 +54,7 @@ class WebViewModel(application: Application) : BaseViewModel(application) {
             sourceType = intent.getIntExtra("sourceType", SourceType.book)
             sourceVerificationEnable = intent.getBooleanExtra("sourceVerificationEnable", false)
             refetchAfterSuccess = intent.getBooleanExtra("refetchAfterSuccess", true)
+            verificationResultKey = intent.getStringExtra("verificationResultKey")
             html = intent.getStringExtra("html")?.let{
                 localHtml = true
                 val headIndex = it.indexOf("<head", ignoreCase = true)
@@ -128,7 +130,7 @@ class WebViewModel(application: Application) : BaseViewModel(application) {
                         coroutineContext = coroutineContext
                     ).getStrResponseAwait(useWebView = false).body
                 }
-                SourceVerificationHelp.setResult(sourceOrigin, html ?: "", baseUrl)
+                SourceVerificationHelp.setResult(verificationResultKey, html ?: "", baseUrl)
             }.onSuccess {
                 success.invoke()
             }
@@ -137,7 +139,11 @@ class WebViewModel(application: Application) : BaseViewModel(application) {
                 execute {
                     html = StringEscapeUtils.unescapeJson(it).trim('"')
                 }.onSuccess {
-                    SourceVerificationHelp.setResult(sourceOrigin, html ?: "",  webView.url ?: "")
+                    SourceVerificationHelp.setResult(
+                        verificationResultKey,
+                        html ?: "",
+                        webView.url ?: "",
+                    )
                     success.invoke()
                 }
             }

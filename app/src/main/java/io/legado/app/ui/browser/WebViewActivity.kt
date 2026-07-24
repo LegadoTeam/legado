@@ -62,6 +62,8 @@ import io.legado.app.model.Download
 import splitties.systemservices.powerManager
 import java.lang.ref.WeakReference
 import java.net.URLDecoder
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit.SECONDS
 import androidx.core.graphics.createBitmap
 import io.legado.app.help.WebCacheManager
 import io.legado.app.help.webView.WebJsExtensions.Companion.nameCache
@@ -99,6 +101,14 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
         pooledWebView = WebViewPool.acquire(this)
         currentWebView = pooledWebView.realWebView
         binding.webViewContainer.addView(currentWebView)
+        if (!SourceVerificationHelp.attachVerificationUi(
+                intent.getStringExtra("verificationResultKey"),
+                ::finishVerificationUi,
+            )
+        ) {
+            finish()
+            return
+        }
         currentWebView.post {
             currentWebView.clearHistory()
         }
@@ -302,8 +312,20 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
     }
 
     override fun finish() {
-        SourceVerificationHelp.checkResult(viewModel.sourceOrigin)
+        SourceVerificationHelp.checkResult(intent.getStringExtra("verificationResultKey"))
         super.finish()
+    }
+
+    private fun finishVerificationUi() {
+        val finished = CountDownLatch(1)
+        runOnUiThread {
+            try {
+                finish()
+            } finally {
+                finished.countDown()
+            }
+        }
+        finished.await(5, SECONDS)
     }
 
     private fun close() {
