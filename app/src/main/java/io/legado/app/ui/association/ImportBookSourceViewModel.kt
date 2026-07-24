@@ -3,7 +3,6 @@ package io.legado.app.ui.association
 import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.MutableLiveData
-import com.jayway.jsonpath.JsonPath
 import io.legado.app.R
 import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppConst
@@ -21,9 +20,6 @@ import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.source.SourceHelp
 import io.legado.app.model.RuleUpdate
 import io.legado.app.model.jsSource.JsSourceConfig
-import io.legado.app.utils.GSON
-import io.legado.app.utils.fromJsonArray
-import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.inputStream
 import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.isJsonArray
@@ -166,32 +162,8 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
         executeLazy {
             val mText = text.trim()
             when {
-                mText.isJsonObject() -> {
-                    kotlin.runCatching {
-                        val json = JsonPath.parse(mText)
-                        json.read<List<String>>("$.sourceUrls")
-                    }.onSuccess { listUrl ->
-                        listUrl.forEach {
-                            importSourceUrl(it)
-                        }
-                    }.onFailure {
-                        GSON.fromJsonObject<BookSource>(mText).getOrThrow().let {
-                            if (it.bookSourceUrl.isEmpty()) {
-                                throw NoStackTraceException("不是书源")
-                            }
-                            allSources.add(it)
-                        }
-                    }
-                }
-
-                mText.isJsonArray() -> GSON.fromJsonArray<BookSource>(mText).getOrThrow()
-                    .let { items ->
-                        val source = items.firstOrNull() ?: return@let
-                        if (source.bookSourceUrl.isEmpty()) {
-                            throw NoStackTraceException("不是书源")
-                        }
-                        allSources.addAll(items)
-                    }
+                mText.isJsonObject() || mText.isJsonArray() ->
+                    importBookSourceJson(parseBookSourceJson(mText))
 
                 mText.isAbsUrl() -> {
                     importSourceUrl(mText)
@@ -241,22 +213,19 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
     private suspend fun importSourceText(text: String) {
         val content = text.trim()
         when {
-            content.isJsonArray() -> GSON.fromJsonArray<BookSource>(content).getOrThrow().let { list ->
-                val source = list.firstOrNull() ?: return
-                if (source.bookSourceUrl.isEmpty()) {
-                    throw NoStackTraceException("不是书源")
-                }
-                allSources.addAll(list)
-            }
-
-            content.isJsonObject() -> GSON.fromJsonObject<BookSource>(content).getOrThrow().let {
-                if (it.bookSourceUrl.isEmpty()) {
-                    throw NoStackTraceException("不是书源")
-                }
-                allSources.add(it)
-            }
+            content.isJsonArray() || content.isJsonObject() ->
+                importBookSourceJson(parseBookSourceJson(content, allowSourceUrls = false))
 
             else -> allSources.add(JsSourceConfig.extract(content, coroutineContext))
+        }
+    }
+
+    private suspend fun importBookSourceJson(importJson: BookSourceImportJson) {
+        when (importJson) {
+            is BookSourceImportJson.Sources -> allSources.addAll(importJson.items)
+            is BookSourceImportJson.SourceUrls -> importJson.items.forEach {
+                importSourceUrl(it)
+            }
         }
     }
 
