@@ -3,6 +3,7 @@ package io.legado.app.ui.association
 import com.google.gson.JsonObject
 import io.legado.app.data.entities.RssSource
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.source.requireSourceUrl
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
 import io.legado.app.utils.fromJsonObject
@@ -19,7 +20,7 @@ internal fun parseRssSourceJson(text: String): RssSourceImportJson {
     return when {
         json.isJsonArray() -> {
             val sources = GSON.fromJsonArray<RssSource>(json).getOrThrow()
-            sources.firstOrNull()?.requireSourceUrl()
+            sources.forEach { it.requireSourceUrl() }
             RssSourceImportJson.Sources(sources)
         }
 
@@ -39,11 +40,5 @@ internal fun parseRssSourceJson(text: String): RssSourceImportJson {
         }
 
         else -> throw NoStackTraceException("不是订阅源")
-    }
-}
-
-private fun RssSource.requireSourceUrl() {
-    if (sourceUrl.isNullOrEmpty()) {
-        throw NoStackTraceException("不是订阅源")
     }
 }

@@ -15,15 +15,15 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.decompressed
 import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
+import io.legado.app.help.source.requireSourceUrl
 import io.legado.app.help.source.SourceHelp
 import io.legado.app.model.RuleUpdate
 import io.legado.app.utils.GSON
-import io.legado.app.utils.fromJsonObject
+import io.legado.app.utils.fromJsonArray
 import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.isJsonArray
 import io.legado.app.utils.isJsonObject
 import io.legado.app.utils.isUri
-import io.legado.app.utils.jsonPath
 import io.legado.app.utils.readText
 import io.legado.app.utils.splitNotBlank
 import splitties.init.appCtx
@@ -153,16 +153,9 @@ class ImportRssSourceViewModel(app: Application) : BaseViewModel(app) {
                 url(url)
             }
         }.decompressed().byteStream().use { body ->
-            val items: List<Map<String, Any>> = jsonPath.parse(body).read("$")
-            for (item in items) {
-                if (!item.containsKey("sourceUrl")) {
-                    throw NoStackTraceException("不是订阅源")
-                }
-                val jsonItem = jsonPath.parse(item)
-                GSON.fromJsonObject<RssSource>(jsonItem.jsonString()).getOrThrow().let { source ->
-                    allSources.add(source)
-                }
-            }
+            val sources = GSON.fromJsonArray<RssSource>(body).getOrThrow()
+            sources.forEach { source -> source.requireSourceUrl() }
+            allSources.addAll(sources)
         }
     }
 
