@@ -194,7 +194,14 @@ object AudioPlay : CoroutineScope by MainScope() {
 
     fun changePlayMode() {
         playMode = playMode.next()
-        book?.setPlayMode(playMode.ordinal)
+        book?.let { currentBook ->
+            val mode = playMode.ordinal
+            val bookUrl = currentBook.bookUrl
+            currentBook.setPlayMode(mode)
+            executor.execute {
+                appDb.bookDao.updateAudioPlayMode(bookUrl, mode)
+            }
+        }
         postEvent(EventBus.PLAY_MODE_CHANGED, playMode)
     }
 

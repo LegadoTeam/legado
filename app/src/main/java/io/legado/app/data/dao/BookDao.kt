@@ -7,6 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import com.google.gson.JsonObject
 import io.legado.app.constant.BookType
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookCacheCleanupSnapshot
@@ -14,6 +15,8 @@ import io.legado.app.data.entities.BookCacheInfo
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookSource
 import io.legado.app.help.book.isNotShelf
+import io.legado.app.utils.GSON
+import io.legado.app.utils.fromJsonObject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -191,6 +194,17 @@ interface BookDao {
     @Update
     fun update(vararg book: Book)
 
+    @Query("select readConfig from books where bookUrl = :bookUrl")
+    fun getReadConfigJson(bookUrl: String): String?
+
+    @Query("update books set readConfig = :readConfig where bookUrl = :bookUrl")
+    fun updateReadConfigJson(bookUrl: String, readConfig: String)
+
+    @Transaction
+    fun updateAudioPlayMode(bookUrl: String, playMode: Int) {
+        updateReadConfigJson(bookUrl, getReadConfigJson(bookUrl).withAudioPlayMode(playMode))
+    }
+
     @Delete
     fun delete(vararg book: Book)
 
@@ -214,4 +228,10 @@ interface BookDao {
 
     @Query("delete from books where type & ${BookType.notShelf} > 0")
     fun deleteNotShelfBook()
+}
+
+internal fun String?.withAudioPlayMode(playMode: Int): String {
+    val readConfig = GSON.fromJsonObject<JsonObject>(this).getOrNull() ?: JsonObject()
+    readConfig.addProperty("playMode", playMode)
+    return GSON.toJson(readConfig)
 }
