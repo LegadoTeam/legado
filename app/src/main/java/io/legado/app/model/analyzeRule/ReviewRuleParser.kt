@@ -1,5 +1,6 @@
 package io.legado.app.model.analyzeRule
 
+import com.jayway.jsonpath.PathNotFoundException
 import io.legado.app.constant.AppLog
 import io.legado.app.data.entities.BaseSource
 import io.legado.app.data.entities.Book
@@ -311,7 +312,11 @@ internal object ReviewRuleParser {
                 analyzeRule.getString(analyzeRule.splitSourceRule(value), content)
             }
         }
-        result.onFailure { logRuleErrorOnce(loggedRules, "段评规则执行出错", value, it) }
+        result.onFailure {
+            if (it !is PathNotFoundException) {
+                logRuleErrorOnce(loggedRules, "段评规则执行出错", value, it)
+            }
+        }
         return result.getOrNull()?.takeIf { it.isNotBlank() }
     }
 
@@ -323,11 +328,13 @@ internal object ReviewRuleParser {
     ): List<String> {
         val value = rule?.trim().orEmpty()
         if (value.isEmpty()) return emptyList()
-        val list = if (content is Map<*, *> && isJsonPath(value)) {
+        val result = if (content is Map<*, *> && isJsonPath(value)) {
             runCatching { AnalyzeByJSonPath(content) { throw it }.getStringList(value) }
         } else {
             runCatching { analyzeRule.getStringList(value, content).orEmpty() }
         }
+        if (result.exceptionOrNull() is PathNotFoundException) return emptyList()
+        val list = result
             .onFailure { logRuleErrorOnce(loggedRules, "段评规则执行出错", value, it) }
             .getOrDefault(emptyList())
         if (list.isNotEmpty()) return list.flatMap(::splitBadgeValue).distinct()
