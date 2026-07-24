@@ -67,12 +67,14 @@ class FileAssociationActivity :
             importBook(uri)
         }
         viewModel.onLineImportLive.observe(this) {
+            binding.rotateLoading.gone()
             startActivity<OnLineImportActivity> {
                 data = it
             }
             finish()
         }
         viewModel.successLive.observe(this) {
+            binding.rotateLoading.gone()
             when (it.first) {
                 "bookSource" -> showDialogFragment(ImportBookSourceDialog(it.second, true))
                 "rssSource" -> showDialogFragment(ImportRssSourceDialog(it.second, true))
@@ -123,6 +125,7 @@ class FileAssociationActivity :
                     .onGranted {
                         viewModel.dispatchIntent(data)
                     }.onDenied {
+                        binding.rotateLoading.gone()
                         toastOnUi("请求存储权限失败。")
                         handler.postDelayed(2000) {
                             finish()
@@ -136,6 +139,7 @@ class FileAssociationActivity :
         if (uri.isContentScheme()) {
             val treeUriStr = AppConfig.defaultBookTreeUri
             if (treeUriStr.isNullOrEmpty()) {
+                binding.rotateLoading.gone()
                 localBookTreeSelect.launch {
                     title = getString(R.string.select_book_folder)
                     mode = HandleFileContract.DIR_SYS
@@ -149,6 +153,7 @@ class FileAssociationActivity :
     }
 
     private fun importBook(treeUri: Uri?, uri: Uri) {
+        binding.rotateLoading.visible()
         lifecycleScope.launch {
             runCatching {
                 withContext(IO) {
@@ -204,6 +209,7 @@ class FileAssociationActivity :
                     }
                 }
             }.onFailure {
+                binding.rotateLoading.gone()
                 when (it) {
                     is InvalidBooksDirException -> localBookTreeSelect.launch {
                         title = getString(R.string.select_book_folder)
