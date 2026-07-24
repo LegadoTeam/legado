@@ -66,10 +66,15 @@ class BookshelfReadProgressTest {
     }
 
     @Test
-    fun `bookshelf settings expose the progress switch in order`() {
+    fun `bookshelf settings expose display switches in order`() {
         val document = parseProjectXml("src/main/res/layout/dialog_bookshelf_config.xml")
         val progressSwitch = document.findElementById("@+id/sw_show_read_progress")
         val waitSwitch = document.findElementById("@+id/sw_show_wait_up_books")
+        val fastScrollerSwitch =
+            document.findElementById("@+id/sw_show_bookshelf_fast_scroller")
+        val recentReadingSwitch = document.findElementById("@+id/sw_show_recent_reading")
+        val statsSwitch = document.findElementById("@+id/sw_show_bookshelf_stats")
+        val layout = document.findElementById("@+id/ll_layout")
 
         assertEquals("@string/show_read_progress", progressSwitch.androidAttribute("text"))
         assertEquals(
@@ -80,11 +85,30 @@ class BookshelfReadProgressTest {
             "@+id/sw_show_read_progress",
             waitSwitch.appAttribute("layout_constraintTop_toBottomOf"),
         )
+        assertEquals(
+            "@+id/sw_show_bookshelf_fast_scroller",
+            recentReadingSwitch.appAttribute("layout_constraintTop_toBottomOf"),
+        )
+        assertEquals("@string/recent_reading", recentReadingSwitch.androidAttribute("text"))
+        assertEquals(
+            "@+id/sw_show_recent_reading",
+            statsSwitch.appAttribute("layout_constraintTop_toBottomOf"),
+        )
+        assertEquals("@string/bookshelf_statistics", statsSwitch.androidAttribute("text"))
+        assertEquals(
+            "@+id/sw_show_bookshelf_stats",
+            layout.appAttribute("layout_constraintTop_toBottomOf"),
+        )
+        assertEquals(
+            "@+id/sw_show_wait_up_books",
+            fastScrollerSwitch.appAttribute("layout_constraintTop_toBottomOf"),
+        )
     }
 
     @Test
     fun `bookshelf layouts expose the shared header and keep content below it`() {
         val header = parseProjectXml("src/main/res/layout/view_bookshelf_header.xml")
+        assertEquals("gone", header.documentElement.androidAttribute("visibility"))
         assertEquals(
             "gone",
             header.findElementById("@+id/continue_reading").androidAttribute("visibility"),
@@ -117,6 +141,47 @@ class BookshelfReadProgressTest {
             style2.findElementById("@+id/tv_empty_msg")
                 .appAttribute("layout_constraintTop_toBottomOf"),
         )
+    }
+
+    @Test
+    fun `bookshelf header options default off and gate database work`() {
+        val appConfig =
+            projectFile("src/main/java/io/legado/app/help/config/AppConfig.kt").readText()
+        assertTrue(
+            appConfig.contains(
+                "get() = appCtx.getPrefBoolean(PreferKey.showBookshelfRecentReading, false)",
+            ),
+        )
+        assertTrue(
+            appConfig.contains(
+                "get() = appCtx.getPrefBoolean(PreferKey.showBookshelfStats, false)",
+            ),
+        )
+
+        val fragment = projectFile(
+            "src/main/java/io/legado/app/ui/main/bookshelf/BaseBookshelfFragment.kt",
+        ).readText()
+        val disabledGate = fragment.indexOf("if (!showRecentReading && !showBookshelfStats) return")
+        val databaseFlow = fragment.indexOf("appDb.bookDao.flowShelfBookCount()")
+        assertTrue(disabledGate >= 0)
+        assertTrue(databaseFlow > disabledGate)
+        assertTrue(fragment.contains("val book = if (showRecentReading)"))
+        assertTrue(fragment.contains("val readingCount = if (showBookshelfStats)"))
+        assertTrue(
+            fragment.contains(
+                "if (showBookshelfStats || book != null) View.VISIBLE else View.GONE",
+            ),
+        )
+        val recentSetting = fragment.indexOf(
+            "AppConfig.showBookshelfRecentReading = swShowRecentReading.isChecked",
+        )
+        val statsSetting = fragment.indexOf(
+            "AppConfig.showBookshelfStats = swShowBookshelfStats.isChecked",
+        )
+        assertTrue(recentSetting >= 0)
+        assertTrue(fragment.indexOf("recreate = true", recentSetting) in 0..<statsSetting)
+        assertTrue(statsSetting >= 0)
+        assertTrue(fragment.indexOf("recreate = true", statsSetting) > statsSetting)
     }
 
     @Test

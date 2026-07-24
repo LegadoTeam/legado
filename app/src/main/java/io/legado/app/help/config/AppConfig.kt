@@ -211,6 +211,18 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefBoolean(PreferKey.showBookshelfReadProgress, value)
         }
 
+    var showBookshelfRecentReading: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.showBookshelfRecentReading, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.showBookshelfRecentReading, value)
+        }
+
+    var showBookshelfStats: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.showBookshelfStats, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.showBookshelfStats, value)
+        }
+
     var showWaitUpCount: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.showWaitUpCount, false)
         set(value) {

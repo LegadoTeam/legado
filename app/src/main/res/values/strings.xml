@@ -425,6 +425,7 @@
     <string name="no_loaded_books_to_add">No loaded books to add</string>
     <string name="continue_read">Continue reading</string>
     <string name="bookshelf_stats">%1$d books · %2$d reading</string>
+    <string name="bookshelf_statistics">Bookshelf statistics</string>
     <string name="read_not_started">Not started</string>
     <string name="cover_path">Cover path</string>
     <string name="page_anim_cover">Cover</string>

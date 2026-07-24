@@ -13,6 +13,8 @@ object PreferKey {
     const val editTemeAuto = "editTemeAuto"
     const val showUnread = "showUnread"
     const val showBookshelfReadProgress = "showBookshelfReadProgress"
+    const val showBookshelfRecentReading = "showBookshelfRecentReading"
+    const val showBookshelfStats = "showBookshelfStats"
     const val showBooknameLayout = "showBooknameLayout"
     const val bookshelfMargin = "bookshelfMargin"
     const val bookGroupStyle = "bookGroupStyle"

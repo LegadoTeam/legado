@@ -8,7 +8,8 @@
     android:paddingLeft="16dp"
     android:paddingTop="8dp"
     android:paddingRight="16dp"
-    android:paddingBottom="12dp">
+    android:paddingBottom="12dp"
+    android:visibility="gone">
 
     <TextView
         android:id="@+id/tv_shelf_stats"

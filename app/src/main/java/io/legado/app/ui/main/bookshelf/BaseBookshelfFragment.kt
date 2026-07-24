@@ -138,6 +138,16 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
 
     private fun subscribeShelfHeaderRefresh() {
         shelfHeaderFlowJob?.cancel()
+        shelfHeaderFlowJob = null
+        continueBook = null
+        val header = shelfHeaderBinding ?: return
+        val showRecentReading = AppConfig.showBookshelfRecentReading
+        val showBookshelfStats = AppConfig.showBookshelfStats
+        header.tvShelfStats.visibility = if (showBookshelfStats) View.VISIBLE else View.GONE
+        header.continueReading.gone()
+        header.root.visibility = if (showBookshelfStats) View.VISIBLE else View.GONE
+        if (!showRecentReading && !showBookshelfStats) return
+
         shelfHeaderFlowJob = viewLifecycleOwner.lifecycleScope.launch {
             appDb.bookDao.flowShelfBookCount()
                 .flowWithLifecycleAndDatabaseChangeFirst(
@@ -149,24 +159,38 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
                 .conflate()
                 .flowOn(Dispatchers.Default)
                 .collect { bookCount ->
-                    val header = shelfHeaderBinding ?: return@collect
+                    val currentHeader = shelfHeaderBinding ?: return@collect
                     val (book, readingCount) = withContext(Dispatchers.IO) {
-                        appDb.bookDao.lastReadBookOnShelf to appDb.bookDao.readingCount
+                        val book = if (showRecentReading) {
+                            appDb.bookDao.lastReadBookOnShelf
+                        } else {
+                            null
+                        }
+                        val readingCount = if (showBookshelfStats) {
+                            appDb.bookDao.readingCount
+                        } else {
+                            0
+                        }
+                        book to readingCount
                     }
-                    if (shelfHeaderBinding !== header) return@collect
+                    if (shelfHeaderBinding !== currentHeader) return@collect
                     continueBook = book
-                    header.tvShelfStats.text =
-                        getString(R.string.bookshelf_stats, bookCount, readingCount)
+                    if (showBookshelfStats) {
+                        currentHeader.tvShelfStats.text =
+                            getString(R.string.bookshelf_stats, bookCount, readingCount)
+                    }
+                    currentHeader.root.visibility =
+                        if (showBookshelfStats || book != null) View.VISIBLE else View.GONE
                     if (book == null) {
-                        header.continueReading.gone()
+                        currentHeader.continueReading.gone()
                         return@collect
                     }
-                    header.continueReading.visibility = View.VISIBLE
-                    header.tvContinueName.text = book.name
-                    header.tvContinueChapter.text = book.durChapterTitle
+                    currentHeader.continueReading.visibility = View.VISIBLE
+                    currentHeader.tvContinueName.text = book.name
+                    currentHeader.tvContinueChapter.text = book.durChapterTitle
                         .takeIf { it?.isNotBlank() == true }
                         ?: getString(R.string.read_not_started)
-                    header.tvContinuePercent.text =
+                    currentHeader.tvContinuePercent.text =
                         "${((book.readProgress() ?: 0f) * 100).roundToInt().coerceIn(0, 100)}%"
                 }
         }
@@ -280,6 +304,8 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
                         swShowReadProgress.isChecked = AppConfig.showBookshelfReadProgress
                         swShowWaitUpBooks.isChecked = AppConfig.showWaitUpCount
                         swShowBookshelfFastScroller.isChecked = AppConfig.showBookshelfFastScroller
+                        swShowRecentReading.isChecked = AppConfig.showBookshelfRecentReading
+                        swShowBookshelfStats.isChecked = AppConfig.showBookshelfStats
                         rgLayout.checkByIndex(bookshelfLayout)
                         rgbLayout.checkByIndex(showBookname)
                         if (bookshelfLayout < 2) {
@@ -328,6 +354,14 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
                     if (AppConfig.showBookshelfFastScroller != swShowBookshelfFastScroller.isChecked) {
                         AppConfig.showBookshelfFastScroller = swShowBookshelfFastScroller.isChecked
                         postEvent(EventBus.BOOKSHELF_REFRESH, "")
+                    }
+                    if (AppConfig.showBookshelfRecentReading != swShowRecentReading.isChecked) {
+                        AppConfig.showBookshelfRecentReading = swShowRecentReading.isChecked
+                        recreate = true
+                    }
+                    if (AppConfig.showBookshelfStats != swShowBookshelfStats.isChecked) {
+                        AppConfig.showBookshelfStats = swShowBookshelfStats.isChecked
+                        recreate = true
                     }
                     if (bookshelfSort != rgSort.getCheckedIndex()) {
                         AppConfig.bookshelfSort = rgSort.getCheckedIndex()
