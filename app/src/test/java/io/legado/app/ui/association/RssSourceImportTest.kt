@@ -1,5 +1,6 @@
 package io.legado.app.ui.association
 
+import com.google.gson.JsonSyntaxException
 import io.legado.app.data.entities.RssSource
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.source.requireSourceUrl
@@ -134,5 +135,28 @@ class RssSourceImportTest {
 
         assertTrue(result is RssSourceImportJson.SourceUrls)
         assertTrue((result as RssSourceImportJson.SourceUrls).items.isEmpty())
+    }
+
+    @Test
+    fun `rejects null empty or blank source urls while keeping empty arrays`() {
+        val invalidSourceUrls = listOf(
+            """{"sourceUrls":null}""",
+            """{"sourceUrls":[""]}""",
+            """{"sourceUrls":["   "]}""",
+        )
+
+        invalidSourceUrls.forEach { json ->
+            val error = assertThrows(NoStackTraceException::class.java) {
+                parseRssSourceJson(json)
+            }
+            assertEquals("不是订阅源", error.message)
+        }
+
+        assertThrows(JsonSyntaxException::class.java) {
+            parseRssSourceJson("""{"sourceUrls":[null]}""")
+        }
+
+        val empty = parseRssSourceJson("""{"sourceUrls":[]}""")
+        assertTrue((empty as RssSourceImportJson.SourceUrls).items.isEmpty())
     }
 }

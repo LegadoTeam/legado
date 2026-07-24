@@ -27,10 +27,16 @@ internal fun parseRssSourceJson(text: String): RssSourceImportJson {
         json.isJsonObject() -> {
             val jsonObject = GSON.fromJsonObject<JsonObject>(json).getOrThrow()
             if (jsonObject.has("sourceUrls")) {
-                val sourceUrls = jsonObject.get("sourceUrls")
-                    ?.takeUnless { it.isJsonNull }
+                val sourceUrlsElement = jsonObject.get("sourceUrls")
+                if (sourceUrlsElement?.isJsonNull == true) {
+                    throw NoStackTraceException("不是订阅源")
+                }
+                val sourceUrls = sourceUrlsElement
                     ?.let { GSON.fromJsonArray<String>(it.toString()).getOrThrow() }
                     .orEmpty()
+                if (sourceUrls.any { it.isBlank() }) {
+                    throw NoStackTraceException("不是订阅源")
+                }
                 RssSourceImportJson.SourceUrls(sourceUrls)
             } else {
                 val source = GSON.fromJsonObject<RssSource>(json).getOrThrow()
