@@ -65,10 +65,20 @@ class BookSourceEditAdapter(
 
         fun bind(editEntity: EditEntity) = binding.run {
             val rawText = editEntity.value.orEmpty()
-            val presentation = EditSafety.presentation(
-                rawText,
-                itemView.context.getString(R.string.combining_text_placeholder)
-            )
+            val presentation = if (EditSafety.isTooLongForInline(rawText)) {
+                EditSafety.Presentation(
+                    itemView.context.getString(
+                        R.string.large_text_placeholder,
+                        rawText.length,
+                    ),
+                    isInlineEditable = false,
+                )
+            } else {
+                EditSafety.presentation(
+                    rawText,
+                    itemView.context.getString(R.string.combining_text_placeholder)
+                )
+            }
             isUnsafeText = !presentation.isInlineEditable
 
             editText.setTag(R.id.tag, editEntity.key)
