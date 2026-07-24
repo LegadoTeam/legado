@@ -34,6 +34,10 @@ and exists (
 )
 """
 
+private const val REPLACE_RULE_NO_GROUP_FILTER = """
+trim(coalesce(`group`, ''), $GROUP_TRIM_CHARACTERS) in ('', '未分组')
+"""
+
 @Dao
 interface ReplaceRuleDao {
 
@@ -59,7 +63,10 @@ interface ReplaceRuleDao {
     @Query("select `group` from replace_rules where `group` is not null and `group` <> ''")
     fun flowGroupsUnProcessed(): Flow<List<String>>
 
-    @Query("select * from replace_rules where `group` is null or trim(`group`) = '' or trim(`group`) like '%未分组%'")
+    @Query(
+        """select * from replace_rules
+        where """ + REPLACE_RULE_NO_GROUP_FILTER
+    )
     fun flowNoGroup(): Flow<List<ReplaceRule>>
 
     @get:Query("SELECT MIN(sortOrder) FROM replace_rules")

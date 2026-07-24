@@ -17,6 +17,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 
+private const val BOOK_SOURCE_NO_GROUP_FILTER = """
+trim(coalesce(bookSourceGroup, ''), $GROUP_TRIM_CHARACTERS) in ('', '未分组')
+"""
+
 @Dao
 interface BookSourceDao {
 
@@ -89,7 +93,7 @@ interface BookSourceDao {
 
     @Query(
         """select * from book_sources_part 
-        where bookSourceGroup is null or bookSourceGroup = '' or bookSourceGroup like '%未分组%'
+        where """ + BOOK_SOURCE_NO_GROUP_FILTER + """
         order by customOrder asc"""
     )
     fun flowNoGroup(): Flow<List<BookSourcePart>>
@@ -202,7 +206,7 @@ interface BookSourceDao {
 
     @get:Query(
         """select * from book_sources 
-        where bookSourceGroup is null or bookSourceGroup = '' or bookSourceGroup like '%未分组%'"""
+        where """ + BOOK_SOURCE_NO_GROUP_FILTER
     )
     val allNoGroup: List<BookSource>
 
