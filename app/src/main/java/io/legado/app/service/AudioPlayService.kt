@@ -75,6 +75,8 @@ class AudioPlayService : BaseService(),
     SharedPreferences.OnSharedPreferenceChangeListener {
 
     companion object {
+        private const val ACTION_UPDATE_NOTIFICATION = "updateNotification"
+
         @JvmStatic
         var isRun = false
             private set
@@ -114,6 +116,15 @@ class AudioPlayService : BaseService(),
 
         private const val APP_ACTION_STOP = "Stop"
         private const val APP_ACTION_TIMER = "Timer"
+
+        internal fun updateNotification(context: Context) {
+            if (isRun) {
+                context.startService(
+                    Intent(context, AudioPlayService::class.java)
+                        .setAction(ACTION_UPDATE_NOTIFICATION)
+                )
+            }
+        }
     }
 
     private val useWakeLock = AppConfig.audioPlayUseWakeLock
@@ -215,6 +226,11 @@ class AudioPlayService : BaseService(),
                 IntentAction.setChapterStop -> setChapterStop(intent.getIntExtra("count", 0))
                 IntentAction.adjustProgress -> {
                     adjustProgress(intent.getIntExtra("position", position))
+                }
+
+                ACTION_UPDATE_NOTIFICATION -> {
+                    upMediaMetadata()
+                    upAudioPlayNotification()
                 }
 
                 IntentAction.stop -> stopSelf()
@@ -753,7 +769,11 @@ class AudioPlayService : BaseService(),
             .setContentTitle(nTitle)
             .setContentText(nSubtitle)
             .setContentIntent(
-                activityPendingIntent<AudioPlayActivity>("activity")
+                activityPendingIntent<AudioPlayActivity>("activity") {
+                    AudioPlay.book?.let {
+                        putExtra("bookUrl", it.bookUrl)
+                    }
+                }
             )
         builder.setLargeIcon(cover)
         builder.addAction(

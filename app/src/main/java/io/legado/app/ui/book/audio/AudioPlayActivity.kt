@@ -1,6 +1,7 @@
 package io.legado.app.ui.book.audio
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
@@ -142,10 +143,26 @@ class AudioPlayActivity :
             upCover(it)
         }
         viewModel.customBtnListData.observe(this) { menuCustomBtn?.isVisible = it }
-        viewModel.initData(intent) {
-            initListener()
-        }
+        viewModel.initData(
+            intent = intent,
+            success = ::initListener,
+            error = ::finishAfterInitError,
+        )
         initView()
+    }
+
+    private fun finishAfterInitError() {
+        super.finish()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        viewModel.initData(
+            intent = intent,
+            success = ::initListener,
+            error = ::finishAfterInitError,
+        )
     }
 
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {

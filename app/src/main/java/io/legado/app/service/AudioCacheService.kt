@@ -78,6 +78,7 @@ class AudioCacheService : BaseService() {
     private var workerJob: Job? = null
     private var latestStartId = 0
     private var bookName = ""
+    private var currentBookUrl = ""
     private var doneCount = 0
     private var totalCount = 0
     private var failCount = 0
@@ -88,7 +89,6 @@ class AudioCacheService : BaseService() {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentTitle(getString(R.string.audio_cache_notification_title))
-            .setContentIntent(activityPendingIntent<AudioPlayActivity>("audioPlay"))
             .addAction(
                 R.drawable.ic_stop_black_24dp,
                 getString(R.string.stop),
@@ -190,6 +190,12 @@ class AudioCacheService : BaseService() {
         val book = appDb.bookDao.getBook(task.bookUrl) ?: return
         if (!book.isAudio) return
         val source = appDb.bookSourceDao.getBookSource(book.origin) ?: return
+        currentBookUrl = book.bookUrl
+        bookName = book.name
+        doneCount = 0
+        failCount = 0
+        totalCount = 0
+        updateNotification()
         if (!ensureChapterList(source, book)) return
         val chapterCount = appDb.bookChapterDao.getChapterCount(book.bookUrl)
         val range = AudioCachePolicy.normalizeRange(
@@ -198,9 +204,6 @@ class AudioCacheService : BaseService() {
             chapterCount
         ) ?: return
 
-        bookName = book.name
-        doneCount = 0
-        failCount = 0
         totalCount = range.count()
         val cachedKeys = AudioCacheManager.listCachedChapterKeys(treeUri, book.bookUrl).toMutableSet()
         updateNotification()
@@ -274,6 +277,12 @@ class AudioCacheService : BaseService() {
     }
 
     private fun buildNotification(): NotificationCompat.Builder {
+        val contentIntent = currentBookUrl.takeIf { it.isNotBlank() }?.let { bookUrl ->
+            activityPendingIntent<AudioPlayActivity>("audioPlay") {
+                putExtra("bookUrl", bookUrl)
+            }
+        }
+        notificationBuilder.setContentIntent(contentIntent)
         if (totalCount <= 0) {
             return notificationBuilder
                 .setContentText(getString(R.string.service_starting))
