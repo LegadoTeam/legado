@@ -57,7 +57,7 @@ _注：本文所有代码均通过 Chrome(版本 123.0.6312.86) 验证_
     <head>
         <meta charset="utf-8" />
         <title>标题</title>
-        <meta property=author" content="作者" />
+        <meta property="author" content="作者" />
     </head>
     <body>
         <div>
@@ -234,10 +234,10 @@ _注：本文所有代码均通过 Chrome(版本 123.0.6312.86) 验证_
 < [title] // <title>标题</title>
 // position() 返回选定元素处于路径表达式匹配的同级元素集合中的位置。
 > $x('//meta[position()=2]')
-< [meta] // <meta property=author" content="作者" />
+< [meta] // <meta property="author" content="作者" />
 // starts-with(haystack, needle) 检查某个字符串 haystack 是否以另一个字符串 needle 开始。
 > $x('//title[starts-with(., "Cpp")]')
-< [title] // <title lang="cn">Cpp高级编程</title]
+< [title] // <title lang="cn">Cpp高级编程</title>
 // string([object]) 将给定参数转换为字符串
 > $x('string(//p)')
 < '29.39'
