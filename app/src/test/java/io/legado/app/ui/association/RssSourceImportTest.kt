@@ -33,6 +33,7 @@ class RssSourceImportTest {
             """{"sourceName":"Missing URL"}""",
             """{"sourceUrl":null,"sourceName":"Null URL"}""",
             """{"sourceUrl":"","sourceName":"Empty URL"}""",
+            """{"sourceUrl":"   ","sourceName":"Blank URL"}""",
         )
 
         invalidSources.forEach { json ->
@@ -78,12 +79,28 @@ class RssSourceImportTest {
     }
 
     @Test
-    fun `shared source url validator rejects empty but not whitespace`() {
-        assertThrows(NoStackTraceException::class.java) {
-            RssSource().requireSourceUrl()
+    fun `rejects a later rss source array item whose url is blank`() {
+        val error = assertThrows(NoStackTraceException::class.java) {
+            parseRssSourceJson(
+                """
+                [
+                  {"sourceUrl":"https://example.com/valid","sourceName":"Valid"},
+                  {"sourceUrl":"   ","sourceName":"Blank URL"}
+                ]
+                """.trimIndent()
+            )
         }
 
-        RssSource(sourceUrl = " ").requireSourceUrl()
+        assertEquals("不是订阅源", error.message)
+    }
+
+    @Test
+    fun `shared source url validator rejects empty and whitespace`() {
+        listOf("", " ").forEach { sourceUrl ->
+            assertThrows(NoStackTraceException::class.java) {
+                RssSource(sourceUrl = sourceUrl).requireSourceUrl()
+            }
+        }
     }
 
     @Test
