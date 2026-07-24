@@ -2,6 +2,7 @@ package io.legado.app.help.source
 
 import com.script.rhino.runScriptWithContext
 import io.legado.app.data.entities.RssSource
+import io.legado.app.exception.NoStackTraceException
 import io.legado.app.utils.ACache
 import io.legado.app.utils.MD5Utils
 import kotlinx.coroutines.CancellationException
@@ -9,6 +10,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 private val aCache by lazy { ACache.get("rssSortUrl") }
+
+internal fun RssSource.requireSourceUrl() {
+    if (sourceUrl.isNullOrEmpty()) {
+        throw NoStackTraceException("不是订阅源")
+    }
+}
 
 private fun RssSource.getSortUrlsKey(): String {
     return MD5Utils.md5Encode(sourceUrl + sortUrl)

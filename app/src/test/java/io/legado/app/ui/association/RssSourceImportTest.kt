@@ -1,6 +1,8 @@
 package io.legado.app.ui.association
 
+import io.legado.app.data.entities.RssSource
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.source.requireSourceUrl
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -57,6 +59,31 @@ class RssSourceImportTest {
             listOf("https://example.com/one", "https://example.com/two"),
             (result as RssSourceImportJson.Sources).items.map { it.sourceUrl },
         )
+    }
+
+    @Test
+    fun `rejects any rss source array item without a usable source url`() {
+        val error = assertThrows(NoStackTraceException::class.java) {
+            parseRssSourceJson(
+                """
+                [
+                  {"sourceUrl":"https://example.com/one","sourceName":"One"},
+                  {"sourceName":"Missing URL"}
+                ]
+                """.trimIndent()
+            )
+        }
+
+        assertEquals("不是订阅源", error.message)
+    }
+
+    @Test
+    fun `shared source url validator rejects empty but not whitespace`() {
+        assertThrows(NoStackTraceException::class.java) {
+            RssSource().requireSourceUrl()
+        }
+
+        RssSource(sourceUrl = " ").requireSourceUrl()
     }
 
     @Test

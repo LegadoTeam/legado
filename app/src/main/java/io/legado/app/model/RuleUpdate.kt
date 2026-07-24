@@ -11,6 +11,7 @@ import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.http.decompressed
 import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
+import io.legado.app.help.source.requireSourceUrl
 import io.legado.app.help.source.SourceHelp
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
@@ -66,10 +67,7 @@ object RuleUpdate {
                     }
                 }
                 1 -> GSON.fromJsonArray<RssSource>(it).getOrThrow().let { lists ->
-                    val source = lists.firstOrNull() ?: return@let
-                    if (source.sourceUrl.isEmpty()) {
-                        throw NoStackTraceException("不是订阅源")
-                    }
+                    lists.forEach { source -> source.requireSourceUrl() }
                     lists.forEach { list ->
                         val localSource = appDb.rssSourceDao.getByKey(list.sourceUrl)
                         if (localSource == null || localSource.lastUpdateTime < list.lastUpdateTime) {
