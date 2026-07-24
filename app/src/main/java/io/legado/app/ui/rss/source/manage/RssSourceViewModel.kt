@@ -1,7 +1,6 @@
 package io.legado.app.ui.rss.source.manage
 
 import android.app.Application
-import android.text.TextUtils
 import io.legado.app.base.BaseViewModel
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.RssSource
@@ -11,7 +10,6 @@ import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.normalizeFileName
 import io.legado.app.utils.renameGroupExact
-import io.legado.app.utils.splitNotBlank
 import io.legado.app.utils.stackTraceStr
 import io.legado.app.utils.toastOnUi
 import java.io.File
@@ -145,20 +143,7 @@ class RssSourceViewModel(application: Application) : BaseViewModel(application) 
         }
     }
 
-    fun delGroup(group: String) {
-        execute {
-            execute {
-                val sources = appDb.rssSourceDao.getByGroup(group)
-                sources.forEach { source ->
-                    source.sourceGroup?.splitNotBlank(",")?.toHashSet()?.let {
-                        it.remove(group)
-                        source.sourceGroup = TextUtils.join(",", it)
-                    }
-                }
-                appDb.rssSourceDao.update(*sources.toTypedArray())
-            }
-        }
-    }
+    fun delGroup(group: String) = upGroup(group, null)
 
     fun importDefault() {
         execute {

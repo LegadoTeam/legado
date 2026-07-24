@@ -1,12 +1,10 @@
 package io.legado.app.ui.replace
 
 import android.app.Application
-import android.text.TextUtils
 import io.legado.app.base.BaseViewModel
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.utils.renameGroupExact
-import io.legado.app.utils.splitNotBlank
 
 /**
  * 替换规则数据修改
@@ -117,18 +115,5 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
         }
     }
 
-    fun delGroup(group: String) {
-        execute {
-            execute {
-                val sources = appDb.replaceRuleDao.getByGroup(group)
-                sources.forEach { source ->
-                    source.group?.splitNotBlank(",")?.toHashSet()?.let {
-                        it.remove(group)
-                        source.group = TextUtils.join(",", it)
-                    }
-                }
-                appDb.replaceRuleDao.update(*sources.toTypedArray())
-            }
-        }
-    }
+    fun delGroup(group: String) = upGroup(group, null)
 }
