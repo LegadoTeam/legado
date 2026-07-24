@@ -1,7 +1,9 @@
 package io.legado.app.ui.font
 
 import android.content.Context
+import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.view.ViewGroup
 import io.legado.app.base.adapter.ItemViewHolder
@@ -53,9 +55,12 @@ class FontAdapter(context: Context, curFilePath: String, val callBack: CallBack)
             root.setOnClickListener { callBack.onFontSelect(item) }
             val selected = item.name == curName
             ivChecked.visible(selected)
-            rootCard.apply {
-                strokeWidth = if (selected) 2.dpToPx() else 0
-                setStrokeColor(context.accentColor)
+            rootCard.background = GradientDrawable().apply {
+                cornerRadius = 4.dpToPx().toFloat()
+                setColor(Color.TRANSPARENT)
+                if (selected) {
+                    setStroke(2.dpToPx(), context.accentColor)
+                }
             }
         }
     }
