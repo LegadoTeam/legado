@@ -35,6 +35,15 @@ class GroupRenameTest {
     }
 
     @Test
+    fun `deleting only removes literal complete members`() {
+        assertNull("AA；历史".renameGroupExact("A", null))
+        assertNull("普通；历史".renameGroupExact("%", null))
+        assertNull("普通；历史".renameGroupExact("_", null))
+        assertEquals("普通", "%；普通".renameGroupExact("%", null))
+        assertEquals("普通", "_；普通".renameGroupExact("_", null))
+    }
+
+    @Test
     fun `like wildcard characters are matched literally`() {
         val groups = "%组,_组,普通"
 
