@@ -34,6 +34,10 @@ and exists (
 )
 """
 
+private const val RSS_SOURCE_NO_GROUP_FILTER = """
+trim(coalesce(sourceGroup, ''), $GROUP_TRIM_CHARACTERS) in ('', '未分组')
+"""
+
 @Dao
 interface RssSourceDao {
 
@@ -81,7 +85,10 @@ interface RssSourceDao {
     @Query("select * from rssSources where loginUrl is not null and loginUrl != ''")
     fun flowLogin(): Flow<List<RssSource>>
 
-    @Query("select * from rssSources where sourceGroup is null or sourceGroup = '' or sourceGroup like '%未分组%'")
+    @Query(
+        """select * from rssSources
+        where """ + RSS_SOURCE_NO_GROUP_FILTER
+    )
     fun flowNoGroup(): Flow<List<RssSource>>
 
     @Query(
