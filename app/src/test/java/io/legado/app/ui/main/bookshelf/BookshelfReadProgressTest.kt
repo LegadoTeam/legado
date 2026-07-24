@@ -75,6 +75,9 @@ class BookshelfReadProgressTest {
         val recentReadingSwitch = document.findElementById("@+id/sw_show_recent_reading")
         val statsSwitch = document.findElementById("@+id/sw_show_bookshelf_stats")
         val layout = document.findElementById("@+id/ll_layout")
+        val sort = document.findElementById("@+id/ll_sort")
+        val columnsBottom = document.findElementById("@+id/layout_columns_bottom")
+        val bookNameChoice = document.findElementById("@+id/book_name_choice")
 
         assertEquals("@string/show_read_progress", progressSwitch.androidAttribute("text"))
         assertEquals(
@@ -98,6 +101,19 @@ class BookshelfReadProgressTest {
         assertEquals(
             "@+id/sw_show_bookshelf_stats",
             layout.appAttribute("layout_constraintTop_toBottomOf"),
+        )
+        assertEquals(
+            "@+id/sw_show_bookshelf_stats",
+            sort.appAttribute("layout_constraintTop_toBottomOf"),
+        )
+        assertEquals("bottom", columnsBottom.appAttribute("barrierDirection"))
+        assertEquals(
+            "ll_layout,ll_sort",
+            columnsBottom.appAttribute("constraint_referenced_ids"),
+        )
+        assertEquals(
+            "@+id/layout_columns_bottom",
+            bookNameChoice.appAttribute("layout_constraintTop_toBottomOf"),
         )
         assertEquals(
             "@+id/sw_show_wait_up_books",

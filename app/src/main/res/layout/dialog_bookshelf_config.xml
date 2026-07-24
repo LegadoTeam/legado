@@ -172,7 +172,7 @@
             android:orientation="vertical"
             app:layout_constraintLeft_toRightOf="@+id/ll_layout"
             app:layout_constraintRight_toRightOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/sw_show_bookshelf_fast_scroller">
+            app:layout_constraintTop_toBottomOf="@+id/sw_show_bookshelf_stats">
 
             <io.legado.app.ui.widget.text.AccentTextView
                 android:layout_width="match_parent"
@@ -227,12 +227,19 @@
 
         </LinearLayout>
 
+        <androidx.constraintlayout.widget.Barrier
+            android:id="@+id/layout_columns_bottom"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:barrierDirection="bottom"
+            app:constraint_referenced_ids="ll_layout,ll_sort" />
+
         <LinearLayout
             android:id="@+id/book_name_choice"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical"
-            app:layout_constraintTop_toBottomOf="@+id/ll_layout">
+            app:layout_constraintTop_toBottomOf="@+id/layout_columns_bottom">
 
             <io.legado.app.ui.widget.text.AccentTextView
                 android:layout_width="match_parent"
