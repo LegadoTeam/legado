@@ -191,15 +191,12 @@ object NetworkUtils {
 
     fun getBaseUrl(url: String?): String? {
         url ?: return null
-        if (url.startsWith("http://", true)
-            || url.startsWith("https://", true)
-        ) {
-            val index = url.indexOf("/", 9)
-            return if (index == -1) {
-                url
-            } else url.substring(0, index)
-        }
-        return null
+        if (!url.startsWith("http://", true) &&
+            !url.startsWith("https://", true)
+        ) return null
+        val parsed = kotlin.runCatching { URL(url) }.getOrNull() ?: return null
+        if (parsed.host.isEmpty()) return null
+        return "${url.substringBefore("://")}://${parsed.authority}"
     }
 
     /**
