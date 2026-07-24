@@ -70,19 +70,24 @@ object RhinoScriptEngine {
         cx.allowScriptRun = true
         cx.recursiveCount++
         val ret: Any?
+        var source = ""
         try {
             cx.checkRecursive()
-            val source = reader.readText()
+            source = reader.readText()
             val script = cx.compileWithCompatibility(source, SOURCE_NAME, 1, scope)
             ret = script.exec(cx, scope, topLevelThis(scope))
         } catch (re: RhinoException) {
             val line = if (re.lineNumber() == 0) -1 else re.lineNumber()
-            val msg: String = if (re is JavaScriptException) {
+            val baseMsg: String = if (re is JavaScriptException) {
                 re.value.toString()
             } else {
                 re.toString()
             }
-            val se = ScriptException(msg, re.sourceName(), line)
+            val se = ScriptException(
+                buildErrorMessage(baseMsg, source, line, re.columnNumber()),
+                re.sourceName(),
+                line,
+            )
             se.initCause(re)
             throw se
         } catch (var14: IOException) {
@@ -109,9 +114,10 @@ object RhinoScriptEngine {
         withContext(RhinoContextElement(cx)) {
             cx.allowScriptRun = true
             cx.recursiveCount++
+            var source = ""
             try {
                 cx.checkRecursive()
-                val source = reader.readText()
+                source = reader.readText()
                 val script = cx.compileWithCompatibility(source, SOURCE_NAME, 1, scope)
                 try {
                     ret = cx.executeScriptWithContinuations(script, scope)
@@ -131,12 +137,16 @@ object RhinoScriptEngine {
                 }
             } catch (re: RhinoException) {
                 val line = if (re.lineNumber() == 0) -1 else re.lineNumber()
-                val msg: String = if (re is JavaScriptException) {
+                val baseMsg: String = if (re is JavaScriptException) {
                     re.value.toString()
                 } else {
                     re.toString()
                 }
-                val se = ScriptException(msg, re.sourceName(), line)
+                val se = ScriptException(
+                    buildErrorMessage(baseMsg, source, line, re.columnNumber()),
+                    re.sourceName(),
+                    line,
+                )
                 se.initCause(re)
                 throw se
             } catch (var14: IOException) {
@@ -195,6 +205,41 @@ object RhinoScriptEngine {
             result1 = result1.toString()
         }
         return if (result1 is Undefined) null else result1
+    }
+
+    private fun buildErrorMessage(
+        baseMessage: String,
+        source: String,
+        errorLine: Int,
+        errorColumn: Int,
+    ): String {
+        if (errorLine <= 0) return baseMessage
+        val lines = source.split('\n')
+        val errorIndex = errorLine - 1
+        if (errorIndex !in lines.indices) return baseMessage
+
+        val startIndex = maxOf(0, errorIndex - 1)
+        val endIndex = minOf(lines.lastIndex, errorIndex + 1)
+        val lineNumberWidth = (endIndex + 1).toString().length
+        return buildString {
+            append(baseMessage)
+            append("\nSource context:\n")
+            for (index in startIndex..endIndex) {
+                val marker = if (index == errorIndex) ">" else " "
+                val lineContent = lines[index].removeSuffix("\r")
+                append(marker)
+                    .append(' ')
+                    .append((index + 1).toString().padStart(lineNumberWidth))
+                    .append(": ")
+                    .append(lineContent)
+                    .append('\n')
+                if (index == errorIndex && errorColumn > 0) {
+                    append(" ".repeat(4 + lineNumberWidth + (errorColumn - 1).coerceAtMost(400)))
+                        .append('^')
+                        .append('\n')
+                }
+            }
+        }.trimEnd()
     }
 
     internal fun topLevelThis(scope: VarScope): Scriptable {
