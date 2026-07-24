@@ -271,14 +271,10 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     }
 
     private val binding by viewBinding(DialogWebViewBinding::bind)
-    private val bottomSheet by lazy {
-        dialog?.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
-    }
-    private val behavior by lazy {
-        bottomSheet?.let { sheet ->
-            BottomSheetBehavior.from(sheet)
-        }
-    }
+    private val bottomSheet: View?
+        get() = dialog?.findViewById(com.google.android.material.R.id.design_bottom_sheet)
+    private val behavior: BottomSheetBehavior<View>?
+        get() = bottomSheet?.let { sheet -> BottomSheetBehavior.from(sheet) }
     private val displayMetrics by lazy { resources.displayMetrics }
     private val selectImageDir = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
