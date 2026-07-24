@@ -57,24 +57,20 @@ interface BookSourceDao {
     fun flowSearchEnabled(searchKey: String): Flow<List<BookSourcePart>>
 
     @Query(
-        """select * from book_sources_part 
-        where bookSourceGroup = :searchKey
-        or bookSourceGroup like :searchKey || ',%' 
-        or bookSourceGroup like  '%,' || :searchKey
-        or bookSourceGroup like  '%,' || :searchKey || ',%' 
-        order by customOrder asc"""
+        """select t2.* from book_sources_part as t2
+        where """ + NON_EMPTY_SOURCE_GROUP_CONDITION + """
+        """ + SOURCE_GROUP_MEMBERSHIP_FILTER + """
+        order by t2.customOrder asc"""
     )
-    fun flowGroupSearch(searchKey: String): Flow<List<BookSourcePart>>
+    fun flowGroupSearch(sourceGroup: String): Flow<List<BookSourcePart>>
 
     @Query(
-        """select * from book_sources 
-        where bookSourceGroup = :searchKey
-        or bookSourceGroup like :searchKey || ',%' 
-        or bookSourceGroup like  '%,' || :searchKey
-        or bookSourceGroup like  '%,' || :searchKey || ',%' 
-        order by customOrder asc"""
+        """select t2.* from book_sources as t2
+        where """ + NON_EMPTY_SOURCE_GROUP_CONDITION + """
+        """ + SOURCE_GROUP_MEMBERSHIP_FILTER + """
+        order by t2.customOrder asc"""
     )
-    fun groupSearch(searchKey: String): List<BookSource>
+    fun groupSearch(sourceGroup: String): List<BookSource>
 
     @Query("select * from book_sources_part where enabled = 1 order by customOrder asc")
     fun flowEnabled(): Flow<List<BookSourcePart>>
@@ -115,16 +111,14 @@ interface BookSourceDao {
     fun flowExplore(key: String): Flow<List<BookSourcePart>>
 
     @Query(
-        """select * from book_sources_part 
-        where enabledExplore = 1 
-        and hasExploreUrl = 1 
-        and (bookSourceGroup = :key
-            or bookSourceGroup like :key || ',%' 
-            or bookSourceGroup like  '%,' || :key
-            or bookSourceGroup like  '%,' || :key || ',%') 
-        order by customOrder asc"""
+        """select t2.* from book_sources_part as t2
+        where t2.enabledExplore = 1
+        and t2.hasExploreUrl = 1
+        and """ + NON_EMPTY_SOURCE_GROUP_CONDITION + """
+        """ + SOURCE_GROUP_MEMBERSHIP_FILTER + """
+        order by t2.customOrder asc"""
     )
-    fun flowGroupExplore(key: String): Flow<List<BookSourcePart>>
+    fun flowGroupExplore(sourceGroup: String): Flow<List<BookSourcePart>>
 
     @Query("select distinct bookSourceGroup from book_sources where trim(bookSourceGroup) <> ''")
     fun flowGroupsUnProcessed(): Flow<List<String>>
