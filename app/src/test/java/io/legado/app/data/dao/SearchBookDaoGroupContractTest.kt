@@ -38,7 +38,7 @@ class SearchBookDaoGroupContractTest {
         assertEquals(1, enabledPartQuery.countOccurrences("+ SOURCE_GROUP_MEMBERSHIP_FILTER +"))
         assertTrue(enabledPartQuery.contains("from book_sources_part as t2"))
 
-        assertTrue(searchBookDaoSource.contains("private const val GROUP_TRIM_CHARACTERS"))
+        assertTrue(searchBookDaoSource.contains("internal const val GROUP_TRIM_CHARACTERS"))
         assertTrue(
             searchBookDaoSource.contains(
                 "internal const val NON_EMPTY_SOURCE_GROUP_CONDITION = " +

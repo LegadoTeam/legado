@@ -3,7 +3,7 @@ package io.legado.app.data.dao
 import androidx.room.*
 import io.legado.app.data.entities.SearchBook
 
-private const val GROUP_TRIM_CHARACTERS =
+internal const val GROUP_TRIM_CHARACTERS =
     "char(9,10,11,12,13,28,29,30,31,32,160,5760,8192,8193,8194,8195,8196," +
         "8197,8198,8199,8200,8201,8202,8232,8233,8239,8287,12288)"
 

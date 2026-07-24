@@ -203,8 +203,8 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
                 }
 
                 searchKey.startsWith("group:") -> {
-                    val key = searchKey.substringAfter("group:")
-                    appDb.replaceRuleDao.flowGroupSearch("%$key%")
+                    val groupName = searchKey.substringAfter("group:")
+                    appDb.replaceRuleDao.flowGroupSearch(groupName)
                 }
 
                 else -> {
