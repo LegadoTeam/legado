@@ -146,7 +146,7 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
     ) {
         val item = items[index]
         val chapter = item.chapter
-        if (displayTitleMap[chapter.title] != null) return
+        if (displayTitleMap[item.key] != null) return
         currentCoroutineContext().ensureActive()
         val displayTitle = chapter.getDisplayTitle(
             replaceRules,
@@ -154,7 +154,7 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
             replaceBook = replaceBook,
         )
         currentCoroutineContext().ensureActive()
-        displayTitleMap[chapter.title] = displayTitle
+        displayTitleMap[item.key] = displayTitle
         handler.post {
             if (!released && getItem(index)?.key == item.key) {
                 notifyItemChanged(index, true)
@@ -162,8 +162,8 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
         }
     }
 
-    private fun getDisplayTitle(chapter: BookChapter): String {
-        return displayTitleMap[chapter.title] ?: chapter.title
+    private fun getDisplayTitle(item: TocListItem): String {
+        return displayTitleMap[item.key] ?: item.chapter.title
     }
 
     override fun getViewBinding(parent: ViewGroup): ItemChapterListBinding {
@@ -187,7 +187,7 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
                     } else {
                         cacheFileNames.contains(chapter.getFileName())
                     }
-            tvChapterName.text = getDisplayTitle(chapter)
+            tvChapterName.text = getDisplayTitle(item)
 
             if (payloads.isEmpty()) {
                 val isCurrentGroup = isCurrentChapter ||
@@ -299,7 +299,7 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
         }
         holder.itemView.setOnLongClickListener {
             getItem(holder.layoutPosition)?.let { item ->
-                context.longToastOnUi(getDisplayTitle(item.chapter))
+                context.longToastOnUi(getDisplayTitle(item))
             }
             true
         }
