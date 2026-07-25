@@ -8,17 +8,27 @@ class RssArticleAdapterReuseTest {
 
     @Test
     fun `empty image binding clears recycled image state`() {
-        val source = readProjectFile(
-            "src/main/java/io/legado/app/ui/rss/article/RssArticlesAdapter3.kt"
-        )
+        val source = readProjectFile("src/main/java/io/legado/app/ui/rss/article/RssArticlesAdapter3.kt")
         val branchStart = source.indexOf("if (imageUrl.isNullOrEmpty())")
         val branchEnd = source.indexOf("return", branchStart)
         require(branchStart >= 0 && branchEnd > branchStart)
         val branch = source.substring(branchStart, branchEnd)
 
-        assertTrue(branch.contains("Glide.with(context).clear(imageView)"))
-        assertTrue(branch.contains("imageView.setImageDrawable(null)"))
+        assertTrue(branch.contains("clearImage(imageView)"))
         assertTrue(branch.contains("layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT"))
+
+        val base = readProjectFile("src/main/java/io/legado/app/ui/rss/article/BaseRssArticlesAdapter.kt")
+        assertTrue(base.contains("Glide.with(context).clear(imageView)"))
+        assertTrue(base.contains("imageView.setImageDrawable(null)"))
+
+        listOf("", "1", "2", "4").forEach { suffix ->
+            val adapter = readProjectFile(
+                "src/main/java/io/legado/app/ui/rss/article/RssArticlesAdapter$suffix.kt"
+            )
+            val imageBranch = adapter.substringAfter("item.image.isNullOrBlank() && !callBack.isGridLayout")
+                .substringBefore("} else {")
+            assertTrue(imageBranch.contains("clearImage(imageView)"))
+        }
     }
 
     @Test
