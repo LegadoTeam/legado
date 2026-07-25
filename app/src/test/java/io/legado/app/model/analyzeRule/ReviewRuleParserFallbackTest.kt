@@ -183,32 +183,129 @@ class ReviewRuleParserFallbackTest {
             bookUrl = book.bookUrl,
         )
 
-        val result = ReviewRuleParser.parseSummary(
-            body = """
-                {
-                  "items": [
-                    {"data": "first", "count": "2"},
-                    {"count": 3},
-                    {"index": 0, "count": 9},
-                    {"count": 0}
-                  ]
-                }
-            """.trimIndent(),
-            rule = ReviewRule(
-                summaryListRule = "$.items",
-                summaryParagraphIndexRule = "$.index",
-                summaryParagraphDataRule = "$.data",
-                summaryCountRule = "$.count",
-            ),
-            source = source,
-            book = book,
-            chapter = chapter,
-            baseUrl = chapter.url,
-            context = EmptyCoroutineContext,
+        AppLog.clear()
+        try {
+            val result = ReviewRuleParser.parseSummary(
+                body = """
+                    {
+                      "items": [
+                        {"data": "first", "count": "2"},
+                        {"count": 3},
+                        {"index": 0, "count": 9},
+                        {"count": 0}
+                      ]
+                    }
+                """.trimIndent(),
+                rule = ReviewRule(
+                    summaryListRule = "$.items",
+                    summaryParagraphIndexRule = "$.index",
+                    summaryParagraphDataRule = "$.data",
+                    summaryCountRule = "$.count",
+                ),
+                source = source,
+                book = book,
+                chapter = chapter,
+                baseUrl = chapter.url,
+                context = EmptyCoroutineContext,
+            )
+
+            assertEquals(mapOf(1 to 2, 2 to 3), result?.counts)
+            assertEquals(mapOf(1 to "first", 2 to "2"), result?.keys)
+            assertTrue(AppLog.logs.isEmpty())
+        } finally {
+            AppLog.clear()
+        }
+    }
+
+    @Test
+    fun `missing required count JSONPath is recorded once`() {
+        val source = BookSource(
+            bookSourceUrl = "https://example.com",
+            bookSourceName = "Review source",
+        )
+        val book = Book(
+            bookUrl = "https://example.com/book",
+            origin = source.bookSourceUrl,
+        )
+        val chapter = BookChapter(
+            url = "https://example.com/chapter/1",
+            bookUrl = book.bookUrl,
         )
 
-        assertEquals(mapOf(1 to 2, 2 to 3), result?.counts)
-        assertEquals(mapOf(1 to "first", 2 to "2"), result?.keys)
+        AppLog.clear()
+        try {
+            val result = ReviewRuleParser.parseSummary(
+                body = """{"items":[{},{}]}""",
+                rule = ReviewRule(
+                    summaryListRule = "$.items",
+                    summaryParagraphIndexRule = "$.index",
+                    summaryCountRule = "$.count",
+                ),
+                source = source,
+                book = book,
+                chapter = chapter,
+                baseUrl = chapter.url,
+                context = EmptyCoroutineContext,
+            )
+
+            assertTrue(result?.counts.isNullOrEmpty())
+            assertEquals(1, AppLog.logs.count { it.second.contains("$.count") })
+        } finally {
+            AppLog.clear()
+        }
+    }
+
+    @Test
+    fun `missing required detail and reply content JSONPaths are recorded once each`() {
+        val source = BookSource(
+            bookSourceUrl = "https://example.com",
+            bookSourceName = "Review source",
+        )
+        val book = Book(
+            bookUrl = "https://example.com/book",
+            origin = source.bookSourceUrl,
+        )
+        val chapter = BookChapter(
+            url = "https://example.com/chapter/1",
+            bookUrl = book.bookUrl,
+        )
+
+        AppLog.clear()
+        try {
+            val result = ReviewRuleParser.parseDetailPage(
+                body = """
+                    {
+                      "items": [
+                        {"UserName":"Alice","replies":[{"UserName":"Bob"}]}
+                      ]
+                    }
+                """.trimIndent(),
+                rule = ReviewRule(
+                    detailListRule = "$.items",
+                    detailNameRule = "$.UserName",
+                    detailContentRule = "$.DetailContent",
+                    replyListRule = "$.replies",
+                    replyNameRule = "$.UserName",
+                    replyContentRule = "$.ReplyContent",
+                ),
+                nextPageRule = null,
+                baseUrl = chapter.url,
+                source = source,
+                book = book,
+                chapter = chapter,
+                context = EmptyCoroutineContext,
+                paraIndex = "1",
+                paraData = "key",
+                page = "1",
+            )
+
+            assertEquals("Alice", result.items.single().name)
+            assertEquals("Bob", result.items.single().replies.single().name)
+            assertEquals(1, AppLog.logs.count { it.second.contains("$.DetailContent") })
+            assertEquals(1, AppLog.logs.count { it.second.contains("$.ReplyContent") })
+        } finally {
+            AppLog.clear()
+        }
     }
 
     @Test

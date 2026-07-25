@@ -85,7 +85,15 @@ internal object ReviewRuleParser {
             val count = if (countRule.isEmpty()) {
                 0
             } else {
-                parseInt(safeRuleString(itemRule, countRule, item, loggedRules)) ?: 0
+                parseInt(
+                    safeRuleString(
+                        itemRule,
+                        countRule,
+                        item,
+                        loggedRules,
+                        logMissingPath = true,
+                    )
+                ) ?: 0
             }
             if (paragraphIndex != 0 && count > 0) {
                 counts[paragraphIndex] = count
@@ -173,7 +181,13 @@ internal object ReviewRuleParser {
         }
         val name = safeRuleString(analyzeRule, nameRule, item, loggedRules)
         val badges = safeRuleList(analyzeRule, badgeRule, item, loggedRules)
-        val rawContent = safeRuleString(analyzeRule, contentRule, item, loggedRules)
+        val rawContent = safeRuleString(
+            analyzeRule,
+            contentRule,
+            item,
+            loggedRules,
+            logMissingPath = true,
+        )
         val protocol = parseContentProtocol(rawContent, baseUrl)
         val content = protocol?.text ?: if (protocol == null) rawContent else ""
         val replies = if (!isReply && !rule.replyListRule.isNullOrBlank()) {
@@ -302,6 +316,7 @@ internal object ReviewRuleParser {
         rule: String?,
         content: Any? = null,
         loggedRules: MutableSet<String>,
+        logMissingPath: Boolean = false,
     ): String? {
         val value = rule?.trim().orEmpty()
         if (value.isEmpty()) return null
@@ -313,7 +328,7 @@ internal object ReviewRuleParser {
             }
         }
         result.onFailure {
-            if (it !is PathNotFoundException) {
+            if (it !is PathNotFoundException || logMissingPath) {
                 logRuleErrorOnce(loggedRules, "段评规则执行出错", value, it)
             }
         }
