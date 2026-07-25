@@ -11,6 +11,7 @@ interface BaseColumn {
     var start: Float
     var end: Float
     var textLine: TextLine
+    val positionLength: Int get() = 0
 
     fun draw(view: ContentTextView, canvas: Canvas)
 

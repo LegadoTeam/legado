@@ -21,6 +21,15 @@ class FontSelectionStyleTest {
         assertTrue(adapter.contains("setStroke(2.dpToPx(), context.accentColor)"))
     }
 
+    @Test
+    fun `font preview falls back when loading a recycled row fails`() {
+        val adapter = readProjectFile("src/main/java/io/legado/app/ui/font/FontAdapter.kt")
+            .substringAfter("override fun convert")
+
+        assertTrue(adapter.contains("tvFont.typeface = kotlin.runCatching"))
+        assertTrue(adapter.contains("}.getOrNull() ?: Typeface.DEFAULT"))
+    }
+
     private fun readProjectFile(pathInApp: String): String {
         return sequenceOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull(File::isFile)

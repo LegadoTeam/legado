@@ -373,11 +373,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
                                 return@run
                             }
                             val column = textLine.getColumn(j)
-                            if (column is TextBaseColumn) {
-                                ci += column.charData.length
-                            } else {
-                                ci++
-                            }
+                            ci += column.positionLength
                         }
                     }
                 }

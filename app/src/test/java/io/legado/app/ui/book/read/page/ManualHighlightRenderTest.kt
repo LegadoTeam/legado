@@ -15,7 +15,10 @@ class ManualHighlightRenderTest {
         val content = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/ContentTextView.kt")
 
         assertTrue(content.contains("ReadBook.highlightsOfChapter(chapter, titleLength)"))
-        assertTrue(content.contains("(column as? TextBaseColumn)?.charData?.length ?: 0"))
+        assertTrue(content.contains("it.bodyStart(titleLength) + titleLength"))
+        assertTrue(content.contains("val pageBase = chapter.getReadLength(page.index)"))
+        assertTrue(content.contains("val ruleRanges = ReadBook.ruleMatchesOfChapter(chapter)"))
+        assertTrue(content.contains("line.columns.map { it.positionLength }"))
         assertTrue(content.contains("isTitle = line.isTitle"))
         assertTrue(content.contains("if (column is TextBaseColumn)"))
     }
@@ -40,6 +43,7 @@ class ManualHighlightRenderTest {
 
         assertTrue(content.contains("if (startPage.chapterIndex != endPage.chapterIndex) return null"))
         assertTrue(content.contains("if (startLine.isTitle || endLine.isTitle) return null"))
+        assertTrue(content.contains("if (page.getLine(textPos.lineIndex).isTitle) return null"))
         assertTrue(content.contains("highlightSelectionEndLength(selectEnd.columnIndex)"))
         assertTrue(content.contains("layoutTitleLength = titleLength"))
         assertTrue(content.contains("bookUrl = book.bookUrl"))
@@ -114,6 +118,41 @@ class ManualHighlightRenderTest {
         assertTrue(draw.contains("height - 3.5f.dpToPx()"))
         assertTrue(draw.contains("while (start < x1)"))
         assertTrue(draw.contains("canvas.drawCircle(center, y, radius, fillPaint)"))
+    }
+
+    @Test
+    fun `html horizontal rules consume one chapter position`() {
+        val column = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/read/page/entities/column/BaseColumn.kt"
+        )
+        val baseColumn = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/read/page/entities/column/TextBaseColumn.kt"
+        )
+        val htmlColumn = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/read/page/entities/column/TextHtmlColumn.kt"
+        )
+        val page = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/read/page/entities/TextPage.kt"
+        )
+
+        assertTrue(column.contains("val positionLength: Int get() = 0"))
+        assertTrue(baseColumn.contains("override val positionLength: Int get() = charData.length"))
+        assertTrue(htmlColumn.contains("charData == HR_PLACE_STR"))
+        assertTrue(htmlColumn.contains("HR_PLACE_CHAR.length"))
+        assertTrue(page.contains("length += columns[index].positionLength"))
+    }
+
+    @Test
+    fun `inline images consume one chapter position without counting review controls`() {
+        val image = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/read/page/entities/column/ImageColumn.kt"
+        )
+        val content = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/read/page/ContentTextView.kt"
+        )
+
+        assertTrue(image.contains("override val positionLength: Int = 1"))
+        assertTrue(content.contains("line.columns.map { it.positionLength }"))
     }
 
     private fun readProjectFile(pathInApp: String): String {

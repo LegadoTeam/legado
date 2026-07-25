@@ -726,28 +726,43 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                 continue
             }
             val titleLength = chapter.layoutTitleLength
-            val ranges = if (titleLength >= 0) {
+            val pageBase = chapter.getReadLength(page.index)
+            val pageLength = page.lines.sumOf {
+                it.charSize + if (it.isParagraphEnd) 1 else 0
+            }
+            val pageEnd = pageBase + pageLength
+            val ruleRanges = ReadBook.ruleMatchesOfChapter(chapter)
+                .asSequence()
+                .filter { it.start < pageEnd && it.end > pageBase }
+                .map {
+                    HighlightMatcher.Range(
+                        it.start,
+                        it.end,
+                        it.style,
+                        it.applyToTitle
+                    )
+                }
+                .toList()
+            val manualRanges = if (titleLength >= 0) {
                 ReadBook.highlightsOfChapter(chapter, titleLength).map {
                     HighlightMatcher.Range(
-                        it.bodyStart(titleLength),
-                        it.bodyEnd(titleLength),
+                        it.bodyStart(titleLength) + titleLength,
+                        it.bodyEnd(titleLength) + titleLength,
                         it.styleObj()
                     )
                 }
             } else emptyList()
+            val ranges = ruleRanges + manualRanges
             val lineSpecs = page.lines.map { line ->
                 HighlightMatcher.LineSpec(
-                    charSize = if (line.isTitle) 0 else line.charSize,
-                    columnCharLengths = line.columns.map { column ->
-                        if (line.isTitle) 0
-                        else (column as? TextBaseColumn)?.charData?.length ?: 0
-                    },
-                    isParagraphEnd = !line.isTitle && line.isParagraphEnd,
+                    charSize = line.charSize,
+                    columnCharLengths = line.columns.map { it.positionLength },
+                    isParagraphEnd = line.isParagraphEnd,
                     isTitle = line.isTitle
                 )
             }
             val styles = HighlightMatcher.resolve(
-                (chapter.getReadLength(page.index) - titleLength.coerceAtLeast(0)).coerceAtLeast(0),
+                pageBase,
                 lineSpecs,
                 ranges
             )
@@ -836,7 +851,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         if (!chapter.isForBook(book)) return null
         val titleLength = chapter.layoutTitleLength.takeIf { it >= 0 } ?: return null
         val endLength = highlightSelectionEndLength(selectEnd.columnIndex) {
-            (endLine.getColumn(selectEnd.columnIndex) as? TextBaseColumn)?.charData?.length ?: 0
+            endLine.getColumn(selectEnd.columnIndex).positionLength
         }
         val rawStart = chapter.getReadLength(startPage.index) +
                 startPage.getPosByLineColumn(selectStart.lineIndex, selectStart.columnIndex)
@@ -868,19 +883,20 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         line: TextLine,
         relativeOffset: Float
     ): Boolean {
-        val highlight = highlightAt(textPos, page) ?: return false
-        callBack.onHighlightClick(
-            highlight,
-            column.start + callBack.imgBgPaddingStart,
-            line.lineTop + relativeOffset + callBack.headerHeight
-        )
-        return true
+        val x = column.start + callBack.imgBgPaddingStart
+        val y = line.lineTop + relativeOffset + callBack.headerHeight
+        highlightAt(textPos, page)?.let {
+            callBack.onHighlightClick(it, x, y)
+            return true
+        }
+        return false
     }
 
     private fun highlightAt(textPos: TextPos, page: TextPage): BookHighlight? {
         val book = ReadBook.book ?: return null
         val chapter = page.getTextChapter()
         if (!chapter.isForBook(book)) return null
+        if (page.getLine(textPos.lineIndex).isTitle) return null
         val titleLength = chapter.layoutTitleLength.takeIf { it >= 0 } ?: return null
         val position = (chapter.getReadLength(page.index) +
                 page.getPosByLineColumn(textPos.lineIndex, textPos.columnIndex) -

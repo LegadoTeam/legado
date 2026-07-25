@@ -94,4 +94,22 @@ class HighlightMatcherTest {
         assertNotNull(result[0][0])
         assertNotNull(result[0][1])
     }
+
+    @Test
+    fun `title and body share one chapter coordinate space`() {
+        val result = HighlightMatcher.resolve(
+            pageBase = 10,
+            lines = listOf(
+                LineSpec(3, listOf(1, 1, 1), false, isTitle = true),
+                LineSpec(3, listOf(1, 1, 1), false)
+            ),
+            ranges = listOf(
+                Range(10, 13, HighlightStyle(fill = 0x11), applyToTitle = true),
+                Range(13, 15, HighlightStyle(fill = 0x22))
+            )
+        )
+
+        assertEquals(listOf(0x11, 0x11, 0x11), result[0].map { it?.fill ?: 0 })
+        assertEquals(listOf(0x22, 0x22, 0), result[1].map { it?.fill ?: 0 })
+    }
 }
