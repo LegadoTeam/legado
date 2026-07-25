@@ -47,6 +47,33 @@ class AutoTaskPersistenceContractTest {
     }
 
     @Test
+    fun `batch cron update changes only cron and refreshes scheduling once`() {
+        val dao = file("app/src/main/java/io/legado/app/data/dao/AutoTaskRuleDao.kt").readText()
+        val autoTask = file("app/src/main/java/io/legado/app/model/AutoTask.kt").readText()
+        val activity = file(
+            "app/src/main/java/io/legado/app/ui/autoTask/AutoTaskActivity.kt"
+        ).readText()
+        val adapter = file(
+            "app/src/main/java/io/legado/app/ui/autoTask/AutoTaskAdapter.kt"
+        ).readText()
+        val update = autoTask.substringAfter("fun updateCron(").substringBefore("fun updateRunState(")
+        val cronQuery = Regex("""@Query\("([^"]+)"\)\s+fun updateCron""")
+            .find(dao)
+            ?.groupValues
+            ?.get(1)
+
+        assertEquals("UPDATE auto_task_rules SET cron = :cron WHERE id IN (:ids)", cronQuery)
+        assertMutationChecksLegacyFirst(update, "appDb.autoTaskRuleDao.updateCron")
+        assertTrue(update.contains("ids.chunked(900).sumOf"))
+        assertTrue(update.contains("if (changed > 0) AutoTaskScheduler.refresh(context)"))
+        assertFalse(update.contains("autoTaskRuleDao.update("))
+        assertTrue(activity.contains("CronSchedule.parse(cron)"))
+        assertTrue(activity.contains("AutoTask.updateCron(ids, cron"))
+        assertTrue(adapter.contains("private val selectedIds = linkedSetOf<String>()"))
+        assertTrue(adapter.contains("DragSelectTouchHelper.AdvanceCallback<String>"))
+    }
+
+    @Test
     fun `exported room schema contains automatic task table`() {
         val schema = file("app/schemas/io.legado.app.data.AppDatabase/95.json")
         assertTrue("Room schema 95 must be committed", schema.isFile)

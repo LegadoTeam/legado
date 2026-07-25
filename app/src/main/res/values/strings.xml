@@ -1497,6 +1497,7 @@
     <string name="auto_task_cookie_jar">Cookie jar</string>
     <string name="auto_task_name_required">Enter a task name</string>
     <string name="auto_task_cron_invalid">Enter a valid five-field cron schedule</string>
+    <string name="auto_task_batch_cron">Change schedule</string>
     <string name="auto_task_script_empty">Enter a JavaScript task</string>
     <string name="auto_task_no_tasks">No automatic tasks</string>
     <string name="auto_task_no_log">This task has not produced a log yet</string>

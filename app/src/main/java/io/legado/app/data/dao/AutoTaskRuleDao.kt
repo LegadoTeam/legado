@@ -31,6 +31,9 @@ interface AutoTaskRuleDao {
     @Query("DELETE FROM auto_task_rules WHERE id IN (:ids)")
     fun deleteByIds(ids: Collection<String>)
 
+    @Query("UPDATE auto_task_rules SET cron = :cron WHERE id IN (:ids)")
+    fun updateCron(ids: Collection<String>, cron: String): Int
+
     @Query(
         """
         UPDATE auto_task_rules

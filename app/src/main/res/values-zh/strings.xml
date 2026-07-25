@@ -1388,6 +1388,7 @@
     <string name="auto_task_cookie_jar">Cookie 管理</string>
     <string name="auto_task_name_required">请输入任务名称</string>
     <string name="auto_task_cron_invalid">请输入有效的五段 Cron 计划</string>
+    <string name="auto_task_batch_cron">批量修改定时</string>
     <string name="auto_task_script_empty">请输入 JavaScript 任务脚本</string>
     <string name="auto_task_no_tasks">暂无定时任务</string>
     <string name="auto_task_no_log">该任务还没有执行日志</string>

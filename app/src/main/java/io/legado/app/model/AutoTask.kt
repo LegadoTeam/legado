@@ -118,6 +118,16 @@ object AutoTask {
         if (changed) AutoTaskScheduler.refresh(context)
     }
 
+    fun updateCron(ids: Collection<String>, cron: String, context: Context = appCtx): Int {
+        if (ids.isEmpty()) return 0
+        val changed = synchronized(this) {
+            all()
+            ids.chunked(900).sumOf { appDb.autoTaskRuleDao.updateCron(it, cron) }
+        }
+        if (changed > 0) AutoTaskScheduler.refresh(context)
+        return changed
+    }
+
     fun updateRunState(
         id: String,
         lastRunAt: Long,

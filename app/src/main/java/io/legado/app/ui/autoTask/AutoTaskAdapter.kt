@@ -11,9 +11,18 @@ import io.legado.app.constant.AppConst
 import io.legado.app.data.entities.AutoTaskRule
 import io.legado.app.databinding.ItemAutoTaskBinding
 import io.legado.app.ui.widget.popupActionMenu
+import io.legado.app.ui.widget.recycler.DragSelectTouchHelper
 
 class AutoTaskAdapter(context: Context, private val callback: Callback) :
     RecyclerAdapter<AutoTaskRule, ItemAutoTaskBinding>(context) {
+
+    private val selectedIds = linkedSetOf<String>()
+
+    val selection: List<AutoTaskRule>
+        get() = getItems().filter { it.id in selectedIds }
+
+    val selectionCount: Int
+        get() = selectedIds.size
 
     val diffCallback = object : DiffUtil.ItemCallback<AutoTaskRule>() {
         override fun areItemsTheSame(oldItem: AutoTaskRule, newItem: AutoTaskRule) =
@@ -33,7 +42,8 @@ class AutoTaskAdapter(context: Context, private val callback: Callback) :
         item: AutoTaskRule,
         payloads: MutableList<Any>
     ) = binding.run {
-        tvName.text = item.name
+        cbTask.text = item.name
+        cbTask.isChecked = item.id in selectedIds
         tvSummary.text = buildString {
             append(item.cron.orEmpty())
             when {
@@ -45,6 +55,12 @@ class AutoTaskAdapter(context: Context, private val callback: Callback) :
     }
 
     override fun registerListener(holder: ItemViewHolder, binding: ItemAutoTaskBinding) {
+        binding.cbTask.setOnUserCheckedChangeListener { selected ->
+            getItem(holder.bindingAdapterPosition)?.let { task ->
+                if (selected) selectedIds.add(task.id) else selectedIds.remove(task.id)
+                callback.upCountView()
+            }
+        }
         binding.root.setOnClickListener {
             getItem(holder.bindingAdapterPosition)?.let(callback::edit)
         }
@@ -61,6 +77,42 @@ class AutoTaskAdapter(context: Context, private val callback: Callback) :
             showMenu(it, holder.bindingAdapterPosition)
         }
     }
+
+    override fun onCurrentListChanged() {
+        selectedIds.retainAll(getItems().mapTo(hashSetOf()) { it.id })
+        callback.upCountView()
+    }
+
+    fun selectAll() {
+        getItems().forEach { selectedIds.add(it.id) }
+        notifyItemRangeChanged(0, itemCount)
+        callback.upCountView()
+    }
+
+    fun revertSelection() {
+        getItems().forEach { task ->
+            if (!selectedIds.remove(task.id)) selectedIds.add(task.id)
+        }
+        notifyItemRangeChanged(0, itemCount)
+        callback.upCountView()
+    }
+
+    val dragSelectCallback: DragSelectTouchHelper.Callback =
+        object : DragSelectTouchHelper.AdvanceCallback<String>(
+            DragSelectTouchHelper.AdvanceCallback.Mode.ToggleAndReverse
+        ) {
+            override fun currentSelectedId(): MutableSet<String> = selectedIds
+
+            override fun getItemId(position: Int): String = getItem(position)!!.id
+
+            override fun updateSelectState(position: Int, isSelected: Boolean): Boolean {
+                val task = getItem(position) ?: return false
+                if (isSelected) selectedIds.add(task.id) else selectedIds.remove(task.id)
+                notifyItemChanged(position)
+                callback.upCountView()
+                return true
+            }
+        }
 
     private fun showMenu(anchor: View, position: Int) {
         val task = getItem(position) ?: return
@@ -87,5 +139,6 @@ class AutoTaskAdapter(context: Context, private val callback: Callback) :
         fun move(task: AutoTaskRule, offset: Int)
         fun showLog(task: AutoTaskRule)
         fun delete(task: AutoTaskRule)
+        fun upCountView()
     }
 }

@@ -10,8 +10,8 @@
     android:paddingEnd="8dp"
     android:paddingBottom="8dp">
 
-    <TextView
-        android:id="@+id/tv_name"
+    <io.legado.app.lib.theme.view.ThemeCheckBox
+        android:id="@+id/cb_task"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:ellipsize="end"
@@ -41,8 +41,8 @@
         android:textSize="13sp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toStartOf="@id/action_group"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tv_name"
+        app:layout_constraintStart_toStartOf="@id/cb_task"
+        app:layout_constraintTop_toBottomOf="@id/cb_task"
         tools:text="*/30 * * * * | 2026/07/23 09:30" />
 
     <LinearLayout
