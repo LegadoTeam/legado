@@ -71,7 +71,7 @@ class SelectActionBarPopupActionMigrationTest {
     @Test
     fun `migration is recorded in the current update log`() {
         val log = readProjectAsset("updateLog.md")
-        assertTrue(log.contains("**2026/07/23**"))
+        assertTrue(log.contains("**2026/07/25**"))
         assertTrue(log.contains("批量选择栏的展开菜单改为主题化纵向菜单"))
     }
 
