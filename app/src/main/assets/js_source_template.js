@@ -14,6 +14,7 @@ var config = {
     bookSourceComment: "",
     // 表单登录示例: [{ name: "账号", type: "text" }, { name: "密码", type: "password" }]
     loginUi: [],
+    // 发现分类支持 JSON 数组，或“名称::url”文本（换行或 && 分隔）。
     exploreUrl: [],
     lastUpdateTime: 0
 };
@@ -33,7 +34,7 @@ function search(key, page) {
     return books;
 }
 
-// config.exploreUrl 非空时必须提供。
+// config.exploreUrl 非空时必须提供。url 原样传入，不会替换 {{page}}，翻页请使用 page。
 function explore(url, page) {
     var html = java.ajax(url);
     return [];

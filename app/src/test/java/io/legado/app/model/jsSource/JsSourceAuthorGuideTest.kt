@@ -78,6 +78,18 @@ class JsSourceAuthorGuideTest {
     }
 
     @Test
+    fun `guide documents explore URL handling`() {
+        val template = source("app/src/main/assets/js_source_template.js")
+
+        listOf("换行或 `&&` 分隔", "`url` 原样传入", "不替换 `{{page}}`").forEach { text ->
+            assertTrue("Missing explore URL contract: $text", guide.contains(text))
+        }
+        listOf("换行或 && 分隔", "url 原样传入", "不会替换 {{page}}").forEach { text ->
+            assertTrue("Missing explore URL template hint: $text", template.contains(text))
+        }
+    }
+
+    @Test
     fun `guide documents Java string wrapper boundaries`() {
         val requiredText = listOf(
             "`typeof chapter.title`",

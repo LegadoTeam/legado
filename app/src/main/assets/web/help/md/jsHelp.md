@@ -705,7 +705,7 @@ function getContent(chapter, book, nextChapterUrl) {
 |`enabledCookieJar`|是否自动保存请求 Cookie|
 |`concurrentRate`|并发限制|
 |`jsLib`|公共 JavaScript 库文本|
-|`exploreUrl`|发现分类，与 `explore` 函数配对|
+|`exploreUrl`|发现分类，支持 JSON 数组，或“名称::url”文本（换行或 `&&` 分隔）；与 `explore` 函数配对|
 |`loginUrl`|WebView 登录地址|
 |`loginUi`|表单登录配置，与 `login` 函数配对|
 
@@ -718,7 +718,7 @@ function getContent(chapter, book, nextChapterUrl) {
 |函数|要求|返回值|
 |---|---|---|
 |`search(key, page)`|必选，页码从 `1` 开始|书籍数组|
-|`explore(url, page)`|`exploreUrl` 非空时必选|与搜索相同的书籍数组|
+|`explore(url, page)`|`exploreUrl` 非空时必选；`url` 原样传入，不替换 `{{page}}`，翻页由脚本使用 `page` 处理|与搜索相同的书籍数组|
 |`getBookInfo(book)`|文件源必选，其他类型可选|详情字段对象|
 |`getChapters(book)`|非文件源必选|非空章节数组|
 |`getContent(chapter, book, nextChapterUrl)`|非文件源必选|非空正文字符串|
