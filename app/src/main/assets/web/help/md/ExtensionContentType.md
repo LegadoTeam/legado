@@ -1,3 +1,5 @@
+# 扩展名与 MIME 类型对照表
+
 ```java
 public enum MimeTypeEnum {
 

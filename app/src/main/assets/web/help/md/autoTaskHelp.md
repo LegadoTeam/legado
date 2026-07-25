@@ -1,5 +1,7 @@
 # 自动任务
 
+## Cron 表达式
+
 自动任务按五段 Cron 表达式运行 JavaScript：
 
 ```txt
@@ -18,6 +20,8 @@
 
 系统会保存下一次任务，设备重启后仍会继续调度；受 Android 电量管理影响，实际执行时间可能延迟。关闭“运行自动任务”会取消等待中的任务。
 
+## 返回协议
+
 脚本可使用书源 JavaScript 相同的 `java`、`source`、`sourceApi`、`cookie` 和 `cache` 绑定，也支持 `@js:` 与 `<js>...</js>` 包装。
 
 脚本可返回一个动作对象、动作数组，或带有 `actions` 数组的对象。`notify` 用于发送通知，`{task}` 和 `{time}` 会替换为任务名与执行时间：
@@ -26,10 +30,14 @@
 {"type":"notify","title":"任务完成","content":"{task} 已于 {time} 完成"}
 ```
 
+## 更新书籍目录
+
 `refreshToc` 按书籍地址刷新目录，并可在新增章节达到指定数量时通知：
 
 ```js
 {"type":"refreshToc","bookUrl":"BOOK_URL","notify":{"enable":true,"minCount":1}}
 ```
+
+## 调试
 
 启用任务前建议先调试。系统通知被关闭或无通知权限时会跳过通知，不会把任务判定为失败。
