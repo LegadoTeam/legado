@@ -57,6 +57,20 @@ object AutoTask {
 
     fun enabled(): List<AutoTaskRule> = all().filter { it.enable }
 
+    fun exportJson(rules: List<AutoTaskRule> = all()): String {
+        val json = GSON.toJsonTree(rules).asJsonArray
+        json.forEach { task ->
+            task.asJsonObject.apply {
+                remove("customOrder")
+                remove("lastRunAt")
+                remove("lastResult")
+                remove("lastError")
+                remove("lastLog")
+            }
+        }
+        return GSON.toJson(json)
+    }
+
     @Synchronized
     fun get(id: String): AutoTaskRule? {
         all()
@@ -124,7 +138,7 @@ object AutoTask {
         lastResult: String?,
         lastError: String?,
         lastLog: String?
-    ) {
+    ) = synchronized(this) {
         appDb.autoTaskRuleDao.updateRunState(id, lastRunAt, lastResult, lastError, lastLog)
     }
 
@@ -138,10 +152,18 @@ internal fun prepareImportedAutoTasks(
     val importedById = linkedMapOf<String, AutoTaskRule>()
     var nextOrder = (localTasks.maxOfOrNull { it.customOrder } ?: -1) + 1
     importedTasks.forEach { imported ->
-        val order = localById[imported.id]?.customOrder
+        val local = localById[imported.id]
+        val state = local ?: imported
+        val order = local?.customOrder
             ?: importedById[imported.id]?.customOrder
             ?: nextOrder++
-        importedById[imported.id] = imported.copy(customOrder = order)
+        importedById[imported.id] = imported.copy(
+            customOrder = order,
+            lastRunAt = state.lastRunAt,
+            lastResult = state.lastResult,
+            lastError = state.lastError,
+            lastLog = state.lastLog
+        )
     }
     return importedById.values.toList()
 }

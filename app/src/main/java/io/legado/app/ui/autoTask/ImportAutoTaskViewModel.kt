@@ -157,5 +157,12 @@ class ImportAutoTaskViewModel(app: Application) : BaseViewModel(app) {
 }
 
 internal fun sameAutoTaskForImport(left: AutoTaskRule, right: AutoTaskRule): Boolean {
-    return left.copy(customOrder = 0) == right.copy(customOrder = 0)
+    fun AutoTaskRule.configuration() = copy(
+        customOrder = 0,
+        lastRunAt = 0L,
+        lastResult = null,
+        lastError = null,
+        lastLog = null
+    )
+    return left.configuration() == right.configuration()
 }

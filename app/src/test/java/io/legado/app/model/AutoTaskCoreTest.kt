@@ -2,9 +2,12 @@ package io.legado.app.model
 
 import com.script.rhino.RhinoInterruptError
 import com.script.rhino.RhinoScriptEngine
+import com.google.gson.JsonParser
 import com.google.gson.annotations.SerializedName
 import io.legado.app.data.entities.AutoTaskRule
 import io.legado.app.data.entities.BookChapter
+import io.legado.app.utils.GSON
+import io.legado.app.utils.fromJsonArray
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import org.htmlunit.corejs.javascript.ConsString
@@ -136,6 +139,65 @@ class AutoTaskCoreTest {
         }.toSet()
 
         assertEquals(expected, serializedNames)
+    }
+
+    @Test
+    fun exportedAutoTaskJsonContainsOnlyReusableConfiguration() {
+        assertEquals("[]", AutoTask.exportJson(emptyList()))
+
+        val rule = AutoTaskRule(
+            id = "task-id",
+            name = "task-name",
+            enable = false,
+            cron = "1 2 3 4 5",
+            loginUrl = "https://example.com/login",
+            loginUi = "login-ui",
+            loginCheckJs = "login-check",
+            comment = "comment",
+            script = "script",
+            header = "header",
+            jsLib = "library",
+            concurrentRate = "2/1000",
+            enabledCookieJar = false,
+            customOrder = 7,
+            lastRunAt = 8L,
+            lastResult = "result",
+            lastError = "error",
+            lastLog = "log",
+        )
+
+        val json = AutoTask.exportJson(listOf(rule))
+        val exported = JsonParser.parseString(json).asJsonArray.single().asJsonObject
+        val imported = GSON.fromJsonArray<AutoTaskRule>(json).getOrThrow().single()
+
+        assertEquals(
+            setOf(
+                "id",
+                "name",
+                "enable",
+                "cron",
+                "loginUrl",
+                "loginUi",
+                "loginCheckJs",
+                "comment",
+                "script",
+                "header",
+                "jsLib",
+                "concurrentRate",
+                "enabledCookieJar"
+            ),
+            exported.keySet()
+        )
+        assertEquals(
+            rule.copy(
+                customOrder = 0,
+                lastRunAt = 0L,
+                lastResult = null,
+                lastError = null,
+                lastLog = null,
+            ),
+            imported
+        )
     }
 
     @Test

@@ -3,7 +3,9 @@ package io.legado.app.ui.autoTask
 import io.legado.app.data.entities.AutoTaskRule
 import io.legado.app.model.prepareImportedAutoTasks
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class AutoTaskImportMergeTest {
 
@@ -27,11 +29,65 @@ class AutoTaskImportMergeTest {
     }
 
     @Test
-    fun `import comparison ignores local ordering`() {
-        val task = AutoTaskRule(id = "same", name = "task", customOrder = 1)
-        val imported = task.copy(customOrder = 99)
+    fun `import comparison ignores local ordering and run state`() {
+        val task = AutoTaskRule(
+            id = "same",
+            name = "task",
+            customOrder = 1,
+            lastRunAt = 2L,
+            lastResult = "result",
+            lastError = "error",
+            lastLog = "log"
+        )
+        val imported = task.copy(
+            customOrder = 99,
+            lastRunAt = 0L,
+            lastResult = null,
+            lastError = null,
+            lastLog = null
+        )
 
         assertEquals(true, sameAutoTaskForImport(imported, task))
+    }
+
+    @Test
+    fun `import preserves local ordering and run state`() {
+        val local = AutoTaskRule(
+            id = "existing",
+            name = "old",
+            customOrder = 4,
+            lastRunAt = 5L,
+            lastResult = null,
+            lastError = "error",
+            lastLog = null
+        )
+
+        val imported = prepareImportedAutoTasks(
+            listOf(local),
+            listOf(
+                AutoTaskRule(
+                    id = "existing",
+                    name = "new",
+                    lastResult = "imported result",
+                    lastLog = "imported log"
+                )
+            )
+        ).single()
+
+        assertEquals("new", imported.name)
+        assertEquals(4, imported.customOrder)
+        assertEquals(5L, imported.lastRunAt)
+        assertEquals(null, imported.lastResult)
+        assertEquals("error", imported.lastError)
+        assertEquals(null, imported.lastLog)
+    }
+
+    @Test
+    fun `run state writes share the import mutation lock`() {
+        val source = projectFile("src/main/java/io/legado/app/model/AutoTask.kt").readText()
+        val update = source.substringAfter("fun updateRunState(").substringBefore("\n\n")
+
+        assertTrue(update.contains(") = synchronized(this) {"))
     }
 
     @Test
@@ -46,5 +102,11 @@ class AutoTaskImportMergeTest {
         assertEquals(1, prepared.size)
         assertEquals("last", prepared.single().name)
         assertEquals(0, prepared.single().customOrder)
+    }
+
+    private fun projectFile(pathInApp: String): File {
+        return listOf(File(pathInApp), File("app/$pathInApp"))
+            .firstOrNull { it.isFile }
+            ?: error("Missing project file: $pathInApp")
     }
 }

@@ -40,6 +40,9 @@ class AutoTaskActivity : BaseActivity<ActivityAutoTaskBinding>(), AutoTaskAdapte
     private val importDoc = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri -> showDialogFragment(ImportAutoTaskDialog(uri.toString())) }
     }
+    private val exportDoc = registerForActivityResult(HandleFileContract()) {
+        if (it.uri != null) toastOnUi(R.string.export_success)
+    }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         binding.recyclerView.layoutManager = LinearLayoutManager(this)
@@ -80,6 +83,17 @@ class AutoTaskActivity : BaseActivity<ActivityAutoTaskBinding>(), AutoTaskAdapte
                 allowExtensions = arrayOf("txt", "json")
             }
             R.id.menu_import_on_line -> showImportDialog()
+            R.id.menu_export -> lifecycleScope.launch {
+                val json = withContext(Dispatchers.IO) { AutoTask.exportJson() }
+                exportDoc.launch {
+                    mode = HandleFileContract.EXPORT
+                    fileData = HandleFileContract.FileData(
+                        "exportAutoTask.json",
+                        json,
+                        "application/json"
+                    )
+                }
+            }
             R.id.menu_help -> showHelp("autoTaskHelp")
         }
         return super.onCompatOptionsItemSelected(item)
