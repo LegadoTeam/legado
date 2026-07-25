@@ -24,6 +24,8 @@ data class ImageColumn(
 ) : BaseColumn {
 
     override var textLine: TextLine = emptyTextLine
+    override val positionLength: Int = 1
+
     override fun draw(view: ContentTextView, canvas: Canvas) {
         val book = ReadBook.book ?: return
 

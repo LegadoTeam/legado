@@ -7,6 +7,7 @@ import io.legado.app.ui.book.read.page.entities.TextChapter
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class ReadBookHighlightIsolationTest {
 
@@ -76,4 +77,57 @@ class ReadBookHighlightIsolationTest {
         assertFalse(chapter.isForBook(Book(bookUrl = "other-url")))
         assertFalse(chapter.isForBook(null))
     }
+
+    @Test
+    fun `automatic matching validates async result ownership before caching`() {
+        val source = projectFile("src/main/java/io/legado/app/model/ReadBook.kt").readText()
+
+        assertTrue(source.contains("launch(Default, start = CoroutineStart.LAZY)"))
+        assertTrue(source.contains("highlightRulesVersion != version"))
+        assertTrue(source.contains("highlightRulesBookUrl != bookUrl"))
+        assertTrue(source.contains("textChapter.chapter.index != chapterIndex"))
+        assertTrue(source.contains("!isActiveTextChapter(textChapter)"))
+        assertTrue(source.contains("textChapter.highlightRuleMatchesJob !== job"))
+        assertTrue(source.contains("HighlightTextBuilder.LineInput("))
+        assertTrue(source.contains("line.text,"))
+        assertFalse(source.contains("line.columns.map { column ->"))
+    }
+
+    @Test
+    fun `completed layouts always trigger automatic matching`() {
+        val source = projectFile("src/main/java/io/legado/app/model/ReadBook.kt").readText()
+        val observer = source.substringAfter("private fun observeHighlightRuleLayout")
+            .substringBefore("private fun invalidateHighlightRuleMatches")
+
+        assertTrue(observer.contains("textChapter.setProgressListener"))
+        assertTrue(observer.contains("override fun onLayoutCompleted()"))
+        assertTrue(observer.contains("launch { ruleMatchesOfChapter(textChapter) }"))
+        assertTrue(observer.contains("if (textChapter.isCompleted) ruleMatchesOfChapter(textChapter)"))
+        assertTrue(source.countOccurrences("observeHighlightRuleLayout(textChapter)") >= 6)
+    }
+
+    @Test
+    fun `chapter navigation cancels matching for evicted chapters`() {
+        val source = projectFile("src/main/java/io/legado/app/model/ReadBook.kt").readText()
+        val next = source.substringAfter("fun moveToNextChapter(")
+            .substringBefore("suspend fun moveToNextChapterAwait(")
+        val nextAwait = source.substringAfter("suspend fun moveToNextChapterAwait(")
+            .substringBefore("fun moveToPrevChapter(")
+        val previous = source.substringAfter("fun moveToPrevChapter(")
+            .substringBefore("fun skipToPage(")
+
+        assertTrue(next.indexOf("prevTextChapter?.invalidateHighlightRuleMatches()") in
+            0 until next.indexOf("prevTextChapter = curTextChapter"))
+        assertTrue(nextAwait.indexOf("prevTextChapter?.invalidateHighlightRuleMatches()") in
+            0 until nextAwait.indexOf("prevTextChapter = curTextChapter"))
+        assertTrue(previous.indexOf("nextTextChapter?.invalidateHighlightRuleMatches()") in
+            0 until previous.indexOf("nextTextChapter = curTextChapter"))
+    }
+
+    private fun projectFile(pathInApp: String): File =
+        sequenceOf(File(pathInApp), File("app/$pathInApp"))
+            .first(File::isFile)
+
+    private fun String.countOccurrences(value: String): Int =
+        split(value).size - 1
 }

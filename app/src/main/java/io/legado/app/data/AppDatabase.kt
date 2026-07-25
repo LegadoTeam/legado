@@ -9,6 +9,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import io.legado.app.constant.PreferKey
 import io.legado.app.data.dao.BookChapterDao
 import io.legado.app.data.dao.BookDao
 import io.legado.app.data.dao.BookGroupDao
@@ -20,6 +21,7 @@ import io.legado.app.data.dao.CacheDao
 import io.legado.app.data.dao.CookieDao
 import io.legado.app.data.dao.DictRuleDao
 import io.legado.app.data.dao.HttpTTSDao
+import io.legado.app.data.dao.HighlightRuleDao
 import io.legado.app.data.dao.KeyboardAssistsDao
 import io.legado.app.data.dao.ReadRecordDao
 import io.legado.app.data.dao.ReplaceRuleDao
@@ -44,6 +46,7 @@ import io.legado.app.data.entities.Cache
 import io.legado.app.data.entities.Cookie
 import io.legado.app.data.entities.DictRule
 import io.legado.app.data.entities.HttpTTS
+import io.legado.app.data.entities.HighlightRule
 import io.legado.app.data.entities.KeyboardAssist
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.ReplaceRule
@@ -71,14 +74,14 @@ val appDb by lazy {
 }
 
 @Database(
-    version = 97,
+    version = 98,
     exportSchema = true,
     entities = [Book::class, BookGroup::class, BookSource::class, BookChapter::class,
         ReplaceRule::class, SearchBook::class, SearchKeyword::class, Cookie::class,
         RssSource::class, Bookmark::class, RssArticle::class, RssReadRecord::class,
         RssStar::class, TxtTocRule::class, ReadRecord::class, HttpTTS::class, Cache::class,
         RuleSub::class, DictRule::class, KeyboardAssist::class, Server::class,
-        AutoTaskRule::class, BookHighlight::class],
+        AutoTaskRule::class, BookHighlight::class, HighlightRule::class],
     views = [BookSourcePart::class],
     autoMigrations = [
         AutoMigration(from = 43, to = 44),
@@ -134,7 +137,8 @@ val appDb by lazy {
         AutoMigration(from = 93, to = 94),
         AutoMigration(from = 94, to = 95),
         AutoMigration(from = 95, to = 96),
-        AutoMigration(from = 96, to = 97, spec = DatabaseMigrations.Migration_96_97::class)
+        AutoMigration(from = 96, to = 97, spec = DatabaseMigrations.Migration_96_97::class),
+        AutoMigration(from = 97, to = 98)
     ]
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -143,6 +147,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract val bookDao: BookDao
     abstract val bookGroupDao: BookGroupDao
     abstract val bookHighlightDao: BookHighlightDao
+    abstract val highlightRuleDao: HighlightRuleDao
     abstract val bookSourceDao: BookSourceDao
     abstract val bookChapterDao: BookChapterDao
     abstract val replaceRuleDao: ReplaceRuleDao
