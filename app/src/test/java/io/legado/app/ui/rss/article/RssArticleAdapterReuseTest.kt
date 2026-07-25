@@ -21,6 +21,23 @@ class RssArticleAdapterReuseTest {
         assertTrue(branch.contains("layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT"))
     }
 
+    @Test
+    fun `image changes use a full binding`() {
+        val source = readProjectFile(
+            "src/main/java/io/legado/app/ui/rss/article/RssArticlesFragment.kt"
+        )
+        val payloadStart = source.indexOf("override fun getChangePayload")
+        val payloadEnd = source.indexOf("}, true)", payloadStart)
+        require(payloadStart >= 0 && payloadEnd > payloadStart)
+        val payload = source.substring(payloadStart, payloadEnd)
+
+        assertTrue(payload.contains("return if (oldItem.image != newItem.image) { null }"))
+        assertTrue(
+            payload.indexOf("oldItem.image != newItem.image") <
+                payload.indexOf("oldItem.read != newItem.read")
+        )
+    }
+
     private fun readProjectFile(path: String): String =
         sequenceOf(File(path), File("app/$path"))
             .firstOrNull(File::isFile)

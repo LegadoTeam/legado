@@ -205,7 +205,8 @@ class RssArticlesFragment() : VMBaseFragment<RssArticlesViewModel>(R.layout.frag
                             override fun getChangePayload(
                                 oldItem: RssArticle, newItem: RssArticle
                             ): Any? {
-                                return if (oldItem.read != newItem.read) { "read" }
+                                return if (oldItem.image != newItem.image) { null }
+                                else if (oldItem.read != newItem.read) { "read" }
                                 else if (oldItem.title != newItem.title) { "title" }
                                 else { null }
                             }
