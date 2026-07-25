@@ -2,6 +2,7 @@ package io.legado.app.ui.association
 
 import android.app.Application
 import androidx.core.net.toUri
+import androidx.lifecycle.MutableLiveData
 import io.legado.app.R
 import io.legado.app.constant.AppConst
 import io.legado.app.help.DefaultData
@@ -16,6 +17,9 @@ import okhttp3.MediaType.Companion.toMediaType
 import splitties.init.appCtx
 
 class OnLineImportViewModel(app: Application) : BaseAssociationViewModel(app) {
+
+    val readConfigLive = MutableLiveData<ByteArray?>()
+    var intentHandled = false
 
     fun getText(url: String, success: (text: String) -> Unit) {
         execute {
@@ -36,7 +40,7 @@ class OnLineImportViewModel(app: Application) : BaseAssociationViewModel(app) {
         }
     }
 
-    fun getBytes(url: String, success: (bytes: ByteArray) -> Unit) {
+    fun getReadConfig(url: String) {
         execute {
             okHttpClient.newCallResponseBody {
                 if (url.endsWith("#requestWithoutUA")) {
@@ -47,7 +51,7 @@ class OnLineImportViewModel(app: Application) : BaseAssociationViewModel(app) {
                 }
             }.bytes()
         }.onSuccess {
-            success.invoke(it)
+            readConfigLive.value = it
         }.onError {
             errorLive.postValue(
                 it.localizedMessage ?: context.getString(R.string.unknown_error)
@@ -55,7 +59,9 @@ class OnLineImportViewModel(app: Application) : BaseAssociationViewModel(app) {
         }
     }
 
-    fun importReadConfig(bytes: ByteArray, finally: (title: String, msg: String) -> Unit) {
+    fun importReadConfig() {
+        val bytes = readConfigLive.value ?: return
+        readConfigLive.value = null
         execute {
             val config = ReadBookConfig.import(bytes)
             applyImportedReadConfig(
@@ -66,16 +72,18 @@ class OnLineImportViewModel(app: Application) : BaseAssociationViewModel(app) {
                 transactionLock = ReadBookConfig,
             )
         }.onSuccess {
-            finally.invoke(context.getString(R.string.success), "导入排版成功")
+            successLive.value = "readConfig" to context.getString(R.string.read_config_import_success)
         }.onError {
-            finally.invoke(
-                context.getString(R.string.error),
+            errorLive.value =
                 it.localizedMessage ?: context.getString(R.string.unknown_error)
-            )
         }
     }
 
-    fun determineType(url: String, finally: (title: String, msg: String) -> Unit) {
+    fun cancelReadConfigImport() {
+        readConfigLive.value = null
+    }
+
+    fun determineType(url: String) {
         execute {
             val rs = okHttpClient.newCallResponseBody {
                 if (url.endsWith("#requestWithoutUA")) {
@@ -88,7 +96,7 @@ class OnLineImportViewModel(app: Application) : BaseAssociationViewModel(app) {
             when (rs.contentType()) {
                 "application/zip".toMediaType(),
                 "application/octet-stream".toMediaType() -> {
-                    importReadConfig(rs.bytes(), finally)
+                    rs.bytes()
                 }
                 else -> {
                     val inputStream = rs.byteStream()
@@ -103,8 +111,17 @@ class OnLineImportViewModel(app: Application) : BaseAssociationViewModel(app) {
                         }
                     }
                     importJson(file.toUri())
+                    null
                 }
             }
+        }.onSuccess {
+            if (it != null) {
+                readConfigLive.value = it
+            }
+        }.onError {
+            errorLive.postValue(
+                it.localizedMessage ?: context.getString(R.string.unknown_error)
+            )
         }
     }
 

@@ -824,6 +824,8 @@
     <string name="restore_ignore">恢复忽略列表</string>
     <string name="restore_ignore_summary">恢复时忽略一些内容不恢复，方便不同手机配置不同</string>
     <string name="read_config">阅读界面设置</string>
+    <string name="confirm_read_config_import">是否导入阅读排版？</string>
+    <string name="read_config_import_success">导入排版成功</string>
     <string name="group_name">分组名称</string>
     <string name="note_content">备注内容</string>
     <string name="replace_enable_default_t">默认启用替换净化</string>

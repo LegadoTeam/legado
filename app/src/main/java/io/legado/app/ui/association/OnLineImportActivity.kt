@@ -47,11 +47,19 @@ class OnLineImportActivity :
                 "autoTask" -> showDialogFragment(
                     ImportAutoTaskDialog(it.second, true)
                 )
+                "readConfig" -> finallyDialog(getString(R.string.success), it.second)
+            }
+        }
+        viewModel.readConfigLive.observe(this) {
+            if (it != null) {
+                confirmReadConfigImport()
             }
         }
         viewModel.errorLive.observe(this) {
             finallyDialog(getString(R.string.error), it)
         }
+        if (viewModel.intentHandled) return
+        viewModel.intentHandled = true
         intent.data?.let {
             val url = it.getQueryParameter("src")
             if (url.isNullOrEmpty()) {
@@ -85,10 +93,8 @@ class OnLineImportActivity :
                 "/autoTask" -> showDialogFragment(
                     ImportAutoTaskDialog(url, true)
                 )
-                "/auto" -> viewModel.determineType(url, this::finallyDialog)
-                "/readConfig" -> viewModel.getBytes(url) { bytes ->
-                    viewModel.importReadConfig(bytes, this::finallyDialog)
-                }
+                "/auto" -> viewModel.determineType(url)
+                "/readConfig" -> viewModel.getReadConfig(url)
                 "/addToBookshelf" -> showDialogFragment(
                     AddToBookshelfDialog(url, true)
                 )
@@ -103,10 +109,29 @@ class OnLineImportActivity :
                         ImportReplaceRuleDialog(url, true)
                     )
                     else -> {
-                        viewModel.determineType(url, this::finallyDialog)
+                        viewModel.determineType(url)
                     }
                 }
-                else -> viewModel.determineType(url, this::finallyDialog)
+                else -> viewModel.determineType(url)
+            }
+        }
+    }
+
+    private fun confirmReadConfigImport() {
+        alert(
+            titleResource = R.string.import_str,
+            messageResource = R.string.confirm_read_config_import
+        ) {
+            yesButton {
+                viewModel.importReadConfig()
+            }
+            noButton {
+                viewModel.cancelReadConfigImport()
+                finish()
+            }
+            onCancelled {
+                viewModel.cancelReadConfigImport()
+                finish()
             }
         }
     }
