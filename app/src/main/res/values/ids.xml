@@ -16,5 +16,6 @@
     <item name="small_id" type="id" />
     <item name="full_id" type="id" />
     <item name="text_watcher" type="id" />
+    <item name="toolbar_overflow_menu_state" type="id" />
 
 </resources>

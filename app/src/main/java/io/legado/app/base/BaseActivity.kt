@@ -10,10 +10,12 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
+import android.view.Window
 import android.widget.FrameLayout
 import androidx.activity.addCallback
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
 import androidx.viewbinding.ViewBinding
 import io.legado.app.R
 import io.legado.app.constant.AppConst
@@ -32,6 +34,7 @@ import io.legado.app.utils.applyTint
 import io.legado.app.utils.disableAutoFill
 import io.legado.app.utils.fullScreen
 import io.legado.app.utils.hideSoftInput
+import io.legado.app.utils.installMd3OverflowMenu
 import io.legado.app.utils.setLightStatusBar
 import io.legado.app.utils.setNavigationBarColorAuto
 import io.legado.app.utils.setStatusBarColorAuto
@@ -72,7 +75,9 @@ abstract class BaseActivity<VB : ViewBinding>(
         if (AppConst.menuViewNames.contains(name) && parent?.parent is FrameLayout) {
             (parent.parent as View).setBackgroundColor(backgroundColor)
         }
-        return super.onCreateView(parent, name, context, attrs)
+        return super.onCreateView(parent, name, context, attrs)?.also { view ->
+            if (view is Toolbar) view.installMd3OverflowMenu()
+        }
     }
 
     @SuppressLint("ObsoleteSdkInt")
@@ -114,6 +119,9 @@ abstract class BaseActivity<VB : ViewBinding>(
     final override fun onCreateOptionsMenu(menu: Menu): Boolean {
         val bool = onCompatCreateOptionsMenu(menu)
         menu.applyTint(this, toolBarTheme)
+        val titleBar: TitleBar? = findViewById<TitleBar>(R.id.title_bar)
+            ?: findViewById(R.id.titleBar)
+        titleBar?.toolbar?.installActivityOverflowMenu()
         return bool
     }
 
@@ -123,6 +131,16 @@ abstract class BaseActivity<VB : ViewBinding>(
     }
 
     open fun onCompatCreateOptionsMenu(menu: Menu) = super.onCreateOptionsMenu(menu)
+
+    private fun Toolbar.installActivityOverflowMenu() {
+        installMd3OverflowMenu(
+            showIcons = showOpenMenuIcon,
+            onPrepareMenu = { toolbarMenu -> onPrepareOptionsMenu(toolbarMenu) },
+            onOpenCustomMenu = { toolbarMenu ->
+                onMenuOpened(Window.FEATURE_OPTIONS_PANEL, toolbarMenu)
+            }
+        )
+    }
 
     final override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId == android.R.id.home) {

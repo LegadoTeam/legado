@@ -45,7 +45,7 @@ class SelectActionBarPopupActionMigrationTest {
         listOf(
             "private var disabledValues: Set<String> = emptySet()",
             "fun setDisabledValues(values: Set<String>)",
-            "holder.itemView.isEnabled = item.value !in disabledValues",
+            "item.enabled && item.value !in disabledValues",
             "context.secondaryDisabledTextColor"
         ).forEach { expected ->
             assertTrue("PopupAction should contain $expected", source.contains(expected))
