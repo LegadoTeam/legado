@@ -1,6 +1,5 @@
 package io.legado.app.ui.book.import.local
 
-import android.annotation.SuppressLint
 import android.net.Uri
 import android.os.Bundle
 import android.view.Menu
@@ -121,14 +120,12 @@ class ImportBookActivity : BaseImportBookActivity<ImportBookViewModel>(),
         adapter.revertSelection()
     }
 
-    @SuppressLint("NotifyDataSetChanged")
     override fun onClickSelectBarMainAction() {
         viewModel.addToBookshelf(adapter.selected) {
             adapter.selected.forEach {
                 it.isOnBookShelf = true
             }
-            adapter.selected.clear()
-            adapter.notifyDataSetChanged()
+            adapter.selectAll(false)
         }
     }
 
