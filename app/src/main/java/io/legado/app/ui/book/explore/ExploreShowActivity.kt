@@ -68,11 +68,11 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
                             }
                             oldPage = it
                             viewModel.skipPage(it)
+                            loadMoreViewTop.stopLoad()
+                            loadMoreView.hasMore()
                             isClearAll = true
-                            adapter.clearItems() //清空，然后会自动触发scrollToBottom
-                            if (!loadMoreView.hasMore) { //强制触发
-                                scrollToBottom(true)
-                            }
+                            adapter.clearItems()
+                            viewModel.explore()
                         }
                     }
                 true

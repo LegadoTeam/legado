@@ -47,7 +47,7 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
     val addBooksBusy = MutableLiveData(false)
     private var bookSource: BookSource? = null
     private var exploreUrl: String? = null
-    private var page = 1
+    private val paginationState = ExplorePaginationState()
     private val booksLock = Any()
     private var books = linkedSetOf<SearchBook>()
     private val addBooksLock = Any()
@@ -94,29 +94,35 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
         val source = bookSource
         val url = exploreUrl
         if (source == null || url == null) return
-        WebBook.exploreBook(viewModelScope, source, url, page)
+        val request = paginationState.startPage(page) ?: return
+        WebBook.exploreBook(viewModelScope, source, url, request.page)
             .timeout(if (BuildConfig.DEBUG) 0L else 60000L)
             .onSuccess(IO) { searchBooks ->
-                synchronized(booksLock) {
-                    val newBooks = linkedSetOf<SearchBook>()
-                    newBooks.addAll(searchBooks)
-                    newBooks.addAll(books)
-                    books = newBooks
-                }
-                addBooksData.postValue(searchBooks)
+                if (!paginationState.isActive(request)) return@onSuccess
                 appDb.searchBookDao.insert(*searchBooks.toTypedArray())
-                pageLiveData.postValue(page)
+                withContext(Main) {
+                    if (!paginationState.complete(request)) return@withContext
+                    synchronized(booksLock) {
+                        val newBooks = linkedSetOf<SearchBook>()
+                        newBooks.addAll(searchBooks)
+                        newBooks.addAll(books)
+                        books = newBooks
+                    }
+                    addBooksData.value = searchBooks
+                    pageLiveData.value = request.page
+                }
             }.onError {
+                if (!paginationState.fail(request)) return@onError
                 it.printOnDebug()
-                errorTopLiveData.postValue(it.stackTraceStr)
+                errorTopLiveData.value = it.stackTraceStr
             }
     }
+
     fun skipPage(page: Int) {
-        if (page > 0) {
+        if (paginationState.skipTo(page)) {
             synchronized(booksLock) {
                 books.clear()
             }
-            this.page = page
         }
     }
 
@@ -124,20 +130,25 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
         val source = bookSource
         val url = exploreUrl
         if (source == null || url == null) return
-        WebBook.exploreBook(viewModelScope, source, url, page)
+        val request = paginationState.startNextPage()
+        WebBook.exploreBook(viewModelScope, source, url, request.page)
             .timeout(if (BuildConfig.DEBUG) 0L else 60000L)
             .onSuccess(IO) { searchBooks ->
-                val loadedBooks = synchronized(booksLock) {
-                    books.addAll(searchBooks)
-                    books.toList()
-                }
-                booksData.postValue(loadedBooks)
+                if (!paginationState.isActive(request)) return@onSuccess
                 appDb.searchBookDao.insert(*searchBooks.toTypedArray())
-                pageLiveData.postValue(page)
-                page++
+                withContext(Main) {
+                    if (!paginationState.complete(request)) return@withContext
+                    val loadedBooks = synchronized(booksLock) {
+                        books.addAll(searchBooks)
+                        books.toList()
+                    }
+                    booksData.value = loadedBooks
+                    pageLiveData.value = request.page
+                }
             }.onError {
+                if (!paginationState.fail(request)) return@onError
                 it.printOnDebug()
-                errorLiveData.postValue(it.stackTraceStr)
+                errorLiveData.value = it.stackTraceStr
             }
     }
 
@@ -258,4 +269,64 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
         val order: Int,
     )
 
+}
+
+internal data class ExplorePageRequest(
+    val page: Int,
+    internal val requestId: Long,
+    internal val advancesNextPage: Boolean,
+)
+
+internal class ExplorePaginationState {
+
+    private var requestSequence = 0L
+    private var activeRequestId: Long? = null
+
+    var nextPage = 1
+        private set
+
+    @Synchronized
+    fun skipTo(page: Int): Boolean {
+        if (page <= 0) return false
+        activeRequestId = null
+        nextPage = page
+        return true
+    }
+
+    @Synchronized
+    fun startNextPage(): ExplorePageRequest {
+        return startRequest(nextPage, advancesNextPage = true)
+    }
+
+    @Synchronized
+    fun startPage(page: Int): ExplorePageRequest? {
+        if (page <= 0) return null
+        return startRequest(page, advancesNextPage = false)
+    }
+
+    @Synchronized
+    fun isActive(request: ExplorePageRequest): Boolean {
+        return activeRequestId == request.requestId
+    }
+
+    @Synchronized
+    fun complete(request: ExplorePageRequest): Boolean {
+        if (!isActive(request)) return false
+        if (request.advancesNextPage) nextPage = request.page + 1
+        activeRequestId = null
+        return true
+    }
+
+    @Synchronized
+    fun fail(request: ExplorePageRequest): Boolean {
+        if (!isActive(request)) return false
+        activeRequestId = null
+        return true
+    }
+
+    private fun startRequest(page: Int, advancesNextPage: Boolean): ExplorePageRequest {
+        val requestId = ++requestSequence
+        activeRequestId = requestId
+        return ExplorePageRequest(page, requestId, advancesNextPage)
+    }
 }
