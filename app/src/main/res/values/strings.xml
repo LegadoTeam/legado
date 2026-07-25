@@ -314,6 +314,7 @@
     <string name="bookmark">Bookmarks</string>
     <string name="bookmark_add">Add to Bookmarks</string>
     <string name="highlight">Highlight</string>
+    <string name="highlight_tab">Highlights</string>
     <string name="highlight_bg_color">Background color</string>
     <string name="highlight_text_color">Text color</string>
     <string name="highlight_style">Style</string>

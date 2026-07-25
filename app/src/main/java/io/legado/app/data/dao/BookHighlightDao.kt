@@ -7,6 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import io.legado.app.data.entities.BookHighlight
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface BookHighlightDao {
@@ -23,6 +24,24 @@ interface BookHighlightDao {
         order by chapterIndex, chapterPos, time"""
     )
     fun getByBook(bookUrl: String): List<BookHighlight>
+
+    @Query(
+        """select * from highlights
+        where bookUrl = :bookUrl
+        order by chapterIndex, chapterPos, time"""
+    )
+    fun flowByBook(bookUrl: String): Flow<List<BookHighlight>>
+
+    @Query(
+        """select * from highlights
+        where bookUrl = :bookUrl and (
+            chapterName like '%' || :key || '%'
+            or bookText like '%' || :key || '%'
+            or note like '%' || :key || '%'
+        )
+        order by chapterIndex, chapterPos, time"""
+    )
+    fun flowSearch(bookUrl: String, key: String): Flow<List<BookHighlight>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insert(vararg highlight: BookHighlight)

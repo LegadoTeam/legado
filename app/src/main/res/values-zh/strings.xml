@@ -311,6 +311,7 @@
     <string name="bookmark">书签</string>
     <string name="bookmark_add">添加书签</string>
     <string name="highlight">高亮</string>
+    <string name="highlight_tab">标注</string>
     <string name="highlight_bg_color">背景色</string>
     <string name="highlight_text_color">字体色</string>
     <string name="highlight_style">样式</string>

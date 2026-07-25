@@ -58,6 +58,15 @@ class TocActivity : VMBaseActivity<ActivityChapterListBinding, TocViewModel>(),
         tabLayout.setSelectedTabIndicatorColor(accentColor)
         binding.viewPager.adapter = TabFragmentPageAdapter()
         tabLayout.setupWithViewPager(binding.viewPager)
+        tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab) {
+                startSearch(tab.position, viewModel.searchKey)
+            }
+
+            override fun onTabUnselected(tab: TabLayout.Tab) = Unit
+
+            override fun onTabReselected(tab: TabLayout.Tab) = Unit
+        })
         tabLayout.tabGravity = TabLayout.GRAVITY_CENTER
         viewModel.bookData.observe(this) {
             menu?.setGroupVisible(R.id.menu_group_text, it.isLocalTxt)
@@ -88,11 +97,7 @@ class TocActivity : VMBaseActivity<ActivityChapterListBinding, TocViewModel>(),
 
                 override fun onQueryTextChange(newText: String): Boolean {
                     viewModel.searchKey = newText
-                    if (tabLayout.selectedTabPosition == 1) {
-                        viewModel.startBookmarkSearch(newText)
-                    } else {
-                        viewModel.startChapterListSearch(newText)
-                    }
+                    startSearch(tabLayout.selectedTabPosition, newText)
                     return false
                 }
             })
@@ -106,14 +111,27 @@ class TocActivity : VMBaseActivity<ActivityChapterListBinding, TocViewModel>(),
     }
 
     override fun onMenuOpened(featureId: Int, menu: Menu): Boolean {
-        if (tabLayout.selectedTabPosition == 1) {
-            menu.setGroupVisible(R.id.menu_group_bookmark, true)
-            menu.setGroupVisible(R.id.menu_group_toc, false)
-            menu.setGroupVisible(R.id.menu_group_text, false)
-        } else {
-            menu.setGroupVisible(R.id.menu_group_bookmark, false)
-            menu.setGroupVisible(R.id.menu_group_toc, true)
-            menu.setGroupVisible(R.id.menu_group_text, viewModel.bookData.value?.isLocalTxt == true)
+        when (tabLayout.selectedTabPosition) {
+            1 -> {
+                menu.setGroupVisible(R.id.menu_group_bookmark, true)
+                menu.setGroupVisible(R.id.menu_group_toc, false)
+                menu.setGroupVisible(R.id.menu_group_text, false)
+            }
+
+            2 -> {
+                menu.setGroupVisible(R.id.menu_group_bookmark, false)
+                menu.setGroupVisible(R.id.menu_group_toc, false)
+                menu.setGroupVisible(R.id.menu_group_text, false)
+            }
+
+            else -> {
+                menu.setGroupVisible(R.id.menu_group_bookmark, false)
+                menu.setGroupVisible(R.id.menu_group_toc, true)
+                menu.setGroupVisible(
+                    R.id.menu_group_text,
+                    viewModel.bookData.value?.isLocalTxt == true
+                )
+            }
         }
         menu.findItem(R.id.menu_use_replace)?.isChecked =
             AppConfig.tocUiUseReplace
@@ -195,24 +213,33 @@ class TocActivity : VMBaseActivity<ActivityChapterListBinding, TocViewModel>(),
         }
     }
 
-    @Suppress("DEPRECATION")
+    private fun startSearch(position: Int, searchKey: String?) {
+        when (position) {
+            1 -> viewModel.startBookmarkSearch(searchKey)
+            2 -> viewModel.startHighlightSearch(searchKey)
+            else -> viewModel.startChapterListSearch(searchKey)
+        }
+    }
+
     private inner class TabFragmentPageAdapter :
         FragmentPagerAdapter(supportFragmentManager, BEHAVIOR_RESUME_ONLY_CURRENT_FRAGMENT) {
 
         override fun getItem(position: Int): Fragment {
             return when (position) {
                 1 -> BookmarkFragment()
+                2 -> HighlightFragment()
                 else -> ChapterListFragment()
             }
         }
 
         override fun getCount(): Int {
-            return 2
+            return 3
         }
 
         override fun getPageTitle(position: Int): CharSequence {
             return when (position) {
                 1 -> getString(R.string.bookmark)
+                2 -> getString(R.string.highlight_tab)
                 else -> getString(R.string.chapter_list)
             }
         }

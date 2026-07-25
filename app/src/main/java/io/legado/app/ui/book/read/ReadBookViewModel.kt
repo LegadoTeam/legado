@@ -33,6 +33,7 @@ import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.ui.book.searchContent.SearchResult
+import io.legado.app.ui.book.toc.TocActivityResult
 import io.legado.app.utils.DocumentUtils
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.isContentScheme
@@ -85,7 +86,10 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
     fun initData(intent: Intent, success: (() -> Unit)? = null) {
         execute {
             ReadBook.inBookshelf = intent.getBooleanExtra("inBookshelf", true)
-            ReadBook.chapterChanged = intent.getBooleanExtra("chapterChanged", false)
+            val hasHighlightTarget =
+                intent.hasExtra(TocActivityResult.EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH)
+            ReadBook.chapterChanged =
+                intent.getBooleanExtra("chapterChanged", false) || hasHighlightTarget
             val bookUrl = intent.getStringExtra("bookUrl")
             val book = when {
                 bookUrl.isNullOrEmpty() -> appDb.bookDao.lastReadBook
@@ -100,9 +104,16 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
             }
             val index = intent.getIntExtra("index", -1)
             val chapterPos = intent.getIntExtra("chapterPos", -1)
-            if (index >= 0 && chapterPos >= 0) { //从书签打开的正文，有进度传递
+            val highlightLayoutTitleLength = intent.takeIf { hasHighlightTarget }
+                ?.getIntExtra(TocActivityResult.EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH, -1)
+            if (index >= 0 && chapterPos >= 0) { //从目录定位正文，有进度传递
+                if (hasHighlightTarget) {
+                    intent.removeExtra(TocActivityResult.EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH)
+                    intent.removeExtra("index")
+                    intent.removeExtra("chapterPos")
+                }
                 ReadBook.saveCurrentBookProgress() //启用恢复进度提示
-                openChapter(index, chapterPos)
+                openChapter(index, chapterPos, highlightLayoutTitleLength)
             }
         }.onSuccess {
             success?.invoke()
@@ -349,8 +360,18 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
-    fun openChapter(index: Int, durChapterPos: Int = 0, success: (() -> Unit)? = null) {
-        ReadBook.openChapter(index, durChapterPos, success = success)
+    fun openChapter(
+        index: Int,
+        durChapterPos: Int = 0,
+        highlightLayoutTitleLength: Int? = null,
+        success: (() -> Unit)? = null
+    ) {
+        ReadBook.openChapter(
+            index,
+            durChapterPos,
+            highlightLayoutTitleLength = highlightLayoutTitleLength,
+            success = success
+        )
     }
 
     fun removeFromBookshelf(success: (() -> Unit)?) {
