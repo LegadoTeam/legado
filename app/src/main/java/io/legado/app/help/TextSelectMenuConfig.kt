@@ -47,6 +47,7 @@ data class TextSelectMenuConfig(
         const val KEY_REPLACE = "replace"
         const val KEY_COPY = "copy"
         const val KEY_BOOKMARK = "bookmark"
+        const val KEY_HIGHLIGHT = "highlight"
         const val KEY_ALOUD = "aloud"
         const val KEY_DICT = "dict"
         const val KEY_SEARCH = "search"
@@ -58,6 +59,7 @@ data class TextSelectMenuConfig(
             KEY_REPLACE,
             KEY_COPY,
             KEY_BOOKMARK,
+            KEY_HIGHLIGHT,
             KEY_ALOUD,
             KEY_DICT,
             KEY_SEARCH,
@@ -66,8 +68,8 @@ data class TextSelectMenuConfig(
             KEY_PROCESS_TEXT
         )
 
-        val DEFAULT_BAR = listOf(KEY_REPLACE, KEY_COPY, KEY_BOOKMARK, KEY_ALOUD, KEY_DICT)
-        val DEFAULT_MORE = listOf(KEY_SEARCH, KEY_BROWSER, KEY_SHARE, KEY_PROCESS_TEXT)
+        val DEFAULT_BAR = listOf(KEY_REPLACE, KEY_COPY, KEY_BOOKMARK, KEY_HIGHLIGHT, KEY_ALOUD)
+        val DEFAULT_MORE = listOf(KEY_DICT, KEY_SEARCH, KEY_BROWSER, KEY_SHARE, KEY_PROCESS_TEXT)
 
         private val gson = Gson()
 

@@ -13,8 +13,10 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.page.ContentTextView
+import io.legado.app.ui.book.read.page.HighlightDraw
 import io.legado.app.ui.book.read.page.entities.TextPage.Companion.emptyTextPage
 import io.legado.app.ui.book.read.page.entities.column.BaseColumn
+import io.legado.app.ui.book.read.page.entities.column.TextBaseColumn
 import io.legado.app.ui.book.read.page.entities.column.TextColumn
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.utils.canvasrecorder.CanvasRecorderFactory
@@ -58,6 +60,7 @@ data class TextLine(
     val height: Float inline get() = lineBottom - lineTop
     val canvasRecorder = CanvasRecorderFactory.create()
     var searchResultColumnCount = 0
+    var styledColumnCount = 0
     var isReadAloud: Boolean = false
         set(value) {
             if (field != value) {
@@ -178,6 +181,7 @@ data class TextLine(
             for (i in columns.indices) {
                 columns[i].draw(view, canvas)
             }
+            drawHighlightRuns(canvas)
         }
 
         // 墨水屏模式下的朗读和搜索下划线
@@ -223,6 +227,12 @@ data class TextLine(
             paint.wordSpacing = wordSpacing
         }
         val offsetX = if (atLeastApi35) letterSpacingHalf else extraLetterSpacingOffsetX
+        for (column in columns) {
+            val fill = (column as TextColumn).highlightStyle?.fill ?: 0
+            if (fill != 0) {
+                canvas.drawRect(column.start, 0f, column.end, height, view.highlightPaint(fill))
+            }
+        }
         canvas.drawText(text, indentSize, text.length, startX + offsetX, lineBase - lineTop, paint)
         PaintPool.recycle(paint)
         for (i in columns.indices) {
@@ -262,6 +272,52 @@ data class TextLine(
         }
     }
 
+    private fun drawHighlightRuns(canvas: Canvas) {
+        val baseline = lineBase - lineTop
+        var index = 0
+        while (index < columns.size) {
+            val first = columns[index] as? TextBaseColumn
+            val style = first?.highlightStyle
+            val underline = style?.underline
+            val strike = style?.strike
+            val box = style?.box
+            if (first == null || style == null || (underline == null && strike == null && box == null)) {
+                index++
+                continue
+            }
+            var endIndex = index + 1
+            while (endIndex < columns.size) {
+                val next = columns[endIndex] as? TextBaseColumn ?: break
+                val nextStyle = next.highlightStyle
+                if (
+                    nextStyle != null &&
+                    nextStyle.underline == underline &&
+                    nextStyle.strike == strike &&
+                    nextStyle.box == box &&
+                    nextStyle.textColor == style.textColor
+                ) {
+                    endIndex++
+                } else {
+                    break
+                }
+            }
+            val last = columns[endIndex - 1] as TextBaseColumn
+            val fallbackColor = style.textColor.takeIf { it != 0 } ?: ReadBookConfig.textColor
+            HighlightDraw.drawRun(
+                canvas,
+                first.start,
+                last.end,
+                baseline,
+                height,
+                underline,
+                strike,
+                box,
+                fallbackColor
+            )
+            index = endIndex
+        }
+    }
+
     fun checkFastDraw(): Boolean {
         if (!AppConfig.optimizeRender || exceed || !onlyTextColumn || textPage.isMsgPage) {
             return false
@@ -269,7 +325,7 @@ data class TextLine(
         if (wordSpacing != 0f && (!atLeastApi26 || !wordSpacingWorking)) {
             return false
         }
-        return searchResultColumnCount == 0
+        return searchResultColumnCount == 0 && styledColumnCount == 0
     }
 
     fun invalidate() {

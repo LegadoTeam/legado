@@ -61,6 +61,9 @@
 -keep class * extends io.legado.app.help.JsExtensions{*;}
 # 数据类
 -keep class **.data.entities.**{*;}
+# HighlightStyle is serialized outside data.entities; keep nested enum names for Gson.
+-keep class io.legado.app.help.HighlightStyle { *; }
+-keep class io.legado.app.help.HighlightStyle$** { *; }
 # hutool-core hutool-crypto
 -keep class
 !cn.hutool.core.util.RuntimeUtil,

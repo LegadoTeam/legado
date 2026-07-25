@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:minHeight="48dp"
+    android:orientation="horizontal"
+    android:paddingHorizontal="16dp">
+
+    <CheckBox
+        android:id="@+id/cb_channel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textColor="@color/primaryText"
+        android:textSize="15sp" />
+
+    <TextView
+        android:id="@+id/tv_extra"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:minHeight="40dp"
+        android:minWidth="48dp"
+        android:gravity="center"
+        android:paddingHorizontal="6dp"
+        android:textColor="@color/accent"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <FrameLayout
+        android:id="@+id/v_swatch"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="8dp"
+        android:clickable="true"
+        android:foreground="?attr/selectableItemBackground"
+        android:focusable="true"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="14dp">
+
+        <View
+            android:id="@+id/v_swatch_color"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/shape_card_view" />
+
+    </FrameLayout>
+
+</LinearLayout>

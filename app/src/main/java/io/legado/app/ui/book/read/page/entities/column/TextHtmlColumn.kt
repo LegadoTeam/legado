@@ -4,10 +4,11 @@ import android.graphics.Canvas
 import android.os.Build
 import android.text.TextPaint
 import androidx.annotation.Keep
-import io.legado.app.help.TextViewTagHandler.Companion.HR_PLACE_CHAR
 import io.legado.app.help.TextViewTagHandler.Companion.HR_PLACE_STR
+import io.legado.app.help.HighlightStyle
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.ui.book.read.page.ContentTextView
+import io.legado.app.ui.book.read.page.HighlightDraw
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.book.read.page.entities.TextLine.Companion.emptyTextLine
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
@@ -54,28 +55,58 @@ data class TextHtmlColumn(
             field = value
         }
 
+    override var highlightStyle: HighlightStyle? = null
+        set(value) {
+            if (field != value) {
+                textLine.invalidate()
+                val before = field?.needsPerColumnDraw == true
+                val after = value?.needsPerColumnDraw == true
+                if (!before && after) textLine.styledColumnCount++
+                else if (before && !after) textLine.styledColumnCount--
+            }
+            field = value
+        }
+
     override fun draw(view: ContentTextView, canvas: Canvas) {
         val y = textLine.lineBase - textLine.lineTop
-        if (linkUrl != null) {
-            textPaint.run {
-                color = ReadBookConfig.textAccentColor
-                isUnderlineText = true
+        val style = highlightStyle
+        val styleTextColor = style?.textColor ?: 0
+        val textColor = when {
+            textLine.isReadAloud || isSearchResult || linkUrl != null -> {
+                ReadBookConfig.textAccentColor
             }
-            drawText(view, canvas, y, textPaint)
-            return
+
+            styleTextColor != 0 -> styleTextColor
+            else -> mTextColor ?: ReadBookConfig.textColor
         }
         textPaint.run {
-            color = if (textLine.isReadAloud || isSearchResult) {
-                ReadBookConfig.textAccentColor
-            } else {
-                mTextColor ?: ReadBookConfig.textColor
-            }
-            isUnderlineText = false
+            color = textColor
+            isUnderlineText = linkUrl != null
         }
-        drawText(view, canvas, y, textPaint)
+        val fill = style?.fill ?: 0
+        if (fill != 0) {
+            canvas.drawRect(start, 0f, end, textLine.height, view.highlightPaint(fill))
+        }
+        val styledPaint = style?.takeIf {
+            it.textColor != 0 || it.bold || it.italic
+        }?.let { HighlightDraw.obtainTextPaint(textPaint, it, textColor) }
+        drawText(canvas, y, styledPaint ?: textPaint)
+        styledPaint?.let(HighlightDraw::recycleTextPaint)
+        style?.emphasis?.let {
+            HighlightDraw.drawEmphasis(
+                canvas,
+                start,
+                end,
+                textLine.height,
+                if (it.color != 0) it.color else textColor
+            )
+        }
+        if (selected) {
+            canvas.drawRect(start, 0f, end, textLine.height, view.selectedPaint)
+        }
     }
 
-    private fun drawText(view: ContentTextView, canvas: Canvas, y: Float, textPaint: TextPaint) {
+    private fun drawText(canvas: Canvas, y: Float, textPaint: android.graphics.Paint) {
         if (charData == HR_PLACE_STR) {
             canvas.drawRect(start, 0f, end, 3f, textPaint)
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
@@ -84,9 +115,6 @@ data class TextHtmlColumn(
             canvas.drawText(charData, start + letterSpacingHalf, y, textPaint)
         } else {
             canvas.drawText(charData, start, y, textPaint)
-        }
-        if (selected) {
-            canvas.drawRect(start, 0f, end, textLine.height, view.selectedPaint)
         }
     }
 

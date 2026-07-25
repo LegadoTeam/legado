@@ -24,10 +24,14 @@ class BookInfoEditViewModel(application: Application) : BaseViewModel(applicatio
 
     fun saveBook(book: Book, success: (() -> Unit)?) {
         execute {
+            appDb.runInTransaction {
+                appDb.bookDao.update(book)
+                appDb.bookHighlightDao.updateBookMetadata(book.bookUrl, book.name, book.author)
+            }
             if (ReadBook.book?.bookUrl == book.bookUrl) {
                 ReadBook.book = book
+                ReadBook.loadHighlights(book)
             }
-            appDb.bookDao.update(book)
         }.onSuccess {
             success?.invoke()
         }.onError {

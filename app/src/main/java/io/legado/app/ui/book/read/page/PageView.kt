@@ -12,8 +12,10 @@ import androidx.core.view.isGone
 import androidx.core.view.isInvisible
 import io.legado.app.R
 import io.legado.app.constant.AppConst.timeFormat
+import io.legado.app.data.entities.BookHighlight
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.databinding.ViewBookPageBinding
+import io.legado.app.help.HighlightStyle
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ReadTipConfig
@@ -445,6 +447,10 @@ class PageView(context: Context) : FrameLayout(context) {
 
     fun createBookmark(): Bookmark? {
         return binding.contentTextView.createBookmark()
+    }
+
+    fun createHighlight(style: HighlightStyle): BookHighlight? {
+        return binding.contentTextView.createHighlight(style)
     }
 
     fun relativePage(relativePagePos: Int): TextPage {

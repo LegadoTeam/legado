@@ -12,6 +12,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import io.legado.app.data.dao.BookChapterDao
 import io.legado.app.data.dao.BookDao
 import io.legado.app.data.dao.BookGroupDao
+import io.legado.app.data.dao.BookHighlightDao
 import io.legado.app.data.dao.BookSourceDao
 import io.legado.app.data.dao.BookmarkDao
 import io.legado.app.data.dao.AutoTaskRuleDao
@@ -34,6 +35,7 @@ import io.legado.app.data.dao.TxtTocRuleDao
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookGroup
+import io.legado.app.data.entities.BookHighlight
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.Bookmark
@@ -69,14 +71,14 @@ val appDb by lazy {
 }
 
 @Database(
-    version = 95,
+    version = 97,
     exportSchema = true,
     entities = [Book::class, BookGroup::class, BookSource::class, BookChapter::class,
         ReplaceRule::class, SearchBook::class, SearchKeyword::class, Cookie::class,
         RssSource::class, Bookmark::class, RssArticle::class, RssReadRecord::class,
         RssStar::class, TxtTocRule::class, ReadRecord::class, HttpTTS::class, Cache::class,
         RuleSub::class, DictRule::class, KeyboardAssist::class, Server::class,
-        AutoTaskRule::class],
+        AutoTaskRule::class, BookHighlight::class],
     views = [BookSourcePart::class],
     autoMigrations = [
         AutoMigration(from = 43, to = 44),
@@ -130,7 +132,9 @@ val appDb by lazy {
         AutoMigration(from = 91, to = 92),
         AutoMigration(from = 92, to = 93),
         AutoMigration(from = 93, to = 94),
-        AutoMigration(from = 94, to = 95)
+        AutoMigration(from = 94, to = 95),
+        AutoMigration(from = 95, to = 96),
+        AutoMigration(from = 96, to = 97, spec = DatabaseMigrations.Migration_96_97::class)
     ]
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -138,6 +142,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract val autoTaskRuleDao: AutoTaskRuleDao
     abstract val bookDao: BookDao
     abstract val bookGroupDao: BookGroupDao
+    abstract val bookHighlightDao: BookHighlightDao
     abstract val bookSourceDao: BookSourceDao
     abstract val bookChapterDao: BookChapterDao
     abstract val replaceRuleDao: ReplaceRuleDao

@@ -12,6 +12,7 @@ enum class TextSelectMenuItem(val key: String, val menuId: Int?, val titleRes: I
     Replace(TextSelectMenuConfig.KEY_REPLACE, R.id.menu_replace, R.string.replace),
     Copy(TextSelectMenuConfig.KEY_COPY, R.id.menu_copy, android.R.string.copy),
     Bookmark(TextSelectMenuConfig.KEY_BOOKMARK, R.id.menu_bookmark, R.string.bookmark),
+    Highlight(TextSelectMenuConfig.KEY_HIGHLIGHT, R.id.menu_highlight, R.string.highlight),
     Aloud(TextSelectMenuConfig.KEY_ALOUD, R.id.menu_aloud, R.string.read_aloud),
     Dict(TextSelectMenuConfig.KEY_DICT, R.id.menu_dict, R.string.dict),
     Search(TextSelectMenuConfig.KEY_SEARCH, R.id.menu_search_content, R.string.search_content),

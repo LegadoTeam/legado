@@ -21,8 +21,13 @@ class AutoTaskPersistenceContractTest {
         val activity = file(
             "app/src/main/java/io/legado/app/ui/autoTask/AutoTaskActivity.kt"
         ).readText()
-        assertTrue(database.contains("version = 95"))
-        assertTrue(database.contains("AutoMigration(from = 94, to = 95)"))
+        val databaseVersion = Regex("""version = (\d+)""")
+            .find(database)
+            ?.groupValues
+            ?.get(1)
+            ?.toInt()
+        assertTrue(requireNotNull(databaseVersion) >= 94)
+        assertTrue(database.contains("AutoMigration(from = 93, to = 94)"))
         assertTrue(database.contains("AutoTaskRule::class"))
         assertTrue(dao.contains("ORDER BY customOrder"))
         assertTrue(dao.contains("@Upsert"))

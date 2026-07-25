@@ -38,6 +38,9 @@ data class TextChapter(
 
     private var layout: TextChapterLayout? = null
 
+    @Volatile
+    var layoutTitleLength: Int = UNKNOWN_LAYOUT_TITLE_LENGTH
+
     val layoutChannel get() = layout!!.channel
 
     fun getPage(index: Int): TextPage? {
@@ -312,6 +315,8 @@ data class TextChapter(
     }
 
     companion object {
+        const val UNKNOWN_LAYOUT_TITLE_LENGTH = -1
+
         val emptyTextChapter = TextChapter(
             BookChapter(), -1, "emptyTextChapter", -1,
             sameTitleRemoved = false,

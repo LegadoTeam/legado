@@ -298,7 +298,8 @@ class TextChapterLayout(
                                 contentPaintTextHeight,
                                 style,
                                 imgSize,
-                                click
+                                click,
+                                isTitle = true
                             )
                             null
                         }
@@ -327,6 +328,8 @@ class TextChapterLayout(
                 prepareNextPageIfNeed()
             }
         }
+        textChapter.layoutTitleLength =
+            textPages.sumOf { it.text.length } + stringBuilder.length
 
         val isTextImageStyle = imageStyle.equals(Book.imgStyleText, true)
 
@@ -531,7 +534,8 @@ class TextChapterLayout(
         textHeight: Float,
         imageStyle: String?,
         size: Size,
-        click: String?
+        click: String?,
+        isTitle: Boolean = false
     ) {
         if (size.width > 0 && size.height > 0) {
             prepareNextPageIfNeed(durY)
@@ -581,6 +585,7 @@ class TextChapterLayout(
                 }
             }
             val textLine = TextLine(
+                isTitle = isTitle,
                 isImage = true,
                 reviewTitleOffset = reviewTitleOffset,
             )

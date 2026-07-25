@@ -7,10 +7,14 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import io.legado.app.R
+import io.legado.app.data.entities.BookHighlight
 import io.legado.app.data.entities.Bookmark
+import io.legado.app.help.HighlightMatcher
+import io.legado.app.help.HighlightStyle
 import io.legado.app.help.book.isOnLineTxt
 import io.legado.app.help.config.AppConfig
 import io.legado.app.model.ReadBook
+import io.legado.app.model.isForBook
 import io.legado.app.ui.association.OpenUrlConfirmActivity
 import io.legado.app.ui.book.read.page.delegate.PageDelegate
 import io.legado.app.ui.book.read.page.entities.TextLine
@@ -47,6 +51,14 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
             style = Paint.Style.FILL
         }
     }
+    private val highlightFillPaint = object : ThreadLocal<Paint>() {
+        override fun initialValue() = Paint().apply { style = Paint.Style.FILL }
+    }
+
+    fun highlightPaint(color: Int): Paint {
+        return highlightFillPaint.get()!!.apply { this.color = color }
+    }
+
     private var callBack: CallBack
     private val visibleRect = ChapterProvider.visibleRect
     val selectStart = TextPos(0, -1, -1)
@@ -84,6 +96,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
      */
     fun setContent(textPage: TextPage) {
         this.textPage = textPage
+        upHighlight()
         // 非滑动翻页动画需要同步重绘，不然翻页可能会出现闪烁
         if (isScroll) {
             postInvalidate()
@@ -220,7 +233,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         y: Float,
         select: (textPos: TextPos) -> Unit,
     ) {
-        touch(x, y) { _, textPos, _, _, column ->
+        touch(x, y) { relativeOffset, textPos, textPage, textLine, column ->
             when (column) {
                 is ImageColumn -> callBack.onImageLongPress(x, y, column.src)
                 is TextColumn -> {
@@ -229,6 +242,10 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                     select(textPos)
                 }
                 is TextHtmlColumn -> {
+                    if (
+                        column.linkUrl != null && column.highlightStyle != null &&
+                        notifyHighlightClick(column, textPos, textPage, textLine, relativeOffset)
+                    ) return@touch
                     if (!selectAble) return@touch
                     column.selected = true
                     select(textPos)
@@ -252,7 +269,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
             false
         }
         var handled = false
-        touch(x, y) { _, textPos, textPage, textLine, column ->
+        touch(x, y) { relativeOffset, textPos, textPage, textLine, column ->
             when (column) {
                 is ButtonColumn -> {
                     context.toastOnUi("Button Pressed!")
@@ -312,12 +329,31 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                     }
                 }
                 is TextHtmlColumn -> {
-                    column.linkUrl?.let {
+                    val linkUrl = column.linkUrl
+                    if (linkUrl != null) {
                         activity?.startActivity<OpenUrlConfirmActivity> {
-                            putExtra("uri", it)
+                            putExtra("uri", linkUrl)
                         }
                         handled = true
+                    } else if (column.highlightStyle != null) {
+                        handled = notifyHighlightClick(
+                            column,
+                            textPos,
+                            textPage,
+                            textLine,
+                            relativeOffset
+                        )
                     }
+                }
+
+                is TextColumn -> if (column.highlightStyle != null) {
+                    handled = notifyHighlightClick(
+                        column,
+                        textPos,
+                        textPage,
+                        textLine,
+                        relativeOffset
+                    )
                 }
             }
         }
@@ -675,6 +711,57 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         callBack.onCancelSelect()
     }
 
+    fun upHighlight() {
+        val last = if (isScroll) 2 else 0
+        for (relativePos in 0..last) {
+            val page = relativePage(relativePos)
+            if (page.lines.isEmpty() || page.isMsgPage) continue
+            val chapter = page.getTextChapter()
+            if (!chapter.isForBook(ReadBook.book)) {
+                page.lines.forEach { line ->
+                    line.columns.forEach { column ->
+                        if (column is TextBaseColumn) column.highlightStyle = null
+                    }
+                }
+                continue
+            }
+            val titleLength = chapter.layoutTitleLength
+            val ranges = if (titleLength >= 0) {
+                ReadBook.highlightsOfChapter(chapter, titleLength).map {
+                    HighlightMatcher.Range(
+                        it.bodyStart(titleLength),
+                        it.bodyEnd(titleLength),
+                        it.styleObj()
+                    )
+                }
+            } else emptyList()
+            val lineSpecs = page.lines.map { line ->
+                HighlightMatcher.LineSpec(
+                    charSize = if (line.isTitle) 0 else line.charSize,
+                    columnCharLengths = line.columns.map { column ->
+                        if (line.isTitle) 0
+                        else (column as? TextBaseColumn)?.charData?.length ?: 0
+                    },
+                    isParagraphEnd = !line.isTitle && line.isParagraphEnd,
+                    isTitle = line.isTitle
+                )
+            }
+            val styles = HighlightMatcher.resolve(
+                (chapter.getReadLength(page.index) - titleLength.coerceAtLeast(0)).coerceAtLeast(0),
+                lineSpecs,
+                ranges
+            )
+            page.lines.forEachIndexed { lineIndex, line ->
+                line.columns.forEachIndexed { columnIndex, column ->
+                    if (column is TextBaseColumn) {
+                        column.highlightStyle = styles[lineIndex][columnIndex]
+                    }
+                }
+            }
+        }
+        postInvalidate()
+    }
+
     fun getSelectedText(): String {
         val textPos = TextPos(0, 0, 0)
         val builder = StringBuilder()
@@ -735,6 +822,71 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
             }
         }
         return null
+    }
+
+    fun createHighlight(style: HighlightStyle): BookHighlight? {
+        val book = ReadBook.book ?: return null
+        val startPage = relativePage(selectStart.relativePagePos)
+        val endPage = relativePage(selectEnd.relativePagePos)
+        if (startPage.chapterIndex != endPage.chapterIndex) return null
+        val startLine = startPage.getLine(selectStart.lineIndex)
+        val endLine = endPage.getLine(selectEnd.lineIndex)
+        if (startLine.isTitle || endLine.isTitle) return null
+        val chapter = startPage.getTextChapter()
+        if (!chapter.isForBook(book)) return null
+        val titleLength = chapter.layoutTitleLength.takeIf { it >= 0 } ?: return null
+        val endLength = highlightSelectionEndLength(selectEnd.columnIndex) {
+            (endLine.getColumn(selectEnd.columnIndex) as? TextBaseColumn)?.charData?.length ?: 0
+        }
+        val rawStart = chapter.getReadLength(startPage.index) +
+                startPage.getPosByLineColumn(selectStart.lineIndex, selectStart.columnIndex)
+        val rawEnd = chapter.getReadLength(endPage.index) +
+                endPage.getPosByLineColumn(selectEnd.lineIndex, selectEnd.columnIndex) + endLength
+        val bodyStart = (rawStart - titleLength).coerceAtLeast(0)
+        val bodyEnd = (rawEnd - titleLength).coerceAtLeast(0)
+        if (bodyEnd <= bodyStart) return null
+        val bookText = getSelectedText()
+        if (!bookText.hasHighlightableText()) return null
+        return BookHighlight(
+            bookUrl = book.bookUrl,
+            chapterUrl = chapter.chapter.url,
+            bookName = book.name,
+            bookAuthor = book.author,
+            chapterIndex = startPage.chapterIndex,
+            chapterPos = bodyStart + titleLength,
+            chapterPosEnd = bodyEnd + titleLength,
+            layoutTitleLength = titleLength,
+            chapterName = chapter.title,
+            bookText = bookText
+        ).apply { applyStyle(style) }
+    }
+
+    private fun notifyHighlightClick(
+        column: TextBaseColumn,
+        textPos: TextPos,
+        page: TextPage,
+        line: TextLine,
+        relativeOffset: Float
+    ): Boolean {
+        val highlight = highlightAt(textPos, page) ?: return false
+        callBack.onHighlightClick(
+            highlight,
+            column.start + callBack.imgBgPaddingStart,
+            line.lineTop + relativeOffset + callBack.headerHeight
+        )
+        return true
+    }
+
+    private fun highlightAt(textPos: TextPos, page: TextPage): BookHighlight? {
+        val book = ReadBook.book ?: return null
+        val chapter = page.getTextChapter()
+        if (!chapter.isForBook(book)) return null
+        val titleLength = chapter.layoutTitleLength.takeIf { it >= 0 } ?: return null
+        val position = (chapter.getReadLength(page.index) +
+                page.getPosByLineColumn(textPos.lineIndex, textPos.columnIndex) -
+                titleLength).coerceAtLeast(0)
+        return ReadBook.highlightsOfChapter(chapter, titleLength)
+            .lastHighlightAt(position, titleLength)
     }
 
     private fun relativeOffset(relativePos: Int): Float {
@@ -804,6 +956,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         fun oldClickImg(src: String): Boolean
         fun clickImg(click: String, src: String)
         fun onReviewClick(paragraphNum: Int, count: Int, chapterIndex: Int)
+        fun onHighlightClick(highlight: BookHighlight, x: Float, y: Float)
     }
 
     private fun resolveReviewId(textLine: TextLine): Int {
@@ -812,3 +965,17 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         return if (reviewId > 0) reviewId else textLine.paragraphNum
     }
 }
+
+internal inline fun highlightSelectionEndLength(
+    columnIndex: Int,
+    columnLength: () -> Int
+): Int = if (columnIndex < 0) 0 else columnLength()
+
+internal fun List<BookHighlight>.lastHighlightAt(
+    position: Int,
+    titleLength: Int
+): BookHighlight? = lastOrNull {
+    position >= it.bodyStart(titleLength) && position < it.bodyEnd(titleLength)
+}
+
+internal fun String.hasHighlightableText(): Boolean = any { it != '\r' && it != '\n' }

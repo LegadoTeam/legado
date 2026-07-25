@@ -3,13 +3,16 @@ package io.legado.app.model
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.PageAnim.scrollPageAnim
+import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
+import io.legado.app.data.entities.BookHighlight
 import io.legado.app.data.entities.BookProgress
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.help.AppWebDav
+import io.legado.app.help.HighlightStyle
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.isImage
@@ -30,7 +33,9 @@ import io.legado.app.service.CacheBookService
 import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.ui.book.read.page.provider.LayoutProgressListener
+import io.legado.app.utils.GSON
 import io.legado.app.utils.postEvent
+import io.legado.app.utils.putPrefString
 import io.legado.app.utils.stackTraceStr
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.CancellationException
@@ -61,6 +66,8 @@ import kotlin.math.min
 object ReadBook : CoroutineScope by MainScope() {
     var book: Book? = null
     var callBack: CallBack? = null
+    var highlights: List<BookHighlight> = emptyList()
+        private set
     var inBookshelf = false
     var chapterSize = 0
     var simulatedChapterSize = 0
@@ -98,6 +105,7 @@ object ReadBook : CoroutineScope by MainScope() {
     fun resetData(book: Book) {
         releaseAndCancel()
         ReadBook.book = book
+        loadHighlights(book)
         readRecord.bookName = book.name
         readRecord.readTime = appDb.readRecordDao.getReadTime(book.name) ?: 0
         chapterSize = appDb.bookChapterDao.getChapterCount(book.bookUrl)
@@ -125,9 +133,74 @@ object ReadBook : CoroutineScope by MainScope() {
         }
     }
 
+    fun loadHighlights(book: Book) {
+        highlights = appDb.bookHighlightDao.getByBook(book.bookUrl)
+    }
+
+    fun highlightsOfChapter(
+        chapter: TextChapter,
+        layoutTitleLength: Int? = null
+    ): List<BookHighlight> {
+        val currentBook = book ?: return emptyList()
+        val bookChapter = chapter.chapter
+        val legacyBound = highlights.filter {
+            it.bindLegacyChapter(currentBook, bookChapter, chapter.title)
+        }
+        if (legacyBound.isNotEmpty()) {
+            val legacyTimes = legacyBound.map { it.time }
+            executor.execute {
+                appDb.bookHighlightDao.bindChapterUrl(legacyTimes, bookChapter.url)
+            }
+        }
+        val chapterHighlights = highlights
+            .filter { it.isForChapter(currentBook, bookChapter) }
+            .sortedWith(compareBy(BookHighlight::chapterPos, BookHighlight::time))
+        val titleLength = layoutTitleLength ?: return chapterHighlights
+        val pinned = chapterHighlights.filter { it.pinLayoutTitleLength(titleLength) }
+        if (pinned.isNotEmpty()) {
+            executor.execute {
+                appDb.bookHighlightDao.pinLayoutTitleLength(
+                    currentBook.bookUrl,
+                    bookChapter.url,
+                    titleLength
+                )
+            }
+        }
+        return chapterHighlights
+    }
+
+    fun addHighlight(highlight: BookHighlight) {
+        appDb.bookHighlightDao.insert(highlight)
+        if (!highlight.isForBook(book)) return
+        highlights = (highlights.filterNot { it.time == highlight.time } + highlight)
+            .sortedWith(
+                compareBy(BookHighlight::chapterIndex, BookHighlight::chapterPos, BookHighlight::time)
+            )
+        callBack?.upContent(resetPageOffset = false)
+    }
+
+    fun updateHighlight(highlight: BookHighlight) {
+        appDb.bookHighlightDao.update(highlight)
+        if (!highlight.isForBook(book)) return
+        highlights = highlights.map { if (it.time == highlight.time) highlight else it }
+        callBack?.upContent(resetPageOffset = false)
+    }
+
+    fun removeHighlight(highlight: BookHighlight) {
+        appDb.bookHighlightDao.delete(highlight)
+        if (!highlight.isForBook(book)) return
+        highlights = highlights.filter { it.time != highlight.time }
+        callBack?.upContent(resetPageOffset = false)
+    }
+
+    fun saveLastHighlightStyle(style: HighlightStyle) {
+        appCtx.putPrefString(PreferKey.highlightLastStyle, GSON.toJson(style))
+    }
+
     fun upData(book: Book) {
         releaseAndCancel()
         ReadBook.book = book
+        loadHighlights(book)
         chapterSize = appDb.bookChapterDao.getChapterCount(book.bookUrl)
         simulatedChapterSize = if (book.readSimulating()) {
             book.simulatedTotalChapterNum()
@@ -1152,4 +1225,29 @@ object ReadBook : CoroutineScope by MainScope() {
         fun cancelSelect()
     }
 
+}
+
+internal fun BookHighlight.isForBook(book: Book?): Boolean {
+    return book != null && bookUrl == book.bookUrl
+}
+
+internal fun BookHighlight.isForChapter(book: Book?, chapter: BookChapter): Boolean {
+    return isForBook(book) && book?.bookUrl == chapter.bookUrl && chapterUrl == chapter.url
+}
+
+internal fun BookHighlight.bindLegacyChapter(
+    book: Book?,
+    chapter: BookChapter,
+    displayTitle: String = chapter.title
+): Boolean {
+    if (!isForBook(book) || chapterUrl.isNotBlank()) return false
+    if (book?.bookUrl != chapter.bookUrl) return false
+    if (chapterIndex != chapter.index) return false
+    if (chapterName != chapter.title && chapterName != displayTitle) return false
+    chapterUrl = chapter.url
+    return true
+}
+
+internal fun TextChapter.isForBook(book: Book?): Boolean {
+    return book != null && chapter.bookUrl == book.bookUrl
 }
