@@ -22,6 +22,9 @@ import org.jsoup.Jsoup
 import splitties.init.appCtx
 
 class CodeEditViewModel(application: Application) : BaseViewModel(application) {
+    private val beautifyJs by lazy {
+        appCtx.assets.open("scripts/beautify.min.js").bufferedReader().use { it.readText() }
+    }
     private val themeFileNames = arrayOf(
         "d_monokai_dimmed",
         "d_monokai",
@@ -166,8 +169,8 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
         CacheManager.putMemory("web_format_code", jsCode)
         return BackstageWebView(
             url = null,
-            html = """<html><body><script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.15.4/beautify.min.js"></script>
-                <script>
+            html = """<html><body><script>
+                $beautifyJs
                 window.re = js_beautify($nameCache.getFromMemory('web_format_code'), {
                 indent_size: 4,
                 indent_char: ' ',
@@ -183,7 +186,6 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
                 });
                 </script></body></html>""".trimIndent(),
             javaScript = "window.re",
-            cacheFirst = true,
             timeout = 5000,
             isRule = true
         ).getStrResponse().body

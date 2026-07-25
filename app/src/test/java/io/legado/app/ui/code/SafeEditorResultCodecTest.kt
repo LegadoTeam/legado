@@ -1,12 +1,15 @@
 package io.legado.app.ui.code
 
 import com.google.gson.Gson
+import com.script.ScriptBindings
+import com.script.rhino.RhinoScriptEngine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.security.MessageDigest
 
 class SafeEditorResultCodecTest {
 
@@ -125,6 +128,42 @@ class SafeEditorResultCodecTest {
                 "returnText(action, resolvedState.text, resolvedState.cursorPosition)"
             )
         )
+    }
+
+    @Test
+    fun `code formatter bundles its runtime for offline use`() {
+        val root = repositoryRoot()
+        val viewModel = File(
+            root,
+            "app/src/main/java/io/legado/app/ui/code/CodeEditViewModel.kt"
+        ).readText()
+        val runtime = File(root, "app/src/main/assets/scripts/beautify.min.js")
+        val license = File(root, "app/src/main/assets/scripts/beautify.LICENSE.txt")
+
+        assertTrue(runtime.isFile)
+        assertTrue(license.isFile)
+
+        val hash = MessageDigest.getInstance("SHA-256")
+            .digest(runtime.readBytes())
+            .joinToString("") { "%02x".format(it) }
+
+        assertEquals(
+            "40789fde39e23977976d6e5ca7f6d9ec294bbb0462f5e6563e64001b76b802eb",
+            hash
+        )
+        val formatted = RhinoScriptEngine.eval(
+            """
+                var window = {};
+                ${runtime.readText()}
+                window.js_beautify('function demo(){return 1;}', { indent_size: 4 });
+            """.trimIndent(),
+            ScriptBindings()
+        )
+
+        assertEquals("function demo() {\n    return 1;\n}", formatted)
+        assertTrue(license.readText().contains("The MIT License"))
+        assertTrue(viewModel.contains("appCtx.assets.open(\"scripts/beautify.min.js\")"))
+        assertFalse(viewModel.contains("cdnjs.cloudflare.com/ajax/libs/js-beautify"))
     }
 
     @Test
