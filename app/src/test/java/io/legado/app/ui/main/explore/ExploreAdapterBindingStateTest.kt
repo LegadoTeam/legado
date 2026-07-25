@@ -1,5 +1,6 @@
 package io.legado.app.ui.main.explore
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -28,6 +29,20 @@ class ExploreAdapterBindingStateTest {
         assertTrue(recycleIndex >= 0 && recycleIndex < emptyIndex)
         assertTrue(hideIndex >= 0 && hideIndex < emptyIndex)
     }
+
+    @Test
+    fun `dynamic explore labels ignore callbacks after view reuse`() {
+        val source = readProjectFile(
+            "src/main/java/io/legado/app/ui/main/explore/ExploreAdapter.kt"
+        )
+
+        assertEquals(5, source.countOccurrences("val viewNameToken = Any()"))
+        assertEquals(5, source.countOccurrences("tag = viewNameToken"))
+        assertEquals(10, source.countOccurrences("tag !== viewNameToken"))
+    }
+
+    private fun String.countOccurrences(value: String): Int =
+        windowed(value.length).count { it == value }
 
     private fun readProjectFile(path: String): String =
         sequenceOf(File(path), File("app/$path"))

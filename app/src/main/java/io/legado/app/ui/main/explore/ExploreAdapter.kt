@@ -188,6 +188,8 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                 when (type) {
                     Type.url -> {
                         val tv = getFlexboxChild(flexbox)
+                        val viewNameToken = Any()
+                        tv.tag = viewNameToken
                         flexbox.addView(tv)
                         kind.style().apply {
                             when (this.layout_justifySelf) {
@@ -207,12 +209,14 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                             Coroutine.async(callBack.scope, IO) {
                                 evalUiJs(viewName, source, infoMap)
                             }.onSuccess { n ->
+                                if (tv.tag !== viewNameToken) return@onSuccess
                                 if (n.isNullOrEmpty()) {
                                     tv.text = "null"
                                 } else {
                                     tv.text = n
                                 }
                             }.onError { _ ->
+                                if (tv.tag !== viewNameToken) return@onError
                                 tv.text = "err"
                             }
                         }
@@ -253,6 +257,8 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
 
                     Type.button -> {
                         val tv = getFlexboxChild(flexbox)
+                        val viewNameToken = Any()
+                        tv.tag = viewNameToken
                         flexbox.addView(tv)
                         kind.style().apply {
                             when (this.layout_justifySelf) {
@@ -272,12 +278,14 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                             Coroutine.async(callBack.scope, IO) {
                                 evalUiJs(viewName, source, infoMap)
                             }.onSuccess { n ->
+                                if (tv.tag !== viewNameToken) return@onSuccess
                                 if (n.isNullOrEmpty()) {
                                     tv.text = "null"
                                 } else {
                                     tv.text = n
                                 }
                             }.onError{ _ ->
+                                if (tv.tag !== viewNameToken) return@onError
                                 tv.text = "err"
                             }
                         }
@@ -314,6 +322,8 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
 
                     Type.text -> {
                         val ti = getFlexboxChildText(flexbox)
+                        val viewNameToken = Any()
+                        ti.tag = viewNameToken
                         flexbox.addView(ti)
                         kind.style().apply {
                             when (this.layout_justifySelf) {
@@ -333,12 +343,14 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                             Coroutine.async(callBack.scope, IO) {
                                 evalUiJs(viewName, source, infoMap)
                             }.onSuccess { n ->
+                                if (ti.tag !== viewNameToken) return@onSuccess
                                 if (n.isNullOrEmpty()) {
                                     ti.hint = "null"
                                 } else {
                                     ti.hint = n
                                 }
                             }.onError{ _ ->
+                                if (ti.tag !== viewNameToken) return@onError
                                 ti.hint = "err"
                             }
                         }
@@ -373,6 +385,8 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                         var newName = title
                         var left = true
                         val tv = getFlexboxChild(flexbox)
+                        val viewNameToken = Any()
+                        tv.tag = viewNameToken
                         flexbox.addView(tv)
                         kind.style().apply {
                             when (this.layout_justifySelf) {
@@ -403,6 +417,7 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                             Coroutine.async(callBack.scope, IO) {
                                 evalUiJs(viewName, source, infoMap)
                             }.onSuccess { n ->
+                                if (tv.tag !== viewNameToken) return@onSuccess
                                 if (n.isNullOrEmpty()) {
                                     tv.text = char + "null"
                                 } else {
@@ -410,6 +425,7 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                                     tv.text = if (left) char + n else n + char
                                 }
                             }.onError{ _ ->
+                                if (tv.tag !== viewNameToken) return@onError
                                 tv.text = char + "err"
                             }
                         }
@@ -466,6 +482,8 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                             apply(sl)
                         }
                         val spName = sl.findViewById<AccentTextView>(R.id.sp_name)
+                        val viewNameToken = Any()
+                        spName.tag = viewNameToken
                         if (viewName == null) {
                             spName.text = title
                         } else if (viewName.length in 3..19 && viewName.first() == '\'' && viewName.last() == '\'') {
@@ -476,12 +494,14 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                             Coroutine.async(callBack.scope, IO) {
                                 evalUiJs(viewName, source, infoMap)
                             }.onSuccess { n ->
+                                if (spName.tag !== viewNameToken) return@onSuccess
                                 if (n.isNullOrEmpty()) {
                                     spName.text = "null"
                                 } else {
                                     spName.text = n
                                 }
                             }.onError{ _ ->
+                                if (spName.tag !== viewNameToken) return@onError
                                 spName.text = "err"
                             }
                         }
