@@ -1,6 +1,5 @@
 package io.legado.app.ui.book.import.remote
 
-import android.annotation.SuppressLint
 import android.net.Uri
 import android.os.Bundle
 import android.view.Menu
@@ -149,12 +148,10 @@ class RemoteBookActivity : BaseImportBookActivity<RemoteBookViewModel>(),
         adapter.selectAll(selectAll)
     }
 
-    @SuppressLint("NotifyDataSetChanged")
     override fun onClickSelectBarMainAction() {
         binding.refreshProgressBar.isAutoLoading = true
         viewModel.addToBookshelf(adapter.selected) {
-            adapter.selected.clear()
-            adapter.notifyDataSetChanged()
+            adapter.selectAll(false)
             binding.refreshProgressBar.isAutoLoading = false
         }
     }
