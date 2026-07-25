@@ -1003,6 +1003,10 @@
     <string name="open">open</string>
     <string name="del_login_header">del login header</string>
     <string name="clear_login_info">clear login info</string>
+    <string name="login_ui_v2_render_error">Login UI failed to load. loginUi(state) must return {rows:[...]}. See logs.</string>
+    <string name="login_ui_v2_action_error">Login action failed: %1$s</string>
+    <string name="login_ui_v2_invalid_action">loginAction returned an invalid command object</string>
+    <string name="login_ui_v2_save_error">Failed to save login info</string>
     <string name="show_login_header">show login header</string>
     <string name="login_header">login header</string>
     <string name="font_scale">font scale</string>

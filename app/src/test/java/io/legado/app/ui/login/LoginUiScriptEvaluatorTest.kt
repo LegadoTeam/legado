@@ -193,7 +193,36 @@ class LoginUiScriptEvaluatorTest {
         assertFalse(action.contains("handleUpUiData(null)"))
         assertTrue(preventSaveStart > clearStart)
         assertTrue(dismissStart > preventSaveStart)
-        assertTrue(source.contains("if (!oKToClose && hasChange)"))
+        assertTrue(source.contains("if (!isLoginUiV2 && !oKToClose && hasChange)"))
+    }
+
+    @Test
+    fun `v2 login rendering follows the view lifecycle and commits state after success`() {
+        val dialog = readProjectFile(
+            "src/main/java/io/legado/app/ui/login/SourceLoginDialog.kt"
+        )
+        val delegate = readProjectFile(
+            "src/main/java/io/legado/app/ui/login/SourceLoginV2Delegate.kt"
+        )
+
+        assertTrue(delegate.contains("fragment.viewLifecycleOwner.lifecycleScope"))
+        assertTrue(delegate.contains("renderJob?.cancel()"))
+        assertTrue(delegate.contains("actionJob?.cancel()"))
+        assertTrue(delegate.contains("countdownTimers.values.forEach(CountDownTimer::cancel)"))
+        assertTrue(delegate.contains("renderJob?.isActive == true"))
+        val renderFailure = delegate.indexOf("if (rows == null)")
+        val stateCommit = delegate.indexOf("stateJson = candidateState", renderFailure)
+        val viewBuild = delegate.indexOf("buildViews(rows", stateCommit)
+        assertTrue(renderFailure >= 0)
+        assertTrue(stateCommit > renderFailure)
+        assertTrue(viewBuild > stateCommit)
+        assertTrue(delegate.contains("if (!saved)"))
+        assertTrue(delegate.indexOf("if (!saved)") < delegate.indexOf("if (command.close)"))
+
+        val destroyDelegate = dialog.indexOf("v2Delegate?.destroy()")
+        val destroyView = dialog.indexOf("super.onDestroyView()", destroyDelegate)
+        assertTrue(destroyDelegate >= 0)
+        assertTrue(destroyView > destroyDelegate)
     }
 
     private fun readProjectFile(pathInApp: String): String {

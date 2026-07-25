@@ -2,6 +2,7 @@
  * JavaScript 单文件书源模板。
  * search、getChapters、getContent 为必需函数，getBookInfo 和 explore 为可选函数。
  * getReviewSummary 与 getReviewDetail 成对声明即可启用段评。
+ * loginUi 与 loginAction 成对声明即可启用动态登录界面。
  * config 保存脚本配置；source 是运行时书源实体，sourceApi 是兼容旧脚本的别名。
  * 可使用 java、source、sourceApi、cookie、cache、baseUrl 等现有书源脚本绑定。
  */
@@ -12,7 +13,7 @@ var config = {
     bookSourceType: 0,
     bookSourceGroup: "",
     bookSourceComment: "",
-    // 表单登录示例: [{ name: "账号", type: "text" }, { name: "密码", type: "password" }]
+    // 旧版表单登录示例: [{ name: "账号", type: "text" }, { name: "密码", type: "password" }]
     loginUi: [],
     // 发现分类支持 JSON 数组，或“名称::url”文本（换行或 && 分隔）。
     exploreUrl: [],
@@ -26,6 +27,12 @@ function login() {
     var loginInfo = JSON.parse(source.getLoginInfo() || "{}");
     // 执行登录请求；失败时 throw "错误信息"。
 }
+
+/**
+ * 动态登录界面（可选）由 loginUi(state) 与 loginAction(action, state, form) 成对启用，
+ * 不要同时填写 config.loginUi。支持 text、password、label、select 和 button 行；
+ * loginAction 可返回 state、error、login、close 命令，完整示例见 JS 帮助。
+ */
 
 function search(key, page) {
     var html = java.ajax(config.bookSourceUrl + "/search?q=" + encodeURIComponent(key) + "&p=" + page);

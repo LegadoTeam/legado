@@ -140,6 +140,39 @@ getStrResponse( jsStr: String? = null, sourceRegex: String? = null) //返回访�
 getResponse(): Response //返回访问结果,网络朗读引擎采用的是这个,调用登录后在调用这方法可以重新访问,参考阿里云登录检测
 ```
 
+* 登录 UI v2（动态状态协议）
+> `登录UI` 填 `{"version":2}`，并在`登录URL`中实现 `loginUi(state)` 与 `loginAction(action, state, form)`。适合验证码、多步骤和动态字段；完整契约见 JS 帮助的“登录”章节。
+```js
+function loginUi(state) {
+    if (!state.step) {
+        return { rows: [
+            { key: "phone", name: "手机号", type: "text" },
+            { name: "发送验证码", type: "button", action: "sendCode", countdown: 60 }
+        ] };
+    }
+    return { rows: [
+        { key: "code", name: "验证码", type: "text" },
+        { name: "登录", type: "button", action: "verify" }
+    ] };
+}
+
+function loginAction(action, state, form) {
+    if (action === "sendCode") {
+        if (!form.phone) return { error: { phone: "请输入手机号" } };
+        java.ajax("https://example.com/sms?phone=" + form.phone);
+        return { state: { step: "code", phone: form.phone } };
+    }
+    if (action === "verify") {
+        var result = JSON.parse(java.ajax("https://example.com/verify?code=" + form.code));
+        if (!result.ok) return { error: { code: "验证码错误" } };
+        source.putLoginHeader(JSON.stringify({ Cookie: result.cookie }));
+        return { login: { phone: state.phone }, close: true };
+    }
+}
+```
+
+`loginUi` 返回 `{rows:[...]}`；行类型支持 `text`、`password`、`label`、`select` 和 `button`。`loginAction` 可返回 `state` 重新渲染、`error` 显示字段错误、`login` 保存登录信息、`close` 关闭界面。
+
 ## 发现
 
 * 发现url格式

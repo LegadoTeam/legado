@@ -8,6 +8,7 @@ import io.legado.app.constant.BookSourceType
 import io.legado.app.data.entities.BookSource
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.model.SharedJsScope
+import io.legado.app.model.login.LoginUiV2
 import io.legado.app.utils.GSON
 import kotlinx.coroutines.CancellationException
 import org.htmlunit.corejs.javascript.Function
@@ -89,7 +90,16 @@ object JsSourceConfig {
         ) {
             throw NoStackTraceException("JS源声明了 exploreUrl,缺少配对的 explore 函数")
         }
-        if (!source.loginUi.isNullOrBlank() &&
+        val loginUiFunction = ScriptableObject.getProperty(scope, "loginUi")
+        if (loginUiFunction is Function) {
+            if (!source.loginUi.isNullOrBlank()) {
+                throw NoStackTraceException("loginUi 函数与 config.loginUi 数据只能二选一")
+            }
+            if (ScriptableObject.getProperty(scope, "loginAction") !is Function) {
+                throw NoStackTraceException("JS源声明了 loginUi 函数,缺少配对的 loginAction 函数")
+            }
+            source.loginUi = LoginUiV2.MARKER
+        } else if (!source.loginUi.isNullOrBlank() &&
             ScriptableObject.getProperty(scope, "login") !is Function
         ) {
             throw NoStackTraceException("JS源声明了 loginUi,缺少配对的 login 函数")

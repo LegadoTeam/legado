@@ -76,6 +76,8 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
     private var loginUrl: String? = null
     private var renderJob: Job? = null
     private var isRenderingLoginUi = false
+    private var isLoginUiV2 = false
+    private var v2Delegate: SourceLoginV2Delegate? = null
     private val sourceLoginJsExtensions by lazy {
         SourceLoginJsExtensions(
             activity as AppCompatActivity,
@@ -703,18 +705,25 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
         val source = viewModel.source ?: return
         loginUrl = source.getLoginJs()
         val loginUiStr = source.loginUi ?: return
-        val codeStr = source.getLoginUiJs()
-        if (codeStr != null) {
-            renderLoginUi(source, codeStr, deltaUp = false, installMenu = true)
+        isLoginUiV2 = source.isLoginUiV2()
+        if (isLoginUiV2) {
+            v2Delegate = SourceLoginV2Delegate(this, binding, source)
         } else {
-            rowUis = loginUi(loginUiStr)
-            buttonUi(source, rowUis)
+            val codeStr = source.getLoginUiJs()
+            if (codeStr != null) {
+                renderLoginUi(source, codeStr, deltaUp = false, installMenu = true)
+            } else {
+                rowUis = loginUi(loginUiStr)
+                buttonUi(source, rowUis)
+            }
         }
         binding.toolBar.setBackgroundColor(primaryColor)
         binding.toolBar.title = getString(R.string.login_source, source.getTag())
         binding.toolBar.inflateMenu(R.menu.source_login)
         binding.toolBar.menu.applyTint(requireContext())
+        binding.toolBar.menu.findItem(R.id.menu_ok)?.isVisible = !isLoginUiV2
         installToolbarActions(source)
+        v2Delegate?.start()
     }
 
     private fun renderLoginUi(
@@ -757,6 +766,8 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
     }
 
     override fun onDestroyView() {
+        v2Delegate?.destroy()
+        v2Delegate = null
         renderJob?.cancel()
         renderJob = null
         isRenderingLoginUi = false
@@ -841,7 +852,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
     }
 
     override fun onDismiss(dialog: DialogInterface) {
-        if (!oKToClose && hasChange) {
+        if (!isLoginUiV2 && !oKToClose && hasChange) {
             val loginInfo = viewModel.loginInfo
             if (loginInfo.isEmpty()) {
                 viewModel.source?.removeLoginInfo()

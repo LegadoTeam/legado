@@ -9,6 +9,7 @@ import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern.JS_PATTERN
 import io.legado.app.data.entities.rule.RowUi
+import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.CacheManager
 import io.legado.app.help.ConcurrentRateLimiter.Companion.updateConcurrentRate
 import io.legado.app.help.JsExtensions
@@ -21,6 +22,7 @@ import io.legado.app.help.source.getSharedGlobalStateKey
 import io.legado.app.model.SharedJsScope
 import io.legado.app.model.SharedJsScope.remove
 import io.legado.app.model.jsSource.JsSourceEngine
+import io.legado.app.model.login.LoginUiV2
 import io.legado.app.utils.GSON
 import io.legado.app.utils.GSONStrict
 import io.legado.app.utils.fromJsonArray
@@ -103,6 +105,36 @@ interface BaseSource : JsExtensions {
 
     fun getLoginUiJs(): String? {
         return extractInlineJs(loginUi)
+    }
+
+    fun isLoginUiV2(): Boolean {
+        return LoginUiV2.isV2(loginUi)
+    }
+
+    fun evalLoginUiV2(stateJson: String): String? {
+        val loginJs = getLoginJs()
+            ?: throw NoStackTraceException("登录UI v2 缺少 loginUi/loginAction 脚本")
+        val result = evalJS(
+            "$loginJs\nloginUi(JSON.parse(String(__loginState)))"
+        ) {
+            put("__loginState", stateJson)
+        }
+        return JsSourceEngine.normalizeJsResult(result)
+    }
+
+    fun evalLoginActionV2(action: String, stateJson: String, formJson: String): String? {
+        val loginJs = getLoginJs()
+            ?: throw NoStackTraceException("登录UI v2 缺少 loginUi/loginAction 脚本")
+        val result = evalJS(
+            "$loginJs\n" +
+                "loginAction(String(__loginAction), JSON.parse(String(__loginState)), " +
+                "JSON.parse(String(__loginForm)))"
+        ) {
+            put("__loginAction", action)
+            put("__loginState", stateJson)
+            put("__loginForm", formJson)
+        }
+        return JsSourceEngine.normalizeJsResult(result)
     }
 
     fun getLoginJs(): String? {
@@ -232,6 +264,7 @@ interface BaseSource : JsExtensions {
             return GSON.fromJsonObject<MutableMap<String, String>>(json).getOrNull()
                 ?: mutableMapOf()
         }
+        if (isLoginUiV2()) return mutableMapOf()
         val loginUiRule = loginUi?.trim().takeUnless { it.isNullOrBlank() } ?: return mutableMapOf()
         return LoginInfoMapInitialization.run(
             sourceKey = getKey(),

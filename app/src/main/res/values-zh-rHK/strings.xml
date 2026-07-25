@@ -949,6 +949,10 @@
     <string name="open">打開</string>
     <string name="del_login_header">刪除登錄頭</string>
     <string name="clear_login_info">清除登錄資訊</string>
+    <string name="login_ui_v2_render_error">登錄介面載入失敗，loginUi(state) 必須返回 {rows:[...]}，詳情請見日誌</string>
+    <string name="login_ui_v2_action_error">登錄操作失敗：%1$s</string>
+    <string name="login_ui_v2_invalid_action">loginAction 返回了無效的命令物件</string>
+    <string name="login_ui_v2_save_error">登錄資訊儲存失敗</string>
     <string name="show_login_header">查看登錄頭</string>
     <string name="login_header">登錄頭</string>
     <string name="font_scale">字體大小</string>

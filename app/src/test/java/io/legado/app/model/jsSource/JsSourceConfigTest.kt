@@ -3,6 +3,7 @@ package io.legado.app.model.jsSource
 import io.legado.app.constant.BookSourceType
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.data.entities.rule.RowUi
+import io.legado.app.model.login.LoginUiV2
 import io.legado.app.utils.GSON
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -447,6 +448,46 @@ class JsSourceConfigTest {
         """.trimIndent()
 
         assertEquals(expected, JsSourceConfig.stampLastUpdateTime(script, 123456))
+    }
+
+    @Test
+    fun `loginUi function enables v2`() {
+        val source = JsSourceConfig.extract(
+            validScript + "\n" + """
+                function loginUi(state) { return { rows: [] }; }
+                function loginAction(action, state, form) { return {}; }
+            """.trimIndent()
+        )
+
+        assertEquals(LoginUiV2.MARKER, source.loginUi)
+    }
+
+    @Test
+    fun `loginUi function requires loginAction`() {
+        assertExtractError(
+            validScript + "\nfunction loginUi(state) { return { rows: [] }; }",
+            "loginAction",
+        )
+    }
+
+    @Test
+    fun `loginUi function conflicts with config data`() {
+        assertExtractError(
+            """
+                var config = {
+                    bookSourceUrl: "https://example.com",
+                    bookSourceName: "冲突源",
+                    loginUi: [{ name: "账号", type: "text" }]
+                };
+                function search(key, page) { return []; }
+                function getChapters(book) { return []; }
+                function getContent(chapter, book) { return ""; }
+                function login() {}
+                function loginUi(state) { return { rows: [] }; }
+                function loginAction(action, state, form) { return {}; }
+            """.trimIndent(),
+            "二选一",
+        )
     }
 
     private fun assertExtractError(script: String, messagePart: String) {

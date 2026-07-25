@@ -7,7 +7,12 @@ data class RowUi(
     val chars: Array<String?>? = null,
     val default: String? = null,
     var viewName: String? = null,
-    val style: FlexChildStyle? = null
+    val style: FlexChildStyle? = null,
+    val key: String? = null,
+    val hint: String? = null,
+    val value: String? = null,
+    val options: List<String>? = null,
+    val countdown: Int? = null,
 ) {
 
     @Suppress("ConstPropertyName")
@@ -16,6 +21,7 @@ data class RowUi(
         const val text = "text"
         const val password = "password"
         const val button = "button"
+        const val label = "label"
         const val toggle = "toggle"
         const val select = "select"
 

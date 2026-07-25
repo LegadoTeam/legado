@@ -707,7 +707,7 @@ function getContent(chapter, book, nextChapterUrl) {
 |`jsLib`|公共 JavaScript 库文本|
 |`exploreUrl`|发现分类，支持 JSON 数组，或“名称::url”文本（换行或 `&&` 分隔）；与 `explore` 函数配对|
 |`loginUrl`|WebView 登录地址|
-|`loginUi`|表单登录配置，与 `login` 函数配对|
+|`loginUi`|旧版表单登录配置，与 `login` 函数配对；动态登录界面不要填写此字段|
 
 `bookSourceType` 的 `0` 到 `4` 是书源类型，不等于返回书籍对象中的 `type`。
 搜索结果和详情返回值里的 `type` 使用 `BookType` 位值：视频 `4`、文本 `8`、
@@ -723,9 +723,72 @@ function getContent(chapter, book, nextChapterUrl) {
 |`getChapters(book)`|非文件源必选|非空章节数组|
 |`getContent(chapter, book, nextChapterUrl)`|非文件源必选|非空正文字符串|
 |`login()`|`loginUi` 非空时必选|返回值不限，失败时可 `throw`|
+|`loginUi(state)`|动态登录界面，与 `loginAction` 成对声明|`{rows:[...]}`|
+|`loginAction(action, state, form)`|动态登录界面，与 `loginUi` 成对声明|命令对象或空值|
 
 返回值可以直接返回原生对象或数组，也可以返回 `JSON.stringify(...)` 生成的字符串。
 原生对象或数组会由引擎自动转换为 JSON，字符串则直接交给解析器。
+
+#### 登录
+
+登录支持三种互斥的界面形态：
+
+- WebView 登录：`config.loginUrl` 填登录页地址，手动登录产生的 Cookie 会供后续请求使用。
+- 旧版表单登录：`config.loginUi` 填行数组，并实现顶层 `login()`。
+- 动态登录界面：顶层实现 `loginUi(state)` 和 `loginAction(action, state, form)`，适合短信验证码、多步骤和动态字段。保存时会自动写入 v2 标记，不能同时填写 `config.loginUi`。
+
+```js
+function loginUi(state) {
+    if (!state.step) {
+        return { rows: [
+            { key: "phone", name: "手机号", type: "text", hint: "11 位手机号" },
+            { name: "发送验证码", type: "button", action: "sendCode", countdown: 60 }
+        ] };
+    }
+    return { rows: [
+        { name: "验证码已发送至 " + state.phone, type: "label" },
+        { key: "code", name: "验证码", type: "text" },
+        { key: "line", name: "线路", type: "select", options: ["主线路", "备用线路"] },
+        { name: "登录", type: "button", action: "verify" }
+    ] };
+}
+
+function loginAction(action, state, form) {
+    if (action === "sendCode") {
+        if (!form.phone) return { error: { phone: "请输入手机号" } };
+        java.ajax(config.bookSourceUrl + "/sms?phone=" + encodeURIComponent(form.phone));
+        return { state: { step: "code", phone: form.phone } };
+    }
+    if (action === "verify") {
+        var result = JSON.parse(java.ajax(
+            config.bookSourceUrl + "/verify?code=" + encodeURIComponent(form.code)
+        ));
+        if (!result.ok) return { error: { code: result.message || "验证码错误" } };
+        source.putLoginHeader(JSON.stringify({ Authorization: "Bearer " + result.token }));
+        return { login: { phone: state.phone }, close: true };
+    }
+}
+```
+
+`state` 由当前弹窗持有，关闭后丢弃；只有返回 `state` 才会重新渲染。带 `key` 的输入行会进入 `form`，回填顺序是行内 `value`、本次弹窗输入、已保存登录信息。支持的行类型如下：
+
+|`type`|必要字段|说明|
+|---|---|---|
+|`text`、`password`|`key`、`name`|文本或密码输入，可加 `hint`、`value`|
+|`label`|`name`|只读提示文字|
+|`select`|`key`、`name`、`options`|单选，值为选项字符串|
+|`button`|`name`、`action`|派发动作，可加 `countdown` 秒数|
+
+`loginAction` 可以返回以下命令；未知键会被忽略并写入日志，非法命令对象会提示错误：
+
+|命令|行为|
+|---|---|
+|`state` 对象|替换状态并重新渲染|
+|`error` 对象|按字段 `key` 显示错误；找不到字段时以提示消息显示|
+|`login` 对象|加密保存登录信息，重新打开时按 `key` 回填|
+|`close: true`|关闭登录界面|
+
+返回空值表示动作只执行脚本副作用。认证请求头仍使用 `source.putLoginHeader(json)` 保存；工具栏“清除登录信息”会同时删除登录信息和登录头。
 
 #### search 与 explore
 
