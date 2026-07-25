@@ -29,6 +29,12 @@ class RssArticleAdapterReuseTest {
                 .substringBefore("} else {")
             assertTrue(imageBranch.contains("clearImage(imageView)"))
         }
+
+        val favorites = readProjectFile(
+            "src/main/java/io/legado/app/ui/rss/favorites/RssFavoritesAdapter.kt"
+        ).substringAfter("if (item.image.isNullOrBlank())").substringBefore("} else {")
+        assertTrue(favorites.contains("Glide.with(context).clear(imageView)"))
+        assertTrue(favorites.contains("imageView.setImageDrawable(null)"))
     }
 
     @Test
