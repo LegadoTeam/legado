@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.Configuration
 import android.view.ViewGroup
+import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
 import io.legado.app.R
 import io.legado.app.base.adapter.ItemViewHolder
@@ -88,7 +89,12 @@ class RssArticlesAdapter3(context: Context, callBack: CallBack) :
             }
             tvPubDate.text = item.pubDate
             val imageUrl = item.image
+            val layoutParams = imageView.layoutParams
             if (imageUrl.isNullOrEmpty()) {
+                Glide.with(context).clear(imageView)
+                imageView.setImageDrawable(null)
+                layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT
+                imageView.layoutParams = layoutParams
                 return
             }
             val options = RequestOptions()
@@ -96,7 +102,6 @@ class RssArticlesAdapter3(context: Context, callBack: CallBack) :
             val imageRequest = ImageLoader.load(context, imageUrl)
                 .apply(options)
                 .placeholder(R.drawable.transparent_placeholder) //svg图会依靠这个进行尺寸约束
-            val layoutParams = imageView.layoutParams
             layoutParams.width = ViewGroup.LayoutParams.MATCH_PARENT
             val aspectRatio = getImageAspectRatio(imageUrl)
             if (aspectRatio == 0f) {
