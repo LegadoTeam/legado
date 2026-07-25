@@ -103,14 +103,24 @@ class TextDialog() : BaseDialogFragment(R.layout.dialog_text_view) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         binding.textView.setTextClassifier(TextClassifier.NO_OP)
                     }
-                    if (showToc) setupToc()
+                    if (showToc) {
+                        binding.textView.setLineSpacing(0f, 1.3f)
+                        setupToc()
+                    }
                     viewLifecycleOwner.lifecycleScope.launch {
                         markwon = withContext(IO) {
-                            Markwon.builder(requireContext())
-                                .usePlugin(GlideImagesPlugin.create(Glide.with(requireContext())))
+                            val context = requireContext()
+                            val builder = Markwon.builder(context)
+                                .usePlugin(GlideImagesPlugin.create(Glide.with(context)))
                                 .usePlugin(HtmlPlugin.create())
-                                .usePlugin(TablePlugin.create(requireContext()))
-                                .build()
+                            if (showToc) {
+                                builder
+                                    .usePlugin(TablePlugin.create(HelpMarkwonTheme.tableTheme(context)))
+                                    .usePlugin(HelpMarkwonTheme.plugin(context))
+                            } else {
+                                builder.usePlugin(TablePlugin.create(context))
+                            }
+                            builder.build()
                         }
                         renderMarkdown(currentMarkdown(), restoredScrollY)
                     }
