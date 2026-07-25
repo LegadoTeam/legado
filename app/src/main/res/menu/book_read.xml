@@ -50,6 +50,11 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_highlight_rule"
+        android:title="@string/highlight_rule"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_edit_content"
         android:title="@string/edit_content"
         app:showAsAction="never" />

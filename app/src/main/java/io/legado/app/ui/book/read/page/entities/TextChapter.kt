@@ -5,11 +5,13 @@ import androidx.annotation.Keep
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.ReplaceRule
+import io.legado.app.help.HighlightRuleMatcher
 import io.legado.app.help.book.BookContent
 import io.legado.app.ui.book.read.page.provider.LayoutProgressListener
 import io.legado.app.ui.book.read.page.provider.TextChapterLayout
 import io.legado.app.utils.fastBinarySearchBy
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.abs
 import kotlin.math.min
@@ -61,7 +63,28 @@ data class TextChapter(
 
     var listener: LayoutProgressListener? = null
 
+    @Volatile
     var isCompleted = false
+
+    @Volatile
+    var highlightRuleMatches: List<HighlightRuleMatcher.RuleMatch>? = null
+
+    @Volatile
+    var highlightRuleMatchesVersion: Long = Long.MIN_VALUE
+
+    @Volatile
+    var highlightRuleMatchesBookUrl: String? = null
+
+    @Volatile
+    var highlightRuleMatchesJob: Job? = null
+
+    fun invalidateHighlightRuleMatches() {
+        highlightRuleMatchesJob?.cancel()
+        highlightRuleMatchesJob = null
+        highlightRuleMatches = null
+        highlightRuleMatchesVersion = Long.MIN_VALUE
+        highlightRuleMatchesBookUrl = null
+    }
 
     val paragraphs by lazy {
         paragraphsInternal
@@ -310,6 +333,7 @@ data class TextChapter(
     }
 
     fun cancelLayout() {
+        invalidateHighlightRuleMatches()
         layout?.cancel()
         listener = null
     }

@@ -10,9 +10,12 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookHighlight
 import io.legado.app.data.entities.BookProgress
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.HighlightRule
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.help.AppWebDav
+import io.legado.app.help.HighlightRuleMatcher
 import io.legado.app.help.HighlightStyle
+import io.legado.app.help.HighlightTextBuilder
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.isImage
@@ -41,6 +44,7 @@ import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers.Default
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.Job
@@ -68,6 +72,10 @@ object ReadBook : CoroutineScope by MainScope() {
     var callBack: CallBack? = null
     var highlights: List<BookHighlight> = emptyList()
         private set
+    var highlightRules: List<HighlightRule> = emptyList()
+        private set
+    private var highlightRulesVersion = 0L
+    private var highlightRulesBookUrl: String? = null
     var inBookshelf = false
     var chapterSize = 0
     var simulatedChapterSize = 0
@@ -106,6 +114,7 @@ object ReadBook : CoroutineScope by MainScope() {
         releaseAndCancel()
         ReadBook.book = book
         loadHighlights(book)
+        loadHighlightRules(book)
         readRecord.bookName = book.name
         readRecord.readTime = appDb.readRecordDao.getReadTime(book.name) ?: 0
         chapterSize = appDb.bookChapterDao.getChapterCount(book.bookUrl)
@@ -135,6 +144,106 @@ object ReadBook : CoroutineScope by MainScope() {
 
     fun loadHighlights(book: Book) {
         highlights = appDb.bookHighlightDao.getByBook(book.bookUrl)
+    }
+
+    fun loadHighlightRules(book: Book) {
+        invalidateHighlightRuleMatches()
+        highlightRules = appDb.highlightRuleDao.findEnabledByBook(book.name, book.origin)
+        highlightRulesBookUrl = book.bookUrl
+        highlightRulesVersion++
+    }
+
+    fun upHighlightRules() {
+        book?.let { loadHighlightRules(it) }
+        callBack?.upContent(resetPageOffset = false)
+    }
+
+    fun ruleMatchesOfChapter(textChapter: TextChapter): List<HighlightRuleMatcher.RuleMatch> {
+        val currentBook = book ?: return emptyList()
+        if (highlightRules.isEmpty() || !textChapter.isCompleted) return emptyList()
+        if (!textChapter.isForBook(currentBook) || !isActiveTextChapter(textChapter)) {
+            return emptyList()
+        }
+        val version = highlightRulesVersion
+        val bookUrl = currentBook.bookUrl
+        if (textChapter.highlightRuleMatchesVersion == version &&
+            textChapter.highlightRuleMatchesBookUrl == bookUrl
+        ) {
+            return textChapter.highlightRuleMatches ?: emptyList()
+        }
+        if (textChapter.highlightRuleMatchesJob?.isActive == true) return emptyList()
+        val rules = highlightRules.map {
+            HighlightRuleMatcher.Rule(
+                it.id,
+                it.pattern,
+                it.isRegex,
+                it.styleObj(),
+                it.timeoutMillisecond,
+                it.applyToTitle
+            )
+        }
+        val chapterBookUrl = textChapter.chapter.bookUrl
+        val chapterIndex = textChapter.chapter.index
+        lateinit var job: Job
+        job = launch(Default, start = CoroutineStart.LAZY) {
+            val lines = textChapter.pages.flatMap { page ->
+                page.lines.map { line ->
+                    HighlightTextBuilder.LineInput(
+                        line.text,
+                        line.isParagraphEnd
+                    )
+                }
+            }
+            val matches = HighlightRuleMatcher.match(
+                HighlightTextBuilder.build(lines),
+                rules,
+                shouldContinue = { job.isActive }
+            )
+            withContext(Main) {
+                if (highlightRulesVersion != version ||
+                    highlightRulesBookUrl != bookUrl ||
+                    book?.bookUrl != bookUrl ||
+                    textChapter.chapter.bookUrl != chapterBookUrl ||
+                    textChapter.chapter.index != chapterIndex ||
+                    !textChapter.isCompleted ||
+                    !isActiveTextChapter(textChapter) ||
+                    textChapter.highlightRuleMatchesJob !== job
+                ) return@withContext
+                textChapter.highlightRuleMatches = matches
+                textChapter.highlightRuleMatchesVersion = version
+                textChapter.highlightRuleMatchesBookUrl = bookUrl
+                callBack?.upContent(resetPageOffset = false)
+            }
+        }
+        textChapter.highlightRuleMatchesJob = job
+        job.invokeOnCompletion {
+            if (textChapter.highlightRuleMatchesJob === job) {
+                textChapter.highlightRuleMatchesJob = null
+            }
+        }
+        job.start()
+        return emptyList()
+    }
+
+    private fun isActiveTextChapter(textChapter: TextChapter): Boolean {
+        return prevTextChapter === textChapter ||
+            curTextChapter === textChapter ||
+            nextTextChapter === textChapter
+    }
+
+    private fun observeHighlightRuleLayout(textChapter: TextChapter) {
+        textChapter.setProgressListener(object : LayoutProgressListener {
+            override fun onLayoutCompleted() {
+                launch { ruleMatchesOfChapter(textChapter) }
+            }
+        })
+        if (textChapter.isCompleted) ruleMatchesOfChapter(textChapter)
+    }
+
+    private fun invalidateHighlightRuleMatches() {
+        prevTextChapter?.invalidateHighlightRuleMatches()
+        curTextChapter?.invalidateHighlightRuleMatches()
+        nextTextChapter?.invalidateHighlightRuleMatches()
     }
 
     fun highlightsOfChapter(
@@ -201,6 +310,7 @@ object ReadBook : CoroutineScope by MainScope() {
         releaseAndCancel()
         ReadBook.book = book
         loadHighlights(book)
+        loadHighlightRules(book)
         chapterSize = appDb.bookChapterDao.getChapterCount(book.bookUrl)
         simulatedChapterSize = if (book.readSimulating()) {
             book.simulatedTotalChapterNum()
@@ -299,6 +409,7 @@ object ReadBook : CoroutineScope by MainScope() {
 
     fun clearTextChapter() {
         clearExpiredChapterLoadingJob(true)
+        invalidateHighlightRuleMatches()
         prevTextChapter = null
         curTextChapter = null
         nextTextChapter = null
@@ -450,6 +561,7 @@ object ReadBook : CoroutineScope by MainScope() {
             durChapterPos = 0
             durChapterIndex++
             clearExpiredChapterLoadingJob()
+            prevTextChapter?.invalidateHighlightRuleMatches()
             prevTextChapter = curTextChapter
             curTextChapter = nextTextChapter
             nextTextChapter = null
@@ -491,6 +603,7 @@ object ReadBook : CoroutineScope by MainScope() {
             durChapterPos = 0
             durChapterIndex++
             clearExpiredChapterLoadingJob()
+            prevTextChapter?.invalidateHighlightRuleMatches()
             prevTextChapter = curTextChapter
             curTextChapter = nextTextChapter
             nextTextChapter = null
@@ -528,6 +641,7 @@ object ReadBook : CoroutineScope by MainScope() {
             durChapterPos = if (toLast) prevTextChapter?.lastReadLength ?: Int.MAX_VALUE else 0
             durChapterIndex--
             clearExpiredChapterLoadingJob()
+            nextTextChapter?.invalidateHighlightRuleMatches()
             nextTextChapter = curTextChapter
             curTextChapter = prevTextChapter
             prevTextChapter = null
@@ -881,7 +995,9 @@ object ReadBook : CoroutineScope by MainScope() {
                 0 -> curChapterLoadingLock.withLock {
                     withContext(Main) {
                         ensureActive()
+                        curTextChapter?.invalidateHighlightRuleMatches()
                         curTextChapter = textChapter
+                        observeHighlightRuleLayout(textChapter)
                     }
                     callBack?.upMenuView()
                     var available = false
@@ -910,7 +1026,9 @@ object ReadBook : CoroutineScope by MainScope() {
                 -1 -> prevChapterLoadingLock.withLock {
                     withContext(Main) {
                         ensureActive()
+                        prevTextChapter?.invalidateHighlightRuleMatches()
                         prevTextChapter = textChapter
+                        observeHighlightRuleLayout(textChapter)
                     }
                     textChapter.layoutChannel.receiveAsFlow().collect()
                     if (upContent) callBack?.upContent(offset, resetPageOffset)
@@ -919,7 +1037,9 @@ object ReadBook : CoroutineScope by MainScope() {
                 1 -> nextChapterLoadingLock.withLock {
                     withContext(Main) {
                         ensureActive()
+                        nextTextChapter?.invalidateHighlightRuleMatches()
                         nextTextChapter = textChapter
+                        observeHighlightRuleLayout(textChapter)
                     }
                     for (page in textChapter.layoutChannel) {
                         if (page.index > 1) {
@@ -972,6 +1092,7 @@ object ReadBook : CoroutineScope by MainScope() {
                     curTextChapter?.cancelLayout()
                     withContext(Main) {
                         curTextChapter = textChapter
+                        observeHighlightRuleLayout(textChapter)
                     }
                     callBack?.upMenuView()
                     var available = false
@@ -1001,6 +1122,7 @@ object ReadBook : CoroutineScope by MainScope() {
                     prevTextChapter?.cancelLayout()
                     withContext(Main) {
                         prevTextChapter = textChapter
+                        observeHighlightRuleLayout(textChapter)
                     }
                     textChapter.layoutChannel.receiveAsFlow().collect()
                     if (upContent) callBack?.upContent(offset, resetPageOffset)
@@ -1010,6 +1132,7 @@ object ReadBook : CoroutineScope by MainScope() {
                     nextTextChapter?.cancelLayout()
                     withContext(Main) {
                         nextTextChapter = textChapter
+                        observeHighlightRuleLayout(textChapter)
                     }
                     for (page in textChapter.layoutChannel) {
                         if (page.index > 1) {
@@ -1186,6 +1309,7 @@ object ReadBook : CoroutineScope by MainScope() {
     private fun releaseAndCancel() {
         msg = null
         preDownloadTask?.cancel()
+        invalidateHighlightRuleMatches()
         downloadScope.coroutineContext.cancelChildren()
         coroutineContext.cancelChildren()
         ImageProvider.clear()

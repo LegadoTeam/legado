@@ -18,6 +18,7 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.entities.DictRule
 import io.legado.app.data.entities.HttpTTS
+import io.legado.app.data.entities.HighlightRule
 import io.legado.app.data.entities.KeyboardAssist
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.ReplaceRule
@@ -143,6 +144,13 @@ object Restore {
                 appDb.bookHighlightDao.insert(*highlights.toTypedArray())
             }.onFailure {
                 AppLog.put("恢复高亮出错\n${it.localizedMessage}", it)
+            }
+        }
+        fileToListT<HighlightRule>(path, "highlightRule.json")?.let { rules ->
+            kotlin.runCatching {
+                appDb.highlightRuleDao.replaceAll(rules.map(HighlightRule::normalizeForRestore))
+            }.onFailure {
+                AppLog.put("恢复高亮规则出错\n${it.localizedMessage}", it)
             }
         }
         fileToListT<BookGroup>(path, "bookGroup.json")?.let {

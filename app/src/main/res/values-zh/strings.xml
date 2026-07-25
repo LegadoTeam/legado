@@ -328,6 +328,16 @@
     <string name="highlight_underline_dashed">虚线</string>
     <string name="highlight_underline_dotted">点线</string>
     <string name="highlight_underline_double">双线</string>
+    <string name="highlight_rule">高亮规则</string>
+    <string name="highlight_rule_add">新建高亮规则</string>
+    <string name="highlight_rule_edit_title">编辑高亮规则</string>
+    <string name="highlight_rule_pattern">关键词 / 正则</string>
+    <string name="highlight_rule_scope_hint">作用范围（书名/书源，留空为全部）</string>
+    <string name="highlight_rule_apply_to_title">应用于章节标题</string>
+    <string name="highlight_rule_empty">暂无高亮规则</string>
+    <string name="highlight_rule_invalid">规则无效：%1$s</string>
+    <string name="highlight_rule_not_found">高亮规则已不存在</string>
+    <string name="highlight_create_rule">创建规则</string>
     <string name="action_del">删除</string>
     <string name="load_over_time">加载超时</string>
     <string name="join_group">关注：%s</string>

@@ -176,4 +176,43 @@ class MigrationTest {
                 close()
             }
     }
+
+    @Test
+    @Throws(IOException::class)
+    fun migrate97To98AddsHighlightRules() {
+        val databaseName = "migration-highlight-rules"
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        context.deleteDatabase(databaseName)
+        helper.createDatabase(databaseName, 97).close()
+
+        Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
+            .build().apply {
+                openHelper.writableDatabase.query("PRAGMA table_info(highlightRules)")
+                    .use { cursor ->
+                        val nameIndex = cursor.getColumnIndexOrThrow("name")
+                        val defaultIndex = cursor.getColumnIndexOrThrow("dflt_value")
+                        val columns = buildMap<String, String?> {
+                            while (cursor.moveToNext()) {
+                                put(cursor.getString(nameIndex), cursor.getString(defaultIndex))
+                            }
+                        }
+                        assertTrue(columns.keys.containsAll(
+                            listOf(
+                                "id",
+                                "name",
+                                "pattern",
+                                "isRegex",
+                                "scope",
+                                "isEnabled",
+                                "style",
+                                "sortOrder",
+                                "timeoutMillisecond",
+                                "applyToTitle"
+                            )
+                        ))
+                        assertEquals("0", columns["applyToTitle"])
+                    }
+                close()
+            }
+    }
 }
