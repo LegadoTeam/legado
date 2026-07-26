@@ -138,6 +138,11 @@ class BookInfoActivity :
                 changed = it[2] as Boolean,
                 volumeIndex = it[3] as Int,
                 chapterInVolumeIndex = it[4] as Int,
+                highlightLayoutTitleLength =
+                    (it[TocActivityResult.HIGHLIGHT_LAYOUT_TITLE_LENGTH_INDEX] as Int)
+                        .takeUnless { titleLength ->
+                            titleLength == TocActivityResult.NO_HIGHLIGHT_LAYOUT_TITLE_LENGTH
+                        },
             )
         } ?: let {
             if (!viewModel.inBookshelf) {
@@ -1190,13 +1195,19 @@ class BookInfoActivity :
         changed: Boolean,
         volumeIndex: Int,
         chapterInVolumeIndex: Int,
+        highlightLayoutTitleLength: Int?,
     ) {
         viewModel.getBook(false)?.let { book ->
-            book.durChapterIndex = index
-            book.durChapterPos = pos
+            val deferHighlightPosition = highlightLayoutTitleLength != null &&
+                !book.isAudio && !book.isVideo &&
+                (book.isLocal || !book.isImage || !AppConfig.showMangaUi)
+            if (!deferHighlightPosition) {
+                book.durChapterIndex = index
+                book.durChapterPos = pos
+                book.durVolumeIndex = volumeIndex
+                book.chapterInVolumeIndex = chapterInVolumeIndex
+            }
             chapterChanged = changed
-            book.durVolumeIndex = volumeIndex
-            book.chapterInVolumeIndex = chapterInVolumeIndex
             if (!viewModel.inBookshelf) {
                 book.addType(BookType.notShelf)
                 lifecycleScope.launch {
@@ -1204,7 +1215,12 @@ class BookInfoActivity :
                         book.save()
                     }
                     viewModel.saveChapterList {
-                        startReadActivity(book)
+                        startReadActivity(
+                            book,
+                            index.takeIf { deferHighlightPosition },
+                            pos.takeIf { deferHighlightPosition },
+                            highlightLayoutTitleLength.takeIf { deferHighlightPosition }
+                        )
                     }
                 }
             } else {
@@ -1212,7 +1228,12 @@ class BookInfoActivity :
                     withContext(IO) {
                         appDb.bookDao.update(book)
                     }
-                    startReadActivity(book)
+                    startReadActivity(
+                        book,
+                        index.takeIf { deferHighlightPosition },
+                        pos.takeIf { deferHighlightPosition },
+                        highlightLayoutTitleLength.takeIf { deferHighlightPosition }
+                    )
                 }
             }
         }
@@ -1299,7 +1320,12 @@ class BookInfoActivity :
         }
     }
 
-    private fun startReadActivity(book: Book) {
+    private fun startReadActivity(
+        book: Book,
+        highlightIndex: Int? = null,
+        highlightChapterPos: Int? = null,
+        highlightLayoutTitleLength: Int? = null,
+    ) {
         when {
             book.isAudio -> readBookResult.launch(
                 Intent(this, AudioPlayActivity::class.java)
@@ -1317,10 +1343,22 @@ class BookInfoActivity :
                     this,
                     if (!book.isLocal && book.isImage && AppConfig.showMangaUi) ReadMangaActivity::class.java
                     else ReadBookActivity::class.java
-                )
-                    .putExtra("bookUrl", book.bookUrl)
-                    .putExtra("inBookshelf", viewModel.inBookshelf)
-                    .putExtra("chapterChanged", chapterChanged)
+                ).apply {
+                    putExtra("bookUrl", book.bookUrl)
+                    putExtra("inBookshelf", viewModel.inBookshelf)
+                    putExtra("chapterChanged", chapterChanged)
+                    if (highlightIndex != null &&
+                        highlightChapterPos != null &&
+                        highlightLayoutTitleLength != null
+                    ) {
+                        putExtra("index", highlightIndex)
+                        putExtra("chapterPos", highlightChapterPos)
+                        putExtra(
+                            TocActivityResult.EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH,
+                            highlightLayoutTitleLength
+                        )
+                    }
+                }
             )
         }
     }

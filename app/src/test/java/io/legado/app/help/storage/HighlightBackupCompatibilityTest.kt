@@ -1,11 +1,15 @@
 package io.legado.app.help.storage
 
 import io.legado.app.data.entities.BookHighlight
+import io.legado.app.data.entities.HighlightRule
 import io.legado.app.help.HighlightStyle
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class HighlightBackupCompatibilityTest {
 
@@ -24,4 +28,33 @@ class HighlightBackupCompatibilityTest {
         assertEquals(BookHighlight.UNKNOWN_TITLE_LENGTH, legacy.layoutTitleLength)
         assertEquals(HighlightStyle(fill = 7), current.styleObj())
     }
+
+    @Test
+    fun `older rule json defaults title matching to false`() {
+        val rule = GSON.fromJsonArray<HighlightRule>(
+            """[{"id":1,"name":"rule","pattern":"text"}]"""
+        ).getOrThrow().single().normalizeForRestore()
+
+        assertFalse(rule.applyToTitle)
+        assertEquals(HighlightRule.DEFAULT_TIMEOUT_MILLISECONDS, rule.timeoutMillisecond)
+        assertEquals(HighlightStyle(), rule.styleObj())
+    }
+
+    @Test
+    fun `backup and restore include automatic highlight rules`() {
+        val backup = projectFile("src/main/java/io/legado/app/help/storage/Backup.kt").readText()
+        val restore = projectFile("src/main/java/io/legado/app/help/storage/Restore.kt").readText()
+
+        assertTrue(backup.contains("\"highlightRule.json\""))
+        assertTrue(backup.contains("appDb.highlightRuleDao.all"))
+        assertTrue(backup.contains("writeEmpty = true"))
+        assertTrue(restore.contains("fileToListT<HighlightRule>(path, \"highlightRule.json\")"))
+        assertTrue(restore.contains("appDb.highlightRuleDao.replaceAll"))
+        assertTrue(restore.contains("HighlightRule::normalizeForRestore"))
+        assertTrue(restore.contains("恢复高亮规则出错"))
+    }
+
+    private fun projectFile(pathInApp: String): File =
+        sequenceOf(File(pathInApp), File("app/$pathInApp"))
+            .first(File::isFile)
 }

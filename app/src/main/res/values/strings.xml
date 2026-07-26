@@ -314,6 +314,7 @@
     <string name="bookmark">Bookmarks</string>
     <string name="bookmark_add">Add to Bookmarks</string>
     <string name="highlight">Highlight</string>
+    <string name="highlight_tab">Highlights</string>
     <string name="highlight_bg_color">Background color</string>
     <string name="highlight_text_color">Text color</string>
     <string name="highlight_style">Style</string>
@@ -331,6 +332,16 @@
     <string name="highlight_underline_dashed">Dashed</string>
     <string name="highlight_underline_dotted">Dotted</string>
     <string name="highlight_underline_double">Double</string>
+    <string name="highlight_rule">Highlight rules</string>
+    <string name="highlight_rule_add">New highlight rule</string>
+    <string name="highlight_rule_edit_title">Edit highlight rule</string>
+    <string name="highlight_rule_pattern">Keyword / regular expression</string>
+    <string name="highlight_rule_scope_hint">Scope (book title/source; blank for all)</string>
+    <string name="highlight_rule_apply_to_title">Apply to chapter titles</string>
+    <string name="highlight_rule_empty">No highlight rules</string>
+    <string name="highlight_rule_invalid">Invalid rule: %1$s</string>
+    <string name="highlight_rule_not_found">Highlight rule no longer exists</string>
+    <string name="highlight_create_rule">Create rule</string>
     <string name="action_del">Delete</string>
     <string name="load_over_time">Loading timeout</string>
     <string name="join_group">Follow:%s</string>

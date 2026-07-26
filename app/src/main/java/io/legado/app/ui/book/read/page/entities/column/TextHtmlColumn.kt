@@ -4,6 +4,7 @@ import android.graphics.Canvas
 import android.os.Build
 import android.text.TextPaint
 import androidx.annotation.Keep
+import io.legado.app.help.TextViewTagHandler.Companion.HR_PLACE_CHAR
 import io.legado.app.help.TextViewTagHandler.Companion.HR_PLACE_STR
 import io.legado.app.help.HighlightStyle
 import io.legado.app.help.config.ReadBookConfig
@@ -25,6 +26,9 @@ data class TextHtmlColumn(
     val mTextColor: Int?,
     val linkUrl: String?
 ) : TextBaseColumn {
+
+    override val positionLength: Int
+        get() = if (charData == HR_PLACE_STR) HR_PLACE_CHAR.length else charData.length
 
     override var textLine: TextLine = emptyTextLine
 
