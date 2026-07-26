@@ -285,6 +285,7 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
                 if (AppConfig.importShowComment) {
                     item.bookSourceComment?.takeIf{ it.isNotBlank() }?.let {
                         showComment.text = it
+                        showComment.maxLines = 3
                         showComment.visible()
                         showComment.setOnClickListener {
                             if (showComment.maxLines == 3) {

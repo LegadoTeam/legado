@@ -65,6 +65,16 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.max
 import kotlin.math.min
 
+internal fun resolveHighlightChapterPosition(
+    rawPosition: Int,
+    sourceTitleLength: Int,
+    currentTitleLength: Int
+): Int {
+    val currentLength = currentTitleLength.coerceAtLeast(0)
+    val sourceLength = sourceTitleLength.takeIf { it >= 0 } ?: currentLength
+    return (rawPosition - sourceLength).coerceAtLeast(0) + currentLength
+}
+
 
 @Suppress("MemberVisibilityCanBePrivate")
 object ReadBook : CoroutineScope by MainScope() {
@@ -94,6 +104,7 @@ object ReadBook : CoroutineScope by MainScope() {
     private val prevChapterLoadingLock = Mutex()
     private val curChapterLoadingLock = Mutex()
     private val nextChapterLoadingLock = Mutex()
+    private var pendingHighlightJump: PendingHighlightJump? = null
     var readStartTime: Long = System.currentTimeMillis()
 
     /* 跳转进度前进度记录 */
@@ -409,6 +420,7 @@ object ReadBook : CoroutineScope by MainScope() {
 
     fun clearTextChapter() {
         clearExpiredChapterLoadingJob(true)
+        pendingHighlightJump = null
         invalidateHighlightRuleMatches()
         prevTextChapter = null
         curTextChapter = null
@@ -710,6 +722,7 @@ object ReadBook : CoroutineScope by MainScope() {
         index: Int,
         durChapterPos: Int = 0,
         upContent: Boolean = true,
+        highlightLayoutTitleLength: Int? = null,
         success: (() -> Unit)? = null
     ) {
         if (BaseReadAloudService.isRun) {
@@ -720,7 +733,19 @@ object ReadBook : CoroutineScope by MainScope() {
             if (upContent) callBack?.upContent()
             durChapterIndex = index
             ReadBook.durChapterPos = durChapterPos
-            saveRead()
+            pendingHighlightJump = highlightLayoutTitleLength?.let { sourceTitleLength ->
+                book?.let {
+                    PendingHighlightJump(
+                        it.bookUrl,
+                        index,
+                        durChapterPos,
+                        sourceTitleLength
+                    )
+                }
+            }
+            if (pendingHighlightJump == null) {
+                saveRead()
+            }
             loadContent(resetPageOffset = true) {
                 success?.invoke()
             }
@@ -1003,13 +1028,14 @@ object ReadBook : CoroutineScope by MainScope() {
                     var available = false
                     for (page in textChapter.layoutChannel) {
                         val index = page.index
-                        if (!available && page.containPos(durChapterPos)) {
+                        val positionReady = resolvePendingHighlightJump(book, textChapter)
+                        if (positionReady && !available && page.containPos(durChapterPos)) {
                             if (upContent) {
                                 callBack?.upContent(offset, resetPageOffset)
                             }
                             available = true
                         }
-                        if (upContent && isScroll) {
+                        if (positionReady && upContent && isScroll) {
                             if (max(index - 3, 0) < durPageIndex) {
                                 callBack?.upContent(offset, false)
                             }
@@ -1098,13 +1124,14 @@ object ReadBook : CoroutineScope by MainScope() {
                     var available = false
                     for (page in textChapter.layoutChannel) {
                         val index = page.index
-                        if (!available && page.containPos(durChapterPos)) {
+                        val positionReady = resolvePendingHighlightJump(book, textChapter)
+                        if (positionReady && !available && page.containPos(durChapterPos)) {
                             if (upContent) {
                                 callBack?.upContent(offset, resetPageOffset)
                             }
                             available = true
                         }
-                        if (upContent && isScroll) {
+                        if (positionReady && upContent && isScroll) {
                             if (max(index - 3, 0) < durPageIndex) {
                                 callBack?.upContent(offset, false)
                             }
@@ -1193,6 +1220,7 @@ object ReadBook : CoroutineScope by MainScope() {
     }
 
     fun saveRead(pageChanged: Boolean = false) {
+        if (hasPendingHighlightJump()) return
         val book = book ?: return
         executor.execute {
             kotlin.runCatching {
@@ -1287,6 +1315,51 @@ object ReadBook : CoroutineScope by MainScope() {
             }
         }
     }
+
+    private fun resolvePendingHighlightJump(
+        layoutBook: Book,
+        textChapter: TextChapter
+    ): Boolean {
+        if (curTextChapter !== textChapter) return false
+        val pending = pendingHighlightJump ?: return true
+        if (pending.bookUrl != layoutBook.bookUrl ||
+            pending.chapterIndex != durChapterIndex ||
+            pending.chapterIndex != textChapter.chapter.index ||
+            pending.rawPosition != durChapterPos
+        ) {
+            pendingHighlightJump = null
+            return true
+        }
+        val currentTitleLength = textChapter.layoutTitleLength
+        if (currentTitleLength < 0) return false
+        durChapterPos = resolveHighlightChapterPosition(
+            pending.rawPosition,
+            pending.sourceTitleLength,
+            currentTitleLength
+        )
+        pendingHighlightJump = null
+        saveRead()
+        return true
+    }
+
+    private fun hasPendingHighlightJump(): Boolean {
+        val pending = pendingHighlightJump ?: return false
+        if (pending.bookUrl == book?.bookUrl &&
+            pending.chapterIndex == durChapterIndex &&
+            pending.rawPosition == durChapterPos
+        ) {
+            return true
+        }
+        pendingHighlightJump = null
+        return false
+    }
+
+    private data class PendingHighlightJump(
+        val bookUrl: String,
+        val chapterIndex: Int,
+        val rawPosition: Int,
+        val sourceTitleLength: Int
+    )
 
     /**
      * 注册回调
