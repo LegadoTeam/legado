@@ -143,6 +143,7 @@ class ImportTxtTocRuleDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
                 cbSourceName.text = item.name
                 item.example?.takeIf{ it.isNotBlank() }?.let {
                     showComment.text = it
+                    showComment.maxLines = 3
                     showComment.visible()
                     showComment.setOnClickListener {
                             if (showComment.maxLines == 3) {

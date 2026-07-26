@@ -85,6 +85,20 @@ class RssSourceEditLayoutTest {
         assertTrue(Regex("optionsHeader\\.contentDescription\\s*=").containsMatchIn(updatePanel))
     }
 
+    @Test
+    fun `long text stays out of the inline editor`() {
+        val adapter = File(repositoryRoot, ADAPTER_PATH).readText()
+        val activity = File(repositoryRoot, ACTIVITY_PATH).readText()
+        val refresh = activity.section(
+            "private fun refreshEditedEntity(",
+            "override fun onCompatOptionsItemSelected("
+        )
+
+        assertTrue(adapter.contains("EditSafety.isTooLongForInline(rawText)"))
+        assertTrue(adapter.contains("R.string.large_text_placeholder"))
+        assertTrue(refresh.contains("EditSafety.isTooLongForInline(editEntity.value.orEmpty())"))
+    }
+
     private fun parse(path: String): Document =
         DocumentBuilderFactory.newInstance().apply {
             isNamespaceAware = true
@@ -121,6 +135,8 @@ class RssSourceEditLayoutTest {
         const val LAYOUT_PATH = "app/src/main/res/layout/activity_rss_source_edit.xml"
         const val ACTIVITY_PATH =
             "app/src/main/java/io/legado/app/ui/rss/source/edit/RssSourceEditActivity.kt"
+        const val ADAPTER_PATH =
+            "app/src/main/java/io/legado/app/ui/rss/source/edit/RssSourceEditAdapter.kt"
         const val CARD_VIEW = "androidx.cardview.widget.CardView"
         const val FLEXBOX = "com.google.android.flexbox.FlexboxLayout"
         const val THEME_CHECK_BOX = "io.legado.app.lib.theme.view.ThemeCheckBox"

@@ -33,8 +33,8 @@ class FontAdapter(context: Context, curFilePath: String, val callBack: CallBack)
         payloads: MutableList<Any>
     ) {
         binding.run {
-            kotlin.runCatching {
-                val typeface: Typeface? = if (item.isContentScheme) {
+            tvFont.typeface = kotlin.runCatching {
+                if (item.isContentScheme) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         context.contentResolver
                             .openFileDescriptor(item.uri, "r")?.use {
@@ -46,11 +46,10 @@ class FontAdapter(context: Context, curFilePath: String, val callBack: CallBack)
                 } else {
                     Typeface.createFromFile(item.uri.path!!)
                 }
-                tvFont.typeface = typeface
             }.onFailure {
                 it.printOnDebug()
                 AppLog.put("读取字体 ${item.name} 出错\n${it.localizedMessage}", it, true)
-            }
+            }.getOrNull() ?: Typeface.DEFAULT
             tvFont.text = item.name
             root.setOnClickListener { callBack.onFontSelect(item) }
             val selected = item.name == curName
