@@ -219,7 +219,7 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
                 if (book.tocUrl.isBlank()) {
                     WebBook.getBookInfoAwait(source, book)
                 } else {
-                    WebBook.runPreUpdateJs(source, book)
+                    WebBook.runPreUpdateJs(source, book).getOrThrow()
                 }
                 val toc = WebBook.getChapterListAwait(source, book).getOrThrow()
                 book.sync(oldBook)

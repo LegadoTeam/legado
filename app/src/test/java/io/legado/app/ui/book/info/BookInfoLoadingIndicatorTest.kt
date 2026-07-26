@@ -91,6 +91,34 @@ class BookInfoLoadingIndicatorTest {
         )
     }
 
+    @Test
+    fun `refresh failures preserve the persisted book metadata`() {
+        val bookInfoViewModel = projectFile(VIEW_MODEL_PATH).readText()
+        val loadBookInfo = bookInfoViewModel
+            .substringAfter("fun loadBookInfo(")
+            .substringBefore("fun loadChapter(")
+        val loadChapter = bookInfoViewModel
+            .substringAfter("fun loadChapter(")
+            .substringBefore("fun loadGroup(")
+        val mainViewModel = projectFile(MAIN_VIEW_MODEL_PATH).readText()
+        val normalBookRefresh = loadBookInfo
+            .substringAfter("if (it.isWebFile) {")
+            .substringAfter("} else {")
+            .substringBefore("}.onError")
+
+        assertTrue(loadBookInfo.contains("val oldBook = book.copy()"))
+        assertTrue(loadBookInfo.contains("bookData.postValue(oldBook)"))
+        assertFalse(normalBookRefresh.contains("it.save()"))
+        assertTrue(normalBookRefresh.contains("oldBook = persistedBook"))
+        assertTrue(loadChapter.contains("appDb.bookDao.replace(oldBook, book)"))
+        assertTrue(loadChapter.contains("bookData.postValue(oldBook)"))
+        assertTrue(
+            mainViewModel.contains(
+                "WebBook.runPreUpdateJs(source, book).getOrThrow()",
+            ),
+        )
+    }
+
     private fun Element.androidAttribute(name: String): String = getAttributeNS(ANDROID_NS, name)
 
     private fun Element.elementChildren(): List<Element> {
@@ -112,6 +140,8 @@ class BookInfoLoadingIndicatorTest {
             "src/main/java/io/legado/app/ui/book/info/BookInfoActivity.kt"
         private const val VIEW_MODEL_PATH =
             "src/main/java/io/legado/app/ui/book/info/BookInfoViewModel.kt"
+        private const val MAIN_VIEW_MODEL_PATH =
+            "src/main/java/io/legado/app/ui/main/MainViewModel.kt"
         private val LAYOUTS = listOf(
             "src/main/res/layout/activity_book_info.xml",
             "src/main/res/layout-land/activity_book_info.xml",

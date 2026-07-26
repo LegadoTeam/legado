@@ -242,8 +242,10 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 context.toastOnUi(R.string.error_no_source)
                 return
             }
+            val oldBook = book.copy()
             WebBook.getBookInfo(scope, bookSource, book, canReName = canReName)
                 .onSuccess(IO) {
+                    var persistedBook = oldBook
                     val dbBook = appDb.bookDao.getBook(book.name, book.author)
                     if (!inBookshelf && dbBook != null && !dbBook.isNotShelf && dbBook.origin == book.origin) {
                         /**
@@ -252,18 +254,25 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                          * book 加载详情后虽然书名作者相同，但是又可能不是数据库中(书源不同)的那本书 #3149
                          */
                         dbBook.updateTo(it)
+                        persistedBook = dbBook
                         inBookshelf = true
                     }
-                    bookData.postValue(it)
-                    if (inBookshelf) {
-                        it.save()
-                    }
                     if (it.isWebFile) {
+                        bookData.postValue(it)
+                        if (inBookshelf) {
+                            it.save()
+                        }
                         loadWebFile(it)
                     } else {
-                        loadChapter(it, runPreUpdateJs, isFromBookInfo = true)
+                        loadChapter(
+                            it,
+                            runPreUpdateJs,
+                            isFromBookInfo = true,
+                            oldBook = persistedBook,
+                        )
                     }
                 }.onError {
+                    bookData.postValue(oldBook)
                     chapterListData.postValue(chapterListData.value.orEmpty())
                     AppLog.put("获取书籍信息失败\n${it.localizedMessage}", it)
                     context.toastOnUi(R.string.error_get_book_info)
@@ -276,7 +285,8 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         book: Book,
         runPreUpdateJs: Boolean = true,
         scope: CoroutineScope = viewModelScope,
-        isFromBookInfo: Boolean = false
+        isFromBookInfo: Boolean = false,
+        oldBook: Book = book.copy(),
     ) {
         if (book.isLocal) {
             execute(scope) {
@@ -298,7 +308,6 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 context.toastOnUi(R.string.error_no_source)
                 return
             }
-            val oldBook = book.copy()
             WebBook.getChapterList(
                 scope,
                 bookSource,
@@ -323,6 +332,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     bookData.postValue(book)
                     chapterListData.postValue(it)
                 }.onError {
+                    bookData.postValue(oldBook)
                     chapterListData.postValue(chapterListData.value.orEmpty())
                     AppLog.put("获取目录失败\n${it.localizedMessage}", it)
                     context.toastOnUi(R.string.error_get_chapter_list)
