@@ -3,6 +3,7 @@ package io.legado.app.ui.rss.favorites
 import android.content.Context
 import android.graphics.drawable.Drawable
 import android.view.ViewGroup
+import com.bumptech.glide.Glide
 import com.bumptech.glide.load.DataSource
 import com.bumptech.glide.load.engine.GlideException
 import com.bumptech.glide.request.RequestListener
@@ -35,6 +36,8 @@ class RssFavoritesAdapter(context: Context, val callBack: CallBack) :
             tvTitle.text = item.title
             tvPubDate.text = item.pubDate
             if (item.image.isNullOrBlank()) {
+                Glide.with(context).clear(imageView)
+                imageView.setImageDrawable(null)
                 imageView.gone()
             } else {
                 val options =
