@@ -88,7 +88,11 @@ class RssArticlesAdapter3(context: Context, callBack: CallBack) :
             }
             tvPubDate.text = item.pubDate
             val imageUrl = item.image
+            val layoutParams = imageView.layoutParams
             if (imageUrl.isNullOrEmpty()) {
+                clearImage(imageView)
+                layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT
+                imageView.layoutParams = layoutParams
                 return
             }
             val options = RequestOptions()
@@ -96,7 +100,6 @@ class RssArticlesAdapter3(context: Context, callBack: CallBack) :
             val imageRequest = ImageLoader.load(context, imageUrl)
                 .apply(options)
                 .placeholder(R.drawable.transparent_placeholder) //svg图会依靠这个进行尺寸约束
-            val layoutParams = imageView.layoutParams
             layoutParams.width = ViewGroup.LayoutParams.MATCH_PARENT
             val aspectRatio = getImageAspectRatio(imageUrl)
             if (aspectRatio == 0f) {

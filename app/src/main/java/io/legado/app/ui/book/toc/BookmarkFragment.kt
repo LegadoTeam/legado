@@ -20,12 +20,11 @@ import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.viewbindingdelegate.viewBinding
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 
 class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark),
@@ -33,55 +32,60 @@ class BookmarkFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmark
     TocViewModel.BookmarkCallBack {
     override val viewModel by activityViewModels<TocViewModel>()
     private val binding by viewBinding(FragmentBookmarkBinding::bind)
-    private val mLayoutManager by lazy { UpLinearLayoutManager(requireContext()) }
-    private val adapter by lazy { BookmarkAdapter(requireContext(), this) }
+    private var layoutManager: UpLinearLayoutManager? = null
+    private var adapter: BookmarkAdapter? = null
+    private var bookmarkJob: Job? = null
     private var durChapterIndex = 0
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         viewModel.bookMarkCallBack = this
         initRecyclerView()
-        viewModel.bookData.observe(this) {
+        viewModel.bookData.observe(viewLifecycleOwner) {
             durChapterIndex = it.durChapterIndex
-            upBookmark(null)
+            upBookmark(viewModel.searchKey)
         }
     }
 
     override fun onDestroyView() {
-        super.onDestroyView()
+        bookmarkJob?.cancel()
+        bookmarkJob = null
+        binding.recyclerView.adapter = null
+        adapter = null
+        layoutManager = null
         viewModel.bookMarkCallBack = clearCallbackIfOwned(
             viewModel.bookMarkCallBack,
             this
         )
+        super.onDestroyView()
     }
 
     private fun initRecyclerView() {
+        val layoutManager = UpLinearLayoutManager(requireContext())
+        val adapter = BookmarkAdapter(requireContext(), this)
+        this.layoutManager = layoutManager
+        this.adapter = adapter
         binding.recyclerView.setEdgeEffectColor(primaryColor)
-        binding.recyclerView.layoutManager = mLayoutManager
+        binding.recyclerView.layoutManager = layoutManager
         binding.recyclerView.addItemDecoration(VerticalDivider(requireContext()))
         binding.recyclerView.adapter = adapter
         binding.recyclerView.applyNavigationBarPadding()
     }
 
     override fun upBookmark(searchKey: String?) {
+        bookmarkJob?.cancel()
         val book = viewModel.bookData.value ?: return
-        lifecycleScope.launch {
+        bookmarkJob = viewLifecycleOwner.lifecycleScope.launch {
             when {
                 searchKey.isNullOrBlank() -> appDb.bookmarkDao.flowByBook(book.name, book.author)
                 else -> appDb.bookmarkDao.flowSearch(book.name, book.author, searchKey)
             }.catch {
                 AppLog.put("目录界面获取书签数据失败\n${it.localizedMessage}", it)
-            }.flowOn(IO).collect {
-                adapter.setItems(it)
-                var scrollPos = 0
-                withContext(Dispatchers.Default) {
-                    adapter.getItems().forEachIndexed { index, bookmark ->
-                        if (bookmark.chapterIndex >= durChapterIndex) {
-                            return@withContext
-                        }
-                        scrollPos = index
-                    }
-                }
-                mLayoutManager.scrollToPositionWithOffset(scrollPos, 0)
+            }.flowOn(IO).collect { bookmarks ->
+                adapter?.setItems(bookmarks)
+                val scrollPosition = bookmarks
+                    .indexOfLast { it.chapterIndex < durChapterIndex }
+                    .coerceAtLeast(0)
+                layoutManager?.scrollToPositionWithOffset(scrollPosition, 0)
             }
         }
     }

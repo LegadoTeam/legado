@@ -20,10 +20,20 @@ class TocActivityResult : ActivityResultContract<String, Array<Any>?>() {
                     it.getIntExtra("chapterPos", 0),
                     it.getBooleanExtra("chapterChanged", false),
                     it.getIntExtra("durVolumeIndex", 0),
-                    it.getIntExtra("chapterInVolumeIndex", 0)
+                    it.getIntExtra("chapterInVolumeIndex", 0),
+                    it.getIntExtra(
+                        EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH,
+                        NO_HIGHLIGHT_LAYOUT_TITLE_LENGTH
+                    )
                 )
             }
         }
         return null
+    }
+
+    companion object {
+        const val EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH = "highlightLayoutTitleLength"
+        const val HIGHLIGHT_LAYOUT_TITLE_LENGTH_INDEX = 5
+        const val NO_HIGHLIGHT_LAYOUT_TITLE_LENGTH = Int.MIN_VALUE
     }
 }

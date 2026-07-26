@@ -140,6 +140,7 @@ class BookAdapter(context: Context, val callBack: CallBack) :
                 selectedPosition.add(index)
             }
         }
+        if (selectedPosition.isEmpty()) return
         val minPosition = Collections.min(selectedPosition)
         val maxPosition = Collections.max(selectedPosition)
         val itemCount = maxPosition - minPosition + 1

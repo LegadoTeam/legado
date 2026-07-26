@@ -60,6 +60,7 @@ class RssArticlesAdapter(context: Context, callBack: CallBack) :
             }
             tvPubDate.text = item.pubDate
             if (item.image.isNullOrBlank() && !callBack.isGridLayout) {
+                clearImage(imageView)
                 imageView.gone()
             } else {
                 val options =

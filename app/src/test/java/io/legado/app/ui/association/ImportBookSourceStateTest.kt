@@ -89,6 +89,24 @@ class ImportBookSourceStateTest {
         assertTrue(icon.contains("android:pathData="))
     }
 
+    @Test
+    fun `import comment rows reset collapsed state when rebound`() {
+        listOf(
+            "src/main/java/io/legado/app/ui/association/ImportBookSourceDialog.kt",
+            "src/main/java/io/legado/app/ui/association/ImportRssSourceDialog.kt",
+            "src/main/java/io/legado/app/ui/association/ImportTxtTocRuleDialog.kt",
+        ).forEach { path ->
+            val source = readProjectFile(path)
+            val textIndex = source.indexOf("showComment.text = it")
+            val resetIndex = source.indexOf("showComment.maxLines = 3", textIndex)
+            val visibleIndex = source.indexOf("showComment.visible()", textIndex)
+            assertTrue(textIndex >= 0 && resetIndex > textIndex && visibleIndex > resetIndex)
+        }
+
+        val layout = readProjectFile("src/main/res/layout/item_source_import.xml")
+        assertTrue(layout.contains("android:maxLines=\"3\""))
+    }
+
     private fun readProjectFile(pathInApp: String): String {
         val file = sequenceOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull(File::isFile)
