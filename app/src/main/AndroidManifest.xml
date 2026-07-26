@@ -265,6 +265,11 @@
             android:name=".ui.replace.ReplaceRuleActivity"
             android:launchMode="singleTop"
             android:screenOrientation="behind" />
+        <!-- Highlight rules -->
+        <activity
+            android:name=".ui.highlight.HighlightRuleActivity"
+            android:launchMode="singleTop"
+            android:screenOrientation="behind" />
         <!-- 书籍管理 -->
         <activity
             android:name=".ui.book.manage.BookshelfManageActivity"

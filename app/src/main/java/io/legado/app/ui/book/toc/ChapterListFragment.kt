@@ -124,7 +124,8 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
         tocListState.clear()
         chapterList = emptyList()
         adapter.setItems(emptyList())
-        currentSearchKey = null
+        val normalizedSearchKey = viewModel.searchKey?.takeIf { it.isNotBlank() }
+        currentSearchKey = normalizedSearchKey
         pendingScrollItemKey = null
         pendingChapterScroll = null
         chapterListJob = viewLifecycleOwner.lifecycleScope.launch {
@@ -135,7 +136,16 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                 reverseOrder = book.getReverseToc(),
                 resetCollapse = true,
             )
-            adapter.setItems(tocListState.showNormal(durChapterIndex))
+            adapter.setItems(
+                if (normalizedSearchKey == null) {
+                    tocListState.showNormal(durChapterIndex)
+                } else {
+                    tocListState.showSearch(
+                        searchResultIndexes = queryChapterIndexes(book, normalizedSearchKey),
+                        currentChapterIndex = durChapterIndex,
+                    )
+                }
+            )
         }
         cacheFileJob = viewLifecycleOwner.lifecycleScope.launch {
             if (book.isAudio) {

@@ -117,6 +117,8 @@ import io.legado.app.ui.book.toc.rule.TxtTocRuleDialog
 import io.legado.app.ui.browser.WebViewActivity
 import io.legado.app.ui.dict.DictDialog
 import io.legado.app.ui.file.HandleFileContract
+import io.legado.app.ui.highlight.HighlightRuleActivity
+import io.legado.app.ui.highlight.edit.HighlightRuleEditDialog
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.replace.ReplaceRuleActivity
 import io.legado.app.ui.replace.edit.ReplaceEditActivity
@@ -189,7 +191,16 @@ class ReadBookActivity : BaseReadBookActivity(),
     private val tocActivity =
         registerForActivityResult(TocActivityResult()) {
             it?.let {
-                viewModel.openChapter(it[0] as Int, it[1] as Int)
+                val highlightLayoutTitleLength =
+                    (it[TocActivityResult.HIGHLIGHT_LAYOUT_TITLE_LENGTH_INDEX] as Int)
+                        .takeUnless { titleLength ->
+                            titleLength == TocActivityResult.NO_HIGHLIGHT_LAYOUT_TITLE_LENGTH
+                        }
+                viewModel.openChapter(
+                    it[0] as Int,
+                    it[1] as Int,
+                    highlightLayoutTitleLength
+                )
             }
         }
     private val sourceEditActivity =
@@ -604,6 +615,7 @@ class ReadBookActivity : BaseReadBookActivity(),
 
             R.id.menu_download -> showDownloadDialog()
             R.id.menu_add_bookmark -> addBookmark()
+            R.id.menu_highlight_rule -> startActivity<HighlightRuleActivity>()
             R.id.menu_simulated_reading -> showSimulatedReading()
             R.id.menu_edit_content -> showDialogFragment(ContentEditDialog())
             R.id.menu_update_toc -> ReadBook.book?.let {
@@ -962,6 +974,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         popupActionMenu(this) {
             item(getString(R.string.highlight_style), ACTION_HIGHLIGHT_STYLE)
             item(getString(R.string.highlight_note), ACTION_HIGHLIGHT_NOTE)
+            item(getString(R.string.highlight_create_rule), ACTION_HIGHLIGHT_CREATE_RULE)
             item(getString(android.R.string.copy), ACTION_HIGHLIGHT_COPY)
             item(getString(R.string.delete), ACTION_HIGHLIGHT_DELETE)
             danger(ACTION_HIGHLIGHT_DELETE)
@@ -974,6 +987,13 @@ class ReadBookActivity : BaseReadBookActivity(),
                 }
 
                 ACTION_HIGHLIGHT_NOTE -> showDialogFragment(HighlightNoteDialog(highlight))
+                ACTION_HIGHLIGHT_CREATE_RULE -> showDialogFragment(
+                    HighlightRuleEditDialog.create(
+                        pattern = highlight.bookText,
+                        scope = ReadBook.book?.name,
+                        style = highlight.style
+                    )
+                )
                 ACTION_HIGHLIGHT_COPY -> sendToClip(highlight.bookText)
                 ACTION_HIGHLIGHT_DELETE -> {
                     ReadBook.removeHighlight(highlight)
@@ -2547,6 +2567,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         const val RESULT_DELETED = 100
         private const val ACTION_HIGHLIGHT_STYLE = "highlightStyle"
         private const val ACTION_HIGHLIGHT_NOTE = "highlightNote"
+        private const val ACTION_HIGHLIGHT_CREATE_RULE = "highlightCreateRule"
         private const val ACTION_HIGHLIGHT_COPY = "highlightCopy"
         private const val ACTION_HIGHLIGHT_DELETE = "highlightDelete"
         private const val STATE_EDITING_HIGHLIGHT = "editingHighlight"
