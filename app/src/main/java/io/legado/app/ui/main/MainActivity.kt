@@ -112,6 +112,8 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     }
     private var onUpBooksBadgeView: BadgeView? = null
     private var lastPassphraseText: String? = null
+    private var pendingPassphraseRead = false
+    private var passphraseReadGeneration = 0
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         upBottomMenu()
@@ -159,7 +161,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             binding.viewPagerMain.postDelayed(1000) {
                 viewModel.ruleSubsUp()
             }
-            readSourceSharePassphrase(1500)
+            scheduleSourceSharePassphraseRead(1500)
             //自动更新书籍
             val isAutoRefreshedBook = savedInstanceState?.getBoolean("isAutoRefreshedBook") ?: false
             if (AppConfig.autoRefreshBook && !isAutoRefreshedBook) {
@@ -180,7 +182,22 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
                 activityCount = LifecycleHelp.activitySize()
             )
         ) {
-            readSourceSharePassphrase(500)
+            scheduleSourceSharePassphraseRead(500)
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        pendingPassphraseRead = false
+        passphraseReadGeneration++
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && pendingPassphraseRead && canAwaitPassphraseWindowFocus()) {
+            readSourceSharePassphrase(200)
+        } else if (hasFocus) {
+            pendingPassphraseRead = false
         }
     }
 
@@ -453,13 +470,42 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         adapter.notifyDataSetChanged()
     }
 
-    private fun readSourceSharePassphrase(delayMillis: Long) {
+    private fun scheduleSourceSharePassphraseRead(delayMillis: Long) {
+        passphraseReadGeneration++
+        pendingPassphraseRead = true
+        if (hasWindowFocus()) {
+            readSourceSharePassphrase(delayMillis, passphraseReadGeneration)
+        }
+    }
+
+    private fun canAwaitPassphraseWindowFocus(): Boolean {
+        return SourceSharePassphraseImportPolicy.canAwaitWindowFocus(
+            privacyPolicyOk = LocalConfig.privacyPolicyOk,
+            activityCount = LifecycleHelp.activitySize(),
+            isFinishing = isFinishing,
+            isResumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED),
+            isFragmentStateSaved = supportFragmentManager.isStateSaved
+        )
+    }
+
+    private fun readSourceSharePassphrase(
+        delayMillis: Long,
+        generation: Int = passphraseReadGeneration
+    ) {
+        pendingPassphraseRead = false
         binding.viewPagerMain.postDelayed(delayMillis) {
+            if (generation != passphraseReadGeneration) return@postDelayed
+            val hasWindowFocus = hasWindowFocus()
+            if (!hasWindowFocus) {
+                pendingPassphraseRead = canAwaitPassphraseWindowFocus()
+            }
             if (!SourceSharePassphraseImportPolicy.canReadClipboard(
                     privacyPolicyOk = LocalConfig.privacyPolicyOk,
+                    activityCount = LifecycleHelp.activitySize(),
                     isFinishing = isFinishing,
                     isResumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED),
-                    isFragmentStateSaved = supportFragmentManager.isStateSaved
+                    isFragmentStateSaved = supportFragmentManager.isStateSaved,
+                    hasWindowFocus = hasWindowFocus
                 )
             ) {
                 return@postDelayed

@@ -6,12 +6,31 @@ internal object SourceSharePassphraseImportPolicy {
         return privacyPolicyOk && activityCount == 1
     }
 
-    fun canReadClipboard(
+    fun canAwaitWindowFocus(
         privacyPolicyOk: Boolean,
+        activityCount: Int,
         isFinishing: Boolean,
         isResumed: Boolean,
         isFragmentStateSaved: Boolean
     ): Boolean {
-        return privacyPolicyOk && !isFinishing && isResumed && !isFragmentStateSaved
+        return shouldScheduleOnResume(privacyPolicyOk, activityCount) &&
+            !isFinishing && isResumed && !isFragmentStateSaved
+    }
+
+    fun canReadClipboard(
+        privacyPolicyOk: Boolean,
+        activityCount: Int,
+        isFinishing: Boolean,
+        isResumed: Boolean,
+        isFragmentStateSaved: Boolean,
+        hasWindowFocus: Boolean
+    ): Boolean {
+        return canAwaitWindowFocus(
+            privacyPolicyOk,
+            activityCount,
+            isFinishing,
+            isResumed,
+            isFragmentStateSaved
+        ) && hasWindowFocus
     }
 }
