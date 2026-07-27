@@ -41,7 +41,6 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_bias="1.0"
         tools:ignore="RtlHardcoded" />
 
     <io.legado.app.ui.widget.text.BevelLabelView
