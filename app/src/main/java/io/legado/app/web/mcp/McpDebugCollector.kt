@@ -7,7 +7,9 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
 
-class McpDebugCollector : Debug.Callback {
+class McpDebugCollector(
+    private val onLine: ((String) -> Unit)? = null,
+) : Debug.Callback {
 
     private val lines = StringBuilder()
     private val finished = CompletableDeferred<Unit>()
@@ -15,9 +17,10 @@ class McpDebugCollector : Debug.Callback {
 
     override fun printLog(state: Int, msg: String) {
         if (state in notPrintStates) return
-        synchronized(lines) {
+        val accepted = synchronized(lines) {
             appendBounded(msg)
         }
+        accepted?.let { onLine?.invoke(it) }
         if (state == -1 || state == 1000) {
             finished.complete(Unit)
         }
@@ -25,13 +28,14 @@ class McpDebugCollector : Debug.Callback {
 
     fun snapshot(): String = synchronized(lines) { lines.toString() }
 
-    private fun appendBounded(message: String) {
-        if (truncated) return
+    private fun appendBounded(message: String): String? {
+        if (truncated) return null
+        val start = lines.length
         val line = "$message\n"
         val remaining = MAX_LOG_CHARS - lines.length
         if (line.length <= remaining) {
             lines.append(line)
-            return
+            return message.ifEmpty { null }
         }
         val contentSize = (remaining - TRUNCATED_MARKER.length).coerceAtLeast(0)
         if (contentSize > 0) {
@@ -42,6 +46,7 @@ class McpDebugCollector : Debug.Callback {
             lines.append(TRUNCATED_MARKER, 0, markerSize.coerceAtMost(TRUNCATED_MARKER.length))
         }
         truncated = true
+        return lines.substring(start).trimEnd('\n').ifEmpty { null }
     }
 
     suspend fun awaitFinished(timeoutMs: Long): Boolean {

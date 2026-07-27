@@ -128,6 +128,8 @@ X-Legado-Token = 设置中配置的令牌
 `clear_cookies`、`eval_js`。书源写入、删除、调试、日志开关、Cookie 持久层写入和清理及脚本求值均可能修改应用状态；
 书源全文、未脱敏 Cookie 与已脱敏 HTTP 日志仍可能包含敏感业务数据，请只向可信客户端开放令牌。
 `debug_source` 返回的调试输出不会脱敏，也可能包含请求参数、书源正文或其他敏感内容。
+调试期间会发送 `notifications/message` 日志；请求 `_meta.progressToken` 时还会同步发送
+`notifications/progress`。通知超时或客户端不支持通知不会影响最终的完整有界日志结果。
 `get_cookies` 返回持久层与会话层合并后的未脱敏 Cookie；`set_cookie` 只合并写入持久层，
 同名会话 Cookie 在当前会话中仍优先；`clear_cookies` 会同时清理持久层、会话层和 WebView Cookie。
 `eval_js` 可在应用书源环境执行任意 JavaScript，令牌等同于书源脚本执行权限；求值结果和 `java.log`

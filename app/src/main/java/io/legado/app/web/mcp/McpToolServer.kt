@@ -17,11 +17,18 @@ import io.legado.app.model.jsSource.JsSourceUpsert
 import io.legado.app.utils.GSON
 import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.printOnDebug
+import io.modelcontextprotocol.kotlin.sdk.server.ClientConnection
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
+import io.modelcontextprotocol.kotlin.sdk.types.LoggingLevel
+import io.modelcontextprotocol.kotlin.sdk.types.LoggingMessageNotification
+import io.modelcontextprotocol.kotlin.sdk.types.LoggingMessageNotificationParams
+import io.modelcontextprotocol.kotlin.sdk.types.ProgressNotification
+import io.modelcontextprotocol.kotlin.sdk.types.ProgressNotificationParams
 import io.modelcontextprotocol.kotlin.sdk.types.ReadResourceResult
+import io.modelcontextprotocol.kotlin.sdk.types.RequestId
 import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import io.modelcontextprotocol.kotlin.sdk.types.TextResourceContents
@@ -30,12 +37,16 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -49,6 +60,7 @@ import java.time.Instant
 
 object McpToolServer {
 
+    private const val NOTIFICATION_TIMEOUT_MS = 500L
     private val debugScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val debugMutex = Mutex()
 
@@ -62,6 +74,7 @@ object McpToolServer {
                 capabilities = ServerCapabilities(
                     tools = ServerCapabilities.Tools(listChanged = false),
                     resources = ServerCapabilities.Resources(),
+                    logging = ServerCapabilities.Logging,
                 ),
             ),
         ).also {
@@ -132,6 +145,47 @@ object McpToolServer {
         put("description", description)
     }
 
+    private suspend fun sendBestEffort(block: suspend () -> Unit) {
+        try {
+            withTimeoutOrNull(NOTIFICATION_TIMEOUT_MS) { block() }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            // Notifications do not affect the tool result.
+        }
+    }
+
+    private suspend fun ClientConnection.sendProgressLine(
+        line: String,
+        progress: Int,
+        progressToken: RequestId?,
+    ) {
+        sendBestEffort {
+            sendLoggingMessage(
+                LoggingMessageNotification(
+                    LoggingMessageNotificationParams(
+                        level = LoggingLevel.Info,
+                        data = JsonPrimitive(line),
+                        logger = "legado.debug_source",
+                    )
+                )
+            )
+        }
+        if (progressToken != null) {
+            sendBestEffort {
+                notification(
+                    ProgressNotification(
+                        ProgressNotificationParams(
+                            progressToken = progressToken,
+                            progress = progress.toDouble(),
+                            message = line,
+                        )
+                    )
+                )
+            }
+        }
+    }
+
     private fun registerTools(server: Server) {
         server.addTool(
             name = "save_source",
@@ -199,12 +253,28 @@ object McpToolServer {
                     if (Debug.callback != null || Debug.isChecking) {
                         return@addTool err("调试通道占用中，请稍后重试")
                     }
-                    val (log, timedOut) = McpDebugCollector().collect(
-                        debugScope,
-                        source,
-                        key,
-                        timeoutSec * 1_000L,
-                    )
+                    val progressToken = request.meta?.progressToken
+                    val (log, timedOut) = coroutineScope {
+                        // Keep only the newest unsent line; the complete bounded log is returned.
+                        val lineChannel = Channel<String>(Channel.CONFLATED)
+                        val notificationJob = launch {
+                            var progress = 0
+                            for (line in lineChannel) {
+                                sendProgressLine(line, ++progress, progressToken)
+                            }
+                        }
+                        try {
+                            McpDebugCollector { lineChannel.trySend(it) }.collect(
+                                debugScope,
+                                source,
+                                key,
+                                timeoutSec * 1_000L,
+                            )
+                        } finally {
+                            lineChannel.close()
+                            notificationJob.join()
+                        }
+                    }
                     val body = McpFormat.truncate(log.ifEmpty { "（调试无输出）" })
                     ok(
                         if (timedOut) {

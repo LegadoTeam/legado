@@ -116,6 +116,23 @@ class McpServiceContractTest {
         assertFalse(tools.contains("UNCHECKED_CAST"))
         assertFalse(tools.contains("HttpRecord"))
         assertFalse(tools.contains("HttpLogger"))
+        assertTrue(tools.contains("logging = ServerCapabilities.Logging"))
+
+        val debugTool = tools.substringAfter("name = \"debug_source\"")
+            .substringBefore("name = \"list_sources\"")
+        assertTrue(debugTool.contains("Channel<String>(Channel.CONFLATED)"))
+        assertTrue(debugTool.contains("request.meta?.progressToken"))
+        assertTrue(debugTool.contains("notificationJob.join()"))
+        assertFalse(debugTool.contains("Channel.UNLIMITED"))
+
+        val notification = tools.substringAfter("private suspend fun sendBestEffort")
+            .substringBefore("private suspend fun ClientConnection.sendProgressLine")
+        assertTrue(notification.contains("catch (error: CancellationException)"))
+        assertTrue(notification.contains("throw error"))
+
+        val api = projectFile("api.md")
+        assertTrue(api.contains("notifications/message"))
+        assertTrue(api.contains("progressToken"))
 
         val evalTool = tools.substringAfter("name = \"eval_js\"")
         assertTrue(evalTool.contains("JsSourceUpsert.validatePayload(js)"))
