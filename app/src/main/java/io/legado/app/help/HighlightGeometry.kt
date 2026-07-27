@@ -36,6 +36,18 @@ object HighlightGeometry {
         return Band(clampedTop, bottom.coerceIn(clampedTop, height))
     }
 
+    fun strikeY(baseline: Float, ascent: Float, descent: Float): Float {
+        return baseline + (ascent + descent) / 2f
+    }
+
+    fun glyphTop(baseline: Float, ascent: Float, height: Float): Float {
+        return (baseline + ascent).coerceIn(0f, height)
+    }
+
+    fun glyphBottom(baseline: Float, descent: Float, height: Float): Float {
+        return (baseline + descent).coerceIn(0f, height)
+    }
+
     fun wavePoints(
         x0: Float,
         x1: Float,

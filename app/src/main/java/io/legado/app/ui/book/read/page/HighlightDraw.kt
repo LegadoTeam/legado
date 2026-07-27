@@ -146,6 +146,8 @@ object HighlightDraw {
         x1: Float,
         baseline: Float,
         height: Float,
+        ascent: Float,
+        descent: Float,
         underline: HighlightStyle.Underline?,
         strike: HighlightStyle.Deco?,
         box: HighlightStyle.Deco?,
@@ -200,14 +202,32 @@ object HighlightDraw {
 
         strike?.let {
             strokePaint.color = if (it.color != 0) it.color else fallbackColor
-            val y = baseline * 0.7f
+            val y = HighlightGeometry.strikeY(
+                baseline,
+                ascent,
+                descent
+            )
             canvas.drawLine(x0, y, x1, y, strokePaint)
         }
 
         box?.let {
             strokePaint.color = if (it.color != 0) it.color else fallbackColor
-            val inset = 0.5f.dpToPx()
-            canvas.drawRect(x0 + inset, inset, x1 - inset, height - inset, strokePaint)
+            val inset = strokePaint.strokeWidth / 2f
+            val left = x0 + inset
+            val top = HighlightGeometry.glyphTop(
+                baseline,
+                ascent,
+                height
+            ) + inset
+            val right = x1 - inset
+            val bottom = HighlightGeometry.glyphBottom(
+                baseline,
+                descent,
+                height
+            ) - inset
+            if (right > left && bottom > top) {
+                canvas.drawRect(left, top, right, bottom, strokePaint)
+            }
         }
     }
 

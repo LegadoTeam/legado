@@ -7,6 +7,19 @@ import org.junit.Test
 class HighlightGeometryTest {
 
     @Test
+    fun `strike and box follow font metrics`() {
+        val baseline = 30f
+        val ascent = -18f
+        val descent = 6f
+
+        assertEquals(24f, HighlightGeometry.strikeY(baseline, ascent, descent), 1e-4f)
+        assertEquals(12f, HighlightGeometry.glyphTop(baseline, ascent, 40f), 1e-4f)
+        assertEquals(36f, HighlightGeometry.glyphBottom(baseline, descent, 40f), 1e-4f)
+        assertEquals(0f, HighlightGeometry.glyphTop(10f, -18f, 40f), 1e-4f)
+        assertEquals(40f, HighlightGeometry.glyphBottom(38f, 6f, 40f), 1e-4f)
+    }
+
+    @Test
     fun `wave starts on baseline and reaches the endpoint`() {
         val points = HighlightGeometry.wavePoints(0f, 11f, 100f, 3f, 8f, 2f)
         assertEquals(0f, points[0], 1e-4f)

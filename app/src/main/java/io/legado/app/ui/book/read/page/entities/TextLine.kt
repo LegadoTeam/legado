@@ -326,6 +326,15 @@ data class TextLine(
 
     private fun drawHighlightRuns(canvas: Canvas) {
         val baseline = lineBase - lineTop
+        val baseTextSize: Float
+        val fontMetrics: FontMetrics
+        if (isTitle) {
+            baseTextSize = ChapterProvider.titlePaint.textSize
+            fontMetrics = ChapterProvider.titlePaintFontMetrics
+        } else {
+            baseTextSize = ChapterProvider.contentPaint.textSize
+            fontMetrics = ChapterProvider.contentPaintFontMetrics
+        }
         var index = 0
         while (index < columns.size) {
             val first = columns[index] as? TextBaseColumn
@@ -337,16 +346,25 @@ data class TextLine(
                 index++
                 continue
             }
+            val sizeSensitive = strike != null || box != null
+            val textSize = if (sizeSensitive) {
+                (first as? TextHtmlColumn)?.mTextSize ?: baseTextSize
+            } else {
+                baseTextSize
+            }
             var endIndex = index + 1
             while (endIndex < columns.size) {
                 val next = columns[endIndex] as? TextBaseColumn ?: break
                 val nextStyle = next.highlightStyle
+                val sameTextSize = !sizeSensitive ||
+                    ((next as? TextHtmlColumn)?.mTextSize ?: baseTextSize) == textSize
                 if (
                     nextStyle != null &&
                     nextStyle.underline == underline &&
                     nextStyle.strike == strike &&
                     nextStyle.box == box &&
-                    nextStyle.textColor == style.textColor
+                    nextStyle.textColor == style.textColor &&
+                    sameTextSize
                 ) {
                     endIndex++
                 } else {
@@ -355,12 +373,15 @@ data class TextLine(
             }
             val last = columns[endIndex - 1] as TextBaseColumn
             val fallbackColor = style.textColor.takeIf { it != 0 } ?: ReadBookConfig.textColor
+            val metricScale = textSize / baseTextSize
             HighlightDraw.drawRun(
                 canvas,
                 first.start,
                 last.end,
                 baseline,
                 height,
+                fontMetrics.ascent * metricScale,
+                fontMetrics.descent * metricScale,
                 underline,
                 strike,
                 box,

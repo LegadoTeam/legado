@@ -131,6 +131,17 @@ class ManualHighlightRenderTest {
     }
 
     @Test
+    fun `run decorations follow html text size`() {
+        val line = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/TextLine.kt")
+        val draw = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/HighlightDraw.kt")
+
+        assertTrue(line.contains("val sizeSensitive = strike != null || box != null"))
+        assertTrue(line.contains("val sameTextSize = !sizeSensitive ||"))
+        assertTrue(line.contains("val metricScale = textSize / baseTextSize"))
+        assertTrue(draw.contains("if (right > left && bottom > top)"))
+    }
+
+    @Test
     fun `html horizontal rules consume one chapter position`() {
         val column = readProjectFile(
             "src/main/java/io/legado/app/ui/book/read/page/entities/column/BaseColumn.kt"
