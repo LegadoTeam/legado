@@ -186,8 +186,46 @@ class SourceSharePassphraseTest {
     }
 
     @Test
+    fun decodeAllowsDecorationAfterFullPrefix() {
+        assertEquals(
+            SourceSharePassphrase.DecodeResult.Success(
+                SourceSharePassphrase.Value(
+                    "https://example.com/rules.json",
+                    SourceSharePassphrase.Type.BOOK_SOURCE,
+                    0,
+                    "Legado",
+                )
+            ),
+            SourceSharePassphrase.decode(
+                "复制口令到阅读导入 [书源] #L:example电🛜1杠rules电串！sy©0¥Legado^"
+            ),
+        )
+    }
+
+    @Test
+    fun decodeAcceptsSecondAndMillisecondExpiryTimestamps() {
+        val expected = SourceSharePassphrase.Value(
+            "https://example.com/rules.json",
+            SourceSharePassphrase.Type.BOOK_SOURCE,
+            1_800_000_000_000L,
+            "Legado",
+        )
+
+        listOf("1800000000", "1800000000000").forEach { expiry ->
+            assertEquals(
+                SourceSharePassphrase.DecodeResult.Success(expected),
+                SourceSharePassphrase.decode(
+                    "复制口令到阅读导入#L:example电🛜1杠rules电串！sy©$expiry¥Legado^",
+                    time = fixedTime,
+                ),
+            )
+        }
+    }
+
+    @Test
     fun decodeRejectsInvalidExpiryTokens() {
-        listOf("", "00", "123456", "12345678", "abc", "١٢٣٤٥٦٧").forEach { expiry ->
+        listOf("", "00", "123456", "12345678", "12345678901", "abc", "١٢٣٤٥٦٧")
+            .forEach { expiry ->
             assertEquals(
                 SourceSharePassphrase.DecodeResult.Invalid,
                 SourceSharePassphrase.decode(
