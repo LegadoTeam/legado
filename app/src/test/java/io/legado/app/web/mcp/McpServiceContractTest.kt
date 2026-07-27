@@ -1,7 +1,18 @@
 package io.legado.app.web.mcp
 
+import com.script.rhino.runScriptWithContext
+import io.legado.app.data.entities.BookSource
+import io.legado.app.model.jsSource.JsSourceEngine
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -52,7 +63,7 @@ class McpServiceContractTest {
     }
 
     @Test
-    fun `server exposes the expected eight tools on current safe APIs`() {
+    fun `server exposes the expected nine tools on current safe APIs`() {
         val tools = projectFile("app/src/main/java/io/legado/app/web/mcp/McpToolServer.kt")
         val registrations = tools.substringAfter("private fun registerTools")
         val names = Regex("name = \\\"([a-z_]+)\\\"")
@@ -70,6 +81,7 @@ class McpServiceContractTest {
                 "get_http_logs",
                 "get_http_log",
                 "set_http_log_recording",
+                "eval_js",
             ),
             names,
         )
@@ -81,6 +93,17 @@ class McpServiceContractTest {
         assertFalse(tools.contains("UNCHECKED_CAST"))
         assertFalse(tools.contains("HttpRecord"))
         assertFalse(tools.contains("HttpLogger"))
+
+        val evalTool = tools.substringAfter("name = \"eval_js\"")
+        assertTrue(evalTool.contains("JsSourceUpsert.validatePayload(js)"))
+        assertTrue(evalTool.contains("Debug.startSimpleDebug(collector, source.getKey())"))
+        assertTrue(evalTool.contains("Debug.cancelDebug(collector)"))
+        assertTrue(evalTool.contains("withTimeoutOrNull"))
+        assertTrue(evalTool.contains("withContext(Dispatchers.IO)"))
+        assertTrue(evalTool.contains("runScriptWithContext"))
+        assertTrue(evalTool.contains("JsSourceEngine.normalizeJsResult(raw, context)"))
+        assertTrue(evalTool.contains("catch (error: CancellationException)"))
+        assertFalse(evalTool.contains("debugScope.async"))
 
         val sourceStore = projectFile("app/src/main/java/io/legado/app/web/mcp/McpSourceStore.kt")
         assertTrue(sourceStore.contains("JsSourceUpsert.prepareForSave"))
@@ -94,6 +117,39 @@ class McpServiceContractTest {
     }
 
     @Test
+    fun `request context evaluates and normalizes source javascript`() = runBlocking {
+        val source = BookSource(
+            bookSourceUrl = "https://example.com",
+            mainJs = "var mainLoaded = true",
+        )
+
+        val objectResult = evaluate(source, "({message: 'ok', items: [1, 2]})").orEmpty()
+        assertTrue(objectResult.contains("\"message\":\"ok\""))
+        assertTrue(objectResult.contains("\"items\":[1,2]"))
+        assertEquals("plain", evaluate(source, "'plain'"))
+        assertNull(evaluate(source, "null"))
+        assertEquals(
+            "https://example.com|https://example.com|https://example.com|undefined",
+            evaluate(
+                source,
+                "baseUrl + '|' + source.bookSourceUrl + '|' + " +
+                    "sourceApi.bookSourceUrl + '|' + typeof mainLoaded"
+            )
+        )
+    }
+
+    @Test(timeout = 5_000)
+    fun `request cancellation interrupts source javascript`() {
+        assertThrows(TimeoutCancellationException::class.java) {
+            runBlocking {
+                withTimeout(250) {
+                    evaluate(BookSource(), "while (true) {}")
+                }
+            }
+        }
+    }
+
+    @Test
     fun `documentation and shrinker keep the security boundary`() {
         val api = projectFile("api.md")
         val updateLog = projectFile("app/src/main/assets/updateLog.md")
@@ -102,10 +158,21 @@ class McpServiceContractTest {
         assertTrue(api.contains("X-Legado-Token"))
         assertTrue(api.contains("Host 和 Origin 校验"))
         assertTrue(api.contains("可信局域网"))
+        assertTrue(api.contains("令牌等同于书源脚本执行权限"))
+        assertTrue(api.contains("eval_js"))
         assertTrue(updateLog.contains("**2026/07/22**"))
         assertTrue(updateLog.contains("原生 MCP 书源开发服务"))
+        assertTrue(updateLog.contains("支持通过 MCP 在应用内书源环境执行 JavaScript"))
         assertFalse(proguard.contains("-keep class io.ktor.**"))
         assertFalse(proguard.contains("-keep class kotlinx.coroutines.**"))
+    }
+
+    private suspend fun evaluate(source: BookSource, js: String): String? {
+        return withContext(Dispatchers.IO) {
+            val context = currentCoroutineContext()
+            val raw = runScriptWithContext { source.evalJS(js) }
+            JsSourceEngine.normalizeJsResult(raw, context)
+        }
     }
 
     private fun projectFile(path: String): String {

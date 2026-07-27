@@ -1,5 +1,6 @@
 package io.legado.app.web.mcp
 
+import com.script.rhino.runScriptWithContext
 import io.legado.app.api.ReturnData
 import io.legado.app.api.controller.BookSourceController
 import io.legado.app.api.controller.HttpLogController
@@ -9,6 +10,7 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.help.http.HttpLogRecord
 import io.legado.app.help.source.SourceHelp
 import io.legado.app.model.Debug
+import io.legado.app.model.jsSource.JsSourceEngine
 import io.legado.app.model.jsSource.JsSourceUpsert
 import io.legado.app.utils.GSON
 import io.modelcontextprotocol.kotlin.sdk.server.Server
@@ -22,7 +24,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
@@ -337,6 +342,110 @@ object McpToolServer {
                     ?: return@addTool err("参数 enabled 必须为布尔值")
                 HttpLogController.setRecording(enabled).dataOrThrow()
                 ok("HTTP 日志记录已${if (enabled) "开启" else "关闭"}")
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                err(error.localizedMessage ?: error.toString())
+            }
+        }
+
+        server.addTool(
+            name = "eval_js",
+            description = "在应用内书源 JavaScript 环境执行脚本，返回求值结果和 java.log 输出。" +
+                "可按 bookSourceUrl 绑定已保存书源的运行时身份，但不自动执行其 mainJs；" +
+                "不传时使用空白书源。与书源调试共用通道。",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    put("js", stringProp("要执行的 JavaScript 脚本"))
+                    put("url", stringProp("可选的书源 bookSourceUrl"))
+                    putJsonObject("timeoutSec") {
+                        put("type", "integer")
+                        put("description", "超时秒数，默认 60，范围 5..600")
+                    }
+                },
+                required = listOf("js"),
+            ),
+        ) { request ->
+            try {
+                val js = request.arguments.str("js")
+                when (JsSourceUpsert.validatePayload(js)) {
+                    JsSourceUpsert.PayloadIssue.EMPTY ->
+                        return@addTool err("参数 js 不能为空")
+
+                    JsSourceUpsert.PayloadIssue.TOO_LARGE ->
+                        return@addTool err("脚本不能超过 1 MiB")
+
+                    null -> Unit
+                }
+                requireNotNull(js)
+                val url = request.arguments.str("url")
+                val timeoutSec = (request.arguments.int("timeoutSec") ?: 60).coerceIn(5, 600)
+                val source = if (url.isNullOrBlank()) {
+                    BookSource()
+                } else {
+                    appDb.bookSourceDao.getBookSource(url)
+                        ?: return@addTool err("未找到书源，请检查书源地址")
+                }
+                if (!debugMutex.tryLock()) {
+                    return@addTool err("调试通道占用中，请稍后重试")
+                }
+                try {
+                    val collector = McpDebugCollector()
+                    if (!Debug.startSimpleDebug(collector, source.getKey())) {
+                        return@addTool err("调试通道占用中，请稍后重试")
+                    }
+                    try {
+                        val startedAt = System.currentTimeMillis()
+                        val outcome: Result<String?>? = try {
+                            withTimeoutOrNull(timeoutSec * 1_000L) {
+                                Result.success(
+                                    withContext(Dispatchers.IO) {
+                                        val context = currentCoroutineContext()
+                                        val raw = runScriptWithContext { source.evalJS(js) }
+                                        JsSourceEngine.normalizeJsResult(raw, context)
+                                    }
+                                )
+                            }
+                        } catch (error: CancellationException) {
+                            throw error
+                        } catch (error: Exception) {
+                            Result.failure(error)
+                        }
+                        val elapsedMs = System.currentTimeMillis() - startedAt
+                        val logSuffix = collector.snapshot().trimEnd().takeIf { it.isNotEmpty() }
+                            ?.let { "\n\n-- 日志 --\n$it" }
+                            .orEmpty()
+                        when {
+                            outcome == null -> err(
+                                McpFormat.truncate(
+                                    "-- 错误 --\n求值超时 ${timeoutSec}s，脚本已取消$logSuffix"
+                                )
+                            )
+
+                            outcome.isFailure -> {
+                                val error = requireNotNull(outcome.exceptionOrNull())
+                                err(
+                                    McpFormat.truncate(
+                                        "-- 错误 --\n" +
+                                            (error.localizedMessage ?: error.toString()) +
+                                            logSuffix
+                                    )
+                                )
+                            }
+
+                            else -> ok(
+                                McpFormat.truncate(
+                                    "-- 结果 --\n${outcome.getOrNull() ?: "null"}" +
+                                        "\n\n耗时 ${elapsedMs}ms$logSuffix"
+                                )
+                            )
+                        }
+                    } finally {
+                        Debug.cancelDebug(collector)
+                    }
+                } finally {
+                    debugMutex.unlock()
+                }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {

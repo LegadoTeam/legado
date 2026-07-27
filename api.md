@@ -123,10 +123,13 @@ X-Legado-Token = 设置中配置的令牌
 }
 ```
 
-服务提供 8 个工具：`save_source`、`debug_source`、`list_sources`、`get_source`、`delete_sources`、
-`get_http_logs`、`get_http_log`、`set_http_log_recording`。书源写入、删除、调试和日志开关均属于修改操作；
+服务提供 9 个工具：`save_source`、`debug_source`、`list_sources`、`get_source`、`delete_sources`、
+`get_http_logs`、`get_http_log`、`set_http_log_recording`、`eval_js`。书源写入、删除、调试、日志开关和脚本求值均可能修改应用状态；
 书源全文与已脱敏 HTTP 日志仍可能包含敏感业务数据，请只向可信客户端开放令牌。
 `debug_source` 返回的调试输出不会脱敏，也可能包含请求参数、书源正文或其他敏感内容。
+`eval_js` 可在应用书源环境执行任意 JavaScript，令牌等同于书源脚本执行权限；求值结果和 `java.log`
+输出不会脱敏，也可能访问网络、Cookie、缓存及已绑定书源的数据。传入书源 URL 只绑定其运行时身份，
+不会自动执行该书源的 `mainJs`。
 
 #### 获取替换规则
 
