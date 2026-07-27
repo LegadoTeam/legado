@@ -65,6 +65,12 @@ data class TextLine(
         get() = styledColumnCount > 0 && textColumns.any {
             (it as? TextBaseColumn)?.highlightStyle?.shadow != null
         }
+    val hasOverflowTextStyle: Boolean
+        get() = styledColumnCount > 0 && textColumns.any {
+            (it as? TextBaseColumn)?.highlightStyle?.let { style ->
+                style.shadow != null || style.resolvedFontPath.isNotEmpty()
+            } == true
+        }
     val canvasRecorder = CanvasRecorderFactory.create()
     var searchResultColumnCount = 0
     var styledColumnCount = 0
@@ -172,7 +178,7 @@ data class TextLine(
     }
 
     fun draw(view: ContentTextView, canvas: Canvas) {
-        if (AppConfig.optimizeRender && !hasShadowStyle) {
+        if (AppConfig.optimizeRender && !hasOverflowTextStyle) {
             canvasRecorder.recordIfNeededThenDraw(canvas, view.width, height.toInt()) {
                 drawTextLine(view, this)
             }

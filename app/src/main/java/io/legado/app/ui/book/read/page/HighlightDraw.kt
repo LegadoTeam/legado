@@ -5,9 +5,11 @@ import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Shader
+import android.graphics.Typeface
 import io.legado.app.help.HighlightGeometry
 import io.legado.app.help.HighlightStyle
 import io.legado.app.help.PaintPool
+import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.utils.dpToPx
 
 object HighlightDraw {
@@ -29,7 +31,7 @@ object HighlightDraw {
         override fun initialValue() = DrawState()
     }
 
-    fun obtainTextPaint(base: Paint, style: HighlightStyle, color: Int): Paint {
+    fun obtainTextPaint(base: Paint, style: HighlightStyle, color: Int, text: String): Paint {
         val paint = PaintPool.obtain()
         paint.set(base)
         paint.color = color
@@ -38,8 +40,30 @@ object HighlightDraw {
         style.shadow?.let {
             paint.setShadowLayer(it.radius, it.dx, it.dy, it.color)
         }
+        if (style.resolvedFontPath.isNotEmpty()) {
+            ChapterProvider.getHighlightTypeface(style.resolvedFontPath)?.let {
+                paint.typeface = Typeface.create(
+                    it,
+                    base.typeface?.style ?: Typeface.NORMAL
+                )
+                preserveTextAdvance(base, paint, text)
+            }
+        }
         return paint
     }
+
+    private fun preserveTextAdvance(base: Paint, paint: Paint, text: String) {
+        val targetWidth = base.measureText(text)
+        val fontWidth = paint.measureText(text)
+        paint.textScaleX *= textAdvanceScale(targetWidth, fontWidth)
+    }
+
+    internal fun textAdvanceScale(targetWidth: Float, fontWidth: Float): Float =
+        if (targetWidth.isFinite() && fontWidth.isFinite() && targetWidth > 0f && fontWidth > 0f) {
+            targetWidth / fontWidth
+        } else {
+            1f
+        }
 
     fun recycleTextPaint(paint: Paint) {
         PaintPool.recycle(paint)

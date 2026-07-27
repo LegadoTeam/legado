@@ -39,6 +39,7 @@ class HighlightStyleTest {
         assertTrue(HighlightStyle(box = Deco()).needsPerColumnDraw)
         assertTrue(HighlightStyle(emphasis = Deco()).needsPerColumnDraw)
         assertTrue(HighlightStyle(shadow = Shadow()).needsPerColumnDraw)
+        assertTrue(HighlightStyle(fontPath = "font.ttf").needsPerColumnDraw)
     }
 
     @Test
@@ -50,13 +51,14 @@ class HighlightStyleTest {
         )
         val merged = HighlightStyle.merge(
             base,
-            HighlightStyle(fill = 3, bold = true, strike = Deco(4))
+            HighlightStyle(fill = 3, bold = true, strike = Deco(4), fontPath = "font.ttf")
         )
         assertEquals(3, merged.fill)
         assertEquals(2, merged.textColor)
         assertTrue(merged.bold)
         assertEquals(Underline(Kind.SOLID), merged.underline)
         assertEquals(Deco(4), merged.strike)
+        assertEquals("font.ttf", merged.fontPath)
     }
 
     @Test
@@ -102,6 +104,7 @@ class HighlightStyleTest {
             fill = 0x80FFFF00.toInt(),
             textColor = 0xFFFF0000.toInt(),
             bold = true,
+            fontPath = "content://fonts/reader.ttf",
             underline = Underline(Kind.DASHED, 0xFF00FF00.toInt()),
             strike = Deco(0xFF0000FF.toInt())
         )

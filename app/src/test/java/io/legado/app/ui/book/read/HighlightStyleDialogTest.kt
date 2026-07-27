@@ -2,12 +2,14 @@ package io.legado.app.ui.book.read
 
 import io.legado.app.help.HighlightStyle
 import io.legado.app.help.HighlightStyles
+import io.legado.app.ui.font.FontSelectDialog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class HighlightStyleDialogTest {
 
@@ -68,5 +70,35 @@ class HighlightStyleDialogTest {
         assertTrue(HighlightStyleDialog.shouldOpenShadowEditor(disabled, enabled))
         assertFalse(HighlightStyleDialog.shouldOpenShadowEditor(enabled, enabled))
         assertFalse(HighlightStyleDialog.shouldOpenShadowEditor(disabled, disabled))
+    }
+
+    @Test
+    fun highlightDefaultFontDoesNotChangeTheGlobalSystemTypeface() {
+        fun callback(selectSystemTypeface: Boolean) = object : FontSelectDialog.CallBack {
+            override val curFontPath = ""
+            override val selectSystemTypefaceOnDefault = selectSystemTypeface
+            override fun selectFont(path: String) = Unit
+        }
+
+        assertTrue(FontSelectDialog.shouldSelectSystemTypeface(callback(true)))
+        assertFalse(FontSelectDialog.shouldSelectSystemTypeface(callback(false)))
+    }
+
+    @Test
+    fun fontSelectionReturnsOnTheUiThread() {
+        val source = sequenceOf(
+            File("src/main/java/io/legado/app/ui/font/FontSelectDialog.kt"),
+            File("app/src/main/java/io/legado/app/ui/font/FontSelectDialog.kt")
+        ).first(File::isFile).readText()
+        val callback = source.substringAfter("override fun onFontSelect")
+            .substringBefore("private fun onDefaultFontChange")
+        val highlightDialog = sequenceOf(
+            File("src/main/java/io/legado/app/ui/book/read/HighlightStyleDialog.kt"),
+            File("app/src/main/java/io/legado/app/ui/book/read/HighlightStyleDialog.kt")
+        ).first(File::isFile).readText()
+
+        assertTrue(callback.contains("callBack?.selectFont"))
+        assertFalse(callback.contains("execute"))
+        assertTrue(highlightDialog.contains("invalidateHighlightTypeface(path)"))
     }
 }

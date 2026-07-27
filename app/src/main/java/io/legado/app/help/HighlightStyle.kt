@@ -13,7 +13,8 @@ data class HighlightStyle(
     val strike: Deco? = null,
     val box: Deco? = null,
     val emphasis: Deco? = null,
-    val shadow: Shadow? = null
+    val shadow: Shadow? = null,
+    val fontPath: String = ""
 ) {
     data class Underline(val kind: Kind = Kind.SOLID, val color: Int = 0)
 
@@ -46,14 +47,17 @@ data class HighlightStyle(
     val resolvedFillShape: FillShape
         get() = fillShape ?: FillShape.RECTANGLE
 
+    val resolvedFontPath: String
+        get() = fontPath.orEmpty()
+
     val isEmpty: Boolean
         get() = fill == 0 && textColor == 0 && !bold && !italic &&
             underline == null && strike == null && box == null && emphasis == null &&
-            shadow == null
+            shadow == null && resolvedFontPath.isEmpty()
 
     val needsPerColumnDraw: Boolean
         get() = textColor != 0 || bold || italic || underline != null || strike != null ||
-            box != null || emphasis != null || shadow != null
+            box != null || emphasis != null || shadow != null || resolvedFontPath.isNotEmpty()
 
     fun normalized(): HighlightStyle {
         val normalizedShadow = shadow?.normalized()
@@ -73,7 +77,8 @@ data class HighlightStyle(
                 strike = other.strike ?: current.strike,
                 box = other.box ?: current.box,
                 emphasis = other.emphasis ?: current.emphasis,
-                shadow = other.shadow ?: current.shadow
+                shadow = other.shadow ?: current.shadow,
+                fontPath = other.resolvedFontPath.ifEmpty { current.resolvedFontPath }
             )
         }
     }

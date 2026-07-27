@@ -39,7 +39,7 @@ class HighlightStyleAppGsonTest {
     }
 
     @Test
-    fun `legacy font field is ignored without losing supported channels`() {
+    fun `custom font field is preserved with supported channels`() {
         val restored = GSON.fromJsonObject<HighlightStyle>(
             """{"fill":-2130771969,"bold":true,"fontPath":"legacy.ttf"}"""
         ).getOrThrow()
@@ -48,6 +48,18 @@ class HighlightStyleAppGsonTest {
         assertEquals(true, restored.bold)
         assertEquals(FillShape.RECTANGLE, restored.resolvedFillShape)
         assertNull(restored.shadow)
+        assertEquals("legacy.ttf", restored.fontPath)
         assertEquals(restored, HighlightStyle.merge(restored, HighlightStyle()))
+    }
+
+    @Test
+    fun `missing or null font fields keep legacy styles readable`() {
+        val missing = GSON.fromJsonObject<HighlightStyle>("""{"fill":1}""").getOrThrow()
+        val nullFont = GSON.fromJsonObject<HighlightStyle>(
+            """{"fill":1,"fontPath":null}"""
+        ).getOrThrow()
+
+        assertEquals("", missing.resolvedFontPath)
+        assertEquals("", nullFont.resolvedFontPath)
     }
 }

@@ -1,6 +1,7 @@
 package io.legado.app.ui.book.read
 
 import android.content.res.ColorStateList
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -17,9 +18,14 @@ import io.legado.app.help.HighlightStyle.Kind
 import io.legado.app.help.HighlightStyle.Shadow
 import io.legado.app.help.HighlightStyle.Underline
 import io.legado.app.help.HighlightStyles
+import io.legado.app.ui.font.FontSelectDialog
+import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.utils.dpToPx
+import io.legado.app.utils.showDialogFragment
 
-class HighlightStyleDialog : BottomSheetDialogFragment(), ShadowEditDialog.Callback {
+class HighlightStyleDialog : BottomSheetDialogFragment(),
+    ShadowEditDialog.Callback,
+    FontSelectDialog.CallBack {
 
     interface StyleHost {
         fun currentHighlightStyle(): HighlightStyle
@@ -50,6 +56,9 @@ class HighlightStyleDialog : BottomSheetDialogFragment(), ShadowEditDialog.Callb
         }
         buildPresets()
         buildChannels()
+        binding.llHighlightFont.setOnClickListener {
+            showDialogFragment<FontSelectDialog>()
+        }
         refresh()
     }
 
@@ -275,6 +284,25 @@ class HighlightStyleDialog : BottomSheetDialogFragment(), ShadowEditDialog.Callb
             row.tvExtra.visibility = if (extra != null && enabled) View.VISIBLE else View.GONE
             row.tvExtra.text = extra.orEmpty()
         }
+        val fontPath = style.resolvedFontPath
+        binding.tvHighlightFontValue.text = if (fontPath.isEmpty()) {
+            getString(R.string.default_font)
+        } else {
+            Uri.decode(fontPath)
+                .substringAfterLast('/')
+                .substringAfterLast('\\')
+                .ifBlank { fontPath }
+        }
+    }
+
+    override val curFontPath: String
+        get() = currentStyle().resolvedFontPath
+
+    override val selectSystemTypefaceOnDefault = false
+
+    override fun selectFont(path: String) {
+        ChapterProvider.invalidateHighlightTypeface(path)
+        apply(currentStyle().copy(fontPath = path))
     }
 
     private fun underlineLabel(kind: Kind?): String = when (kind) {

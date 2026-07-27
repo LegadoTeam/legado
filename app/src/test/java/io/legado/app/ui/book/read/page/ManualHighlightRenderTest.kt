@@ -94,11 +94,21 @@ class ManualHighlightRenderTest {
         val text = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/column/TextColumn.kt")
         val html = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/column/TextHtmlColumn.kt")
         val draw = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/HighlightDraw.kt")
+        val provider = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/read/page/provider/ChapterProvider.kt"
+        )
 
-        assertTrue(text.contains("HighlightDraw.obtainTextPaint(textPaint, it, textColor)"))
+        assertTrue(text.contains("HighlightDraw.obtainTextPaint(textPaint, it, textColor, charData)"))
         assertTrue(text.contains("HighlightDraw::recycleTextPaint"))
-        assertTrue(html.contains("HighlightDraw.obtainTextPaint(textPaint, it, textColor)"))
+        assertTrue(html.contains("HighlightDraw.obtainTextPaint(textPaint, it, textColor, charData)"))
         assertTrue(html.contains("HighlightDraw::recycleTextPaint"))
+        assertTrue(text.contains("it.resolvedFontPath.isNotEmpty()"))
+        assertTrue(html.contains("it.resolvedFontPath.isNotEmpty()"))
+        assertTrue(draw.contains("ChapterProvider.getHighlightTypeface(style.resolvedFontPath)"))
+        assertTrue(draw.contains("preserveTextAdvance(base, paint, text)"))
+        assertTrue(draw.contains("base.typeface?.style ?: Typeface.NORMAL"))
+        assertTrue(provider.contains("LruCache<String, TypefaceResult>(8)"))
+        assertFalse(provider.contains("HashMap<String, Typeface?>"))
         assertTrue(draw.contains("ThreadLocal<DrawState>"))
         assertTrue(text.contains("it.shadow != null"))
         assertTrue(html.contains("it.shadow != null"))
@@ -114,13 +124,22 @@ class ManualHighlightRenderTest {
         val draw = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/HighlightDraw.kt")
 
         assertTrue(line.contains("(it as? TextBaseColumn)?.highlightStyle?.shadow != null"))
-        assertTrue(line.contains("AppConfig.optimizeRender && !hasShadowStyle"))
+        assertTrue(line.contains("style.shadow != null || style.resolvedFontPath.isNotEmpty()"))
+        assertTrue(line.contains("AppConfig.optimizeRender && !hasOverflowTextStyle"))
         assertTrue(page.contains("private val hasShadowStyle: Boolean"))
         assertTrue(page.contains("if (hasShadowStyle) return false"))
         assertTrue(page.contains("recordIfCompleted(view)"))
         assertTrue(text.contains("val normalized = value?.normalized()"))
         assertTrue(html.contains("val normalized = value?.normalized()"))
         assertFalse(draw.contains("shadow?.normalized()"))
+    }
+
+    @Test
+    fun `custom font advance scaling keeps layout width`() {
+        assertEquals(0.5f, HighlightDraw.textAdvanceScale(10f, 20f), 0f)
+        assertEquals(1f, HighlightDraw.textAdvanceScale(0f, 20f), 0f)
+        assertEquals(1f, HighlightDraw.textAdvanceScale(10f, 0f), 0f)
+        assertEquals(1f, HighlightDraw.textAdvanceScale(Float.NaN, 20f), 0f)
     }
 
     @Test
