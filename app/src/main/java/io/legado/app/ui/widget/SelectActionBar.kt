@@ -19,6 +19,7 @@ import io.legado.app.databinding.ViewSelectActionBarBinding
 import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.theme.TintHelper
 import io.legado.app.lib.theme.accentColor
+import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.elevation
 import io.legado.app.lib.theme.getPrimaryTextColor
@@ -36,7 +37,9 @@ class SelectActionBar @JvmOverloads constructor(
     attrs: AttributeSet? = null
 ) : FrameLayout(context, attrs) {
 
-    private val bgIsLight = ColorUtils.isColorLight(context.bottomBackground)
+    private val bgIsLight = ColorUtils.isColorLight(
+        if (context.transparentNavBar) context.backgroundColor else context.bottomBackground
+    )
     private val primaryTextColor = context.getPrimaryTextColor(bgIsLight)
     private val disabledColor = context.getSecondaryDisabledTextColor(bgIsLight)
 
