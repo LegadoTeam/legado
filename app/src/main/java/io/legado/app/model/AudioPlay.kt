@@ -658,13 +658,22 @@ object AudioPlay : CoroutineScope by MainScope() {
     }
 
     fun setSpeed(speed: Float) {
+        val clampedSpeed = speed.coerceIn(0.5f, 3.0f)
+        AudioPlayService.playSpeed = clampedSpeed
+        book?.takeIf { it.getPlaySpeed() != clampedSpeed }?.let { currentBook ->
+            val bookUrl = currentBook.bookUrl
+            currentBook.setPlaySpeed(clampedSpeed)
+            executor.execute {
+                appDb.bookDao.updateAudioPlaySpeed(bookUrl, clampedSpeed)
+            }
+        }
         if (AudioPlayService.isRun) {
-            book?.setPlaySpeed(speed)
-            val clampedSpeed = speed.coerceIn(0.5f, 3.0f)
             context.startService<AudioPlayService> {
                 action = IntentAction.setSpeed
                 putExtra("speed", clampedSpeed)
             }
+        } else {
+            postEvent(EventBus.AUDIO_SPEED, clampedSpeed)
         }
     }
 

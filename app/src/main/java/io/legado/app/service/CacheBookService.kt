@@ -11,7 +11,6 @@ import io.legado.app.constant.EventBus
 import io.legado.app.constant.IntentAction
 import io.legado.app.constant.NotificationId
 import io.legado.app.data.appDb
-import io.legado.app.help.book.update
 import io.legado.app.help.config.AppConfig
 import io.legado.app.model.CacheBook
 import io.legado.app.model.webBook.WebBook
@@ -122,7 +121,7 @@ class CacheBookService : BaseService() {
                     WebBook.getChapterListAwait(cacheBook.bookSource, book).onFailure {
                         if (book.totalChapterNum > 0) {
                             book.totalChapterNum = 0
-                            book.update()
+                            appDb.bookDao.updatePreservingReadConfig(book)
                         }
                         removeDownload(bookUrl)
                         val msg = "《$name》目录为空且加载目录失败\n${it.localizedMessage}"
@@ -131,7 +130,7 @@ class CacheBookService : BaseService() {
                     }.getOrNull()?.let { toc ->
                         appDb.bookChapterDao.insert(*toc.toTypedArray())
                     }
-                    book.update()
+                    appDb.bookDao.updatePreservingReadConfig(book)
                 }
             }
             val end2 = if (end < 0) {

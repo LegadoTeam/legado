@@ -198,11 +198,23 @@ interface BookDao {
     fun getReadConfigJson(bookUrl: String): String?
 
     @Query("update books set readConfig = :readConfig where bookUrl = :bookUrl")
-    fun updateReadConfigJson(bookUrl: String, readConfig: String)
+    fun updateReadConfigJson(bookUrl: String, readConfig: String?)
+
+    @Transaction
+    fun updatePreservingReadConfig(book: Book) {
+        val readConfig = getReadConfigJson(book.bookUrl)
+        update(book)
+        updateReadConfigJson(book.bookUrl, readConfig)
+    }
 
     @Transaction
     fun updateAudioPlayMode(bookUrl: String, playMode: Int) {
         updateReadConfigJson(bookUrl, getReadConfigJson(bookUrl).withAudioPlayMode(playMode))
+    }
+
+    @Transaction
+    fun updateAudioPlaySpeed(bookUrl: String, playSpeed: Float) {
+        updateReadConfigJson(bookUrl, getReadConfigJson(bookUrl).withAudioPlaySpeed(playSpeed))
     }
 
     @Delete
@@ -233,5 +245,11 @@ interface BookDao {
 internal fun String?.withAudioPlayMode(playMode: Int): String {
     val readConfig = GSON.fromJsonObject<JsonObject>(this).getOrNull() ?: JsonObject()
     readConfig.addProperty("playMode", playMode)
+    return GSON.toJson(readConfig)
+}
+
+internal fun String?.withAudioPlaySpeed(playSpeed: Float): String {
+    val readConfig = GSON.fromJsonObject<JsonObject>(this).getOrNull() ?: JsonObject()
+    readConfig.addProperty("playSpeed", playSpeed)
     return GSON.toJson(readConfig)
 }

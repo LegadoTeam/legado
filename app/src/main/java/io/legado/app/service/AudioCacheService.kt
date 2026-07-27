@@ -238,7 +238,7 @@ class AudioCacheService : BaseService() {
         return try {
             if (book.tocUrl.isEmpty()) {
                 WebBook.getBookInfoAwait(source, book)
-                appDb.bookDao.update(book)
+                appDb.bookDao.updatePreservingReadConfig(book)
             }
             val chapters = WebBook.getChapterListAwait(source, book).getOrThrow()
             appDb.bookChapterDao.delByBook(book.bookUrl)
