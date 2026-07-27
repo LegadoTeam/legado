@@ -266,6 +266,30 @@ interface BookSourceDao {
     @Update
     fun update(vararg bookSource: BookSource)
 
+    @Query(
+        """update book_sources set
+        bookSourceGroup = :bookSourceGroup,
+        bookSourceComment = :bookSourceComment,
+        respondTime = :respondTime
+        where bookSourceUrl = :bookSourceUrl
+        and lastUpdateTime = :expectedLastUpdateTime
+        and ((bookSourceGroup is null and :expectedBookSourceGroup is null)
+            or bookSourceGroup = :expectedBookSourceGroup)
+        and ((bookSourceComment is null and :expectedBookSourceComment is null)
+            or bookSourceComment = :expectedBookSourceComment)
+        and respondTime = :expectedRespondTime"""
+    )
+    fun updateCheckResult(
+        bookSourceUrl: String,
+        bookSourceGroup: String?,
+        bookSourceComment: String?,
+        respondTime: Long,
+        expectedLastUpdateTime: Long,
+        expectedBookSourceGroup: String?,
+        expectedBookSourceComment: String?,
+        expectedRespondTime: Long,
+    ): Int
+
     @Delete
     fun delete(vararg bookSource: BookSource)
 

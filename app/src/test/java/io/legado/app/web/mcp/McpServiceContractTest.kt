@@ -64,7 +64,7 @@ class McpServiceContractTest {
     }
 
     @Test
-    fun `server exposes the expected twelve tools on current safe APIs`() {
+    fun `server exposes the expected thirteen tools on current safe APIs`() {
         val tools = projectFile("app/src/main/java/io/legado/app/web/mcp/McpToolServer.kt")
         val registrations = tools.substringAfter("private fun registerTools")
         val names = Regex("name = \\\"([a-z_]+)\\\"")
@@ -86,6 +86,7 @@ class McpServiceContractTest {
                 "set_cookie",
                 "clear_cookies",
                 "eval_js",
+                "check_source",
             ),
             names,
         )
@@ -113,6 +114,10 @@ class McpServiceContractTest {
         assertTrue(tools.contains("catch (error: CancellationException)"))
         assertTrue(tools.contains("val logs = data[\"logs\"] as List<*>"))
         assertTrue(tools.contains("val log = item as Map<*, *>"))
+        assertTrue(tools.contains("Debug.tryStartCheckSession()"))
+        assertTrue(tools.contains("Debug.isCheckServiceStarted(checkSessionId)"))
+        assertTrue(tools.contains("CheckSource.stop(appCtx, checkSessionId)"))
+        assertTrue(tools.contains("IntentData.get<Any>(selectedSourcesKey)"))
         assertFalse(tools.contains("UNCHECKED_CAST"))
         assertFalse(tools.contains("HttpRecord"))
         assertFalse(tools.contains("HttpLogger"))
@@ -135,6 +140,7 @@ class McpServiceContractTest {
         assertTrue(api.contains("progressToken"))
 
         val evalTool = tools.substringAfter("name = \"eval_js\"")
+            .substringBefore("name = \"check_source\"")
         assertTrue(evalTool.contains("JsSourceUpsert.validatePayload(js)"))
         assertTrue(evalTool.contains("Debug.startSimpleDebug(collector, source.getKey())"))
         assertTrue(evalTool.contains("Debug.cancelDebug(collector)"))
@@ -144,6 +150,13 @@ class McpServiceContractTest {
         assertTrue(evalTool.contains("JsSourceEngine.normalizeJsResult(raw, context)"))
         assertTrue(evalTool.contains("catch (error: CancellationException)"))
         assertFalse(evalTool.contains("debugScope.async"))
+
+        val checkTool = tools.substringAfter("name = \"check_source\"")
+        assertTrue(checkTool.contains("Debug.getCheckSnapshot(checkSessionId, urls)"))
+        assertTrue(checkTool.contains("Debug.takeCheckSnapshot(checkSessionId, urls)"))
+        assertTrue(checkTool.contains("sendCheckProgress("))
+        assertTrue(tools.contains("logger = \"legado.check_source\""))
+        assertFalse(checkTool.contains("getBookSources(urls)"))
 
         val sourceStore = projectFile("app/src/main/java/io/legado/app/web/mcp/McpSourceStore.kt")
         assertTrue(sourceStore.contains("JsSourceUpsert.prepareForSave"))

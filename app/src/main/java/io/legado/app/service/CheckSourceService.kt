@@ -14,6 +14,7 @@ import io.legado.app.constant.NotificationId
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.exception.ContentEmptyException
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.exception.TocEmptyException
@@ -21,11 +22,13 @@ import io.legado.app.help.IntentData
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.source.exploreKinds
 import io.legado.app.model.CheckSource
+import io.legado.app.model.CheckSourceResult
+import io.legado.app.model.CheckSourceStatus
 import io.legado.app.model.Debug
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.ui.book.source.manage.BookSourceActivity
 import io.legado.app.utils.activityPendingIntent
-import io.legado.app.utils.onEachParallel
+import io.legado.app.utils.mapParallel
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.servicePendingIntent
 import io.legado.app.utils.toastOnUi
@@ -36,7 +39,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
@@ -63,11 +65,29 @@ internal fun parseCheckSourceEndpoint(domain: String): Pair<String, Int>? {
  * 校验书源
  */
 class CheckSourceService : BaseService() {
+    private data class CheckTarget(
+        val selected: BookSourcePart,
+        val original: BookSource,
+        val source: BookSource,
+    )
+
+    private data class CheckOutcome(
+        val succeeded: Boolean,
+        val message: String,
+    )
+
     private var threadCount = AppConfig.threadCount
     private var searchCoroutine =
         Executors.newFixedThreadPool(min(threadCount, AppConst.MAX_THREAD)).asCoroutineDispatcher()
     private var notificationMsg = appCtx.getString(R.string.service_starting)
     private var checkJob: Job? = null
+    private var checkSessionId: Long? = null
+    @Volatile
+    private var latestStartId = 0
+    @Volatile
+    private var checkJobFinished = false
+    @Volatile
+    private var serviceDestroyed = false
     private var originSize = 0
     private var finishCount = 0
 
@@ -80,78 +100,202 @@ class CheckSourceService : BaseService() {
             .setContentIntent(
                 activityPendingIntent<BookSourceActivity>("activity")
             )
-            .addAction(
-                R.drawable.ic_stop_black_24dp,
-                getString(R.string.cancel),
-                servicePendingIntent<CheckSourceService>(IntentAction.stop)
-            )
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        latestStartId = startId
         when (intent?.action) {
-            IntentAction.start -> IntentData.get<List<String>>("checkSourceSelectedIds")?.let {
-                check(it)
+            IntentAction.start -> {
+                val sessionId = intent.getLongExtra(CheckSource.EXTRA_SESSION_ID, 0L)
+                val selectedSources = IntentData.get<List<BookSourcePart>>(
+                    intent.getStringExtra(CheckSource.EXTRA_SELECTED_SOURCES_KEY)
+                )
+                if (sessionId > 0L && selectedSources != null) {
+                    check(selectedSources, sessionId, startId)
+                } else {
+                    if (sessionId > 0L) {
+                        finishCheckSession(sessionId)
+                    }
+                    stopSelf(startId)
+                }
             }
 
-            IntentAction.resume -> upNotification()
-            IntentAction.stop -> stopSelf()
+            IntentAction.resume -> {
+                if (checkJob?.isActive == true) upNotification() else stopSelf(startId)
+            }
+
+            IntentAction.stop -> {
+                val sessionId = intent.getLongExtra(CheckSource.EXTRA_SESSION_ID, 0L)
+                if (sessionId > 0L && Debug.isChecking(sessionId)) {
+                    if (checkSessionId == null) {
+                        finishCheckSession(sessionId)
+                    } else {
+                        checkJob?.cancel()
+                    }
+                    stopSelf(startId)
+                } else if (checkJob?.isActive != true) {
+                    stopSelf(startId)
+                }
+            }
         }
         return super.onStartCommand(intent, flags, startId)
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        Debug.finishChecking()
+        checkJob?.cancel()
         searchCoroutine.close()
-        postEvent(EventBus.CHECK_SOURCE_DONE, 0)
         notificationManager.cancel(NotificationId.CheckSourceService)
+        serviceDestroyed = true
+        finishCheckSessionIfComplete()
     }
 
-    private fun check(ids: List<String>) {
+    private fun check(
+        selectedSources: List<BookSourcePart>,
+        sessionId: Long,
+        startId: Int,
+    ) {
         if (checkJob?.isActive == true) {
             toastOnUi("已有书源在校验,等完成后再试")
             return
         }
-        checkJob = lifecycleScope.launch(searchCoroutine) {
+        if (!Debug.markCheckServiceStarted(sessionId)) {
+            if (!Debug.isChecking) stopSelf(startId)
+            return
+        }
+        checkSessionId = sessionId
+        notificationBuilder.clearActions()
+        notificationBuilder.addAction(
+            R.drawable.ic_stop_black_24dp,
+            getString(R.string.cancel),
+            servicePendingIntent<CheckSourceService>(IntentAction.stop, sessionId.hashCode()) {
+                putExtra(CheckSource.EXTRA_SESSION_ID, sessionId)
+            }
+        )
+        val job = lifecycleScope.launch(searchCoroutine) {
             flow {
-                for (origin in ids) {
-                    appDb.bookSourceDao.getBookSource(origin)?.let {
-                        emit(it)
+                for (selected in selectedSources) {
+                    val source = appDb.bookSourceDao.getBookSource(selected.bookSourceUrl)
+                    when {
+                        source == null -> Debug.recordCheckResult(
+                            sessionId,
+                            selected.bookSourceUrl,
+                            CheckSourceResult(
+                                CheckSourceStatus.NOT_COMPLETED,
+                                "书源已删除",
+                            ),
+                        )
+
+                        source.lastUpdateTime != selected.lastUpdateTime ->
+                            Debug.recordCheckResult(
+                                sessionId,
+                                selected.bookSourceUrl,
+                                CheckSourceResult(
+                                    CheckSourceStatus.NOT_COMPLETED,
+                                    "书源已变更，校验结果未写回",
+                                ),
+                            )
+
+                        else -> emit(CheckTarget(selected, source.copy(), source))
                     }
                 }
             }.onStart {
-                originSize = ids.size
+                originSize = selectedSources.size
                 finishCount = 0
                 notificationMsg = getString(R.string.progress_show, "", 0, originSize)
                 upNotification()
-            }.onEachParallel(threadCount) {
-                checkSource(it)
-            }.onEach {
+            }.mapParallel(threadCount) {
+                it to checkSource(it.source, sessionId)
+            }.onEach { (target, outcome) ->
+                val (selected, original, source) = target
                 finishCount++
                 notificationMsg = getString(
                     R.string.progress_show,
-                    it.bookSourceName,
+                    source.bookSourceName,
                     finishCount,
                     originSize
                 )
                 upNotification()
-                appDb.bookSourceDao.update(it)
-            }.onCompletion {
-                stopSelf()
+                val updated = appDb.bookSourceDao.updateCheckResult(
+                    source.bookSourceUrl,
+                    source.bookSourceGroup,
+                    source.bookSourceComment,
+                    source.respondTime,
+                    selected.lastUpdateTime,
+                    original.bookSourceGroup,
+                    original.bookSourceComment,
+                    original.respondTime,
+                )
+                if (updated == 0) {
+                    val detail = "校验结果未写回：书源已变更或删除"
+                    Debug.updateCheckMessage(
+                        sessionId,
+                        source.bookSourceUrl,
+                        detail,
+                    )
+                    Debug.recordCheckResult(
+                        sessionId,
+                        source.bookSourceUrl,
+                        CheckSourceResult(CheckSourceStatus.NOT_COMPLETED, detail),
+                    )
+                } else {
+                    Debug.updateFinalMessage(sessionId, source.bookSourceUrl, outcome.message)
+                    val status = if (outcome.succeeded) {
+                        CheckSourceStatus.PASSED
+                    } else {
+                        CheckSourceStatus.FAILED
+                    }
+                    val detail = if (outcome.succeeded) {
+                        ""
+                    } else {
+                        listOf(
+                            source.getInvalidGroupNames(),
+                            source.bookSourceComment
+                                ?.lineSequence()
+                                ?.firstOrNull { it.startsWith("// Error: ") }
+                                .orEmpty(),
+                            outcome.message,
+                        ).filter { it.isNotEmpty() }.distinct().joinToString(" | ")
+                    }
+                    Debug.recordCheckResult(
+                        sessionId,
+                        source.bookSourceUrl,
+                        CheckSourceResult(status, detail),
+                    )
+                }
             }.collect()
+        }
+        checkJob = job
+        job.invokeOnCompletion {
+            stopSelf(latestStartId)
+            checkJobFinished = true
+            finishCheckSessionIfComplete()
         }
     }
 
-    private suspend fun checkSource(source: BookSource) {
+    private fun finishCheckSessionIfComplete() {
+        if (checkJobFinished && serviceDestroyed) {
+            checkSessionId?.let(::finishCheckSession)
+        }
+    }
+
+    private fun finishCheckSession(sessionId: Long) {
+        if (Debug.finishChecking(sessionId)) {
+            postEvent(EventBus.CHECK_SOURCE_DONE, sessionId)
+        }
+    }
+
+    private suspend fun checkSource(source: BookSource, sessionId: Long): CheckOutcome {
+        var resultMessage = "校验成功"
+        var succeeded = true
         kotlin.runCatching {
             withTimeout(CheckSource.timeout) {
-                doCheckSource(source)
+                doCheckSource(source, sessionId)
             }
-        }.onSuccess {
-            Debug.updateFinalMessage(source.bookSourceUrl, "校验成功")
         }.onFailure {
             currentCoroutineContext().ensureActive()
+            succeeded = false
             when (it) {
                 is TimeoutCancellationException -> source.addGroup("校验超时")
                 is ScriptException, is WrappedException -> source.addGroup("js失效")
@@ -160,9 +304,10 @@ class CheckSourceService : BaseService() {
             if (CheckSource.wSourceComment) {
                 source.addErrorComment(it)
             }
-            Debug.updateFinalMessage(source.bookSourceUrl, "校验失败:${it.localizedMessage}")
+            resultMessage = "校验失败:${it.localizedMessage}"
         }
-        source.respondTime = Debug.getRespondTime(source.bookSourceUrl)
+        source.respondTime = Debug.getRespondTime(sessionId, source.bookSourceUrl, succeeded)
+        return CheckOutcome(succeeded, resultMessage)
     }
 
     private suspend fun isDomainReachable(endpoint: Pair<String, Int>): Boolean {
@@ -177,8 +322,8 @@ class CheckSourceService : BaseService() {
         }.getOrDefault(false)
     }
 
-    private suspend fun doCheckSource(source: BookSource) {
-        Debug.startChecking(source)
+    private suspend fun doCheckSource(source: BookSource, sessionId: Long) {
+        Debug.startChecking(sessionId, source)
         source.removeInvalidGroups()
         if (CheckSource.wSourceComment) {
             source.removeErrorComment()
@@ -284,7 +429,9 @@ class CheckSourceService : BaseService() {
     private fun upNotification() {
         notificationBuilder.setContentText(notificationMsg)
         notificationBuilder.setProgress(originSize, finishCount, false)
-        postEvent(EventBus.CHECK_SOURCE, notificationMsg)
+        checkSessionId?.let {
+            postEvent(EventBus.CHECK_SOURCE, it to notificationMsg)
+        }
         notificationManager.notify(NotificationId.CheckSourceService, notificationBuilder.build())
     }
 
@@ -294,7 +441,9 @@ class CheckSourceService : BaseService() {
     override fun startForegroundNotification() {
         notificationBuilder.setContentText(notificationMsg)
         notificationBuilder.setProgress(originSize, finishCount, false)
-        postEvent(EventBus.CHECK_SOURCE, notificationMsg)
+        checkSessionId?.let {
+            postEvent(EventBus.CHECK_SOURCE, it to notificationMsg)
+        }
         startForeground(NotificationId.CheckSourceService, notificationBuilder.build())
     }
 

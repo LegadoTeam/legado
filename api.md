@@ -123,13 +123,17 @@ X-Legado-Token = 设置中配置的令牌
 }
 ```
 
-服务提供 12 个工具：`save_source`、`debug_source`、`list_sources`、`get_source`、`delete_sources`、
+服务提供 13 个工具：`save_source`、`debug_source`、`list_sources`、`get_source`、`delete_sources`、
 `get_http_logs`、`get_http_log`、`set_http_log_recording`、`get_cookies`、`set_cookie`、
-`clear_cookies`、`eval_js`。书源写入、删除、调试、日志开关、Cookie 持久层写入和清理及脚本求值均可能修改应用状态；
+`clear_cookies`、`eval_js`、`check_source`。书源写入、删除、调试、日志开关、Cookie 持久层写入和清理、
+脚本求值及批量校验均可能修改应用状态；`check_source` 会按当前应用配置更新书源分组、错误备注和响应时间。
+校验期间若书源被删除或重新保存，该项会标记为未完成，旧校验结果不会覆盖新记录。
+客户端取消 MCP 请求不会中止已经启动的应用内校验，可在应用的校验通知中手动停止。
 书源全文、未脱敏 Cookie 与已脱敏 HTTP 日志仍可能包含敏感业务数据，请只向可信客户端开放令牌。
 `debug_source` 返回的调试输出不会脱敏，也可能包含请求参数、书源正文或其他敏感内容。
 调试期间会发送 `notifications/message` 日志；请求 `_meta.progressToken` 时还会同步发送
 `notifications/progress`。通知超时或客户端不支持通知不会影响最终的完整有界日志结果。
+`check_source` 也会在每个书源得到明确结果后发送日志和可选进度通知，最终汇总仍以该次校验会话的结果快照为准。
 `get_cookies` 返回持久层与会话层合并后的未脱敏 Cookie；`set_cookie` 只合并写入持久层，
 同名会话 Cookie 在当前会话中仍优先；`clear_cookies` 会同时清理持久层、会话层和 WebView Cookie。
 `eval_js` 可在应用书源环境执行任意 JavaScript，令牌等同于书源脚本执行权限；求值结果和 `java.log`

@@ -7,10 +7,14 @@ import io.legado.app.api.controller.HttpLogController
 import io.legado.app.constant.AppConst
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.BookSourcePart
+import io.legado.app.help.IntentData
 import io.legado.app.help.http.CookieManager
 import io.legado.app.help.http.CookieStore
 import io.legado.app.help.http.HttpLogRecord
 import io.legado.app.help.source.SourceHelp
+import io.legado.app.model.CheckSource
+import io.legado.app.model.CheckSourceResult
 import io.legado.app.model.Debug
 import io.legado.app.model.jsSource.JsSourceEngine
 import io.legado.app.model.jsSource.JsSourceUpsert
@@ -40,6 +44,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
@@ -159,6 +164,7 @@ object McpToolServer {
         line: String,
         progress: Int,
         progressToken: RequestId?,
+        logger: String = "legado.debug_source",
     ) {
         sendBestEffort {
             sendLoggingMessage(
@@ -166,7 +172,7 @@ object McpToolServer {
                     LoggingMessageNotificationParams(
                         level = LoggingLevel.Info,
                         data = JsonPrimitive(line),
-                        logger = "legado.debug_source",
+                        logger = logger,
                     )
                 )
             )
@@ -181,6 +187,28 @@ object McpToolServer {
                             message = line,
                         )
                     )
+                )
+            }
+        }
+    }
+
+    private suspend fun ClientConnection.sendCheckProgress(
+        sourcesByUrl: Map<String, BookSourcePart>,
+        results: Map<String, CheckSourceResult>,
+        reportedUrls: MutableSet<String>,
+        total: Int,
+        progressToken: RequestId?,
+    ) {
+        results.forEach { (url, result) ->
+            val source = sourcesByUrl[url] ?: return@forEach
+            if (reportedUrls.add(url)) {
+                val line = "[${reportedUrls.size}/$total] " +
+                    McpFormat.renderCheckResult(source, result)
+                sendProgressLine(
+                    line,
+                    reportedUrls.size,
+                    progressToken,
+                    logger = "legado.check_source",
                 )
             }
         }
@@ -654,6 +682,114 @@ object McpToolServer {
                 throw error
             } catch (error: Exception) {
                 err(error.localizedMessage ?: error.toString())
+            }
+        }
+
+        server.addTool(
+            name = "check_source",
+            description = "按应用当前校验配置批量校验书源并写回分组、错误备注和响应时间。" +
+                "单批最多 50 个；校验期间书源调试不可用，客户端取消请求不会中止应用内校验。",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    putJsonObject("urls") {
+                        put("type", "array")
+                        putJsonObject("items") { put("type", "string") }
+                        put("description", "要校验的 bookSourceUrl 列表，单批最多 50 个")
+                    }
+                },
+                required = listOf("urls"),
+            ),
+        ) { request ->
+            val urls = (request.arguments?.get("urls") as? JsonArray)
+                ?.mapNotNull { runCatching { it.jsonPrimitive.contentOrNull }.getOrNull() }
+                ?.filter { it.isNotBlank() }
+                ?.distinct()
+                .orEmpty()
+            if (urls.isEmpty()) return@addTool err("参数 urls 不能为空")
+            if (urls.size > 50) return@addTool err("单批最多校验 50 个书源")
+            val parts = urls.map { url ->
+                appDb.bookSourceDao.getBookSourcePart(url)
+                    ?: return@addTool err("未找到书源：$url")
+            }
+            if (!debugMutex.tryLock()) {
+                return@addTool err("调试通道占用中，请稍后重试")
+            }
+            var serviceRequested = false
+            var checkSessionId = 0L
+            var selectedSourcesKey: String? = null
+            try {
+                checkSessionId = Debug.tryStartCheckSession()
+                    ?: return@addTool err("调试通道占用中，请稍后重试")
+                selectedSourcesKey = CheckSource.start(appCtx, parts, checkSessionId)
+                serviceRequested = true
+                val progressToken = request.meta?.progressToken
+                val sourcesByUrl = parts.associateBy { it.bookSourceUrl }
+                val reportedUrls = hashSetOf<String>()
+
+                val started = withTimeoutOrNull(5_000L) {
+                    while (!Debug.isCheckServiceStarted(checkSessionId) &&
+                        Debug.isChecking(checkSessionId)
+                    ) {
+                        delay(100)
+                    }
+                    Debug.isCheckServiceStarted(checkSessionId)
+                } ?: Debug.isCheckServiceStarted(checkSessionId)
+                if (!started) {
+                    IntentData.get<Any>(selectedSourcesKey)
+                    if (Debug.isChecking(checkSessionId)) {
+                        runCatching { CheckSource.stop(appCtx, checkSessionId) }
+                        withTimeoutOrNull(5_000L) {
+                            while (Debug.isChecking(checkSessionId)) delay(100)
+                        }
+                        if (!Debug.isCheckServiceStarted(checkSessionId)) {
+                            Debug.finishChecking(checkSessionId)
+                        }
+                    }
+                    return@addTool err("校验服务未能启动，请将应用置于前台后重试")
+                }
+
+                while (Debug.isChecking(checkSessionId)) {
+                    sendCheckProgress(
+                        sourcesByUrl,
+                        Debug.getCheckSnapshot(checkSessionId, urls).results,
+                        reportedUrls,
+                        urls.size,
+                        progressToken,
+                    )
+                    delay(250)
+                }
+                val snapshot = Debug.takeCheckSnapshot(checkSessionId, urls)
+                sendCheckProgress(
+                    sourcesByUrl,
+                    snapshot.results,
+                    reportedUrls,
+                    urls.size,
+                    progressToken,
+                )
+                val summary = McpFormat.renderCheckSummary(
+                    parts,
+                    snapshot.results,
+                    snapshot.messages,
+                )
+                ok(McpFormat.truncate(summary))
+            } catch (error: CancellationException) {
+                if (!serviceRequested && checkSessionId > 0L) {
+                    IntentData.get<Any>(selectedSourcesKey)
+                    Debug.finishChecking(checkSessionId)
+                }
+                throw error
+            } catch (error: Exception) {
+                if (serviceRequested && checkSessionId > 0L &&
+                    Debug.isChecking(checkSessionId)
+                ) {
+                    runCatching { CheckSource.stop(appCtx, checkSessionId) }
+                } else if (checkSessionId > 0L) {
+                    IntentData.get<Any>(selectedSourcesKey)
+                    Debug.finishChecking(checkSessionId)
+                }
+                err(error.localizedMessage ?: error.toString())
+            } finally {
+                debugMutex.unlock()
             }
         }
     }

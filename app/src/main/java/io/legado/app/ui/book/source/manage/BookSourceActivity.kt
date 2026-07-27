@@ -115,6 +115,7 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
     override var sortAscending = true
         private set
     private var snackBar: Snackbar? = null
+    private var checkSourceUiSessionId: Long? = null
     private var groupSourcesByDomain = false
     private val hostMap = hashMapOf<String, String>()
     private val qrResult = registerForActivityResult(QrCodeResult()) {
@@ -549,12 +550,18 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
                 val adapterItems = adapter.getItems()
                 val firstItem = adapterItems.indexOf(selectItems.firstOrNull())
                 val lastItem = adapterItems.indexOf(selectItems.lastOrNull())
-                if (firstItem >= 0 && lastItem >= 0 && !Debug.tryStartChecking()) {
+                if (firstItem < 0 || lastItem < 0) {
+                    keepScreenOn(false)
+                    return@okButton
+                }
+                val checkSessionId = Debug.tryStartCheckSession()
+                if (checkSessionId == null) {
                     keepScreenOn(false)
                     toastOnUi("书源调试通道占用中，请稍后重试")
                     return@okButton
                 }
-                CheckSource.start(this@BookSourceActivity, selectItems)
+                CheckSource.start(this@BookSourceActivity, selectItems, checkSessionId)
+                checkSourceUiSessionId = checkSessionId
                 startCheckMessageRefreshJob(firstItem, lastItem)
             }
             neutralButton(R.string.check_source_config)
@@ -654,16 +661,23 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
     }
 
     override fun observeLiveBus() {
-        observeEvent<String>(EventBus.CHECK_SOURCE) { msg ->
-            snackBar?.setText(msg) ?: let {
-                snackBar = Snackbar
-                    .make(binding.root, msg, Snackbar.LENGTH_INDEFINITE)
-                    .setAction(R.string.cancel) {
-                        CheckSource.stop(this)
-                    }.apply { show() }
+        observeEvent<Pair<Long, String>>(EventBus.CHECK_SOURCE) { (checkSessionId, msg) ->
+            if (!Debug.isChecking(checkSessionId)) return@observeEvent
+            checkSourceUiSessionId = checkSessionId
+            val currentSnackBar = snackBar
+                ?: Snackbar.make(binding.root, msg, Snackbar.LENGTH_INDEFINITE)
+            currentSnackBar.setText(msg)
+            currentSnackBar.setAction(R.string.cancel) {
+                CheckSource.stop(this, checkSessionId)
             }
+            currentSnackBar.show()
+            snackBar = currentSnackBar
         }
-        observeEvent<Int>(EventBus.CHECK_SOURCE_DONE) {
+        observeEvent<Long>(EventBus.CHECK_SOURCE_DONE) { checkSessionId ->
+            if (checkSourceUiSessionId != null && checkSourceUiSessionId != checkSessionId) {
+                return@observeEvent
+            }
+            checkSourceUiSessionId = null
             keepScreenOn(false)
             snackBar?.dismiss()
             snackBar = null
