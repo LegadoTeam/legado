@@ -40,6 +40,16 @@ class SourceImmersiveBackgroundTest {
     }
 
     @Test
+    fun navigationBarsDisablePlatformContrastScrimOnAndroidQ() {
+        val source = projectFile("src/main/java/io/legado/app/utils/ActivityExtensions.kt")
+            .readText()
+            .substringAfter("fun Activity.setNavigationBarColorAuto")
+            .substringBefore("\nfun ")
+        assertTrue(source.contains("if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)"))
+        assertTrue(source.contains("window.isNavigationBarContrastEnforced = false"))
+    }
+
+    @Test
     fun sourceDebugHelpPanelsHideLogsAndMatchTitleBarTransparency() {
         listOf(
             "src/main/java/io/legado/app/ui/book/source/debug/BookSourceDebugActivity.kt",
