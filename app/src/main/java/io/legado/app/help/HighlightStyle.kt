@@ -5,6 +5,7 @@ package io.legado.app.help
  */
 data class HighlightStyle(
     val fill: Int = 0,
+    val fillShape: FillShape? = null,
     val textColor: Int = 0,
     val bold: Boolean = false,
     val italic: Boolean = false,
@@ -19,6 +20,11 @@ data class HighlightStyle(
 
     enum class Kind { SOLID, WAVY, DASHED, DOTTED, DOUBLE }
 
+    enum class FillShape { RECTANGLE, ROUNDED, MARKER, HALF, BASELINE, PILL }
+
+    val resolvedFillShape: FillShape
+        get() = fillShape ?: FillShape.RECTANGLE
+
     val isEmpty: Boolean
         get() = fill == 0 && textColor == 0 && !bold && !italic &&
             underline == null && strike == null && box == null && emphasis == null
@@ -32,6 +38,7 @@ data class HighlightStyle(
             val current = base ?: HighlightStyle()
             return current.copy(
                 fill = if (other.fill != 0) other.fill else current.fill,
+                fillShape = if (other.fill != 0) other.fillShape else current.fillShape,
                 textColor = if (other.textColor != 0) other.textColor else current.textColor,
                 bold = other.bold || current.bold,
                 italic = other.italic || current.italic,

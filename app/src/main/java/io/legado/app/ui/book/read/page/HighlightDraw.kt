@@ -1,8 +1,10 @@
 package io.legado.app.ui.book.read.page
 
 import android.graphics.Canvas
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.Shader
 import io.legado.app.help.HighlightGeometry
 import io.legado.app.help.HighlightStyle
 import io.legado.app.help.PaintPool
@@ -19,7 +21,8 @@ object HighlightDraw {
             isAntiAlias = true
             style = Paint.Style.FILL
         },
-        val wavePath: Path = Path()
+        val wavePath: Path = Path(),
+        val fillPath: Path = Path()
     )
 
     private val drawState = object : ThreadLocal<DrawState>() {
@@ -37,6 +40,92 @@ object HighlightDraw {
 
     fun recycleTextPaint(paint: Paint) {
         PaintPool.recycle(paint)
+    }
+
+    fun drawFillRun(
+        canvas: Canvas,
+        x0: Float,
+        x1: Float,
+        top: Float,
+        bottom: Float,
+        fill: Int,
+        shape: HighlightStyle.FillShape
+    ) {
+        if (x1 <= x0 || bottom <= top) return
+        val state = drawState.get()!!
+        val fillPaint = state.fillPaint
+        fillPaint.shader = null
+        when (shape) {
+            HighlightStyle.FillShape.RECTANGLE -> {
+                fillPaint.color = fill
+                canvas.drawRect(x0, top, x1, bottom, fillPaint)
+            }
+
+            HighlightStyle.FillShape.ROUNDED -> {
+                val radius = 3f.dpToPx()
+                fillPaint.color = fill
+                canvas.drawRoundRect(x0, top, x1, bottom, radius, radius, fillPaint)
+            }
+
+            HighlightStyle.FillShape.MARKER -> {
+                fillPaint.color = fill
+                fillPaint.shader = LinearGradient(
+                    x0,
+                    0f,
+                    x1,
+                    0f,
+                    intArrayOf(fill and 0x00FFFFFF, fill, fill, fill and 0x00FFFFFF),
+                    floatArrayOf(0f, 0.04f, 0.96f, 1f),
+                    Shader.TileMode.CLAMP
+                )
+                val unit = 2f.dpToPx()
+                state.fillPath.reset()
+                state.fillPath.addRoundRect(
+                    x0,
+                    top,
+                    x1,
+                    bottom,
+                    floatArrayOf(
+                        unit, unit * 2f,
+                        unit * 2.5f, unit,
+                        unit * 1.5f, unit * 2f,
+                        unit * 2f, unit
+                    ),
+                    Path.Direction.CW
+                )
+                canvas.drawPath(state.fillPath, fillPaint)
+                fillPaint.shader = null
+            }
+
+            HighlightStyle.FillShape.HALF,
+            HighlightStyle.FillShape.BASELINE -> {
+                fillPaint.color = fill
+                canvas.drawRect(x0, top, x1, bottom, fillPaint)
+            }
+
+            HighlightStyle.FillShape.PILL -> {
+                val radius = (bottom - top) / 2f
+                fillPaint.color = scaleAlpha(fill, 0.35f)
+                canvas.drawRoundRect(x0, top, x1, bottom, radius, radius, fillPaint)
+                val strokePaint = state.strokePaint
+                strokePaint.strokeWidth = 1f.dpToPx()
+                strokePaint.pathEffect = null
+                strokePaint.color = fill
+                val inset = strokePaint.strokeWidth / 2f
+                if (x1 - x0 > inset * 2f && bottom - top > inset * 2f) {
+                    val strokeRadius = (radius - inset).coerceAtLeast(0f)
+                    canvas.drawRoundRect(
+                        x0 + inset,
+                        top + inset,
+                        x1 - inset,
+                        bottom - inset,
+                        strokeRadius,
+                        strokeRadius,
+                        strokePaint
+                    )
+                }
+            }
+        }
     }
 
     fun drawEmphasis(canvas: Canvas, start: Float, end: Float, height: Float, color: Int) {
@@ -147,5 +236,10 @@ object HighlightDraw {
             index += 2
         }
         canvas.drawPath(path, paint)
+    }
+
+    private fun scaleAlpha(color: Int, factor: Float): Int {
+        val alpha = ((color ushr 24) * factor).toInt().coerceIn(0, 255)
+        return (alpha shl 24) or (color and 0x00FFFFFF)
     }
 }

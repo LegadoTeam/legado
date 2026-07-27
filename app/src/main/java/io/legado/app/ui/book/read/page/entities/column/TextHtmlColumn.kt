@@ -87,10 +87,6 @@ data class TextHtmlColumn(
             color = textColor
             isUnderlineText = linkUrl != null
         }
-        val fill = style?.fill ?: 0
-        if (fill != 0) {
-            canvas.drawRect(start, 0f, end, textLine.height, view.highlightPaint(fill))
-        }
         val styledPaint = style?.takeIf {
             it.textColor != 0 || it.bold || it.italic
         }?.let { HighlightDraw.obtainTextPaint(textPaint, it, textColor) }

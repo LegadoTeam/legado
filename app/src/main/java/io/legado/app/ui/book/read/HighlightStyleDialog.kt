@@ -12,6 +12,7 @@ import io.legado.app.databinding.DialogHighlightStyleBinding
 import io.legado.app.databinding.ItemHighlightChannelBinding
 import io.legado.app.help.HighlightStyle
 import io.legado.app.help.HighlightStyle.Deco
+import io.legado.app.help.HighlightStyle.FillShape
 import io.legado.app.help.HighlightStyle.Kind
 import io.legado.app.help.HighlightStyle.Underline
 import io.legado.app.help.HighlightStyles
@@ -115,6 +116,10 @@ class HighlightStyleDialog : BottomSheetDialogFragment() {
                             0
                         }
                     )
+                },
+                extra = { style -> fillShapeLabel(style.resolvedFillShape) },
+                changeExtra = { style ->
+                    style.copy(fillShape = nextFillShape(style.resolvedFillShape))
                 }
             ),
             Channel(
@@ -259,6 +264,20 @@ class HighlightStyleDialog : BottomSheetDialogFragment() {
     private fun nextKind(kind: Kind): Kind {
         val kinds = Kind.entries
         return kinds[(kinds.indexOf(kind) + 1) % kinds.size]
+    }
+
+    private fun fillShapeLabel(shape: FillShape): String = when (shape) {
+        FillShape.RECTANGLE -> getString(R.string.highlight_fill_rectangle)
+        FillShape.ROUNDED -> getString(R.string.highlight_fill_rounded)
+        FillShape.MARKER -> getString(R.string.highlight_fill_marker)
+        FillShape.HALF -> getString(R.string.highlight_fill_half)
+        FillShape.BASELINE -> getString(R.string.highlight_fill_baseline)
+        FillShape.PILL -> getString(R.string.highlight_fill_pill)
+    }
+
+    private fun nextFillShape(shape: FillShape): FillShape {
+        val shapes = FillShape.entries
+        return shapes[(shapes.indexOf(shape) + 1) % shapes.size]
     }
 
     companion object {

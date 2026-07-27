@@ -48,4 +48,13 @@ class HighlightStyleDialogTest {
 
         assertSame(style, visibleHighlightStyle(style))
     }
+
+    @Test
+    fun fillPresetsHaveDistinctSwatches() {
+        val colors = HighlightStyles.presets.mapNotNull { style ->
+            style.fill.takeIf { it != 0 }
+        }
+
+        assertEquals(colors.size, colors.distinct().size)
+    }
 }

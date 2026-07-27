@@ -113,6 +113,24 @@ class ManualHighlightRenderTest {
     }
 
     @Test
+    fun `fill shapes share one run renderer across fast and styled text`() {
+        val line = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/TextLine.kt")
+        val text = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/column/TextColumn.kt")
+        val html = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/column/TextHtmlColumn.kt")
+        val draw = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/HighlightDraw.kt")
+
+        assertTrue(line.indexOf("drawHighlightFills(canvas)") < line.indexOf("checkFastDraw()"))
+        assertTrue(line.contains("nextStyle.resolvedFillShape == shape"))
+        assertTrue(line.contains("nextTextSize == textSize"))
+        assertTrue(draw.contains("fun drawFillRun("))
+        assertTrue(draw.contains("val inset = strokePaint.strokeWidth / 2f"))
+        assertTrue(draw.contains("top + inset"))
+        assertTrue(draw.contains("bottom - inset"))
+        assertFalse(text.contains("highlightPaint("))
+        assertFalse(html.contains("highlightPaint("))
+    }
+
+    @Test
     fun `html horizontal rules consume one chapter position`() {
         val column = readProjectFile(
             "src/main/java/io/legado/app/ui/book/read/page/entities/column/BaseColumn.kt"

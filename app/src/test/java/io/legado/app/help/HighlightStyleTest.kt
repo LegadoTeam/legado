@@ -2,6 +2,7 @@ package io.legado.app.help
 
 import com.google.gson.Gson
 import io.legado.app.help.HighlightStyle.Deco
+import io.legado.app.help.HighlightStyle.FillShape
 import io.legado.app.help.HighlightStyle.Kind
 import io.legado.app.help.HighlightStyle.Underline
 import org.junit.Assert.assertEquals
@@ -23,6 +24,7 @@ class HighlightStyleTest {
         val style = HighlightStyle(fill = 0x80FFFF00.toInt())
         assertFalse(style.isEmpty)
         assertFalse(style.needsPerColumnDraw)
+        assertEquals(FillShape.RECTANGLE, style.resolvedFillShape)
     }
 
     @Test
@@ -71,5 +73,26 @@ class HighlightStyleTest {
             strike = Deco(0xFF0000FF.toInt())
         )
         assertEquals(style, gson.fromJson(gson.toJson(style), HighlightStyle::class.java))
+    }
+
+    @Test
+    fun `fill shape follows the winning fill channel`() {
+        val base = HighlightStyle(fill = 1, fillShape = FillShape.MARKER)
+        val shaped = HighlightStyle.merge(
+            base,
+            HighlightStyle(fill = 2, fillShape = FillShape.PILL)
+        )
+        val legacy = HighlightStyle.merge(base, HighlightStyle(fill = 3))
+
+        assertEquals(FillShape.PILL, shaped.resolvedFillShape)
+        assertEquals(FillShape.RECTANGLE, legacy.resolvedFillShape)
+    }
+
+    @Test
+    fun `shape alone does not enable highlighting`() {
+        val style = HighlightStyle(fillShape = FillShape.HALF)
+
+        assertTrue(style.isEmpty)
+        assertFalse(style.needsPerColumnDraw)
     }
 }

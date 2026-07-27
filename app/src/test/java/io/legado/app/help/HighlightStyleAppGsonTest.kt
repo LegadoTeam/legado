@@ -1,6 +1,7 @@
 package io.legado.app.help
 
 import io.legado.app.help.HighlightStyle.Deco
+import io.legado.app.help.HighlightStyle.FillShape
 import io.legado.app.help.HighlightStyle.Kind
 import io.legado.app.help.HighlightStyle.Underline
 import io.legado.app.utils.GSON
@@ -24,6 +25,7 @@ class HighlightStyleAppGsonTest {
     fun `app Gson preserves the full style`() {
         val style = HighlightStyle(
             fill = 0x80FFFF00.toInt(),
+            fillShape = FillShape.MARKER,
             textColor = 0xFFFF0000.toInt(),
             bold = true,
             underline = Underline(Kind.DASHED, 0xFF00FF00.toInt()),
@@ -41,6 +43,7 @@ class HighlightStyleAppGsonTest {
 
         assertEquals(-2130771969, restored.fill)
         assertEquals(true, restored.bold)
+        assertEquals(FillShape.RECTANGLE, restored.resolvedFillShape)
         assertEquals(restored, HighlightStyle.merge(restored, HighlightStyle()))
     }
 }

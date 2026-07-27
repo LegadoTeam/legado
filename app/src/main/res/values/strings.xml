@@ -332,6 +332,12 @@
     <string name="highlight_underline_dashed">Dashed</string>
     <string name="highlight_underline_dotted">Dotted</string>
     <string name="highlight_underline_double">Double</string>
+    <string name="highlight_fill_rectangle">Rectangle</string>
+    <string name="highlight_fill_rounded">Rounded</string>
+    <string name="highlight_fill_marker">Marker</string>
+    <string name="highlight_fill_half">Half height</string>
+    <string name="highlight_fill_baseline">Baseline</string>
+    <string name="highlight_fill_pill">Pill</string>
     <string name="highlight_rule">Highlight rules</string>
     <string name="highlight_rule_add">New highlight rule</string>
     <string name="highlight_rule_edit_title">Edit highlight rule</string>
