@@ -134,6 +134,10 @@ X-Legado-Token = 设置中配置的令牌
 输出不会脱敏，也可能访问网络、Cookie、缓存及已绑定书源的数据。传入书源 URL 只绑定其运行时身份，
 不会自动执行该书源的 `mainJs`。
 
+服务还会将应用内置 Markdown 帮助文档作为只读 resources 暴露，URI 格式为 `legado://help/<文件名>`，
+例如 `legado://help/jsHelp` 和 `legado://help/ruleHelp`。客户端可先列出 resources，再按 URI 读取；
+返回内容使用 UTF-8 和 `text/markdown`，不会修改应用状态。
+
 #### 获取替换规则
 
 ```

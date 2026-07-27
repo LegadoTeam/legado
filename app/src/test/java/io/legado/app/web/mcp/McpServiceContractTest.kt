@@ -16,6 +16,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.net.URI
 
 class McpServiceContractTest {
 
@@ -172,6 +173,49 @@ class McpServiceContractTest {
     }
 
     @Test
+    fun `server exposes bundled help markdown as read only resources`() {
+        val server = projectFile("app/src/main/java/io/legado/app/web/mcp/McpToolServer.kt")
+
+        assertTrue(server.contains("resources = ServerCapabilities.Resources(),"))
+        assertTrue(server.contains("val assetDir = \"web/help/md\""))
+        assertTrue(server.contains("catch (error: IOException)"))
+        assertTrue(server.contains("error.printOnDebug()"))
+        assertTrue(server.contains(".filter { it.endsWith(\".md\") }"))
+        assertTrue(server.contains(".sorted()"))
+        assertTrue(server.contains("val uri = \"legado://help/\$name\""))
+        assertTrue(server.contains("server.addResource("))
+        assertTrue(server.contains("appCtx.assets.open(\"\$assetDir/\$fileName\")"))
+        assertTrue(server.contains("bufferedReader(Charsets.UTF_8)"))
+        assertTrue(server.contains(".use { it.readText() }"))
+        assertTrue(server.contains("mimeType = \"text/markdown\""))
+    }
+
+    @Test
+    fun `bundled help resource uris are unique valid and readable`() {
+        val files = projectPath("app/src/main/assets/web/help/md")
+            .listFiles { file -> file.isFile && file.extension == "md" }
+            .orEmpty()
+
+        assertTrue(files.isNotEmpty())
+        val resources = files.associateWith { file ->
+            assertTrue(file.readText(Charsets.UTF_8).isNotBlank())
+            URI("legado://help/${file.nameWithoutExtension}")
+        }
+        val uris = resources.values
+        assertEquals(uris.size, uris.distinct().size)
+        assertTrue(uris.any { it.toString() == "legado://help/rssRuleHelp" })
+        assertTrue(
+            resources.all { (file, uri) ->
+                uri.scheme == "legado" &&
+                    uri.host == "help" &&
+                    uri.rawPath == "/${file.nameWithoutExtension}" &&
+                    uri.rawQuery == null &&
+                    uri.rawFragment == null
+            }
+        )
+    }
+
+    @Test
     fun `documentation and shrinker keep the security boundary`() {
         val api = projectFile("api.md")
         val updateLog = projectFile("app/src/main/assets/updateLog.md")
@@ -185,10 +229,12 @@ class McpServiceContractTest {
         assertTrue(api.contains("未脱敏 Cookie"))
         assertTrue(api.contains("只合并写入持久层"))
         assertTrue(api.contains("同名会话 Cookie"))
+        assertTrue(api.contains("legado://help/"))
         assertTrue(updateLog.contains("**2026/07/22**"))
         assertTrue(updateLog.contains("原生 MCP 书源开发服务"))
         assertTrue(updateLog.contains("支持通过 MCP 在应用内书源环境执行 JavaScript"))
         assertTrue(updateLog.contains("MCP 增加 Cookie 非破坏性读取"))
+        assertTrue(updateLog.contains("支持通过 MCP resources 读取应用内帮助文档"))
         assertFalse(proguard.contains("-keep class io.ktor.**"))
         assertFalse(proguard.contains("-keep class kotlinx.coroutines.**"))
     }
@@ -201,13 +247,15 @@ class McpServiceContractTest {
         }
     }
 
-    private fun projectFile(path: String): String {
+    private fun projectFile(path: String): String = projectPath(path).readText()
+
+    private fun projectPath(path: String): File {
         var root = File(requireNotNull(System.getProperty("user.dir")))
         repeat(6) {
             val candidate = File(root, path)
-            if (candidate.isFile) return candidate.readText()
+            if (candidate.exists()) return candidate
             root = root.parentFile ?: error("Project root not found for: $path")
         }
-        error("Project file not found: $path")
+        error("Project path not found: $path")
     }
 }

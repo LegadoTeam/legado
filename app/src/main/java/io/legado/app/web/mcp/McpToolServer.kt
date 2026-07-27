@@ -16,12 +16,15 @@ import io.legado.app.model.jsSource.JsSourceEngine
 import io.legado.app.model.jsSource.JsSourceUpsert
 import io.legado.app.utils.GSON
 import io.legado.app.utils.NetworkUtils
+import io.legado.app.utils.printOnDebug
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
+import io.modelcontextprotocol.kotlin.sdk.types.ReadResourceResult
 import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
+import io.modelcontextprotocol.kotlin.sdk.types.TextResourceContents
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -40,6 +43,8 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
+import splitties.init.appCtx
+import java.io.IOException
 import java.time.Instant
 
 object McpToolServer {
@@ -56,9 +61,49 @@ object McpToolServer {
             options = ServerOptions(
                 capabilities = ServerCapabilities(
                     tools = ServerCapabilities.Tools(listChanged = false),
+                    resources = ServerCapabilities.Resources(),
                 ),
             ),
-        ).also(::registerTools)
+        ).also {
+            registerTools(it)
+            registerResources(it)
+        }
+    }
+
+    private fun registerResources(server: Server) {
+        val assetDir = "web/help/md"
+        val fileNames = try {
+            appCtx.assets.list(assetDir).orEmpty().toList()
+        } catch (error: IOException) {
+            error.printOnDebug()
+            emptyList()
+        }
+        fileNames
+            .filter { it.endsWith(".md") }
+            .sorted()
+            .forEach { fileName ->
+                val name = fileName.removeSuffix(".md")
+                val uri = "legado://help/$name"
+                server.addResource(
+                    uri = uri,
+                    name = name,
+                    description = "Legado 应用内帮助文档：$name",
+                    mimeType = "text/markdown",
+                ) { _ ->
+                    val text = appCtx.assets.open("$assetDir/$fileName")
+                        .bufferedReader(Charsets.UTF_8)
+                        .use { it.readText() }
+                    ReadResourceResult(
+                        contents = listOf(
+                            TextResourceContents(
+                                text = text,
+                                uri = uri,
+                                mimeType = "text/markdown",
+                            )
+                        )
+                    )
+                }
+            }
     }
 
     private fun ok(text: String) = CallToolResult(content = listOf(TextContent(text)))
