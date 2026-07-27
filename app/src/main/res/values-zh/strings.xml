@@ -324,6 +324,11 @@
     <string name="highlight_strike">删除线</string>
     <string name="highlight_box">方框</string>
     <string name="highlight_emphasis">着重号</string>
+    <string name="highlight_shadow">阴影 / 发光</string>
+    <string name="highlight_shadow_radius">半径</string>
+    <string name="highlight_shadow_offset_x">横向</string>
+    <string name="highlight_shadow_offset_y">纵向</string>
+    <string name="highlight_shadow_values">%1$.1f / %2$+.1f / %3$+.1f</string>
     <string name="highlight_underline_solid">实线</string>
     <string name="highlight_underline_wavy">波浪</string>
     <string name="highlight_underline_dashed">虚线</string>

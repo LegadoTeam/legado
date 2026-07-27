@@ -4,6 +4,7 @@ import com.google.gson.Gson
 import io.legado.app.help.HighlightStyle.Deco
 import io.legado.app.help.HighlightStyle.FillShape
 import io.legado.app.help.HighlightStyle.Kind
+import io.legado.app.help.HighlightStyle.Shadow
 import io.legado.app.help.HighlightStyle.Underline
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -36,6 +37,7 @@ class HighlightStyleTest {
         assertTrue(HighlightStyle(strike = Deco()).needsPerColumnDraw)
         assertTrue(HighlightStyle(box = Deco()).needsPerColumnDraw)
         assertTrue(HighlightStyle(emphasis = Deco()).needsPerColumnDraw)
+        assertTrue(HighlightStyle(shadow = Shadow()).needsPerColumnDraw)
     }
 
     @Test
@@ -54,6 +56,27 @@ class HighlightStyleTest {
         assertTrue(merged.bold)
         assertEquals(Underline(Kind.SOLID), merged.underline)
         assertEquals(Deco(4), merged.strike)
+    }
+
+    @Test
+    fun `shadow merge is last-wins and null keeps the base`() {
+        val base = HighlightStyle(shadow = Shadow(radius = 5f, color = 1))
+        val replacement = Shadow(radius = 2f, dx = 0f, dy = 0f, color = 2)
+
+        assertEquals(replacement, HighlightStyle.merge(base, HighlightStyle(shadow = replacement)).shadow)
+        assertEquals(base, HighlightStyle.merge(base, HighlightStyle()))
+    }
+
+    @Test
+    fun `shadow values are normalized before drawing`() {
+        assertEquals(
+            Shadow(radius = 0f, dx = 0f, dy = 0f, color = 7),
+            Shadow(-1f, Float.POSITIVE_INFINITY, Float.NaN, 7).normalized()
+        )
+        assertEquals(
+            Shadow(radius = 10f, dx = -10f, dy = 10f),
+            Shadow(radius = 99f, dx = -99f, dy = 99f).normalized()
+        )
     }
 
     @Test

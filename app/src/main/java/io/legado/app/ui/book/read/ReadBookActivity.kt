@@ -2164,7 +2164,8 @@ class ReadBookActivity : BaseReadBookActivity(),
             HighlightStyleDialog.HL_UNDERLINE,
             HighlightStyleDialog.HL_STRIKE,
             HighlightStyleDialog.HL_BOX,
-            HighlightStyleDialog.HL_EMPHASIS -> {
+            HighlightStyleDialog.HL_EMPHASIS,
+            HighlightStyleDialog.HL_SHADOW -> {
                 val style = HighlightStyleDialog.applyChannelColor(
                     currentHighlightStyle(),
                     dialogId,

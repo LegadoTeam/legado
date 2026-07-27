@@ -12,11 +12,25 @@ data class HighlightStyle(
     val underline: Underline? = null,
     val strike: Deco? = null,
     val box: Deco? = null,
-    val emphasis: Deco? = null
+    val emphasis: Deco? = null,
+    val shadow: Shadow? = null
 ) {
     data class Underline(val kind: Kind = Kind.SOLID, val color: Int = 0)
 
     data class Deco(val color: Int = 0)
+
+    data class Shadow(
+        val radius: Float = 3f,
+        val dx: Float = 2f,
+        val dy: Float = 2f,
+        val color: Int = 0x80000000.toInt()
+    ) {
+        fun normalized() = copy(
+            radius = radius.takeIf { it.isFinite() }?.coerceIn(0f, 10f) ?: 0f,
+            dx = dx.takeIf { it.isFinite() }?.coerceIn(-10f, 10f) ?: 0f,
+            dy = dy.takeIf { it.isFinite() }?.coerceIn(-10f, 10f) ?: 0f
+        )
+    }
 
     enum class Kind { SOLID, WAVY, DASHED, DOTTED, DOUBLE }
 
@@ -27,11 +41,12 @@ data class HighlightStyle(
 
     val isEmpty: Boolean
         get() = fill == 0 && textColor == 0 && !bold && !italic &&
-            underline == null && strike == null && box == null && emphasis == null
+            underline == null && strike == null && box == null && emphasis == null &&
+            shadow == null
 
     val needsPerColumnDraw: Boolean
         get() = textColor != 0 || bold || italic || underline != null || strike != null ||
-            box != null || emphasis != null
+            box != null || emphasis != null || shadow != null
 
     companion object {
         fun merge(base: HighlightStyle?, other: HighlightStyle): HighlightStyle {
@@ -45,7 +60,8 @@ data class HighlightStyle(
                 underline = other.underline ?: current.underline,
                 strike = other.strike ?: current.strike,
                 box = other.box ?: current.box,
-                emphasis = other.emphasis ?: current.emphasis
+                emphasis = other.emphasis ?: current.emphasis,
+                shadow = other.shadow ?: current.shadow
             )
         }
     }

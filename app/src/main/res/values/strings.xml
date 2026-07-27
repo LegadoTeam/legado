@@ -327,6 +327,11 @@
     <string name="highlight_strike">Strikethrough</string>
     <string name="highlight_box">Box</string>
     <string name="highlight_emphasis">Emphasis mark</string>
+    <string name="highlight_shadow">Shadow / glow</string>
+    <string name="highlight_shadow_radius">Radius</string>
+    <string name="highlight_shadow_offset_x">X offset</string>
+    <string name="highlight_shadow_offset_y">Y offset</string>
+    <string name="highlight_shadow_values">%1$.1f / %2$+.1f / %3$+.1f</string>
     <string name="highlight_underline_solid">Solid</string>
     <string name="highlight_underline_wavy">Wavy</string>
     <string name="highlight_underline_dashed">Dashed</string>

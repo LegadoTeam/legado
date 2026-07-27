@@ -88,7 +88,7 @@ data class TextHtmlColumn(
             isUnderlineText = linkUrl != null
         }
         val styledPaint = style?.takeIf {
-            it.textColor != 0 || it.bold || it.italic
+            it.textColor != 0 || it.bold || it.italic || it.shadow != null
         }?.let { HighlightDraw.obtainTextPaint(textPaint, it, textColor) }
         drawText(canvas, y, styledPaint ?: textPaint)
         styledPaint?.let(HighlightDraw::recycleTextPaint)

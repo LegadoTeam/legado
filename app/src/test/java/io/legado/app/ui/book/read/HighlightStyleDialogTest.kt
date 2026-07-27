@@ -3,8 +3,10 @@ package io.legado.app.ui.book.read
 import io.legado.app.help.HighlightStyle
 import io.legado.app.help.HighlightStyles
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HighlightStyleDialogTest {
@@ -56,5 +58,15 @@ class HighlightStyleDialogTest {
         }
 
         assertEquals(colors.size, colors.distinct().size)
+    }
+
+    @Test
+    fun shadowEditorOpensOnlyForTheFirstEnableTransition() {
+        val disabled = HighlightStyle()
+        val enabled = HighlightStyle(shadow = HighlightStyle.Shadow())
+
+        assertTrue(HighlightStyleDialog.shouldOpenShadowEditor(disabled, enabled))
+        assertFalse(HighlightStyleDialog.shouldOpenShadowEditor(enabled, enabled))
+        assertFalse(HighlightStyleDialog.shouldOpenShadowEditor(disabled, disabled))
     }
 }

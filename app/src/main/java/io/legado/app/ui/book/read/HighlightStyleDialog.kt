@@ -14,11 +14,12 @@ import io.legado.app.help.HighlightStyle
 import io.legado.app.help.HighlightStyle.Deco
 import io.legado.app.help.HighlightStyle.FillShape
 import io.legado.app.help.HighlightStyle.Kind
+import io.legado.app.help.HighlightStyle.Shadow
 import io.legado.app.help.HighlightStyle.Underline
 import io.legado.app.help.HighlightStyles
 import io.legado.app.utils.dpToPx
 
-class HighlightStyleDialog : BottomSheetDialogFragment() {
+class HighlightStyleDialog : BottomSheetDialogFragment(), ShadowEditDialog.Callback {
 
     interface StyleHost {
         fun currentHighlightStyle(): HighlightStyle
@@ -86,6 +87,7 @@ class HighlightStyleDialog : BottomSheetDialogFragment() {
             ?: strike?.color?.takeIf { it != 0 }
             ?: box?.color?.takeIf { it != 0 }
             ?: emphasis?.color?.takeIf { it != 0 }
+            ?: shadow?.color?.takeIf { it != 0 }
             ?: DEFAULT_SWATCH_COLOR
     }
 
@@ -198,6 +200,17 @@ class HighlightStyleDialog : BottomSheetDialogFragment() {
                 { style, enabled ->
                     style.copy(emphasis = if (enabled) style.emphasis ?: Deco() else null)
                 }
+            ),
+            Channel(
+                R.string.highlight_shadow,
+                HL_SHADOW,
+                true,
+                { it.shadow != null },
+                { it.shadow?.color ?: 0 },
+                { style, enabled ->
+                    style.copy(shadow = if (enabled) style.shadow ?: Shadow() else null)
+                },
+                extra = { style -> shadowLabel(style.shadow ?: Shadow()) }
             )
         )
     }
@@ -211,7 +224,14 @@ class HighlightStyleDialog : BottomSheetDialogFragment() {
             )
             row.cbChannel.setText(channel.labelRes)
             row.cbChannel.setOnClickListener {
-                apply(channel.toggle(currentStyle(), row.cbChannel.isChecked))
+                val previousStyle = currentStyle()
+                val newStyle = channel.toggle(previousStyle, row.cbChannel.isChecked)
+                apply(newStyle)
+                if (channel.labelRes == R.string.highlight_shadow &&
+                    shouldOpenShadowEditor(previousStyle, newStyle)
+                ) {
+                    newStyle.shadow?.let { ShadowEditDialog.show(childFragmentManager, it) }
+                }
             }
             row.vSwatch.setOnClickListener {
                 if (channel.dialogId != NO_COLOR) {
@@ -224,7 +244,11 @@ class HighlightStyleDialog : BottomSheetDialogFragment() {
             }
             row.vSwatch.contentDescription = getString(channel.labelRes)
             row.tvExtra.setOnClickListener {
-                channel.changeExtra?.let { apply(it(currentStyle())) }
+                if (channel.labelRes == R.string.highlight_shadow) {
+                    currentStyle().shadow?.let { ShadowEditDialog.show(childFragmentManager, it) }
+                } else {
+                    channel.changeExtra?.let { apply(it(currentStyle())) }
+                }
             }
             binding.llChannels.addView(row.root)
             rows.add(row)
@@ -280,6 +304,13 @@ class HighlightStyleDialog : BottomSheetDialogFragment() {
         return shapes[(shapes.indexOf(shape) + 1) % shapes.size]
     }
 
+    private fun shadowLabel(shadow: Shadow): String =
+        getString(R.string.highlight_shadow_values, shadow.radius, shadow.dx, shadow.dy)
+
+    override fun onShadowChanged(shadow: Shadow) {
+        apply(currentStyle().copy(shadow = shadow))
+    }
+
     companion object {
         const val HL_FILL = 8101
         const val HL_TEXT = 8102
@@ -287,6 +318,7 @@ class HighlightStyleDialog : BottomSheetDialogFragment() {
         const val HL_STRIKE = 8104
         const val HL_BOX = 8105
         const val HL_EMPHASIS = 8106
+        const val HL_SHADOW = 8107
 
         private const val NO_COLOR = -1
         private val DEFAULT_FILL_COLOR = 0x80FFF176.toInt()
@@ -310,7 +342,15 @@ class HighlightStyleDialog : BottomSheetDialogFragment() {
             HL_STRIKE -> style.copy(strike = Deco(color))
             HL_BOX -> style.copy(box = Deco(color))
             HL_EMPHASIS -> style.copy(emphasis = Deco(color))
+            HL_SHADOW -> style.copy(
+                shadow = (style.shadow ?: Shadow()).copy(color = color)
+            )
             else -> style
         }
+
+        internal fun shouldOpenShadowEditor(
+            previousStyle: HighlightStyle,
+            newStyle: HighlightStyle
+        ): Boolean = previousStyle.shadow == null && newStyle.shadow != null
     }
 }

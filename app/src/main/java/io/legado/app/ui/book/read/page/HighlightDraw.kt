@@ -35,6 +35,9 @@ object HighlightDraw {
         paint.color = color
         paint.isFakeBoldText = paint.isFakeBoldText || style.bold
         if (style.italic) paint.textSkewX = -0.25f
+        style.shadow?.normalized()?.let {
+            paint.setShadowLayer(it.radius, it.dx, it.dy, it.color)
+        }
         return paint
     }
 

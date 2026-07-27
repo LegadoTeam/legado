@@ -100,6 +100,9 @@ class ManualHighlightRenderTest {
         assertTrue(html.contains("HighlightDraw.obtainTextPaint(textPaint, it, textColor)"))
         assertTrue(html.contains("HighlightDraw::recycleTextPaint"))
         assertTrue(draw.contains("ThreadLocal<DrawState>"))
+        assertTrue(text.contains("it.shadow != null"))
+        assertTrue(html.contains("it.shadow != null"))
+        assertTrue(draw.contains("paint.setShadowLayer(it.radius, it.dx, it.dy, it.color)"))
     }
 
     @Test
