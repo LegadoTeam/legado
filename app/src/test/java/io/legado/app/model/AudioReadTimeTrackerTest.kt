@@ -40,8 +40,8 @@ class AudioReadTimeTrackerTest {
         val source = projectFile(
             "src/main/java/io/legado/app/service/AudioPlayService.kt"
         ).readText()
-        val callback = source.substringAfter("override fun onIsPlayingChanged(isPlaying: Boolean)")
-            .substringBefore("override fun onPlayerError")
+        val callback = source.substringAfter("private fun handleIsPlayingChanged(")
+            .substringBefore("override fun onSharedPreferenceChanged")
             .replace(Regex("\\s+"), " ")
 
         assertTrue(
