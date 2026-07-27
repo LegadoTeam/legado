@@ -81,6 +81,14 @@
         app:isBottomBackground="true" />
 
     <io.legado.app.lib.prefs.SwitchPreference
+        android:defaultValue="false"
+        android:key="hangingPunctuation"
+        android:summary="@string/hanging_punctuation_summary"
+        android:title="@string/hanging_punctuation"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
+    <io.legado.app.lib.prefs.SwitchPreference
         android:defaultValue="true"
         android:key="textBottomJustify"
         android:title="@string/text_bottom_justify"

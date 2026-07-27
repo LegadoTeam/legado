@@ -50,6 +50,7 @@ data class TextLine(
     var exceed: Boolean = false,
     var onlyTextColumn: Boolean = true,
     var reviewTitleOffset: Int = 0,
+    var hangingPunctuation: Boolean = false,
 ) {
 
     val columns: List<BaseColumn> get() = textColumns
@@ -319,7 +320,8 @@ data class TextLine(
     }
 
     fun checkFastDraw(): Boolean {
-        if (!AppConfig.optimizeRender || exceed || !onlyTextColumn || textPage.isMsgPage) {
+        //悬挂标点的行整体绘制无法复现列坐标,退回逐列绘制
+        if (!AppConfig.optimizeRender || exceed || hangingPunctuation || !onlyTextColumn || textPage.isMsgPage) {
             return false
         }
         if (wordSpacing != 0f && (!atLeastApi26 || !wordSpacingWorking)) {

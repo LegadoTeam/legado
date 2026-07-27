@@ -826,6 +826,8 @@
     <string name="auto_change_source">Change source automatically</string>
     <string name="text_full_justify">Text justified</string>
     <string name="text_bottom_justify">Text align bottom</string>
+    <string name="hanging_punctuation">Hanging punctuation</string>
+    <string name="hanging_punctuation_summary">Hang the opening quote at paragraph start into the indent, so the first character aligns with other paragraphs</string>
     <string name="auto_page_speed">Auto scroll speed</string>
     <string name="sort_by_url">Sort by URL</string>
     <string name="backup_summary">Backup the local and WebDav simultaneously</string>

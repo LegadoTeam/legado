@@ -752,6 +752,8 @@
     <string name="auto_change_source">自動換源</string>
     <string name="text_full_justify">文字兩端對齊</string>
     <string name="text_bottom_justify">文字底部對齊</string>
+    <string name="hanging_punctuation">段首標點懸掛</string>
+    <string name="hanging_punctuation_summary">段首引號等標點懸掛於縮排內，使正文首字與其他段落對齊</string>
     <string name="auto_page_speed">自動翻頁速度</string>
     <string name="sort_by_url">地址排序</string>
     <string name="backup_summary">本機和 WebDav 一起備份</string>

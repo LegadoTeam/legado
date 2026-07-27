@@ -134,6 +134,7 @@ class MoreConfigDialog : BasePrefDialogFragment() {
 
                 PreferKey.textFullJustify,
                 PreferKey.textBottomJustify,
+                PreferKey.hangingPunctuation,
                 PreferKey.useZhLayout,
                 PreferKey.adaptSpecialStyle-> {
                     postEvent(EventBus.UP_CONFIG, arrayListOf(5))
