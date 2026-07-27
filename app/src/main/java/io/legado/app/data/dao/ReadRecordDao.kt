@@ -10,6 +10,9 @@ interface ReadRecordDao {
     @get:Query("select * from readRecord")
     val all: List<ReadRecord>
 
+    @get:Query("select distinct bookName from readRecord")
+    val allBookNames: List<String>
+
     @get:Query(
         """
         select bookName, sum(readTime) as readTime, max(lastRead) as lastRead 

@@ -487,6 +487,13 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
     }
 
     /**
+     * 是否有阅读记录
+     */
+    override fun hasReadRecord(book: SearchBook): Boolean {
+        return viewModel.hasReadRecord(book)
+    }
+
+    /**
      * 显示书籍详情
      */
     override fun showBookInfo(book: Book) {

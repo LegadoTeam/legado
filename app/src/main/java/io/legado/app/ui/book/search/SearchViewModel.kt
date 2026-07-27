@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap
 class SearchViewModel(application: Application) : BaseViewModel(application) {
     val handler = Handler(Looper.getMainLooper())
     val bookshelf: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    val readRecords: MutableSet<String> = ConcurrentHashMap.newKeySet()
     val upAdapterLiveData = MutableLiveData<String>()
     var searchBookLiveData = ConflateLiveData<List<SearchBook>>(1000)
     val searchScope: SearchScope = SearchScope(AppConfig.searchScope)
@@ -68,6 +69,12 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
 
     init {
         execute {
+            readRecords.addAll(appDb.readRecordDao.allBookNames)
+            upAdapterLiveData.postValue("hasReadRecord")
+        }.onError {
+            AppLog.put("加载阅读记录失败", it)
+        }
+        execute {
             appDb.bookDao.flowAll().mapLatest { books ->
                 val keys = arrayListOf<String>()
                 books.filterNot { it.isNotShelf }
@@ -95,6 +102,10 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
         val bookUrl = book.bookUrl
         val key = if (author.isNotBlank()) "$name-$author" else name
         return bookshelf.contains(key) || bookshelf.contains(bookUrl)
+    }
+
+    fun hasReadRecord(book: SearchBook): Boolean {
+        return readRecords.contains(book.name)
     }
 
     /**
