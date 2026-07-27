@@ -320,8 +320,10 @@ data class TextLine(
     }
 
     fun checkFastDraw(): Boolean {
-        //悬挂标点的行整体绘制无法复现列坐标,退回逐列绘制
-        if (!AppConfig.optimizeRender || exceed || hangingPunctuation || !onlyTextColumn || textPage.isMsgPage) {
+        if (!FastDrawRule.canDrawWholeLine(
+                AppConfig.optimizeRender, exceed, hangingPunctuation, onlyTextColumn, textPage.isMsgPage
+            )
+        ) {
             return false
         }
         if (wordSpacing != 0f && (!atLeastApi26 || !wordSpacingWorking)) {
@@ -364,6 +366,26 @@ data class TextLine(
                 PaintPool.recycle(paint)
             }
         }
+    }
+
+}
+
+/**
+ * 整行一次性绘制的前置条件
+ * 一次 drawText 只能按字宽顺序排字,列坐标被改写过的行必须退回逐列绘制
+ */
+internal object FastDrawRule {
+
+    fun canDrawWholeLine(
+        optimizeRender: Boolean,
+        /**超出版心后整体左移*/
+        exceed: Boolean,
+        /**段首标点悬挂到缩进内*/
+        hangingPunctuation: Boolean,
+        onlyTextColumn: Boolean,
+        isMsgPage: Boolean
+    ): Boolean {
+        return optimizeRender && !exceed && !hangingPunctuation && onlyTextColumn && !isMsgPage
     }
 
 }
