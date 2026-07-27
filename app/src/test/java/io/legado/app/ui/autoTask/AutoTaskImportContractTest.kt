@@ -32,6 +32,21 @@ class AutoTaskImportContractTest {
     }
 
     @Test
+    fun `automatic task share passphrase routes import and export`() {
+        val main = projectFile("src/main/java/io/legado/app/ui/main/MainActivity.kt")
+        val activity = projectFile(
+            "src/main/java/io/legado/app/ui/autoTask/AutoTaskActivity.kt"
+        )
+        val exportBlock = activity.substringAfter("private val exportDoc")
+            .substringBefore("override fun onActivityCreated")
+
+        assertTrue(main.contains("SourceSharePassphrase.Type.AUTO_TASK ->"))
+        assertTrue(main.contains("showDialogFragment(ImportAutoTaskDialog(value.url))"))
+        assertTrue(exportBlock.contains("sourceSharePassphraseButton("))
+        assertTrue(exportBlock.contains("SourceSharePassphrase.Type.AUTO_TASK"))
+    }
+
+    @Test
     fun `automatic task import batches storage and scheduler refresh`() {
         val model = projectFile("src/main/java/io/legado/app/model/AutoTask.kt")
         val block = model.substringAfter("fun importRules(")

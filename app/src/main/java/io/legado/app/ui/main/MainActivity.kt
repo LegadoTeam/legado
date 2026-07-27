@@ -42,6 +42,7 @@ import io.legado.app.lib.theme.primaryColor
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.ui.about.CrashLogsDialog
 import io.legado.app.ui.about.UpdateDialog
+import io.legado.app.ui.autoTask.ImportAutoTaskDialog
 import io.legado.app.ui.association.ImportBookSourceDialog
 import io.legado.app.ui.association.ImportDictRuleDialog
 import io.legado.app.ui.association.ImportHttpTtsDialog
@@ -545,6 +546,9 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
 
                         SourceSharePassphrase.Type.TTS_RULE ->
                             showDialogFragment(ImportHttpTtsDialog(value.url))
+
+                        SourceSharePassphrase.Type.AUTO_TASK ->
+                            showDialogFragment(ImportAutoTaskDialog(value.url))
                     }
                 }
             }

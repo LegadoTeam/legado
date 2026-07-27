@@ -26,7 +26,10 @@ class SourceSharePassphraseTest {
                 "复制口令到阅读导入#L:example店🛜1刚path钢file店串?key=🕓拜2F五！ml©1800000¥Sigma^",
             SourceSharePassphrase.Type.TTS_RULE to
                 "复制口令到阅读导入#L:example店🛜1刚path钢file店串?key=🕓拜2F五！ld©1800000¥Sigma^",
+            SourceSharePassphrase.Type.AUTO_TASK to
+                "复制口令到阅读导入#L:example店🛜1刚path钢file店串?key=🕓拜2F五！rw©1800000¥Sigma^",
         )
+        assertEquals(SourceSharePassphrase.Type.entries.toSet(), fixtures.keys)
 
         fixtures.forEach { (type, fixture) ->
             assertEquals(
