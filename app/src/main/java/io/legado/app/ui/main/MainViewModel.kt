@@ -120,9 +120,15 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
         books: List<Book>,
         onlyUpdateRead: Boolean,
         policy: TocUpdatePolicy = TocUpdatePolicy.ALLOW_PRE_DOWNLOAD,
+        refreshBookInfo: Boolean = false,
     ) {
         execute(context = upTocPool) {
-            addToWaitUp(filterBooksForTocUpdate(books), onlyUpdateRead, policy)
+            addToWaitUp(
+                filterBooksForTocUpdate(books),
+                onlyUpdateRead,
+                policy,
+                refreshBookInfo,
+            )
         }
     }
 
@@ -131,10 +137,11 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
         books: List<Book>,
         onlyUpdateRead: Boolean,
         policy: TocUpdatePolicy = TocUpdatePolicy.ALLOW_PRE_DOWNLOAD,
+        refreshBookInfo: Boolean = false,
     ) {
         books.forEach { book ->
             if (onlyUpdateRead && book.getUnreadChapterNum() > 0) return@forEach
-            tocUpdateRequests.enqueue(book.bookUrl, policy)
+            tocUpdateRequests.enqueue(book.bookUrl, policy, refreshBookInfo)
         }
         if (upTocJob == null && tocUpdateRequests.hasQueued()) {
             startUpTocJob()
@@ -193,6 +200,7 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
 
     private suspend fun updateToc(request: TocUpdateRequestToken) {
         val bookUrl = request.bookUrl
+        var persistedBookUrl = bookUrl
         try {
             val book = appDb.bookDao.getBook(bookUrl) ?: return
             val source = appDb.bookSourceDao.getBookSource(book.origin)
@@ -215,23 +223,49 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
                 }
             }
             kotlin.runCatching {
-                val oldBook = book.copy()
-                if (book.tocUrl.isBlank()) {
+                val refreshBookInfo = tocUpdateRequests.takeRefreshBookInfo(request)
+                if (refreshBookInfo) {
+                    WebBook.getBookInfoAwait(source, book, canReName = false)
+                } else if (book.tocUrl.isBlank()) {
                     WebBook.getBookInfoAwait(source, book)
                 } else {
                     WebBook.runPreUpdateJs(source, book).getOrThrow()
                 }
-                val toc = WebBook.getChapterListAwait(source, book).getOrThrow()
-                book.sync(oldBook)
-                book.removeType(BookType.updateError)
-                if (book.bookUrl == bookUrl) {
-                    appDb.bookDao.update(book)
-                } else {
-                    appDb.bookDao.replace(oldBook, book)
-                    BookHelp.updateCacheFolder(oldBook, book)
+                val toc = WebBook.getChapterListAwait(
+                    source,
+                    book,
+                    runPerJs = refreshBookInfo,
+                    isFromBookInfo = refreshBookInfo,
+                ).getOrThrow()
+                var replacedBook: Book? = null
+                var persisted = false
+                appDb.runInTransaction {
+                    val currentBook = appDb.bookDao.getBook(bookUrl)
+                        ?: return@runInTransaction
+                    if (currentBook.origin != source.bookSourceUrl) {
+                        return@runInTransaction
+                    }
+                    if (refreshBookInfo) {
+                        book.name = currentBook.name.ifBlank { book.name }
+                        book.author = currentBook.author.ifBlank { book.author }
+                    }
+                    book.sync(currentBook, toc)
+                    book.removeType(BookType.updateError)
+                    if (book.bookUrl != bookUrl) {
+                        replacedBook = currentBook
+                        appDb.bookDao.replace(currentBook, book)
+                    } else {
+                        appDb.bookDao.update(book)
+                    }
+                    appDb.bookChapterDao.delByBook(bookUrl)
+                    appDb.bookChapterDao.insert(*toc.toTypedArray())
+                    persisted = true
                 }
-                appDb.bookChapterDao.delByBook(bookUrl)
-                appDb.bookChapterDao.insert(*toc.toTypedArray())
+                if (!persisted) return@runCatching
+                persistedBookUrl = book.bookUrl
+                replacedBook?.let {
+                    BookHelp.updateCacheFolder(it, book)
+                }
                 ReadBook.onChapterListUpdated(book)
                 val policy = tocUpdateRequests.close(request)
                 if (policy == TocUpdatePolicy.ALLOW_PRE_DOWNLOAD) {
@@ -241,13 +275,13 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
                 currentCoroutineContext().ensureActive()
                 AppLog.put("${book.name} 更新目录失败\n${it.localizedMessage}", it)
                 //这里可能因为时间太长书籍信息已经更改,所以重新获取
-                appDb.bookDao.getBook(book.bookUrl)?.let { book ->
+                appDb.bookDao.getBook(persistedBookUrl)?.let { book ->
                     book.addType(BookType.updateError)
                     appDb.bookDao.update(book)
                 }
             }
         } finally {
-            tocUpdateRequests.finish(request)
+            tocUpdateRequests.finish(request, persistedBookUrl)
         }
     }
 

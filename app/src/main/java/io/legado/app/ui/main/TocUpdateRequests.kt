@@ -36,8 +36,11 @@ internal class TocUpdateRequests {
     private data class Request(
         val token: TocUpdateRequestToken,
         var policy: TocUpdatePolicy,
+        var refreshBookInfo: Boolean,
         var state: State,
         var decisionClosed: Boolean = false,
+        var refreshDecisionClosed: Boolean = false,
+        var followUpPolicy: TocUpdatePolicy? = null,
     )
 
     private val queue = LinkedList<TocUpdateRequestToken>()
@@ -45,16 +48,27 @@ internal class TocUpdateRequests {
     private var nextGeneration = 0L
 
     @Synchronized
-    fun enqueue(bookUrl: String, policy: TocUpdatePolicy) {
+    fun enqueue(
+        bookUrl: String,
+        policy: TocUpdatePolicy,
+        refreshBookInfo: Boolean = false,
+    ) {
         val current = requests[bookUrl]
         if (current != null) {
             if (!current.decisionClosed) {
                 current.policy = current.policy.merge(policy)
             }
+            if (refreshBookInfo && current.refreshDecisionClosed && !current.refreshBookInfo) {
+                current.followUpPolicy = current.followUpPolicy?.merge(policy) ?: policy
+                return
+            }
+            if (!current.refreshDecisionClosed) {
+                current.refreshBookInfo = current.refreshBookInfo || refreshBookInfo
+            }
             return
         }
         val token = TocUpdateRequestToken(bookUrl, ++nextGeneration)
-        requests[bookUrl] = Request(token, policy, State.QUEUED)
+        requests[bookUrl] = Request(token, policy, refreshBookInfo, State.QUEUED)
         queue.add(token)
     }
 
@@ -70,6 +84,14 @@ internal class TocUpdateRequests {
         return null
     }
 
+    @Synchronized
+    fun takeRefreshBookInfo(token: TocUpdateRequestToken): Boolean {
+        val request = requests[token.bookUrl]
+        if (request?.token != token) return false
+        request.refreshDecisionClosed = true
+        return request.refreshBookInfo
+    }
+
     /**
      * Atomically closes the pre-download decision while keeping the request running.
      * Requests arriving after this point share the current completed directory update.
@@ -83,10 +105,14 @@ internal class TocUpdateRequests {
     }
 
     @Synchronized
-    fun finish(token: TocUpdateRequestToken) {
+    fun finish(token: TocUpdateRequestToken, persistedBookUrl: String = token.bookUrl) {
         val request = requests[token.bookUrl]
         if (request?.token == token) {
+            val followUpPolicy = request.followUpPolicy
             requests.remove(token.bookUrl)
+            if (followUpPolicy != null) {
+                enqueue(persistedBookUrl, followUpPolicy, refreshBookInfo = true)
+            }
         }
         queue.remove(token)
     }

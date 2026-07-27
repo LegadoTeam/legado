@@ -58,16 +58,31 @@ class JsSourceMarshallerTest {
 
         JsSourceMarshaller.mergeBookInfo(
             book,
-            """{"name":"新名","intro":"简介","bookUrl":"ignored","durChapterIndex":0}""",
+            """{"name":"新名","author":"新作者","intro":"简介","bookUrl":"ignored","durChapterIndex":0}""",
             textSource,
             canReName = false,
         )
 
         assertEquals("原名", book.name)
+        assertEquals("原作者", book.author)
         assertEquals("简介", book.intro)
         assertEquals("keep", book.bookUrl)
         assertEquals(5, book.durChapterIndex)
         assertNull(book.customTag)
+    }
+
+    @Test
+    fun `fills a missing author when renaming is disabled`() {
+        val book = Book(bookUrl = "keep")
+
+        JsSourceMarshaller.mergeBookInfo(
+            book,
+            """{"author":"作者"}""",
+            textSource,
+            canReName = false,
+        )
+
+        assertEquals("作者", book.author)
     }
 
     @Test
