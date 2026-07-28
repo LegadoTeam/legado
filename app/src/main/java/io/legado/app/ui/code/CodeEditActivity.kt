@@ -54,7 +54,8 @@ import io.legado.app.utils.viewbindingdelegate.viewBinding
 
 class CodeEditActivity :
     VMBaseActivity<ActivityCodeEditBinding, CodeEditViewModel>(),
-    KeyboardToolPop.CallBack, ChangeThemeDialog.CallBack, SettingsDialog.CallBack {
+    KeyboardToolPop.CallBack, ChangeThemeDialog.CallBack, SettingsDialog.CallBack,
+    CurlAnalyzeUrlDialog.Callback {
     companion object {
         const val EXTRA_SHOW_DEBUG_SOURCE = "showDebugSourceAction"
         const val EXTRA_RESULT_ACTION = "resultAction"
@@ -782,6 +783,7 @@ class CodeEditActivity :
             R.id.menu_save -> save(false)
             R.id.menu_debug_source -> returnText(RESULT_ACTION_DEBUG_SOURCE)
             R.id.menu_format_code -> if (!useSafeEditor) viewModel.formatCode(editor)
+            R.id.menu_curl_analyze_url -> showCurlAnalyzeUrlConverter()
             R.id.menu_change_theme -> if (!useSafeEditor) showDialogFragment(ChangeThemeDialog())
             R.id.menu_config_settings -> if (!useSafeEditor) {
                 showDialogFragment(SettingsDialog(this, this))
@@ -795,6 +797,18 @@ class CodeEditActivity :
             R.id.menu_log -> showDialogFragment<AppLogDialog>()
         }
         return super.onCompatOptionsItemSelected(item)
+    }
+
+    private fun showCurlAnalyzeUrlConverter() {
+        val input = if (!useSafeEditor && editor.cursor.isSelected) {
+            editor.text.substring(editor.cursor.left, editor.cursor.right)
+        } else {
+            ""
+        }
+        val canInsert = viewModel.writable &&
+            (!useSafeEditor ||
+                (safeEditorStatus == SafeEditorStatus.READY && !safeEditorReadPending))
+        showDialogFragment(CurlAnalyzeUrlDialog(input, canInsert))
     }
 
     override fun finish() {
@@ -843,6 +857,15 @@ class CodeEditActivity :
             }
         }
         else {
+            editor.insertText(text, text.length)
+        }
+    }
+
+    override fun onCurlAnalyzeUrlInsert(text: String) {
+        if (!viewModel.writable) return
+        if (useSafeEditor) {
+            insertSafeEditorText(text)
+        } else {
             editor.insertText(text, text.length)
         }
     }

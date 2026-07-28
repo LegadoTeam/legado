@@ -34,6 +34,11 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_curl_analyze_url"
+        android:title="@string/curl_analyze_url_converter"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_config_settings"
         android:title="@string/config_settings"
         app:showAsAction="never" />

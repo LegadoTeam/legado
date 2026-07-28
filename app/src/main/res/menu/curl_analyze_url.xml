@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="AlwaysShowAction">
+
+    <item
+        android:id="@+id/menu_convert"
+        android:icon="@drawable/ic_swap_horiz"
+        android:title="@string/curl_converter_convert"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/menu_copy"
+        android:icon="@drawable/ic_copy"
+        android:title="@string/copy_text"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/menu_insert"
+        android:icon="@drawable/ic_check"
+        android:title="@string/curl_converter_insert"
+        app:showAsAction="ifRoom" />
+
+</menu>
