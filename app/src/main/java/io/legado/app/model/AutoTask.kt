@@ -60,6 +60,27 @@ object AutoTask {
         return sameBook.singleOrNull()?.first
     }
 
+    internal fun buildBookUpdateTasks(
+        books: List<Book>,
+        existingTasks: List<AutoTaskRule>,
+        cron: String,
+        nameOf: (Book) -> String
+    ): List<AutoTaskRule> {
+        val generated = books.map { it to buildBookUpdateTask(it, nameOf(it)) }
+        val existingById = existingTasks.associateBy { it.id }
+        val generatedIds = generated.mapTo(hashSetOf()) { it.second.id }
+        val movedTasks = existingTasks.filterNot { it.id in generatedIds }.toMutableList()
+        return generated.map { (book, task) ->
+            val existing = existingById[task.id]
+                ?: findBookUpdateTask(movedTasks, book)?.also { movedTasks.remove(it) }
+            task.copy(
+                id = existing?.id ?: task.id,
+                enable = existing?.enable ?: task.enable,
+                cron = cron
+            )
+        }
+    }
+
     private fun bookUpdateTaskId(bookUrl: String): String {
         return "book_update:${MD5Utils.md5Encode16(bookUrl)}"
     }

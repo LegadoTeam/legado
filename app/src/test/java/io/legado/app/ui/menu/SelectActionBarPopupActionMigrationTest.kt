@@ -116,7 +116,8 @@ class SelectActionBarPopupActionMigrationTest {
                 "@+id/menu_change_source",
                 "@+id/menu_clear_cache",
                 "@+id/menu_check_selected_interval",
-                "@+id/menu_update_toc"
+                "@+id/menu_update_toc",
+                "@+id/menu_create_book_update_tasks"
             ),
             "book_source_sel.xml" to listOf(
                 "@+id/menu_enable_selection",
