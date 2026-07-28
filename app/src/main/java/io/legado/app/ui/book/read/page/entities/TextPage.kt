@@ -296,8 +296,7 @@ data class TextPage(
     }
 
     fun draw(view: ContentTextView, canvas: Canvas, relativeOffset: Float) {
-        if (AppConfig.optimizeRender && lines.none { it.hasShadowStyle }) {
-            render(view)
+        if (AppConfig.optimizeRender && render(view)) {
             canvas.withTranslation(0f, relativeOffset) {
                 canvasRecorder.draw(this)
             }
@@ -333,7 +332,7 @@ data class TextPage(
     }
 
     fun render(view: ContentTextView): Boolean {
-        if (!isCompleted) return false
+        if (!isCompleted || lines.any { it.hasShadowStyle }) return false
         return canvasRecorder.recordIfNeeded(view.width, renderHeight + 10.dpToPx()) { //高度留余，避免图片过高时被截断 下划线最远10dp
             drawPage(view, this)
         }

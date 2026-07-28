@@ -115,7 +115,8 @@ class ManualHighlightRenderTest {
 
         assertTrue(line.contains("(it as? TextBaseColumn)?.highlightStyle?.shadow != null"))
         assertTrue(line.contains("AppConfig.optimizeRender && !hasShadowStyle"))
-        assertTrue(page.contains("AppConfig.optimizeRender && lines.none { it.hasShadowStyle }"))
+        assertTrue(page.contains("AppConfig.optimizeRender && render(view)"))
+        assertTrue(page.contains("if (!isCompleted || lines.any { it.hasShadowStyle }) return false"))
         assertTrue(text.contains("val normalized = value?.normalized()"))
         assertTrue(html.contains("val normalized = value?.normalized()"))
         assertFalse(draw.contains("shadow?.normalized()"))
