@@ -58,8 +58,10 @@ class CodeEditActivity :
     CurlAnalyzeUrlDialog.Callback {
     companion object {
         const val EXTRA_SHOW_DEBUG_SOURCE = "showDebugSourceAction"
+        const val EXTRA_SHOW_LOGIN_SOURCE = "showLoginSourceAction"
         const val EXTRA_RESULT_ACTION = "resultAction"
         const val RESULT_ACTION_DEBUG_SOURCE = "debugSource"
+        const val RESULT_ACTION_LOGIN_SOURCE = "loginSource"
 
         private var isInitialized = false
         private var findText = ""
@@ -78,6 +80,7 @@ class CodeEditActivity :
     private var searchOptions: SearchOptions? = null
     private var menuSaveBtn: MenuItem? = null
     private var menuDebugSourceBtn: MenuItem? = null
+    private var menuLoginSourceBtn: MenuItem? = null
     private var useSafeEditor = false
     private var safeEditor: WebView? = null
     private var safeEditorStatus = SafeEditorStatus.IDLE
@@ -253,6 +256,7 @@ class CodeEditActivity :
             !safeEditorReadPending
         menuSaveBtn?.isEnabled = enabled
         menuDebugSourceBtn?.isEnabled = enabled && isDebugSourceActionEnabled()
+        menuLoginSourceBtn?.isEnabled = enabled && isLoginSourceActionEnabled()
     }
 
     private fun buildSafeEditorHtml(text: String): String {
@@ -587,6 +591,10 @@ class CodeEditActivity :
         return intent.getBooleanExtra(EXTRA_SHOW_DEBUG_SOURCE, false)
     }
 
+    private fun isLoginSourceActionEnabled(): Boolean {
+        return intent.getBooleanExtra(EXTRA_SHOW_LOGIN_SOURCE, false)
+    }
+
     override fun upEdit(fontSize: Int?, autoComplete: Boolean?, autoWarp: Boolean?, editNonPrintable: Int?) {
         if (useSafeEditor) return
         if (fontSize != null) {
@@ -632,6 +640,7 @@ class CodeEditActivity :
         menuInflater.inflate(R.menu.code_edit_activity, menu)
         menuSaveBtn = menu.findItem(R.id.menu_save)
         menuDebugSourceBtn = menu.findItem(R.id.menu_debug_source)
+        menuLoginSourceBtn = menu.findItem(R.id.menu_login)
         updateEditorMenu(menu)
         return super.onCompatCreateOptionsMenu(menu)
     }
@@ -643,6 +652,9 @@ class CodeEditActivity :
 
     private fun updateEditorMenu(menu: Menu) {
         val showSoraActions = !useSafeEditor
+        val canReturnText = viewModel.writable &&
+            (!useSafeEditor ||
+                (safeEditorStatus == SafeEditorStatus.READY && !safeEditorReadPending))
         menu.findItem(R.id.menu_search)?.isVisible = showSoraActions
         menu.findItem(R.id.menu_change_theme)?.isVisible = showSoraActions
         menu.findItem(R.id.menu_format_code)?.isVisible = showSoraActions
@@ -653,18 +665,21 @@ class CodeEditActivity :
         }
         menu.findItem(R.id.menu_save)?.apply {
             isVisible = viewModel.writable
-            isEnabled = viewModel.writable &&
-                (!useSafeEditor ||
-                    (safeEditorStatus == SafeEditorStatus.READY && !safeEditorReadPending))
+            isEnabled = canReturnText
         }
         menu.findItem(R.id.menu_debug_source)?.apply {
             isVisible = shouldShowDebugSourceAction(
                 viewModel.writable,
                 isDebugSourceActionEnabled()
             )
-            isEnabled = viewModel.writable &&
-                (!useSafeEditor ||
-                    (safeEditorStatus == SafeEditorStatus.READY && !safeEditorReadPending))
+            isEnabled = canReturnText
+        }
+        menu.findItem(R.id.menu_login)?.apply {
+            isVisible = shouldShowLoginSourceAction(
+                viewModel.writable,
+                isLoginSourceActionEnabled()
+            )
+            isEnabled = canReturnText
         }
     }
 
@@ -793,6 +808,7 @@ class CodeEditActivity :
             R.id.menu_search -> if (!useSafeEditor) search()
             R.id.menu_save -> save(false)
             R.id.menu_debug_source -> returnText(RESULT_ACTION_DEBUG_SOURCE)
+            R.id.menu_login -> returnText(RESULT_ACTION_LOGIN_SOURCE)
             R.id.menu_format_code -> if (!useSafeEditor) viewModel.formatCode(editor)
             R.id.menu_curl_analyze_url -> showCurlAnalyzeUrlConverter()
             R.id.menu_change_theme -> if (!useSafeEditor) showDialogFragment(ChangeThemeDialog())
@@ -912,5 +928,9 @@ class CodeEditActivity :
 }
 
 internal fun shouldShowDebugSourceAction(writable: Boolean, requested: Boolean): Boolean {
+    return writable && requested
+}
+
+internal fun shouldShowLoginSourceAction(writable: Boolean, requested: Boolean): Boolean {
     return writable && requested
 }
