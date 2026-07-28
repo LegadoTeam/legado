@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.widget.PopupMenu
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -41,7 +42,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class AutoTaskActivity : BaseActivity<ActivityAutoTaskBinding>(), AutoTaskAdapter.Callback,
-    SelectActionBar.CallBack {
+    SelectActionBar.CallBack, PopupMenu.OnMenuItemClickListener {
 
     override val binding by viewBinding(ActivityAutoTaskBinding::inflate)
     private val adapter by lazy { AutoTaskAdapter(this, this) }
@@ -84,7 +85,9 @@ class AutoTaskActivity : BaseActivity<ActivityAutoTaskBinding>(), AutoTaskAdapte
             activeSlideSelect()
         }
         binding.selectActionBar.setMainActionText(R.string.auto_task_batch_cron)
+        binding.selectActionBar.inflateMenu(R.menu.auto_task_sel)
         binding.selectActionBar.setCallBack(this)
+        binding.selectActionBar.setOnMenuItemClickListener(this)
         upCountView()
         lifecycleScope.launch {
             withContext(Dispatchers.IO) { AutoTask.all() }
@@ -244,5 +247,23 @@ class AutoTaskActivity : BaseActivity<ActivityAutoTaskBinding>(), AutoTaskAdapte
 
     override fun onClickSelectBarMainAction() {
         showBatchCronDialog()
+    }
+
+    override fun onMenuItemClick(item: MenuItem): Boolean {
+        if (item.itemId == R.id.menu_export_selection) {
+            val rules = adapter.selection
+            lifecycleScope.launch {
+                val json = withContext(Dispatchers.IO) { AutoTask.exportJson(rules) }
+                exportDoc.launch {
+                    mode = HandleFileContract.EXPORT
+                    fileData = HandleFileContract.FileData(
+                        "exportAutoTaskSelection.json",
+                        json,
+                        "application/json"
+                    )
+                }
+            }
+        }
+        return true
     }
 }

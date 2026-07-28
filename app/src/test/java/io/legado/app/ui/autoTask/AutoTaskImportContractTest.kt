@@ -44,6 +44,9 @@ class AutoTaskImportContractTest {
         assertTrue(main.contains("showDialogFragment(ImportAutoTaskDialog(value.url))"))
         assertTrue(exportBlock.contains("sourceSharePassphraseButton("))
         assertTrue(exportBlock.contains("SourceSharePassphrase.Type.AUTO_TASK"))
+        assertTrue(activity.contains("inflateMenu(R.menu.auto_task_sel)"))
+        assertTrue(activity.contains("val rules = adapter.selection"))
+        assertTrue(activity.contains("AutoTask.exportJson(rules)"))
     }
 
     @Test
