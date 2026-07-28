@@ -678,7 +678,10 @@ class CodeEditActivity :
 
     private fun search() {
         if (useSafeEditor) return
-        if (binding.searchGroup.isVisible) return
+        if (binding.searchGroup.isVisible) {
+            binding.btnCloseFind.performClick()
+            return
+        }
         binding.switchRegex.run {
             isChecked = isRegex
             setSearchOptions()
