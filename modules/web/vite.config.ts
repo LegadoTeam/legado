@@ -65,12 +65,5 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
-    css: {
-      preprocessorOptions: {
-        scss: {
-          api: 'modern-compiler', // or 'modern'
-        },
-      },
-    },
   }
 });
