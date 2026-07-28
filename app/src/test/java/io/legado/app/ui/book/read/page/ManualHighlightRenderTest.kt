@@ -106,6 +106,20 @@ class ManualHighlightRenderTest {
     }
 
     @Test
+    fun `shadow styles are normalized once and bypass clipped line caches`() {
+        val line = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/TextLine.kt")
+        val text = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/column/TextColumn.kt")
+        val html = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/column/TextHtmlColumn.kt")
+        val draw = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/HighlightDraw.kt")
+
+        assertTrue(line.contains("(it as? TextBaseColumn)?.highlightStyle?.shadow != null"))
+        assertTrue(line.contains("AppConfig.optimizeRender && canCacheLine"))
+        assertTrue(text.contains("val normalized = value?.normalized()"))
+        assertTrue(html.contains("val normalized = value?.normalized()"))
+        assertFalse(draw.contains("shadow?.normalized()"))
+    }
+
+    @Test
     fun `underline variants do not depend on clipped or path-effect drawing`() {
         val draw = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/HighlightDraw.kt")
 

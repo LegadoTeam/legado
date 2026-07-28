@@ -20,6 +20,18 @@ class ReadPaddingBehaviorSourceTest {
     }
 
     @Test
+    fun `detail seek bar owns its saved progress state`() {
+        val source = projectFile(
+            "src/main/java/io/legado/app/ui/widget/DetailSeekBar.kt"
+        ).readText().normalizeLines()
+
+        assertTrue(source.contains("dispatchFreezeSelfOnly(container)"))
+        assertTrue(source.contains("dispatchThawSelfOnly(container)"))
+        assertTrue(source.contains("putInt(STATE_PROGRESS, progress)"))
+        assertTrue(source.contains("progress = state.getInt(STATE_PROGRESS)"))
+    }
+
+    @Test
     fun `pending body edits stay scoped and are not discarded`() {
         val source = paddingDialogSource()
 

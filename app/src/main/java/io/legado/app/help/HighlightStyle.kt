@@ -48,6 +48,8 @@ data class HighlightStyle(
         get() = textColor != 0 || bold || italic || underline != null || strike != null ||
             box != null || emphasis != null || shadow != null
 
+    fun normalized() = copy(shadow = shadow?.normalized())
+
     companion object {
         fun merge(base: HighlightStyle?, other: HighlightStyle): HighlightStyle {
             val current = base ?: HighlightStyle()

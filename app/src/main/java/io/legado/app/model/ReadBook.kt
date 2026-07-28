@@ -365,7 +365,7 @@ object ReadBook : CoroutineScope by MainScope() {
     }
 
     fun saveLastHighlightStyle(style: HighlightStyle) {
-        appCtx.putPrefString(PreferKey.highlightLastStyle, GSON.toJson(style))
+        appCtx.putPrefString(PreferKey.highlightLastStyle, GSON.toJson(style.normalized()))
     }
 
     fun upData(book: Book) {

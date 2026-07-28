@@ -2,7 +2,10 @@ package io.legado.app.ui.widget
 
 import android.content.Context
 import android.graphics.PorterDuff
+import android.os.Bundle
+import android.os.Parcelable
 import android.util.AttributeSet
+import android.util.SparseArray
 import android.view.LayoutInflater
 import android.widget.FrameLayout
 import android.widget.SeekBar
@@ -72,6 +75,32 @@ class DetailSeekBar @JvmOverloads constructor(
         binding.seekBar.setOnSeekBarChangeListener(this)
     }
 
+    override fun dispatchSaveInstanceState(container: SparseArray<Parcelable>) {
+        dispatchFreezeSelfOnly(container)
+    }
+
+    override fun dispatchRestoreInstanceState(container: SparseArray<Parcelable>) {
+        dispatchThawSelfOnly(container)
+    }
+
+    override fun onSaveInstanceState(): Parcelable {
+        val superState = super.onSaveInstanceState()
+        return Bundle().apply {
+            putParcelable(STATE_SUPER, superState)
+            putInt(STATE_PROGRESS, progress)
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onRestoreInstanceState(state: Parcelable?) {
+        if (state !is Bundle) {
+            super.onRestoreInstanceState(state)
+            return
+        }
+        super.onRestoreInstanceState(state.getParcelable<Parcelable>(STATE_SUPER))
+        progress = state.getInt(STATE_PROGRESS)
+    }
+
     private fun upValue(progress: Int = binding.seekBar.progress) {
         valueFormat?.let {
             binding.tvSeekValue.text = it.invoke(progress)
@@ -92,6 +121,11 @@ class DetailSeekBar @JvmOverloads constructor(
     override fun onStopTrackingTouch(seekBar: SeekBar) {
         onChanged?.invoke(binding.seekBar.progress)
         onTrackingStop?.invoke()
+    }
+
+    private companion object {
+        const val STATE_SUPER = "superState"
+        const val STATE_PROGRESS = "progress"
     }
 
 }

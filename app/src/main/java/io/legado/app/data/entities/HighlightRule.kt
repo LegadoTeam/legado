@@ -45,13 +45,14 @@ data class HighlightRule(
 
     fun styleObj(): HighlightStyle {
         styleCache?.takeIf { it.first == style }?.second?.let { return it }
-        return (GSON.fromJsonObject<HighlightStyle>(style).getOrNull() ?: HighlightStyle())
+        return (GSON.fromJsonObject<HighlightStyle>(style).getOrNull() ?: HighlightStyle()).normalized()
             .also { styleCache = style to it }
     }
 
     fun applyStyle(value: HighlightStyle) {
-        style = GSON.toJson(value)
-        styleCache = style to value
+        val normalized = value.normalized()
+        style = GSON.toJson(normalized)
+        styleCache = style to normalized
     }
 
     fun getDisplayName(): String = name.ifBlank { pattern }

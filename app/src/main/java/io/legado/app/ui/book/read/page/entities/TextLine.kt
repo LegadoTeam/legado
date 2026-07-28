@@ -168,7 +168,10 @@ data class TextLine(
     }
 
     fun draw(view: ContentTextView, canvas: Canvas) {
-        if (AppConfig.optimizeRender) {
+        val canCacheLine = styledColumnCount == 0 || columns.none {
+            (it as? TextBaseColumn)?.highlightStyle?.shadow != null
+        }
+        if (AppConfig.optimizeRender && canCacheLine) {
             canvasRecorder.recordIfNeededThenDraw(canvas, view.width, height.toInt()) {
                 drawTextLine(view, this)
             }
