@@ -106,7 +106,7 @@ class ManualHighlightRenderTest {
     }
 
     @Test
-    fun `shadow styles are normalized once and bypass clipped line caches`() {
+    fun `shadow styles are normalized once and bypass clipped caches`() {
         val line = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/TextLine.kt")
         val page = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/TextPage.kt")
         val text = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/column/TextColumn.kt")
@@ -115,8 +115,9 @@ class ManualHighlightRenderTest {
 
         assertTrue(line.contains("(it as? TextBaseColumn)?.highlightStyle?.shadow != null"))
         assertTrue(line.contains("AppConfig.optimizeRender && !hasShadowStyle"))
-        assertTrue(page.contains("AppConfig.optimizeRender && render(view)"))
-        assertTrue(page.contains("if (!isCompleted || lines.any { it.hasShadowStyle }) return false"))
+        assertTrue(page.contains("private val hasShadowStyle: Boolean"))
+        assertTrue(page.contains("if (hasShadowStyle) return false"))
+        assertTrue(page.contains("recordIfCompleted(view)"))
         assertTrue(text.contains("val normalized = value?.normalized()"))
         assertTrue(html.contains("val normalized = value?.normalized()"))
         assertFalse(draw.contains("shadow?.normalized()"))
