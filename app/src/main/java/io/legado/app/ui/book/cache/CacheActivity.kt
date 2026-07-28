@@ -74,7 +74,7 @@ class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>()
     override val viewModel by viewModels<CacheViewModel>()
 
     private val exportBookPathKey = "exportBookPath"
-    private val exportTypes = arrayListOf("txt", "epub")
+    private val exportTypes = arrayListOf("txt", "epub", "pdf")
     private val layoutManager by lazy { LinearLayoutManager(this) }
     private val adapter by lazy { CacheAdapter(this, this) }
     private var booksFlowJob: Job? = null
@@ -493,6 +493,7 @@ class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>()
     private fun startExport(path: String, exportPosition: Int) {
         val exportType = when (AppConfig.exportType) {
             1 -> "epub"
+            2 -> "pdf"
             else -> "txt"
         }
         if (exportPosition == -10) {

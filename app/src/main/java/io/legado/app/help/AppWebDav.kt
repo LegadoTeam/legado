@@ -218,7 +218,7 @@ object AppWebDav {
             authorization?.let {
                 // 如果导出的本地文件存在,开始上传
                 val putUrl = exportsWebDavUrl + fileName
-                WebDav(putUrl, it).upload(byteArray, "text/plain")
+                WebDav(putUrl, it).upload(byteArray, FileUtils.getMimeType(fileName))
             }
         } catch (e: Exception) {
             currentCoroutineContext().ensureActive()
@@ -232,7 +232,7 @@ object AppWebDav {
             authorization?.let {
                 // 如果导出的本地文件存在,开始上传
                 val putUrl = exportsWebDavUrl + fileName
-                WebDav(putUrl, it).upload(uri, "text/plain")
+                WebDav(putUrl, it).upload(uri, FileUtils.getMimeType(fileName))
             }
         } catch (e: Exception) {
             currentCoroutineContext().ensureActive()

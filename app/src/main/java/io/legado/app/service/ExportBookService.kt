@@ -2,7 +2,18 @@ package io.legado.app.service
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.Typeface
+import android.graphics.pdf.PdfDocument
+import android.text.Layout
+import android.text.StaticLayout
+import android.text.TextPaint
 import androidx.core.app.NotificationCompat
+import androidx.core.graphics.withSave
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import io.legado.app.R
@@ -20,9 +31,13 @@ import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
+import io.legado.app.help.book.getBookSource
 import io.legado.app.help.book.getExportFileName
+import io.legado.app.help.book.isImage
 import io.legado.app.help.book.isLocalModified
+import io.legado.app.help.book.isPdf
 import io.legado.app.help.config.AppConfig
+import io.legado.app.model.ImageProvider
 import io.legado.app.model.ReadBook
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.ui.book.cache.CacheActivity
@@ -31,10 +46,12 @@ import io.legado.app.utils.FileUtils
 import io.legado.app.utils.HtmlFormatter
 import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.NetworkUtils
+import io.legado.app.utils.SvgUtils
 import io.legado.app.utils.activityPendingIntent
 import io.legado.app.utils.cnCompare
 import io.legado.app.utils.createFileIfNotExist
 import io.legado.app.utils.delete
+import io.legado.app.utils.exists
 import io.legado.app.utils.find
 import io.legado.app.utils.list
 import io.legado.app.utils.mapAsync
@@ -69,7 +86,93 @@ import splitties.init.appCtx
 import splitties.systemservices.notificationManager
 import java.nio.charset.Charset
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.max
 import kotlin.math.min
+
+internal fun findPdfPageLineEnd(
+    lineTops: IntArray,
+    lineBottoms: IntArray,
+    startLine: Int,
+    availableHeight: Int
+): Int {
+    require(lineTops.size == lineBottoms.size)
+    if (startLine !in lineTops.indices) return lineTops.size
+    var endLine = startLine
+    while (endLine < lineBottoms.size &&
+        lineBottoms[endLine] - lineTops[startLine] <= availableHeight
+    ) {
+        endLine++
+    }
+    return maxOf(startLine + 1, endLine).coerceAtMost(lineTops.size)
+}
+
+internal sealed interface PdfContentBlock {
+    data class Text(val value: String) : PdfContentBlock
+    data class Image(val source: String) : PdfContentBlock
+}
+
+internal fun splitPdfContentBlocks(content: String): List<PdfContentBlock> {
+    val blocks = arrayListOf<PdfContentBlock>()
+    val matcher = AppPattern.imgPattern.matcher(content)
+    var start = 0
+    while (matcher.find()) {
+        if (matcher.start() > start) {
+            blocks.add(PdfContentBlock.Text(content.substring(start, matcher.start())))
+        }
+        matcher.group(1)?.let { blocks.add(PdfContentBlock.Image(it)) }
+        start = matcher.end()
+    }
+    if (start < content.length) {
+        blocks.add(PdfContentBlock.Text(content.substring(start)))
+    }
+    return blocks
+}
+
+internal fun calculatePdfBitmapSampleSize(
+    width: Int,
+    height: Int,
+    requestedWidth: Int,
+    requestedHeight: Int
+): Int {
+    if (width <= 0 || height <= 0 || requestedWidth <= 0 || requestedHeight <= 0) return 1
+    val reduction = max(
+        width / requestedWidth.toFloat(),
+        height / requestedHeight.toFloat()
+    )
+    var sampleSize = 1
+    while (sampleSize * 2f <= reduction) sampleSize *= 2
+    return sampleSize
+}
+
+internal fun <T> replaceStagedExport(
+    current: T?,
+    backupCurrent: (T) -> T?,
+    activateStaged: () -> T?,
+    restoreCurrent: (T) -> T?,
+    deleteBackup: (T) -> Unit
+): T {
+    val backup = current?.let {
+        checkNotNull(backupCurrent(it)) { "无法备份已有导出文件" }
+    }
+    fun restore() {
+        backup?.let {
+            checkNotNull(restoreCurrent(it)) { "无法恢复原导出文件" }
+        }
+    }
+    return try {
+        val installed = checkNotNull(activateStaged()) { "无法替换导出文件" }
+        backup?.let { runCatching { deleteBackup(it) } }
+        installed
+    } catch (error: Throwable) {
+        val restoreError = runCatching { restore() }.exceptionOrNull()
+        if (restoreError == null) {
+            backup?.let { runCatching { deleteBackup(it) } }
+        } else {
+            error.addSuppressed(restoreError)
+        }
+        throw error
+    }
+}
 
 /**
  * 导出书籍服务
@@ -187,17 +290,21 @@ class ExportBookService : BaseService() {
                         waitExportBooks.size
                     )
                     upExportNotification()
-                    if (exportConfig.type == "epub") {
-                        if (exportConfig.epubScope.isNullOrBlank()) {
-                            exportEpub(exportConfig.path, book)
-                        } else {
-                            CustomExporter(
-                                exportConfig.epubScope,
-                                exportConfig.epubSize
-                            ).export(exportConfig.path, book)
+                    when (exportConfig.type) {
+                        "epub" -> {
+                            if (exportConfig.epubScope.isNullOrBlank()) {
+                                exportEpub(exportConfig.path, book)
+                            } else {
+                                CustomExporter(
+                                    exportConfig.epubScope,
+                                    exportConfig.epubSize
+                                ).export(exportConfig.path, book)
+                            }
                         }
-                    } else {
-                        exportTxt(exportConfig.path, book)
+
+                        "pdf" -> exportPdf(exportConfig.path, book)
+                        "txt" -> exportTxt(exportConfig.path, book)
+                        else -> throw NoStackTraceException("未知导出类型: ${exportConfig.type}")
                     }
                     exportMsg[book.bookUrl] = getString(R.string.export_success)
                 } catch (e: Throwable) {
@@ -274,6 +381,316 @@ class ExportBookService : BaseService() {
             // 导出到webdav
             AppWebDav.exportWebDav(bookDoc.uri, filename)
         }
+    }
+
+    private suspend fun exportPdf(path: String, book: Book) {
+        exportMsg.remove(book.bookUrl)
+        postEvent(EventBus.EXPORT_BOOK, book.bookUrl)
+        exportPdf(FileDoc.fromDir(path), book)
+    }
+
+    private suspend fun exportPdf(fileDoc: FileDoc, book: Book) {
+        if (book.isImage || book.isPdf) {
+            throw NoStackTraceException("PDF 导出暂不支持图片书和本地 PDF")
+        }
+        val filename = book.getExportFileName("pdf")
+        val fileStem = filename.substringBeforeLast('.', filename)
+        val nonce = System.nanoTime().toString(16)
+        val stagingName = ".$fileStem.$nonce.pending.pdf"
+        val backupName = ".$fileStem.$nonce.previous.pdf"
+        val pageWidth = 595
+        val pageHeight = 842
+        val margin = 48f
+        val contentWidth = (pageWidth - margin * 2).toInt()
+        val contentBottom = pageHeight - margin
+        val paragraphSpacing = 6f
+        val titlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            textSize = 26f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        val metaPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.DKGRAY
+            textSize = 12f
+        }
+        val chapterPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            textSize = 18f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        val bodyPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            textSize = 14f
+        }
+        val pdf = PdfDocument()
+        var pageNumber = 0
+        var currentPage: PdfDocument.Page? = null
+        var y = margin
+
+        fun finishPage() {
+            currentPage?.let { pdf.finishPage(it) }
+            currentPage = null
+        }
+
+        fun startPage() {
+            finishPage()
+            val pageInfo = PdfDocument.PageInfo.Builder(
+                pageWidth,
+                pageHeight,
+                ++pageNumber
+            ).create()
+            currentPage = pdf.startPage(pageInfo).apply {
+                canvas.drawColor(Color.WHITE)
+            }
+            y = margin
+        }
+
+        fun drawTextBlock(
+            rawText: String,
+            paint: TextPaint,
+            spacing: Float = paragraphSpacing,
+            preserveLeadingWhitespace: Boolean = false
+        ) {
+            val text = if (preserveLeadingWhitespace) rawText.trimEnd() else rawText.trim()
+            if (text.isBlank()) return
+            val layout = StaticLayout.Builder.obtain(text, 0, text.length, paint, contentWidth)
+                .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(2f, 1.15f)
+                .setIncludePad(false)
+                .build()
+            if (layout.lineCount == 0) return
+            val lineTops = IntArray(layout.lineCount) { layout.getLineTop(it) }
+            val lineBottoms = IntArray(layout.lineCount) { layout.getLineBottom(it) }
+            var startLine = 0
+            while (startLine < layout.lineCount) {
+                if (currentPage == null) startPage()
+                var availableHeight = (contentBottom - y).toInt().coerceAtLeast(0)
+                val firstLineHeight = lineBottoms[startLine] - lineTops[startLine]
+                if (availableHeight < firstLineHeight && y > margin) {
+                    startPage()
+                    availableHeight = (contentBottom - y).toInt()
+                }
+                val endLine = findPdfPageLineEnd(
+                    lineTops,
+                    lineBottoms,
+                    startLine,
+                    availableHeight
+                )
+                val blockTop = lineTops[startLine]
+                val blockBottom = lineBottoms[endLine - 1]
+                val blockHeight = (blockBottom - blockTop).toFloat()
+                currentPage!!.canvas.withSave {
+                    clipRect(margin, y, margin + contentWidth.toFloat(), y + blockHeight)
+                    translate(margin, y - blockTop.toFloat())
+                    layout.draw(this)
+                }
+                y += blockHeight
+                startLine = endLine
+                if (startLine < layout.lineCount) startPage()
+            }
+            y += spacing
+        }
+
+        fun drawImage(path: String) {
+            val bitmap = decodePdfBitmap(
+                path,
+                contentWidth,
+                (contentBottom - margin).toInt()
+            ) ?: return
+            try {
+                if (currentPage == null) startPage()
+                val fullPageHeight = contentBottom - margin
+                val fullPageScale = minOf(
+                    1f,
+                    contentWidth / bitmap.width.toFloat(),
+                    fullPageHeight / bitmap.height.toFloat()
+                )
+                if (y + bitmap.height * fullPageScale > contentBottom && y > margin) {
+                    startPage()
+                }
+                val availableHeight = (contentBottom - y).coerceAtLeast(1f)
+                val scale = minOf(
+                    1f,
+                    contentWidth / bitmap.width.toFloat(),
+                    availableHeight / bitmap.height.toFloat()
+                )
+                val drawWidth = max(1f, bitmap.width * scale)
+                val drawHeight = max(1f, bitmap.height * scale)
+                val left = margin + (contentWidth - drawWidth) / 2f
+                currentPage!!.canvas.drawBitmap(
+                    bitmap,
+                    null,
+                    RectF(left, y, left + drawWidth, y + drawHeight),
+                    null
+                )
+                y += drawHeight + paragraphSpacing
+            } finally {
+                if (!bitmap.isRecycled) bitmap.recycle()
+            }
+        }
+
+        suspend fun renderPdf(stagingDoc: FileDoc) {
+            var renderingError: Throwable? = null
+            try {
+                drawTextBlock(book.name, titlePaint, 12f)
+                drawTextBlock(getString(R.string.author_show, book.getRealAuthor()), metaPaint, 6f)
+                drawTextBlock(
+                    getString(
+                        R.string.intro_show,
+                        "\n" + HtmlFormatter.format(book.getDisplayIntro())
+                    ),
+                    metaPaint,
+                    16f
+                )
+                val useReplace = AppConfig.exportUseReplace && book.getUseReplaceRule()
+                val contentProcessor = ContentProcessor.get(book.name, book.origin)
+                val titleReplaceRules = contentProcessor.getTitleReplaceRules()
+                val replaceBook = book.toReplaceBook()
+                val bookSource = book.getBookSource()
+                appDb.bookChapterDao.getChapterList(book.bookUrl)
+                    .forEachIndexed { index, chapter ->
+                        currentCoroutineContext().ensureActive()
+                        postEvent(EventBus.EXPORT_BOOK, book.bookUrl)
+                        exportProgress[book.bookUrl] = index
+                        val exportChapter = chapter.copy(isVip = false)
+                        val rawContent = getChapterContentForExport(book, exportChapter)
+                            ?: return@forEachIndexed
+                        if (!AppConfig.exportNoChapterName) {
+                            drawTextBlock(
+                                exportChapter.getDisplayTitle(
+                                    titleReplaceRules,
+                                    useReplace = useReplace,
+                                    replaceBook = replaceBook
+                                ).replace("\uD83D\uDD12", ""),
+                                chapterPaint,
+                                10f
+                            )
+                        }
+                        val displayContent = contentProcessor.getContent(
+                            book,
+                            exportChapter,
+                            rawContent,
+                            includeTitle = false,
+                            useReplace = useReplace,
+                            chineseConvert = false,
+                            reSegment = false
+                        ).toString()
+                        splitPdfContentBlocks(displayContent).forEach { block ->
+                            when (block) {
+                                is PdfContentBlock.Text -> block.value.lineSequence()
+                                    .forEach { line ->
+                                        drawTextBlock(
+                                            line,
+                                            bodyPaint,
+                                            preserveLeadingWhitespace = true
+                                        )
+                                    }
+
+                                is PdfContentBlock.Image -> {
+                                    val src = NetworkUtils.getAbsoluteURL(
+                                        exportChapter.url,
+                                        block.source
+                                    )
+                                    val image = ImageProvider.cacheImage(book, src, bookSource)
+                                    if (image.exists()) drawImage(image.absolutePath)
+                                }
+                            }
+                        }
+                        y += 8f
+                    }
+                finishPage()
+                stagingDoc.openOutputStream().getOrThrow().use { pdf.writeTo(it) }
+            } catch (error: Throwable) {
+                renderingError = error
+                throw error
+            } finally {
+                var closeError: Throwable? = null
+                currentPage?.let { page ->
+                    runCatching { pdf.finishPage(page) }
+                        .onFailure { closeError = it }
+                    currentPage = null
+                }
+                runCatching { pdf.close() }.onFailure { error ->
+                    closeError?.addSuppressed(error) ?: run { closeError = error }
+                }
+                closeError?.let { error ->
+                    renderingError?.addSuppressed(error) ?: throw error
+                }
+            }
+        }
+
+        val stagingDoc = fileDoc.createFileIfNotExist(stagingName)
+        val bookDoc = try {
+            renderPdf(stagingDoc)
+            currentCoroutineContext().ensureActive()
+            installPdfExport(fileDoc, stagingDoc, filename, backupName)
+        } finally {
+            cleanupExportFile(stagingDoc, "PDF 临时文件")
+        }
+
+        if (AppConfig.exportToWebDav) {
+            AppWebDav.exportWebDav(bookDoc.uri, filename)
+        }
+    }
+
+    private fun decodePdfBitmap(path: String, reqWidth: Int, reqHeight: Int): Bitmap? {
+        val bounds = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        BitmapFactory.decodeFile(path, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            return SvgUtils.createBitmap(path, reqWidth, reqHeight)
+        }
+        val sampleSize = calculatePdfBitmapSampleSize(
+            bounds.outWidth,
+            bounds.outHeight,
+            reqWidth,
+            reqHeight
+        )
+        return BitmapFactory.decodeFile(
+            path,
+            BitmapFactory.Options().apply {
+                inSampleSize = sampleSize
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+        )
+    }
+
+    private fun renameExportFile(file: FileDoc, newName: String): FileDoc? {
+        file.asFile()?.let { source ->
+            val target = source.parentFile?.resolve(newName) ?: return null
+            if (source.renameTo(target)) return FileDoc.fromFile(target)
+        }
+        file.asDocumentFile()?.let { document ->
+            if (document.renameTo(newName)) return FileDoc.fromDocumentFile(document)
+        }
+        return null
+    }
+
+    private fun installPdfExport(
+        folder: FileDoc,
+        staging: FileDoc,
+        filename: String,
+        backupName: String
+    ): FileDoc {
+        val current = folder.find(filename)
+        return replaceStagedExport(
+            current = current,
+            backupCurrent = { renameExportFile(it, backupName) },
+            activateStaged = { renameExportFile(staging, filename) },
+            restoreCurrent = { renameExportFile(it, filename) },
+            deleteBackup = { cleanupExportFile(it, "PDF 备份文件") }
+        )
+    }
+
+    private fun cleanupExportFile(file: FileDoc, description: String) {
+        val error = runCatching {
+            if (file.exists()) {
+                file.delete()
+                check(!file.exists()) { "无法删除$description: ${file.name}" }
+            }
+        }.exceptionOrNull() ?: return
+        AppLog.put("清理${description}失败", error, true)
     }
 
     private suspend fun getAllContents(
