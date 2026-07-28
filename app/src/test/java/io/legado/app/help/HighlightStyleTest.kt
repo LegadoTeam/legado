@@ -8,6 +8,7 @@ import io.legado.app.help.HighlightStyle.Shadow
 import io.legado.app.help.HighlightStyle.Underline
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -77,6 +78,15 @@ class HighlightStyleTest {
             Shadow(radius = 10f, dx = -10f, dy = 10f),
             Shadow(radius = 99f, dx = -99f, dy = 99f).normalized()
         )
+    }
+
+    @Test
+    fun `normalization reuses valid style instances`() {
+        val shadow = Shadow(radius = 4f, dx = -2f, dy = 6f)
+        val style = HighlightStyle(shadow = shadow)
+
+        assertSame(shadow, shadow.normalized())
+        assertSame(style, style.normalized())
     }
 
     @Test

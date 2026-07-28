@@ -61,6 +61,10 @@ data class TextLine(
     val lineEnd: Float get() = textColumns.lastOrNull()?.end ?: 0f
     val chapterIndices: IntRange get() = chapterPosition..chapterPosition + charSize
     val height: Float inline get() = lineBottom - lineTop
+    val hasShadowStyle: Boolean
+        get() = styledColumnCount > 0 && textColumns.any {
+            (it as? TextBaseColumn)?.highlightStyle?.shadow != null
+        }
     val canvasRecorder = CanvasRecorderFactory.create()
     var searchResultColumnCount = 0
     var styledColumnCount = 0
@@ -168,10 +172,7 @@ data class TextLine(
     }
 
     fun draw(view: ContentTextView, canvas: Canvas) {
-        val canCacheLine = styledColumnCount == 0 || columns.none {
-            (it as? TextBaseColumn)?.highlightStyle?.shadow != null
-        }
-        if (AppConfig.optimizeRender && canCacheLine) {
+        if (AppConfig.optimizeRender && !hasShadowStyle) {
             canvasRecorder.recordIfNeededThenDraw(canvas, view.width, height.toInt()) {
                 drawTextLine(view, this)
             }

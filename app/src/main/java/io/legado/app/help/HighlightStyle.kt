@@ -25,11 +25,18 @@ data class HighlightStyle(
         val dy: Float = 2f,
         val color: Int = 0x80000000.toInt()
     ) {
-        fun normalized() = copy(
-            radius = radius.takeIf { it.isFinite() }?.coerceIn(0f, 10f) ?: 0f,
-            dx = dx.takeIf { it.isFinite() }?.coerceIn(-10f, 10f) ?: 0f,
-            dy = dy.takeIf { it.isFinite() }?.coerceIn(-10f, 10f) ?: 0f
-        )
+        fun normalized(): Shadow {
+            val normalizedRadius = radius.takeIf { it.isFinite() }?.coerceIn(0f, 10f) ?: 0f
+            val normalizedDx = dx.takeIf { it.isFinite() }?.coerceIn(-10f, 10f) ?: 0f
+            val normalizedDy = dy.takeIf { it.isFinite() }?.coerceIn(-10f, 10f) ?: 0f
+            return if (
+                normalizedRadius == radius && normalizedDx == dx && normalizedDy == dy
+            ) {
+                this
+            } else {
+                copy(radius = normalizedRadius, dx = normalizedDx, dy = normalizedDy)
+            }
+        }
     }
 
     enum class Kind { SOLID, WAVY, DASHED, DOTTED, DOUBLE }
@@ -48,7 +55,10 @@ data class HighlightStyle(
         get() = textColor != 0 || bold || italic || underline != null || strike != null ||
             box != null || emphasis != null || shadow != null
 
-    fun normalized() = copy(shadow = shadow?.normalized())
+    fun normalized(): HighlightStyle {
+        val normalizedShadow = shadow?.normalized()
+        return if (normalizedShadow === shadow) this else copy(shadow = normalizedShadow)
+    }
 
     companion object {
         fun merge(base: HighlightStyle?, other: HighlightStyle): HighlightStyle {
