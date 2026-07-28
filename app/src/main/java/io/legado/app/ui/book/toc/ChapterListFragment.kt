@@ -80,6 +80,7 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
         pendingScrollItemKey = null
         pendingChapterScroll = null
         binding.recyclerView.adapter = null
+        binding.recyclerView.layoutManager = null
         adapter.release()
         viewModel.chapterListCallBack = clearCallbackIfOwned(
             viewModel.chapterListCallBack,
