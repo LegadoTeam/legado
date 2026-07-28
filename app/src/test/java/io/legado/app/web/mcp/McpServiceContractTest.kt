@@ -63,7 +63,7 @@ class McpServiceContractTest {
     }
 
     @Test
-    fun `server exposes the expected nine tools on current safe APIs`() {
+    fun `server exposes the expected twelve tools on current safe APIs`() {
         val tools = projectFile("app/src/main/java/io/legado/app/web/mcp/McpToolServer.kt")
         val registrations = tools.substringAfter("private fun registerTools")
         val names = Regex("name = \\\"([a-z_]+)\\\"")
@@ -81,10 +81,32 @@ class McpServiceContractTest {
                 "get_http_logs",
                 "get_http_log",
                 "set_http_log_recording",
+                "get_cookies",
+                "set_cookie",
+                "clear_cookies",
                 "eval_js",
             ),
             names,
         )
+        val getCookiesTool = tools.substringAfter("name = \"get_cookies\"")
+            .substringBefore("name = \"set_cookie\"")
+        assertTrue(getCookiesTool.contains("CookieManager.getCookieNoSession"))
+        assertTrue(getCookiesTool.contains("CookieManager.getSessionCookie"))
+        assertTrue(getCookiesTool.contains("CookieManager.mergeCookies"))
+        assertTrue(getCookiesTool.contains("McpFormat.truncate"))
+        assertFalse(getCookiesTool.contains("CookieStore.getCookie("))
+
+        val setCookieTool = tools.substringAfter("name = \"set_cookie\"")
+            .substringBefore("name = \"clear_cookies\"")
+        assertTrue(setCookieTool.contains("CookieStore.cookieToMap(cookie)"))
+        assertTrue(setCookieTool.contains("cookieMap.isEmpty()"))
+        assertTrue(setCookieTool.contains("cookieMap.keys.any"))
+        assertTrue(setCookieTool.contains("有效的 name=value"))
+        assertTrue(setCookieTool.contains("CookieStore.replaceCookie"))
+
+        val clearCookiesTool = tools.substringAfter("name = \"clear_cookies\"")
+            .substringBefore("name = \"eval_js\"")
+        assertTrue(clearCookiesTool.contains("CookieStore.removeCookie"))
         assertTrue(tools.contains("HttpLogRecord"))
         assertTrue(tools.contains("JsSourceUpsert.withSaveLock"))
         assertTrue(tools.contains("catch (error: CancellationException)"))
@@ -160,9 +182,13 @@ class McpServiceContractTest {
         assertTrue(api.contains("可信局域网"))
         assertTrue(api.contains("令牌等同于书源脚本执行权限"))
         assertTrue(api.contains("eval_js"))
+        assertTrue(api.contains("未脱敏 Cookie"))
+        assertTrue(api.contains("只合并写入持久层"))
+        assertTrue(api.contains("同名会话 Cookie"))
         assertTrue(updateLog.contains("**2026/07/22**"))
         assertTrue(updateLog.contains("原生 MCP 书源开发服务"))
         assertTrue(updateLog.contains("支持通过 MCP 在应用内书源环境执行 JavaScript"))
+        assertTrue(updateLog.contains("MCP 增加 Cookie 非破坏性读取"))
         assertFalse(proguard.contains("-keep class io.ktor.**"))
         assertFalse(proguard.contains("-keep class kotlinx.coroutines.**"))
     }

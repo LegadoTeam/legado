@@ -7,12 +7,15 @@ import io.legado.app.api.controller.HttpLogController
 import io.legado.app.constant.AppConst
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
+import io.legado.app.help.http.CookieManager
+import io.legado.app.help.http.CookieStore
 import io.legado.app.help.http.HttpLogRecord
 import io.legado.app.help.source.SourceHelp
 import io.legado.app.model.Debug
 import io.legado.app.model.jsSource.JsSourceEngine
 import io.legado.app.model.jsSource.JsSourceUpsert
 import io.legado.app.utils.GSON
+import io.legado.app.utils.NetworkUtils
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
@@ -342,6 +345,92 @@ object McpToolServer {
                     ?: return@addTool err("参数 enabled 必须为布尔值")
                 HttpLogController.setRecording(enabled).dataOrThrow()
                 ok("HTTP 日志记录已${if (enabled) "开启" else "关闭"}")
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                err(error.localizedMessage ?: error.toString())
+            }
+        }
+
+        server.addTool(
+            name = "get_cookies",
+            description = "非破坏性读取指定 URL 所属二级域名的 Cookie，返回持久层与会话层合并结果。",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    put("url", stringProp("URL 或域名"))
+                },
+                required = listOf("url"),
+            ),
+        ) { request ->
+            try {
+                val url = request.arguments.str("url")
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: return@addTool err("参数 url 不能为空")
+                val domain = NetworkUtils.getSubDomain(url)
+                val cookie = CookieManager.mergeCookies(
+                    CookieManager.getCookieNoSession(url),
+                    CookieManager.getSessionCookie(domain),
+                ).orEmpty()
+                ok(McpFormat.truncate(cookie.ifEmpty { "（该域名没有 Cookie）" }))
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                err(error.localizedMessage ?: error.toString())
+            }
+        }
+
+        server.addTool(
+            name = "set_cookie",
+            description = "合并写入指定 URL 所属二级域名的持久层 Cookie，不删除其他持久键；" +
+                "同名会话 Cookie 在当前会话中仍优先。",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    put("url", stringProp("URL 或域名"))
+                    put("cookie", stringProp("分号分隔的 Cookie 键值对"))
+                },
+                required = listOf("url", "cookie"),
+            ),
+        ) { request ->
+            try {
+                val url = request.arguments.str("url")
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: return@addTool err("参数 url 不能为空")
+                val cookie = request.arguments.str("cookie")
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: return@addTool err("参数 cookie 不能为空")
+                val cookieMap = CookieStore.cookieToMap(cookie)
+                if (cookieMap.isEmpty() || cookieMap.keys.any { it.isBlank() }) {
+                    return@addTool err("参数 cookie 必须包含有效的 name=value")
+                }
+                CookieStore.replaceCookie(url, cookie)
+                ok("Cookie 已写入持久层")
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                err(error.localizedMessage ?: error.toString())
+            }
+        }
+
+        server.addTool(
+            name = "clear_cookies",
+            description = "清除指定 URL 所属二级域名的持久、会话和 WebView Cookie。",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    put("url", stringProp("URL 或域名"))
+                },
+                required = listOf("url"),
+            ),
+        ) { request ->
+            try {
+                val url = request.arguments.str("url")
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: return@addTool err("参数 url 不能为空")
+                CookieStore.removeCookie(url)
+                ok("Cookie 已清除")
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
