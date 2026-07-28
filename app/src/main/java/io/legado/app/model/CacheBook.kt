@@ -280,15 +280,23 @@ object CacheBook {
         }
 
         @Synchronized
-        private fun onError(chapter: BookChapter, error: Throwable) {
-            onPreError(chapter, error)
-            onPostError(chapter, error)
+        private fun onReadError(chapter: BookChapter, error: Throwable) {
+            if (error !is ConcurrentException) {
+                errorDownloadMap[chapter.primaryStr()] =
+                    (errorDownloadMap[chapter.primaryStr()] ?: 0) + 1
+            }
+            onDownloadSet.remove(chapter.index)
         }
 
         @Synchronized
         private fun onCancel(index: Int) {
             onDownloadSet.remove(index)
             if (!isStopped) waitDownloadSet.add(index)
+        }
+
+        @Synchronized
+        private fun onReadCancel(index: Int) {
+            onDownloadSet.remove(index)
         }
 
         @Synchronized
@@ -389,11 +397,11 @@ object CacheBook {
                 ReadBook.downloadedChapters.add(chapter.index)
                 ReadBook.downloadFailChapters.remove(chapter.index)
                 return content
+            } catch (e: CancellationException) {
+                onReadCancel(chapter.index)
+                throw e
             } catch (e: Exception) {
-                if (e is CancellationException) {
-                    onCancel(chapter.index)
-                }
-                onError(chapter, e)
+                onReadError(chapter, e)
                 ReadBook.downloadFailChapters[chapter.index] =
                     (ReadBook.downloadFailChapters[chapter.index] ?: 0) + 1
                 return "获取正文失败\n${e.localizedMessage}"
@@ -428,12 +436,12 @@ object CacheBook {
                 ReadBook.downloadFailChapters.remove(chapter.index)
                 downloadFinish(chapter, content, resetPageOffset)
             }.onError {
-                onError(chapter, it)
+                onReadError(chapter, it)
                 ReadBook.downloadFailChapters[chapter.index] =
                     (ReadBook.downloadFailChapters[chapter.index] ?: 0) + 1
                 downloadFinish(chapter, "获取正文失败\n${it.localizedMessage}", resetPageOffset)
             }.onCancel {
-                onCancel(chapter.index)
+                onReadCancel(chapter.index)
                 downloadFinish(chapter, "download canceled", resetPageOffset, true)
             }.onFinally {
                 postEvent(EventBus.UP_DOWNLOAD, book.bookUrl)
