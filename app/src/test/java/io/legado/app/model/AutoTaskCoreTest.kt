@@ -156,6 +156,15 @@ class AutoTaskCoreTest {
     }
 
     @Test
+    fun protocolSummaryIsNotRepeatedInStoredLog() {
+        val action = "Notification: Done"
+        val log = AutoTaskLogFormatter.success(0L, 25L, listOf(action), action)
+
+        assertEquals(1, log.split(action).size - 1)
+        assertFalse(log.contains("Result:"))
+    }
+
+    @Test
     fun cancellationIsNeverConvertedToFailure() {
         val cancellation = CancellationException("stop")
         assertEquals(cancellation, cancellation.autoTaskCancellation())

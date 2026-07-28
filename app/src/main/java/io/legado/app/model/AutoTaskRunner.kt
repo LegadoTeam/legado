@@ -98,7 +98,9 @@ object AutoTaskLogFormatter {
             append("[OK] ").append(formatTime(runAt))
             append('\n').append("Elapsed: ").append(elapsedMs).append("ms")
             actions.forEach { append('\n').append("- ").append(it) }
-            if (!detail.isNullOrBlank()) append('\n').append("Result: ").append(detail)
+            if (!detail.isNullOrBlank() && detail != actions.joinToString(" | ")) {
+                append('\n').append("Result: ").append(detail)
+            }
         })
     }
 
