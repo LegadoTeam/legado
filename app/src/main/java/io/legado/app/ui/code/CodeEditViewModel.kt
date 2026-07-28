@@ -38,7 +38,7 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
 
     var initialText = ""
     var cursorPosition = 0
-    var language: TextMateLanguage? = null
+    internal var language: RuntimeObjectCompletionLanguage? = null
     private var languageName = "source.js"
     private val themeRegistry: ThemeRegistry = ThemeRegistry.getInstance()
     var writable = true
@@ -69,7 +69,9 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
             } else {
                 intent.getStringExtra("languageName")?.let { languageName = it }
             }
-            language = TextMateLanguage.create(languageName, AppConfig.editAutoComplete)
+            language = RuntimeObjectCompletionLanguage(
+                TextMateLanguage.create(languageName, AppConfig.editAutoComplete)
+            )
             cursorPosition = intent.getIntExtra("cursorPosition", 0)
             title = intent.getStringExtra("title")
         }.onSuccess {

@@ -1444,4 +1444,22 @@
     <string name="auto_task_book_update_title">%1$s 已更新</string>
     <string name="auto_task_book_update_content">新增 %1$d 章，最新：%2$s</string>
     <string name="auto_task_book_update_content_count">新增 %1$d 章</string>
+    <string name="curl_analyze_url_converter">cURL / AnalyzeUrl 转换</string>
+    <string name="curl_to_analyze_url">cURL 转 AnalyzeUrl</string>
+    <string name="analyze_url_to_curl">AnalyzeUrl 转 cURL</string>
+    <string name="curl_input_hint">粘贴 cURL 命令</string>
+    <string name="analyze_url_input_hint">粘贴 AnalyzeUrl</string>
+    <string name="curl_output_hint">转换后的 cURL</string>
+    <string name="analyze_url_output_hint">转换后的 AnalyzeUrl</string>
+    <string name="curl_converter_convert">转换</string>
+    <string name="curl_converter_insert">插入</string>
+    <string name="curl_converter_empty_input">请输入 cURL 命令或 AnalyzeUrl</string>
+    <string name="curl_converter_invalid_curl">cURL 命令格式不正确</string>
+    <string name="curl_converter_missing_url">未找到 URL</string>
+    <string name="curl_converter_invalid_analyze_url">AnalyzeUrl 参数格式不正确</string>
+    <string name="curl_converter_unsupported_method">不支持的 HTTP 方法：%1$s</string>
+    <string name="curl_converter_unsupported_option">不支持的选项：%1$s</string>
+    <string name="curl_converter_failed">转换失败</string>
+    <string name="curl_converter_no_output">请先转换内容</string>
+    <string name="curl_converter_insert_failed">编辑器尚未就绪</string>
 </resources>

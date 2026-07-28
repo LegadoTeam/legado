@@ -54,11 +54,14 @@ import io.legado.app.utils.viewbindingdelegate.viewBinding
 
 class CodeEditActivity :
     VMBaseActivity<ActivityCodeEditBinding, CodeEditViewModel>(),
-    KeyboardToolPop.CallBack, ChangeThemeDialog.CallBack, SettingsDialog.CallBack {
+    KeyboardToolPop.CallBack, ChangeThemeDialog.CallBack, SettingsDialog.CallBack,
+    CurlAnalyzeUrlDialog.Callback {
     companion object {
         const val EXTRA_SHOW_DEBUG_SOURCE = "showDebugSourceAction"
+        const val EXTRA_SHOW_LOGIN_SOURCE = "showLoginSourceAction"
         const val EXTRA_RESULT_ACTION = "resultAction"
         const val RESULT_ACTION_DEBUG_SOURCE = "debugSource"
+        const val RESULT_ACTION_LOGIN_SOURCE = "loginSource"
 
         private var isInitialized = false
         private var findText = ""
@@ -77,6 +80,7 @@ class CodeEditActivity :
     private var searchOptions: SearchOptions? = null
     private var menuSaveBtn: MenuItem? = null
     private var menuDebugSourceBtn: MenuItem? = null
+    private var menuLoginSourceBtn: MenuItem? = null
     private var useSafeEditor = false
     private var safeEditor: WebView? = null
     private var safeEditorStatus = SafeEditorStatus.IDLE
@@ -252,6 +256,7 @@ class CodeEditActivity :
             !safeEditorReadPending
         menuSaveBtn?.isEnabled = enabled
         menuDebugSourceBtn?.isEnabled = enabled && isDebugSourceActionEnabled()
+        menuLoginSourceBtn?.isEnabled = enabled && isLoginSourceActionEnabled()
     }
 
     private fun buildSafeEditorHtml(text: String): String {
@@ -347,7 +352,7 @@ class CodeEditActivity :
                     };
 
                     window.__insertEditorText = function(encodedValue) {
-                        if (editor.readOnly) return;
+                        if (editor.readOnly) return false;
                         var value = decodeBase64(encodedValue);
                         var start = editor.selectionStart || 0;
                         var end = editor.selectionEnd || start;
@@ -358,6 +363,7 @@ class CodeEditActivity :
                             var cursor = start + value.length;
                             editor.setSelectionRange(cursor, cursor);
                         }
+                        return true;
                     };
                 </script>
             </body>
@@ -423,21 +429,31 @@ class CodeEditActivity :
         )
     }
 
-    private fun insertSafeEditorText(text: String) {
-        val webView = safeEditor ?: return
+    private fun insertSafeEditorText(
+        text: String,
+        onResult: (Boolean) -> Unit = {},
+    ) {
+        val webView = safeEditor ?: run {
+            onResult(false)
+            return
+        }
         if (
             safeEditorStatus != SafeEditorStatus.READY ||
             !viewModel.writable ||
             safeEditorReadPending
-        ) return
+        ) {
+            onResult(false)
+            return
+        }
         val encodedText = Base64.encodeToString(
             text.toByteArray(Charsets.UTF_8),
             Base64.NO_WRAP
         )
         webView.evaluateJavascript(
             "window.__insertEditorText && window.__insertEditorText('$encodedText');",
-            null
-        )
+        ) { result ->
+            onResult(result == "true")
+        }
     }
 
     override fun onDestroy() {
@@ -575,6 +591,10 @@ class CodeEditActivity :
         return intent.getBooleanExtra(EXTRA_SHOW_DEBUG_SOURCE, false)
     }
 
+    private fun isLoginSourceActionEnabled(): Boolean {
+        return intent.getBooleanExtra(EXTRA_SHOW_LOGIN_SOURCE, false)
+    }
+
     override fun upEdit(fontSize: Int?, autoComplete: Boolean?, autoWarp: Boolean?, editNonPrintable: Int?) {
         if (useSafeEditor) return
         if (fontSize != null) {
@@ -620,6 +640,7 @@ class CodeEditActivity :
         menuInflater.inflate(R.menu.code_edit_activity, menu)
         menuSaveBtn = menu.findItem(R.id.menu_save)
         menuDebugSourceBtn = menu.findItem(R.id.menu_debug_source)
+        menuLoginSourceBtn = menu.findItem(R.id.menu_login)
         updateEditorMenu(menu)
         return super.onCompatCreateOptionsMenu(menu)
     }
@@ -631,6 +652,9 @@ class CodeEditActivity :
 
     private fun updateEditorMenu(menu: Menu) {
         val showSoraActions = !useSafeEditor
+        val canReturnText = viewModel.writable &&
+            (!useSafeEditor ||
+                (safeEditorStatus == SafeEditorStatus.READY && !safeEditorReadPending))
         menu.findItem(R.id.menu_search)?.isVisible = showSoraActions
         menu.findItem(R.id.menu_change_theme)?.isVisible = showSoraActions
         menu.findItem(R.id.menu_format_code)?.isVisible = showSoraActions
@@ -641,18 +665,21 @@ class CodeEditActivity :
         }
         menu.findItem(R.id.menu_save)?.apply {
             isVisible = viewModel.writable
-            isEnabled = viewModel.writable &&
-                (!useSafeEditor ||
-                    (safeEditorStatus == SafeEditorStatus.READY && !safeEditorReadPending))
+            isEnabled = canReturnText
         }
         menu.findItem(R.id.menu_debug_source)?.apply {
             isVisible = shouldShowDebugSourceAction(
                 viewModel.writable,
                 isDebugSourceActionEnabled()
             )
-            isEnabled = viewModel.writable &&
-                (!useSafeEditor ||
-                    (safeEditorStatus == SafeEditorStatus.READY && !safeEditorReadPending))
+            isEnabled = canReturnText
+        }
+        menu.findItem(R.id.menu_login)?.apply {
+            isVisible = shouldShowLoginSourceAction(
+                viewModel.writable,
+                isLoginSourceActionEnabled()
+            )
+            isEnabled = canReturnText
         }
     }
 
@@ -666,7 +693,10 @@ class CodeEditActivity :
 
     private fun search() {
         if (useSafeEditor) return
-        if (binding.searchGroup.isVisible) return
+        if (binding.searchGroup.isVisible) {
+            binding.btnCloseFind.performClick()
+            return
+        }
         binding.switchRegex.run {
             isChecked = isRegex
             setSearchOptions()
@@ -781,7 +811,9 @@ class CodeEditActivity :
             R.id.menu_search -> if (!useSafeEditor) search()
             R.id.menu_save -> save(false)
             R.id.menu_debug_source -> returnText(RESULT_ACTION_DEBUG_SOURCE)
+            R.id.menu_login -> returnText(RESULT_ACTION_LOGIN_SOURCE)
             R.id.menu_format_code -> if (!useSafeEditor) viewModel.formatCode(editor)
+            R.id.menu_curl_analyze_url -> showCurlAnalyzeUrlConverter()
             R.id.menu_change_theme -> if (!useSafeEditor) showDialogFragment(ChangeThemeDialog())
             R.id.menu_config_settings -> if (!useSafeEditor) {
                 showDialogFragment(SettingsDialog(this, this))
@@ -795,6 +827,15 @@ class CodeEditActivity :
             R.id.menu_log -> showDialogFragment<AppLogDialog>()
         }
         return super.onCompatOptionsItemSelected(item)
+    }
+
+    private fun showCurlAnalyzeUrlConverter() {
+        val input = if (!useSafeEditor && editor.cursor.isSelected) {
+            editor.text.substring(editor.cursor.left, editor.cursor.right)
+        } else {
+            ""
+        }
+        showDialogFragment(CurlAnalyzeUrlDialog(input, viewModel.writable))
     }
 
     override fun finish() {
@@ -847,6 +888,17 @@ class CodeEditActivity :
         }
     }
 
+    override fun onCurlAnalyzeUrlInsert(text: String, onResult: (Boolean) -> Unit) {
+        if (!viewModel.writable) {
+            onResult(false)
+        } else if (useSafeEditor) {
+            insertSafeEditorText(text, onResult)
+        } else {
+            editor.insertText(text, text.length)
+            onResult(true)
+        }
+    }
+
     @RequiresApi(Build.VERSION_CODES.M)
     override fun onUndoClicked() {
         if (useSafeEditor) {
@@ -879,5 +931,9 @@ class CodeEditActivity :
 }
 
 internal fun shouldShowDebugSourceAction(writable: Boolean, requested: Boolean): Boolean {
+    return writable && requested
+}
+
+internal fun shouldShowLoginSourceAction(writable: Boolean, requested: Boolean): Boolean {
     return writable && requested
 }

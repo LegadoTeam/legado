@@ -33,7 +33,7 @@ quickChineseTransfer = "0.2.17"
 splitties = "3.0.0"
 desugar = "2.1.5"
 mcpSdk = "0.14.0"
-ktor = "3.4.3"
+ktor = "3.5.1"
 
 #kotlinxSerialization = "1.8.0"
 swiperefreshlayout = "1.2.0"

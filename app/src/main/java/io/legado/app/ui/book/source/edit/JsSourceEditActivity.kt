@@ -14,6 +14,7 @@ import io.legado.app.databinding.ActivityJsSourceEditBinding
 import io.legado.app.model.jsSource.JsSourceUpsert
 import io.legado.app.ui.book.source.debug.BookSourceDebugActivity
 import io.legado.app.ui.code.CodeEditActivity
+import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.utils.StartActivityContract
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
@@ -53,14 +54,22 @@ class JsSourceEditActivity : BaseActivity<ActivityJsSourceEditBinding>(imageBg =
             return@registerForActivityResult
         }
         pendingText = text
-        val debugRequested = result.data?.getStringExtra(CodeEditActivity.EXTRA_RESULT_ACTION) ==
-            CodeEditActivity.RESULT_ACTION_DEBUG_SOURCE
-        stage = stageForEditorResult(debugRequested)
-        if (debugRequested) {
-            saveForDebug(text)
-        } else {
-            saveSource(text)
+        val action = result.data?.getStringExtra(CodeEditActivity.EXTRA_RESULT_ACTION)
+        val debugRequested = action == CodeEditActivity.RESULT_ACTION_DEBUG_SOURCE
+        val loginRequested = action == CodeEditActivity.RESULT_ACTION_LOGIN_SOURCE
+        stage = stageForEditorResult(debugRequested, loginRequested)
+        when {
+            debugRequested -> saveForDebug(text)
+            loginRequested -> saveForLogin(text)
+            else -> saveSource(text)
         }
+    }
+
+    private val loginResult = registerForActivityResult(
+        StartActivityContract(SourceLoginActivity::class.java)
+    ) {
+        stage = stage.afterLoginResult()
+        pendingText?.let(::openEditor) ?: super.finish()
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
@@ -82,7 +91,9 @@ class JsSourceEditActivity : BaseActivity<ActivityJsSourceEditBinding>(imageBg =
                 JsSourceEditRestoreAction.OPEN_EDITOR -> openEditor(text)
                 JsSourceEditRestoreAction.SAVE_AND_FINISH -> saveSource(text)
                 JsSourceEditRestoreAction.SAVE_FOR_DEBUG -> saveForDebug(text)
+                JsSourceEditRestoreAction.SAVE_FOR_LOGIN -> saveForLogin(text)
                 JsSourceEditRestoreAction.LAUNCH_DEBUG -> launchDebugWhenResumed()
+                JsSourceEditRestoreAction.LAUNCH_LOGIN -> launchLoginWhenResumed()
                 JsSourceEditRestoreAction.AWAIT_RESULT -> Unit
             }
         }
@@ -104,6 +115,7 @@ class JsSourceEditActivity : BaseActivity<ActivityJsSourceEditBinding>(imageBg =
             putExtra("languageName", "source.js")
             putExtra("returnUnchangedText", true)
             putExtra(CodeEditActivity.EXTRA_SHOW_DEBUG_SOURCE, true)
+            putExtra(CodeEditActivity.EXTRA_SHOW_LOGIN_SOURCE, true)
         }
     }
 
@@ -125,6 +137,37 @@ class JsSourceEditActivity : BaseActivity<ActivityJsSourceEditBinding>(imageBg =
                 if (stage != JsSourceEditStage.DEBUG_READY) return@withStateAtLeast
                 stage = JsSourceEditStage.DEBUG_OPEN
                 debugResult.launch {
+                    putExtra("key", sourceUrl)
+                }
+            }
+        }
+    }
+
+    private fun saveForLogin(text: String) {
+        saveSource(text, showSuccessToast = false, finishAfterSave = false) { source ->
+            if (source.hasLogin()) {
+                launchLoginWhenResumed()
+            } else {
+                stage = JsSourceEditStage.READY
+                toastOnUi(R.string.source_no_login)
+                pendingText?.let(::openEditor) ?: super.finish()
+            }
+        }
+    }
+
+    private fun launchLoginWhenResumed() {
+        val sourceUrl = openedSourceUrl ?: run {
+            val text = pendingText ?: return super.finish()
+            stage = JsSourceEditStage.SAVING_FOR_LOGIN
+            saveForLogin(text)
+            return
+        }
+        lifecycleScope.launch {
+            lifecycle.withStateAtLeast(Lifecycle.State.RESUMED) {
+                if (stage != JsSourceEditStage.LOGIN_READY) return@withStateAtLeast
+                stage = JsSourceEditStage.LOGIN_OPEN
+                loginResult.launch {
+                    putExtra("type", "bookSource")
                     putExtra("key", sourceUrl)
                 }
             }

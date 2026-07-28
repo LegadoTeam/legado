@@ -2,16 +2,32 @@ package io.legado.app.help
 
 internal object SourceSharePassphraseImportPolicy {
 
-    fun shouldScheduleOnResume(privacyPolicyOk: Boolean, activityCount: Int): Boolean {
-        return privacyPolicyOk && activityCount == 1
+    fun shouldScheduleOnResume(privacyPolicyOk: Boolean): Boolean {
+        return privacyPolicyOk
+    }
+
+    fun canAwaitWindowFocus(
+        privacyPolicyOk: Boolean,
+        isFinishing: Boolean,
+        isResumed: Boolean,
+        isFragmentStateSaved: Boolean
+    ): Boolean {
+        return shouldScheduleOnResume(privacyPolicyOk) &&
+            !isFinishing && isResumed && !isFragmentStateSaved
     }
 
     fun canReadClipboard(
         privacyPolicyOk: Boolean,
         isFinishing: Boolean,
         isResumed: Boolean,
-        isFragmentStateSaved: Boolean
+        isFragmentStateSaved: Boolean,
+        hasWindowFocus: Boolean
     ): Boolean {
-        return privacyPolicyOk && !isFinishing && isResumed && !isFragmentStateSaved
+        return canAwaitWindowFocus(
+            privacyPolicyOk,
+            isFinishing,
+            isResumed,
+            isFragmentStateSaved
+        ) && hasWindowFocus
     }
 }

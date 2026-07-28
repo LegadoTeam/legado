@@ -1,5 +1,5 @@
 import { fileURLToPath, URL } from "node:url";
-import { defineConfig } from "vite";
+import { defineConfig, type UserConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import Icons from "unplugin-icons/vite";
 import IconsResolver from "unplugin-icons/resolver";
@@ -8,7 +8,7 @@ import Components from "unplugin-vue-components/vite";
 import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode }): UserConfig => {
   return {
     plugins: [
       vue(),
@@ -51,24 +51,20 @@ export default defineConfig(({ mode }) => {
         "@utils": fileURLToPath(new URL("./src/utils/", import.meta.url)),
       },
     },
-    esbuild: {
-      drop: mode === "development" ? undefined : ["console", "debugger"],
-    },
     build: {
-      rollupOptions: {
+      rolldownOptions: {
         output: {
+          minify: mode === "development" ? true : {
+            compress: {
+              dropConsole: true,
+              dropDebugger: true,
+            },
+          },
           manualChunks: (id) => {
             if (id.includes("node_modules")) {
               return "vendor";
             }
           },
-        },
-      },
-    },
-    css: {
-      preprocessorOptions: {
-        scss: {
-          api: 'modern-compiler', // or 'modern'
         },
       },
     },
