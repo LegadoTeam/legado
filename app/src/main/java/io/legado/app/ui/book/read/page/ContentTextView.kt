@@ -744,11 +744,11 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                 }
                 .toList()
             val manualRanges = if (titleLength >= 0) {
-                ReadBook.highlightsOfChapter(chapter, titleLength).map {
+                ReadBook.anchoredHighlightsOfChapter(chapter, titleLength).map { (highlight, anchor) ->
                     HighlightMatcher.Range(
-                        it.bodyStart(titleLength) + titleLength,
-                        it.bodyEnd(titleLength) + titleLength,
-                        it.styleObj()
+                        anchor.start + titleLength,
+                        anchor.end + titleLength,
+                        highlight.styleObj()
                     )
                 }
             } else emptyList()
@@ -901,8 +901,9 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         val position = (chapter.getReadLength(page.index) +
                 page.getPosByLineColumn(textPos.lineIndex, textPos.columnIndex) -
                 titleLength).coerceAtLeast(0)
-        return ReadBook.highlightsOfChapter(chapter, titleLength)
-            .lastHighlightAt(position, titleLength)
+        return ReadBook.anchoredHighlightsOfChapter(chapter, titleLength)
+            .lastOrNull { (_, anchor) -> position in anchor.start..<anchor.end }
+            ?.first
     }
 
     private fun relativeOffset(relativePos: Int): Float {
@@ -986,12 +987,5 @@ internal inline fun highlightSelectionEndLength(
     columnIndex: Int,
     columnLength: () -> Int
 ): Int = if (columnIndex < 0) 0 else columnLength()
-
-internal fun List<BookHighlight>.lastHighlightAt(
-    position: Int,
-    titleLength: Int
-): BookHighlight? = lastOrNull {
-    position >= it.bodyStart(titleLength) && position < it.bodyEnd(titleLength)
-}
 
 internal fun String.hasHighlightableText(): Boolean = any { it != '\r' && it != '\n' }

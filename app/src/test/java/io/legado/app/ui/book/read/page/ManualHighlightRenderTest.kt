@@ -1,9 +1,7 @@
 package io.legado.app.ui.book.read.page
 
-import io.legado.app.data.entities.BookHighlight
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -14,8 +12,10 @@ class ManualHighlightRenderTest {
     fun `manual ranges cover every text column but skip titles`() {
         val content = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/ContentTextView.kt")
 
-        assertTrue(content.contains("ReadBook.highlightsOfChapter(chapter, titleLength)"))
-        assertTrue(content.contains("it.bodyStart(titleLength) + titleLength"))
+        assertTrue(content.contains("ReadBook.anchoredHighlightsOfChapter(chapter, titleLength)"))
+        assertTrue(content.contains("anchor.start + titleLength"))
+        assertTrue(content.contains("anchor.end + titleLength"))
+        assertTrue(content.contains(".lastOrNull { (_, anchor)"))
         assertTrue(content.contains("val pageBase = chapter.getReadLength(page.index)"))
         assertTrue(content.contains("val ruleRanges = ReadBook.ruleMatchesOfChapter(chapter)"))
         assertTrue(content.contains("line.columns.map { it.positionLength }"))
@@ -87,14 +87,6 @@ class ManualHighlightRenderTest {
         assertTrue(review in 0 until html)
         assertTrue(link in html until highlight)
         assertTrue(manageHighlight in longPressHtml until selectText)
-    }
-
-    @Test
-    fun `overlapping highlight click follows the last rendered range`() {
-        val outer = BookHighlight(time = 1, chapterPos = 0, chapterPosEnd = 10)
-        val inner = BookHighlight(time = 2, chapterPos = 2, chapterPosEnd = 4)
-
-        assertSame(inner, listOf(outer, inner).lastHighlightAt(position = 3, titleLength = 0))
     }
 
     @Test

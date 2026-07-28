@@ -199,7 +199,9 @@ class ReadBookActivity : BaseReadBookActivity(),
                 viewModel.openChapter(
                     it[0] as Int,
                     it[1] as Int,
-                    highlightLayoutTitleLength
+                    highlightLayoutTitleLength,
+                    (it[TocActivityResult.HIGHLIGHT_ANCHOR_TEXT_INDEX] as String)
+                        .takeIf(String::isNotEmpty)
                 )
             }
         }

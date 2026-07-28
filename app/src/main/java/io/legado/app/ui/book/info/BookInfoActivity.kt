@@ -143,6 +143,9 @@ class BookInfoActivity :
                         .takeUnless { titleLength ->
                             titleLength == TocActivityResult.NO_HIGHLIGHT_LAYOUT_TITLE_LENGTH
                         },
+                highlightAnchorText =
+                    (it[TocActivityResult.HIGHLIGHT_ANCHOR_TEXT_INDEX] as String)
+                        .takeIf(String::isNotEmpty),
             )
         } ?: let {
             if (!viewModel.inBookshelf) {
@@ -1196,6 +1199,7 @@ class BookInfoActivity :
         volumeIndex: Int,
         chapterInVolumeIndex: Int,
         highlightLayoutTitleLength: Int?,
+        highlightAnchorText: String?,
     ) {
         viewModel.getBook(false)?.let { book ->
             val deferHighlightPosition = highlightLayoutTitleLength != null &&
@@ -1219,7 +1223,8 @@ class BookInfoActivity :
                             book,
                             index.takeIf { deferHighlightPosition },
                             pos.takeIf { deferHighlightPosition },
-                            highlightLayoutTitleLength.takeIf { deferHighlightPosition }
+                            highlightLayoutTitleLength.takeIf { deferHighlightPosition },
+                            highlightAnchorText.takeIf { deferHighlightPosition }
                         )
                     }
                 }
@@ -1232,7 +1237,8 @@ class BookInfoActivity :
                         book,
                         index.takeIf { deferHighlightPosition },
                         pos.takeIf { deferHighlightPosition },
-                        highlightLayoutTitleLength.takeIf { deferHighlightPosition }
+                        highlightLayoutTitleLength.takeIf { deferHighlightPosition },
+                        highlightAnchorText.takeIf { deferHighlightPosition }
                     )
                 }
             }
@@ -1325,6 +1331,7 @@ class BookInfoActivity :
         highlightIndex: Int? = null,
         highlightChapterPos: Int? = null,
         highlightLayoutTitleLength: Int? = null,
+        highlightAnchorText: String? = null,
     ) {
         when {
             book.isAudio -> readBookResult.launch(
@@ -1357,6 +1364,9 @@ class BookInfoActivity :
                             TocActivityResult.EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH,
                             highlightLayoutTitleLength
                         )
+                        highlightAnchorText?.let {
+                            putExtra(TocActivityResult.EXTRA_HIGHLIGHT_ANCHOR_TEXT, it)
+                        }
                     }
                 }
             )
