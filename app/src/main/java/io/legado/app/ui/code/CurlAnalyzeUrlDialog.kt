@@ -135,8 +135,21 @@ class CurlAnalyzeUrlDialog() : BaseDialogFragment(R.layout.dialog_curl_analyze_u
             return
         }
         val callback = parentFragment as? Callback ?: activity as? Callback
-        callback?.onCurlAnalyzeUrlInsert(output)
-        dismiss()
+        if (callback == null) {
+            toastOnUi(R.string.curl_converter_insert_failed)
+            return
+        }
+        val insertItem = binding.toolBar.menu.findItem(R.id.menu_insert)
+        insertItem.isEnabled = false
+        callback.onCurlAnalyzeUrlInsert(output) { success ->
+            if (!isAdded) return@onCurlAnalyzeUrlInsert
+            if (success) {
+                dismiss()
+            } else {
+                insertItem.isEnabled = true
+                toastOnUi(R.string.curl_converter_insert_failed)
+            }
+        }
     }
 
     private fun errorMessage(error: ConversionException): String {
@@ -154,6 +167,6 @@ class CurlAnalyzeUrlDialog() : BaseDialogFragment(R.layout.dialog_curl_analyze_u
     }
 
     interface Callback {
-        fun onCurlAnalyzeUrlInsert(text: String)
+        fun onCurlAnalyzeUrlInsert(text: String, onResult: (Boolean) -> Unit)
     }
 }

@@ -348,7 +348,7 @@ class CodeEditActivity :
                     };
 
                     window.__insertEditorText = function(encodedValue) {
-                        if (editor.readOnly) return;
+                        if (editor.readOnly) return false;
                         var value = decodeBase64(encodedValue);
                         var start = editor.selectionStart || 0;
                         var end = editor.selectionEnd || start;
@@ -359,6 +359,7 @@ class CodeEditActivity :
                             var cursor = start + value.length;
                             editor.setSelectionRange(cursor, cursor);
                         }
+                        return true;
                     };
                 </script>
             </body>
@@ -424,21 +425,31 @@ class CodeEditActivity :
         )
     }
 
-    private fun insertSafeEditorText(text: String) {
-        val webView = safeEditor ?: return
+    private fun insertSafeEditorText(
+        text: String,
+        onResult: (Boolean) -> Unit = {},
+    ) {
+        val webView = safeEditor ?: run {
+            onResult(false)
+            return
+        }
         if (
             safeEditorStatus != SafeEditorStatus.READY ||
             !viewModel.writable ||
             safeEditorReadPending
-        ) return
+        ) {
+            onResult(false)
+            return
+        }
         val encodedText = Base64.encodeToString(
             text.toByteArray(Charsets.UTF_8),
             Base64.NO_WRAP
         )
         webView.evaluateJavascript(
             "window.__insertEditorText && window.__insertEditorText('$encodedText');",
-            null
-        )
+        ) { result ->
+            onResult(result == "true")
+        }
     }
 
     override fun onDestroy() {
@@ -805,10 +816,7 @@ class CodeEditActivity :
         } else {
             ""
         }
-        val canInsert = viewModel.writable &&
-            (!useSafeEditor ||
-                (safeEditorStatus == SafeEditorStatus.READY && !safeEditorReadPending))
-        showDialogFragment(CurlAnalyzeUrlDialog(input, canInsert))
+        showDialogFragment(CurlAnalyzeUrlDialog(input, viewModel.writable))
     }
 
     override fun finish() {
@@ -861,12 +869,14 @@ class CodeEditActivity :
         }
     }
 
-    override fun onCurlAnalyzeUrlInsert(text: String) {
-        if (!viewModel.writable) return
-        if (useSafeEditor) {
-            insertSafeEditorText(text)
+    override fun onCurlAnalyzeUrlInsert(text: String, onResult: (Boolean) -> Unit) {
+        if (!viewModel.writable) {
+            onResult(false)
+        } else if (useSafeEditor) {
+            insertSafeEditorText(text, onResult)
         } else {
             editor.insertText(text, text.length)
+            onResult(true)
         }
     }
 

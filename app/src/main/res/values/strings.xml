@@ -1568,4 +1568,5 @@
     <string name="curl_converter_unsupported_option">Unsupported option: %1$s</string>
     <string name="curl_converter_failed">Conversion failed</string>
     <string name="curl_converter_no_output">Convert content first</string>
+    <string name="curl_converter_insert_failed">The editor is not ready</string>
 </resources>

@@ -56,8 +56,9 @@ class CurlAnalyzeUrlConverterTest {
         )
 
         assertTrue(curl.contains("'https://example.com/a,b?x=1'"))
+        assertTrue(curl.startsWith("curl -g "))
         assertTrue(curl.contains("-L"))
-        assertTrue(curl.contains("""-H 'Content-Type: application/json'"""))
+        assertTrue(curl.contains("""-H 'Content-Type: application/json; charset=UTF-8'"""))
         assertTrue(curl.contains("--data-raw '{"))
         assertTrue(curl.contains("\"x\": 1"))
     }
@@ -79,7 +80,7 @@ class CurlAnalyzeUrlConverterTest {
     @Test
     fun `equals signs survive long option forms and shell round trip`() {
         val analyzeUrl = CurlAnalyzeUrlConverter.curlToAnalyzeUrl(
-            """curl.exe --request=HEAD --header='X-Key: a=b' --url='https://example.com/a?x=1&y=2'"""
+            """curl.exe -I --header='X-Key: a=b' --url='https://example.com/a?x=1&y=2'"""
         )
         val curl = CurlAnalyzeUrlConverter.analyzeUrlToCurl(analyzeUrl)
 
@@ -128,12 +129,82 @@ class CurlAnalyzeUrlConverterTest {
         }
         assertFailure(ErrorReason.UNSUPPORTED_OPTION) {
             CurlAnalyzeUrlConverter.curlToAnalyzeUrl(
+                """curl -X POST https://example.com"""
+            )
+        }
+        assertFailure(ErrorReason.UNSUPPORTED_OPTION) {
+            CurlAnalyzeUrlConverter.curlToAnalyzeUrl(
+                """curl -X POST -d 'q=1' -L https://example.com"""
+            )
+        }
+        assertFailure(ErrorReason.UNSUPPORTED_OPTION) {
+            CurlAnalyzeUrlConverter.curlToAnalyzeUrl(
+                """curl -I -X GET https://example.com"""
+            )
+        }
+        assertFailure(ErrorReason.UNSUPPORTED_OPTION) {
+            CurlAnalyzeUrlConverter.curlToAnalyzeUrl(
+                """curl --json '' https://example.com"""
+            )
+        }
+        assertFailure(ErrorReason.UNSUPPORTED_OPTION) {
+            CurlAnalyzeUrlConverter.curlToAnalyzeUrl(
+                """curl -d '   ' https://example.com"""
+            )
+        }
+        assertFailure(ErrorReason.UNSUPPORTED_OPTION) {
+            CurlAnalyzeUrlConverter.curlToAnalyzeUrl(
+                """curl -d '' -H 'Content-Type: text/plain' https://example.com"""
+            )
+        }
+        assertFailure(ErrorReason.UNSUPPORTED_OPTION) {
+            CurlAnalyzeUrlConverter.curlToAnalyzeUrl(
+                """curl -H 'Content-Length: 1' https://example.com"""
+            )
+        }
+        assertFailure(ErrorReason.UNSUPPORTED_OPTION) {
+            CurlAnalyzeUrlConverter.curlToAnalyzeUrl(
+                """curl https://example.com/[a]"""
+            )
+        }
+        assertFailure(ErrorReason.UNSUPPORTED_OPTION) {
+            CurlAnalyzeUrlConverter.curlToAnalyzeUrl(
+                """curl ftp://example.com/file"""
+            )
+        }
+        assertFailure(ErrorReason.UNSUPPORTED_OPTION) {
+            CurlAnalyzeUrlConverter.curlToAnalyzeUrl(
+                """curl https://user:pass@example.com/file"""
+            )
+        }
+        assertFailure(ErrorReason.UNSUPPORTED_OPTION) {
+            CurlAnalyzeUrlConverter.curlToAnalyzeUrl(
+                """curl --compressed https://example.com"""
+            )
+        }
+        assertFailure(ErrorReason.UNSUPPORTED_OPTION) {
+            CurlAnalyzeUrlConverter.curlToAnalyzeUrl(
+                """curl --data-raw $'a\\nb' https://example.com"""
+            )
+        }
+        assertFailure(ErrorReason.UNSUPPORTED_OPTION) {
+            CurlAnalyzeUrlConverter.curlToAnalyzeUrl(
                 """curl --referer='https://example.com;auto' -L https://example.com"""
             )
         }
         assertFailure(ErrorReason.UNSUPPORTED_OPTION) {
             CurlAnalyzeUrlConverter.analyzeUrlToCurl(
                 """https://example.com,{"method":"GET","timeout":1000}"""
+            )
+        }
+        assertFailure(ErrorReason.UNSUPPORTED_OPTION) {
+            CurlAnalyzeUrlConverter.analyzeUrlToCurl(
+                """https://example.com,{"headers":{"Transfer-Encoding":"chunked"}}"""
+            )
+        }
+        assertFailure(ErrorReason.UNSUPPORTED_OPTION) {
+            CurlAnalyzeUrlConverter.analyzeUrlToCurl(
+                """https://user:pass@example.com/file"""
             )
         }
     }
@@ -219,7 +290,44 @@ class CurlAnalyzeUrlConverterTest {
 
         assertTrue(curl.contains("--data-raw q=a+b"))
         assertFalse(curl.contains("Content-Type: application/json"))
-        assertTrue(whitespace.contains("--data-raw +"))
+        assertTrue(whitespace.contains("--data-raw ''"))
+    }
+
+    @Test
+    fun `AnalyzeUrl POST uses its effective body content type`() {
+        val lowerCaseHeader = CurlAnalyzeUrlConverter.analyzeUrlToCurl(
+            """https://example.com,{"method":"POST","headers":{"content-type":"text/plain"},"body":{"x":1}}"""
+        )
+        val blankCustomType = CurlAnalyzeUrlConverter.analyzeUrlToCurl(
+            """https://example.com,{"method":"POST","headers":{"Content-Type":"text/plain"},"body":" "}"""
+        )
+        val blankContentType = CurlAnalyzeUrlConverter.analyzeUrlToCurl(
+            """https://example.com,{"method":"POST","headers":{"Content-Type":" "},"body":"q=a b"}"""
+        )
+
+        assertFalse(lowerCaseHeader.contains("content-type: text/plain", true))
+        assertTrue(
+            lowerCaseHeader.contains(
+                """-H 'Content-Type: application/json; charset=UTF-8'"""
+            )
+        )
+        assertTrue(blankCustomType.contains("Content-Type: application/x-www-form-urlencoded"))
+        assertTrue(blankCustomType.contains("--data-raw ''"))
+        assertTrue(blankContentType.contains("Content-Type: application/json; charset=UTF-8"))
+        assertTrue(blankContentType.contains("--data-raw 'q=a b'"))
+    }
+
+    @Test
+    fun `URL glob and POSIX caret keep one literal request`() {
+        val glob = CurlAnalyzeUrlConverter.analyzeUrlToCurl(
+            "https://example.com/{a,b}"
+        )
+        val caret = CurlAnalyzeUrlConverter.curlToAnalyzeUrl(
+            "curl https://example.com/^a"
+        )
+
+        assertTrue(glob.startsWith("curl -g "))
+        assertTrue(caret.startsWith("https://example.com/^a"))
     }
 
     @Test
@@ -235,10 +343,11 @@ class CurlAnalyzeUrlConverterTest {
 
     @Test
     fun `unclosed shell quotes are rejected`() {
+        val input = """curl 'https://example.com"""
+
+        assertTrue(CurlAnalyzeUrlConverter.looksLikeCurl(input))
         assertFailure(ErrorReason.INVALID_CURL) {
-            CurlAnalyzeUrlConverter.curlToAnalyzeUrl(
-                """curl 'https://example.com"""
-            )
+            CurlAnalyzeUrlConverter.curlToAnalyzeUrl(input)
         }
     }
 

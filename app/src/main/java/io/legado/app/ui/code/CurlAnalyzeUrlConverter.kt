@@ -7,7 +7,9 @@ import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.isJson
 import io.legado.app.utils.isXml
 import java.net.URLEncoder
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
+/** Converts shared request fields using POSIX shell syntax; runtime defaults are excluded. */
 object CurlAnalyzeUrlConverter {
 
     enum class ErrorReason {
@@ -26,18 +28,24 @@ object CurlAnalyzeUrlConverter {
 
     private data class CurlRequest(
         var url: String = "",
-        var method: String = "",
+        var customMethod: String? = null,
         val headers: LinkedHashMap<String, String> = linkedMapOf(),
         val bodyParts: MutableList<String> = mutableListOf(),
+        var head: Boolean = false,
         var followRedirects: Boolean = false,
+        var globOff: Boolean = false,
         var addJsonHeaders: Boolean = false,
+    )
+
+    private data class EffectivePost(
+        val body: String,
+        val contentType: String,
     )
 
     private val supportedMethods = setOf("GET", "POST", "HEAD")
     private val ignoredOptions = setOf(
         "-s", "--silent", "-S", "--show-error", "-sS", "-Ss",
         "-f", "--fail", "--fail-with-body",
-        "-g", "--globoff", "--compressed",
         "--no-progress-meter", "--progress-bar",
     )
     private val ignoredOptionsWithValue = setOf(
@@ -46,35 +54,39 @@ object CurlAnalyzeUrlConverter {
     private val analyzeOptionKeys = setOf(
         "method", "headers", "body", "followRedirects",
     )
+    private val curlCommand = Regex("^\\s*curl(?:\\.exe)?(?:\\s|$)", RegexOption.IGNORE_CASE)
     private val safeShellValue = Regex("[A-Za-z0-9_@%+=:,./-]+")
+    private const val FORM_CONTENT_TYPE = "application/x-www-form-urlencoded"
+    private const val JSON_CONTENT_TYPE = "application/json; charset=UTF-8"
 
     fun looksLikeCurl(text: String): Boolean {
-        val first = runCatching { tokenize(text).firstOrNull() }.getOrNull()
-        return first.equals("curl", true) || first.equals("curl.exe", true)
+        return curlCommand.containsMatchIn(text)
     }
 
     fun curlToAnalyzeUrl(text: String): String {
         if (text.isBlank()) throw ConversionException(ErrorReason.EMPTY_INPUT)
         val request = parseCurl(text)
         if (request.url.isBlank()) throw ConversionException(ErrorReason.MISSING_URL)
+        validateUrl(request.url, request.globOff)
 
-        val method = request.method.ifBlank {
-            if (request.bodyParts.isEmpty()) "GET" else "POST"
-        }.uppercase()
-        validateMethod(method)
-        if (method != "POST" && request.bodyParts.isNotEmpty()) {
-            throw ConversionException(ErrorReason.UNSUPPORTED_OPTION, "$method body")
+        val method = resolveCurlMethod(request)
+        val body = request.bodyParts.takeIf { it.isNotEmpty() }?.joinToString("&")
+        if (body?.isBlank() == true) {
+            val contentType = request.headers["Content-Type"]
+            if (body.isNotEmpty() || contentType != FORM_CONTENT_TYPE) {
+                throw ConversionException(ErrorReason.UNSUPPORTED_OPTION, "blank body")
+            }
         }
 
         val options = linkedMapOf<String, Any>()
-        if (method != "GET" || request.bodyParts.isNotEmpty()) {
+        if (method != "GET" || body != null) {
             options["method"] = method
         }
         if (request.headers.isNotEmpty()) {
             options["headers"] = request.headers
         }
-        if (request.bodyParts.isNotEmpty()) {
-            options["body"] = request.bodyParts.joinToString("&")
+        if (body != null) {
+            options["body"] = body
         }
         if (!request.followRedirects) options["followRedirects"] = false
 
@@ -99,6 +111,7 @@ object CurlAnalyzeUrlConverter {
             optionJson = null
         }
         if (url.isBlank()) throw ConversionException(ErrorReason.MISSING_URL)
+        validateUrl(url, globOff = true)
 
         val (option, rawOptions) = optionJson?.let {
             val rawOptions = GSON
@@ -154,17 +167,13 @@ object CurlAnalyzeUrlConverter {
             ?.firstOrNull { it.key.toString() == "Content-Type" }
             ?.value
             ?.toString()
-        val outputBody = when {
-            method != "POST" -> null
-            body == null -> ""
-            !contentType.isNullOrBlank() -> if (body.isBlank()) "" else body
-            body.isJson() || body.isXml() -> body
-            else -> encodeAnalyzeForm(body)
+        val effectivePost = if (method == "POST") {
+            effectiveAnalyzePost(body, contentType)
+        } else {
+            null
         }
-        val hasContentType = headerMap?.keys
-            ?.any { it.toString().equals("Content-Type", true) } == true
 
-        val parts = mutableListOf("curl")
+        val parts = mutableListOf("curl", "-g")
         if (followRedirects) parts += "-L"
         if (method == "HEAD") parts += "-I"
         parts += shellQuote(url)
@@ -173,21 +182,24 @@ object CurlAnalyzeUrlConverter {
             if (name.equals("proxy", true) || name.equals("CookieJar", true)) {
                 throw ConversionException(ErrorReason.UNSUPPORTED_OPTION, name)
             }
+            if (
+                name.equals("Content-Length", true) ||
+                name.equals("Transfer-Encoding", true)
+            ) {
+                throw ConversionException(ErrorReason.UNSUPPORTED_OPTION, name)
+            }
+            if (method == "POST" && name.equals("Content-Type", true)) {
+                return@forEach
+            }
             if (name.equals("User-Agent", true) && value.toString() == "null") {
                 parts += listOf("-A", shellQuote(""))
             } else {
                 parts += listOf("-H", shellQuote("$key: $value"))
             }
         }
-        if (
-            method == "POST" &&
-            body?.run { isJson() || isXml() } == true &&
-            !hasContentType
-        ) {
-            parts += listOf("-H", shellQuote("Content-Type: application/json"))
-        }
-        if (method == "POST") {
-            parts += listOf("--data-raw", shellQuote(outputBody.orEmpty()))
+        effectivePost?.let {
+            parts += listOf("-H", shellQuote("Content-Type: ${it.contentType}"))
+            parts += listOf("--data-raw", shellQuote(it.body))
         }
         return parts.joinToString(" ")
     }
@@ -218,12 +230,13 @@ object CurlAnalyzeUrlConverter {
                 endOfOptions -> setUrl(request, token)
                 token == "--" -> endOfOptions = true
 
-                token == "-X" || token == "--request" -> request.method = nextValue()
-                token.startsWith("--request=") -> request.method =
+                token == "-X" || token == "--request" -> request.customMethod = nextValue()
+                token.startsWith("--request=") -> request.customMethod =
                     token.substringAfter("--request=")
-                token.startsWith("-X") && token.length > 2 -> request.method = token.substring(2)
+                token.startsWith("-X") && token.length > 2 ->
+                    request.customMethod = token.substring(2)
 
-                token == "-I" || token == "--head" -> request.method = "HEAD"
+                token == "-I" || token == "--head" -> request.head = true
 
                 token == "-H" || token == "--header" -> addHeader(request, nextValue())
                 token.startsWith("--header=") -> addHeader(
@@ -314,6 +327,8 @@ object CurlAnalyzeUrlConverter {
 
                 token == "-L" || token == "--location" -> request.followRedirects = true
                 token == "--no-location" -> request.followRedirects = false
+                token == "-g" || token == "--globoff" -> request.globOff = true
+                token == "--no-globoff" -> request.globOff = false
 
                 token in ignoredOptions -> Unit
                 token in ignoredOptionsWithValue -> nextValue()
@@ -399,7 +414,8 @@ object CurlAnalyzeUrlConverter {
             "user-agent" -> "User-Agent"
             "referer" -> "Referer"
             "accept" -> "Accept"
-            "proxy", "cookiejar" -> throw ConversionException(
+            "proxy", "cookiejar", "content-length", "transfer-encoding" ->
+                throw ConversionException(
                 ErrorReason.UNSUPPORTED_OPTION,
                 name,
             )
@@ -425,13 +441,76 @@ object CurlAnalyzeUrlConverter {
             throw ConversionException(ErrorReason.UNSUPPORTED_OPTION, "$option @file")
         }
         request.bodyParts += value
-        if (request.method.isBlank()) request.method = "POST"
+    }
+
+    private fun resolveCurlMethod(request: CurlRequest): String {
+        val customMethod = request.customMethod
+        if (customMethod != null) validateMethod(customMethod)
+        if (request.followRedirects && customMethod == "POST") {
+            throw ConversionException(ErrorReason.UNSUPPORTED_OPTION, "-X POST with -L")
+        }
+        if (request.head) {
+            if (request.bodyParts.isNotEmpty() || customMethod?.let { it != "HEAD" } == true) {
+                throw ConversionException(ErrorReason.UNSUPPORTED_OPTION, "-I with $customMethod")
+            }
+            return "HEAD"
+        }
+        if (request.bodyParts.isNotEmpty()) {
+            if (customMethod?.let { it != "POST" } == true) {
+                throw ConversionException(
+                    ErrorReason.UNSUPPORTED_OPTION,
+                    "$customMethod body",
+                )
+            }
+            return "POST"
+        }
+        if (customMethod == null || customMethod == "GET") return "GET"
+        throw ConversionException(
+            ErrorReason.UNSUPPORTED_OPTION,
+            "$customMethod without body",
+        )
     }
 
     private fun validateMethod(method: String) {
         if (method !in supportedMethods) {
             throw ConversionException(ErrorReason.UNSUPPORTED_METHOD, method)
         }
+    }
+
+    private fun effectiveAnalyzePost(body: String?, contentType: String?): EffectivePost {
+        return when {
+            body.isNullOrBlank() -> EffectivePost("", FORM_CONTENT_TYPE)
+            !contentType.isNullOrBlank() -> EffectivePost(body, contentType)
+            !contentType.isNullOrEmpty() -> EffectivePost(body, JSON_CONTENT_TYPE)
+            body.isJson() || body.isXml() -> EffectivePost(body, JSON_CONTENT_TYPE)
+            else -> EffectivePost(encodeAnalyzeForm(body), FORM_CONTENT_TYPE)
+        }
+    }
+
+    private fun validateUrl(value: String, globOff: Boolean) {
+        if (!globOff && hasCurlGlob(value)) {
+            throw ConversionException(ErrorReason.UNSUPPORTED_OPTION, "URL glob")
+        }
+        if (AnalyzeUrl.paramPattern.matcher(value).find()) {
+            throw ConversionException(ErrorReason.UNSUPPORTED_OPTION, "URL ,{")
+        }
+        val url = value.toHttpUrlOrNull()
+            ?: throw ConversionException(ErrorReason.UNSUPPORTED_OPTION, "HTTP(S) URL")
+        if (url.username.isNotEmpty() || url.password.isNotEmpty()) {
+            throw ConversionException(ErrorReason.UNSUPPORTED_OPTION, "URL userinfo")
+        }
+    }
+
+    private fun hasCurlGlob(value: String): Boolean {
+        if ('{' in value || '}' in value) return true
+        if ('[' !in value && ']' !in value) return false
+        val authorityStart = value.indexOf("://").takeIf { it >= 0 }?.plus(3) ?: return true
+        val authorityEnd = value.indexOfAny(charArrayOf('/', '?', '#'), authorityStart)
+            .takeIf { it >= 0 } ?: value.length
+        val authority = value.substring(authorityStart, authorityEnd)
+        val ipv6Authority = Regex("(?:[^@]+@)?\\[[0-9A-Fa-f:.%]+](?::[0-9]+)?")
+        return !ipv6Authority.matches(authority) ||
+            value.substring(authorityEnd).any { it == '[' || it == ']' }
     }
 
     private fun optionName(token: String): String {
@@ -500,6 +579,12 @@ object CurlAnalyzeUrlConverter {
                         continue
                     }
                 }
+                if (quote == '"' && (char == '$' || char == '`')) {
+                    throw ConversionException(
+                        ErrorReason.UNSUPPORTED_OPTION,
+                        "shell expansion",
+                    )
+                }
                 current.append(char)
                 tokenStarted = true
                 index++
@@ -518,7 +603,10 @@ object CurlAnalyzeUrlConverter {
                     index++
                 }
 
-                (char == '\\' || char == '^') && index + 1 < command.length -> {
+                char == '\\' -> {
+                    if (index + 1 >= command.length) {
+                        throw ConversionException(ErrorReason.INVALID_CURL)
+                    }
                     val next = command[index + 1]
                     if (next == '\n' || next == '\r') {
                         index += if (next == '\r' && command.getOrNull(index + 2) == '\n') 3 else 2
@@ -528,6 +616,11 @@ object CurlAnalyzeUrlConverter {
                         index += 2
                     }
                 }
+
+                char == '$' || char == '`' -> throw ConversionException(
+                    ErrorReason.UNSUPPORTED_OPTION,
+                    "shell expansion",
+                )
 
                 else -> {
                     current.append(char)

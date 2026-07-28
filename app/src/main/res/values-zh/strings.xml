@@ -1459,4 +1459,5 @@
     <string name="curl_converter_unsupported_option">不支持的选项：%1$s</string>
     <string name="curl_converter_failed">转换失败</string>
     <string name="curl_converter_no_output">请先转换内容</string>
+    <string name="curl_converter_insert_failed">编辑器尚未就绪</string>
 </resources>
