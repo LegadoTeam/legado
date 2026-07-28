@@ -2,6 +2,7 @@ package io.legado.app.ui.book.read.page.provider
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -70,18 +71,33 @@ class HangingLineWidthTest {
     }
 
     @Test
-    fun `sub pixel hanging width leaves the layout unchanged`() {
-        val layoutWidth = HangingLineWidth.layoutWidth(visibleWidth, 0.4f)
-        assertEquals(visibleWidth, layoutWidth)
-        assertArrayEquals(
-            intArrayOf(0, 0),
-            HangingLineWidth.rightIndents(visibleWidth, layoutWidth)
-        )
+    fun `fractional hanging width rounds up so the first line keeps the extra char`() {
+        // StaticLayout 只接受整数宽度,向下取整会让首行差不足1px而少排一个字
+        assertEquals(265, HangingLineWidth.layoutWidth(visibleWidth, 24.9f))
+        assertEquals(253, HangingLineWidth.layoutWidth(visibleWidth, 12.5f))
+        assertEquals(241, HangingLineWidth.layoutWidth(visibleWidth, 0.4f))
     }
 
     @Test
-    fun `fractional hanging width rounds down to stay inside the visible width`() {
-        assertEquals(264, HangingLineWidth.layoutWidth(visibleWidth, 24.9f))
+    fun `the rounded first line never gets less room than the hanging frees`() {
+        listOf(0.4f, 12.5f, 23.9f, 24f, 24.1f, 47.5f).forEach { extra ->
+            val layoutWidth = HangingLineWidth.layoutWidth(visibleWidth, extra)
+            assertTrue(
+                "$extra lost room: $layoutWidth < ${visibleWidth + extra}",
+                layoutWidth >= visibleWidth + extra
+            )
+            // 多出的部分不足1px
+            assertTrue("$extra over-widened", layoutWidth < visibleWidth + extra + 1f)
+        }
+    }
+
+    @Test
+    fun `later lines are pulled back to the visible width whatever the rounding`() {
+        listOf(0.4f, 12.5f, 24f, 24.9f).forEach { extra ->
+            val layoutWidth = HangingLineWidth.layoutWidth(visibleWidth, extra)
+            val indents = HangingLineWidth.rightIndents(visibleWidth, layoutWidth)
+            assertEquals(visibleWidth, layoutWidth - indents[1])
+        }
     }
 
     private companion object {

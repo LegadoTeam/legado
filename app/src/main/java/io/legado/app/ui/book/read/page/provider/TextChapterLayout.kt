@@ -1411,6 +1411,25 @@ internal object HangingPunctuationRule {
         if (indent.isEmpty()) return false
         if (text.length <= indent.length) return false
         if (!text.startsWith(indent)) return false
-        return isHangingChar(text[indent.length])
+        if (!isHangingChar(text[indent.length])) return false
+        //排版逐字从左往右累加坐标,右向段落的段首在右侧,悬挂会落在错误的一边
+        return !isRightToLeft(text, indent.length + 1)
+    }
+
+    /**
+     * 段落的首个强方向字符是否为右向,中性字符(数字/标点/空白)继续往后找
+     */
+    fun isRightToLeft(text: String, start: Int): Boolean {
+        var index = start
+        while (index < text.length) {
+            val codePoint = text.codePointAt(index)
+            when (Character.getDirectionality(codePoint)) {
+                Character.DIRECTIONALITY_LEFT_TO_RIGHT -> return false
+                Character.DIRECTIONALITY_RIGHT_TO_LEFT,
+                Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC -> return true
+            }
+            index += Character.charCount(codePoint)
+        }
+        return false
     }
 }
