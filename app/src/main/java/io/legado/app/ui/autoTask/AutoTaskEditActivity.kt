@@ -17,7 +17,12 @@ import io.legado.app.model.AutoTask
 import io.legado.app.ui.code.CodeEditActivity
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.utils.CronSchedule
+import io.legado.app.utils.GSON
 import io.legado.app.utils.StartActivityContract
+import io.legado.app.utils.fromJsonArray
+import io.legado.app.utils.fromJsonObject
+import io.legado.app.utils.getClipText
+import io.legado.app.utils.sendToClip
 import io.legado.app.utils.showHelp
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.toastOnUi
@@ -101,12 +106,20 @@ class AutoTaskEditActivity : BaseActivity<ActivityAutoTaskEditBinding>() {
                     }
                 }
             }
+            R.id.menu_copy_rule -> copyRule()
+            R.id.menu_paste_rule -> pasteRule()
             R.id.menu_help -> showHelp("autoTaskHelp")
         }
         return super.onCompatOptionsItemSelected(item)
     }
 
     private fun bind(rule: AutoTaskRule) {
+        applyRule(rule)
+        originTask = buildDraft()
+        applyPendingEditResult()
+    }
+
+    private fun applyRule(rule: AutoTaskRule) {
         binding.run {
             cbEnable.isChecked = rule.enable
             cbCookieJar.isChecked = rule.enabledCookieJar
@@ -121,8 +134,6 @@ class AutoTaskEditActivity : BaseActivity<ActivityAutoTaskEditBinding>() {
             etLoginUi.setText(rule.loginUi)
             etLoginCheckJs.setText(rule.loginCheckJs)
         }
-        originTask = buildDraft()
-        applyPendingEditResult()
     }
 
     private fun onFullEditClicked() {
@@ -177,6 +188,42 @@ class AutoTaskEditActivity : BaseActivity<ActivityAutoTaskEditBinding>() {
         pendingEditViewId = View.NO_ID
         pendingEditText = null
         pendingEditCursor = -1
+    }
+
+    private fun copyRule() {
+        if (originTask == null) {
+            toastOnUi(R.string.loading)
+            return
+        }
+        val draft = buildDraft()
+        lifecycleScope.launch {
+            val json = withContext(Dispatchers.Default) {
+                AutoTask.exportJson(listOf(draft))
+            }
+            sendToClip(json)
+        }
+    }
+
+    private fun pasteRule() {
+        if (originTask == null) {
+            toastOnUi(R.string.loading)
+            return
+        }
+        val text = getClipText() ?: run {
+            toastOnUi(R.string.wrong_format)
+            return
+        }
+        lifecycleScope.launch {
+            val pasted = withContext(Dispatchers.Default) {
+                GSON.fromJsonObject<AutoTaskRule>(text).getOrNull()
+                    ?: GSON.fromJsonArray<AutoTaskRule>(text).getOrNull()?.singleOrNull()
+            }
+            if (pasted == null) {
+                toastOnUi(R.string.wrong_format)
+            } else {
+                applyRule(pasted)
+            }
+        }
     }
 
     private fun save(after: (AutoTaskRule) -> Unit) {

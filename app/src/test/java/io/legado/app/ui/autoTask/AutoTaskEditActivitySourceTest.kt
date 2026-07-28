@@ -50,6 +50,31 @@ class AutoTaskEditActivitySourceTest {
         assertTrue(menu.contains("android:icon=\"@drawable/ic_code\""))
     }
 
+    @Test
+    fun `copy and paste keep task identity and leave pasted values unsaved`() {
+        val source = projectFile(
+            "src/main/java/io/legado/app/ui/autoTask/AutoTaskEditActivity.kt"
+        ).readText().replace("\r\n", "\n")
+        val copyBlock = source.substringAfter("private fun copyRule()")
+            .substringBefore("private fun pasteRule()")
+        val pasteBlock = source.substringAfter("private fun pasteRule()")
+            .substringBefore("private fun save(")
+        val menu = projectFile("src/main/res/menu/auto_task_edit.xml").readText()
+
+        assertTrue(copyBlock.contains("val draft = buildDraft()"))
+        assertTrue(copyBlock.contains("withContext(Dispatchers.Default)"))
+        assertTrue(copyBlock.contains("AutoTask.exportJson(listOf(draft))"))
+        assertTrue(pasteBlock.contains("withContext(Dispatchers.Default)"))
+        assertTrue(pasteBlock.contains("fromJsonObject<AutoTaskRule>"))
+        assertTrue(pasteBlock.contains("fromJsonArray<AutoTaskRule>"))
+        assertTrue(pasteBlock.contains("singleOrNull()"))
+        assertTrue(pasteBlock.contains("applyRule(pasted)"))
+        assertTrue(!pasteBlock.contains("task = pasted"))
+        assertTrue(!pasteBlock.contains("originTask = buildDraft()"))
+        assertTrue(menu.contains("@+id/menu_copy_rule"))
+        assertTrue(menu.contains("@+id/menu_paste_rule"))
+    }
+
     private fun projectFile(pathInApp: String): File {
         return listOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull { it.isFile }
