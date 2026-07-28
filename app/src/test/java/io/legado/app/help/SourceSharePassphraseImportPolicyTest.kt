@@ -8,17 +8,14 @@ import java.io.File
 class SourceSharePassphraseImportPolicyTest {
 
     @Test
-    fun resumeCheckRequiresPrivacyConsentAndOnlyMainActivity() {
-        assertTrue(SourceSharePassphraseImportPolicy.shouldScheduleOnResume(true, 1))
-        assertFalse(SourceSharePassphraseImportPolicy.shouldScheduleOnResume(false, 1))
-        assertFalse(SourceSharePassphraseImportPolicy.shouldScheduleOnResume(true, 2))
-        assertFalse(SourceSharePassphraseImportPolicy.shouldScheduleOnResume(true, 0))
+    fun resumeCheckRequiresPrivacyConsent() {
+        assertTrue(SourceSharePassphraseImportPolicy.shouldScheduleOnResume(true))
+        assertFalse(SourceSharePassphraseImportPolicy.shouldScheduleOnResume(false))
     }
 
     @Test
-    fun focusRetryRequiresOnlyActiveMainActivity() {
+    fun focusRetryRequiresActiveMainActivity() {
         assertTrue(canAwaitWindowFocus())
-        assertFalse(canAwaitWindowFocus(activityCount = 2))
         assertFalse(canAwaitWindowFocus(isResumed = false))
     }
 
@@ -54,13 +51,11 @@ class SourceSharePassphraseImportPolicyTest {
 
     private fun canAwaitWindowFocus(
         privacyPolicyOk: Boolean = true,
-        activityCount: Int = 1,
         isFinishing: Boolean = false,
         isResumed: Boolean = true,
         isFragmentStateSaved: Boolean = false
     ) = SourceSharePassphraseImportPolicy.canAwaitWindowFocus(
         privacyPolicyOk,
-        activityCount,
         isFinishing,
         isResumed,
         isFragmentStateSaved
@@ -68,14 +63,12 @@ class SourceSharePassphraseImportPolicyTest {
 
     private fun canReadClipboard(
         privacyPolicyOk: Boolean = true,
-        activityCount: Int = 1,
         isFinishing: Boolean = false,
         isResumed: Boolean = true,
         isFragmentStateSaved: Boolean = false,
         hasWindowFocus: Boolean = true
     ) = SourceSharePassphraseImportPolicy.canReadClipboard(
         privacyPolicyOk,
-        activityCount,
         isFinishing,
         isResumed,
         isFragmentStateSaved,

@@ -29,7 +29,6 @@ import io.legado.app.databinding.ActivityMainBinding
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.BottomBarSkinManager
-import io.legado.app.help.LifecycleHelp
 import io.legado.app.help.SourceSharePassphrase
 import io.legado.app.help.SourceSharePassphraseImportPolicy
 import io.legado.app.help.book.BookHelp
@@ -178,8 +177,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     override fun onResume() {
         super.onResume()
         if (SourceSharePassphraseImportPolicy.shouldScheduleOnResume(
-                privacyPolicyOk = LocalConfig.privacyPolicyOk,
-                activityCount = LifecycleHelp.activitySize()
+                privacyPolicyOk = LocalConfig.privacyPolicyOk
             )
         ) {
             scheduleSourceSharePassphraseRead(500)
@@ -481,7 +479,6 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     private fun canAwaitPassphraseWindowFocus(): Boolean {
         return SourceSharePassphraseImportPolicy.canAwaitWindowFocus(
             privacyPolicyOk = LocalConfig.privacyPolicyOk,
-            activityCount = LifecycleHelp.activitySize(),
             isFinishing = isFinishing,
             isResumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED),
             isFragmentStateSaved = supportFragmentManager.isStateSaved
@@ -501,7 +498,6 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             }
             if (!SourceSharePassphraseImportPolicy.canReadClipboard(
                     privacyPolicyOk = LocalConfig.privacyPolicyOk,
-                    activityCount = LifecycleHelp.activitySize(),
                     isFinishing = isFinishing,
                     isResumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED),
                     isFragmentStateSaved = supportFragmentManager.isStateSaved,
