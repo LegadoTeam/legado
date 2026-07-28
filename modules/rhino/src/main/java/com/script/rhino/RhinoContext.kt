@@ -101,6 +101,7 @@ class RhinoContext(factory: ContextFactory) : Context(factory) {
                     lineno,
                     compilationErrorReporter ?: errorReporter,
                     scope,
+                    functionSource = true,
                 ),
                 scope,
             )
@@ -145,17 +146,22 @@ class RhinoContext(factory: ContextFactory) : Context(factory) {
         lineNumber: Int,
         reporter: ErrorReporter,
         runtimeScope: VarScope?,
+        functionSource: Boolean = false,
     ): String {
-        if (!source.contains("with") || !source.contains("const")) return source
+        val hasConst = source.contains("const")
+        val hasLet = source.contains("let")
+        if (!hasConst && !hasLet) return source
 
         val environs = CompilerEnvirons().apply {
             initFromContext(this@RhinoContext)
             setXmlAvailable(true)
         }
         val root = Parser(environs, reporter).parse(source, sourceName, lineNumber)
-        val positions = linkedSetOf<Int>()
-        val declarations = arrayListOf<LegacyConstDeclaration>()
+        val outerFunction = if (functionSource) root.firstChild as? FunctionNode else null
+        val replacements = linkedMapOf<Int, String>()
+        val declarations = arrayListOf<LegacyBlockDeclaration>()
         val references = arrayListOf<Name>()
+        val hasLegacyWithConst = hasConst && source.contains("with")
         val visitor = object : NodeVisitor {
             override fun visit(node: AstNode): Boolean {
                 if (node is CatchClause) {
@@ -164,44 +170,67 @@ class RhinoContext(factory: ContextFactory) : Context(factory) {
                     node.body.visit(this)
                     return false
                 }
-                if (node is WithStatement) {
+                if (hasLegacyWithConst && node is WithStatement) {
                     when (val body = node.statement) {
-                        is VariableDeclaration -> positions.add(body.absolutePosition)
+                        is VariableDeclaration -> body.addConstReplacement(replacements, source)
                         else -> body.filterIsInstance<VariableDeclaration>()
-                            .forEach { positions.add(it.absolutePosition) }
+                            .forEach { it.addConstReplacement(replacements, source) }
                     }
                 }
-                if (runtimeScope != null && node is VariableDeclaration) {
-                    val position = node.absolutePosition
+                if (node is VariableDeclaration) {
                     val scope = node.parent as? Scope
                     val function = node.enclosingFunction
                     val names = node.variables.mapNotNull {
                         (it.target as? Name)?.identifier
                     }.toSet()
+                    val replacement = node.declarationReplacement(source)
+                    val inOuterScope = if (functionSource) {
+                        function === outerFunction
+                    } else {
+                        function == null
+                    }
+                    val inLegacyFunction = runtimeScope != null &&
+                        hasLegacyWithConst &&
+                        function != null &&
+                        replacement?.second == "var  "
                     if (
                         scope?.type == Token.BLOCK &&
-                        function != null &&
+                        (inOuterScope || inLegacyFunction) &&
                         names.isNotEmpty() &&
-                        position >= 0 &&
-                        source.regionMatches(position, "const", 0, 5)
+                        replacement != null
                     ) {
-                        declarations += LegacyConstDeclaration(position, scope, function, names)
+                        declarations += LegacyBlockDeclaration(
+                            replacement.first,
+                            replacement.second,
+                            scope,
+                            function,
+                            names,
+                        )
                     }
                 }
                 if (
-                    runtimeScope != null &&
                     node is Name &&
                     node.definingScope == null &&
-                    node.enclosingFunction != null &&
                     node.isRequiredReference()
                 ) {
-                    references += node
+                    val function = node.enclosingFunction
+                    val inOuterScope = if (functionSource) {
+                        function === outerFunction
+                    } else {
+                        function == null
+                    }
+                    if (
+                        inOuterScope ||
+                        runtimeScope != null && hasLegacyWithConst && function != null
+                    ) {
+                        references += node
+                    }
                 }
                 return true
             }
         }
         root.visit(visitor)
-        // 旧 Rhino 将 const 放在函数作用域；仅在块外真实读取无法解析时恢复该行为。
+        // 旧书源会在块外读取 let/const；仅在同一执行层的未解析真实读取时恢复可见性。
         references.forEach { reference ->
             if (runtimeScope != null &&
                 ScriptableObject.hasProperty(runtimeScope, reference.identifier)
@@ -215,16 +244,15 @@ class RhinoContext(factory: ContextFactory) : Context(factory) {
                         declaration.scope.absolutePosition + declaration.scope.length
             }
             if (matches.size == 1) {
-                positions.add(matches.single().position)
+                val declaration = matches.single()
+                replacements[declaration.position] = declaration.replacement
             }
         }
-        if (positions.isEmpty()) return source
+        if (replacements.isEmpty()) return source
 
         val result = source.toCharArray()
-        positions.forEach { position ->
-            if (position >= 0 && source.regionMatches(position, "const", 0, 5)) {
-                "var  ".toCharArray(result, position)
-            }
+        replacements.forEach { (position, replacement) ->
+            replacement.toCharArray(result, position)
         }
         return result.concatToString()
     }
@@ -233,12 +261,58 @@ class RhinoContext(factory: ContextFactory) : Context(factory) {
         return if (ScriptRuntime.hasTopCall(this)) ScriptRuntime.getTopCallScope(this) else null
     }
 
-    private data class LegacyConstDeclaration(
+    private data class LegacyBlockDeclaration(
         val position: Int,
+        val replacement: String,
         val scope: Scope,
-        val function: FunctionNode,
+        val function: FunctionNode?,
         val names: Set<String>,
     )
+
+    private fun VariableDeclaration.addConstReplacement(
+        replacements: MutableMap<Int, String>,
+        source: String,
+    ) {
+        val position = absolutePosition
+        if (
+            position >= 0 &&
+            source.regionMatches(position, "const", 0, 5)
+        ) {
+            replacements[position] = "var  "
+        }
+    }
+
+    private fun VariableDeclaration.declarationReplacement(
+        source: String,
+    ): Pair<Int, String>? {
+        val position = absolutePosition
+        return when {
+            position >= 0 && source.regionMatches(position, "const", 0, 5) -> {
+                position to "var  "
+            }
+
+            type == Token.LET -> {
+                if (position >= 0 && source.regionMatches(position, "let", 0, 3)) {
+                    return position to "var"
+                }
+                var keywordEnd = position - 1
+                while (keywordEnd >= 0 && source[keywordEnd].isWhitespace()) {
+                    keywordEnd--
+                }
+                val keywordPosition = keywordEnd - 2
+                if (
+                    keywordPosition >= 0 &&
+                    source.regionMatches(keywordPosition, "let", 0, 3)
+                ) {
+                    keywordPosition to "var"
+                } else {
+                    null
+                }
+            }
+
+            else -> null
+        }
+    }
 
     private fun Name.isRequiredReference(): Boolean {
         var expression: AstNode = this

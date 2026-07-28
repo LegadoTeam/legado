@@ -106,6 +106,56 @@ class JsEngineCapabilitiesTest {
     }
 
     @Test
+    fun legacyTopLevelBlockDeclarationsRemainVisibleAfterBlock() {
+        val source = """
+            try {
+                const acontentTarget = {innerHTML: 'content'};
+                let blankLines = [2];
+            } catch (e) {}
+            acontentTarget.innerHTML + ':' + blankLines[0];
+        """.trimIndent()
+
+        Assert.assertEquals("content:2", RhinoScriptEngine.eval(source, ScriptBindings()))
+        Assert.assertEquals(
+            "content:2",
+            RhinoScriptEngine.compile(source).eval(ScriptBindings()),
+        )
+        Assert.assertEquals(
+            "eval",
+            RhinoScriptEngine.eval(
+                """(0, eval)("if (true) { let value = 'eval'; } value;")""",
+                ScriptBindings(),
+            ),
+        )
+        Assert.assertEquals(
+            "function",
+            RhinoScriptEngine.eval(
+                """new Function("try { const value = 'function'; } catch (e) {} return value;")()""",
+                ScriptBindings(),
+            ),
+        )
+        Assert.assertEquals(
+            "undefined",
+            RhinoScriptEngine.eval(
+                """
+                    function nested() {
+                        if (true) { let hidden = 'block'; }
+                        return typeof hidden;
+                    }
+                    nested();
+                """.trimIndent(),
+                ScriptBindings(),
+            ),
+        )
+
+        val bindings = ScriptBindings().apply { this["book"] = "runtime" }
+        Assert.assertEquals(
+            "runtime",
+            RhinoScriptEngine.eval("if (false) { const book = 'block'; } book;", bindings),
+        )
+    }
+
+    @Test
     fun legacyConstDoesNotShadowRuntimeBindings() {
         val bindings = ScriptBindings().apply {
             this["book"] = "global"
