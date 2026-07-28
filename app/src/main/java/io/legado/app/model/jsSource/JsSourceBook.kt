@@ -114,7 +114,7 @@ object JsSourceBook {
     ): String {
         if (chapter.isVolume && chapter.url.startsWith(chapter.title)) {
             Debug.log(source.bookSourceUrl, "⇒一级目录正文不解析")
-            return chapter.tag.orEmpty()
+            return ""
         }
         val engine = JsSourceEngine(source, coroutineContext)
         val content = engine.callFunction(
