@@ -109,6 +109,29 @@ class AutoTaskPersistenceContractTest {
     }
 
     @Test
+    fun `automatic task search preserves hidden selections`() {
+        val layout = file("app/src/main/res/layout/activity_auto_task.xml").readText()
+        val activity = file(
+            "app/src/main/java/io/legado/app/ui/autoTask/AutoTaskActivity.kt"
+        ).readText()
+        val adapter = file(
+            "app/src/main/java/io/legado/app/ui/autoTask/AutoTaskAdapter.kt"
+        ).readText()
+        val listChanged = adapter.substringAfter("override fun onCurrentListChanged()")
+            .substringBefore("fun retainExistingSelections")
+
+        assertTrue(layout.contains("app:contentLayout=\"@layout/view_search\""))
+        assertTrue(activity.contains("private var allRules = emptyList<AutoTaskRule>()"))
+        assertTrue(activity.contains("it.name.contains(query, ignoreCase = true)"))
+        assertTrue(activity.contains("binding.tvEmpty.isVisible = filtered.isEmpty()"))
+        assertTrue(activity.indexOf("adapter.retainExistingSelections(rules)") <
+                activity.indexOf("updateTaskList()", activity.indexOf("collectLatest")))
+        assertTrue(adapter.contains("get() = selection.size"))
+        assertTrue(adapter.contains("selectedIds.retainAll(tasks.mapTo(hashSetOf()) { it.id })"))
+        assertFalse(listChanged.contains("retainAll"))
+    }
+
+    @Test
     fun `exported room schema contains automatic task table`() {
         val schema = file("app/schemas/io.legado.app.data.AppDatabase/95.json")
         assertTrue("Room schema 95 must be committed", schema.isFile)

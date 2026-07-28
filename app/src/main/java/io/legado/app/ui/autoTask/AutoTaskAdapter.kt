@@ -22,7 +22,7 @@ class AutoTaskAdapter(context: Context, private val callback: Callback) :
         get() = getItems().filter { it.id in selectedIds }
 
     val selectionCount: Int
-        get() = selectedIds.size
+        get() = selection.size
 
     val diffCallback = object : DiffUtil.ItemCallback<AutoTaskRule>() {
         override fun areItemsTheSame(oldItem: AutoTaskRule, newItem: AutoTaskRule) =
@@ -79,8 +79,11 @@ class AutoTaskAdapter(context: Context, private val callback: Callback) :
     }
 
     override fun onCurrentListChanged() {
-        selectedIds.retainAll(getItems().mapTo(hashSetOf()) { it.id })
         callback.upCountView()
+    }
+
+    fun retainExistingSelections(tasks: List<AutoTaskRule>) {
+        selectedIds.retainAll(tasks.mapTo(hashSetOf()) { it.id })
     }
 
     fun selectAll() {
