@@ -49,11 +49,12 @@ object WallpaperTheme {
         }
         if (!isAvailable()) return false
         val seed = readWallpaperSeed(context) ?: return false
+        if (autoUpdate && !registerListener(context)) return false
+        if (!autoUpdate) unregisterListener(context)
         context.defaultSharedPreferences.edit {
             putBoolean(PreferKey.wallpaperColorFollow, true)
             putBoolean(PreferKey.wallpaperColorAutoUpdate, autoUpdate)
         }
-        if (autoUpdate) registerListener(context) else unregisterListener(context)
         applyColors(context, colorsForSeed(seed), recreate = true)
         return true
     }
@@ -65,12 +66,17 @@ object WallpaperTheme {
     }
 
     @MainThread
-    fun restoreListenerIfNeeded(context: Context) {
+    fun syncWithPreferences(context: Context) {
+        unregisterListener(context)
         if (!isAvailable()) return
         if (!context.getPrefBoolean(PreferKey.wallpaperColorFollow)) return
         if (!context.getPrefBoolean(PreferKey.wallpaperColorAutoUpdate, true)) return
         applyCurrentColors(context, recreate = false)
-        registerListener(context)
+        if (!registerListener(context)) {
+            context.defaultSharedPreferences.edit {
+                putBoolean(PreferKey.wallpaperColorAutoUpdate, false)
+            }
+        }
     }
 
     @Suppress("RestrictedApi")
@@ -121,12 +127,15 @@ object WallpaperTheme {
         } finally {
             applyingColors = false
         }
-        if (recreate) ThemeConfig.applyDayNight(context)
+        if (recreate) {
+            ThemeConfig.applyDayNight(context, recreateAllActivities = true)
+        }
     }
 
     @MainThread
-    private fun registerListener(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || listener != null) return
+    private fun registerListener(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+        if (listener != null) return true
         val appContext = context.applicationContext
         val colorsChangedListener = WallpaperManager.OnColorsChangedListener { colors, which ->
             if (which and WallpaperManager.FLAG_SYSTEM == 0) return@OnColorsChangedListener
@@ -139,26 +148,28 @@ object WallpaperTheme {
             }
             applyColors(appContext, colorsForSeed(seed), recreate = true)
         }
-        runCatching {
+        return runCatching {
             WallpaperManager.getInstance(appContext)
                 .addOnColorsChangedListener(colorsChangedListener, mainHandler)
-        }.onSuccess {
             listener = colorsChangedListener
-        }
+        }.isSuccess
     }
 
     @MainThread
     private fun unregisterListener(context: Context) {
         val registeredListener = listener ?: return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            runCatching {
-                @Suppress("UNCHECKED_CAST")
-                WallpaperManager.getInstance(context.applicationContext)
-                    .removeOnColorsChangedListener(
-                        registeredListener as WallpaperManager.OnColorsChangedListener
-                    )
-            }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            listener = null
+            return
         }
-        listener = null
+        runCatching {
+            @Suppress("UNCHECKED_CAST")
+            WallpaperManager.getInstance(context.applicationContext)
+                .removeOnColorsChangedListener(
+                    registeredListener as WallpaperManager.OnColorsChangedListener
+                )
+        }.onSuccess {
+            listener = null
+        }
     }
 }

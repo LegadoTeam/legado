@@ -77,7 +77,7 @@ class App : Application() {
             ThreadUtils.hasSubtleSideEffectsSetThreadAssertsDisabledForTesting(true)
         }
         oldConfig = Configuration(resources.configuration)
-        WallpaperTheme.restoreListenerIfNeeded(this)
+        WallpaperTheme.syncWithPreferences(this)
         applyDayNightInit(this)
         registerActivityLifecycleCallbacks(LifecycleHelp)
         defaultSharedPreferences.registerOnSharedPreferenceChangeListener(AppConfig)
