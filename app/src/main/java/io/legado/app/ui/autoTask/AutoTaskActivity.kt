@@ -84,7 +84,7 @@ class AutoTaskActivity : BaseActivity<ActivityAutoTaskBinding>(), AutoTaskAdapte
             attachToRecyclerView(binding.recyclerView)
             activeSlideSelect()
         }
-        binding.selectActionBar.setMainActionText(R.string.auto_task_batch_cron)
+        binding.selectActionBar.setMainActionText(R.string.delete)
         binding.selectActionBar.inflateMenu(R.menu.auto_task_sel)
         binding.selectActionBar.setCallBack(this)
         binding.selectActionBar.setOnMenuItemClickListener(this)
@@ -121,6 +121,27 @@ class AutoTaskActivity : BaseActivity<ActivityAutoTaskBinding>(), AutoTaskAdapte
                 AutoTask.updateCron(ids, cron, this@AutoTaskActivity)
             }
             dialog.dismiss()
+        }
+    }
+
+    private fun updateSelectionEnabled(enabled: Boolean) {
+        val ids = adapter.selection.map { it.id }
+        if (ids.isEmpty()) return
+        lifecycleScope.launch(Dispatchers.IO) {
+            AutoTask.updateEnabled(ids, enabled, this@AutoTaskActivity)
+        }
+    }
+
+    private fun deleteSelection() {
+        val ids = adapter.selection.map { it.id }
+        if (ids.isEmpty()) return
+        alert(R.string.delete, R.string.sure_del) {
+            yesButton {
+                lifecycleScope.launch(Dispatchers.IO) {
+                    AutoTask.delete(ids, this@AutoTaskActivity)
+                }
+            }
+            noButton()
         }
     }
 
@@ -246,21 +267,26 @@ class AutoTaskActivity : BaseActivity<ActivityAutoTaskBinding>(), AutoTaskAdapte
     }
 
     override fun onClickSelectBarMainAction() {
-        showBatchCronDialog()
+        deleteSelection()
     }
 
     override fun onMenuItemClick(item: MenuItem): Boolean {
-        if (item.itemId == R.id.menu_export_selection) {
-            val rules = adapter.selection
-            lifecycleScope.launch {
-                val json = withContext(Dispatchers.IO) { AutoTask.exportJson(rules) }
-                exportDoc.launch {
-                    mode = HandleFileContract.EXPORT
-                    fileData = HandleFileContract.FileData(
-                        "exportAutoTaskSelection.json",
-                        json,
-                        "application/json"
-                    )
+        when (item.itemId) {
+            R.id.menu_batch_cron -> showBatchCronDialog()
+            R.id.menu_enable_selection -> updateSelectionEnabled(true)
+            R.id.menu_disable_selection -> updateSelectionEnabled(false)
+            R.id.menu_export_selection -> {
+                val rules = adapter.selection
+                lifecycleScope.launch {
+                    val json = withContext(Dispatchers.IO) { AutoTask.exportJson(rules) }
+                    exportDoc.launch {
+                        mode = HandleFileContract.EXPORT
+                        fileData = HandleFileContract.FileData(
+                            "exportAutoTaskSelection.json",
+                            json,
+                            "application/json"
+                        )
+                    }
                 }
             }
         }

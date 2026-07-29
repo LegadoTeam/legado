@@ -202,6 +202,16 @@ object AutoTask {
         if (changed) AutoTaskScheduler.refresh(context)
     }
 
+    fun updateEnabled(ids: Collection<String>, enabled: Boolean, context: Context = appCtx): Int {
+        if (ids.isEmpty()) return 0
+        val changed = synchronized(this) {
+            all()
+            ids.chunked(900).sumOf { appDb.autoTaskRuleDao.updateEnabled(it, enabled) }
+        }
+        if (changed > 0) AutoTaskScheduler.refresh(context)
+        return changed
+    }
+
     fun updateCron(ids: Collection<String>, cron: String, context: Context = appCtx): Int {
         if (ids.isEmpty()) return 0
         val changed = synchronized(this) {

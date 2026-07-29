@@ -34,6 +34,9 @@ interface AutoTaskRuleDao {
     @Query("UPDATE auto_task_rules SET cron = :cron WHERE id IN (:ids)")
     fun updateCron(ids: Collection<String>, cron: String): Int
 
+    @Query("UPDATE auto_task_rules SET enable = :enabled WHERE id IN (:ids)")
+    fun updateEnabled(ids: Collection<String>, enabled: Boolean): Int
+
     @Query(
         """
         UPDATE auto_task_rules
