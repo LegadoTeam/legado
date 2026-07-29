@@ -42,6 +42,9 @@ data class TextPage(
     var renderHeight: Int = 0
 ) {
 
+    private val hasShadowStyle: Boolean
+        get() = lines.any { it.hasShadowStyle }
+
     companion object {
         val readProgressFormatter = DecimalFormat("0.0%")
         val emptyTextPage = TextPage()
@@ -296,8 +299,8 @@ data class TextPage(
     }
 
     fun draw(view: ContentTextView, canvas: Canvas, relativeOffset: Float) {
-        if (AppConfig.optimizeRender) {
-            render(view)
+        if (AppConfig.optimizeRender && !hasShadowStyle) {
+            recordIfCompleted(view)
             canvas.withTranslation(0f, relativeOffset) {
                 canvasRecorder.draw(this)
             }
@@ -333,6 +336,11 @@ data class TextPage(
     }
 
     fun render(view: ContentTextView): Boolean {
+        if (hasShadowStyle) return false
+        return recordIfCompleted(view)
+    }
+
+    private fun recordIfCompleted(view: ContentTextView): Boolean {
         if (!isCompleted) return false
         return canvasRecorder.recordIfNeeded(view.width, renderHeight + 10.dpToPx()) { //高度留余，避免图片过高时被截断 下划线最远10dp
             drawPage(view, this)

@@ -148,6 +148,12 @@ class HighlightFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_bookmar
                     TocActivityResult.EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH,
                     highlight.layoutTitleLength
                 )
+                putExtra(
+                    TocActivityResult.EXTRA_HIGHLIGHT_ANCHOR_TEXT,
+                    highlight.bookText.takeIf {
+                        highlight.chapterPosEnd - highlight.chapterPos == it.length
+                    }.orEmpty()
+                )
             })
             finish()
         }

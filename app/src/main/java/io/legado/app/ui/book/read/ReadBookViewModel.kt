@@ -106,14 +106,17 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
             val chapterPos = intent.getIntExtra("chapterPos", -1)
             val highlightLayoutTitleLength = intent.takeIf { hasHighlightTarget }
                 ?.getIntExtra(TocActivityResult.EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH, -1)
+            val highlightAnchorText = intent.takeIf { hasHighlightTarget }
+                ?.getStringExtra(TocActivityResult.EXTRA_HIGHLIGHT_ANCHOR_TEXT)
             if (index >= 0 && chapterPos >= 0) { //从目录定位正文，有进度传递
                 if (hasHighlightTarget) {
                     intent.removeExtra(TocActivityResult.EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH)
+                    intent.removeExtra(TocActivityResult.EXTRA_HIGHLIGHT_ANCHOR_TEXT)
                     intent.removeExtra("index")
                     intent.removeExtra("chapterPos")
                 }
                 ReadBook.saveCurrentBookProgress() //启用恢复进度提示
-                openChapter(index, chapterPos, highlightLayoutTitleLength)
+                openChapter(index, chapterPos, highlightLayoutTitleLength, highlightAnchorText)
             }
         }.onSuccess {
             success?.invoke()
@@ -364,12 +367,14 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
         index: Int,
         durChapterPos: Int = 0,
         highlightLayoutTitleLength: Int? = null,
+        highlightAnchorText: String? = null,
         success: (() -> Unit)? = null
     ) {
         ReadBook.openChapter(
             index,
             durChapterPos,
             highlightLayoutTitleLength = highlightLayoutTitleLength,
+            highlightAnchorText = highlightAnchorText,
             success = success
         )
     }

@@ -61,14 +61,15 @@ data class TextHtmlColumn(
 
     override var highlightStyle: HighlightStyle? = null
         set(value) {
-            if (field != value) {
+            val normalized = value?.normalized()
+            if (field != normalized) {
                 textLine.invalidate()
                 val before = field?.needsPerColumnDraw == true
-                val after = value?.needsPerColumnDraw == true
+                val after = normalized?.needsPerColumnDraw == true
                 if (!before && after) textLine.styledColumnCount++
                 else if (before && !after) textLine.styledColumnCount--
             }
-            field = value
+            field = normalized
         }
 
     override fun draw(view: ContentTextView, canvas: Canvas) {
@@ -87,16 +88,13 @@ data class TextHtmlColumn(
             color = textColor
             isUnderlineText = linkUrl != null
         }
-        val fill = style?.fill ?: 0
-        if (fill != 0) {
-            canvas.drawRect(start, 0f, end, textLine.height, view.highlightPaint(fill))
-        }
         val styledPaint = style?.takeIf {
-            it.textColor != 0 || it.bold || it.italic
-        }?.let { HighlightDraw.obtainTextPaint(textPaint, it, textColor) }
+            it.textColor != 0 || it.bold || it.italic || it.shadow != null ||
+                it.resolvedFontPath.isNotEmpty()
+        }?.let { HighlightDraw.obtainTextPaint(textPaint, it, textColor, charData) }
         drawText(canvas, y, styledPaint ?: textPaint)
         styledPaint?.let(HighlightDraw::recycleTextPaint)
-        style?.emphasis?.let {
+        style?.takeIf { it.underline == null }?.emphasis?.let {
             HighlightDraw.drawEmphasis(
                 canvas,
                 start,

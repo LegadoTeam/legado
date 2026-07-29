@@ -2,6 +2,7 @@ package io.legado.app.data.entities
 
 import io.legado.app.help.HighlightStyle
 import io.legado.app.utils.GSON
+import io.legado.app.utils.fromJsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -28,6 +29,20 @@ class BookHighlightTest {
 
         highlight.style = GSON.toJson(HighlightStyle(fill = 2))
         assertEquals(2, highlight.styleObj().fill)
+    }
+
+    @Test
+    fun `oversized shadow remains editable and serializable`() {
+        val highlight = BookHighlight(style = """{"shadow":{"radius":3.5e38}}""")
+
+        val restored = highlight.styleObj()
+        assertTrue(restored.shadow?.radius?.isFinite() == true)
+        highlight.applyStyle(restored)
+
+        assertEquals(
+            restored,
+            GSON.fromJsonObject<HighlightStyle>(highlight.style).getOrThrow()
+        )
     }
 
     @Test

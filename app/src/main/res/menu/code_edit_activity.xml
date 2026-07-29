@@ -24,6 +24,12 @@
         app:showAsAction="always" />
 
     <item
+        android:id="@+id/menu_login"
+        android:title="@string/login"
+        android:visible="false"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_change_theme"
         android:title="@string/change_theme"
         app:showAsAction="never" />
@@ -31,6 +37,11 @@
     <item
         android:id="@+id/menu_format_code"
         android:title="@string/format_code"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_curl_analyze_url"
+        android:title="@string/curl_analyze_url_converter"
         app:showAsAction="never" />
 
     <item

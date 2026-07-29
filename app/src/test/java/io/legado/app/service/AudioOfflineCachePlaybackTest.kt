@@ -34,8 +34,8 @@ class AudioOfflineCachePlaybackTest {
         val serviceSource = projectFile(
             "src/main/java/io/legado/app/service/AudioPlayService.kt"
         ).readText()
-        assertTrue(serviceSource.contains("url = AudioPlay.durMediaUrl"))
-        assertTrue(serviceSource.contains("localMediaItem(url) ?: analyzeUrl.getMediaItem()"))
+        assertTrue(serviceSource.contains("requestUrl = AudioPlay.durMediaUrl"))
+        assertTrue(serviceSource.contains("localMediaItem(requestUrl) ?: analyzeUrl.getMediaItem()"))
         assertTrue(serviceSource.contains("url.startsWith(\"content://\", true)"))
     }
 
@@ -80,7 +80,7 @@ class AudioOfflineCachePlaybackTest {
         val source = projectFile(
             "src/main/java/io/legado/app/service/AudioPlayService.kt"
         ).readText()
-        val errorBody = source.substringAfter("override fun onPlayerError")
+        val errorBody = source.substringAfter("private fun handlePlayerError")
             .substringBefore("private fun setTimer")
 
         assertTrue(

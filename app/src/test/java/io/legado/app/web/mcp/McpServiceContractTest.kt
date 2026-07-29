@@ -1,10 +1,22 @@
 package io.legado.app.web.mcp
 
+import com.script.rhino.runScriptWithContext
+import io.legado.app.data.entities.BookSource
+import io.legado.app.model.jsSource.JsSourceEngine
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.net.URI
 
 class McpServiceContractTest {
 
@@ -52,7 +64,7 @@ class McpServiceContractTest {
     }
 
     @Test
-    fun `server exposes the expected eight tools on current safe APIs`() {
+    fun `server exposes the expected thirteen tools on current safe APIs`() {
         val tools = projectFile("app/src/main/java/io/legado/app/web/mcp/McpToolServer.kt")
         val registrations = tools.substringAfter("private fun registerTools")
         val names = Regex("name = \\\"([a-z_]+)\\\"")
@@ -70,17 +82,81 @@ class McpServiceContractTest {
                 "get_http_logs",
                 "get_http_log",
                 "set_http_log_recording",
+                "get_cookies",
+                "set_cookie",
+                "clear_cookies",
+                "eval_js",
+                "check_source",
             ),
             names,
         )
+        val getCookiesTool = tools.substringAfter("name = \"get_cookies\"")
+            .substringBefore("name = \"set_cookie\"")
+        assertTrue(getCookiesTool.contains("CookieManager.getCookieNoSession"))
+        assertTrue(getCookiesTool.contains("CookieManager.getSessionCookie"))
+        assertTrue(getCookiesTool.contains("CookieManager.mergeCookies"))
+        assertTrue(getCookiesTool.contains("McpFormat.truncate"))
+        assertFalse(getCookiesTool.contains("CookieStore.getCookie("))
+
+        val setCookieTool = tools.substringAfter("name = \"set_cookie\"")
+            .substringBefore("name = \"clear_cookies\"")
+        assertTrue(setCookieTool.contains("CookieStore.cookieToMap(cookie)"))
+        assertTrue(setCookieTool.contains("cookieMap.isEmpty()"))
+        assertTrue(setCookieTool.contains("cookieMap.keys.any"))
+        assertTrue(setCookieTool.contains("有效的 name=value"))
+        assertTrue(setCookieTool.contains("CookieStore.replaceCookie"))
+
+        val clearCookiesTool = tools.substringAfter("name = \"clear_cookies\"")
+            .substringBefore("name = \"eval_js\"")
+        assertTrue(clearCookiesTool.contains("CookieStore.removeCookie"))
         assertTrue(tools.contains("HttpLogRecord"))
         assertTrue(tools.contains("JsSourceUpsert.withSaveLock"))
         assertTrue(tools.contains("catch (error: CancellationException)"))
         assertTrue(tools.contains("val logs = data[\"logs\"] as List<*>"))
         assertTrue(tools.contains("val log = item as Map<*, *>"))
+        assertTrue(tools.contains("Debug.tryStartCheckSession()"))
+        assertTrue(tools.contains("Debug.isCheckServiceStarted(checkSessionId)"))
+        assertTrue(tools.contains("CheckSource.stop(appCtx, checkSessionId)"))
+        assertTrue(tools.contains("IntentData.get<Any>(selectedSourcesKey)"))
         assertFalse(tools.contains("UNCHECKED_CAST"))
         assertFalse(tools.contains("HttpRecord"))
         assertFalse(tools.contains("HttpLogger"))
+        assertTrue(tools.contains("logging = ServerCapabilities.Logging"))
+
+        val debugTool = tools.substringAfter("name = \"debug_source\"")
+            .substringBefore("name = \"list_sources\"")
+        assertTrue(debugTool.contains("Channel<String>(Channel.CONFLATED)"))
+        assertTrue(debugTool.contains("request.meta?.progressToken"))
+        assertTrue(debugTool.contains("notificationJob.join()"))
+        assertFalse(debugTool.contains("Channel.UNLIMITED"))
+
+        val notification = tools.substringAfter("private suspend fun sendBestEffort")
+            .substringBefore("private suspend fun ClientConnection.sendProgressLine")
+        assertTrue(notification.contains("catch (error: CancellationException)"))
+        assertTrue(notification.contains("throw error"))
+
+        val api = projectFile("api.md")
+        assertTrue(api.contains("notifications/message"))
+        assertTrue(api.contains("progressToken"))
+
+        val evalTool = tools.substringAfter("name = \"eval_js\"")
+            .substringBefore("name = \"check_source\"")
+        assertTrue(evalTool.contains("JsSourceUpsert.validatePayload(js)"))
+        assertTrue(evalTool.contains("Debug.startSimpleDebug(collector, source.getKey())"))
+        assertTrue(evalTool.contains("Debug.cancelDebug(collector)"))
+        assertTrue(evalTool.contains("withTimeoutOrNull"))
+        assertTrue(evalTool.contains("withContext(Dispatchers.IO)"))
+        assertTrue(evalTool.contains("runScriptWithContext"))
+        assertTrue(evalTool.contains("JsSourceEngine.normalizeJsResult(raw, context)"))
+        assertTrue(evalTool.contains("catch (error: CancellationException)"))
+        assertFalse(evalTool.contains("debugScope.async"))
+
+        val checkTool = tools.substringAfter("name = \"check_source\"")
+        assertTrue(checkTool.contains("Debug.getCheckSnapshot(checkSessionId, urls)"))
+        assertTrue(checkTool.contains("Debug.takeCheckSnapshot(checkSessionId, urls)"))
+        assertTrue(checkTool.contains("sendCheckProgress("))
+        assertTrue(tools.contains("logger = \"legado.check_source\""))
+        assertFalse(checkTool.contains("getBookSources(urls)"))
 
         val sourceStore = projectFile("app/src/main/java/io/legado/app/web/mcp/McpSourceStore.kt")
         assertTrue(sourceStore.contains("JsSourceUpsert.prepareForSave"))
@@ -94,6 +170,82 @@ class McpServiceContractTest {
     }
 
     @Test
+    fun `request context evaluates and normalizes source javascript`() = runBlocking {
+        val source = BookSource(
+            bookSourceUrl = "https://example.com",
+            mainJs = "var mainLoaded = true",
+        )
+
+        val objectResult = evaluate(source, "({message: 'ok', items: [1, 2]})").orEmpty()
+        assertTrue(objectResult.contains("\"message\":\"ok\""))
+        assertTrue(objectResult.contains("\"items\":[1,2]"))
+        assertEquals("plain", evaluate(source, "'plain'"))
+        assertNull(evaluate(source, "null"))
+        assertEquals(
+            "https://example.com|https://example.com|https://example.com|undefined",
+            evaluate(
+                source,
+                "baseUrl + '|' + source.bookSourceUrl + '|' + " +
+                    "sourceApi.bookSourceUrl + '|' + typeof mainLoaded"
+            )
+        )
+    }
+
+    @Test(timeout = 5_000)
+    fun `request cancellation interrupts source javascript`() {
+        assertThrows(TimeoutCancellationException::class.java) {
+            runBlocking {
+                withTimeout(250) {
+                    evaluate(BookSource(), "while (true) {}")
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `server exposes bundled help markdown as read only resources`() {
+        val server = projectFile("app/src/main/java/io/legado/app/web/mcp/McpToolServer.kt")
+
+        assertTrue(server.contains("resources = ServerCapabilities.Resources(),"))
+        assertTrue(server.contains("val assetDir = \"web/help/md\""))
+        assertTrue(server.contains("catch (error: IOException)"))
+        assertTrue(server.contains("error.printOnDebug()"))
+        assertTrue(server.contains(".filter { it.endsWith(\".md\") }"))
+        assertTrue(server.contains(".sorted()"))
+        assertTrue(server.contains("val uri = \"legado://help/\$name\""))
+        assertTrue(server.contains("server.addResource("))
+        assertTrue(server.contains("appCtx.assets.open(\"\$assetDir/\$fileName\")"))
+        assertTrue(server.contains("bufferedReader(Charsets.UTF_8)"))
+        assertTrue(server.contains(".use { it.readText() }"))
+        assertTrue(server.contains("mimeType = \"text/markdown\""))
+    }
+
+    @Test
+    fun `bundled help resource uris are unique valid and readable`() {
+        val files = projectPath("app/src/main/assets/web/help/md")
+            .listFiles { file -> file.isFile && file.extension == "md" }
+            .orEmpty()
+
+        assertTrue(files.isNotEmpty())
+        val resources = files.associateWith { file ->
+            assertTrue(file.readText(Charsets.UTF_8).isNotBlank())
+            URI("legado://help/${file.nameWithoutExtension}")
+        }
+        val uris = resources.values
+        assertEquals(uris.size, uris.distinct().size)
+        assertTrue(uris.any { it.toString() == "legado://help/rssRuleHelp" })
+        assertTrue(
+            resources.all { (file, uri) ->
+                uri.scheme == "legado" &&
+                    uri.host == "help" &&
+                    uri.rawPath == "/${file.nameWithoutExtension}" &&
+                    uri.rawQuery == null &&
+                    uri.rawFragment == null
+            }
+        )
+    }
+
+    @Test
     fun `documentation and shrinker keep the security boundary`() {
         val api = projectFile("api.md")
         val updateLog = projectFile("app/src/main/assets/updateLog.md")
@@ -102,19 +254,38 @@ class McpServiceContractTest {
         assertTrue(api.contains("X-Legado-Token"))
         assertTrue(api.contains("Host 和 Origin 校验"))
         assertTrue(api.contains("可信局域网"))
+        assertTrue(api.contains("令牌等同于书源脚本执行权限"))
+        assertTrue(api.contains("eval_js"))
+        assertTrue(api.contains("未脱敏 Cookie"))
+        assertTrue(api.contains("只合并写入持久层"))
+        assertTrue(api.contains("同名会话 Cookie"))
+        assertTrue(api.contains("legado://help/"))
         assertTrue(updateLog.contains("**2026/07/22**"))
         assertTrue(updateLog.contains("原生 MCP 书源开发服务"))
+        assertTrue(updateLog.contains("支持通过 MCP 在应用内书源环境执行 JavaScript"))
+        assertTrue(updateLog.contains("MCP 增加 Cookie 非破坏性读取"))
+        assertTrue(updateLog.contains("支持通过 MCP resources 读取应用内帮助文档"))
         assertFalse(proguard.contains("-keep class io.ktor.**"))
         assertFalse(proguard.contains("-keep class kotlinx.coroutines.**"))
     }
 
-    private fun projectFile(path: String): String {
+    private suspend fun evaluate(source: BookSource, js: String): String? {
+        return withContext(Dispatchers.IO) {
+            val context = currentCoroutineContext()
+            val raw = runScriptWithContext { source.evalJS(js) }
+            JsSourceEngine.normalizeJsResult(raw, context)
+        }
+    }
+
+    private fun projectFile(path: String): String = projectPath(path).readText()
+
+    private fun projectPath(path: String): File {
         var root = File(requireNotNull(System.getProperty("user.dir")))
         repeat(6) {
             val candidate = File(root, path)
-            if (candidate.isFile) return candidate.readText()
+            if (candidate.exists()) return candidate
             root = root.parentFile ?: error("Project root not found for: $path")
         }
-        error("Project file not found: $path")
+        error("Project path not found: $path")
     }
 }

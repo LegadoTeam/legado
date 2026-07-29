@@ -16,6 +16,7 @@ import io.legado.app.help.HighlightStyle
 import io.legado.app.help.HighlightStyles
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.model.ReadBook
+import io.legado.app.ui.book.read.HighlightFillPreviewDrawable
 import io.legado.app.ui.book.read.HighlightStyleDialog
 import io.legado.app.utils.GSON
 import io.legado.app.utils.getCompatColor
@@ -153,7 +154,11 @@ class HighlightRuleEditDialog : BaseDialogFragment(R.layout.dialog_highlight_rul
     }
 
     private fun upPreview() {
-        binding.tvStylePreview.setBackgroundColor(editingStyle.fill)
+        binding.tvStylePreview.background = if (editingStyle.fill != 0) {
+            HighlightFillPreviewDrawable(editingStyle, binding.tvStylePreview.textSize)
+        } else {
+            null
+        }
         binding.tvStylePreview.setTextColor(
             editingStyle.textColor.takeIf { it != 0 }
                 ?: requireContext().getCompatColor(R.color.primaryText)

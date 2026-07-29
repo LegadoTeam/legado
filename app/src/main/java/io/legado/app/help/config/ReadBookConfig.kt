@@ -246,6 +246,11 @@ object ReadBookConfig {
      */
     val textBottomJustify get() = appCtx.getPrefBoolean(PreferKey.textBottomJustify, true)
 
+    /**
+     * 段首标点悬挂
+     */
+    val hangingPunctuation get() = appCtx.getPrefBoolean(PreferKey.hangingPunctuation, false)
+
     var hideStatusBar = appCtx.getPrefBoolean(PreferKey.hideStatusBar)
     var hideNavigationBar = appCtx.getPrefBoolean(PreferKey.hideNavigationBar)
     var useZhLayout = appCtx.getPrefBoolean(PreferKey.useZhLayout)

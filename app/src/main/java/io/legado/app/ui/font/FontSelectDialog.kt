@@ -104,6 +104,11 @@ class FontSelectDialog : BaseDialogFragment(R.layout.dialog_font_select),
     override fun onMenuItemClick(item: MenuItem?): Boolean {
         when (item?.itemId) {
             R.id.menu_default -> {
+                if (!shouldSelectSystemTypeface(callBack)) {
+                    onDefaultFontChange()
+                    dismissAllowingStateLoss()
+                    return true
+                }
                 val requireContext = requireContext()
                 alert(titleResource = R.string.system_typeface) {
                     items(
@@ -187,11 +192,8 @@ class FontSelectDialog : BaseDialogFragment(R.layout.dialog_font_select),
     }
 
     override fun onFontSelect(docItem: FileDoc) {
-        execute {
-            callBack?.selectFont(docItem.toString())
-        }.onSuccess {
-            dismissAllowingStateLoss()
-        }
+        callBack?.selectFont(docItem.toString())
+        dismissAllowingStateLoss()
     }
 
     private fun onDefaultFontChange() {
@@ -204,5 +206,12 @@ class FontSelectDialog : BaseDialogFragment(R.layout.dialog_font_select),
     interface CallBack {
         fun selectFont(path: String)
         val curFontPath: String
+        val selectSystemTypefaceOnDefault: Boolean get() = true
+    }
+
+    companion object {
+        internal fun shouldSelectSystemTypeface(callBack: CallBack?): Boolean {
+            return callBack?.selectSystemTypefaceOnDefault != false
+        }
     }
 }

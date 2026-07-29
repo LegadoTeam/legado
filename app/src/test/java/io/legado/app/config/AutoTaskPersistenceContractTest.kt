@@ -79,6 +79,59 @@ class AutoTaskPersistenceContractTest {
     }
 
     @Test
+    fun `batch selection actions update only selected state and refresh scheduling once`() {
+        val dao = file("app/src/main/java/io/legado/app/data/dao/AutoTaskRuleDao.kt").readText()
+        val autoTask = file("app/src/main/java/io/legado/app/model/AutoTask.kt").readText()
+        val activity = file(
+            "app/src/main/java/io/legado/app/ui/autoTask/AutoTaskActivity.kt"
+        ).readText()
+        val menu = file("app/src/main/res/menu/auto_task_sel.xml").readText()
+        val update = autoTask.substringAfter("fun updateEnabled(").substringBefore("fun updateCron(")
+        val enabledQuery = Regex("""@Query\("([^"]+)"\)\s+fun updateEnabled""")
+            .find(dao)
+            ?.groupValues
+            ?.get(1)
+
+        assertEquals(
+            "UPDATE auto_task_rules SET enable = :enabled WHERE id IN (:ids)",
+            enabledQuery
+        )
+        assertMutationChecksLegacyFirst(update, "appDb.autoTaskRuleDao.updateEnabled")
+        assertTrue(update.contains("ids.chunked(900).sumOf"))
+        assertTrue(update.contains("if (changed > 0) AutoTaskScheduler.refresh(context)"))
+        assertFalse(update.contains("autoTaskRuleDao.update("))
+        assertTrue(activity.contains("setMainActionText(R.string.delete)"))
+        assertTrue(activity.contains("AutoTask.updateEnabled(ids, enabled"))
+        assertTrue(activity.contains("AutoTask.delete(ids"))
+        assertTrue(menu.contains("menu_batch_cron"))
+        assertTrue(menu.contains("menu_enable_selection"))
+        assertTrue(menu.contains("menu_disable_selection"))
+    }
+
+    @Test
+    fun `automatic task search preserves hidden selections`() {
+        val layout = file("app/src/main/res/layout/activity_auto_task.xml").readText()
+        val activity = file(
+            "app/src/main/java/io/legado/app/ui/autoTask/AutoTaskActivity.kt"
+        ).readText()
+        val adapter = file(
+            "app/src/main/java/io/legado/app/ui/autoTask/AutoTaskAdapter.kt"
+        ).readText()
+        val listChanged = adapter.substringAfter("override fun onCurrentListChanged()")
+            .substringBefore("fun retainExistingSelections")
+
+        assertTrue(layout.contains("app:contentLayout=\"@layout/view_search\""))
+        assertTrue(activity.contains("private var allRules = emptyList<AutoTaskRule>()"))
+        assertTrue(activity.contains("it.name.contains(query, ignoreCase = true)"))
+        assertTrue(activity.contains("binding.tvEmpty.isVisible = filtered.isEmpty()"))
+        assertTrue(activity.indexOf("adapter.retainExistingSelections(rules)") <
+                activity.indexOf("updateTaskList()", activity.indexOf("collectLatest")))
+        assertTrue(adapter.contains("get() = selection.size"))
+        assertTrue(adapter.contains("selectedIds.retainAll(tasks.mapTo(hashSetOf()) { it.id })"))
+        assertFalse(listChanged.contains("retainAll"))
+    }
+
+    @Test
     fun `exported room schema contains automatic task table`() {
         val schema = file("app/schemas/io.legado.app.data.AppDatabase/95.json")
         assertTrue("Room schema 95 must be committed", schema.isFile)

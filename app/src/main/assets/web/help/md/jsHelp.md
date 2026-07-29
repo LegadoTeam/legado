@@ -828,7 +828,7 @@ function getBookInfo(book) {
 `isPay`、`resourceUrl`、`tag` 和 `wordCount`。
 
 卷名行推荐设置 `isVolume: true`，并令 `url` 与 `title` 完全相同。应用不会为这种行补全
-URL，打开时直接使用 `tag` 作为内容，不调用 `getContent`。
+URL，打开时作为空正文的卷名分隔页显示，不调用 `getContent`。
 
 #### getContent
 

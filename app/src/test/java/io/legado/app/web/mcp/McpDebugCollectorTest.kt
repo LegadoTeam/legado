@@ -16,13 +16,15 @@ class McpDebugCollectorTest {
 
     @Test
     fun accumulateAndFinishSignals() = runBlocking {
-        val collector = McpDebugCollector()
+        val forwarded = mutableListOf<String>()
+        val collector = McpDebugCollector(forwarded::add)
         collector.printLog(1, "step1")
         collector.printLog(10, "raw html ignored")
         collector.printLog(1000, "done")
 
         assertTrue(collector.awaitFinished(1_000))
         assertEquals("step1\ndone\n", collector.snapshot())
+        assertEquals(listOf("step1", "done"), forwarded)
 
         val failed = McpDebugCollector()
         failed.printLog(-1, "boom")
@@ -41,13 +43,16 @@ class McpDebugCollectorTest {
 
     @Test
     fun logBufferIsBoundedButStillAcceptsCompletion() = runBlocking {
-        val collector = McpDebugCollector()
+        val forwarded = mutableListOf<String>()
+        val collector = McpDebugCollector(forwarded::add)
         collector.printLog(1, "x".repeat(McpFormat.TRUNCATE_LIMIT * 2))
         collector.printLog(1000, "done")
 
         assertTrue(collector.awaitFinished(1_000))
         val snapshot = collector.snapshot()
         assertTrue(snapshot.length <= McpFormat.TRUNCATE_LIMIT)
+        assertEquals(1, forwarded.size)
+        assertTrue(forwarded.single().length <= McpFormat.TRUNCATE_LIMIT)
         assertTrue(snapshot.contains("调试日志已截断"))
     }
 

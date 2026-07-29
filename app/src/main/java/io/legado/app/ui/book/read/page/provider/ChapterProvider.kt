@@ -7,6 +7,7 @@ import android.graphics.Typeface
 import android.os.Build
 import android.text.StaticLayout
 import android.text.TextPaint
+import android.util.LruCache
 import androidx.core.os.postDelayed
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.EventBus
@@ -381,19 +382,7 @@ object ChapterProvider {
     private fun getTypeface(fontPath: String): Typeface? {
         return kotlin.runCatching {
             when {
-                fontPath.isContentScheme() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> {
-                    appCtx.contentResolver
-                        .openFileDescriptor(fontPath.toUri(), "r")!!
-                        .use {
-                            Typeface.Builder(it.fileDescriptor).build()
-                        }
-                }
-
-                fontPath.isContentScheme() -> {
-                    Typeface.createFromFile(RealPathUtil.getPath(appCtx, fontPath.toUri()))
-                }
-
-                fontPath.isNotEmpty() -> Typeface.createFromFile(fontPath)
+                fontPath.isNotEmpty() -> loadTypeface(fontPath)
                 else -> when (AppConfig.systemTypefaces) {
                     1 -> Typeface.SERIF
                     2 -> Typeface.MONOSPACE
@@ -405,6 +394,37 @@ object ChapterProvider {
             ReadBookConfig.save()
             Typeface.SANS_SERIF
         } ?: Typeface.DEFAULT
+    }
+
+    private fun loadTypeface(fontPath: String): Typeface? = when {
+        fontPath.isContentScheme() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> {
+            appCtx.contentResolver.openFileDescriptor(fontPath.toUri(), "r")!!.use {
+                Typeface.Builder(it.fileDescriptor).build()
+            }
+        }
+
+        fontPath.isContentScheme() -> {
+            Typeface.createFromFile(RealPathUtil.getPath(appCtx, fontPath.toUri()))
+        }
+
+        else -> Typeface.createFromFile(fontPath)
+    }
+
+    private data class TypefaceResult(val typeface: Typeface?)
+
+    private val highlightTypefaceCache = object : LruCache<String, TypefaceResult>(8) {
+        override fun create(key: String): TypefaceResult {
+            return TypefaceResult(kotlin.runCatching { loadTypeface(key) }.getOrNull())
+        }
+    }
+
+    internal fun getHighlightTypeface(fontPath: String): Typeface? {
+        if (fontPath.isEmpty()) return null
+        return highlightTypefaceCache[fontPath]?.typeface
+    }
+
+    internal fun invalidateHighlightTypeface(fontPath: String) {
+        if (fontPath.isNotEmpty()) highlightTypefaceCache.remove(fontPath)
     }
 
     private fun getPaints(typeface: Typeface?): Pair<TextPaint, TextPaint> {

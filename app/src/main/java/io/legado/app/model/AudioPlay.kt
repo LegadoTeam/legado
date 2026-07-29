@@ -34,6 +34,7 @@ import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancelChildren
 import splitties.init.appCtx
 import java.util.concurrent.Future
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.text.trim
 
 internal data class AudioPlayUrlKey(
@@ -142,6 +143,9 @@ internal class AudioReadTimeTracker {
 @SuppressLint("StaticFieldLeak")
 @Suppress("unused")
 object AudioPlay : CoroutineScope by MainScope() {
+
+    private val playbackGeneration = AtomicLong()
+
     /**
      * 播放模式枚举
      */
@@ -206,6 +210,11 @@ object AudioPlay : CoroutineScope by MainScope() {
     }
 
     fun upData(book: Book) {
+        val playbackChanged = AudioPlay.book?.bookUrl != book.bookUrl ||
+                durChapterIndex != book.durChapterIndex
+        if (playbackChanged) {
+            stopPlay()
+        }
         AudioPlay.book = book
         chapterSize = appDb.bookChapterDao.getChapterCount(book.bookUrl)
         simulatedChapterSize = if (book.readSimulating()) {
@@ -213,8 +222,7 @@ object AudioPlay : CoroutineScope by MainScope() {
         } else {
             chapterSize
         }
-        if (durChapterIndex != book.durChapterIndex) {
-            stopPlay()
+        if (playbackChanged) {
             durChapterIndex = book.durChapterIndex
             durChapterPos = book.durChapterPos
             durPlayUrl = ""
@@ -651,6 +659,7 @@ object AudioPlay : CoroutineScope by MainScope() {
     }
 
     fun stop() {
+        invalidatePlayback()
         if (AudioPlayService.isRun) {
             context.startService<AudioPlayService> {
                 action = IntentAction.stop
@@ -659,13 +668,22 @@ object AudioPlay : CoroutineScope by MainScope() {
     }
 
     fun setSpeed(speed: Float) {
+        val clampedSpeed = speed.coerceIn(0.5f, 3.0f)
+        AudioPlayService.playSpeed = clampedSpeed
+        book?.takeIf { it.getPlaySpeed() != clampedSpeed }?.let { currentBook ->
+            val bookUrl = currentBook.bookUrl
+            currentBook.setPlaySpeed(clampedSpeed)
+            executor.execute {
+                appDb.bookDao.updateAudioPlaySpeed(bookUrl, clampedSpeed)
+            }
+        }
         if (AudioPlayService.isRun) {
-            book?.setPlaySpeed(speed)
-            val clampedSpeed = speed.coerceIn(0.5f, 3.0f)
             context.startService<AudioPlayService> {
                 action = IntentAction.setSpeed
                 putExtra("speed", clampedSpeed)
             }
+        } else {
+            postEvent(EventBus.AUDIO_SPEED, clampedSpeed)
         }
     }
 
@@ -683,43 +701,64 @@ object AudioPlay : CoroutineScope by MainScope() {
     }
 
     fun skipTo(index: Int) {
-        Coroutine.async {
-            stopPlay()
-            if (index in 0..<simulatedChapterSize) {
+        val generation = stopPlayAndGetGeneration()
+        val changed = synchronized(this) {
+            if (generation == playbackGeneration.get() && index in 0..<simulatedChapterSize) {
                 durChapterIndex = index
                 durChapterPos = 0
                 durPlayUrl = ""
                 durMediaUrl = ""
                 durLyric = null
                 clearPlayingCache()
-                saveRead()
-                loadPlayUrl()
+                true
+            } else {
+                false
             }
         }
+        if (!changed) return
+        saveRead()
+        loadPlayUrlWhenCurrent(generation)
     }
 
     fun prev() {
-        Coroutine.async {
-            stopPlay()
-            if (durChapterIndex > 0) {
+        val generation = stopPlayAndGetGeneration()
+        val changed = synchronized(this) {
+            if (generation == playbackGeneration.get() && durChapterIndex > 0) {
                 durChapterIndex -= 1
                 durChapterPos = 0
                 durPlayUrl = ""
                 durMediaUrl = ""
                 durLyric = null
                 clearPlayingCache()
-                saveRead()
-                loadPlayUrl()
+                true
+            } else {
+                false
             }
         }
+        if (!changed) return
+        saveRead()
+        loadPlayUrlWhenCurrent(generation)
     }
 
     fun next() {
-        stopPlay()
-        when (playMode) {
-            PlayMode.LIST_END_STOP -> {
-                if (durChapterIndex + 1 < simulatedChapterSize) {
-                    durChapterIndex += 1
+        val generation = stopPlayAndGetGeneration()
+        synchronized(this) {
+            if (generation != playbackGeneration.get()) return
+            when (playMode) {
+                PlayMode.LIST_END_STOP -> {
+                    if (durChapterIndex + 1 < simulatedChapterSize) {
+                        durChapterIndex += 1
+                        durChapterPos = 0
+                        durPlayUrl = ""
+                        durMediaUrl = ""
+                        durLyric = null
+                        clearPlayingCache()
+                        saveRead()
+                        loadPlayUrl()
+                    }
+                }
+
+                PlayMode.SINGLE_LOOP -> {
                     durChapterPos = 0
                     durPlayUrl = ""
                     durMediaUrl = ""
@@ -728,38 +767,28 @@ object AudioPlay : CoroutineScope by MainScope() {
                     saveRead()
                     loadPlayUrl()
                 }
-            }
 
-            PlayMode.SINGLE_LOOP -> {
-                durChapterPos = 0
-                durPlayUrl = ""
-                durMediaUrl = ""
-                durLyric = null
-                clearPlayingCache()
-                saveRead()
-                loadPlayUrl()
-            }
+                PlayMode.RANDOM -> {
+                    durChapterIndex = (0 until simulatedChapterSize).random()
+                    durChapterPos = 0
+                    durPlayUrl = ""
+                    durMediaUrl = ""
+                    durLyric = null
+                    clearPlayingCache()
+                    saveRead()
+                    loadPlayUrl()
+                }
 
-            PlayMode.RANDOM -> {
-                durChapterIndex = (0 until simulatedChapterSize).random()
-                durChapterPos = 0
-                durPlayUrl = ""
-                durMediaUrl = ""
-                durLyric = null
-                clearPlayingCache()
-                saveRead()
-                loadPlayUrl()
-            }
-
-            PlayMode.LIST_LOOP -> {
-                durChapterIndex = (durChapterIndex + 1) % simulatedChapterSize
-                durChapterPos = 0
-                durPlayUrl = ""
-                durMediaUrl = ""
-                durLyric = null
-                clearPlayingCache()
-                saveRead()
-                loadPlayUrl()
+                PlayMode.LIST_LOOP -> {
+                    durChapterIndex = (durChapterIndex + 1) % simulatedChapterSize
+                    durChapterPos = 0
+                    durPlayUrl = ""
+                    durMediaUrl = ""
+                    durLyric = null
+                    clearPlayingCache()
+                    saveRead()
+                    loadPlayUrl()
+                }
             }
         }
     }
@@ -798,31 +827,76 @@ object AudioPlay : CoroutineScope by MainScope() {
         context.startService(intent)
     }
 
-    fun stopPlay() {
+    private fun invalidatePlayback(): Long = synchronized(this) {
+        playbackGeneration.incrementAndGet()
+    }
+
+    private fun stopPlayAndGetGeneration(): Long {
+        val generation = invalidatePlayback()
         if (AudioPlayService.isRun) {
             context.startService<AudioPlayService> {
                 action = IntentAction.stopPlay
             }
         }
+        return generation
     }
 
+    fun stopPlay() {
+        stopPlayAndGetGeneration()
+    }
+
+    internal fun currentPlaybackGeneration(): Long = playbackGeneration.get()
+
+    internal fun runIfPlaybackCurrent(generation: Long, block: () -> Unit): Boolean {
+        return synchronized(this) {
+            if (generation != playbackGeneration.get()) {
+                false
+            } else {
+                block()
+                true
+            }
+        }
+    }
+
+    private fun loadPlayUrlWhenCurrent(generation: Long) {
+        Coroutine.async {
+            synchronized(this@AudioPlay) {
+                if (generation == playbackGeneration.get()) {
+                    loadPlayUrl()
+                }
+            }
+        }
+    }
+
+    @Synchronized
     fun saveRead(first: Boolean = false) {
         val book = book ?: return
+        val chapterIndex = durChapterIndex
+        val chapterPosition = durChapterPos
+        val source = bookSource
+        book.lastCheckCount = 0
+        val durTime = System.currentTimeMillis()
+        book.durChapterTime = durTime
+        val chapterChanged = book.durChapterIndex != chapterIndex
+        book.durChapterIndex = chapterIndex
+        book.durChapterPos = chapterPosition
         Coroutine.async {
-            book.lastCheckCount = 0
-            val durTime = System.currentTimeMillis()
-            book.durChapterTime = durTime
-            val chapterChanged = book.durChapterIndex != durChapterIndex
-            book.durChapterIndex = durChapterIndex
-            book.durChapterPos = durChapterPos
             if (first || chapterChanged) {
-                appDb.bookChapterDao.getChapter(book.bookUrl, book.durChapterIndex)?.let {
-                    book.durChapterTitle = it.getDisplayTitle(
-                        ContentProcessor.get(book.name, book.origin).getTitleReplaceRules(),
-                        book.getUseReplaceRule(),
-                        replaceBook = book.toReplaceBook()
-                    )
-                    SourceCallBack.callBackBook(SourceCallBack.SAVE_READ, bookSource, book, it,durTime.toString())
+                appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)?.let { chapter ->
+                    if (book.durChapterIndex == chapterIndex) {
+                        book.durChapterTitle = chapter.getDisplayTitle(
+                            ContentProcessor.get(book.name, book.origin).getTitleReplaceRules(),
+                            book.getUseReplaceRule(),
+                            replaceBook = book.toReplaceBook()
+                        )
+                        SourceCallBack.callBackBook(
+                            SourceCallBack.SAVE_READ,
+                            source,
+                            book,
+                            chapter,
+                            durTime.toString()
+                        )
+                    }
                 }
             }
             book.update()
@@ -832,15 +906,17 @@ object AudioPlay : CoroutineScope by MainScope() {
     /**
      * 保存章节长度
      */
+    @Synchronized
     fun saveDurChapter(audioSize: Long) {
         val chapter = durChapter ?: return
+        durAudioSize = audioSize.toInt()
         Coroutine.async {
-            durAudioSize = audioSize.toInt()
             chapter.end = audioSize
             chapter.update()
         }
     }
 
+    @Synchronized
     fun playPositionChanged(position: Int) {
         durChapterPos = position
         saveRead()

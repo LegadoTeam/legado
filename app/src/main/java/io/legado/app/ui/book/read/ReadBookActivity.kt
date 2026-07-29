@@ -199,7 +199,9 @@ class ReadBookActivity : BaseReadBookActivity(),
                 viewModel.openChapter(
                     it[0] as Int,
                     it[1] as Int,
-                    highlightLayoutTitleLength
+                    highlightLayoutTitleLength,
+                    (it[TocActivityResult.HIGHLIGHT_ANCHOR_TEXT_INDEX] as String)
+                        .takeIf(String::isNotEmpty)
                 )
             }
         }
@@ -2162,7 +2164,8 @@ class ReadBookActivity : BaseReadBookActivity(),
             HighlightStyleDialog.HL_UNDERLINE,
             HighlightStyleDialog.HL_STRIKE,
             HighlightStyleDialog.HL_BOX,
-            HighlightStyleDialog.HL_EMPHASIS -> {
+            HighlightStyleDialog.HL_EMPHASIS,
+            HighlightStyleDialog.HL_SHADOW -> {
                 val style = HighlightStyleDialog.applyChannelColor(
                     currentHighlightStyle(),
                     dialogId,

@@ -1,9 +1,7 @@
 package io.legado.app.ui.book.read.page
 
-import io.legado.app.data.entities.BookHighlight
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -14,8 +12,10 @@ class ManualHighlightRenderTest {
     fun `manual ranges cover every text column but skip titles`() {
         val content = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/ContentTextView.kt")
 
-        assertTrue(content.contains("ReadBook.highlightsOfChapter(chapter, titleLength)"))
-        assertTrue(content.contains("it.bodyStart(titleLength) + titleLength"))
+        assertTrue(content.contains("ReadBook.anchoredHighlightsOfChapter(chapter, titleLength)"))
+        assertTrue(content.contains("anchor.start + titleLength"))
+        assertTrue(content.contains("anchor.end + titleLength"))
+        assertTrue(content.contains(".lastOrNull { (_, anchor)"))
         assertTrue(content.contains("val pageBase = chapter.getReadLength(page.index)"))
         assertTrue(content.contains("val ruleRanges = ReadBook.ruleMatchesOfChapter(chapter)"))
         assertTrue(content.contains("line.columns.map { it.positionLength }"))
@@ -90,24 +90,56 @@ class ManualHighlightRenderTest {
     }
 
     @Test
-    fun `overlapping highlight click follows the last rendered range`() {
-        val outer = BookHighlight(time = 1, chapterPos = 0, chapterPosEnd = 10)
-        val inner = BookHighlight(time = 2, chapterPos = 2, chapterPosEnd = 4)
-
-        assertSame(inner, listOf(outer, inner).lastHighlightAt(position = 3, titleLength = 0))
-    }
-
-    @Test
     fun `column drawing uses isolated temporary paint styles`() {
         val text = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/column/TextColumn.kt")
         val html = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/column/TextHtmlColumn.kt")
         val draw = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/HighlightDraw.kt")
+        val provider = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/read/page/provider/ChapterProvider.kt"
+        )
 
-        assertTrue(text.contains("HighlightDraw.obtainTextPaint(textPaint, it, textColor)"))
+        assertTrue(text.contains("HighlightDraw.obtainTextPaint(textPaint, it, textColor, charData)"))
         assertTrue(text.contains("HighlightDraw::recycleTextPaint"))
-        assertTrue(html.contains("HighlightDraw.obtainTextPaint(textPaint, it, textColor)"))
+        assertTrue(html.contains("HighlightDraw.obtainTextPaint(textPaint, it, textColor, charData)"))
         assertTrue(html.contains("HighlightDraw::recycleTextPaint"))
+        assertTrue(text.contains("it.resolvedFontPath.isNotEmpty()"))
+        assertTrue(html.contains("it.resolvedFontPath.isNotEmpty()"))
+        assertTrue(draw.contains("ChapterProvider.getHighlightTypeface(style.resolvedFontPath)"))
+        assertTrue(draw.contains("preserveTextAdvance(base, paint, text)"))
+        assertTrue(draw.contains("base.typeface?.style ?: Typeface.NORMAL"))
+        assertTrue(provider.contains("LruCache<String, TypefaceResult>(8)"))
+        assertFalse(provider.contains("HashMap<String, Typeface?>"))
         assertTrue(draw.contains("ThreadLocal<DrawState>"))
+        assertTrue(text.contains("it.shadow != null"))
+        assertTrue(html.contains("it.shadow != null"))
+        assertTrue(draw.contains("paint.setShadowLayer(it.radius, it.dx, it.dy, it.color)"))
+    }
+
+    @Test
+    fun `shadow styles are normalized once and bypass clipped caches`() {
+        val line = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/TextLine.kt")
+        val page = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/TextPage.kt")
+        val text = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/column/TextColumn.kt")
+        val html = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/column/TextHtmlColumn.kt")
+        val draw = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/HighlightDraw.kt")
+
+        assertTrue(line.contains("(it as? TextBaseColumn)?.highlightStyle?.shadow != null"))
+        assertTrue(line.contains("style.shadow != null || style.resolvedFontPath.isNotEmpty()"))
+        assertTrue(line.contains("AppConfig.optimizeRender && !hasOverflowTextStyle"))
+        assertTrue(page.contains("private val hasShadowStyle: Boolean"))
+        assertTrue(page.contains("if (hasShadowStyle) return false"))
+        assertTrue(page.contains("recordIfCompleted(view)"))
+        assertTrue(text.contains("val normalized = value?.normalized()"))
+        assertTrue(html.contains("val normalized = value?.normalized()"))
+        assertFalse(draw.contains("shadow?.normalized()"))
+    }
+
+    @Test
+    fun `custom font advance scaling keeps layout width`() {
+        assertEquals(0.5f, HighlightDraw.textAdvanceScale(10f, 20f), 0f)
+        assertEquals(1f, HighlightDraw.textAdvanceScale(0f, 20f), 0f)
+        assertEquals(1f, HighlightDraw.textAdvanceScale(10f, 0f), 0f)
+        assertEquals(1f, HighlightDraw.textAdvanceScale(Float.NaN, 20f), 0f)
     }
 
     @Test
@@ -118,6 +150,49 @@ class ManualHighlightRenderTest {
         assertTrue(draw.contains("height - 3.5f.dpToPx()"))
         assertTrue(draw.contains("while (start < x1)"))
         assertTrue(draw.contains("canvas.drawCircle(center, y, radius, fillPaint)"))
+    }
+
+    @Test
+    fun `underline takes drawing priority over emphasis`() {
+        val text = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/read/page/entities/column/TextColumn.kt"
+        )
+        val html = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/read/page/entities/column/TextHtmlColumn.kt"
+        )
+        val guardedEmphasis = "style?.takeIf { it.underline == null }?.emphasis?.let"
+
+        assertTrue(text.contains(guardedEmphasis))
+        assertTrue(html.contains(guardedEmphasis))
+    }
+
+    @Test
+    fun `fill shapes share one run renderer across fast and styled text`() {
+        val line = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/TextLine.kt")
+        val text = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/column/TextColumn.kt")
+        val html = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/column/TextHtmlColumn.kt")
+        val draw = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/HighlightDraw.kt")
+
+        assertTrue(line.indexOf("drawHighlightFills(canvas)") < line.indexOf("checkFastDraw()"))
+        assertTrue(line.contains("nextStyle.resolvedFillShape == shape"))
+        assertTrue(line.contains("nextTextSize == textSize"))
+        assertTrue(draw.contains("fun drawFillRun("))
+        assertTrue(draw.contains("val inset = strokePaint.strokeWidth / 2f"))
+        assertTrue(draw.contains("top + inset"))
+        assertTrue(draw.contains("bottom - inset"))
+        assertFalse(text.contains("highlightPaint("))
+        assertFalse(html.contains("highlightPaint("))
+    }
+
+    @Test
+    fun `run decorations follow html text size`() {
+        val line = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/TextLine.kt")
+        val draw = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/HighlightDraw.kt")
+
+        assertTrue(line.contains("val sizeSensitive = strike != null || box != null"))
+        assertTrue(line.contains("val sameTextSize = !sizeSensitive ||"))
+        assertTrue(line.contains("val metricScale = textSize / baseTextSize"))
+        assertTrue(draw.contains("if (right > left && bottom > top)"))
     }
 
     @Test

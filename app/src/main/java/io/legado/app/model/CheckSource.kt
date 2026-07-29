@@ -11,6 +11,9 @@ import io.legado.app.utils.startService
 import splitties.init.appCtx
 
 object CheckSource {
+    internal const val EXTRA_SESSION_ID = "checkSourceSessionId"
+    internal const val EXTRA_SELECTED_SOURCES_KEY = "checkSourceSelectedSourcesKey"
+
     var keyword = "我的"
 
     //校验设置
@@ -24,19 +27,31 @@ object CheckSource {
     var checkContent = CacheManager.get("checkContent")?.toBoolean() ?: true
     val summary get() = upSummary()
 
-    fun start(context: Context, sources: List<BookSourcePart>) {
-        val selectedIds = sources.map {
-            it.bookSourceUrl
+    fun start(
+        context: Context,
+        sources: List<BookSourcePart>,
+        sessionId: Long,
+    ): String {
+        Debug.prepareCheckSession(sessionId, sources.map { it.bookSourceUrl })
+        val selectedSourcesKey = IntentData.put(sources.map { it.copy() })
+        try {
+            context.startService<CheckSourceService> {
+                action = IntentAction.start
+                putExtra(EXTRA_SESSION_ID, sessionId)
+                putExtra(EXTRA_SELECTED_SOURCES_KEY, selectedSourcesKey)
+            }
+        } catch (error: Exception) {
+            IntentData.get<Any>(selectedSourcesKey)
+            Debug.finishChecking(sessionId)
+            throw error
         }
-        IntentData.put("checkSourceSelectedIds", selectedIds)
-        context.startService<CheckSourceService> {
-            action = IntentAction.start
-        }
+        return selectedSourcesKey
     }
 
-    fun stop(context: Context) {
+    fun stop(context: Context, sessionId: Long) {
         context.startService<CheckSourceService> {
             action = IntentAction.stop
+            putExtra(EXTRA_SESSION_ID, sessionId)
         }
     }
 

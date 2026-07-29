@@ -307,6 +307,7 @@ abstract class BaseReadAloudService : BaseService(),
     }
 
     private fun newReadAloud(play: Boolean, pageIndex: Int, startPos: Int) {
+        playStop()
         restoreReadAloudFollow()
         execute(executeContext = IO) {
             this@BaseReadAloudService.pageIndex = pageIndex

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <io.legado.app.ui.widget.text.AccentTextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:paddingBottom="8dp"
+        android:text="@string/highlight_shadow"
+        android:textSize="18sp" />
+
+    <io.legado.app.ui.widget.DetailSeekBar
+        android:id="@+id/dsb_radius"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:max="20"
+        app:title="@string/highlight_shadow_radius" />
+
+    <io.legado.app.ui.widget.DetailSeekBar
+        android:id="@+id/dsb_dx"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:max="40"
+        app:title="@string/highlight_shadow_offset_x" />
+
+    <io.legado.app.ui.widget.DetailSeekBar
+        android:id="@+id/dsb_dy"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:max="40"
+        app:title="@string/highlight_shadow_offset_y" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="end"
+        android:orientation="horizontal">
+
+        <io.legado.app.ui.widget.text.AccentTextView
+            android:id="@+id/btn_cancel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:minHeight="48dp"
+            android:minWidth="48dp"
+            android:padding="12dp"
+            android:text="@string/cancel" />
+
+        <io.legado.app.ui.widget.text.AccentTextView
+            android:id="@+id/btn_ok"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:minHeight="48dp"
+            android:minWidth="48dp"
+            android:padding="12dp"
+            android:text="@string/ok" />
+
+    </LinearLayout>
+
+</LinearLayout>

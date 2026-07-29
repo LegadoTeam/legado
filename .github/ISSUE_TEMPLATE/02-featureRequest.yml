@@ -9,7 +9,7 @@ body:
       options:
         - label: 搜索现有issues，不存在相似或相关的issue / No related requests
           required: true
-        - label: 最新[测试版](https://github.com/gedoor/legado/releases/beta)没有此功能 / Latest beta app does not this feature
+        - label: 最新[测试版](https://github.com/LegadoTeam/legado/releases/beta)没有此功能 / Latest beta app does not this feature
           required: true
 
   - type: textarea

@@ -412,7 +412,7 @@ object WebBook {
         }
         if (bookChapter.isVolume && bookChapter.url.startsWith(bookChapter.title)) {
             Debug.log(bookSource.bookSourceUrl, "⇒一级目录正文不解析规则")
-            return bookChapter.tag ?: ""
+            return ""
         }
         return if (bookChapter.url == book.bookUrl && !book.tocHtml.isNullOrEmpty()) {
             BookContent.analyzeContent(

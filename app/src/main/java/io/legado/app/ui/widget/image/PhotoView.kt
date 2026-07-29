@@ -65,7 +65,6 @@ class PhotoView @JvmOverloads constructor(
     private val mRotateDetector: RotateGestureDetector
     private val mDetector: GestureDetector
     private val mScaleDetector: ScaleGestureDetector
-    private var mClickListener: OnClickListener? = null
 
     private var mScaleType: ScaleType? = null
 
@@ -141,11 +140,6 @@ class PhotoView @JvmOverloads constructor(
      */
     fun getDefaultAnimDuring(): Int {
         return ANIMA_DURING
-    }
-
-    override fun setOnClickListener(l: OnClickListener?) {
-        super.setOnClickListener(l)
-        mClickListener = l
     }
 
     override fun setScaleType(scaleType: ScaleType) {
@@ -612,10 +606,6 @@ class PhotoView @JvmOverloads constructor(
         if (!hasOverTranslate) {
             mapRect(mWidgetRect, mImgRect, mCommonRect)
         }
-    }
-
-    private val mClickRunnable = Runnable {
-        mClickListener?.onClick(this)
     }
 
     fun canScrollHorizontallySelf(direction: Float): Boolean {
@@ -1121,7 +1111,6 @@ class PhotoView @JvmOverloads constructor(
             hasOverTranslate = false
             hasMultiTouch = false
             canRotate = false
-            removeCallbacks(mClickRunnable)
             return false
         }
 
@@ -1213,10 +1202,7 @@ class PhotoView @JvmOverloads constructor(
             return true
         }
 
-        override fun onSingleTapUp(e: MotionEvent): Boolean {
-            postDelayed(mClickRunnable, 250)
-            return false
-        }
+        override fun onSingleTapConfirmed(e: MotionEvent): Boolean = performClick()
 
         override fun onDoubleTap(e: MotionEvent): Boolean {
             mTranslate.stop()

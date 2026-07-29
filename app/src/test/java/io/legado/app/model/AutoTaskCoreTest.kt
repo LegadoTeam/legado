@@ -76,6 +76,36 @@ class AutoTaskCoreTest {
     }
 
     @Test
+    fun buildsBatchBookUpdateTasksWithoutStealingExactMatches() {
+        val movedBook = Book(bookUrl = "new", name = "Test", author = "Author")
+        val exactBook = Book(bookUrl = "exact", name = "Test", author = "Author")
+        val movedTask = AutoTask.buildBookUpdateTask(
+            Book(bookUrl = "old", name = "Test", author = "Author"),
+            "Old"
+        )
+        val exactTask = AutoTask.buildBookUpdateTask(exactBook, "Exact").copy(enable = false)
+        val cron = "0 */2 * * *"
+
+        val tasks = AutoTask.buildBookUpdateTasks(
+            books = listOf(movedBook, exactBook),
+            existingTasks = listOf(exactTask, movedTask),
+            cron = cron,
+            nameOf = { "Update ${it.name}" }
+        )
+
+        assertEquals(listOf(movedTask.id, exactTask.id), tasks.map { it.id })
+        assertEquals(listOf(true, false), tasks.map { it.enable })
+        assertEquals(listOf(cron, cron), tasks.map { it.cron })
+        assertEquals(
+            listOf(movedBook.bookUrl, exactBook.bookUrl),
+            tasks.map {
+                AutoTaskProtocol.parseActions(RhinoScriptEngine.eval(it.script))
+                    ?.single()?.get("bookUrl")
+            }
+        )
+    }
+
+    @Test
     fun generatedBookUpdateTaskRespectsStoppedUpdates() {
         assertTrue(AutoTaskProtocol.canRefreshBookToc(true, true))
         assertFalse(AutoTaskProtocol.canRefreshBookToc(false, true))

@@ -60,6 +60,16 @@ class HighlightRuleEditDialogTest {
     }
 
     @Test
+    fun `rule preview uses the shared fill renderer`() {
+        val source = projectFile(
+            "src/main/java/io/legado/app/ui/highlight/edit/HighlightRuleEditDialog.kt"
+        ).readText()
+
+        assertTrue(source.contains("HighlightFillPreviewDrawable"))
+        assertTrue(!source.contains("setBackgroundColor(editingStyle.fill)"))
+    }
+
+    @Test
     fun `rule creation preserves the source manual highlight`() {
         val source = projectFile(
             "src/main/java/io/legado/app/ui/highlight/edit/HighlightRuleEditDialog.kt"

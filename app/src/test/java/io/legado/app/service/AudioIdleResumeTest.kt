@@ -12,18 +12,15 @@ class AudioIdleResumeTest {
         val source = projectFile(
             "src/main/java/io/legado/app/service/AudioPlayService.kt"
         ).readText()
-        val idleBranch = Regex(
-            "if \\(exoPlayer\\.playbackState == Player\\.STATE_IDLE\\) \\{(.*?)\\n\\s*}",
-            RegexOption.DOT_MATCHES_ALL,
-        ).find(source)?.groupValues?.get(1) ?: error("Missing STATE_IDLE resume branch")
+        val resumeBody = source.substringAfter("private fun resume()")
+            .substringBefore("private fun adjustProgress")
 
-        assertTrue(
-            idleBranch.contains(
-                "position = AudioPlay.book?.let { AudioPlay.durChapterPos } ?: position"
-            )
-        )
-        assertTrue(idleBranch.contains("play(preservePosition = true)"))
-        assertFalse(idleBranch.contains("position = 0"))
+        assertTrue(resumeBody.contains("currentUrl = AudioPlay.durMediaUrl"))
+        assertTrue(resumeBody.contains("currentPosition = AudioPlay.book?.durChapterPos ?: position"))
+        assertTrue(resumeBody.contains("url != currentUrl"))
+        assertTrue(resumeBody.contains("position = currentPosition"))
+        assertTrue(resumeBody.contains("play(preservePosition = true, generation = generation)"))
+        assertFalse(resumeBody.contains("position = 0"))
     }
 
     @Test
@@ -46,11 +43,16 @@ class AudioIdleResumeTest {
         val source = projectFile(
             "src/main/java/io/legado/app/service/AudioPlayService.kt"
         ).readText()
-        val jsonBranch = source.substringAfter("if (url.isJsonArray())")
-            .substringBefore("} else {")
+        val playBody = source.substringAfter("private fun play(")
+            .substringBefore("private fun localMediaItem")
 
-        assertTrue(jsonBranch.contains("if (!preservePosition)"))
-        assertTrue(jsonBranch.contains("position = 0"))
+        assertTrue(
+            Regex(
+                "val startPosition = if \\(requestUrl\\.isJsonArray\\(\\) && !preservePosition\\) " +
+                        "\\{\\s*0\\s*} else \\{\\s*requestPosition\\s*}"
+            ).containsMatchIn(playBody)
+        )
+        assertTrue(playBody.contains("position = startPosition"))
     }
 
     private fun projectFile(pathInApp: String): File {

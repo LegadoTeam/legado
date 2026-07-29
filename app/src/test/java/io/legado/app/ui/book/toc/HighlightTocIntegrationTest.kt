@@ -115,16 +115,29 @@ class HighlightTocIntegrationTest {
         ).readText()
 
         assertTrue(fragment.contains("EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH"))
+        assertTrue(fragment.contains("EXTRA_HIGHLIGHT_ANCHOR_TEXT"))
+        assertTrue(fragment.contains("highlight.chapterPosEnd - highlight.chapterPos == it.length"))
         assertTrue(readBook.contains("if (hasPendingHighlightJump()) return"))
         assertTrue(readBook.countMatches("positionReady && !available") >= 2)
         assertTrue(readBook.contains("if (curTextChapter !== textChapter) return false"))
+        assertEquals(2, readBook.countMatches("resolvePendingHighlightAnchor(book, textChapter)"))
+        assertTrue(readBook.contains("if (!chapter.isCompleted)"))
+        assertTrue(readBook.contains("manualHighlightAnchorsVersion"))
+        assertTrue(readBook.contains("val cacheResult = textChapter.isCompleted"))
         assertTrue(bookInfo.contains("highlightLayoutTitleLength.takeIf { deferHighlightPosition }"))
+        assertTrue(bookInfo.contains("highlightAnchorText.takeIf { deferHighlightPosition }"))
         assertTrue(readViewModel.contains("|| hasHighlightTarget"))
         assertTrue(
             readViewModel.contains(
                 "intent.removeExtra(TocActivityResult.EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH)"
             )
         )
+        assertTrue(
+            readViewModel.contains(
+                "intent.removeExtra(TocActivityResult.EXTRA_HIGHLIGHT_ANCHOR_TEXT)"
+            )
+        )
+        assertTrue(readViewModel.contains("highlightAnchorText = highlightAnchorText"))
         assertTrue(readViewModel.contains("intent.removeExtra(\"index\")"))
         assertTrue(readViewModel.contains("intent.removeExtra(\"chapterPos\")"))
     }

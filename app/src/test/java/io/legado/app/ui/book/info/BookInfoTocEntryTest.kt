@@ -70,6 +70,7 @@ class BookInfoTocEntryTest {
         assertTrue(callback.contains("volumeIndex = it[3] as Int"))
         assertTrue(callback.contains("chapterInVolumeIndex = it[4] as Int"))
         assertTrue(callback.contains("HIGHLIGHT_LAYOUT_TITLE_LENGTH_INDEX"))
+        assertTrue(callback.contains("HIGHLIGHT_ANCHOR_TEXT_INDEX"))
         assertTrue(normalProgressFlow.contains("book.durChapterIndex = index"))
         assertTrue(normalProgressFlow.contains("book.durChapterPos = pos"))
         assertTrue(normalProgressFlow.contains("book.durVolumeIndex = volumeIndex"))
@@ -83,6 +84,7 @@ class BookInfoTocEntryTest {
         assertTrue(shelfFlow.contains("appDb.bookDao.update(book)"))
         assertTrue(shelfFlow.contains("highlightLayoutTitleLength.takeIf"))
         assertTrue(readFlow.contains("highlightLayoutTitleLength.takeIf { deferHighlightPosition }"))
+        assertTrue(readFlow.contains("highlightAnchorText.takeIf { deferHighlightPosition }"))
         assertTrue(readFlow.contains("startReadActivity("))
     }
 

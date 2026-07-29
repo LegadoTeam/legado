@@ -4,7 +4,9 @@ package io.legado.app.ui.book.read.page.entities
 import androidx.annotation.Keep
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
+import io.legado.app.data.entities.BookHighlight
 import io.legado.app.data.entities.ReplaceRule
+import io.legado.app.help.HighlightAnchor
 import io.legado.app.help.HighlightRuleMatcher
 import io.legado.app.help.book.BookContent
 import io.legado.app.ui.book.read.page.provider.LayoutProgressListener
@@ -77,6 +79,18 @@ data class TextChapter(
 
     @Volatile
     var highlightRuleMatchesJob: Job? = null
+
+    @Volatile
+    var highlightText: String? = null
+
+    @Volatile
+    var manualHighlightAnchors: List<Pair<BookHighlight, HighlightAnchor.Anchor>>? = null
+
+    @Volatile
+    var manualHighlightAnchorsVersion: Long = Long.MIN_VALUE
+
+    @Volatile
+    var manualHighlightAnchorsTitleLength: Int = UNKNOWN_LAYOUT_TITLE_LENGTH
 
     fun invalidateHighlightRuleMatches() {
         highlightRuleMatchesJob?.cancel()

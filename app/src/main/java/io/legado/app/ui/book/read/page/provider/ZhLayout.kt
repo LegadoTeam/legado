@@ -19,7 +19,9 @@ class ZhLayout(
     width: Int,
     words: List<String>,
     widths: List<Float>,
-    indentSize: Int
+    indentSize: Int,
+    /**段首标点悬挂后首行多出的宽度*/
+    firstLineExtra: Float = 0f
 ) : Layout(text, textPaint, width, Alignment.ALIGN_NORMAL, 0f, 0f) {
     companion object {
         private val postPanc = hashSetOf(
@@ -64,7 +66,7 @@ class ZhLayout(
             var offset = 0f
             var breakCharCnt = 0
 
-            if (lineW > width) {
+            if (lineW > HangingLineWidth.lineCapacity(width, firstLineExtra, line)) {
                 /*禁止在行尾的标点处理*/
                 breakMod = if (index >= 1 && isPrePanc(words[index - 1])) {
                     if (index >= 2 && isPrePanc(words[index - 2])) BreakMod.CPS_2//如果后面还有一个禁首标点则异常

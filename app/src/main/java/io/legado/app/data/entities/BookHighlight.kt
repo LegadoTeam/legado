@@ -44,13 +44,14 @@ data class BookHighlight(
 
     fun styleObj(): HighlightStyle {
         styleCache?.takeIf { it.first == style }?.second?.let { return it }
-        return (GSON.fromJsonObject<HighlightStyle>(style).getOrNull() ?: HighlightStyle())
+        return (GSON.fromJsonObject<HighlightStyle>(style).getOrNull() ?: HighlightStyle()).normalized()
             .also { styleCache = style to it }
     }
 
     fun applyStyle(s: HighlightStyle) {
-        style = GSON.toJson(s)
-        styleCache = style to s
+        val normalized = s.normalized()
+        style = GSON.toJson(normalized)
+        styleCache = style to normalized
     }
 
     fun bindLegacyOwner(bookUrl: String, chapterUrl: String) {

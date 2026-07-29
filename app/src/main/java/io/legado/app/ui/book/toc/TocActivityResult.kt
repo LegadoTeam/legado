@@ -24,7 +24,8 @@ class TocActivityResult : ActivityResultContract<String, Array<Any>?>() {
                     it.getIntExtra(
                         EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH,
                         NO_HIGHLIGHT_LAYOUT_TITLE_LENGTH
-                    )
+                    ),
+                    it.getStringExtra(EXTRA_HIGHLIGHT_ANCHOR_TEXT).orEmpty()
                 )
             }
         }
@@ -34,6 +35,8 @@ class TocActivityResult : ActivityResultContract<String, Array<Any>?>() {
     companion object {
         const val EXTRA_HIGHLIGHT_LAYOUT_TITLE_LENGTH = "highlightLayoutTitleLength"
         const val HIGHLIGHT_LAYOUT_TITLE_LENGTH_INDEX = 5
+        const val HIGHLIGHT_ANCHOR_TEXT_INDEX = 6
         const val NO_HIGHLIGHT_LAYOUT_TITLE_LENGTH = Int.MIN_VALUE
+        const val EXTRA_HIGHLIGHT_ANCHOR_TEXT = "highlightAnchorText"
     }
 }

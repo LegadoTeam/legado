@@ -11,6 +11,7 @@ import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.databinding.DialogPhotoViewBinding
 import io.legado.app.help.book.BookHelp
+import io.legado.app.help.config.AppConfig
 import io.legado.app.help.glide.ImageLoader
 import io.legado.app.help.glide.OkHttpModelLoader
 import io.legado.app.model.BookCover
@@ -37,10 +38,18 @@ class PhotoDialog() : BaseDialogFragment(R.layout.dialog_photo_view) {
     override fun onStart() {
         super.onStart()
         setLayout(1f, ViewGroup.LayoutParams.MATCH_PARENT)
+        dialog?.window?.apply {
+            setBackgroundDrawableResource(R.color.transparent)
+            setDimAmount(0f)
+        }
     }
 
     @SuppressLint("CheckResult")
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
+        if (!AppConfig.isEInkMode) {
+            binding.root.setBackgroundResource(R.color.photo_viewer_scrim)
+        }
+        binding.photoView.setOnClickListener { dismiss() }
         val arguments = arguments ?: return
         val src = arguments.getString("src") ?: return
         ImageProvider.get(src)?.let {
