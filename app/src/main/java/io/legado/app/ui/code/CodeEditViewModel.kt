@@ -2,6 +2,8 @@ package io.legado.app.ui.code
 
 import android.app.Application
 import android.content.Intent
+import com.script.ScriptException
+import com.script.rhino.RhinoScriptEngine
 import io.github.rosemoe.sora.langs.textmate.TextMateLanguage
 import io.github.rosemoe.sora.langs.textmate.registry.FileProviderRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.GrammarRegistry
@@ -9,6 +11,7 @@ import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.model.ThemeModel
 import io.github.rosemoe.sora.langs.textmate.registry.provider.AssetsFileResolver
 import io.github.rosemoe.sora.widget.CodeEditor
+import io.legado.app.R
 import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppLog
 import io.legado.app.help.CacheManager
@@ -43,6 +46,8 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
     private val themeRegistry: ThemeRegistry = ThemeRegistry.getInstance()
     var writable = true
     var title: String? = null
+    internal var canCheckJavaScriptSyntax = false
+        private set
 
     fun initSora() {
         //初始化sora加载
@@ -74,6 +79,10 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
             )
             cursorPosition = intent.getIntExtra("cursorPosition", 0)
             title = intent.getStringExtra("title")
+            canCheckJavaScriptSyntax = intent.getBooleanExtra(
+                CodeEditActivity.EXTRA_CHECK_JAVASCRIPT_SYNTAX,
+                false,
+            )
         }.onSuccess {
             success.invoke()
         }.onError {
@@ -167,6 +176,30 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
+    fun checkJavaScriptSyntax(editor: CodeEditor) {
+        val source = editor.text.toString()
+        executeLazy {
+            RhinoScriptEngine.compile(source)
+        }.onSuccess {
+            if (editor.text.toString() == source) {
+                context.toastOnUi(R.string.javascript_syntax_correct)
+            }
+        }.onError { error ->
+            if (editor.text.toString() != source) return@onError
+            (error as? ScriptException)?.takeIf { it.lineNumber > 0 }?.let {
+                val index = scriptSourceIndex(source, it.lineNumber, it.columnNumber)
+                val position = editor.cursor.indexer.getCharPosition(index)
+                editor.setSelection(position.line, position.column, true)
+                editor.requestFocus()
+            }
+            AppLog.put(
+                error.localizedMessage ?: context.getString(R.string.javascript_syntax_error),
+                error,
+                true,
+            )
+        }.start()
+    }
+
     private suspend fun webFormatCode(jsCode: String): String? {
         CacheManager.putMemory("web_format_code", jsCode)
         return BackstageWebView(
@@ -201,4 +234,16 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
         return doc.outerHtml()
     }
 
+}
+
+internal fun scriptSourceIndex(source: String, lineNumber: Int, columnNumber: Int): Int {
+    if (lineNumber <= 0) return 0
+    var lineStart = 0
+    repeat(lineNumber - 1) {
+        val lineEnd = source.indexOf('\n', lineStart)
+        if (lineEnd < 0) return source.length
+        lineStart = lineEnd + 1
+    }
+    val lineEnd = source.indexOf('\n', lineStart).takeIf { it >= 0 } ?: source.length
+    return (lineStart + (columnNumber - 1).coerceAtLeast(0)).coerceAtMost(lineEnd)
 }

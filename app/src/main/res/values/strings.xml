@@ -1408,6 +1408,9 @@
     <string name="btn_next">下个</string>
     <string name="replace_all">全部</string>
     <string name="format_code">格式化</string>
+    <string name="check_javascript_syntax">检查 JavaScript 语法</string>
+    <string name="javascript_syntax_correct">JavaScript 语法正确</string>
+    <string name="javascript_syntax_error">JavaScript 语法错误</string>
     <string name="config_settings">配置</string>
     <string name="auto_wrap">自动换行</string>
     <string name="font_size">字体大小 %d</string>

@@ -47,4 +47,23 @@ class RhinoScriptErrorContextTest {
         assertEquals(2, exception.lineNumber)
         assertTrue(exception.message.contains("> 2: throw 'boom';"))
     }
+
+    @Test
+    fun compileErrorKeepsLineAndColumn() {
+        val script = """
+            var prefix = 'ok';
+            var broken = ;
+        """.trimIndent()
+
+        val exception = try {
+            RhinoScriptEngine.compile(script)
+            error("Expected JavaScript compilation to fail")
+        } catch (error: ScriptException) {
+            error
+        }
+
+        assertEquals(2, exception.lineNumber)
+        assertTrue(exception.columnNumber > 0)
+        assertTrue(exception.message.contains("> 2: var broken = ;"))
+    }
 }
