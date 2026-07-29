@@ -39,11 +39,10 @@ internal fun parseProxyConfig(rawProxy: String): ProxyConfig {
 
     legacyProxyPattern.matchEntire(proxy)?.let { match ->
         val protocol = parseProxyProtocol(match.groupValues[1])
-        if (protocol != ProxyProtocol.HTTP) unsupportedSocksAuthentication()
         val credentials = ProxyCredentials(
             username = match.groupValues[4],
             password = match.groupValues[5],
-        ).validated()
+        ).validated(protocol)
         return ProxyConfig(
             protocol = protocol,
             host = normalizeProxyHost(match.groupValues[2]),
@@ -68,13 +67,12 @@ internal fun parseProxyConfig(rawProxy: String): ProxyConfig {
         ?.substring(0, userInfoSeparator)
     val hostAndPort = authority.substring(userInfoSeparator + 1)
     val credentials = rawUserInfo?.let {
-        if (protocol != ProxyProtocol.HTTP) unsupportedSocksAuthentication()
         val separator = it.indexOf(':')
         if (separator <= 0) invalidProxy()
         ProxyCredentials(
             username = decodeUserInfo(it.substring(0, separator)),
             password = decodeUserInfo(it.substring(separator + 1)),
-        ).validated()
+        ).validated(protocol)
     }
     val (host, port) = parseProxyAddress(hostAndPort)
     return ProxyConfig(
@@ -146,9 +144,18 @@ private fun parseProxyPort(value: String): Int =
 private fun parseProxyPort(value: Int): Int =
     value.takeIf { it in 1..65535 } ?: invalidProxyPort()
 
-private fun ProxyCredentials.validated(): ProxyCredentials {
+private fun ProxyCredentials.validated(protocol: ProxyProtocol): ProxyCredentials {
     if (username.isBlank() || username.any(Char::isISOControl) || password.any(Char::isISOControl)) {
         invalidProxy()
+    }
+    if (protocol == ProxyProtocol.SOCKS4) unsupportedSocksAuthentication()
+    if (protocol == ProxyProtocol.SOCKS5) {
+        if (
+            username.toByteArray(Charsets.UTF_8).size !in 1..255 ||
+            password.toByteArray(Charsets.UTF_8).size !in 1..255
+        ) {
+            invalidProxy()
+        }
     }
     return this
 }
@@ -171,4 +178,4 @@ private fun invalidProxyPort(): Nothing =
     throw IllegalArgumentException("Proxy port must be between 1 and 65535")
 
 private fun unsupportedSocksAuthentication(): Nothing =
-    throw IllegalArgumentException("SOCKS proxy authentication is not supported")
+    throw IllegalArgumentException("SOCKS4 proxy authentication is not supported")
