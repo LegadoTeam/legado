@@ -43,12 +43,15 @@ class AutoTaskEditActivity : BaseActivity<ActivityAutoTaskEditBinding>() {
     private val textEditLauncher = registerForActivityResult(
         StartActivityContract(CodeEditActivity::class.java)
     ) { result ->
-        val text = result.data?.getStringExtra("text")
-        if (result.resultCode != RESULT_OK || text == null) {
+        if (result.resultCode != RESULT_OK) {
             clearPendingEditResult()
             return@registerForActivityResult
         }
-        pendingEditText = text
+        result.data?.getStringExtra("text")?.let { pendingEditText = it }
+        if (pendingEditText == null) {
+            clearPendingEditResult()
+            return@registerForActivityResult
+        }
         pendingEditCursor = result.data?.getIntExtra("cursorPosition", -1) ?: -1
         applyPendingEditResult()
     }
@@ -148,7 +151,7 @@ class AutoTaskEditActivity : BaseActivity<ActivityAutoTaskEditBinding>() {
             return
         }
         pendingEditViewId = view.id
-        pendingEditText = null
+        pendingEditText = view.text.toString()
         pendingEditCursor = -1
         textEditLauncher.launch {
             putExtra("text", view.text.toString())
@@ -232,7 +235,7 @@ class AutoTaskEditActivity : BaseActivity<ActivityAutoTaskEditBinding>() {
             val saved = AutoTask.upsert(draft, this@AutoTaskEditActivity)
             withContext(Dispatchers.Main) {
                 task = saved
-                originTask = buildDraft()
+                originTask = saved
                 setResult(RESULT_OK)
                 after(saved)
             }

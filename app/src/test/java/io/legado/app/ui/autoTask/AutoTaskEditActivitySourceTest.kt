@@ -23,7 +23,7 @@ class AutoTaskEditActivitySourceTest {
             bindBlock.indexOf("originTask = buildDraft()") <
                 bindBlock.indexOf("applyPendingEditResult()")
         )
-        assertTrue(saveBlock.contains("originTask = buildDraft()"))
+        assertTrue(saveBlock.contains("originTask = saved"))
         assertTrue(finishBlock.contains("originTask?.let { it != buildDraft() } == true"))
         assertTrue(finishBlock.contains("setMessage(R.string.exit_no_save)"))
         assertTrue(finishBlock.contains("super.finish()"))
@@ -41,6 +41,8 @@ class AutoTaskEditActivitySourceTest {
         assertTrue(source.contains("pendingEditViewId"))
         assertTrue(source.contains("applyPendingEditResult()"))
         assertTrue(source.contains("if (originTask == null)"))
+        assertTrue(source.contains("pendingEditText = view.text.toString()"))
+        assertTrue(source.contains("getStringExtra(\"text\")?.let { pendingEditText = it }"))
         assertTrue(source.contains("putExtra(\"returnUnchangedText\", true)"))
         assertTrue(source.contains("pendingEditCursor.coerceIn(0, text.length)"))
         listOf("script", "header", "js_lib", "login_ui", "login_check_js").forEach { id ->
