@@ -82,6 +82,7 @@ object WallpaperTheme {
     @Suppress("RestrictedApi")
     internal fun colorsForSeed(seed: Int): IntArray {
         val dynamicColors = MaterialDynamicColors()
+        val source = Hct.fromInt(seed)
         val day = SchemeContent(Hct.fromInt(seed), false, 0.0)
         val night = SchemeContent(Hct.fromInt(seed), true, 0.0)
         return intArrayOf(
@@ -89,7 +90,7 @@ object WallpaperTheme {
             dynamicColors.secondary().getArgb(day),
             dynamicColors.background().getArgb(day),
             dynamicColors.surfaceVariant().getArgb(day),
-            dynamicColors.primaryContainer().getArgb(night),
+            Hct.from(source.hue, source.chroma, 30.0).toInt(),
             dynamicColors.primary().getArgb(night),
             dynamicColors.background().getArgb(night),
             dynamicColors.surfaceVariant().getArgb(night),
