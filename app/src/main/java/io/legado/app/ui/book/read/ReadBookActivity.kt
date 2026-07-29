@@ -2524,11 +2524,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
         observeEvent<Boolean>(EventBus.REFRESH_BOOK_CONTENT) { //书源js函数触发刷新
             if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-                ReadBook.book?.let {
-                    ReadBook.curTextChapter = null
-                    binding.readView.upContent()
-                    viewModel.refreshContentDur(it)
-                }
+                refreshDurChapter()
             }
         }
         observeEvent<Boolean>(EventBus.REFRESH_BOOK_TOC) { //书源js函数触发刷新
