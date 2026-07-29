@@ -454,9 +454,11 @@ object DatabaseMigrations {
                 update readRecord set author = (
                     select max(books.author) from books
                     where books.name = readRecord.bookName
+                    and (books.type & ${BookType.notShelf}) = 0
                 ) where author = '' and (
                     select count(distinct books.author) from books
                     where books.name = readRecord.bookName
+                    and (books.type & ${BookType.notShelf}) = 0
                 ) = 1
                 """.trimIndent()
             )

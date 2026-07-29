@@ -2,6 +2,7 @@ package io.legado.app.data.dao
 
 import androidx.room.*
 import io.legado.app.data.entities.ReadRecord
+import io.legado.app.data.entities.ReadRecordAuthors
 import io.legado.app.data.entities.ReadRecordBook
 import io.legado.app.data.entities.ReadRecordShow
 import kotlinx.coroutines.flow.Flow
@@ -12,7 +13,10 @@ interface ReadRecordDao {
     @get:Query("select * from readRecord")
     val all: List<ReadRecord>
 
-    @Query("select distinct bookName, author from readRecord")
+    @Query(
+        """select distinct bookName, author from readRecord
+            order by bookName collate localized, author collate localized"""
+    )
     fun flowBooks(): Flow<List<ReadRecordBook>>
 
     @get:Query(
@@ -40,11 +44,25 @@ interface ReadRecordDao {
     @Query("select sum(readTime) from readRecord where bookName = :bookName")
     fun getReadTime(bookName: String): Long?
 
-    @Query("select readTime from readRecord where deviceId = :androidId and bookName = :bookName")
-    fun getReadTime(androidId: String, bookName: String): Long?
+    @Query("select * from readRecord where deviceId = :deviceId and bookName = :bookName")
+    fun getRecord(deviceId: String, bookName: String): ReadRecord?
+
+    @Query("select author from readRecord where deviceId = :deviceId and bookName = :bookName")
+    fun getAuthor(deviceId: String, bookName: String): String?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insert(vararg readRecord: ReadRecord)
+    fun insertRaw(vararg readRecord: ReadRecord)
+
+    @Transaction
+    fun insert(vararg readRecord: ReadRecord) {
+        readRecord.forEach { record ->
+            val author = ReadRecordAuthors.merge(
+                getAuthor(record.deviceId, record.bookName).orEmpty(),
+                record.author,
+            )
+            insertRaw(record.copy(author = author))
+        }
+    }
 
     @Update
     fun update(vararg record: ReadRecord)

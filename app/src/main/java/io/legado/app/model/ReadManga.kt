@@ -129,10 +129,12 @@ object ReadManga : CoroutineScope by MainScope() {
 
     //每次切换章节更新阅读记录
     fun upReadTime() {
+        val author = book?.author.orEmpty()
         executor.execute {
             if (!AppConfig.enableReadRecord) {
                 return@execute
             }
+            readRecord.author = author
             readRecord.readTime = readRecord.readTime + System.currentTimeMillis() - readStartTime
             readStartTime = System.currentTimeMillis()
             readRecord.lastRead = System.currentTimeMillis()

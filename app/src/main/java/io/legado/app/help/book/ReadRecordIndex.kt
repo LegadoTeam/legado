@@ -1,5 +1,6 @@
 package io.legado.app.help.book
 
+import io.legado.app.data.entities.ReadRecordAuthors
 import io.legado.app.data.entities.ReadRecordBook
 
 /**
@@ -32,7 +33,8 @@ class ReadRecordIndex private constructor(
             }
             val authors = hashMapOf<String, MutableSet<String>>()
             records.forEach { record ->
-                authors.getOrPut(record.bookName) { hashSetOf() }.add(record.author)
+                authors.getOrPut(record.bookName) { hashSetOf() }
+                    .addAll(ReadRecordAuthors.decode(record.author))
             }
             return ReadRecordIndex(authors)
         }

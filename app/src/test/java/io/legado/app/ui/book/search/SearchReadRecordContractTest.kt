@@ -56,12 +56,13 @@ class SearchReadRecordContractTest {
             "src/main/java/io/legado/app/model/ReadManga.kt",
         ).forEach { path ->
             val source = projectFile(path).readText().replace(Regex("\\s+"), " ")
-            assertTrue(path, source.contains("readRecord.author = book.author"))
+            assertTrue(path, source.contains("val author = book?.author.orEmpty()"))
+            assertTrue(path, source.contains("readRecord.author = author"))
         }
 
         val audioPlay = projectFile("src/main/java/io/legado/app/model/AudioPlay.kt")
             .readText().replace(Regex("\\s+"), " ")
-        assertTrue(audioPlay.contains("author = book.author"))
+        assertTrue(audioPlay.contains("readTimeTracker.updateAuthor(book?.author.orEmpty())"))
     }
 
     private fun projectFile(pathInApp: String): File {

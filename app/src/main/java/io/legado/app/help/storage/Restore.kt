@@ -199,10 +199,12 @@ object Restore {
                 if (readRecord.deviceId != androidId) {
                     appDb.readRecordDao.insert(readRecord)
                 } else {
-                    val time = appDb.readRecordDao
-                        .getReadTime(readRecord.deviceId, readRecord.bookName)
-                    if (time == null || time < readRecord.readTime) {
+                    val current = appDb.readRecordDao
+                        .getRecord(readRecord.deviceId, readRecord.bookName)
+                    if (current == null || current.readTime < readRecord.readTime) {
                         appDb.readRecordDao.insert(readRecord)
+                    } else if (readRecord.author.isNotBlank()) {
+                        appDb.readRecordDao.insert(current.copy(author = readRecord.author))
                     }
                 }
             }
