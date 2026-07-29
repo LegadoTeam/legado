@@ -903,6 +903,11 @@
     <string name="save_night_theme_summary">保存夜间主题配置以供调用和分享</string>
     <string name="theme_list">主题列表</string>
     <string name="theme_list_summary">使用、保存、导入或分享主题</string>
+    <string name="wallpaper_color_follow">跟随壁纸配色</string>
+    <string name="wallpaper_color_follow_summary">使用系统壁纸色板生成日间和夜间主题（Android 12+）</string>
+    <string name="wallpaper_color_auto_update">壁纸变化时自动更新</string>
+    <string name="wallpaper_color_auto_update_summary">系统壁纸变化后自动应用新色板</string>
+    <string name="wallpaper_colors_unavailable">无法获取壁纸配色</string>
     <string name="select_theme">切换默认主题</string>
     <string name="sort_by_lastUpdateTime">更新时间排序</string>
     <string name="search_content">全文搜索</string>

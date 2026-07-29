@@ -809,6 +809,11 @@
     <string name="save_night_theme_summary">儲存夜間主題配置以供使用同埋分享</string>
     <string name="theme_list">主題列表</string>
     <string name="theme_list_summary">使用儲存主題,匯入,分享主題</string>
+    <string name="wallpaper_color_follow">跟隨牆紙配色</string>
+    <string name="wallpaper_color_follow_summary">使用系統牆紙色盤產生日間和夜間主題（Android 12+）</string>
+    <string name="wallpaper_color_auto_update">牆紙變更時自動更新</string>
+    <string name="wallpaper_color_auto_update_summary">系統牆紙變更後自動套用新色盤</string>
+    <string name="wallpaper_colors_unavailable">無法取得牆紙配色</string>
     <string name="select_theme">切換默認主題</string>
     <string name="share_selected_source">分享選中源</string>
     <string name="sort_by_lastUpdateTime">更新時間排序</string>

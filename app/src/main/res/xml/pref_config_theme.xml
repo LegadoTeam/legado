@@ -67,6 +67,21 @@
         app:allowDividerBelow="false"
         app:iconSpaceReserved="false" />
 
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:defaultValue="false"
+        android:key="wallpaperColorFollow"
+        android:summary="@string/wallpaper_color_follow_summary"
+        android:title="@string/wallpaper_color_follow"
+        app:iconSpaceReserved="false" />
+
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:defaultValue="true"
+        android:dependency="wallpaperColorFollow"
+        android:key="wallpaperColorAutoUpdate"
+        android:summary="@string/wallpaper_color_auto_update_summary"
+        android:title="@string/wallpaper_color_auto_update"
+        app:iconSpaceReserved="false" />
+
     <io.legado.app.lib.prefs.PreferenceCategory
         android:key="dayThemeCategory"
         android:title="@string/day"
