@@ -22,6 +22,9 @@ import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 
+internal fun pendingSpeechPageMoves(currentPageIndex: Int, targetPageIndex: Int): Int =
+    (targetPageIndex - currentPageIndex).coerceAtLeast(0)
+
 /**
  * 本地朗读
  */
@@ -196,16 +199,11 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
 
         override fun onStart(s: String) {
             LogUtils.d(TAG, "onStart nowSpeak:$nowSpeak pageIndex:$pageIndex utteranceId:$s")
-            textChapter?.let {
+            if (textChapter != null) {
                 if (contentList[nowSpeak].matches(AppPattern.notReadAloudRegex)) {
                     nextParagraph()
                 }
-                if (pageIndex + 1 < it.pageSize
-                    && readAloudNumber + 1 > it.getReadLength(pageIndex + 1)
-                ) {
-                    pageIndex++
-                    ReadBook.moveToNextPage(syncReadAloudFollow = true)
-                }
+                moveToSpeechPage(readAloudNumber)
                 upTtsProgress(readAloudNumber + 1)
             }
         }
@@ -220,14 +218,9 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
             val msg =
                 "onRangeStart nowSpeak:$nowSpeak pageIndex:$pageIndex utteranceId:$utteranceId start:$start end:$end frame:$frame"
             LogUtils.d(TAG, msg)
-            textChapter?.let {
-                if (pageIndex + 1 < it.pageSize
-                    && readAloudNumber + start > it.getReadLength(pageIndex + 1)
-                ) {
-                    pageIndex++
-                    ReadBook.moveToNextPage(syncReadAloudFollow = true)
-                    upTtsProgress(readAloudNumber + start)
-                }
+            val position = readAloudNumber + start
+            if (moveToSpeechPage(position)) {
+                upTtsProgress(position)
             }
         }
 
@@ -256,6 +249,16 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
         override fun onError(s: String) {
             LogUtils.d(TAG, "onError nowSpeak:$nowSpeak pageIndex:$pageIndex s:$s")
             nextParagraph()
+        }
+
+        private fun moveToSpeechPage(position: Int): Boolean {
+            val targetPageIndex = textChapter?.getPageIndexByCharIndex(position) ?: return false
+            val moves = pendingSpeechPageMoves(pageIndex, targetPageIndex)
+            repeat(moves) {
+                pageIndex++
+                ReadBook.moveToNextPage(syncReadAloudFollow = true)
+            }
+            return moves > 0
         }
 
     }
