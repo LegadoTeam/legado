@@ -153,6 +153,20 @@ class ManualHighlightRenderTest {
     }
 
     @Test
+    fun `underline takes drawing priority over emphasis`() {
+        val text = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/read/page/entities/column/TextColumn.kt"
+        )
+        val html = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/read/page/entities/column/TextHtmlColumn.kt"
+        )
+        val guardedEmphasis = "style?.takeIf { it.underline == null }?.emphasis?.let"
+
+        assertTrue(text.contains(guardedEmphasis))
+        assertTrue(html.contains(guardedEmphasis))
+    }
+
+    @Test
     fun `fill shapes share one run renderer across fast and styled text`() {
         val line = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/TextLine.kt")
         val text = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/column/TextColumn.kt")

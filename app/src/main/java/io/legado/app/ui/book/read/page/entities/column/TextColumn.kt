@@ -91,7 +91,7 @@ data class TextColumn(
             canvas.drawText(charData, start, y, drawPaint)
         }
         styledPaint?.let(HighlightDraw::recycleTextPaint)
-        style?.emphasis?.let {
+        style?.takeIf { it.underline == null }?.emphasis?.let {
             HighlightDraw.drawEmphasis(
                 canvas,
                 start,
