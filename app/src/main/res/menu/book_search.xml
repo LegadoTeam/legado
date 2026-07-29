@@ -10,6 +10,12 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_show_read_record"
+        android:checkable="true"
+        android:title="@string/show_search_read_record"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_source_manage"
         android:title="@string/book_source_manage"
         app:showAsAction="never" />

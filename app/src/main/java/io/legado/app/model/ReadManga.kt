@@ -71,6 +71,7 @@ object ReadManga : CoroutineScope by MainScope() {
     fun resetData(book: Book) {
         ReadManga.book = book
         readRecord.bookName = book.name
+        readRecord.author = book.author
         readRecord.readTime = appDb.readRecordDao.getReadTime(book.name) ?: 0
         chapterSize = appDb.bookChapterDao.getChapterCount(book.bookUrl)
         simulatedChapterSize = if (book.readSimulating()) {
@@ -128,10 +129,12 @@ object ReadManga : CoroutineScope by MainScope() {
 
     //每次切换章节更新阅读记录
     fun upReadTime() {
+        val author = book?.author.orEmpty()
         executor.execute {
             if (!AppConfig.enableReadRecord) {
                 return@execute
             }
+            readRecord.author = author
             readRecord.readTime = readRecord.readTime + System.currentTimeMillis() - readStartTime
             readStartTime = System.currentTimeMillis()
             readRecord.lastRead = System.currentTimeMillis()

@@ -70,7 +70,7 @@ interface BookGroupDao {
     @get:Query("SELECT * FROM book_groups ORDER BY `order`")
     val all: List<BookGroup>
 
-    @get:Query("select count(*) < 64 from book_groups where groupId >= 0 or groupId == ${Long.MIN_VALUE}")
+    @get:Query("select count(*) < 63 from book_groups where groupId > 0")
     val canAddGroup: Boolean
 
     @Query("update book_groups set show = 1 where groupId = :groupId")

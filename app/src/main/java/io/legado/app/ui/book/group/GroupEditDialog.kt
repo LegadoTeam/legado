@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import androidx.fragment.app.viewModels
 import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
+import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.databinding.DialogBookGroupEditBinding
 import io.legado.app.lib.dialogs.alert
@@ -118,6 +119,8 @@ class GroupEditDialog() : BaseDialogFragment(R.layout.dialog_book_group_edit) {
                 val groupName = tieGroupName.text?.toString()
                 if (groupName.isNullOrEmpty()) {
                     toastOnUi("分组名称不能为空")
+                } else if (bookGroup == null && !appDb.bookGroupDao.canAddGroup) {
+                    toastOnUi("分组已达上限(63个)")
                 } else {
                     val bookSort = binding.spSort.selectedItemPosition - 1
                     val coverPath = binding.ivCover.bitmapPath

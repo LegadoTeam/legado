@@ -24,16 +24,29 @@ class SearchResultLayoutTest {
         val document = searchLayout()
         val cover = view(document, "iv_cover")
         val bookshelfIndicator = view(document, "iv_in_bookshelf")
+        val readRecordIndicator = view(document, "iv_read_record")
         val originCount = view(document, "bv_originCount")
 
         assertEquals("parent", cover.appAttribute("layout_constraintStart_toStartOf"))
         assertEquals("@id/iv_cover", bookshelfIndicator.appAttribute("layout_constraintStart_toEndOf"))
+        assertEquals(
+            "@id/iv_in_bookshelf",
+            readRecordIndicator.appAttribute("layout_constraintStart_toEndOf")
+        )
         assertEquals("parent", originCount.appAttribute("layout_constraintEnd_toEndOf"))
-        listOf(cover, bookshelfIndicator, originCount).forEach { view ->
+        listOf(cover, bookshelfIndicator, readRecordIndicator, originCount).forEach { view ->
             assertFalse(view.hasAttributeNS(APP_NS, "layout_constraintLeft_toLeftOf"))
             assertFalse(view.hasAttributeNS(APP_NS, "layout_constraintLeft_toRightOf"))
             assertFalse(view.hasAttributeNS(APP_NS, "layout_constraintRight_toRightOf"))
         }
+    }
+
+    @Test
+    fun titleRowChainsIndicatorsBeforeName() {
+        val document = searchLayout()
+        val name = view(document, "tv_name")
+
+        assertEquals("@+id/iv_read_record", name.appAttribute("layout_constraintStart_toEndOf"))
     }
 
     @Test

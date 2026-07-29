@@ -119,6 +119,12 @@ internal class AudioReadTimeTracker {
     }
 
     @Synchronized
+    fun updateAuthor(author: String) {
+        record.author = author
+        activeRecord?.author = author
+    }
+
+    @Synchronized
     fun start(now: Long) {
         if (startedAt == null) {
             activeRecord = record
@@ -283,6 +289,7 @@ object AudioPlay : CoroutineScope by MainScope() {
         readTimeTracker.setRecord(
             ReadRecord(
                 bookName = book.name,
+                author = book.author,
                 readTime = appDb.readRecordDao.getReadTime(book.name) ?: 0,
             )
         )
@@ -302,6 +309,7 @@ object AudioPlay : CoroutineScope by MainScope() {
     @Synchronized
     fun markReadTimeStart() {
         if (AppConfig.enableReadRecord) {
+            readTimeTracker.updateAuthor(book?.author.orEmpty())
             readTimeTracker.start(SystemClock.elapsedRealtime())
         }
     }
