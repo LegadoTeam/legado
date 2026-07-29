@@ -127,6 +127,7 @@ object ReadBook : CoroutineScope by MainScope() {
         loadHighlights(book)
         loadHighlightRules(book)
         readRecord.bookName = book.name
+        readRecord.author = book.author
         readRecord.readTime = appDb.readRecordDao.getReadTime(book.name) ?: 0
         chapterSize = appDb.bookChapterDao.getChapterCount(book.bookUrl)
         simulatedChapterSize = if (book.readSimulating()) {

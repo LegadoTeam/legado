@@ -71,6 +71,7 @@ object ReadManga : CoroutineScope by MainScope() {
     fun resetData(book: Book) {
         ReadManga.book = book
         readRecord.bookName = book.name
+        readRecord.author = book.author
         readRecord.readTime = appDb.readRecordDao.getReadTime(book.name) ?: 0
         chapterSize = appDb.bookChapterDao.getChapterCount(book.bookUrl)
         simulatedChapterSize = if (book.readSimulating()) {

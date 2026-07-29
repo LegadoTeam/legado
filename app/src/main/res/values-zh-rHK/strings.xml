@@ -794,6 +794,7 @@
     <string name="read_record">閲讀記錄</string>
     <string name="del_read_record">刪除閲讀記錄</string>
     <string name="read_record_summary">閱讀時間記錄</string>
+    <string name="show_search_read_record">標識讀過的書籍</string>
     <string name="local_tts">本地TTS</string>
     <string name="thread_count">線程數</string>
     <string name="all_read_time">總閲讀時間</string>

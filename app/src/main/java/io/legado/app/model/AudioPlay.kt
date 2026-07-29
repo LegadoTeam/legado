@@ -275,6 +275,7 @@ object AudioPlay : CoroutineScope by MainScope() {
         readTimeTracker.setRecord(
             ReadRecord(
                 bookName = book.name,
+                author = book.author,
                 readTime = appDb.readRecordDao.getReadTime(book.name) ?: 0,
             )
         )

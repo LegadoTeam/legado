@@ -2,7 +2,9 @@ package io.legado.app.data.dao
 
 import androidx.room.*
 import io.legado.app.data.entities.ReadRecord
+import io.legado.app.data.entities.ReadRecordBook
 import io.legado.app.data.entities.ReadRecordShow
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ReadRecordDao {
@@ -10,8 +12,8 @@ interface ReadRecordDao {
     @get:Query("select * from readRecord")
     val all: List<ReadRecord>
 
-    @get:Query("select distinct bookName from readRecord")
-    val allBookNames: List<String>
+    @Query("select distinct bookName, author from readRecord")
+    fun flowBooks(): Flow<List<ReadRecordBook>>
 
     @get:Query(
         """

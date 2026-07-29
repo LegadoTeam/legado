@@ -28,6 +28,7 @@ import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.data.entities.SearchKeyword
 import io.legado.app.databinding.ActivityBookSearchBinding
+import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.Selector
 import io.legado.app.lib.theme.accentColor
@@ -90,6 +91,7 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
     private var historyFlowJob: Job? = null
     private var booksFlowJob: Job? = null
     private var precisionSearchMenuItem: MenuItem? = null
+    private var showReadRecordMenuItem: MenuItem? = null
     private var isManualStopSearch = false
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
@@ -111,6 +113,8 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
         this.menu = menu
         precisionSearchMenuItem = menu.findItem(R.id.menu_precision_search)
         precisionSearchMenuItem?.isChecked = getPrefBoolean(PreferKey.precisionSearch)
+        showReadRecordMenuItem = menu.findItem(R.id.menu_show_read_record)
+        showReadRecordMenuItem?.isChecked = AppConfig.showSearchReadRecord
         return super.onCompatCreateOptionsMenu(menu)
     }
 
@@ -165,6 +169,12 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
                 searchView.query?.toString()?.trim()?.let {
                     searchView.setQuery(it, true)
                 }
+            }
+
+            R.id.menu_show_read_record -> {
+                AppConfig.showSearchReadRecord = !AppConfig.showSearchReadRecord
+                showReadRecordMenuItem?.isChecked = AppConfig.showSearchReadRecord
+                viewModel.upAdapterLiveData.postValue("hasReadRecord")
             }
 
             R.id.menu_search_scope -> alertSearchScope()
