@@ -835,6 +835,13 @@
     <string name="text_bottom_justify">文字底部对齐</string>
     <string name="hanging_punctuation">段首标点悬挂</string>
     <string name="hanging_punctuation_summary">段首引号等标点悬挂于缩进内，使正文首字与其他段落对齐</string>
+    <string name="punctuation_compress">标点挤压</string>
+    <string name="punctuation_compress_summary">裁掉全角标点字框内多余的空白，开启中文排版效果最佳</string>
+    <string name="punctuation_compress_none">关闭（全角）</string>
+    <string name="punctuation_compress_line_end">行尾挤压</string>
+    <string name="punctuation_compress_adjacent">相邻标点挤压</string>
+    <string name="punctuation_compress_adjacent_line_end">相邻与行尾挤压</string>
+    <string name="punctuation_compress_all">全部半角</string>
     <string name="auto_page_speed">自动翻页速度</string>
     <string name="sort_by_url">地址排序</string>
     <string name="backup_summary">本地和 WebDav 一起备份</string>

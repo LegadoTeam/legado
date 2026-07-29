@@ -9,6 +9,7 @@ import io.legado.app.R
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.PageAnim
 import io.legado.app.constant.PreferKey
+import io.legado.app.constant.PunctuationCompressMode
 import io.legado.app.help.DefaultData
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.utils.BitmapUtils
@@ -25,6 +26,7 @@ import io.legado.app.utils.getFile
 import io.legado.app.utils.getMeanColor
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getPrefInt
+import io.legado.app.utils.getPrefString
 import io.legado.app.utils.hexString
 import io.legado.app.utils.printOnDebug
 import io.legado.app.utils.putPrefBoolean
@@ -250,6 +252,14 @@ object ReadBookConfig {
      * 段首标点悬挂
      */
     val hangingPunctuation get() = appCtx.getPrefBoolean(PreferKey.hangingPunctuation, false)
+
+    /**
+     * 标点挤压
+     */
+    val punctuationCompress
+        get() = PunctuationCompressMode.fromKey(
+            appCtx.getPrefString(PreferKey.punctuationCompress)
+        )
 
     var hideStatusBar = appCtx.getPrefBoolean(PreferKey.hideStatusBar)
     var hideNavigationBar = appCtx.getPrefBoolean(PreferKey.hideNavigationBar)

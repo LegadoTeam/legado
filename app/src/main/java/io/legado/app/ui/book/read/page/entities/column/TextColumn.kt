@@ -19,6 +19,8 @@ data class TextColumn(
     override var start: Float,
     override var end: Float,
     override val charData: String,
+    /**标点挤压后字形在列内的绘制偏移,裁掉的是字框内的空白*/
+    val drawOffset: Float = 0f,
 ) : TextBaseColumn {
 
     override var textLine: TextLine = emptyTextLine
@@ -86,9 +88,9 @@ data class TextColumn(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
             val letterSpacing = drawPaint.letterSpacing * drawPaint.textSize
             val letterSpacingHalf = letterSpacing * 0.5f
-            canvas.drawText(charData, start + letterSpacingHalf, y, drawPaint)
+            canvas.drawText(charData, start + drawOffset + letterSpacingHalf, y, drawPaint)
         } else {
-            canvas.drawText(charData, start, y, drawPaint)
+            canvas.drawText(charData, start + drawOffset, y, drawPaint)
         }
         styledPaint?.let(HighlightDraw::recycleTextPaint)
         style?.takeIf { it.underline == null }?.emphasis?.let {

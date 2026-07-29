@@ -88,6 +88,16 @@
         app:iconSpaceReserved="false"
         app:isBottomBackground="true" />
 
+    <io.legado.app.lib.prefs.NameListPreference
+        android:defaultValue="none"
+        android:entries="@array/punctuation_compress_title"
+        android:entryValues="@array/punctuation_compress_value"
+        android:key="punctuationCompress"
+        android:summary="@string/punctuation_compress_summary"
+        android:title="@string/punctuation_compress"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
     <io.legado.app.lib.prefs.SwitchPreference
         android:defaultValue="true"
         android:key="textBottomJustify"

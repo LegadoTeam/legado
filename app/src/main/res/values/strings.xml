@@ -839,6 +839,13 @@
     <string name="text_bottom_justify">Text align bottom</string>
     <string name="hanging_punctuation">Hanging punctuation</string>
     <string name="hanging_punctuation_summary">Hang the opening quote at paragraph start into the indent, so the first character aligns with other paragraphs</string>
+    <string name="punctuation_compress">Punctuation compression</string>
+    <string name="punctuation_compress_summary">Trim the blank space inside the em box of full width punctuation. Works best with Chinese layout enabled</string>
+    <string name="punctuation_compress_none">Off (full width)</string>
+    <string name="punctuation_compress_line_end">Line end</string>
+    <string name="punctuation_compress_adjacent">Adjacent punctuation</string>
+    <string name="punctuation_compress_adjacent_line_end">Adjacent and line end</string>
+    <string name="punctuation_compress_all">All (half width)</string>
     <string name="auto_page_speed">Auto scroll speed</string>
     <string name="sort_by_url">Sort by URL</string>
     <string name="backup_summary">Backup the local and WebDav simultaneously</string>

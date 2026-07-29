@@ -196,6 +196,14 @@
 		<item>beta_releaseS_version</item>
 	</string-array>
 
+	<string-array name="punctuation_compress_title">
+		<item>@string/punctuation_compress_none</item>
+		<item>@string/punctuation_compress_line_end</item>
+		<item>@string/punctuation_compress_adjacent</item>
+		<item>@string/punctuation_compress_adjacent_line_end</item>
+		<item>@string/punctuation_compress_all</item>
+	</string-array>
+
 	<string-array name="tip_color">
 		<item>Same color as content</item>
 		<item>Customize</item>

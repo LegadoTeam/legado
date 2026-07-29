@@ -109,6 +109,12 @@ class TextChapterLayout(
     private val isMiddleTitle = ReadBookConfig.isMiddleTitle
     private val textFullJustify = ReadBookConfig.textFullJustify
     private val hangingPunctuation = ReadBookConfig.hangingPunctuation
+    private val punctuationCompressMode = ReadBookConfig.punctuationCompress
+    private val punctuationCompressor = if (punctuationCompressMode.enabled) {
+        PunctuationCompressor(contentPaint)
+    } else {
+        null
+    }
     private val adaptSpecialStyle = AppConfig.adaptSpecialStyle
     private val pageAnim = book.getPageAnim()
     private val reviewTitleOffset = if (
@@ -945,6 +951,9 @@ class TextChapterLayout(
     ) {
         val widthsArray = allocateFloatArray(text.length)
         textPaint.getTextWidthsCompat(text, widthsArray, reviewCharWidth)
+        //标点挤压改写字宽,断行与列排布都用挤压后的宽度,标题不参与
+        val compressor = if (isTitle) null else punctuationCompressor
+        compressor?.compressParagraph(text, widthsArray, punctuationCompressMode)
         val hangingWidth = hangingPunctuationWidth(text, widthsArray, isTitle, isFirstLine)
         val layout = if (useZhLayout) {
             val (words, widths) = measureTextSplit(text, widthsArray)
@@ -1008,6 +1017,13 @@ class TextChapterLayout(
             val lineEnd = layout.getLineEnd(lineIndex)
             val lineText = text.substring(lineStart, lineEnd)
             val (words, widths) = measureTextSplit(lineText, widthsArray, lineStart)
+            if (
+                punctuationCompressMode.compressLineEnd &&
+                lineIndex < layout.lineCount - 1
+            ) {
+                //末行的行尾就是段尾,压了只会让右边界无故缩进
+                compressor?.compressLineEnd(words, widths)
+            }
             val desiredWidth = widths.fastSum()
             textLine.text = lineText
             when (lineIndex) {
@@ -1152,7 +1168,7 @@ class TextChapterLayout(
                     textLine.hangingPunctuation = true
                 }
                 addCharToLine(
-                    book, absStartX, textLine, words[index],
+                    book, absStartX, textLine, words[index], textWidths[index],
                     xStart, xEnd, index + 1 == words.size, srcList, clickList
                 )
             }
@@ -1214,7 +1230,7 @@ class TextChapterLayout(
             }
         ) { index, xStart, xEnd, _ ->
             addCharToLine(
-                book, absStartX, textLine, words[index],
+                book, absStartX, textLine, words[index], textWidths[index],
                 xStart, xEnd, index + 1 == words.size, srcList,
                 clickList
             )
@@ -1247,7 +1263,7 @@ class TextChapterLayout(
                 textLine.hangingPunctuation = true
             }
             addCharToLine(
-                book, absStartX, textLine, words[index],
+                book, absStartX, textLine, words[index], textWidths[index],
                 xStart, xEnd, index + 1 == words.size, srcList, clickList
             )
         }
@@ -1262,6 +1278,8 @@ class TextChapterLayout(
         absStartX: Int,
         textLine: TextLine,
         char: String,
+        /**该列的排布宽度,不含两端对齐补出的行内间隙*/
+        charWidth: Float,
         xStart: Float,
         xEnd: Float,
         isLineEnd: Boolean,
@@ -1289,10 +1307,21 @@ class TextChapterLayout(
 //            }
 
             else -> {
+                //挤压过的标点列变窄,字形要按裁剪方向移回列内
+                var drawOffset = 0f
+                val compressor = if (textLine.isTitle) null else punctuationCompressor
+                if (compressor != null) {
+                    val index = compressor.compressedIndex(char, charWidth)
+                    if (index >= 0) {
+                        textLine.compressedPunctuation = true
+                        drawOffset = compressor.drawOffsetAt(index, charWidth)
+                    }
+                }
                 TextColumn(
                     start = absStartX + xStart,
                     end = absStartX + xEnd,
-                    charData = char
+                    charData = char,
+                    drawOffset = drawOffset
                 )
             }
         }

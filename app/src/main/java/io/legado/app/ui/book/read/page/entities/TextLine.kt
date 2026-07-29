@@ -53,6 +53,7 @@ data class TextLine(
     var onlyTextColumn: Boolean = true,
     var reviewTitleOffset: Int = 0,
     var hangingPunctuation: Boolean = false,
+    var compressedPunctuation: Boolean = false,
 ) {
 
     val columns: List<BaseColumn> get() = textColumns
@@ -403,7 +404,8 @@ data class TextLine(
 
     fun checkFastDraw(): Boolean {
         if (!FastDrawRule.canDrawWholeLine(
-                AppConfig.optimizeRender, exceed, hangingPunctuation, onlyTextColumn, textPage.isMsgPage
+                AppConfig.optimizeRender, exceed, hangingPunctuation, compressedPunctuation,
+                onlyTextColumn, textPage.isMsgPage
             )
         ) {
             return false
@@ -464,10 +466,13 @@ internal object FastDrawRule {
         exceed: Boolean,
         /**段首标点悬挂到缩进内*/
         hangingPunctuation: Boolean,
+        /**标点挤压后列宽小于字宽*/
+        compressedPunctuation: Boolean,
         onlyTextColumn: Boolean,
         isMsgPage: Boolean
     ): Boolean {
-        return optimizeRender && !exceed && !hangingPunctuation && onlyTextColumn && !isMsgPage
+        return optimizeRender && !exceed && !hangingPunctuation && !compressedPunctuation &&
+                onlyTextColumn && !isMsgPage
     }
 
 }

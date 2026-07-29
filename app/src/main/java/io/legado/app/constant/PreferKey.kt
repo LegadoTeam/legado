@@ -92,6 +92,7 @@ object PreferKey {
     const val textFullJustify = "textFullJustify"
     const val textBottomJustify = "textBottomJustify"
     const val hangingPunctuation = "hangingPunctuation"
+    const val punctuationCompress = "punctuationCompress"
     const val adaptSpecialStyle = "adaptSpecialStyle"
     const val autoReadSpeed = "autoReadSpeed"
     const val barElevation = "barElevation"

@@ -14,10 +14,12 @@ class FastDrawRuleTest {
         optimizeRender: Boolean = true,
         exceed: Boolean = false,
         hangingPunctuation: Boolean = false,
+        compressedPunctuation: Boolean = false,
         onlyTextColumn: Boolean = true,
         isMsgPage: Boolean = false
     ) = FastDrawRule.canDrawWholeLine(
-        optimizeRender, exceed, hangingPunctuation, onlyTextColumn, isMsgPage
+        optimizeRender, exceed, hangingPunctuation, compressedPunctuation,
+        onlyTextColumn, isMsgPage
     )
 
     @Test
@@ -29,6 +31,12 @@ class FastDrawRuleTest {
     fun `a hanging punctuation line falls back to per column drawing`() {
         // 悬挂标点把首个标点左移到缩进内,整体绘制会把它排回字宽顺序上
         assertFalse(canDrawWholeLine(hangingPunctuation = true))
+    }
+
+    @Test
+    fun `a compressed punctuation line falls back to per column drawing`() {
+        // 挤压后的标点列窄于字宽,整体绘制仍按原字宽排字,其后的字会整体右移
+        assertFalse(canDrawWholeLine(compressedPunctuation = true))
     }
 
     @Test
