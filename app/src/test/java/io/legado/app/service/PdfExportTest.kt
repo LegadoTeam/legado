@@ -1,5 +1,6 @@
 package io.legado.app.service
 
+import io.legado.app.exception.NoStackTraceException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -36,6 +37,34 @@ class PdfExportTest {
             ),
             blocks
         )
+    }
+
+    @Test
+    fun `image book keeps raw image order and duplicates while ignoring text`() {
+        val blocks = imagePdfContentBlocks(
+            "ignored<img src=\"image-a\">more<img src=\"image-a\">",
+            isVolume = false
+        )
+
+        assertEquals(
+            listOf(
+                PdfContentBlock.Image("image-a"),
+                PdfContentBlock.Image("image-a")
+            ),
+            blocks
+        )
+    }
+
+    @Test
+    fun `image book requires content and images outside volume chapters`() {
+        assertThrows(NoStackTraceException::class.java) {
+            imagePdfContentBlocks(null, isVolume = false)
+        }
+        assertThrows(NoStackTraceException::class.java) {
+            imagePdfContentBlocks("text only", isVolume = false)
+        }
+        assertEquals(emptyList<PdfContentBlock.Image>(), imagePdfContentBlocks(null, true))
+        assertEquals(emptyList<PdfContentBlock.Image>(), imagePdfContentBlocks("", true))
     }
 
     @Test
@@ -118,14 +147,18 @@ class PdfExportTest {
         assertTrue(activity.contains("2 -> \"pdf\""))
         assertTrue(service.contains("\"pdf\" -> exportPdf(exportConfig.path, book)"))
         assertTrue(webDav.contains("upload(uri, FileUtils.getMimeType(fileName))"))
-        assertTrue(exportPdf.contains("if (book.isImage || book.isPdf)"))
+        assertTrue(exportPdf.contains("if (book.isPdf)"))
+        assertFalse(exportPdf.contains("book.isImage || book.isPdf"))
         assertTrue(exportPdf.contains("getChapterContentForExport(book, exportChapter)"))
         assertTrue(exportPdf.contains("findPdfPageLineEnd("))
         assertTrue(exportPdf.contains("clipRect("))
         assertTrue(exportPdf.contains(".canvas.withSave"))
         assertTrue(exportPdf.contains("minOf(\n                    1f,"))
+        assertTrue(exportPdf.contains("imagePdfContentBlocks(rawContent, exportChapter.isVolume)"))
         assertTrue(exportPdf.contains("splitPdfContentBlocks(displayContent)"))
         assertTrue(exportPdf.contains("ImageProvider.cacheImage(book, src, bookSource)"))
+        assertTrue(exportPdf.contains("fun drawImage(path: String): Boolean"))
+        assertTrue(exportPdf.contains("if (book.isImage && !rendered)"))
         assertTrue(service.contains("return SvgUtils.createBitmap(path, reqWidth, reqHeight)"))
         assertTrue(exportPdf.contains("replaceBook = replaceBook"))
         assertTrue(exportPdf.contains("pending.pdf"))
@@ -135,6 +168,11 @@ class PdfExportTest {
         assertFalse(exportPdf.contains("fileDoc.find(filename)?.delete()"))
         assertTrue(exportPdf.contains("finally {"))
         assertTrue(exportPdf.contains("pdf.close()"))
+
+        val imageBlock = exportPdf.substringAfter("is PdfContentBlock.Image -> {")
+            .substringBefore("\n                                }")
+        assertTrue(imageBlock.contains("currentCoroutineContext().ensureActive()"))
+        assertTrue(imageBlock.contains("image.exists() && drawImage(image.absolutePath)"))
 
         val installPdf = service.substringAfter("private fun installPdfExport(")
             .substringBefore("private fun cleanupExportFile")

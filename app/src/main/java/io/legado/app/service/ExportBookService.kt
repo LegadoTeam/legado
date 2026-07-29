@@ -128,6 +128,21 @@ internal fun splitPdfContentBlocks(content: String): List<PdfContentBlock> {
     return blocks
 }
 
+internal fun imagePdfContentBlocks(
+    content: String?,
+    isVolume: Boolean
+): List<PdfContentBlock.Image> {
+    if (content == null) {
+        if (isVolume) return emptyList()
+        throw NoStackTraceException("图片章节正文未缓存")
+    }
+    val images = splitPdfContentBlocks(content).filterIsInstance<PdfContentBlock.Image>()
+    if (images.isEmpty() && !isVolume) {
+        throw NoStackTraceException("图片章节没有可导出的图片")
+    }
+    return images
+}
+
 internal fun calculatePdfBitmapSampleSize(
     width: Int,
     height: Int,
@@ -390,8 +405,8 @@ class ExportBookService : BaseService() {
     }
 
     private suspend fun exportPdf(fileDoc: FileDoc, book: Book) {
-        if (book.isImage || book.isPdf) {
-            throw NoStackTraceException("PDF 导出暂不支持图片书和本地 PDF")
+        if (book.isPdf) {
+            throw NoStackTraceException("PDF 导出暂不支持本地 PDF")
         }
         val filename = book.getExportFileName("pdf")
         val fileStem = filename.substringBeforeLast('.', filename)
@@ -491,12 +506,12 @@ class ExportBookService : BaseService() {
             y += spacing
         }
 
-        fun drawImage(path: String) {
+        fun drawImage(path: String): Boolean {
             val bitmap = decodePdfBitmap(
                 path,
                 contentWidth,
                 (contentBottom - margin).toInt()
-            ) ?: return
+            ) ?: return false
             try {
                 if (currentPage == null) startPage()
                 val fullPageHeight = contentBottom - margin
@@ -527,6 +542,7 @@ class ExportBookService : BaseService() {
             } finally {
                 if (!bitmap.isRecycled) bitmap.recycle()
             }
+            return true
         }
 
         suspend fun renderPdf(stagingDoc: FileDoc) {
@@ -554,7 +570,21 @@ class ExportBookService : BaseService() {
                         exportProgress[book.bookUrl] = index
                         val exportChapter = chapter.copy(isVip = false)
                         val rawContent = getChapterContentForExport(book, exportChapter)
-                            ?: return@forEachIndexed
+                        val contentBlocks: List<PdfContentBlock> = if (book.isImage) {
+                            imagePdfContentBlocks(rawContent, exportChapter.isVolume)
+                        } else {
+                            val textContent = rawContent ?: return@forEachIndexed
+                            val displayContent = contentProcessor.getContent(
+                                book,
+                                exportChapter,
+                                textContent,
+                                includeTitle = false,
+                                useReplace = useReplace,
+                                chineseConvert = false,
+                                reSegment = false
+                            ).toString()
+                            splitPdfContentBlocks(displayContent)
+                        }
                         if (!AppConfig.exportNoChapterName) {
                             drawTextBlock(
                                 exportChapter.getDisplayTitle(
@@ -566,16 +596,7 @@ class ExportBookService : BaseService() {
                                 10f
                             )
                         }
-                        val displayContent = contentProcessor.getContent(
-                            book,
-                            exportChapter,
-                            rawContent,
-                            includeTitle = false,
-                            useReplace = useReplace,
-                            chineseConvert = false,
-                            reSegment = false
-                        ).toString()
-                        splitPdfContentBlocks(displayContent).forEach { block ->
+                        contentBlocks.forEach { block ->
                             when (block) {
                                 is PdfContentBlock.Text -> block.value.lineSequence()
                                     .forEach { line ->
@@ -587,12 +608,18 @@ class ExportBookService : BaseService() {
                                     }
 
                                 is PdfContentBlock.Image -> {
+                                    currentCoroutineContext().ensureActive()
                                     val src = NetworkUtils.getAbsoluteURL(
                                         exportChapter.url,
                                         block.source
                                     )
                                     val image = ImageProvider.cacheImage(book, src, bookSource)
-                                    if (image.exists()) drawImage(image.absolutePath)
+                                    val rendered = image.exists() && drawImage(image.absolutePath)
+                                    if (book.isImage && !rendered) {
+                                        throw NoStackTraceException(
+                                            "图片导出失败: ${exportChapter.title}"
+                                        )
+                                    }
                                 }
                             }
                         }
