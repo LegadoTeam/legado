@@ -43,6 +43,20 @@ internal object PunctuationCompressRule {
     /**标点在挤压表中的下标,非标点返回-1*/
     fun indexOf(char: Char): Int = chars.indexOf(char)
 
+    /**
+     * 簇的基字,变体选择符等零宽修饰字被并入同一列,判定标点要取首字
+     * 代理对的首字是高位代理,不在挤压表内,自然不会被当成标点
+     */
+    fun clusterBase(cluster: String): Char? {
+        return cluster.firstOrNull()
+    }
+
+    /**簇的标点下标,空簇或非标点返回-1*/
+    fun indexOfCluster(cluster: String): Int {
+        val base = clusterBase(cluster) ?: return -1
+        return indexOf(base)
+    }
+
     fun classOf(index: Int): Int = when {
         index < 0 -> classNone
         index < openChars.length -> classOpen
@@ -116,9 +130,6 @@ internal class PunctuationCompressor(private val paint: TextPaint) {
 
     private val measured = BooleanArray(PunctuationCompressRule.size)
 
-    /**标点自身的排布宽度*/
-    private val naturals = FloatArray(PunctuationCompressRule.size)
-
     /**可裁掉的宽度*/
     private val trims = FloatArray(PunctuationCompressRule.size)
 
@@ -126,17 +137,32 @@ internal class PunctuationCompressor(private val paint: TextPaint) {
     private val sides = IntArray(PunctuationCompressRule.size)
 
     /**
-     * 段落内与行位置无关的挤压,直接改写字宽
-     * 挤压后的字宽同时供断行与列排布使用,断行能多排下被挤压让出的宽度
-     * @return 是否有标点被挤压
+     * 段落内被挤压的字位置,与字宽数组同下标
+     * 挤压与否由这里记录,不能靠比较列宽反推:Android 15 会给段落首尾字加上半个字距的补偿,
+     * 字距可为负,补偿量最大可达裁剪量的一半,反推会把没压的判成压了
      */
-    fun compressParagraph(
+    private var compressedAt = BooleanArray(0)
+
+    /**
+     * 段落排版开始,重置挤压记录并执行与行位置无关的挤压
+     * 挤压后的字宽同时供断行与列排布使用,断行能多排下被挤压让出的宽度
+     */
+    fun beginParagraph(text: String, widths: FloatArray, mode: PunctuationCompressMode) {
+        if (compressedAt.size < text.length) {
+            compressedAt = BooleanArray(text.length)
+        } else {
+            compressedAt.fill(false, 0, text.length)
+        }
+        if (mode.compressAdjacent || mode.compressAll) {
+            compressParagraph(text, widths, mode)
+        }
+    }
+
+    private fun compressParagraph(
         text: String,
         widths: FloatArray,
         mode: PunctuationCompressMode
-    ): Boolean {
-        if (!mode.compressAdjacent && !mode.compressAll) return false
-        var compressed = false
+    ) {
         var prevClass = PunctuationCompressRule.classNone
         var current = nextBase(text, widths, 0)
         while (current >= 0) {
@@ -152,14 +178,13 @@ internal class PunctuationCompressor(private val paint: TextPaint) {
                 val hit = mode.compressAll || PunctuationCompressRule.compressAdjacent(
                     charClass, prevClass, nextClass
                 )
-                if (hit && compressAt(index, widths, current)) {
-                    compressed = true
+                if (hit) {
+                    compressAt(index, widths, current)
                 }
             }
             prevClass = charClass
             current = next
         }
-        return compressed
     }
 
     /**
@@ -167,55 +192,63 @@ internal class PunctuationCompressor(private val paint: TextPaint) {
      * 行尾之外的标点不动,段落末行不压,避免自然排版的右边界无故缩进
      * @return 是否有标点被挤压
      */
-    fun compressLineEnd(words: List<String>, widths: MutableList<Float>): Boolean {
+    fun compressLineEnd(
+        words: List<String>,
+        widths: MutableList<Float>,
+        lineStart: Int
+    ): Boolean {
+        var position = lineStart
+        for (i in words.indices) {
+            position += words[i].length
+        }
         for (i in words.indices.reversed()) {
             val word = words[i]
+            position -= word.length
             //行尾的空格不参与,继续往前找最后一个可见字
             if (word.isBlank()) continue
-            if (word.length != 1) return false
-            val index = PunctuationCompressRule.indexOf(word[0])
+            val index = PunctuationCompressRule.indexOfCluster(word)
             if (PunctuationCompressRule.classOf(index) != PunctuationCompressRule.classClose) {
                 return false
             }
             measure(index)
-            val trim = trims[index]
-            if (trim <= minTrim) return false
+            if (trims[index] <= minTrim) return false
             //段落内已挤压过的不再压
-            if (widths[i] < naturals[index] - minTrim) return false
-            widths[i] = widths[i] - trim
+            if (compressedAt[position]) return false
+            widths[i] = widths[i] - trims[index]
+            compressedAt[position] = true
             return true
         }
         return false
     }
 
     /**
-     * 该列被挤压时返回标点下标,否则返回-1
-     * @param columnWidth 该列的排布宽度,不含两端对齐补出的行内间隙
+     * 该行各列的字形绘制偏移,整行都没有挤压时返回 null
+     * 偏移按记录的裁剪量算,不受段落首尾字距补偿影响
      */
-    fun compressedIndex(char: String, columnWidth: Float): Int {
-        if (char.length != 1) return -1
-        val index = PunctuationCompressRule.indexOf(char[0])
-        if (index < 0) return -1
-        measure(index)
-        return if (columnWidth < naturals[index] - minTrim) index else -1
+    fun lineDrawOffsets(words: List<String>, lineStart: Int): FloatArray? {
+        var offsets: FloatArray? = null
+        var position = lineStart
+        for (i in words.indices) {
+            val word = words[i]
+            if (compressedAt[position]) {
+                val index = PunctuationCompressRule.indexOfCluster(word)
+                if (index >= 0) {
+                    val result = offsets ?: FloatArray(words.size).also { offsets = it }
+                    result[i] = PunctuationCompressRule.drawOffset(sides[index], trims[index])
+                }
+            }
+            position += word.length
+        }
+        return offsets
     }
 
-    /**
-     * 挤压后字形在列内的绘制偏移
-     * 按实际压掉的宽度算,与段落挤压还是行尾挤压无关
-     */
-    fun drawOffsetAt(index: Int, columnWidth: Float): Float {
-        return PunctuationCompressRule.drawOffset(sides[index], naturals[index] - columnWidth)
-    }
-
-    private fun compressAt(index: Int, widths: FloatArray, position: Int): Boolean {
+    private fun compressAt(index: Int, widths: FloatArray, position: Int) {
         measure(index)
-        val trim = trims[index]
-        if (trim <= minTrim) return false
+        if (trims[index] <= minTrim) return
         //同一个字只压一次
-        if (widths[position] < naturals[index] - minTrim) return false
-        widths[position] = widths[position] - trim
-        return true
+        if (compressedAt[position]) return
+        widths[position] = widths[position] - trims[index]
+        compressedAt[position] = true
     }
 
     /**下一个有宽度的字,零宽字符并入前一个字,与 measureTextSplit 的分列一致*/
@@ -234,7 +267,6 @@ internal class PunctuationCompressor(private val paint: TextPaint) {
         paint.getTextBounds(text, 0, 1, inkBounds)
         val leftSpace = max(0f, inkBounds.left.toFloat())
         val rightSpace = max(0f, width - inkBounds.right)
-        naturals[index] = width
         sides[index] = PunctuationCompressRule.trimSide(leftSpace, rightSpace)
         trims[index] = PunctuationCompressRule.trimWidth(width, em, leftSpace, rightSpace)
     }

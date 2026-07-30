@@ -75,6 +75,33 @@ class PunctuationCompressRuleTest {
         assertEquals(classNone, PunctuationCompressRule.charClass('—'))
     }
 
+    @Test
+    fun `a punctuation carrying a zero width modifier is still recognised`() {
+        // measureTextSplit 把变体选择符并入同一列,列宽已被挤压,判定必须取簇的首字
+        // 否则字形偏移丢失,整行也不会退回逐列绘制,其后的字与点击区域会错位
+        val cluster = "。︀"
+        assertEquals(
+            PunctuationCompressRule.indexOf('。'),
+            PunctuationCompressRule.indexOfCluster(cluster)
+        )
+        assertEquals(
+            classClose,
+            PunctuationCompressRule.classOf(PunctuationCompressRule.indexOfCluster(cluster))
+        )
+    }
+
+    @Test
+    fun `a surrogate pair is not mistaken for punctuation`() {
+        // 代理对的首字是高位代理,不在挤压表内
+        assertEquals(-1, PunctuationCompressRule.indexOfCluster("😀"))
+        assertEquals(classNone, PunctuationCompressRule.classOf(-1))
+    }
+
+    @Test
+    fun `an empty cluster is not punctuation`() {
+        assertEquals(-1, PunctuationCompressRule.indexOfCluster(""))
+    }
+
     // endregion
 
     // region 相邻标点
