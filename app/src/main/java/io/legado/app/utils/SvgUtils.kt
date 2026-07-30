@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.RectF
 import android.graphics.drawable.PictureDrawable
 import android.util.Size
+import java.io.ByteArrayInputStream
 import java.io.FileInputStream
 import java.io.InputStream
 import com.caverock.androidsvg.SVG
@@ -14,6 +15,7 @@ import kotlin.math.sqrt
 
 private const val MAX_SVG_BITMAP_DIMENSION = 4096
 private const val MAX_SVG_BITMAP_PIXELS = 4_194_304L
+private const val MAX_SVG_TEXT_LENGTH = 512 * 1024
 
 internal fun calculateSvgBitmapSize(
     sourceWidth: Int,
@@ -66,6 +68,23 @@ object SvgUtils {
             val svg = SVG.getFromInputStream(inputStream)
             createBitmap(svg, width, height)
         }.getOrNull()
+    }
+
+    fun createBitmapFromSvgText(svgText: String, width: Int, height: Int? = null): Bitmap? {
+        if (svgText.length > MAX_SVG_TEXT_LENGTH) return null
+        return ByteArrayInputStream(svgText.toByteArray(Charsets.UTF_8)).use { inputStream ->
+            createBitmap(inputStream, width, height)
+        }
+    }
+
+    fun getAspectRatioFromSvgText(svgText: String): Float? {
+        if (svgText.length > MAX_SVG_TEXT_LENGTH) return null
+        return kotlin.runCatching {
+            ByteArrayInputStream(svgText.toByteArray(Charsets.UTF_8)).use { inputStream ->
+                val size = getSize(SVG.getFromInputStream(inputStream))
+                size.width.toFloat() / size.height.toFloat()
+            }
+        }.getOrNull()?.takeIf { it.isFinite() && it > 0f }
     }
 
     fun createDrawable(inputStream: InputStream): Pair<PictureDrawable, Size>? {

@@ -354,6 +354,18 @@ object ReadBookConfig {
             config.reviewIconColor = value
         }
 
+    var reviewIconSvg: String
+        get() = config.reviewIconSvg
+        set(value) {
+            config.reviewIconSvg = value
+        }
+
+    var reviewIconScale: Int
+        get() = config.reviewIconScale
+        set(value) {
+            config.reviewIconScale = value.coerceIn(50, 200)
+        }
+
     var paddingBottom: Int
         get() = config.paddingBottom
         set(value) {
@@ -481,6 +493,8 @@ object ReadBookConfig {
             exportConfig.headerMode = shareConfig.headerMode
             exportConfig.footerMode = shareConfig.footerMode
             exportConfig.reviewIconColor = shareConfig.reviewIconColor
+            exportConfig.reviewIconSvg = shareConfig.reviewIconSvg
+            exportConfig.reviewIconScale = shareConfig.reviewIconScale
         }
         return exportConfig
     }
@@ -590,6 +604,8 @@ object ReadBookConfig {
         var paragraphIndent: String = "　　",//段落缩进
         var underlineMode: Int = 0, //下划线
         var reviewIconColor: Int = 0, //段评内置图标颜色(0=跟随主题)
+        var reviewIconSvg: String = "",
+        var reviewIconScale: Int = 100,
         var paddingBottom: Int = 6,
         var paddingLeft: Int = 16,
         var paddingRight: Int = 16,
@@ -886,6 +902,8 @@ object ReadBookConfig {
             "paragraphIndent" to paragraphIndent,
             "underlineMode" to underlineMode,
             "reviewIconColor" to reviewIconColor,
+            "reviewIconSvg" to reviewIconSvg,
+            "reviewIconScale" to reviewIconScale,
             "paddingBottom" to paddingBottom,
             "paddingLeft" to paddingLeft,
             "paddingRight" to paddingRight,

@@ -3,11 +3,13 @@ package io.legado.app.ui.book.read.page.entities.column
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RectF
 import androidx.annotation.Keep
 import io.legado.app.ui.book.read.page.ContentTextView
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.book.read.page.entities.TextLine.Companion.emptyTextLine
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
+import kotlin.math.roundToInt
 
 /**
  * 评论按钮列
@@ -34,31 +36,44 @@ data class ReviewColumn(
     fun isTouch(x: Float, y: Float, relativeOffset: Float): Boolean {
         if (!isTouch(x)) return false
         if (!textLine.isImage) return true
-        val height = minOf(ChapterProvider.contentPaint.textSize, textLine.height)
+        val height = minOf(ChapterProvider.getReviewHeight(false), textLine.height) * 0.9f
         val baseLine = textLine.lineBase - textLine.lineTop
         val localY = y - textLine.lineTop - relativeOffset
         return height > 0f && localY in (baseLine - height)..baseLine
     }
 
     override fun draw(view: ContentTextView, canvas: Canvas) {
-        val textPaint = if (textLine.isTitle) {
-            ChapterProvider.titlePaint
+        val configuredHeight = ChapterProvider.getReviewHeight(textLine.isTitle)
+        val height = if (textLine.isImage) {
+            minOf(configuredHeight, textLine.height)
         } else {
-            ChapterProvider.contentPaint
+            configuredHeight
         }
-        val height = minOf(textPaint.textSize, textLine.height)
         if (height > 0f) {
             drawToCanvas(canvas, textLine.lineBase - textLine.lineTop, height)
         }
     }
 
     val countText: String
-        get() = if (count > 999) "999" else count.toString()
+        get() = ChapterProvider.getReviewCountText(count)
 
     val path by lazy { Path() }
+    private val iconRect by lazy { RectF() }
 
     fun drawToCanvas(canvas: Canvas, baseLine: Float, height: Float) {
         if (count == 0) return
+        val iconHeight = height * 0.9f
+        ChapterProvider.getReviewIconBitmap(
+            count,
+            (end - start).roundToInt().coerceAtLeast(1),
+            iconHeight.roundToInt().coerceAtLeast(1),
+        )?.let { bitmap ->
+            val drawHeight = minOf(iconHeight, (end - start) * bitmap.height / bitmap.width)
+            val iconTop = baseLine - drawHeight
+            iconRect.set(start, iconTop, end, iconTop + drawHeight)
+            canvas.drawBitmap(bitmap, null, iconRect, null)
+            return
+        }
         path.reset()
         path.moveTo(start + 1, baseLine - height * 2 / 5)
         path.lineTo(start + height / 6, baseLine - height * 0.55f)

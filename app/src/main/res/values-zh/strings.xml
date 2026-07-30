@@ -1408,6 +1408,12 @@
     <string name="review_rule_missing">未配置段评规则</string>
     <string name="review_detail_url_missing">未配置段评详情 URL</string>
     <string name="review_detail_rule_missing">未配置段评详情规则</string>
+    <string name="review_icon_svg_title">SVG 图标</string>
+    <string name="review_icon_svg_hint">&lt;svg ...&gt; 使用 {{count}} 作为数量占位符</string>
+    <string name="review_icon_svg_invalid">SVG 无效，请检查语法和尺寸定义</string>
+    <string name="review_icon_size_title">图标大小</string>
+    <string name="review_icon_size_hint">输入 50-200，100 为默认大小</string>
+    <string name="review_icon_size_invalid">请输入 50-200 之间的整数</string>
     <string name="review_icon_color_title">段评图标颜色</string>
     <string name="review_icon_color_reset">段评图标颜色已恢复跟随主题</string>
     <string name="bottom_bar_skin">底栏图集</string>

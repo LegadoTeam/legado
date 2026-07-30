@@ -5,6 +5,7 @@ import android.content.DialogInterface
 import android.graphics.PorterDuff
 import android.net.Uri
 import android.os.Bundle
+import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -44,6 +45,7 @@ import io.legado.app.utils.FileDoc
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.MD5Utils
+import io.legado.app.utils.SvgUtils
 import io.legado.app.utils.compress.ZipUtils
 import io.legado.app.utils.createFileIfNotExist
 import io.legado.app.utils.createFileReplace
@@ -262,6 +264,58 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
                 .setDialogId(TEXT_ACCENT_COLOR)
                 .show(requireActivity())
         }
+        binding.tvReviewIconSvg.setOnClickListener {
+            val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
+                editView.hint = getString(R.string.review_icon_svg_hint)
+                editView.setSingleLine(false)
+                editView.maxLines = 8
+                editView.setText(ReadBookConfig.reviewIconSvg)
+                editView.setSelection(editView.text?.length ?: 0)
+            }
+            val dialog = alert(R.string.review_icon_svg_title) {
+                customView { alertBinding.root }
+                okButton()
+                cancelButton()
+            }
+            dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                val newSvg = alertBinding.editView.text?.toString().orEmpty().trim()
+                if (newSvg.isNotBlank() && !isValidReviewIconSvg(newSvg)) {
+                    toastOnUi(R.string.review_icon_svg_invalid)
+                    return@setOnClickListener
+                }
+                if (newSvg != ReadBookConfig.reviewIconSvg) {
+                    ReadBookConfig.reviewIconSvg = newSvg
+                    notifyReviewIconStyleChanged()
+                }
+                dialog.dismiss()
+            }
+        }
+        binding.tvReviewIconSize.setOnClickListener {
+            val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
+                editView.hint = getString(R.string.review_icon_size_hint)
+                editView.inputType = InputType.TYPE_CLASS_NUMBER
+                editView.setSingleLine(true)
+                editView.setText(ReadBookConfig.reviewIconScale.toString())
+                editView.setSelection(editView.text?.length ?: 0)
+            }
+            val dialog = alert(R.string.review_icon_size_title) {
+                customView { alertBinding.root }
+                okButton()
+                cancelButton()
+            }
+            dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                val scale = alertBinding.editView.text?.toString()?.trim()?.toIntOrNull()
+                if (scale == null || scale !in 50..200) {
+                    toastOnUi(R.string.review_icon_size_invalid)
+                    return@setOnClickListener
+                }
+                if (scale != ReadBookConfig.reviewIconScale) {
+                    ReadBookConfig.reviewIconScale = scale
+                    notifyReviewIconStyleChanged()
+                }
+                dialog.dismiss()
+            }
+        }
         binding.tvReviewIconColor.setOnClickListener {
             ColorPickerDialog.newBuilder()
                 .setColor(
@@ -326,6 +380,24 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
                 postEvent(EventBus.UP_CONFIG, arrayListOf(3))
             }
         })
+    }
+
+    private fun notifyReviewIconStyleChanged() {
+        ChapterProvider.clearReviewIconCache()
+        ChapterProvider.refreshReviewColumnsForStyleChange()
+        postEvent(EventBus.UP_CONFIG, arrayListOf(9, 11))
+    }
+
+    private fun isValidReviewIconSvg(svg: String): Boolean {
+        val resolvedSvg = svg.replace("{{count}}", "88")
+        val aspectRatio = SvgUtils.getAspectRatioFromSvgText(resolvedSvg)
+            ?: return false
+        if (!ChapterProvider.isReviewIconAspectRatioSupported(aspectRatio)) return false
+        val bitmap = SvgUtils.createBitmapFromSvgText(resolvedSvg, 48, 48)
+        return bitmap?.let {
+            it.recycle()
+            true
+        } ?: false
     }
 
     private fun exportConfig(uri: Uri) {

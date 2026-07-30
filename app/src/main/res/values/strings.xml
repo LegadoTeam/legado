@@ -1520,6 +1520,12 @@
     <string name="review_rule_missing">Paragraph review rules are not configured</string>
     <string name="review_detail_url_missing">Paragraph review detail URL is not configured</string>
     <string name="review_detail_rule_missing">Paragraph review detail rules are not configured</string>
+    <string name="review_icon_svg_title">SVG icon</string>
+    <string name="review_icon_svg_hint">&lt;svg ...&gt; use {{count}} as the count placeholder</string>
+    <string name="review_icon_svg_invalid">Invalid SVG. Check its syntax and dimensions.</string>
+    <string name="review_icon_size_title">Icon size</string>
+    <string name="review_icon_size_hint">Enter 50-200; 100 is the default size</string>
+    <string name="review_icon_size_invalid">Enter an integer from 50 to 200</string>
     <string name="review_icon_color_title">Icon color</string>
     <string name="review_icon_color_reset">Icon color reset to follow theme</string>
     <string name="bottom_bar_skin">Bottom Bar Skin</string>
