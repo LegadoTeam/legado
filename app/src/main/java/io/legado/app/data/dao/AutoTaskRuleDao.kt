@@ -40,6 +40,17 @@ interface AutoTaskRuleDao {
     @Query(
         """
         UPDATE auto_task_rules
+        SET lastResult = NULL,
+            lastError = NULL,
+            lastLog = NULL
+        WHERE id = :id
+        """
+    )
+    fun clearRunLog(id: String): Int
+
+    @Query(
+        """
+        UPDATE auto_task_rules
         SET lastRunAt = :lastRunAt,
             lastResult = :lastResult,
             lastError = :lastError,

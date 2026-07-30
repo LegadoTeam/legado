@@ -222,6 +222,10 @@ object AutoTask {
         return changed
     }
 
+    fun clearRunLog(id: String) = synchronized(this) {
+        appDb.autoTaskRuleDao.clearRunLog(id)
+    }
+
     fun updateRunState(
         id: String,
         lastRunAt: Long,

@@ -109,6 +109,30 @@ class AutoTaskPersistenceContractTest {
     }
 
     @Test
+    fun `clearing automatic task log keeps its last run time`() {
+        val dao = file("app/src/main/java/io/legado/app/data/dao/AutoTaskRuleDao.kt").readText()
+        val autoTask = file("app/src/main/java/io/legado/app/model/AutoTask.kt").readText()
+        val activity = file(
+            "app/src/main/java/io/legado/app/ui/autoTask/AutoTaskActivity.kt"
+        ).readText()
+        val clearQuery = dao.substringBefore("fun clearRunLog").substringAfterLast("@Query")
+        val clearModel = autoTask.substringAfter("fun clearRunLog(")
+            .substringBefore("fun updateRunState(")
+        val showLog = activity.substringAfter("override fun showLog(")
+            .substringBefore("override fun delete(")
+
+        assertTrue(clearQuery.contains("SET lastResult = NULL"))
+        assertTrue(clearQuery.contains("lastError = NULL"))
+        assertTrue(clearQuery.contains("lastLog = NULL"))
+        assertFalse(clearQuery.contains("lastRunAt"))
+        assertTrue(clearModel.contains("autoTaskRuleDao.clearRunLog(id)"))
+        assertTrue(showLog.contains("task.lastLog ?: task.lastError ?: task.lastResult"))
+        assertTrue(showLog.contains("neutralButton(R.string.clear)"))
+        assertTrue(showLog.contains("AutoTask.clearRunLog(task.id)"))
+        assertFalse(showLog.contains("task.lastRunAt"))
+    }
+
+    @Test
     fun `automatic task search preserves hidden selections`() {
         val layout = file("app/src/main/res/layout/activity_auto_task.xml").readText()
         val activity = file(

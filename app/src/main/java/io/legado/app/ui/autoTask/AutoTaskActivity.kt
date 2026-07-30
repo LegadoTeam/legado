@@ -266,7 +266,15 @@ class AutoTaskActivity : BaseActivity<ActivityAutoTaskBinding>(), AutoTaskAdapte
 
     override fun showLog(task: AutoTaskRule) {
         alert(task.name) {
-            setMessage(task.lastLog ?: task.lastError ?: getString(R.string.auto_task_no_log))
+            setMessage(
+                task.lastLog ?: task.lastError ?: task.lastResult
+                ?: getString(R.string.auto_task_no_log)
+            )
+            neutralButton(R.string.clear) {
+                lifecycleScope.launch(Dispatchers.IO) {
+                    AutoTask.clearRunLog(task.id)
+                }
+            }
             okButton()
         }
     }
