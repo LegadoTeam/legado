@@ -189,6 +189,8 @@ object PreferKey {
     const val optimizeRender = "optimizeRender"
     const val updateToVariant = "updateToVariant"
     const val streamReadAloudAudio = "streamReadAloudAudio"
+    const val audioSkipOpenCredits = "audioSkipOpenCredits"
+    const val audioSkipCloseCredits = "audioSkipCloseCredits"
     const val audioCacheTreeUri = "audioCacheTreeUri"
     const val pauseReadAloudWhilePhoneCalls = "pauseReadAloudWhilePhoneCalls"
     const val readAloudByMediaButton = "readAloudByMediaButton"

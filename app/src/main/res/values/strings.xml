@@ -1025,6 +1025,10 @@
     <string name="direct_link_upload_config">Direct link upload configuration</string>
     <string name="copy_play_url">Copy Play Url</string>
     <string name="skip_book_credits">Skip opening and closing</string>
+    <string name="audio_skip_scope_book">This book</string>
+    <string name="audio_skip_scope_global">Global default</string>
+    <string name="audio_skip_opening_seconds">Opening (seconds)</string>
+    <string name="audio_skip_closing_seconds">Closing (seconds)</string>
     <string name="set_source_variable">Set source variable</string>
     <string name="set_book_variable">Set book variable</string>
     <string name="summary">summary</string>

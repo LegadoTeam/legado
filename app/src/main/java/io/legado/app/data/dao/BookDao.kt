@@ -243,13 +243,19 @@ interface BookDao {
 }
 
 internal fun String?.withAudioPlayMode(playMode: Int): String {
-    val readConfig = GSON.fromJsonObject<JsonObject>(this).getOrNull() ?: JsonObject()
-    readConfig.addProperty("playMode", playMode)
-    return GSON.toJson(readConfig)
+    return withAudioPlayPreference("playMode", playMode)
 }
 
 internal fun String?.withAudioPlaySpeed(playSpeed: Float): String {
+    return withAudioPlayPreference("playSpeed", playSpeed)
+}
+
+private fun String?.withAudioPlayPreference(key: String, value: Number): String {
     val readConfig = GSON.fromJsonObject<JsonObject>(this).getOrNull() ?: JsonObject()
-    readConfig.addProperty("playSpeed", playSpeed)
+    val rawConfig = orEmpty()
+    if (rawConfig.isBlank() || rawConfig.trim().equals("null", ignoreCase = true)) {
+        readConfig.addProperty("useGlobalAudioSkip", true)
+    }
+    readConfig.addProperty(key, value)
     return GSON.toJson(readConfig)
 }

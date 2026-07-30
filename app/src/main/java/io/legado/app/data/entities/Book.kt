@@ -195,7 +195,7 @@ data class Book(
     val config: ReadConfig
         get() {
             if (readConfig == null) {
-                readConfig = ReadConfig()
+                readConfig = ReadConfig(useGlobalAudioSkip = true)
             }
             return readConfig!!
         }
@@ -311,19 +311,38 @@ data class Book(
 
     // 片头 的 setter 和 getter
     fun setOpenCredits(openCredits: Int) {
-        config.openCredits = openCredits
+        switchToBookAudioSkip()
+        config.openCredits = openCredits.coerceAtLeast(0)
     }
 
     fun getOpenCredits(): Int {
-        return config.openCredits
+        return if (config.useGlobalAudioSkip) AppConfig.audioSkipOpenCredits else config.openCredits
     }
+
     // 片尾 的 setter 和 getter
     fun setCloseCredits(closeCredits: Int) {
-        config.closeCredits = closeCredits
+        switchToBookAudioSkip()
+        config.closeCredits = closeCredits.coerceAtLeast(0)
     }
 
     fun getCloseCredits(): Int {
-        return config.closeCredits
+        return if (config.useGlobalAudioSkip) AppConfig.audioSkipCloseCredits else config.closeCredits
+    }
+
+    fun isAudioSkipUsingGlobal(): Boolean {
+        return config.useGlobalAudioSkip
+    }
+
+    fun setAudioSkipUsingGlobal(useGlobal: Boolean) {
+        if (useGlobal) config.useGlobalAudioSkip = true else switchToBookAudioSkip()
+    }
+
+    private fun switchToBookAudioSkip() {
+        val readConfig = config
+        if (!readConfig.useGlobalAudioSkip) return
+        readConfig.openCredits = AppConfig.audioSkipOpenCredits
+        readConfig.closeCredits = AppConfig.audioSkipCloseCredits
+        readConfig.useGlobalAudioSkip = false
     }
 
     // 播放模式 的 setter 和 getter
@@ -475,7 +494,8 @@ data class Book(
         var openCredits: Int = 0,       //音频片头
         var closeCredits: Int = 0,       //音频片尾
         var playMode: Int = 0,           //音频播放模式
-        var playSpeed: Float = 1.0f      //音频播放速度
+        var playSpeed: Float = 1.0f,     //音频播放速度
+        var useGlobalAudioSkip: Boolean = false
     ) : Parcelable
 
     class Converters {

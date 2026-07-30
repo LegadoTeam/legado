@@ -17,6 +17,40 @@
             android:text="@string/skip_book_credits"
             android:textSize="18sp" />
 
+        <RadioGroup
+            android:id="@+id/rg_scope"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <io.legado.app.lib.theme.view.ThemeRadioNoButton
+                android:id="@+id/rb_book"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_margin="4dp"
+                android:layout_weight="1"
+                android:button="@null"
+                android:gravity="center"
+                android:minHeight="48dp"
+                android:padding="5dp"
+                android:singleLine="true"
+                android:text="@string/audio_skip_scope_book" />
+
+            <io.legado.app.lib.theme.view.ThemeRadioNoButton
+                android:id="@+id/rb_global"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_margin="4dp"
+                android:layout_weight="1"
+                android:button="@null"
+                android:gravity="center"
+                android:minHeight="48dp"
+                android:padding="5dp"
+                android:singleLine="true"
+                android:text="@string/audio_skip_scope_global" />
+        </RadioGroup>
+
         <io.legado.app.ui.widget.DetailSeekBar
             android:id="@+id/open_credits"
             android:layout_width="match_parent"
@@ -24,7 +58,7 @@
             android:layout_marginTop="8dp"
             android:layout_marginEnd="8dp"
             app:max="180"
-            app:title="片头" />
+            app:title="@string/audio_skip_opening_seconds" />
 
         <io.legado.app.ui.widget.DetailSeekBar
             android:id="@+id/close_credits"
@@ -33,7 +67,7 @@
             android:layout_marginTop="8dp"
             android:layout_marginEnd="8dp"
             app:max="180"
-            app:title="片尾" />
+            app:title="@string/audio_skip_closing_seconds" />
 
     </LinearLayout>
 

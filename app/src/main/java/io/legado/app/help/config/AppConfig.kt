@@ -638,6 +638,14 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     val streamReadAloudAudio get() = appCtx.getPrefBoolean(PreferKey.streamReadAloudAudio, false)
 
+    var audioSkipOpenCredits: Int
+        get() = appCtx.getPrefInt(PreferKey.audioSkipOpenCredits, 0)
+        set(value) = appCtx.putPrefInt(PreferKey.audioSkipOpenCredits, value.coerceAtLeast(0))
+
+    var audioSkipCloseCredits: Int
+        get() = appCtx.getPrefInt(PreferKey.audioSkipCloseCredits, 0)
+        set(value) = appCtx.putPrefInt(PreferKey.audioSkipCloseCredits, value.coerceAtLeast(0))
+
     var audioCacheTreeUri: String?
         get() = appCtx.getPrefString(PreferKey.audioCacheTreeUri)
         set(value) {

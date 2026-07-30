@@ -1022,6 +1022,10 @@
     <string name="direct_link_upload_config">直链上传配置</string>
     <string name="copy_play_url">拷贝播放 URL</string>
     <string name="skip_book_credits">跳过片头片尾</string>
+    <string name="audio_skip_scope_book">本书</string>
+    <string name="audio_skip_scope_global">全局默认</string>
+    <string name="audio_skip_opening_seconds">片头（秒）</string>
+    <string name="audio_skip_closing_seconds">片尾（秒）</string>
     <string name="set_source_variable">设置源变量</string>
     <string name="set_book_variable">设置书籍变量</string>
     <string name="summary">注释</string>

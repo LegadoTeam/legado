@@ -1,17 +1,18 @@
 package io.legado.app.ui.book.audio.config
 
+import android.content.DialogInterface
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
+import io.legado.app.data.entities.Book
 import io.legado.app.databinding.DialogAudioSkipCreditsBinding
+import io.legado.app.help.config.AppConfig
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.viewbindingdelegate.viewBinding
-import io.legado.app.data.entities.Book
 import java.lang.ref.WeakReference
-import android.content.DialogInterface
 
 class AudioSkipCredits : BaseDialogFragment(R.layout.dialog_audio_skip_credits) {
     private val binding by viewBinding(DialogAudioSkipCreditsBinding::bind)
@@ -34,7 +35,7 @@ class AudioSkipCredits : BaseDialogFragment(R.layout.dialog_audio_skip_credits) 
         initData()
         initView()
     }
-    
+
     override fun onStart() {
         super.onStart()
         dialog?.window?.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
@@ -43,26 +44,34 @@ class AudioSkipCredits : BaseDialogFragment(R.layout.dialog_audio_skip_credits) 
 
     private fun initData() {
         binding.run {
-            // 初始设置片头片尾（单位：秒）
-            openCredits.progress = book.getOpenCredits()
-            closeCredits.progress = book.getCloseCredits()
+            rgScope.check(if (book.isAudioSkipUsingGlobal()) R.id.rb_global else R.id.rb_book)
+            updateValues()
         }
     }
 
     private fun initView() {
         binding.run {
-            // 设定值
+            rgScope.setOnCheckedChangeListener { _, checkedId ->
+                book.setAudioSkipUsingGlobal(checkedId == R.id.rb_global)
+                updateValues()
+            }
             openCredits.onChanged = {
-                book.setOpenCredits(it)
+                if (rbGlobal.isChecked) AppConfig.audioSkipOpenCredits = it
+                else book.setOpenCredits(it)
             }
             closeCredits.onChanged = {
-                book.setCloseCredits(it)
+                if (rbGlobal.isChecked) AppConfig.audioSkipCloseCredits = it
+                else book.setCloseCredits(it)
             }
         }
     }
-    
+
+    private fun updateValues() = binding.run {
+        openCredits.progress = book.getOpenCredits()
+        closeCredits.progress = book.getCloseCredits()
+    }
+
     override fun onDismiss(dialog: DialogInterface) {
-        //保存设定
         super.onDismiss(dialog)
         book.save()
     }
