@@ -118,6 +118,28 @@ class BookSourceEditLayoutTest {
         }
     }
 
+    @Test
+    fun `book and rss editors share main field tab navigation`() {
+        listOf(
+            LAYOUT_PATH to ACTIVITY_PATH,
+            RSS_LAYOUT_PATH to RSS_ACTIVITY_PATH
+        ).forEach { (layoutPath, activityPath) ->
+            val navigation = parse(layoutPath).elementById("field_nav")
+            val activity = File(repositoryRoot, activityPath).readText()
+
+            assertEquals(TAB_LAYOUT, navigation.tagName)
+            assertEquals("48dp", navigation.androidAttribute("layout_height"))
+            assertEquals("scrollable", navigation.appAttribute("tabMode"))
+            assertTrue(activity.contains("fieldNav.bindFieldNavigation(binding.recyclerView)"))
+            assertTrue(activity.contains("fieldNav.setFieldLabels(entities.map { it.hint })"))
+        }
+
+        val helper = File(repositoryRoot, FIELD_NAVIGATION_PATH).readText()
+        assertTrue(helper.contains("recyclerView.scrollState == RecyclerView.SCROLL_STATE_IDLE"))
+        assertTrue(helper.contains("spanSizeLookup.getSpanIndex"))
+        assertFalse(helper.contains("AppColorScheme"))
+    }
+
     private fun parse(path: String): Document =
         DocumentBuilderFactory.newInstance().apply {
             isNamespaceAware = true
@@ -156,7 +178,13 @@ class BookSourceEditLayoutTest {
             "app/src/main/java/io/legado/app/ui/book/source/edit/BookSourceEditActivity.kt"
         const val CARD_VIEW = "androidx.cardview.widget.CardView"
         const val FLEXBOX = "com.google.android.flexbox.FlexboxLayout"
+        const val TAB_LAYOUT = "com.google.android.material.tabs.TabLayout"
         const val THEME_CHECK_BOX = "io.legado.app.lib.theme.view.ThemeCheckBox"
+        const val RSS_LAYOUT_PATH = "app/src/main/res/layout/activity_rss_source_edit.xml"
+        const val RSS_ACTIVITY_PATH =
+            "app/src/main/java/io/legado/app/ui/rss/source/edit/RssSourceEditActivity.kt"
+        const val FIELD_NAVIGATION_PATH =
+            "app/src/main/java/io/legado/app/ui/widget/FieldNavigationExtensions.kt"
         const val ANDROID_NAMESPACE = "http://schemas.android.com/apk/res/android"
         const val APP_NAMESPACE = "http://schemas.android.com/apk/res-auto"
         val CHECK_BOX_IDS = listOf(
