@@ -157,30 +157,44 @@ fun getProxyClient(proxy: String? = null): OkHttpClient {
         return it
     }
     val builder = okHttpClient.newBuilder()
-        .proxy(
+    if (proxyConfig.protocol == ProxyProtocol.SOCKS5 && proxyConfig.credentials != null) {
+        builder
+            .proxy(Proxy.NO_PROXY)
+            .dns(socks5ProxyDns)
+            .socketFactory(
+                Socks5SocketFactory(
+                    proxyConfig.host,
+                    proxyConfig.port,
+                    proxyConfig.credentials,
+                )
+            )
+    } else {
+        builder.proxy(
             Proxy(
                 proxyConfig.protocol.proxyType,
                 InetSocketAddress(proxyConfig.host, proxyConfig.port),
             )
         )
+    }
     if (AppConfig.isCronet) {
         Cronet.interceptor?.let { builder.interceptors().remove(it) }
     }
-    proxyConfig.credentials?.let { credentials ->
-        builder.proxyAuthenticator { _, response ->
-            val challengeCount = response.consecutiveProxyChallengeCount()
-            val hasAuthorization = response.request.header("Proxy-Authorization") != null
-            if (!shouldRetryProxyAuthentication(response.code, hasAuthorization, challengeCount)) {
-                return@proxyAuthenticator null
+    proxyConfig.credentials?.takeIf { proxyConfig.protocol == ProxyProtocol.HTTP }
+        ?.let { credentials ->
+            builder.proxyAuthenticator { _, response ->
+                val challengeCount = response.consecutiveProxyChallengeCount()
+                val hasAuthorization = response.request.header("Proxy-Authorization") != null
+                if (!shouldRetryProxyAuthentication(response.code, hasAuthorization, challengeCount)) {
+                    return@proxyAuthenticator null
+                }
+                response.request.newBuilder()
+                    .header(
+                        "Proxy-Authorization",
+                        Credentials.basic(credentials.username, credentials.password),
+                    )
+                    .build()
             }
-            response.request.newBuilder()
-                .header(
-                    "Proxy-Authorization",
-                    Credentials.basic(credentials.username, credentials.password),
-                )
-                .build()
         }
-    }
     val proxyClient = builder.build()
     return proxyClientCache.putIfAbsent(proxyConfig, proxyClient) ?: proxyClient
 }

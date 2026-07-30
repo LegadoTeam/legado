@@ -206,6 +206,12 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefBoolean(PreferKey.showLastUpdateTime, value)
         }
 
+    var showSearchReadRecord: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.showSearchReadRecord, true)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.showSearchReadRecord, value)
+        }
+
     var showBookshelfReadProgress: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.showBookshelfReadProgress, true)
         set(value) {

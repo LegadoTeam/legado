@@ -35,6 +35,19 @@
         app:layout_constraintStart_toEndOf="@id/iv_cover"
         app:layout_constraintTop_toTopOf="@id/tv_name" />
 
+    <io.legado.app.ui.widget.image.CircleImageView
+        android:id="@+id/iv_read_record"
+        android:layout_width="8dp"
+        android:layout_height="8dp"
+        android:layout_margin="8dp"
+        android:scaleType="centerCrop"
+        android:scrollbars="none"
+        android:src="@color/md_orange_600"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/tv_name"
+        app:layout_constraintStart_toEndOf="@id/iv_in_bookshelf"
+        app:layout_constraintTop_toTopOf="@id/tv_name" />
+
     <io.legado.app.ui.widget.text.BadgeView
         android:id="@+id/bv_originCount"
         android:layout_width="wrap_content"
@@ -56,7 +69,7 @@
         android:textColor="@color/primaryText"
         android:textSize="16sp"
         app:layout_constraintEnd_toStartOf="@id/bv_originCount"
-        app:layout_constraintStart_toEndOf="@+id/iv_in_bookshelf"
+        app:layout_constraintStart_toEndOf="@+id/iv_read_record"
         app:layout_constraintTop_toTopOf="parent" />
 
     <TextView

@@ -96,7 +96,7 @@ class GroupManageDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
                 if (appDb.bookGroupDao.canAddGroup) {
                     showDialogFragment(GroupEditDialog())
                 } else {
-                    toastOnUi("分组已达上限(64个)")
+                    toastOnUi("分组已达上限(63个)")
                 }
             }
         }

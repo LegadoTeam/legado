@@ -20,6 +20,7 @@ import io.legado.app.constant.AppLog
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.lib.theme.ThemeStore
+import io.legado.app.utils.disableAutoFill
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.setBackgroundKeepPadding
 import kotlinx.coroutines.CoroutineScope
@@ -40,6 +41,7 @@ abstract class BaseDialogFragment(
 
     override fun onStart() {
         super.onStart()
+        dialog?.window?.decorView?.disableAutoFill()
         if (adaptationSoftKeyboard) {
             dialog?.window?.setBackgroundDrawableResource(R.color.transparent)
         } else if (AppConfig.isEInkMode) {

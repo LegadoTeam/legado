@@ -10,6 +10,7 @@ import io.legado.app.constant.AppLog
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.data.entities.SearchKeyword
+import io.legado.app.help.book.ReadRecordIndex
 import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.config.AppConfig
 import io.legado.app.model.webBook.SearchModel
@@ -17,6 +18,7 @@ import io.legado.app.utils.ConflateLiveData
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.mapLatest
 import java.util.concurrent.ConcurrentHashMap
 
@@ -24,6 +26,11 @@ import java.util.concurrent.ConcurrentHashMap
 class SearchViewModel(application: Application) : BaseViewModel(application) {
     val handler = Handler(Looper.getMainLooper())
     val bookshelf: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    @Volatile
+    var readRecordIndex: ReadRecordIndex = ReadRecordIndex.EMPTY
+        private set
+
     val upAdapterLiveData = MutableLiveData<String>()
     var searchBookLiveData = ConflateLiveData<List<SearchBook>>(1000)
     val searchScope: SearchScope = SearchScope(AppConfig.searchScope)
@@ -68,6 +75,17 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
 
     init {
         execute {
+            //阅读记录会在阅读后变化,用流监听保证返回搜索界面时是最新的
+            appDb.readRecordDao.flowBooks().distinctUntilChanged().catch {
+                AppLog.put("搜索界面获取阅读记录失败\n${it.localizedMessage}", it)
+            }.collect {
+                readRecordIndex = ReadRecordIndex.of(it)
+                upAdapterLiveData.postValue("hasReadRecord")
+            }
+        }.onError {
+            AppLog.put("加载阅读记录失败", it)
+        }
+        execute {
             appDb.bookDao.flowAll().mapLatest { books ->
                 val keys = arrayListOf<String>()
                 books.filterNot { it.isNotShelf }
@@ -95,6 +113,13 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
         val bookUrl = book.bookUrl
         val key = if (author.isNotBlank()) "$name-$author" else name
         return bookshelf.contains(key) || bookshelf.contains(bookUrl)
+    }
+
+    fun hasReadRecord(book: SearchBook): Boolean {
+        if (!AppConfig.showSearchReadRecord) {
+            return false
+        }
+        return readRecordIndex.contains(book.name, book.author)
     }
 
     /**

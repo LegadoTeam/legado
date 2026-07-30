@@ -445,4 +445,24 @@ object DatabaseMigrations {
         }
     }
 
+    @Suppress("ClassName")
+    class Migration_98_99 : AutoMigrationSpec {
+        override fun onPostMigrate(db: SupportSQLiteDatabase) {
+            //书名唯一对应一个作者时用书架数据补全阅读记录的作者,有歧义的保持为空
+            db.execSQL(
+                """
+                update readRecord set author = (
+                    select max(books.author) from books
+                    where books.name = readRecord.bookName
+                    and (books.type & ${BookType.notShelf}) = 0
+                ) where author = '' and (
+                    select count(distinct books.author) from books
+                    where books.name = readRecord.bookName
+                    and (books.type & ${BookType.notShelf}) = 0
+                ) = 1
+                """.trimIndent()
+            )
+        }
+    }
+
 }
