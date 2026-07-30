@@ -1,7 +1,10 @@
 package io.legado.app.ui.book.read.page
 
+import io.legado.app.help.HighlightRuleMatcher.RuleMatch
+import io.legado.app.help.HighlightStyle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -95,21 +98,41 @@ class ManualHighlightRenderTest {
         val activity = readProjectFile("src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
         val notify = content.substringAfter("private fun notifyHighlightClick(")
             .substringBefore("private fun relativeOffset(")
-        val manual = notify.indexOf("highlightAt(textPos, page)?.let")
+        val manual = notify.indexOf("highlightAt(column, textPos, page)?.let")
         val automatic = notify.indexOf("highlightRuleIdAt(column, textPos, page)?.let")
 
         assertTrue(manual in 0 until automatic)
         assertTrue(notify.contains("callBack.onHighlightRuleClick(it, x, y)"))
         assertTrue(notify.contains("ReadBook.ruleMatchesOfChapter(chapter)"))
-        assertTrue(notify.contains(".lastOrNull"))
-        assertTrue(notify.contains("it.start < columnEnd && it.end > columnStart"))
-        assertTrue(notify.contains("!line.isTitle || it.applyToTitle"))
+        assertTrue(notify.contains("highlightRangeIntersects("))
+        assertTrue(notify.contains("highlightRuleIdAtColumn("))
         assertTrue(activity.contains("override fun onHighlightRuleClick(ruleId: Long"))
         assertTrue(activity.contains("HighlightRuleEditDialog.edit(ruleId)"))
         assertTrue(activity.contains("R.string.highlight_rule_disable"))
         assertTrue(activity.contains("copy(isEnabled = false)"))
         assertTrue(activity.contains("appDb.highlightRuleDao.update(rule)"))
         assertTrue(activity.contains("ReadBook.upHighlightRules()"))
+    }
+
+    @Test
+    fun `click ranges use full half-open column intervals`() {
+        assertTrue(highlightRangeIntersects(0, 2, 1, 2))
+        assertFalse(highlightRangeIntersects(0, 1, 1, 2))
+        assertFalse(highlightRangeIntersects(1, 1, 0, 2))
+    }
+
+    @Test
+    fun `automatic click match respects title gate and last rule priority`() {
+        val style = HighlightStyle(fill = 1)
+        val matches = listOf(
+            RuleMatch(1, 2, 1, style, applyToTitle = false),
+            RuleMatch(1, 2, 2, style, applyToTitle = true)
+        )
+
+        assertEquals(2L, highlightRuleIdAtColumn(matches, 0, 2, isTitle = false))
+        assertEquals(2L, highlightRuleIdAtColumn(matches, 0, 2, isTitle = true))
+        assertNull(highlightRuleIdAtColumn(matches.take(1), 0, 2, isTitle = true))
+        assertNull(highlightRuleIdAtColumn(matches, 2, 3, isTitle = false))
     }
 
     @Test
