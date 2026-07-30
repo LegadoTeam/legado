@@ -49,6 +49,7 @@ import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.rhino.NativeBaseSource
 import io.legado.app.help.source.SourceHelp
 import io.legado.app.help.storage.Backup
+import io.legado.app.lib.theme.WallpaperTheme
 import io.legado.app.model.BookCover
 import io.legado.app.model.AutoTask
 import io.legado.app.service.AutoTaskScheduler
@@ -76,6 +77,7 @@ class App : Application() {
             ThreadUtils.hasSubtleSideEffectsSetThreadAssertsDisabledForTesting(true)
         }
         oldConfig = Configuration(resources.configuration)
+        WallpaperTheme.syncWithPreferences(this)
         applyDayNightInit(this)
         registerActivityLifecycleCallbacks(LifecycleHelp)
         defaultSharedPreferences.registerOnSharedPreferenceChangeListener(AppConfig)

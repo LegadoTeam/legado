@@ -19,6 +19,7 @@ import io.legado.app.R
 import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.constant.AppLog
+import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.KeyboardAssist
 import io.legado.app.databinding.ItemFilletTextBinding
@@ -28,6 +29,7 @@ import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.utils.activity
 import io.legado.app.utils.applyMd3PopupStyle
+import io.legado.app.utils.observeEvent
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.windowSize
 import kotlinx.coroutines.CoroutineScope
@@ -47,8 +49,7 @@ class KeyboardToolPop(
     private val rootView: View,
     private val callBack: CallBack
 ) : PopupWindow(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT),
-    ViewTreeObserver.OnGlobalLayoutListener,
-    KeyboardAssistsConfig.CallBack {
+    ViewTreeObserver.OnGlobalLayoutListener {
 
     private val helpChar = "❓"
 
@@ -71,6 +72,11 @@ class KeyboardToolPop(
 
     fun attachToWindow(window: Window) {
         window.decorView.viewTreeObserver.addOnGlobalLayoutListener(this)
+        contentView.activity?.observeEvent<Int>(PreferKey.showBoardLine) { rows ->
+            (binding.recyclerView.layoutManager as GridLayoutManager).spanCount =
+                rows.coerceIn(1, 5)
+            binding.recyclerView.layoutManager?.requestLayout()
+        }
         contentView.measure(
             View.MeasureSpec.UNSPECIFIED,
             View.MeasureSpec.UNSPECIFIED,
@@ -174,12 +180,7 @@ class KeyboardToolPop(
     }
 
     private fun config() {
-        contentView.activity?.showDialogFragment(KeyboardAssistsConfig(this))
-    }
-
-    override fun requestLayout() {
-        (binding.recyclerView.layoutManager as GridLayoutManager).spanCount = AppConfig.showBoardLine
-        binding.recyclerView.layoutManager?.requestLayout()
+        contentView.activity?.showDialogFragment<KeyboardAssistsConfig>()
     }
 
     inner class Adapter(context: Context) :

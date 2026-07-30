@@ -145,7 +145,9 @@ class AnalyzeUrl(
             }
         }
         initUrl()
-        domain = NetworkUtils.getSubDomain(source?.getKey() ?: url)
+        val sourceKey = source?.getKey()
+        domain = sourceKey?.takeIf { NetworkUtils.getBaseUrl(it) == null }
+            ?: NetworkUtils.getSubDomain(url)
     }
 
     /**

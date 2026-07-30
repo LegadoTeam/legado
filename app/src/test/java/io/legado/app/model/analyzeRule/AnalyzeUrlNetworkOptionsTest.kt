@@ -1,6 +1,9 @@
 package io.legado.app.model.analyzeRule
 
+import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.HttpTTS
 import io.legado.app.utils.GSONStrict
+import io.legado.app.utils.NetworkUtils
 import okhttp3.Dns
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
@@ -16,6 +19,39 @@ import java.net.InetAddress
 import java.util.concurrent.TimeUnit
 
 class AnalyzeUrlNetworkOptionsTest {
+
+    @Test
+    fun cookieDomainFollowsResolvedRequestUrl() {
+        val requestUrl = "https://images.assets.net/cover.jpg"
+        val source = BookSource(bookSourceUrl = "https://source.example.com")
+        val analyzedUrl = AnalyzeUrl(
+            requestUrl,
+            source = source,
+            headerMapF = emptyMap(),
+        )
+        val domain = cookieDomain(analyzedUrl)
+
+        assertEquals(NetworkUtils.getSubDomain(requestUrl), domain)
+        assertFalse(domain == NetworkUtils.getSubDomain(source.bookSourceUrl))
+    }
+
+    @Test
+    fun cookieDomainKeepsSyntheticSourceNamespace() {
+        val source = HttpTTS(id = 42)
+        val analyzedUrl = AnalyzeUrl(
+            "https://speech.example.com/audio",
+            source = source,
+            headerMapF = emptyMap(),
+        )
+
+        assertEquals(source.getKey(), cookieDomain(analyzedUrl))
+    }
+
+    private fun cookieDomain(analyzedUrl: AnalyzeUrl): String {
+        return AnalyzeUrl::class.java.getDeclaredField("domain").apply {
+            isAccessible = true
+        }.get(analyzedUrl) as String
+    }
 
     @Test
     fun parsesSupportedTimeoutAndRedirectValues() {

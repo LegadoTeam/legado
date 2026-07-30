@@ -13,6 +13,7 @@ import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BaseBook
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.RuleBigDataHelp
@@ -238,23 +239,16 @@ fun Book.upType() {
     }
 }
 
-fun Book.sync(oldBook: Book) {
-    val curBook = appDb.bookDao.getBook(oldBook.bookUrl)!!
-    durChapterTime = curBook.durChapterTime
-    durChapterPos = curBook.durChapterPos
-    if (durChapterIndex != curBook.durChapterIndex) {
-        durChapterIndex = curBook.durChapterIndex
-        val replaceRules = ContentProcessor.get(this).getTitleReplaceRules()
-        appDb.bookChapterDao.getChapter(bookUrl, durChapterIndex)?.let {
-            durChapterTitle = it.getDisplayTitle(
-                replaceRules,
-                getUseReplaceRule(),
-                replaceBook = toReplaceBook()
-            )
-        }
-    }
-    canUpdate = curBook.canUpdate
-    readConfig = curBook.readConfig
+fun Book.sync(currentBook: Book, toc: List<BookChapter>) {
+    val chapterIndex = BookHelp.getDurChapter(currentBook, toc)
+    currentBook.updateTo(this)
+    if (toc.isEmpty()) return
+    durChapterIndex = chapterIndex
+    durChapterTitle = toc[chapterIndex].getDisplayTitle(
+        ContentProcessor.get(this).getTitleReplaceRules(),
+        getUseReplaceRule(),
+        replaceBook = toReplaceBook()
+    )
 }
 
 fun Book.update() {
@@ -268,6 +262,8 @@ fun Book.primaryStr(): String {
 fun Book.updateTo(newBook: Book): Book {
     newBook.durChapterIndex = durChapterIndex
     newBook.durChapterTitle = durChapterTitle
+    newBook.durVolumeIndex = durVolumeIndex
+    newBook.chapterInVolumeIndex = chapterInVolumeIndex
     newBook.durChapterPos = durChapterPos
     newBook.durChapterTime = durChapterTime
     newBook.group = group
@@ -277,6 +273,9 @@ fun Book.updateTo(newBook: Book): Book {
     newBook.customTag = customTag
     newBook.canUpdate = canUpdate
     newBook.readConfig = readConfig
+    newBook.syncTime = syncTime
+    newBook.type = (newBook.type and BookType.allBookType) or
+        (type and BookType.allBookType.inv())
     val variableMap = variableMap.toMutableMap()
     variableMap.keys.removeIf {
         newBook.hasVariable(it)

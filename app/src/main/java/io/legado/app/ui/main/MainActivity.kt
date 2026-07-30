@@ -443,6 +443,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
                 it,
                 onlyUpdateRead = false,
                 policy = TocUpdatePolicy.SKIP_PRE_DOWNLOAD,
+                refreshBookInfo = true,
             )
         }
     }

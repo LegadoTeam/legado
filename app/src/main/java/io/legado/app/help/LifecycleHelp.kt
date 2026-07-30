@@ -3,6 +3,7 @@ package io.legado.app.help
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
+import androidx.annotation.MainThread
 import io.legado.app.base.BaseService
 import io.legado.app.utils.LogUtils
 import java.lang.ref.WeakReference
@@ -52,6 +53,13 @@ object LifecycleHelp : Application.ActivityLifecycleCallbacks {
         waitFinish.forEach {
             it.get()?.finish()
         }
+    }
+
+    @MainThread
+    fun recreateActivities() {
+        activities.mapNotNull { it.get() }
+            .filterNot { it.isFinishing || it.isDestroyed }
+            .forEach(Activity::recreate)
     }
 
     fun setOnAppFinishedListener(appFinishedListener: (() -> Unit)) {

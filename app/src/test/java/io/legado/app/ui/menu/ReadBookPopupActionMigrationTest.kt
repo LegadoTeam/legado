@@ -101,6 +101,11 @@ class ReadBookPopupActionMigrationTest {
             "private fun refreshAllChapters()",
             "override fun onCompatOptionsItemSelected"
         )
+        val refreshContentEvent = section(
+            source,
+            "observeEvent<Boolean>(EventBus.REFRESH_BOOK_CONTENT)",
+            "observeEvent<Boolean>(EventBus.REFRESH_BOOK_TOC)"
+        )
 
         assertOrdered(
             current,
@@ -127,6 +132,8 @@ class ReadBookPopupActionMigrationTest {
             "upContent()",
             "refreshContentAll(it)"
         )
+        assertContains(refreshContentEvent, "refreshDurChapter()")
+        assertFalse(refreshContentEvent.contains("viewModel.refreshContentDur"))
     }
 
     @Test

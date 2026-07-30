@@ -3,6 +3,12 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
+        android:id="@+id/menu_fullscreen_edit"
+        android:icon="@drawable/ic_code"
+        android:title="@string/edit_content"
+        app:showAsAction="always" />
+
+    <item
         android:id="@+id/menu_save"
         android:icon="@drawable/ic_save"
         android:title="@string/action_save"
@@ -17,6 +23,16 @@
     <item
         android:id="@+id/menu_login"
         android:title="@string/login"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_copy_rule"
+        android:title="@string/copy_rule"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_paste_rule"
+        android:title="@string/paste_rule"
         app:showAsAction="never" />
 
     <item

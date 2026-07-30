@@ -820,6 +820,11 @@
     <string name="save_night_theme_summary">儲存夜間主題配置以供呼叫和分享</string>
     <string name="theme_list">主題列表</string>
     <string name="theme_list_summary">使用儲存主題，匯入、分享主題</string>
+    <string name="wallpaper_color_follow">跟隨桌布配色</string>
+    <string name="wallpaper_color_follow_summary">使用系統桌布色盤產生日間和夜間主題（Android 12+）</string>
+    <string name="wallpaper_color_auto_update">桌布變更時自動更新</string>
+    <string name="wallpaper_color_auto_update_summary">系統桌布變更後自動套用新色盤</string>
+    <string name="wallpaper_colors_unavailable">無法取得桌布配色</string>
     <string name="select_theme">切換預設主題</string>
     <string name="sort_by_lastUpdateTime">更新時間排序</string>
     <string name="search_content">全文搜尋</string>

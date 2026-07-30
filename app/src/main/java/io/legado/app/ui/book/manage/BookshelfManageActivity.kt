@@ -366,7 +366,7 @@ class BookshelfManageActivity :
             return
         }
         postEvent(EventBus.UP_BOOKS_TOC, books)
-        toastOnUi(getString(R.string.update_toc_submitted, books.size))
+        toastOnUi(getString(R.string.update_book_info_toc_submitted, books.size))
     }
 
     private fun upMenu() {

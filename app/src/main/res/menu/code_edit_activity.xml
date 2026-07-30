@@ -40,6 +40,12 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_check_javascript_syntax"
+        android:title="@string/check_javascript_syntax"
+        android:visible="false"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_curl_analyze_url"
         android:title="@string/curl_analyze_url_converter"
         app:showAsAction="never" />

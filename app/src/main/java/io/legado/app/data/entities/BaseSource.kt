@@ -51,6 +51,12 @@ internal object LoginInfoMapInitialization {
     }
 }
 
+internal fun BaseSource.getStoredLoginInfoMap(): MutableMap<String, String>? {
+    val json = getLoginInfo() ?: return null
+    return GSON.fromJsonObject<MutableMap<String, String>>(json).getOrNull()
+        ?: mutableMapOf()
+}
+
 /**
  * 可在js里调用,source.xxx()
  */
@@ -256,10 +262,7 @@ interface BaseSource : JsExtensions {
     }
 
     fun getLoginInfoMap(): MutableMap<String, String> {
-        getLoginInfo()?.let { json ->
-            return GSON.fromJsonObject<MutableMap<String, String>>(json).getOrNull()
-                ?: mutableMapOf()
-        }
+        getStoredLoginInfoMap()?.let { return it }
         if (isLoginUiV2()) return mutableMapOf()
         val loginUiRule = loginUi?.trim().takeUnless { it.isNullOrBlank() } ?: return mutableMapOf()
         return LoginInfoMapInitialization.run(

@@ -904,7 +904,12 @@ class BookInfoActivity :
 
             else -> {
                 book?.let {
-                    binding.tvToc.text = getString(R.string.toc_s, it.durChapterTitle)
+                    val tocTitle = resolveBookInfoTocTitle(
+                        it.durChapterTitle,
+                        it.durChapterIndex,
+                        chapterList,
+                    ) ?: getString(R.string.no_last_chapter)
+                    binding.tvToc.text = getString(R.string.toc_s, tocTitle)
                     binding.tvLasted.text = getString(R.string.lasted_show, it.latestChapterTitle)
                 }
             }
@@ -1447,4 +1452,15 @@ class BookInfoActivity :
         pooledWebView = null
     }
 
+}
+
+internal fun resolveBookInfoTocTitle(
+    storedTitle: String?,
+    currentIndex: Int,
+    chapters: List<BookChapter>,
+): String? {
+    return storedTitle?.takeIf { it.isNotBlank() }
+        ?: (chapters.getOrNull(currentIndex) ?: chapters.lastOrNull())
+            ?.getDisplayTitle(chineseConvert = false)
+            ?.takeIf { it.isNotBlank() }
 }

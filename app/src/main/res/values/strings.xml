@@ -352,6 +352,7 @@
     <string name="highlight_rule_empty">No highlight rules</string>
     <string name="highlight_rule_invalid">Invalid rule: %1$s</string>
     <string name="highlight_rule_not_found">Highlight rule no longer exists</string>
+    <string name="highlight_rule_disable">Disable rule</string>
     <string name="highlight_create_rule">Create rule</string>
     <string name="action_del">Delete</string>
     <string name="load_over_time">Loading timeout</string>
@@ -431,8 +432,10 @@
     <string name="pt_show_all_find">Display all Discovery</string>
     <string name="ps_show_all_find">Display the selected origin\'s Discovery if closed</string>
     <string name="update_toc">Update chapters</string>
+    <string name="update_book_info_toc">Update book info and chapters</string>
     <string name="no_book_can_update">No selected books can be updated (local and update-disabled books excluded)</string>
     <string name="update_toc_submitted">Submitted chapter update requests for %1$d books</string>
+    <string name="update_book_info_toc_submitted">Submitted book info and chapter update requests for %1$d books</string>
     <string name="txt_toc_rule">Txt Catalog Rule</string>
     <string name="select_section_export">Choose some chapters to be exported</string>
     <string name="set_charset">Text encoding</string>
@@ -912,6 +915,11 @@
     <string name="save_night_theme_summary">Save night theme config</string>
     <string name="theme_list">Theme list</string>
     <string name="theme_list_summary">Save, Import, Share theme</string>
+    <string name="wallpaper_color_follow">Follow wallpaper colors</string>
+    <string name="wallpaper_color_follow_summary">Use the system wallpaper palette for day and night themes (Android 12+)</string>
+    <string name="wallpaper_color_auto_update">Update when wallpaper changes</string>
+    <string name="wallpaper_color_auto_update_summary">Apply the new palette automatically after the system wallpaper changes</string>
+    <string name="wallpaper_colors_unavailable">Wallpaper colors are unavailable</string>
     <string name="select_theme">Switch default theme</string>
     <string name="sort_by_lastUpdateTime">Sort by update time</string>
     <string name="sort_by_respondTime">Sort by respond time</string>
@@ -1415,6 +1423,9 @@
     <string name="btn_next">下个</string>
     <string name="replace_all">全部</string>
     <string name="format_code">格式化</string>
+    <string name="check_javascript_syntax">检查 JavaScript 语法</string>
+    <string name="javascript_syntax_correct">JavaScript 语法正确</string>
+    <string name="javascript_syntax_error">JavaScript 语法错误</string>
     <string name="config_settings">配置</string>
     <string name="auto_wrap">自动换行</string>
     <string name="font_size">字体大小 %d</string>

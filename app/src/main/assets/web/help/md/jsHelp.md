@@ -599,6 +599,7 @@ cache.deleteMemory(key: String)
 ```js
 // 跳转外部链接，传入http链接或者scheme跳转到浏览器或其他应用
 // 指定mimeType，可以跳转指定类型应用，例如（video/*）
+// legado:// 或 yuedu:// 导入链接会直接打开应用内导入确认页
 java.openUrl(url: String, mimeType: String = null)
 ```
 ## 视频播放器函数

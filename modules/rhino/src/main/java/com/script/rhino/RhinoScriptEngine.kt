@@ -184,10 +184,27 @@ object RhinoScriptEngine {
     fun compile(script: Reader): CompiledScript {
         val cx = Context.enter()
         val ret: RhinoCompiledScript
+        var source = ""
         try {
-            val source = script.readText()
+            source = script.readText()
             val scr = (cx as RhinoContext).compileWithCompatibility(source, SOURCE_NAME, 1)
             ret = RhinoCompiledScript(scr)
+        } catch (error: RhinoException) {
+            val line = error.lineNumber().takeIf { it > 0 } ?: -1
+            val column = error.columnNumber().takeIf { it > 0 } ?: -1
+            val message = if (error is JavaScriptException) {
+                error.value.toString()
+            } else {
+                error.details()
+            }
+            val scriptError = ScriptException(
+                buildErrorMessage(message, source, line, column),
+                error.sourceName(),
+                line,
+                column,
+            )
+            scriptError.initCause(error)
+            throw scriptError
         } catch (var9: Exception) {
             throw ScriptException(var9)
         } finally {
