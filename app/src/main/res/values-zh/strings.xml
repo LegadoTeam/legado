@@ -349,6 +349,7 @@
     <string name="highlight_rule_empty">暂无高亮规则</string>
     <string name="highlight_rule_invalid">规则无效：%1$s</string>
     <string name="highlight_rule_not_found">高亮规则已不存在</string>
+    <string name="highlight_rule_disable">停用规则</string>
     <string name="highlight_create_rule">创建规则</string>
     <string name="action_del">删除</string>
     <string name="load_over_time">加载超时</string>

@@ -881,6 +881,10 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
             callBack.onHighlightClick(it, x, y)
             return true
         }
+        highlightRuleIdAt(column, textPos, page)?.let {
+            callBack.onHighlightRuleClick(it, x, y)
+            return true
+        }
         return false
     }
 
@@ -896,6 +900,26 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         return ReadBook.anchoredHighlightsOfChapter(chapter, titleLength)
             .lastOrNull { (_, anchor) -> position in anchor.start..<anchor.end }
             ?.first
+    }
+
+    private fun highlightRuleIdAt(
+        column: TextBaseColumn,
+        textPos: TextPos,
+        page: TextPage
+    ): Long? {
+        val book = ReadBook.book ?: return null
+        val chapter = page.getTextChapter()
+        if (!chapter.isForBook(book)) return null
+        val line = page.getLine(textPos.lineIndex)
+        val columnStart = chapter.getReadLength(page.index) +
+                page.getPosByLineColumn(textPos.lineIndex, textPos.columnIndex)
+        val columnEnd = columnStart + column.positionLength
+        return ReadBook.ruleMatchesOfChapter(chapter)
+            .lastOrNull {
+                it.start < columnEnd && it.end > columnStart &&
+                        (!line.isTitle || it.applyToTitle)
+            }
+            ?.ruleId
     }
 
     private fun relativeOffset(relativePos: Int): Float {
@@ -966,6 +990,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         fun clickImg(click: String, src: String)
         fun onReviewClick(paragraphNum: Int, count: Int, chapterIndex: Int)
         fun onHighlightClick(highlight: BookHighlight, x: Float, y: Float)
+        fun onHighlightRuleClick(ruleId: Long, x: Float, y: Float)
     }
 
     private fun resolveReviewId(textLine: TextLine): Int {

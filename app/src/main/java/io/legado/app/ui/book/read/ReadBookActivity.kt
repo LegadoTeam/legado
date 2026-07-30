@@ -1009,6 +1009,31 @@ class ReadBookActivity : BaseReadBookActivity(),
         showHighlightActionMenu(highlight, x, y)
     }
 
+    override fun onHighlightRuleClick(ruleId: Long, x: Float, y: Float) {
+        binding.textMenuPosition.x = x
+        binding.textMenuPosition.y = y
+        popupActionMenu(this) {
+            item(getString(R.string.edit), ACTION_HIGHLIGHT_RULE_EDIT)
+            item(getString(R.string.highlight_rule_disable), ACTION_HIGHLIGHT_RULE_DISABLE)
+            danger(ACTION_HIGHLIGHT_RULE_DISABLE)
+        }.show(binding.textMenuPosition) { action ->
+            when (action) {
+                ACTION_HIGHLIGHT_RULE_EDIT -> showDialogFragment(
+                    HighlightRuleEditDialog.edit(ruleId)
+                )
+
+                ACTION_HIGHLIGHT_RULE_DISABLE -> disableHighlightRule(ruleId)
+            }
+        }
+    }
+
+    private fun disableHighlightRule(ruleId: Long) {
+        val rule = ReadBook.highlightRules.firstOrNull { it.id == ruleId }
+            ?.copy(isEnabled = false) ?: return
+        Coroutine.async(lifecycleScope) { appDb.highlightRuleDao.update(rule) }
+            .onFinally { ReadBook.upHighlightRules() }
+    }
+
     override fun currentHighlightStyle(): HighlightStyle {
         return editingHighlight?.styleObj() ?: HighlightStyle()
     }
@@ -2569,6 +2594,8 @@ class ReadBookActivity : BaseReadBookActivity(),
         private const val ACTION_HIGHLIGHT_CREATE_RULE = "highlightCreateRule"
         private const val ACTION_HIGHLIGHT_COPY = "highlightCopy"
         private const val ACTION_HIGHLIGHT_DELETE = "highlightDelete"
+        private const val ACTION_HIGHLIGHT_RULE_EDIT = "highlightRuleEdit"
+        private const val ACTION_HIGHLIGHT_RULE_DISABLE = "highlightRuleDisable"
         private const val STATE_EDITING_HIGHLIGHT = "editingHighlight"
     }
 

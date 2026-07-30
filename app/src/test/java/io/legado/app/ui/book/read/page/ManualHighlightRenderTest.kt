@@ -90,6 +90,29 @@ class ManualHighlightRenderTest {
     }
 
     @Test
+    fun `automatic highlight clicks fall back to the visible matching rule`() {
+        val content = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/ContentTextView.kt")
+        val activity = readProjectFile("src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
+        val notify = content.substringAfter("private fun notifyHighlightClick(")
+            .substringBefore("private fun relativeOffset(")
+        val manual = notify.indexOf("highlightAt(textPos, page)?.let")
+        val automatic = notify.indexOf("highlightRuleIdAt(column, textPos, page)?.let")
+
+        assertTrue(manual in 0 until automatic)
+        assertTrue(notify.contains("callBack.onHighlightRuleClick(it, x, y)"))
+        assertTrue(notify.contains("ReadBook.ruleMatchesOfChapter(chapter)"))
+        assertTrue(notify.contains(".lastOrNull"))
+        assertTrue(notify.contains("it.start < columnEnd && it.end > columnStart"))
+        assertTrue(notify.contains("!line.isTitle || it.applyToTitle"))
+        assertTrue(activity.contains("override fun onHighlightRuleClick(ruleId: Long"))
+        assertTrue(activity.contains("HighlightRuleEditDialog.edit(ruleId)"))
+        assertTrue(activity.contains("R.string.highlight_rule_disable"))
+        assertTrue(activity.contains("copy(isEnabled = false)"))
+        assertTrue(activity.contains("appDb.highlightRuleDao.update(rule)"))
+        assertTrue(activity.contains("ReadBook.upHighlightRules()"))
+    }
+
+    @Test
     fun `column drawing uses isolated temporary paint styles`() {
         val text = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/column/TextColumn.kt")
         val html = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/column/TextHtmlColumn.kt")

@@ -352,6 +352,7 @@
     <string name="highlight_rule_empty">No highlight rules</string>
     <string name="highlight_rule_invalid">Invalid rule: %1$s</string>
     <string name="highlight_rule_not_found">Highlight rule no longer exists</string>
+    <string name="highlight_rule_disable">Disable rule</string>
     <string name="highlight_create_rule">Create rule</string>
     <string name="action_del">Delete</string>
     <string name="load_over_time">Loading timeout</string>
