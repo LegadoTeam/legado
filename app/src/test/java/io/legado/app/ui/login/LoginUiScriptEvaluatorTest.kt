@@ -151,6 +151,16 @@ class LoginUiScriptEvaluatorTest {
     }
 
     @Test
+    fun `login startup only reads stored form values before showing the dialog`() {
+        val source = readProjectFile(
+            "src/main/java/io/legado/app/ui/login/SourceLoginViewModel.kt"
+        )
+
+        assertTrue(source.contains("source?.getStoredLoginInfoMap() ?: mutableMapOf()"))
+        assertFalse(source.contains("getLoginInfoMap()"))
+    }
+
+    @Test
     fun `toolbar actions remain available when initial dynamic layout fails`() {
         val source = readProjectFile(
             "src/main/java/io/legado/app/ui/login/SourceLoginDialog.kt"
