@@ -6,7 +6,9 @@ import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
@@ -46,12 +48,16 @@ import io.legado.app.utils.setLayout
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.visible
 import io.legado.app.utils.viewbindingdelegate.viewBinding
+import io.legado.app.utils.windowSize
 import io.legado.app.databinding.DialogRecyclerViewBinding
 import io.legado.app.databinding.ItemReviewCommentBinding
 import io.legado.app.ui.widget.dialog.PhotoDialog
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
+import splitties.systemservices.windowManager
+import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
 
@@ -98,6 +104,13 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
     private var reviewAudioPlayer: ExoPlayer? = null
     private var currentAudioUrl: String? = null
     private var isAudioPreparing = false
+    private var dragStartRawY = 0f
+    private var dragStartHeightPx = 0
+    private var isDraggingHeight = false
+    private var hasDraggedHeight = false
+    private val dragTouchSlop by lazy {
+        ViewConfiguration.get(requireContext()).scaledTouchSlop
+    }
     private val audioPlayerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
             val previousAudioUrl = currentAudioUrl
@@ -161,7 +174,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
             attr.gravity = Gravity.BOTTOM
             attributes = attr
         }
-        setLayout(1f, 0.68f)
+        applyDialogHeightRatio(lastHeightRatio)
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
@@ -173,6 +186,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
         sourceKey = arguments?.getString(ARG_SOURCE_KEY).orEmpty()
         ruleHash = arguments?.getInt(ARG_RULE_HASH) ?: 0
         binding.root.setBackgroundResource(R.drawable.bg_dialog_round_top)
+        binding.dragHandle.visible()
         binding.toolBar.setBackgroundResource(R.drawable.bg_review_toolbar)
         binding.toolBar.updateLayoutParams<ViewGroup.LayoutParams> {
             height = 42.dpToPx()
@@ -208,6 +222,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
         binding.toolBar.setNavigationIcon(R.drawable.ic_baseline_close)
         binding.toolBar.navigationIcon?.setTint(getCompatColor(R.color.secondaryText))
         binding.toolBar.setNavigationOnClickListener { dismiss() }
+        setupHeightDrag()
         val layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.layoutManager = layoutManager
         binding.recyclerView.adapter = adapter
@@ -229,6 +244,74 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
             }
         })
         loadDetailPage(paragraphNum, 1, append = false)
+    }
+
+    private fun setupHeightDrag() {
+        binding.dragHandle.setOnClickListener {
+            val windowHeight = requireContext().windowManager.windowSize.heightPixels
+            if (windowHeight <= 0) return@setOnClickListener
+            val currentHeight = dialog?.window?.attributes?.height?.takeIf { it > 0 }
+                ?: (windowHeight * lastHeightRatio).roundToInt()
+            val midpoint = windowHeight * (DEFAULT_HEIGHT_RATIO + MAX_HEIGHT_RATIO) / 2f
+            applyDialogHeightRatio(
+                if (currentHeight < midpoint) MAX_HEIGHT_RATIO else DEFAULT_HEIGHT_RATIO
+            )
+        }
+        binding.dragHandle.setOnTouchListener { handle, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    val windowHeight = requireContext().windowManager.windowSize.heightPixels
+                    if (windowHeight <= 0) return@setOnTouchListener false
+                    isDraggingHeight = true
+                    hasDraggedHeight = false
+                    dragStartRawY = event.rawY
+                    dragStartHeightPx = dialog?.window?.attributes?.height?.takeIf { it > 0 }
+                        ?: (windowHeight * lastHeightRatio).roundToInt()
+                    true
+                }
+
+                MotionEvent.ACTION_MOVE -> {
+                    if (!isDraggingHeight) return@setOnTouchListener false
+                    val deltaY = event.rawY - dragStartRawY
+                    if (!hasDraggedHeight && abs(deltaY) < dragTouchSlop) {
+                        return@setOnTouchListener true
+                    }
+                    hasDraggedHeight = true
+                    applyDialogHeightPx((dragStartHeightPx - deltaY).roundToInt())
+                    true
+                }
+
+                MotionEvent.ACTION_UP -> {
+                    if (!isDraggingHeight) return@setOnTouchListener false
+                    isDraggingHeight = false
+                    if (!hasDraggedHeight) handle.performClick()
+                    true
+                }
+
+                MotionEvent.ACTION_CANCEL -> {
+                    isDraggingHeight = false
+                    true
+                }
+
+                else -> false
+            }
+        }
+    }
+
+    private fun applyDialogHeightRatio(heightRatio: Float) {
+        val windowHeight = requireContext().windowManager.windowSize.heightPixels
+        if (windowHeight <= 0) return
+        applyDialogHeightPx((windowHeight * heightRatio).roundToInt())
+    }
+
+    private fun applyDialogHeightPx(heightPx: Int) {
+        val windowHeight = requireContext().windowManager.windowSize.heightPixels
+        if (windowHeight <= 0) return
+        val minHeight = (windowHeight * MIN_HEIGHT_RATIO).roundToInt()
+        val maxHeight = (windowHeight * MAX_HEIGHT_RATIO).roundToInt()
+        val clampedHeight = heightPx.coerceIn(minHeight, maxHeight)
+        setLayout(1f, clampedHeight)
+        lastHeightRatio = clampedHeight.toFloat() / windowHeight
     }
 
     override fun onDestroyView() {
@@ -597,6 +680,9 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
     )
 
     private companion object {
+        private const val DEFAULT_HEIGHT_RATIO = 0.68f
+        private const val MIN_HEIGHT_RATIO = 0.35f
+        private const val MAX_HEIGHT_RATIO = 0.92f
         const val ARG_PARAGRAPH_NUM = "paragraphNum"
         const val ARG_TOTAL_COUNT = "totalCount"
         const val ARG_CHAPTER_INDEX = "chapterIndex"
@@ -607,6 +693,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
         const val TYPE_NORMAL = 0
         const val TYPE_MORE = 1
         const val PAYLOAD_AUDIO_STATE = "review_audio_state"
+        private var lastHeightRatio = DEFAULT_HEIGHT_RATIO
     }
 
     private inner class ReviewAdapter(context: Context) :

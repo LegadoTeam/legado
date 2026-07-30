@@ -1416,6 +1416,7 @@
     <string name="review_icon_size_invalid">请输入 50-200 之间的整数</string>
     <string name="review_icon_color_title">段评图标颜色</string>
     <string name="review_icon_color_reset">段评图标颜色已恢复跟随主题</string>
+    <string name="review_resize_handle">调整段评窗口高度</string>
     <string name="bottom_bar_skin">底栏图集</string>
     <string name="bottom_bar_skin_summary">导入 zip 自定义底栏图标</string>
     <string name="bottom_bar_skin_assign">分配图集</string>

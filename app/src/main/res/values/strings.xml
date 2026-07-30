@@ -1528,6 +1528,7 @@
     <string name="review_icon_size_invalid">Enter an integer from 50 to 200</string>
     <string name="review_icon_color_title">Icon color</string>
     <string name="review_icon_color_reset">Icon color reset to follow theme</string>
+    <string name="review_resize_handle">Resize paragraph reviews</string>
     <string name="bottom_bar_skin">Bottom Bar Skin</string>
     <string name="bottom_bar_skin_summary">Customize bottom bar icons from a zip</string>
     <string name="bottom_bar_skin_assign">Assign Icons</string>
