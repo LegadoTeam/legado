@@ -22,8 +22,9 @@ class SourceImmersiveBackgroundTest {
         ).forEach { path ->
             val source = projectFile(path).readText()
             assertTrue(source.contains("transparentNavBar && !AppConfig.isEInkMode"))
+            assertTrue(source.contains("listOf(binding.tabLayout, binding.fieldNav)"))
             assertTrue(source.contains("if (transparentBar) Color.TRANSPARENT else backgroundColor"))
-            assertTrue(source.contains("if (transparentBar) binding.tabLayout.elevation = 0f"))
+            assertTrue(source.contains("if (transparentBar) tabs.elevation = 0f"))
         }
     }
 
