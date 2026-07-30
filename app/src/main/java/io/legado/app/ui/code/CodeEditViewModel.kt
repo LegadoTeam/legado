@@ -14,6 +14,7 @@ import io.github.rosemoe.sora.widget.CodeEditor
 import io.legado.app.R
 import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppLog
+import io.legado.app.constant.AppPattern
 import io.legado.app.help.CacheManager
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.BackstageWebView
@@ -126,6 +127,9 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
             if (isHtml) {
                 return@execute formatCodeHtml(text)
             }
+            formatRuleExpression(text, ::webFormatCode)?.let {
+                return@execute it
+            }
             var result = ""
             var start = 0
             val indexS = text.indexOf("<js>")
@@ -234,6 +238,17 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
         return doc.outerHtml()
     }
 
+}
+
+internal suspend fun formatRuleExpression(
+    text: String,
+    formatter: suspend (String) -> String?
+): String? {
+    val matcher = AppPattern.EXP_PATTERN.matcher(text.trim())
+    if (!matcher.matches()) return null
+    val body = matcher.group(1).trim()
+    val formattedBody = if (body.isEmpty()) body else formatter(body) ?: body
+    return "{{$formattedBody}}"
 }
 
 internal fun scriptSourceIndex(source: String, lineNumber: Int, columnNumber: Int): Int {
