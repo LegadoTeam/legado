@@ -251,10 +251,8 @@ internal fun String?.withAudioPlaySpeed(playSpeed: Float): String {
 }
 
 private fun String?.withAudioPlayPreference(key: String, value: Number): String {
-    val readConfig = GSON.fromJsonObject<JsonObject>(this).getOrNull() ?: JsonObject()
-    val rawConfig = orEmpty()
-    if (rawConfig.isBlank() || rawConfig.trim().equals("null", ignoreCase = true)) {
-        readConfig.addProperty("useGlobalAudioSkip", true)
+    val readConfig = GSON.fromJsonObject<JsonObject>(this).getOrNull() ?: JsonObject().apply {
+        addProperty("useGlobalAudioSkip", true)
     }
     readConfig.addProperty(key, value)
     return GSON.toJson(readConfig)

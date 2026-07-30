@@ -48,11 +48,16 @@ class AudioPlaybackPreferenceTest {
         assertEquals(3, updated.get("playMode").asInt)
         assertEquals(1.5f, updated.get("playSpeed").asFloat)
         assertEquals("keep", updated.get("futureAudioOption").asString)
+    }
 
-        val initialized = GSON.fromJsonObject<JsonObject>(
-            "null".withAudioPlayMode(3)
-        ).getOrThrow()
-        assertTrue(initialized.get("useGlobalAudioSkip").asBoolean)
+    @Test
+    fun `audio preference update initializes missing config with global inheritance`() {
+        listOf<String?>(null, "null", "{").forEach { rawConfig ->
+            val initialized = GSON.fromJsonObject<JsonObject>(
+                rawConfig.withAudioPlayMode(3)
+            ).getOrThrow()
+            assertTrue(initialized.get("useGlobalAudioSkip").asBoolean)
+        }
     }
 
     @Test
