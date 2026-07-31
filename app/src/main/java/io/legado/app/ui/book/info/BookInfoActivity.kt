@@ -50,6 +50,7 @@ import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isLocalTxt
 import io.legado.app.help.book.isVideo
 import io.legado.app.help.book.isWebFile
+import io.legado.app.help.book.readProgress
 import io.legado.app.help.book.removeType
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
@@ -909,7 +910,13 @@ class BookInfoActivity :
                         it.durChapterIndex,
                         chapterList,
                     ) ?: getString(R.string.no_last_chapter)
-                    binding.tvToc.text = getString(R.string.toc_s, tocTitle)
+                    val readStatus = resolveBookInfoReadProgress(it)?.let { percent ->
+                        getString(R.string.read_y, "$percent%")
+                    }
+                    binding.tvToc.text = getString(
+                        R.string.toc_s,
+                        listOfNotNull(tocTitle, readStatus).joinToString("  ·  "),
+                    )
                     binding.tvLasted.text = getString(R.string.lasted_show, it.latestChapterTitle)
                 }
             }
@@ -1463,4 +1470,9 @@ internal fun resolveBookInfoTocTitle(
         ?: (chapters.getOrNull(currentIndex) ?: chapters.lastOrNull())
             ?.getDisplayTitle(chineseConvert = false)
             ?.takeIf { it.isNotBlank() }
+}
+
+internal fun resolveBookInfoReadProgress(book: Book): Int? {
+    if (book.totalChapterNum <= 1) return null
+    return book.readProgress()?.let { (it * 100).roundToInt() }
 }

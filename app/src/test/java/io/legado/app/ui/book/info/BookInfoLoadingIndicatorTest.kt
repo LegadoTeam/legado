@@ -1,8 +1,10 @@
 package io.legado.app.ui.book.info
 
+import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -11,6 +13,22 @@ import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 
 class BookInfoLoadingIndicatorTest {
+
+    @Test
+    fun `read progress appears only for read multi chapter books`() {
+        assertNull(resolveBookInfoReadProgress(Book(totalChapterNum = 20)))
+        assertNull(
+            resolveBookInfoReadProgress(
+                Book(totalChapterNum = 1, durChapterPos = 1),
+            ),
+        )
+        assertEquals(
+            50,
+            resolveBookInfoReadProgress(
+                Book(totalChapterNum = 11, durChapterIndex = 5),
+            ),
+        )
+    }
 
     @Test
     fun `empty stored toc title follows the current chapter index`() {
