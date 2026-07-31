@@ -39,7 +39,8 @@ object AutoTask {
             "bookAuthor" to book.author,
             "generatedBy" to BOOK_UPDATE_GENERATOR,
             "respectCanUpdate" to true,
-            "notify" to mapOf("enable" to true, "minCount" to 1)
+            "notify" to mapOf("enable" to true, "minCount" to 1),
+            "cache" to mapOf("enable" to false)
         )
         return AutoTaskRule(
             id = bookUpdateTaskId(book.bookUrl),

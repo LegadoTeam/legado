@@ -32,11 +32,13 @@
 
 ## 更新书籍目录
 
-`refreshToc` 按书籍地址刷新目录，并可在新增章节达到指定数量时通知：
+`refreshToc` 按书籍地址刷新目录，可在新增章节达到指定数量时通知，并缓存新增正文：
 
 ```js
-{"type":"refreshToc","bookUrl":"BOOK_URL","notify":{"enable":true,"minCount":1}}
+{"type":"refreshToc","bookUrl":"BOOK_URL","notify":{"enable":true,"minCount":1},"cache":{"enable":true}}
 ```
+
+`cache.enable` 为 `true` 时，自动任务会在当前任务中顺序缓存新增的非卷章节。每章最多尝试 3 次，全部新增章尝试完成后仍有失败会将本次任务标记为失败。
 
 ## 调试
 

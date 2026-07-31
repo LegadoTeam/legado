@@ -10,6 +10,7 @@ import io.legado.app.constant.NotificationId
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
+import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.isLocal
 import io.legado.app.model.jsSource.JsSourceEngine
 import io.legado.app.model.localBook.LocalBook
@@ -21,6 +22,7 @@ import io.legado.app.utils.isJsonArray
 import io.legado.app.utils.isJsonObject
 import io.legado.app.utils.isTrue
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -120,6 +122,7 @@ object AutoTaskProtocol {
         val chaptersBefore = appDb.bookChapterDao.getChapterList(book.bookUrl)
         val chapters = refreshBookToc(book)
         val newCount = countNewChapters(chaptersBefore, chapters)
+        val newChapters = newContentChapters(chaptersBefore, chapters)
 
         val notify = map(action, "notify")
         val notifyEnabled = notify?.let { boolean(it, "enable", true) } ?: false
@@ -136,11 +139,74 @@ object AutoTaskProtocol {
                 notifyContent
             )
 
+        val cache = map(action, "cache")
+        val cacheEnabled = cache?.let { boolean(it, "enable", false) } ?: false
+        val cached = if (cacheEnabled) cacheNewChapters(book, newChapters) else 0
+
         return buildString {
             append(book.name.ifBlank { book.bookUrl })
             append(": +").append(newCount)
             if (notified) append(", notified")
+            if (cached > 0) append(", cached ").append(cached)
         }
+    }
+
+    private suspend fun cacheNewChapters(book: Book, chapters: List<BookChapter>): Int {
+        if (book.isLocal || chapters.isEmpty()) return 0
+        val bookSource = appDb.bookSourceDao.getBookSource(book.origin)
+            ?: error("未找到对应书源，请换源")
+        return cacheChaptersWithRetry(
+            chapters,
+            onFailure = { chapter, error ->
+                AppLog.put(
+                    "Automatic task cache failed: ${book.name} - ${chapter.title}",
+                    error
+                )
+            }
+        ) { chapter ->
+            if (!BookHelp.hasContent(book, chapter)) {
+                val content = WebBook.getContentAwait(bookSource, book, chapter)
+                if (!BookHelp.hasContent(book, chapter)) {
+                    BookHelp.saveContent(bookSource, book, chapter, content)
+                }
+                check(BookHelp.hasContent(book, chapter)) {
+                    "Failed to cache ${book.name.ifBlank { book.bookUrl }}: ${chapter.title}"
+                }
+            }
+        }
+    }
+
+    internal suspend fun cacheChaptersWithRetry(
+        chapters: List<BookChapter>,
+        retryDelayMillis: Long = 1_000,
+        onFailure: (BookChapter, Exception) -> Unit = { _, _ -> },
+        cache: suspend (BookChapter) -> Unit,
+    ): Int {
+        var cached = 0
+        var firstFailure: Exception? = null
+        for (chapter in chapters) {
+            var failure: Exception? = null
+            for (attempt in 1..3) {
+                currentCoroutineContext().ensureActive()
+                try {
+                    cache(chapter)
+                    failure = null
+                    cached++
+                    break
+                } catch (error: Exception) {
+                    error.autoTaskCancellation()?.let { throw it }
+                    failure = error
+                    if (attempt < 3) delay(retryDelayMillis)
+                }
+            }
+            failure?.let { error ->
+                firstFailure = firstFailure ?: error
+                onFailure(chapter, error)
+            }
+        }
+        currentCoroutineContext().ensureActive()
+        firstFailure?.let { throw it }
+        return cached
     }
 
     private fun findMovedBook(action: Map<String, Any?>): Book? {
@@ -303,6 +369,21 @@ object AutoTaskProtocol {
     ): Int {
         return (after.count { !it.isVolume } - before.count { !it.isVolume })
             .coerceAtLeast(0)
+    }
+
+    internal fun newContentChapters(
+        before: List<BookChapter>,
+        after: List<BookChapter>
+    ): List<BookChapter> {
+        val newCount = countNewChapters(before, after)
+        if (newCount == 0) return emptyList()
+        val knownUrls = before
+            .asSequence()
+            .filterNot { it.isVolume }
+            .mapTo(hashSetOf()) { it.url }
+        return after
+            .filter { !it.isVolume && it.url !in knownUrls }
+            .takeLast(newCount)
     }
 
     internal fun canRefreshBookToc(canUpdate: Boolean, respectCanUpdate: Boolean): Boolean {
