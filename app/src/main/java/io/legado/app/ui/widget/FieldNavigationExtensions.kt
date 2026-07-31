@@ -1,5 +1,7 @@
 package io.legado.app.ui.widget
 
+import android.view.View
+import androidx.core.widget.NestedScrollView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -49,4 +51,39 @@ fun TabLayout.bindFieldNavigation(recyclerView: RecyclerView) {
             selectingFromScroll = false
         }
     })
+}
+
+fun TabLayout.bindFieldNavigation(scrollView: NestedScrollView, fields: List<View>) {
+    var syncing = false
+
+    addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+        private fun scrollTo(tab: TabLayout.Tab?) {
+            if (syncing) return
+            val field = fields.getOrNull(tab?.position ?: return) ?: return
+            syncing = true
+            scrollView.scrollTo(0, field.top)
+            syncing = false
+        }
+
+        override fun onTabSelected(tab: TabLayout.Tab?) = scrollTo(tab)
+
+        override fun onTabReselected(tab: TabLayout.Tab?) = scrollTo(tab)
+
+        override fun onTabUnselected(tab: TabLayout.Tab?) = Unit
+    })
+
+    scrollView.setOnScrollChangeListener(
+        NestedScrollView.OnScrollChangeListener { _, _, scrollY, _, _ ->
+            if (syncing || fields.isEmpty()) return@OnScrollChangeListener
+            val position = if (scrollY > 0 && !scrollView.canScrollVertically(1)) {
+                fields.lastIndex
+            } else {
+                fields.indexOfLast { it.top <= scrollY }.coerceAtLeast(0)
+            }
+            if (position == selectedTabPosition) return@OnScrollChangeListener
+            syncing = true
+            getTabAt(position)?.select()
+            syncing = false
+        }
+    )
 }

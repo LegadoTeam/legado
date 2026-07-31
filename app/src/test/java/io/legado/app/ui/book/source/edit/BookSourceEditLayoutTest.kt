@@ -119,7 +119,7 @@ class BookSourceEditLayoutTest {
     }
 
     @Test
-    fun `book and rss editors share main field tab navigation`() {
+    fun `source and auto task editors share main field tab navigation`() {
         listOf(
             LAYOUT_PATH to ACTIVITY_PATH,
             RSS_LAYOUT_PATH to RSS_ACTIVITY_PATH
@@ -134,9 +134,28 @@ class BookSourceEditLayoutTest {
             assertTrue(activity.contains("fieldNav.setFieldLabels(entities.map { it.hint })"))
         }
 
+        val autoTaskDocument = parse(AUTO_TASK_LAYOUT_PATH)
+        val autoTaskNavigation = autoTaskDocument.elementById("field_nav")
+        val autoTaskFieldContainer = autoTaskDocument.elementById("field_container")
+        val autoTaskActivity = File(repositoryRoot, AUTO_TASK_ACTIVITY_PATH).readText()
+        assertEquals(TAB_LAYOUT, autoTaskNavigation.tagName)
+        assertEquals("48dp", autoTaskNavigation.androidAttribute("layout_height"))
+        assertEquals("scrollable", autoTaskNavigation.appAttribute("tabMode"))
+        val directFields = (0 until autoTaskFieldContainer.childNodes.length)
+            .map { autoTaskFieldContainer.childNodes.item(it) }
+            .filterIsInstance<Element>()
+            .count { it.tagName == TEXT_INPUT_LAYOUT }
+        assertEquals(10, directFields)
+        assertTrue(autoTaskActivity.contains("fieldContainer.children.filterIsInstance<TextInputLayout>()"))
+        assertTrue(autoTaskActivity.contains("fieldNav.setFieldLabels(fields.map"))
+        assertTrue(autoTaskActivity.contains("fieldNav.bindFieldNavigation(scrollView, fields)"))
+
         val helper = File(repositoryRoot, FIELD_NAVIGATION_PATH).readText()
         assertTrue(helper.contains("recyclerView.scrollState == RecyclerView.SCROLL_STATE_IDLE"))
         assertTrue(helper.contains("spanSizeLookup.getSpanIndex"))
+        assertTrue(helper.contains("scrollView.scrollTo(0, field.top)"))
+        assertTrue(helper.contains("fields.indexOfLast { it.top <= scrollY }"))
+        assertTrue(helper.contains("!scrollView.canScrollVertically(1)"))
         assertFalse(helper.contains("AppColorScheme"))
     }
 
@@ -179,10 +198,14 @@ class BookSourceEditLayoutTest {
         const val CARD_VIEW = "androidx.cardview.widget.CardView"
         const val FLEXBOX = "com.google.android.flexbox.FlexboxLayout"
         const val TAB_LAYOUT = "com.google.android.material.tabs.TabLayout"
+        const val TEXT_INPUT_LAYOUT = "io.legado.app.ui.widget.text.TextInputLayout"
         const val THEME_CHECK_BOX = "io.legado.app.lib.theme.view.ThemeCheckBox"
         const val RSS_LAYOUT_PATH = "app/src/main/res/layout/activity_rss_source_edit.xml"
         const val RSS_ACTIVITY_PATH =
             "app/src/main/java/io/legado/app/ui/rss/source/edit/RssSourceEditActivity.kt"
+        const val AUTO_TASK_LAYOUT_PATH = "app/src/main/res/layout/activity_auto_task_edit.xml"
+        const val AUTO_TASK_ACTIVITY_PATH =
+            "app/src/main/java/io/legado/app/ui/autoTask/AutoTaskEditActivity.kt"
         const val FIELD_NAVIGATION_PATH =
             "app/src/main/java/io/legado/app/ui/widget/FieldNavigationExtensions.kt"
         const val ANDROID_NAMESPACE = "http://schemas.android.com/apk/res/android"

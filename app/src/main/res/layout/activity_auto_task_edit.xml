@@ -14,12 +14,23 @@
         app:displayHomeAsUp="true"
         app:title="@string/auto_task_edit" />
 
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/field_nav"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@color/background"
+        app:tabIndicatorFullWidth="false"
+        app:tabMode="scrollable"
+        tools:ignore="SpeakableTextPresentCheck" />
+
     <io.legado.app.ui.widget.NoChildScrollNestedScrollView
+        android:id="@+id/scroll_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1">
 
         <LinearLayout
+            android:id="@+id/field_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"

@@ -7,6 +7,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.EditText
+import androidx.core.view.children
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.base.BaseActivity
@@ -16,6 +17,9 @@ import io.legado.app.lib.dialogs.alert
 import io.legado.app.model.AutoTask
 import io.legado.app.ui.code.CodeEditActivity
 import io.legado.app.ui.login.SourceLoginActivity
+import io.legado.app.ui.widget.bindFieldNavigation
+import io.legado.app.ui.widget.setFieldLabels
+import io.legado.app.ui.widget.text.TextInputLayout
 import io.legado.app.utils.CronSchedule
 import io.legado.app.utils.GSON
 import io.legado.app.utils.StartActivityContract
@@ -71,6 +75,7 @@ class AutoTaskEditActivity : BaseActivity<ActivityAutoTaskEditBinding>() {
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        initFieldNavigation()
         val id = intent.getStringExtra(EXTRA_ID)
         if (id == null) {
             bind(task)
@@ -85,6 +90,12 @@ class AutoTaskEditActivity : BaseActivity<ActivityAutoTaskEditBinding>() {
                 }
             }
         }
+    }
+
+    private fun initFieldNavigation() = binding.run {
+        val fields = fieldContainer.children.filterIsInstance<TextInputLayout>().toList()
+        fieldNav.setFieldLabels(fields.map { it.hint.toString() })
+        fieldNav.bindFieldNavigation(scrollView, fields)
     }
 
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
