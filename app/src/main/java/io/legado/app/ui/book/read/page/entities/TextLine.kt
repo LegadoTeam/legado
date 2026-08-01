@@ -5,7 +5,6 @@ import android.graphics.Canvas
 import android.graphics.DashPathEffect
 import android.graphics.Paint.FontMetrics
 import android.os.Build
-import android.text.TextPaint
 import androidx.annotation.Keep
 import io.legado.app.help.HighlightGeometry
 import io.legado.app.help.PaintPool
@@ -268,16 +267,17 @@ data class TextLine(
                 paint
             )
         } else if (underlineMode == 2) { // 虚线
-            val dashPathEffect = DashPathEffect(floatArrayOf(10f, 10f), 0f)
-            val dashPath = TextPaint(paint)
-            dashPath.pathEffect = dashPathEffect
+            val dashPaint = PaintPool.obtain()
+            dashPaint.set(paint)
+            dashPaint.pathEffect = underlineDashPathEffect
             canvas.drawLine(
                 lineStart + indentWidth,
                 lineY,
                 lineEnd,
                 lineY,
-                dashPath
+                dashPaint
             )
+            PaintPool.recycle(dashPaint)
         }
     }
 
@@ -434,6 +434,7 @@ data class TextLine(
         private val atLeastApi26 = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
         val atLeastApi28 = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
         private val atLeastApi35 = Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM
+        private val underlineDashPathEffect = DashPathEffect(floatArrayOf(10f, 10f), 0f)
         private val wordSpacingWorking by lazy {
             // issue 3785 3846
             val paint = PaintPool.obtain()
