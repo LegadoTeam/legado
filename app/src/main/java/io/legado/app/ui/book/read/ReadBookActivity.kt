@@ -968,12 +968,14 @@ class ReadBookActivity : BaseReadBookActivity(),
             editingHighlightSnapshot = value
         }
     private var highlightStyleDialog: HighlightStyleDialog? = null
+    private var highlightPopup: PopupAction? = null
 
     private fun showHighlightActionMenu(highlight: BookHighlight, x: Float, y: Float) {
         editingHighlight = highlight
         binding.textMenuPosition.x = x
         binding.textMenuPosition.y = y
-        popupActionMenu(this) {
+        highlightPopup?.dismiss()
+        highlightPopup = popupActionMenu(this) {
             item(getString(R.string.highlight_style), ACTION_HIGHLIGHT_STYLE)
             item(getString(R.string.highlight_note), ACTION_HIGHLIGHT_NOTE)
             item(getString(R.string.highlight_create_rule), ACTION_HIGHLIGHT_CREATE_RULE)
@@ -1012,7 +1014,8 @@ class ReadBookActivity : BaseReadBookActivity(),
     override fun onHighlightRuleClick(ruleId: Long, x: Float, y: Float) {
         binding.textMenuPosition.x = x
         binding.textMenuPosition.y = y
-        popupActionMenu(this) {
+        highlightPopup?.dismiss()
+        highlightPopup = popupActionMenu(this) {
             item(getString(R.string.edit), ACTION_HIGHLIGHT_RULE_EDIT)
             item(getString(R.string.highlight_rule_disable), ACTION_HIGHLIGHT_RULE_DISABLE)
             danger(ACTION_HIGHLIGHT_RULE_DISABLE)
@@ -1319,6 +1322,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     override fun pageChanged() {
         pageChanged = true
         binding.readView.onPageChange()
+        highlightPopup?.dismiss()
         handler.post {
             upSeekBarProgress()
         }
@@ -2454,6 +2458,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         tts?.clearTts()
         textActionMenu.dismiss()
         popupAction.dismiss()
+        highlightPopup?.dismiss()
         binding.readView.onDestroy()
         ReadBook.unregister(this)
         handler.removeCallbacksAndMessages(null) // 清理Handler消息

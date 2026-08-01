@@ -129,6 +129,21 @@ class ManualHighlightRenderTest {
     }
 
     @Test
+    fun `page changes dismiss visible highlight actions`() {
+        val activity = readProjectFile("src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
+        val popupMenu = readProjectFile("src/main/java/io/legado/app/ui/widget/PopupActionMenu.kt")
+        val pageChanged = activity.substringAfter("override fun pageChanged()")
+            .substringBefore("private fun upSeekBarProgress()")
+        val onDestroy = activity.substringAfter("override fun onDestroy()")
+
+        assertTrue(popupMenu.contains("fun show(anchor: View, onClick: (String) -> Unit): PopupAction"))
+        assertTrue(popupMenu.contains("return PopupAction(context).apply"))
+        assertTrue(activity.contains("highlightPopup = popupActionMenu(this)"))
+        assertTrue(pageChanged.contains("highlightPopup?.dismiss()"))
+        assertTrue(onDestroy.contains("highlightPopup?.dismiss()"))
+    }
+
+    @Test
     fun `automatic highlight clicks fall back to the visible matching rule`() {
         val content = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/ContentTextView.kt")
         val activity = readProjectFile("src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")

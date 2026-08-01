@@ -20,8 +20,8 @@ class PopupActionMenuBuilder(private val context: Context) {
         return this
     }
 
-    fun show(anchor: View, onClick: (String) -> Unit) {
-        PopupAction(context).apply {
+    fun show(anchor: View, onClick: (String) -> Unit): PopupAction {
+        return PopupAction(context).apply {
             setVertical(true)
             setDangerValues(dangerValues)
             setItems(items)
