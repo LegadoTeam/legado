@@ -84,7 +84,6 @@
         <div
           v-for="data in chapterData"
           :key="data.index"
-          :data-chapter-index="data.index"
         >
           <chapter-content
             ref="chapterRef"
@@ -112,7 +111,7 @@ import API from '@api'
 import { useLoading } from '@/hooks/loading'
 import { useThrottleFn } from '@vueuse/shared'
 import { isNullOrBlank } from '@/utils/utils'
-import { appendToChapterWindow } from '@/utils/chapterWindow'
+import { trimChapterWindowBeforeAppend } from '@/utils/chapterWindow'
 
 const content = ref<HTMLElement>()
 // loading spinner
@@ -288,29 +287,6 @@ const toShelf = () => {
 // 获取章节内容
 type ChapterData = { index: number; content: string[]; title: string }
 const chapterData = ref<ChapterData[]>([])
-const appendChapter = (data: ChapterData) => {
-  const { chapters, removedCount } = appendToChapterWindow(
-    chapterData.value,
-    data,
-  )
-  if (removedCount === 0) {
-    chapterData.value = chapters
-    return
-  }
-
-  const firstRetained = chapterData.value[removedCount]
-  const anchor = content.value?.querySelector<HTMLElement>(
-    `[data-chapter-index="${firstRetained.index}"]`,
-  )
-  const anchorTop = anchor?.getBoundingClientRect().top
-  chapterData.value = chapters
-  if (!anchor || anchorTop === undefined) return
-
-  nextTick(() => {
-    const offset = anchor.getBoundingClientRect().top - anchorTop
-    if (offset !== 0) window.scrollBy(0, offset)
-  })
-}
 const noPoint = ref(true)
 const getContent = (index: number, reloadChapter = true, chapterPos = 0) => {
   const generation = reloadChapter ? ++contentGeneration : contentGeneration
@@ -319,10 +295,13 @@ const getContent = (index: number, reloadChapter = true, chapterPos = 0) => {
     //展示进度条
     store.setShowContent(false)
     //强制滚回顶层
-    jump(top.value, { duration: 0 })
+    window.scrollTo(0, 0)
     //从目录，按钮切换章节时保存进度 预加载时不保存
     saveReadingBookProgressToBrowser(index, chapterPos)
     chapterData.value = []
+  } else {
+    // 提前清理旧章节，避免与下一章渲染挤在同一帧
+    chapterData.value = trimChapterWindowBeforeAppend(chapterData.value)
   }
   const bookUrl = store.readingBook.bookUrl
   const { title, index: chapterIndex } = catalog.value[index]
@@ -334,12 +313,12 @@ const getContent = (index: number, reloadChapter = true, chapterPos = 0) => {
         if (res.data.isSuccess) {
           const data = res.data.data
           const content = data.split(/\n+/)
-          appendChapter({ index, content, title })
+          chapterData.value.push({ index, content, title })
           if (reloadChapter) toChapterPos(chapterPos)
         } else {
           ElMessage({ message: res.data.errorMsg, type: 'error' })
           const content = [res.data.errorMsg]
-          appendChapter({ index, content, title })
+          chapterData.value.push({ index, content, title })
         }
         store.setContentLoading(true)
         noPoint.value = false
@@ -351,7 +330,7 @@ const getContent = (index: number, reloadChapter = true, chapterPos = 0) => {
       err => {
         if (generation !== contentGeneration) return
         const content = ['获取章节内容失败！']
-        appendChapter({ index, content, title })
+        chapterData.value.push({ index, content, title })
         store.setShowContent(true)
         throw err
       },

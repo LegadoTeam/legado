@@ -1,6 +1,3 @@
 export const MAX_RETAINED_CHAPTERS: number
 
-export function appendToChapterWindow<T>(
-  chapters: readonly T[],
-  chapter: T,
-): { chapters: T[]; removedCount: number }
+export function trimChapterWindowBeforeAppend<T>(chapters: T[]): T[]

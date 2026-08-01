@@ -1,21 +1,21 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  appendToChapterWindow,
   MAX_RETAINED_CHAPTERS,
+  trimChapterWindowBeforeAppend,
 } from '../src/utils/chapterWindow.js'
 
-test('keeps a bounded window of the latest chapters', () => {
+test('reserves one chapter slot before the next chapter is rendered', () => {
   const loaded = Array.from(
     { length: MAX_RETAINED_CHAPTERS },
     (_, index) => index,
   )
 
-  const result = appendToChapterWindow(loaded, MAX_RETAINED_CHAPTERS)
+  const prepared = trimChapterWindowBeforeAppend(loaded)
+  prepared.push(MAX_RETAINED_CHAPTERS)
 
-  assert.equal(result.removedCount, 1)
   assert.deepEqual(
-    result.chapters,
+    prepared,
     Array.from({ length: MAX_RETAINED_CHAPTERS }, (_, index) => index + 1),
   )
   assert.deepEqual(
@@ -24,9 +24,8 @@ test('keeps a bounded window of the latest chapters', () => {
   )
 })
 
-test('retains every chapter while the window is not full', () => {
-  const result = appendToChapterWindow([1], 2)
+test('does not trim while the window has room', () => {
+  const loaded = [1]
 
-  assert.equal(result.removedCount, 0)
-  assert.deepEqual(result.chapters, [1, 2])
+  assert.equal(trimChapterWindowBeforeAppend(loaded), loaded)
 })

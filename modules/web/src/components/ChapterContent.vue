@@ -61,12 +61,14 @@ const replaceImage = (content: string) => {
   })
 }
 
-const sanitizeContent = (content: string) =>
-  DOMPurify.sanitize(replaceImage(content), {
+const sanitizeContent = (content: string) => {
+  if (!content.includes('<')) return content
+  return DOMPurify.sanitize(replaceImage(content), {
     USE_PROFILES: { html: true },
     FORBID_TAGS: ['form', 'iframe', 'object', 'embed', 'style'],
     FORBID_ATTR: ['srcdoc'],
   })
+}
 
 const getImageSrc = (content: string) => {
   const src = content.match(imgPattern())![1] //reg tested in template
