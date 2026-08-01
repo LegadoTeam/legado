@@ -27,6 +27,21 @@ class ManualHighlightRenderTest {
     }
 
     @Test
+    fun `chapters without manual highlights skip full text reconstruction`() {
+        val readBook = readProjectFile("src/main/java/io/legado/app/model/ReadBook.kt")
+        val anchors = readBook.substringAfter("fun anchoredHighlightsOfChapter(")
+            .substringBefore("fun addHighlight(")
+        val emptyHighlights = anchors.indexOf(
+            "val anchors = if (chapterHighlights.isEmpty())"
+        )
+        val rebuild = anchors.indexOf("chapterText(chapter)")
+        val cache = anchors.indexOf("chapter.manualHighlightAnchors = anchors")
+
+        assertTrue(emptyHighlights in 0 until rebuild)
+        assertTrue(rebuild in 0 until cache)
+    }
+
+    @Test
     fun `layout captures the exact raw title prefix before body content`() {
         val layout = readProjectFile(
             "src/main/java/io/legado/app/ui/book/read/page/provider/TextChapterLayout.kt"

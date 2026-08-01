@@ -321,14 +321,18 @@ object ReadBook : CoroutineScope by MainScope() {
                 )
             }
         }
-        val bodyText = chapterText(chapter).drop(layoutTitleLength)
-        val anchors = chapterHighlights.mapNotNull { highlight ->
-            HighlightAnchor.reanchor(
-                bodyText,
-                highlight.bodyStart(layoutTitleLength),
-                highlight.bodyEnd(layoutTitleLength),
-                highlight.bookText
-            )?.let { highlight to it }
+        val anchors = if (chapterHighlights.isEmpty()) {
+            emptyList()
+        } else {
+            val bodyText = chapterText(chapter).drop(layoutTitleLength)
+            chapterHighlights.mapNotNull { highlight ->
+                HighlightAnchor.reanchor(
+                    bodyText,
+                    highlight.bodyStart(layoutTitleLength),
+                    highlight.bodyEnd(layoutTitleLength),
+                    highlight.bookText
+                )?.let { highlight to it }
+            }
         }
         if (highlightsVersion == version) {
             chapter.manualHighlightAnchors = anchors
