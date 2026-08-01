@@ -84,16 +84,15 @@
         <div
           v-for="data in chapterData"
           :key="data.index"
+          :data-chapter-index="data.index"
         >
           <chapter-content
             ref="chapterRef"
-            :chapterIndex="data.index"
             :contents="data.content"
             :title="data.title"
             :spacing="store.config.spacing"
             :fontSize="fontSize"
             :fontFamily="fontFamily"
-            @readedLengthChange="onReadedLengthChange"
             v-if="showContent"
           />
         </div>
@@ -359,6 +358,30 @@ const onReadedLengthChange = (index: number, pos: number) => {
   saveBookProgressThrottle()
 }
 
+let progressFrame: number | null = null
+const updateReadingProgress = () => {
+  progressFrame = null
+  let paragraph: HTMLElement | null = null
+  for (const element of document.elementsFromPoint(
+    window.innerWidth / 2,
+    24,
+  )) {
+    paragraph = element.closest<HTMLElement>('[data-chapterpos]')
+    if (paragraph !== null) break
+  }
+  const chapter = paragraph?.closest<HTMLElement>('[data-chapter-index]')
+  const index = Number(chapter?.dataset.chapterIndex)
+  const pos = Number(paragraph?.dataset.chapterpos)
+  if (!Number.isInteger(index) || !Number.isInteger(pos)) return
+  if (index === chapterIndex.value && pos === chapterPos.value) return
+  onReadedLengthChange(index, pos)
+}
+const onScroll = () => {
+  if (progressFrame === null) {
+    progressFrame = window.requestAnimationFrame(updateReadingProgress)
+  }
+}
+
 // 文档标题
 watchEffect(() => {
   document.title = catalog.value[chapterIndex.value]?.title || document.title
@@ -514,6 +537,8 @@ onMounted(async () => {
         if (disposed) return
         window.addEventListener('keyup', handleKeyPress)
         window.addEventListener('keydown', ignoreKeyPress)
+        window.addEventListener('scroll', onScroll, { passive: true })
+        onScroll()
         // 兼容Safari < 14
         document.addEventListener('visibilitychange', onVisibilityChange)
         //监听底部加载
@@ -538,6 +563,8 @@ onUnmounted(() => {
   window.removeEventListener('keyup', handleKeyPress)
   window.removeEventListener('keydown', ignoreKeyPress)
   window.removeEventListener('resize', onResize)
+  window.removeEventListener('scroll', onScroll)
+  if (progressFrame !== null) window.cancelAnimationFrame(progressFrame)
   // 兼容Safari < 14
   document.removeEventListener('visibilitychange', onVisibilityChange)
   readSettingsVisible.value = false

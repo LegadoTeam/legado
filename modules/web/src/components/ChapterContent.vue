@@ -1,5 +1,5 @@
 <template>
-  <div class="title" data-chapterpos="0" ref="titleRef">{{ title }}</div>
+  <div class="title" data-chapterpos="0">{{ title }}</div>
   <div
     v-for="(para, index) in contents"
     :key="index"
@@ -31,7 +31,6 @@ const lineImgWidth = computed(() => store.config.fontSize * 2)
 const bookUrl = computed(() => store.readingBook.bookUrl)
 
 const props = defineProps<{
-  chapterIndex: number
   contents: Array<string>
   title: string
   spacing: webReadConfig['spacing']
@@ -139,7 +138,6 @@ const chapterPos = computed(() => {
   })
 })
 
-const titleRef = ref<HTMLElement>()
 const paragraphRef = ref<HTMLParagraphElement[]>()
 const scrollToReadedLength = (length: number) => {
   if (length === 0) return
@@ -155,35 +153,6 @@ const scrollToReadedLength = (length: number) => {
 }
 defineExpose({
   scrollToReadedLength,
-})
-let intersectionObserver: IntersectionObserver | null = null
-const emit = defineEmits(['readedLengthChange'])
-onMounted(() => {
-  intersectionObserver = new IntersectionObserver(
-    entries => {
-      for (const { target, isIntersecting } of entries) {
-        if (isIntersecting) {
-          emit(
-            'readedLengthChange',
-            props.chapterIndex,
-            parseInt((target as HTMLElement).dataset.chapterpos as string),
-          )
-        }
-      }
-    },
-    {
-      rootMargin: `0px 0px -${window.innerHeight - 24}px 0px`,
-    },
-  )
-  intersectionObserver.observe(titleRef.value!)
-  paragraphRef.value!.forEach(element => {
-    intersectionObserver!.observe(element)
-  })
-})
-
-onUnmounted(() => {
-  intersectionObserver?.disconnect()
-  intersectionObserver = null
 })
 </script>
 

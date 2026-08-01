@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   MAX_RETAINED_CHAPTERS,
@@ -28,4 +29,29 @@ test('does not trim while the window has room', () => {
   const loaded = [1]
 
   assert.equal(trimChapterWindowBeforeAppend(loaded), loaded)
+})
+
+test('tracks reading progress without observing every paragraph', () => {
+  const chapterContent = readFileSync(
+    new URL('../src/components/ChapterContent.vue', import.meta.url),
+    'utf8',
+  )
+  const bookChapter = readFileSync(
+    new URL('../src/views/BookChapter.vue', import.meta.url),
+    'utf8',
+  )
+
+  assert.doesNotMatch(chapterContent, /IntersectionObserver/)
+  assert.match(bookChapter, /:data-chapter-index="data.index"/)
+  assert.match(
+    bookChapter,
+    /elementsFromPoint\(\s*window.innerWidth \/ 2,\s*24,\s*\)/,
+  )
+  assert.match(bookChapter, /requestAnimationFrame\(updateReadingProgress\)/)
+  assert.match(
+    bookChapter,
+    /addEventListener\('scroll', onScroll, \{ passive: true \}\)/,
+  )
+  assert.match(bookChapter, /removeEventListener\('scroll', onScroll\)/)
+  assert.match(bookChapter, /cancelAnimationFrame\(progressFrame\)/)
 })
