@@ -33,6 +33,8 @@ class SourceImmersiveBackgroundTest {
         mapOf(
             "src/main/java/io/legado/app/ui/widget/SelectActionBar.kt" to
                 "if (context.transparentNavBar) context.backgroundColor else context.bottomBackground",
+            "src/main/java/io/legado/app/ui/widget/text/AccentStrokeTextView.kt" to
+                "if (context.transparentNavBar) context.backgroundColor else context.bottomBackground",
             "src/main/java/io/legado/app/lib/theme/view/ThemeBottomNavigationVIew.kt" to
                 "if (transparentNavBar) context.backgroundColor else context.bottomBackground",
         ).forEach { (path, expression) ->
