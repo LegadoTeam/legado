@@ -50,7 +50,7 @@ class SearchResultLayoutTest {
     }
 
     @Test
-    fun introductionCanGrowWithoutBeingBoundToCoverHeight() {
+    fun coverStaysCenteredWhenMetadataGrowsBeyondItsHeight() {
         val document = searchLayout()
         val introduction = view(document, "tv_introduce")
         val cover = view(document, "iv_cover")
@@ -58,7 +58,7 @@ class SearchResultLayoutTest {
         assertEquals("wrap_content", introduction.androidAttribute("layout_height"))
         assertEquals("3", introduction.androidAttribute("maxLines"))
         assertEquals("parent", introduction.appAttribute("layout_constraintBottom_toBottomOf"))
-        assertEquals("0", cover.appAttribute("layout_constraintVertical_bias"))
+        assertEquals("0.5", cover.appAttribute("layout_constraintVertical_bias"))
     }
 
     private fun searchLayout() = DocumentBuilderFactory.newInstance().apply {
