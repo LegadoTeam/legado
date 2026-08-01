@@ -179,7 +179,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                 pageDelegate?.abortAnim()
             }
         }
-        postInvalidate()
+        postInvalidateOnAnimation()
     }
 
     fun submitRenderTask() {

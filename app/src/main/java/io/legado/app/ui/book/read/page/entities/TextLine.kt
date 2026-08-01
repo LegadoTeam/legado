@@ -61,10 +61,6 @@ data class TextLine(
     val lineEnd: Float get() = textColumns.lastOrNull()?.end ?: 0f
     val chapterIndices: IntRange get() = chapterPosition..chapterPosition + charSize
     val height: Float inline get() = lineBottom - lineTop
-    val hasShadowStyle: Boolean
-        get() = styledColumnCount > 0 && textColumns.any {
-            (it as? TextBaseColumn)?.highlightStyle?.shadow != null
-        }
     val hasOverflowTextStyle: Boolean
         get() = styledColumnCount > 0 && textColumns.any {
             (it as? TextBaseColumn)?.highlightStyle?.let { style ->
@@ -73,6 +69,7 @@ data class TextLine(
         }
     val canvasRecorder = CanvasRecorderFactory.create()
     var searchResultColumnCount = 0
+    var fillColumnCount = 0
     var styledColumnCount = 0
     var isReadAloud: Boolean = false
         set(value) {
@@ -188,14 +185,18 @@ data class TextLine(
     }
 
     private fun drawTextLine(view: ContentTextView, canvas: Canvas) {
-        drawHighlightFills(canvas)
+        if (fillColumnCount > 0) {
+            drawHighlightFills(canvas)
+        }
         if (checkFastDraw()) {
             fastDrawTextLine(view, canvas)
         } else {
             for (i in columns.indices) {
                 columns[i].draw(view, canvas)
             }
-            drawHighlightRuns(canvas)
+            if (styledColumnCount > 0) {
+                drawHighlightRuns(canvas)
+            }
         }
 
         // 墨水屏模式下的朗读和搜索下划线

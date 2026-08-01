@@ -42,12 +42,11 @@ data class TextPage(
     var renderHeight: Int = 0
 ) {
 
-    private val hasShadowStyle: Boolean
-        get() = lines.any { it.hasShadowStyle }
-
     companion object {
         val readProgressFormatter = DecimalFormat("0.0%")
         val emptyTextPage = TextPage()
+        // 覆盖 10dp 装饰和最大 20px 阴影溢出，并为抗锯齿保留 1px。
+        private val recordPadding = maxOf(21, 10.dpToPx())
     }
 
     val lines: List<TextLine> get() = textLines
@@ -299,9 +298,12 @@ data class TextPage(
     }
 
     fun draw(view: ContentTextView, canvas: Canvas, relativeOffset: Float) {
-        if (AppConfig.optimizeRender && !hasShadowStyle) {
+        if (AppConfig.optimizeRender) {
             recordIfCompleted(view)
-            canvas.withTranslation(0f, relativeOffset) {
+            canvas.withTranslation(
+                -recordPadding.toFloat(),
+                relativeOffset - recordPadding
+            ) {
                 canvasRecorder.draw(this)
             }
         } else {
@@ -326,9 +328,21 @@ data class TextPage(
         }
     }
 
+    @Suppress("DEPRECATION")
     private fun drawPage(view: ContentTextView, canvas: Canvas) {
+        val overflow = 10.dpToPx().toFloat()
         for (i in lines.indices) {
             val line = lines[i]
+            if (line.onlyTextColumn && !line.hasOverflowTextStyle && canvas.quickReject(
+                    0f,
+                    line.lineTop - overflow,
+                    view.width.toFloat(),
+                    line.lineBottom + overflow,
+                    Canvas.EdgeType.AA
+                )
+            ) {
+                continue
+            }
             canvas.withTranslation(0f, line.lineTop) {
                 line.draw(view, this)
             }
@@ -336,14 +350,18 @@ data class TextPage(
     }
 
     fun render(view: ContentTextView): Boolean {
-        if (hasShadowStyle) return false
         return recordIfCompleted(view)
     }
 
     private fun recordIfCompleted(view: ContentTextView): Boolean {
         if (!isCompleted) return false
-        return canvasRecorder.recordIfNeeded(view.width, renderHeight + 10.dpToPx()) { //高度留余，避免图片过高时被截断 下划线最远10dp
-            drawPage(view, this)
+        return canvasRecorder.recordIfNeeded(
+            view.width + recordPadding * 2,
+            renderHeight + recordPadding * 2
+        ) {
+            withTranslation(recordPadding.toFloat(), recordPadding.toFloat()) {
+                drawPage(view, this)
+            }
         }
     }
 

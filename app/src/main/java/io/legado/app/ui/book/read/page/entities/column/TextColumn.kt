@@ -48,6 +48,10 @@ data class TextColumn(
             val normalized = value?.normalized()
             if (field != normalized) {
                 textLine.invalidate()
+                val beforeFill = field?.fill?.let { it != 0 } == true
+                val afterFill = normalized?.fill?.let { it != 0 } == true
+                if (!beforeFill && afterFill) textLine.fillColumnCount++
+                else if (beforeFill && !afterFill) textLine.fillColumnCount--
                 val before = field?.needsPerColumnDraw == true
                 val after = normalized?.needsPerColumnDraw == true
                 if (!before && after) textLine.styledColumnCount++

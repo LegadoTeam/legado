@@ -162,19 +162,25 @@ class ManualHighlightRenderTest {
     }
 
     @Test
-    fun `shadow styles are normalized once and bypass clipped caches`() {
+    fun `shadow styles are normalized once and use padded page caches`() {
         val line = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/TextLine.kt")
         val page = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/TextPage.kt")
         val text = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/column/TextColumn.kt")
         val html = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/entities/column/TextHtmlColumn.kt")
         val draw = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/HighlightDraw.kt")
 
-        assertTrue(line.contains("(it as? TextBaseColumn)?.highlightStyle?.shadow != null"))
         assertTrue(line.contains("style.shadow != null || style.resolvedFontPath.isNotEmpty()"))
         assertTrue(line.contains("AppConfig.optimizeRender && !hasOverflowTextStyle"))
-        assertTrue(page.contains("private val hasShadowStyle: Boolean"))
-        assertTrue(page.contains("if (hasShadowStyle) return false"))
+        assertTrue(page.contains("private val recordPadding = maxOf(21, 10.dpToPx())"))
+        assertTrue(page.contains("view.width + recordPadding * 2"))
+        assertTrue(page.contains("renderHeight + recordPadding * 2"))
+        assertTrue(page.contains("-recordPadding.toFloat()"))
+        assertTrue(
+            page.contains("withTranslation(recordPadding.toFloat(), recordPadding.toFloat())")
+        )
         assertTrue(page.contains("recordIfCompleted(view)"))
+        assertFalse(page.contains("if (hasShadowStyle) return false"))
+        assertFalse(page.contains("AppConfig.optimizeRender && !hasShadowStyle"))
         assertTrue(text.contains("val normalized = value?.normalized()"))
         assertTrue(html.contains("val normalized = value?.normalized()"))
         assertFalse(draw.contains("shadow?.normalized()"))
