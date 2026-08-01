@@ -181,6 +181,15 @@
         app:iconSpaceReserved="false"
         app:isBottomBackground="true" />
 
+    <io.legado.app.lib.prefs.NameListPreference
+        android:defaultValue="click"
+        android:entries="@array/highlight_action_trigger_title"
+        android:entryValues="@array/highlight_action_trigger_value"
+        android:key="highlightActionTrigger"
+        android:title="@string/highlight_action_trigger"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
     <io.legado.app.lib.prefs.SwitchPreference
         android:defaultValue="false"
         android:key="optimizeRender"

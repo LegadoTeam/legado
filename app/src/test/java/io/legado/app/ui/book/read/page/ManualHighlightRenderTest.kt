@@ -93,6 +93,27 @@ class ManualHighlightRenderTest {
     }
 
     @Test
+    fun `highlight actions move to long press only when explicitly configured`() {
+        val content = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/ContentTextView.kt")
+        val appConfig = readProjectFile("src/main/java/io/legado/app/help/config/AppConfig.kt")
+        val preferences = readProjectFile("src/main/res/xml/pref_config_read.xml")
+        val values = readProjectFile("src/main/res/values/array_values.xml")
+        val longPress = content.substringAfter("fun longPress(").substringBefore("fun click(")
+        val click = content.substringAfter("fun click(").substringBefore("fun selectText(")
+        val clickValue = values.indexOf("<item>click</item>")
+        val longPressValue = values.indexOf("<item>longPress</item>")
+
+        assertTrue(appConfig.contains("getPrefString(PreferKey.highlightActionTrigger, \"click\")"))
+        assertTrue(appConfig.contains("== \"longPress\""))
+        assertTrue(preferences.contains("android:defaultValue=\"click\""))
+        assertTrue(preferences.contains("android:key=\"highlightActionTrigger\""))
+        assertTrue(clickValue in 0 until longPressValue)
+        assertTrue(longPress.contains("highlightActionByLongPress && column.highlightStyle != null &&"))
+        assertTrue(longPress.contains("highlightActionByLongPress || column.linkUrl != null"))
+        assertTrue(click.contains("!highlightActionByLongPress && column.highlightStyle != null"))
+    }
+
+    @Test
     fun `automatic highlight clicks fall back to the visible matching rule`() {
         val content = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/ContentTextView.kt")
         val activity = readProjectFile("src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")

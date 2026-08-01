@@ -354,6 +354,9 @@
     <string name="highlight_rule_not_found">Highlight rule no longer exists</string>
     <string name="highlight_rule_disable">Disable rule</string>
     <string name="highlight_create_rule">Create rule</string>
+    <string name="highlight_action_trigger">Highlight action trigger</string>
+    <string name="highlight_action_trigger_click">Tap</string>
+    <string name="highlight_action_trigger_long_press">Long press</string>
     <string name="action_del">Delete</string>
     <string name="load_over_time">Loading timeout</string>
     <string name="join_group">Follow:%s</string>

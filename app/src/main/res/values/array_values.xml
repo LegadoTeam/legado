@@ -43,6 +43,11 @@
         <item>4</item>
     </string-array>
 
+    <string-array name="highlight_action_trigger_value">
+        <item>click</item>
+        <item>longPress</item>
+    </string-array>
+
     <string-array name="double_page_value">
         <item>0</item>
         <item>1</item>

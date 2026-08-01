@@ -181,6 +181,7 @@ object PreferKey {
     const val importKeepEnable = "importKeepEnable"
     const val importShowComment = "importShowComment"
     const val clickImgWay = "clickImgWay"
+    const val highlightActionTrigger = "highlightActionTrigger"
     const val keyPageOnLongPress = "keyPageOnLongPress"
     const val volumeKeyPage = "volumeKeyPage"
     const val volumeKeyPageOnPlay = "volumeKeyPageOnPlay"

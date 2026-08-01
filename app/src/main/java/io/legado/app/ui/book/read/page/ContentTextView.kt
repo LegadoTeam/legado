@@ -226,17 +226,22 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         y: Float,
         select: (textPos: TextPos) -> Unit,
     ) {
+        val highlightActionByLongPress = AppConfig.highlightActionByLongPress
         touch(x, y) { relativeOffset, textPos, textPage, textLine, column ->
             when (column) {
                 is ImageColumn -> callBack.onImageLongPress(x, y, column.src)
                 is TextColumn -> {
+                    if (highlightActionByLongPress && column.highlightStyle != null &&
+                        notifyHighlightClick(column, textPos, textPage, textLine, relativeOffset)
+                    ) return@touch
                     if (!selectAble) return@touch
                     column.selected = true
                     select(textPos)
                 }
                 is TextHtmlColumn -> {
                     if (
-                        column.linkUrl != null && column.highlightStyle != null &&
+                        column.highlightStyle != null &&
+                        (highlightActionByLongPress || column.linkUrl != null) &&
                         notifyHighlightClick(column, textPos, textPage, textLine, relativeOffset)
                     ) return@touch
                     if (!selectAble) return@touch
@@ -261,6 +266,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         } else {
             false
         }
+        val highlightActionByLongPress = AppConfig.highlightActionByLongPress
         var handled = false
         touch(x, y) { relativeOffset, textPos, textPage, textLine, column ->
             when (column) {
@@ -328,7 +334,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                             putExtra("uri", linkUrl)
                         }
                         handled = true
-                    } else if (column.highlightStyle != null) {
+                    } else if (!highlightActionByLongPress && column.highlightStyle != null) {
                         handled = notifyHighlightClick(
                             column,
                             textPos,
@@ -339,7 +345,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                     }
                 }
 
-                is TextColumn -> if (column.highlightStyle != null) {
+                is TextColumn -> if (!highlightActionByLongPress && column.highlightStyle != null) {
                     handled = notifyHighlightClick(
                         column,
                         textPos,
