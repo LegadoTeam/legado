@@ -306,36 +306,35 @@ const getContent = (index: number, reloadChapter = true, chapterPos = 0) => {
   const bookUrl = store.readingBook.bookUrl
   const { title, index: chapterIndex } = catalog.value[index]
 
-  return loadingWrapper(
-    API.getBookContent(bookUrl, chapterIndex).then(
-      res => {
-        if (generation !== contentGeneration) return
-        if (res.data.isSuccess) {
-          const data = res.data.data
-          const content = data.split(/\n+/)
-          chapterData.value.push({ index, content, title })
-          if (reloadChapter) toChapterPos(chapterPos)
-        } else {
-          ElMessage({ message: res.data.errorMsg, type: 'error' })
-          const content = [res.data.errorMsg]
-          chapterData.value.push({ index, content, title })
-        }
-        store.setContentLoading(true)
-        noPoint.value = false
-        store.setShowContent(true)
-        if (!res.data.isSuccess) {
-          throw res.data
-        }
-      },
-      err => {
-        if (generation !== contentGeneration) return
-        const content = ['获取章节内容失败！']
+  const request = API.getBookContent(bookUrl, chapterIndex).then(
+    res => {
+      if (generation !== contentGeneration) return
+      if (res.data.isSuccess) {
+        const data = res.data.data
+        const content = data.split(/\n+/)
         chapterData.value.push({ index, content, title })
-        store.setShowContent(true)
-        throw err
-      },
-    ),
-  ).finally(() => {
+        if (reloadChapter) toChapterPos(chapterPos)
+      } else {
+        ElMessage({ message: res.data.errorMsg, type: 'error' })
+        const content = [res.data.errorMsg]
+        chapterData.value.push({ index, content, title })
+      }
+      store.setContentLoading(true)
+      noPoint.value = false
+      store.setShowContent(true)
+      if (!res.data.isSuccess) {
+        throw res.data
+      }
+    },
+    err => {
+      if (generation !== contentGeneration) return
+      const content = ['获取章节内容失败！']
+      chapterData.value.push({ index, content, title })
+      store.setShowContent(true)
+      throw err
+    },
+  )
+  return (reloadChapter ? loadingWrapper(request) : request).finally(() => {
     if (generation === contentGeneration) chapterLoading.value = false
   })
 }

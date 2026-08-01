@@ -13,6 +13,7 @@
       @error.once="proxyImage"
       loading="lazy"
     />
+    <p v-else-if="isPlainText(para)" :style="{ fontFamily, fontSize }">{{ para }}</p>
     <p v-else :style="{ fontFamily, fontSize }" v-html="sanitizeContent(para)" @error.capture="handleImgLoadError" />
   </div>
 </template>
@@ -69,6 +70,8 @@ const sanitizeContent = (content: string) => {
     FORBID_ATTR: ['srcdoc'],
   })
 }
+const isPlainText = (content: string) =>
+  !content.includes('<') && !content.includes('&')
 
 const getImageSrc = (content: string) => {
   const src = content.match(imgPattern())![1] //reg tested in template
@@ -123,6 +126,7 @@ const handleImgLoadError = (event: Event) => {
 }
 
 const calculateWordCount = (paragraph: string) => {
+  if (!paragraph.includes('<')) return paragraph.length
   //内嵌图片文字为1
   const imagePlaceHolder = ' '
   return paragraph.replace(imgPatternAll(), imagePlaceHolder).length
