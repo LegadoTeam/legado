@@ -1,5 +1,6 @@
 package io.legado.app.ui.book.source.edit
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -33,6 +34,16 @@ class JsSourceEditRedirectTest {
         assertTrue(activity.contains("setResult(result.resultCode, result.data)"))
         assertTrue(activity.contains("super.finish()"))
         assertFalse(activity.contains("startActivity<JsSourceEditActivity>"))
+    }
+
+    @Test
+    fun `every successful source save notifies the result caller`() {
+        assertEquals(1, "viewModel\\.save\\(getSource\\(\\)\\)".toRegex().findAll(activity).count())
+        val saveSource = activity.substringAfter("private fun saveSource")
+            .substringBefore("private fun initView")
+
+        assertTrue(saveSource.contains("setResult(RESULT_OK"))
+        assertTrue(saveSource.contains("Intent().putExtra(\"origin\", source.bookSourceUrl)"))
     }
 
     @Test
