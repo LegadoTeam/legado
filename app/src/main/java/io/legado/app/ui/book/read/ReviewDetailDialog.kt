@@ -52,6 +52,7 @@ import io.legado.app.utils.windowSize
 import io.legado.app.databinding.DialogRecyclerViewBinding
 import io.legado.app.databinding.ItemReviewCommentBinding
 import io.legado.app.ui.widget.dialog.PhotoDialog
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
 import splitties.systemservices.windowManager
@@ -97,6 +98,10 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
     private val mainItemIndexByKey = LinkedHashMap<String, Int>()
     private val detailItems = ArrayList<ReviewDetailItem>()
     private val expandedReplyParentKeys = HashSet<String>()
+    private val replyLoadingParentKeys = HashSet<String>()
+    private val replyExhaustedParentKeys = HashSet<String>()
+    private val replyPageByParentKey = HashMap<String, Int>()
+    private var hasReplyUrl = false
     private val sourceImageOptions by lazy {
         RequestOptions().set(OkHttpModelLoader.sourceOriginOption, sourceKey)
     }
@@ -406,10 +411,14 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
             mainItemIndexByKey.clear()
             detailItems.clear()
             expandedReplyParentKeys.clear()
+            replyLoadingParentKeys.clear()
+            replyExhaustedParentKeys.clear()
+            replyPageByParentKey.clear()
+            hasReplyUrl = false
         }
         if (!hasMore) return
         isLoading = true
-        Coroutine.async(lifecycleScope, IO) {
+        Coroutine.async(lifecycleScope, IO, start = CoroutineStart.LAZY) {
             val source = ReadBook.bookSource ?: return@async null
             if (source.getKey() != sourceKey) return@async null
             val book = ReadBook.book ?: return@async null
@@ -429,6 +438,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
                     items = result.items,
                     nextPageUrl = result.nextPageUrl,
                     hasNextPageRule = true,
+                    hasReplyUrl = false,
                     source = source,
                 )
             }
@@ -476,12 +486,21 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
                 paraData = paraData,
                 page = page.toString()
             )
-            ReviewResult(result.items, result.nextPageUrl, nextPageUrlRule != null, source)
+            ReviewResult(
+                items = result.items,
+                nextPageUrl = result.nextPageUrl,
+                hasNextPageRule = nextPageUrlRule != null,
+                hasReplyUrl = !rule.reviewQuoteUrl.isNullOrBlank() &&
+                        !rule.replyListRule.isNullOrBlank() &&
+                        !rule.replyContentRule.isNullOrBlank(),
+                source = source,
+            )
         }.onSuccess(Main) { result ->
             if (!append) {
                 binding.rotateLoading.gone()
             }
             result?.source?.let { reviewSource = it }
+            result?.let { hasReplyUrl = it.hasReplyUrl }
             val items = result?.items.orEmpty()
             val nextUrlFromRule = result?.nextPageUrl
             if (result?.hasNextPageRule == true) {
@@ -518,7 +537,100 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
                 binding.tvMsg.text = it.localizedMessage ?: getString(R.string.content_empty)
                 binding.tvMsg.visible()
             }
+        }.start()
+    }
+
+    private fun loadReplies(parentKey: String) {
+        if (!hasReplyUrl || !replyLoadingParentKeys.add(parentKey)) return
+        val itemIndex = mainItemIndexByKey[parentKey]
+        val reviewId = itemIndex?.let { detailItems.getOrNull(it)?.id }
+            ?.takeIf { it.isNotBlank() }
+        if (reviewId == null) {
+            replyLoadingParentKeys.remove(parentKey)
+            return
         }
+        val page = (replyPageByParentKey[parentKey] ?: 0) + 1
+        renderUiItems()
+        Coroutine.async(lifecycleScope, IO, start = CoroutineStart.LAZY) {
+            val source = ReadBook.bookSource ?: return@async null
+            if (source.getKey() != sourceKey || source.isJsSource()) return@async null
+            val book = ReadBook.book ?: return@async null
+            if (book.bookUrl != bookUrl) return@async null
+            val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)
+                ?: return@async null
+            val rule = source.ruleReview ?: return@async null
+            if (!rule.enabled || rule.hashCode() != ruleHash) return@async null
+            val replyUrlRule = rule.reviewQuoteUrl?.takeIf { it.isNotBlank() }
+                ?: return@async null
+            if (rule.replyListRule.isNullOrBlank() || rule.replyContentRule.isNullOrBlank()) {
+                return@async null
+            }
+            val paraIndex = paragraphNum.toString()
+            val analyzeUrl = AnalyzeUrl(
+                replyUrlRule,
+                page = page,
+                extraParams = mapOf(
+                    "paraIndex" to paraIndex,
+                    "paraData" to paragraphData,
+                    "reviewId" to reviewId,
+                    "page" to page.toString(),
+                ),
+                baseUrl = chapter.url,
+                source = source,
+                ruleData = book,
+                chapter = chapter,
+                coroutineContext = coroutineContext,
+            )
+            val body = analyzeUrl.getStrResponseAwait(useWebView = false).body
+                ?.takeIf { it.isNotBlank() }
+                ?: error(getString(R.string.content_empty))
+            ReplyResult(
+                replies = ReviewRuleParser.parseReplyPage(
+                    body = body,
+                    rule = rule,
+                    baseUrl = analyzeUrl.url,
+                    source = source,
+                    book = book,
+                    chapter = chapter,
+                    context = coroutineContext,
+                    paraIndex = paraIndex,
+                    paraData = paragraphData,
+                    page = page.toString(),
+                ),
+                page = page,
+                source = source,
+            )
+        }.onSuccess(Main) { result ->
+            replyLoadingParentKeys.remove(parentKey)
+            if (result == null) {
+                context?.toastOnUi(R.string.review_rule_missing)
+                renderUiItems()
+                return@onSuccess
+            }
+            reviewSource = result.source
+            val currentIndex = mainItemIndexByKey[parentKey]
+            val current = currentIndex?.let { detailItems.getOrNull(it) }
+            if (current == null) {
+                renderUiItems()
+                return@onSuccess
+            }
+            replyPageByParentKey[parentKey] = result.page
+            expandedReplyParentKeys.add(parentKey)
+            if (result.replies.isEmpty()) {
+                replyExhaustedParentKeys.add(parentKey)
+            } else {
+                val replies = mergeReplies(current.replies, result.replies)
+                detailItems[currentIndex] = current.copy(replies = replies)
+                if (current.replyCount != null && replies.size >= current.replyCount) {
+                    replyExhaustedParentKeys.add(parentKey)
+                }
+            }
+            renderUiItems()
+        }.onError {
+            replyLoadingParentKeys.remove(parentKey)
+            context?.toastOnUi(it.localizedMessage ?: getString(R.string.load_over_time))
+            renderUiItems()
+        }.start()
     }
 
     private fun buildDetailItemKey(item: ReviewDetailItem, isReply: Boolean): String {
@@ -603,6 +715,13 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
         val items: List<ReviewDetailItem>,
         val nextPageUrl: String?,
         val hasNextPageRule: Boolean,
+        val hasReplyUrl: Boolean,
+        val source: BaseSource,
+    )
+
+    private data class ReplyResult(
+        val replies: List<ReviewDetailItem>,
+        val page: Int,
         val source: BaseSource,
     )
 
@@ -619,7 +738,8 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
         val isReply: Boolean,
         val itemType: Int = TYPE_NORMAL,
         val parentKey: String? = null,
-        val moreCount: Int = 0
+        val moreCount: Int = 0,
+        val isLoading: Boolean = false,
     )
 
     private fun flattenItems(items: List<ReviewDetailItem>): List<ReviewUiItem> {
@@ -629,16 +749,27 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
             list.add(item.toUiItem(isReply = false, parentKey = parentKey))
 
             val loadedReplyCount = item.replies.size
-            if (loadedReplyCount <= 0) return@forEach
-            val moreCount = max(item.replyCount ?: 0, loadedReplyCount)
+            val totalReplyCount = max(item.replyCount ?: 0, loadedReplyCount)
+            val isExpanded = expandedReplyParentKeys.contains(parentKey)
+            val canLoadMore = hasReplyUrl &&
+                    !item.id.isNullOrBlank() &&
+                    !replyExhaustedParentKeys.contains(parentKey) &&
+                    (item.replyCount ?: 0) > loadedReplyCount
 
-            if (expandedReplyParentKeys.contains(parentKey)) {
+            if (isExpanded) {
                 item.replies.forEach { reply ->
                     list.add(reply.toUiItem(isReply = true, parentKey = parentKey))
                 }
-                return@forEach
             }
 
+            if ((!isExpanded && loadedReplyCount <= 0 && !canLoadMore) ||
+                (isExpanded && !canLoadMore)
+            ) return@forEach
+            val moreCount = if (isExpanded) {
+                totalReplyCount - loadedReplyCount
+            } else {
+                totalReplyCount
+            }
             list.add(
                 ReviewUiItem(
                     id = null,
@@ -653,7 +784,8 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
                     isReply = false,
                     itemType = TYPE_MORE,
                     parentKey = parentKey,
-                    moreCount = moreCount
+                    moreCount = moreCount,
+                    isLoading = replyLoadingParentKeys.contains(parentKey),
                 )
             )
         }
@@ -716,6 +848,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
             val tvContentLp = binding.tvContent.layoutParams as ViewGroup.MarginLayoutParams
             val basePadding = 8.dpToPx()
             val mainAvatarSize = 36.dpToPx()
+            binding.root.isEnabled = !item.isLoading
             if (item.itemType == TYPE_MORE) {
                 binding.root.updatePaddingRelative(
                     start = basePadding,
@@ -735,7 +868,11 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
                 binding.ivMedia.gone()
                 binding.tvAudio.gone()
                 binding.tvContent.visible()
-                binding.tvContent.text = context.getString(R.string.review_more_replies, item.moreCount)
+                binding.tvContent.text = if (item.isLoading) {
+                    context.getString(R.string.loading)
+                } else {
+                    context.getString(R.string.review_more_replies, item.moreCount)
+                }
                 binding.tvContent.textSize = 14f
                 binding.tvContent.setTextColor(context.getCompatColor(R.color.accent))
                 binding.tvContent.setPadding(0, 0, 0, 0)
@@ -849,12 +986,18 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
             binding.root.setOnClickListener {
                 val item = getItemByLayoutPosition(holder.layoutPosition) ?: return@setOnClickListener
                 if (item.itemType == TYPE_MORE) {
+                    if (item.isLoading) return@setOnClickListener
                     val parentKey = item.parentKey ?: return@setOnClickListener
-                    val canExpand = detailItems.any {
-                        buildDetailItemKey(it, isReply = false) == parentKey && it.replies.isNotEmpty()
-                    }
-                    if (canExpand && expandedReplyParentKeys.add(parentKey)) {
+                    val detail = mainItemIndexByKey[parentKey]
+                        ?.let { detailItems.getOrNull(it) }
+                        ?: return@setOnClickListener
+                    if (detail.replies.isNotEmpty() &&
+                        !expandedReplyParentKeys.contains(parentKey)
+                    ) {
+                        expandedReplyParentKeys.add(parentKey)
                         renderUiItems()
+                    } else {
+                        loadReplies(parentKey)
                     }
                 }
             }

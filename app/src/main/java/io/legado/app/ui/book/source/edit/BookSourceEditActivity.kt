@@ -588,6 +588,7 @@ class BookSourceEditActivity :
             add(EditEntity("detailBadgeRule", rr.detailBadgeRule, R.string.rule_review_detail_badge))
             add(EditEntity("detailContentRule", rr.detailContentRule, R.string.rule_review_detail_content))
 
+            add(EditEntity("reviewQuoteUrl", rr.reviewQuoteUrl, R.string.rule_review_quote))
             add(EditEntity("replyListRule", rr.replyListRule, R.string.rule_review_reply_list))
             add(EditEntity("replyIdRule", rr.replyIdRule, R.string.rule_review_reply_id))
             add(EditEntity("replyAvatarRule", rr.replyAvatarRule, R.string.rule_review_reply_avatar))
@@ -811,6 +812,7 @@ class BookSourceEditActivity :
                 "detailNameRule" -> reviewRule.detailNameRule = it.value
                 "detailBadgeRule" -> reviewRule.detailBadgeRule = it.value
                 "detailContentRule" -> reviewRule.detailContentRule = it.value
+                "reviewQuoteUrl" -> reviewRule.reviewQuoteUrl = it.value
                 "replyListRule" -> reviewRule.replyListRule = it.value
                 "replyIdRule" -> reviewRule.replyIdRule = it.value
                 "replyAvatarRule" -> reviewRule.replyAvatarRule = it.value

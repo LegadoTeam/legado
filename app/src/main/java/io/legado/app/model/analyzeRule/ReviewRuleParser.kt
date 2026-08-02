@@ -160,6 +160,49 @@ internal object ReviewRuleParser {
         )
     }
 
+    internal fun parseReplyPage(
+        body: String,
+        rule: ReviewRule,
+        baseUrl: String,
+        source: BaseSource,
+        book: Book,
+        chapter: BookChapter,
+        context: CoroutineContext,
+        paraIndex: String,
+        paraData: String,
+        page: String,
+    ): List<DetailItem> {
+        val listRule = rule.replyListRule?.trim().orEmpty()
+        require(body.isNotBlank()) { "段评回复内容为空" }
+        if (listRule.isEmpty()) return emptyList()
+
+        val analyzeRule = AnalyzeRule(book, source)
+            .setChapter(chapter)
+            .setCoroutineContext(context)
+            .setContent(body, baseUrl)
+            .setLocal("paraIndex", paraIndex)
+            .setLocal("paraData", paraData)
+            .setLocal("page", page)
+        val loggedRules = hashSetOf<String>()
+        val items = runCatching { normalizeList(analyzeRule.getElementsRaw(listRule)) }
+            .onFailure {
+                logRuleErrorOnce(loggedRules, "段评回复列表规则执行出错", listRule, it)
+            }
+            .getOrThrow()
+        val replies = items.mapNotNull {
+            parseDetailItem(
+                analyzeRule,
+                it,
+                rule,
+                baseUrl,
+                isReply = true,
+                loggedRules = loggedRules,
+            )
+        }
+        check(items.isEmpty() || replies.isNotEmpty()) { "段评回复解析为空" }
+        return replies
+    }
+
     private fun parseDetailItem(
         analyzeRule: AnalyzeRule,
         item: Any,
@@ -190,7 +233,9 @@ internal object ReviewRuleParser {
         )
         val protocol = parseContentProtocol(rawContent, baseUrl)
         val content = protocol?.text ?: if (protocol == null) rawContent else ""
-        val replies = if (!isReply && !rule.replyListRule.isNullOrBlank()) {
+        val replies = if (!isReply && rule.reviewQuoteUrl.isNullOrBlank() &&
+            !rule.replyListRule.isNullOrBlank()
+        ) {
             getElementList(
                 analyzeRule,
                 rule.replyListRule!!.trim(),
