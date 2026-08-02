@@ -11,6 +11,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class RuntimeMediaStabilityTest {
 
@@ -54,6 +55,21 @@ class RuntimeMediaStabilityTest {
 
         book.customCoverUrl = "https://images.example.net/cover.jpg"
         assertNull(book.getCoverSourceOrigin())
+    }
+
+    @Test
+    fun audioCoverUsesTheBookScopedSourceOrigin() {
+        val source = listOf(File("src/main/java"), File("app/src/main/java"))
+            .first { it.isDirectory }
+            .resolve("io/legado/app/ui/book/audio/AudioPlayActivity.kt")
+            .readText()
+        val upCover = source.substringAfter("private fun upCover(path: String?)")
+            .substringBefore("override fun upLyric")
+
+        assertTrue(upCover.contains("val sourceOrigin = AudioPlay.book?.getCoverSourceOrigin()"))
+        assertTrue(upCover.contains("BookCover.load(this, path, sourceOrigin = sourceOrigin)"))
+        assertTrue(upCover.contains("BookCover.loadBlur(this, path, sourceOrigin = sourceOrigin)"))
+        assertFalse(upCover.contains("AudioPlay.bookSource?.bookSourceUrl"))
     }
 
     @Test

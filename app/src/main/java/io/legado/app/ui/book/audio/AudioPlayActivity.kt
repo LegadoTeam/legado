@@ -408,8 +408,9 @@ class AudioPlayActivity :
     }
 
     private fun upCover(path: String?) {
-        BookCover.load(this, path, sourceOrigin = AudioPlay.bookSource?.bookSourceUrl) {
-            BookCover.loadBlur(this, path, sourceOrigin = AudioPlay.bookSource?.bookSourceUrl)
+        val sourceOrigin = AudioPlay.book?.getCoverSourceOrigin()
+        BookCover.load(this, path, sourceOrigin = sourceOrigin) {
+            BookCover.loadBlur(this, path, sourceOrigin = sourceOrigin)
                 .into(binding.ivBg)
         }.into(binding.ivCover)
     }
