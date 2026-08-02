@@ -176,8 +176,13 @@ class AudioPlayService : BaseService(),
         upMediaSessionPlaybackState(PlaybackStateCompat.STATE_PLAYING)
         doDs()
         execute {
+            val book = AudioPlay.book
             ImageLoader
-                .loadBitmap(this@AudioPlayService, AudioPlay.book?.getDisplayCover())
+                .loadBitmap(
+                    this@AudioPlayService,
+                    book?.getDisplayCover(),
+                    book?.getCoverSourceOrigin(),
+                )
                 .submit()
                 .get()
         }.onSuccess {

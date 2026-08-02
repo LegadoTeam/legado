@@ -169,9 +169,20 @@ class VideoPlayService : BaseService() {
         initMediaSession()
         initBroadcastReceiver()
         application.registerActivityLifecycleCallbacks(activityLifecycleCallbacks)
+        val book = VideoPlay.book
+        val coverPath = book?.getDisplayCover() ?: VideoPlay.getDisplayCover()
+        val sourceOrigin = if (book != null) {
+            book.getCoverSourceOrigin()
+        } else {
+            VideoPlay.source?.getKey()
+        }
         execute {
             ImageLoader
-                .loadBitmap(this@VideoPlayService, VideoPlay.getDisplayCover())
+                .loadBitmap(
+                    this@VideoPlayService,
+                    coverPath,
+                    sourceOrigin,
+                )
                 .submit()
                 .get()
         }.onSuccess {

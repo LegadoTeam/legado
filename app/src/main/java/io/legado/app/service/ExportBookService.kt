@@ -16,6 +16,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.graphics.withSave
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
+import com.bumptech.glide.request.RequestOptions
 import io.legado.app.R
 import io.legado.app.base.BaseService
 import io.legado.app.constant.AppConst
@@ -37,6 +38,7 @@ import io.legado.app.help.book.isImage
 import io.legado.app.help.book.isLocalModified
 import io.legado.app.help.book.isPdf
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.glide.OkHttpModelLoader
 import io.legado.app.model.ImageProvider
 import io.legado.app.model.ReadBook
 import io.legado.app.model.localBook.LocalBook
@@ -954,9 +956,15 @@ class ExportBookService : BaseService() {
 
     private fun setCover(book: Book, epubBook: EpubBook) {
         kotlin.runCatching {
-            val file = Glide.with(this)
+            val request = Glide.with(this)
                 .asFile()
                 .load(book.getDisplayCover())
+            book.getCoverSourceOrigin()?.let { sourceOrigin ->
+                request.apply(
+                    RequestOptions().set(OkHttpModelLoader.sourceOriginOption, sourceOrigin)
+                )
+            }
+            val file = request
                 .submit()
                 .get()
             val provider = LazyResourceProvider { _ ->
