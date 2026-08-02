@@ -2,7 +2,9 @@ package io.legado.app.model.jsSource
 
 import io.legado.app.constant.BookSourceType
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
+import io.legado.app.exception.ContentEmptyException
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.book.isWebFile
 import kotlinx.coroutines.runBlocking
@@ -12,6 +14,40 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class JsSourceBookTest {
+
+    @Test
+    fun `blank content is allowed only for volume chapters`() = runBlocking {
+        val source = BookSource(
+            bookSourceUrl = "https://source.example",
+            bookSourceName = "Test source",
+            mainJs = "function getContent() { return ''; }",
+        )
+        val chapter = BookChapter(
+            url = "https://source.example/volume/1",
+            title = "Volume 1",
+            isVolume = true,
+        )
+
+        val content = JsSourceBook.getContentAwait(
+            source = source,
+            book = Book(bookUrl = "https://source.example/book/1", name = "Book"),
+            chapter = chapter,
+            needSave = false,
+        )
+
+        assertEquals("", content)
+        assertThrows(ContentEmptyException::class.java) {
+            runBlocking {
+                JsSourceBook.getContentAwait(
+                    source = source,
+                    book = Book(bookUrl = "https://source.example/book/1", name = "Book"),
+                    chapter = chapter.copy(isVolume = false),
+                    needSave = false,
+                )
+            }
+        }
+        Unit
+    }
 
     @Test
     fun `file source resolves download urls without toc fallback`() = runBlocking {

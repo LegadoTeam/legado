@@ -1,5 +1,6 @@
 package io.legado.app.model.jsSource
 
+import io.legado.app.R
 import io.legado.app.constant.BookSourceType
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
@@ -16,6 +17,7 @@ import io.legado.app.help.source.getBookType
 import io.legado.app.model.Debug
 import io.legado.app.model.webBook.BookChapterList
 import kotlinx.coroutines.ensureActive
+import splitties.init.appCtx
 import kotlin.coroutines.coroutineContext
 
 object JsSourceBook {
@@ -95,7 +97,7 @@ object JsSourceBook {
             val chapters = JsSourceMarshaller.parseChapters(json, book, source)
             logSummary(source.bookSourceUrl) { JsSourceDebugFormatter.chapterList(chapters) }
             if (chapters.isEmpty()) {
-                throw TocEmptyException("JS源目录为空")
+                throw TocEmptyException(appCtx.getString(R.string.chapter_list_empty))
             }
             BookChapterList.updateBookTocInfo(book, chapters)
             Debug.log(source.bookSourceUrl, "◇JS源目录完成,共${chapters.size}章")
@@ -124,9 +126,9 @@ object JsSourceBook {
                 "book" to book,
                 "nextChapterUrl" to nextChapterUrl,
             ),
-        )
-        if (content.isNullOrBlank()) {
-            throw ContentEmptyException("JS源正文为空")
+        ).orEmpty()
+        if (!chapter.isVolume && content.isBlank()) {
+            throw ContentEmptyException("内容为空")
         }
         Debug.log(source.bookSourceUrl, content, state = 40)
         logSummary(source.bookSourceUrl) { JsSourceDebugFormatter.content(chapter, content) }
