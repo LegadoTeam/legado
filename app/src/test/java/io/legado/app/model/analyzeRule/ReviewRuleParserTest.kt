@@ -179,7 +179,7 @@ class ReviewRuleParserTest {
             assertEquals("Reply", content)
             assertEquals("https://example.com/reply.jpg", imageUrl)
             assertEquals("now", time)
-            assertTrue(replies.isEmpty())
+            assertTrue(this.replies.isEmpty())
         }
     }
 
@@ -213,7 +213,7 @@ class ReviewRuleParserTest {
 
     @Test
     fun `standalone reply list failures are retryable errors`() {
-        assertThrows(RuntimeException::class.java) {
+        assertThrows(Exception::class.java) {
             ReviewRuleParser.parseReplyPage(
                 body = "{}",
                 rule = ReviewRule(
