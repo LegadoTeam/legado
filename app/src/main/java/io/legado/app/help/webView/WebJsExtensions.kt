@@ -25,6 +25,7 @@ class WebJsExtensions(
 ): RssJsExtensions(activity, source, bookType) {
     private val callbackRef: WeakReference<Callback> = WeakReference(callback)
     private val webViewRef: WeakReference<WebView?> = WeakReference(webView)
+    private var lastForwardedConfig: String? = null
 
     interface Callback {
         fun upConfig(config: String)
@@ -32,6 +33,8 @@ class WebJsExtensions(
 
     @JavascriptInterface
     fun upConfig(config: String) {
+        if (config == lastForwardedConfig) return
+        lastForwardedConfig = config
         callbackRef.get()?.upConfig(config)
     }
 
