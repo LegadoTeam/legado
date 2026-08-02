@@ -451,6 +451,22 @@ class JsSourceConfigTest {
     }
 
     @Test
+    fun `ignores comments and unrelated objects before declared update time`() {
+        val script = """
+            // lastUpdateTime: 1
+            var metadata = { lastUpdateTime: 2 };
+            var config = { "lastUpdateTime": Date.now() };
+        """.trimIndent()
+        val expected = """
+            // lastUpdateTime: 1
+            var metadata = { lastUpdateTime: 2 };
+            var config = { "lastUpdateTime": 123456 };
+        """.trimIndent()
+
+        assertEquals(expected, JsSourceConfig.stampLastUpdateTime(script, 123456))
+    }
+
+    @Test
     fun `loginUi function enables v2`() {
         val source = JsSourceConfig.extract(
             validScript + "\n" + """

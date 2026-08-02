@@ -12,8 +12,16 @@ import io.legado.app.model.login.LoginUiV2
 import io.legado.app.utils.GSON
 import kotlinx.coroutines.CancellationException
 import org.htmlunit.corejs.javascript.Function
+import org.htmlunit.corejs.javascript.Parser
 import org.htmlunit.corejs.javascript.Scriptable
 import org.htmlunit.corejs.javascript.ScriptableObject
+import org.htmlunit.corejs.javascript.ast.FunctionCall
+import org.htmlunit.corejs.javascript.ast.Name
+import org.htmlunit.corejs.javascript.ast.NumberLiteral
+import org.htmlunit.corejs.javascript.ast.ObjectLiteral
+import org.htmlunit.corejs.javascript.ast.ObjectProperty
+import org.htmlunit.corejs.javascript.ast.StringLiteral
+import org.htmlunit.corejs.javascript.ast.VariableInitializer
 import kotlin.coroutines.CoroutineContext
 
 object JsSourceConfig {
@@ -199,11 +207,40 @@ object JsSourceConfig {
         jsonObject.addProperty("loginUi", GSON.toJson(array))
     }
 
-    private val lastUpdateTimeRegex =
-        Regex("""(["']?lastUpdateTime["']?\s*:\s*)(Date\.now\(\)|\d+)""")
-
     fun stampLastUpdateTime(text: String, stamp: Long): String? {
-        val match = lastUpdateTimeRegex.find(text) ?: return null
-        return text.replaceRange(match.range, "${match.groupValues[1]}$stamp")
+        val ranges = runCatching {
+            mutableListOf<IntRange>().apply {
+                Parser().parse(text, null, 1).visit { node ->
+                    val initializer = node as? VariableInitializer ?: return@visit true
+                    val name = (initializer.target as? Name)?.identifier
+                    val config = initializer.initializer as? ObjectLiteral
+                    if (initializer.enclosingFunction != null ||
+                        name != CONFIG_PROPERTY && name != LEGACY_CONFIG_PROPERTY ||
+                        config == null
+                    ) {
+                        return@visit true
+                    }
+                    config.elements.filterIsInstance<ObjectProperty>().forEach { property ->
+                        val key = when (val nodeKey = property.key) {
+                            is Name -> nodeKey.identifier
+                            is StringLiteral -> nodeKey.value
+                            else -> null
+                        }
+                        val value = property.value
+                        val isSupportedValue = value is NumberLiteral ||
+                            value is FunctionCall && value.arguments.isEmpty() &&
+                            value.target.toSource() == "Date.now"
+                        if (key == "lastUpdateTime" && isSupportedValue) {
+                            add(value.absolutePosition until value.absolutePosition + value.length)
+                        }
+                    }
+                    true
+                }
+            }
+        }.getOrNull().orEmpty()
+        if (ranges.isEmpty()) return null
+        return ranges.sortedByDescending { it.first }.fold(text) { script, range ->
+            script.replaceRange(range, stamp.toString())
+        }
     }
 }
