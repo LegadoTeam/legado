@@ -11,7 +11,8 @@ object AppLog {
 
     private val mLogs = arrayListOf<Triple<Long, String, Throwable?>>()
 
-    val logs get() = mLogs.toList()
+    val logs
+        @Synchronized get() = mLogs.toList()
 
     @Synchronized
     fun put(message: String?, throwable: Throwable? = null, toast: Boolean = false) {
@@ -19,7 +20,7 @@ object AppLog {
         if (toast) {
             appCtx.toastOnUi(message)
         }
-        if (mLogs.size > 100) {
+        if (mLogs.size >= 100) {
             mLogs.removeLastOrNull()
         }
         if (throwable == null) {
@@ -40,7 +41,7 @@ object AppLog {
         if (toast) {
             appCtx.toastOnUi(message)
         }
-        if (mLogs.size > 100) {
+        if (mLogs.size >= 100) {
             mLogs.removeLastOrNull()
         }
         mLogs.add(0, Triple(System.currentTimeMillis(), message, throwable))
