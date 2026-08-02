@@ -82,6 +82,16 @@ by appCtx.getSharedPreferences("local", Context.MODE_PRIVATE) {
             putLong("lastCheckUpdate", value)
         }
 
+    var ignoreUpdateVersion: String?
+        get() = getString("ignoreUpdateVersion", null)
+        set(value) {
+            if (value == null) {
+                remove("ignoreUpdateVersion")
+            } else {
+                putString("ignoreUpdateVersion", value)
+            }
+        }
+
     val isFirstOpenApp: Boolean
         get() {
             val value = getBoolean("firstOpen", true)

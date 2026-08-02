@@ -59,11 +59,13 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
                 supportedAbis = Build.SUPPORTED_ABIS.toList()
             )
                 ?.let {
+                    val downloadUrl = resolveAppUpdateDownloadUrl(it.name, it.downloadUrl)
                     return@async AppUpdate.UpdateInfo(
                         it.versionName,
                         it.note,
-                        resolveAppUpdateDownloadUrl(it.name, it.downloadUrl),
-                        it.name
+                        downloadUrl,
+                        it.name,
+                        resolveAppUpdateBackupUrl(downloadUrl, it.downloadUrl)
                     )
                 }
             throw NoStackTraceException("已是最新版本")

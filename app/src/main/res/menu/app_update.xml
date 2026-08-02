@@ -7,4 +7,14 @@
         android:title="@string/action_download"
         app:showAsAction="always" />
 
+    <item
+        android:id="@+id/menu_download_backup"
+        android:title="@string/download_from_github"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_ignore_version"
+        android:title="@string/ignore_this_version"
+        app:showAsAction="never" />
+
 </menu>

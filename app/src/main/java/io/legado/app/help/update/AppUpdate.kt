@@ -13,7 +13,8 @@ object AppUpdate {
         val tagName: String,
         val updateLog: String,
         val downloadUrl: String,
-        val fileName: String
+        val fileName: String,
+        val backupDownloadUrl: String? = null
     )
 
     interface AppUpdateInterface {

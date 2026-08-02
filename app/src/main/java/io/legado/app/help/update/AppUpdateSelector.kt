@@ -72,3 +72,9 @@ internal fun resolveAppUpdateDownloadUrl(fileName: String, githubUrl: String): S
         "https://cdn.mgz.la/app/$fileName"
     }
 }
+
+internal fun resolveAppUpdateBackupUrl(primaryUrl: String, githubUrl: String): String? =
+    githubUrl.takeUnless { it == primaryUrl }
+
+internal fun isIgnoredAppUpdate(versionName: String, ignoredVersion: String?): Boolean =
+    versionName == ignoredVersion

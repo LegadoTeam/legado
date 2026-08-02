@@ -1,7 +1,10 @@
 package io.legado.app.help.update
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AppUpdateSelectorTest {
@@ -219,6 +222,17 @@ class AppUpdateSelectorTest {
                 "https://github.com/example/legacy-universal.apk"
             )
         )
+    }
+
+    @Test
+    fun updateFallbackAndIgnorePoliciesStayScoped() {
+        val githubUrl = "https://github.com/example/app.apk"
+        val cdnUrl = resolveAppUpdateDownloadUrl("legado_app_release.apk", githubUrl)
+
+        assertEquals(githubUrl, resolveAppUpdateBackupUrl(cdnUrl, githubUrl))
+        assertNull(resolveAppUpdateBackupUrl(githubUrl, githubUrl))
+        assertTrue(isIgnoredAppUpdate("3.26080220", "3.26080220"))
+        assertFalse(isIgnoredAppUpdate("3.26080221", "3.26080220"))
     }
 
     private fun release(

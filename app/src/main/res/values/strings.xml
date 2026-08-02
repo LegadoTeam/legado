@@ -1053,6 +1053,8 @@
     <string name="chapter_pay">pay</string>
     <string name="double_page_horizontal">Tablet/Landscape Dual Page</string>
     <string name="open_in_browser">open in browser</string>
+    <string name="download_from_github">Download from GitHub</string>
+    <string name="ignore_this_version">Ignore this version</string>
     <string name="copy_url">copy url</string>
     <string name="full_screen">full screen</string>
     <string name="open_fun">open function</string>

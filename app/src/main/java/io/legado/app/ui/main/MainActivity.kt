@@ -37,6 +37,7 @@ import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.storage.Backup
 import io.legado.app.help.update.AppUpdate
+import io.legado.app.help.update.isIgnoredAppUpdate
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.service.BaseReadAloudService
@@ -284,6 +285,9 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
                 if (LocalConfig.lastCheckUpdate + 24.hours.inWholeMilliseconds < System.currentTimeMillis()) {
                     AppUpdate.gitHubUpdate.check(lifecycleScope)
                         .onSuccess {
+                            if (isIgnoredAppUpdate(it.tagName, LocalConfig.ignoreUpdateVersion)) {
+                                return@onSuccess
+                            }
                             showDialogFragment(
                                 UpdateDialog(it)
                             )

@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.databinding.DialogUpdateBinding
+import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.update.AppUpdate
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.model.Download
@@ -25,6 +26,7 @@ class UpdateDialog() : BaseDialogFragment(R.layout.dialog_update) {
             putString("updateBody", updateInfo.updateLog)
             putString("url", updateInfo.downloadUrl)
             putString("name", updateInfo.fileName)
+            putString("backupUrl", updateInfo.backupDownloadUrl)
         }
     }
 
@@ -53,19 +55,28 @@ class UpdateDialog() : BaseDialogFragment(R.layout.dialog_update) {
                 .setMarkdown(binding.textView, updateBody)
         }
         binding.toolBar.inflateMenu(R.menu.app_update)
+        binding.toolBar.menu.findItem(R.id.menu_download_backup).isVisible =
+            !arguments?.getString("backupUrl").isNullOrBlank()
         binding.toolBar.setOnMenuItemClickListener {
             when (it.itemId) {
-                R.id.menu_download -> {
-                    val url = arguments?.getString("url")
-                    val name = arguments?.getString("name")
-                    if (url != null && name != null) {
-                        Download.start(requireContext(), url, name)
-                        toastOnUi(R.string.download_start)
-                    }
+                R.id.menu_download -> startDownload(arguments?.getString("url"))
+                R.id.menu_download_backup -> startDownload(arguments?.getString("backupUrl"))
+                R.id.menu_ignore_version -> {
+                    LocalConfig.ignoreUpdateVersion = arguments?.getString("newVersion")
+                    toastOnUi(R.string.ignore_this_version)
+                    dismiss()
                 }
             }
             return@setOnMenuItemClickListener true
         }
+    }
+
+    private fun startDownload(url: String?) {
+        val name = arguments?.getString("name")
+        if (url.isNullOrBlank() || name.isNullOrBlank()) return
+        Download.start(requireContext(), url, name)
+        toastOnUi(R.string.download_start)
+        dismiss()
     }
 
 }
