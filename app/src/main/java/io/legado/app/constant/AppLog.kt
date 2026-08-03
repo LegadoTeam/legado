@@ -4,6 +4,7 @@ import android.util.Log
 import io.legado.app.BuildConfig
 import io.legado.app.help.config.AppConfig
 import io.legado.app.utils.LogUtils
+import io.legado.app.utils.postEvent
 import io.legado.app.utils.toastOnUi
 import splitties.init.appCtx
 
@@ -29,6 +30,7 @@ object AppLog {
             LogUtils.d("AppLog", "$message\n${throwable.stackTraceToString()}")
         }
         mLogs.add(0, Triple(System.currentTimeMillis(), message, throwable))
+        postEvent(EventBus.APP_LOG_UPDATED, true)
         if (BuildConfig.DEBUG) {
             val stackTrace = Thread.currentThread().stackTrace
             Log.e(stackTrace[3].className, message, throwable)
@@ -45,6 +47,7 @@ object AppLog {
             mLogs.removeLastOrNull()
         }
         mLogs.add(0, Triple(System.currentTimeMillis(), message, throwable))
+        postEvent(EventBus.APP_LOG_UPDATED, true)
         if (BuildConfig.DEBUG) {
             val stackTrace = Thread.currentThread().stackTrace
             Log.e(stackTrace[3].className, message, throwable)

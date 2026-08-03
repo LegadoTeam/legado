@@ -762,6 +762,7 @@
     <string name="record_http_log">Record HTTP requests</string>
     <string name="record_http_log_summary">Keep the latest 50 sanitized request and response records in memory</string>
     <string name="log">Log</string>
+    <string name="clear_log_confirm">Clear all logs? HTTP request records will also be cleared.</string>
     <string name="chinese_converter">Simplified conversion</string>
     <string name="change_icon_error">The icon is a vector icon, which was not supported before Android 8.0</string>
     <string name="aloud_config">Speech settings</string>
