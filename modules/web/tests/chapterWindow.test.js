@@ -5,6 +5,7 @@ import {
   MAX_RETAINED_CHAPTERS,
   trimChapterWindowBeforeAppend,
 } from '../src/utils/chapterWindow.js'
+import { parseLegacyReviewClick } from '../src/utils/reviewClick.js'
 
 test('reserves one chapter slot before the next chapter is rendered', () => {
   const loaded = Array.from(
@@ -29,6 +30,24 @@ test('does not trim while the window has room', () => {
   const loaded = [1]
 
   assert.equal(trimChapterWindowBeforeAppend(loaded), loaded)
+})
+
+test('maps a legacy paragraph review image click to native review data', () => {
+  const source =
+    'http://,{"style":"text","js":"getDPSvg(3,0)","click":"getDP(12,3)"}'
+  const proxy = `http://localhost/image?path=${encodeURIComponent(source)}`
+
+  assert.deepEqual(parseLegacyReviewClick(proxy), {
+    paraIndex: 13,
+    paraData: '12',
+    count: 3,
+  })
+  assert.equal(
+    parseLegacyReviewClick(
+      'http://,{"style":"full","click":"getZP(3)"}',
+    ),
+    null,
+  )
 })
 
 test('does not report a canceled token prompt as a backend failure', () => {

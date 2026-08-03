@@ -25,10 +25,17 @@
       v-if="/^\s*<img[^>]*src[^>]+>$/.test(String(para))"
       :src="getImageSrc(para)"
       @error.once="proxyImage"
+      @click="handleReviewImageClick"
       loading="lazy"
     />
     <p v-else-if="isPlainText(para)" :style="{ fontFamily, fontSize }">{{ para }}</p>
-    <p v-else :style="{ fontFamily, fontSize }" v-html="sanitizeContent(para)" @error.capture="handleImgLoadError" />
+    <p
+      v-else
+      :style="{ fontFamily, fontSize }"
+      v-html="sanitizeContent(para)"
+      @error.capture="handleImgLoadError"
+      @click="handleReviewImageClick"
+    />
     <button
       v-if="reviewCount(index + 1) > 0"
       type="button"
@@ -47,6 +54,7 @@
 import { isLegadoUrl, lazyRegex } from '@/utils/utils'
 import API from '@api'
 import jump from '@/plugins/jump'
+import { parseLegacyReviewClick } from '@/utils/reviewClick'
 import type { ParagraphReview, ReviewTarget } from '@/book'
 import type { webReadConfig } from '@/web'
 import DOMPurify from 'dompurify'
@@ -77,6 +85,20 @@ const openReview = (paraIndex: number) => {
   const review = props.reviews[paraIndex]
   if (!review || review.count <= 0) return
   emit('openReview', { ...review, chapterIndex: props.chapterIndex, paraIndex })
+}
+
+const handleReviewImageClick = (event: MouseEvent) => {
+  const image = event.target
+  if (!(image instanceof HTMLImageElement)) return
+  const legacy = parseLegacyReviewClick(image.getAttribute('src') || '')
+  if (!legacy) return
+
+  event.stopPropagation()
+  emit('openReview', {
+    ...(props.reviews[legacy.paraIndex] || legacy),
+    chapterIndex: props.chapterIndex,
+    paraIndex: legacy.paraIndex,
+  })
 }
 
 const imgPatternStr = '<img[^>]*src=[\'"]([^\'"]*(?:[\'"][^>]+\\})?)[\'"][^>]*>'
