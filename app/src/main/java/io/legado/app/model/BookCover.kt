@@ -5,7 +5,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 import androidx.annotation.Keep
-import com.bumptech.glide.Glide
 import com.bumptech.glide.RequestBuilder
 import com.bumptech.glide.load.DataSource
 import com.bumptech.glide.load.Transformation
@@ -159,16 +158,13 @@ object BookCover {
         path: String?,
         loadOnlyWifi: Boolean = false,
         sourceOrigin: String? = null,
-    ): RequestBuilder<File?> {
+    ): RequestBuilder<File> {
         var options = RequestOptions().set(OkHttpModelLoader.loadOnlyWifiOption, loadOnlyWifi)
             .set(OkHttpModelLoader.mangaOption, true)
         if (sourceOrigin != null) {
             options = options.set(OkHttpModelLoader.sourceOriginOption, sourceOrigin)
         }
-        return Glide.with(context)
-            .downloadOnly()
-            .apply(options)
-            .load(path)
+        return ImageLoader.loadFile(context, path).apply(options)
     }
 
     /**

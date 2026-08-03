@@ -18,6 +18,11 @@
             app:showAsAction="always" />
 
         <item
+            android:id="@+id/menu_download"
+            android:title="@string/offline_cache"
+            app:showAsAction="never" />
+
+        <item
             android:id="@+id/menu_catalog"
             android:icon="@drawable/ic_toc"
             android:title="@string/chapter_list"

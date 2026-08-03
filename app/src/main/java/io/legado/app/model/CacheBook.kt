@@ -369,6 +369,7 @@ object CacheBook {
                 start = CoroutineStart.LAZY,
                 executeContext = context
             ).onSuccess { content ->
+                BookHelp.saveImages(bookSource, book, chapter, content, 1)
                 onSuccess(chapter)
                 downloadFinish(chapter, content)
             }.onError {

@@ -11,11 +11,13 @@ import android.view.WindowManager
 import android.view.animation.LinearInterpolator
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
+import androidx.core.net.toUri
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.PagerSnapHelper
+import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.integration.recyclerview.RecyclerViewPreloader
 import com.bumptech.glide.request.target.Target.SIZE_ORIGINAL
@@ -23,6 +25,7 @@ import com.bumptech.glide.util.FixedPreloadSizeProvider
 import io.legado.app.BuildConfig
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
+import io.legado.app.constant.AppConst
 import io.legado.app.constant.BookType
 import io.legado.app.constant.EventBus
 import io.legado.app.data.entities.Book
@@ -35,6 +38,7 @@ import io.legado.app.help.book.isImage
 import io.legado.app.help.book.removeType
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.storage.Backup
+import io.legado.app.lib.cache.ACache
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.model.ReadManga
 import io.legado.app.receiver.NetworkChangedListener
@@ -52,7 +56,9 @@ import io.legado.app.ui.book.manga.recyclerview.MangaLayoutManager
 import io.legado.app.ui.book.manga.recyclerview.ScrollTimer
 import io.legado.app.ui.book.read.MangaMenu
 import io.legado.app.ui.book.read.ReadBookActivity.Companion.RESULT_DELETED
+import io.legado.app.ui.book.read.showBookDownloadDialog
 import io.legado.app.ui.book.toc.TocActivityResult
+import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.widget.number.NumberPickerDialog
 import io.legado.app.ui.widget.recycler.LoadMoreView
 import io.legado.app.utils.GSON
@@ -142,6 +148,12 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                 ReadManga.loadOrUpContent()
             }
         }
+    private val selectImageDir = registerForActivityResult(HandleFileContract()) {
+        it.uri?.let { uri ->
+            ACache.get().put(AppConst.imagePathKey, uri.toString())
+            viewModel.saveImage(it.value, uri)
+        }
+    }
     override val binding by viewBinding(ActivityMangaBinding::inflate)
     override val viewModel by viewModels<ReadMangaViewModel>()
     private val loadingViewVisible get() = binding.flLoading.isVisible
@@ -224,6 +236,15 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                     }
                 }
             }
+            longTapListener = { event ->
+                val position = findChildViewUnder(event.x, event.y)
+                    ?.let { getChildAdapterPosition(it) }
+                    ?: RecyclerView.NO_POSITION
+                (mAdapter.getItem(position) as? MangaPage)?.let {
+                    saveImage(it.mImageUrl)
+                    true
+                } ?: false
+            }
         }
         binding.webtoonFrame.run {
             onTouchMiddle {
@@ -237,6 +258,15 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             onPrevPage {
                 scrollToPrev()
             }
+        }
+    }
+
+    private fun saveImage(src: String) {
+        val path = ACache.get().getAsString(AppConst.imagePathKey)
+        if (path.isNullOrEmpty()) {
+            selectImageDir.launch { value = src }
+        } else {
+            viewModel.saveImage(src, path.toUri())
         }
     }
 
@@ -487,6 +517,10 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                 ReadManga.book?.let {
                     viewModel.refreshContentDur(it)
                 }
+            }
+
+            R.id.menu_download -> {
+                ReadManga.book?.let { showBookDownloadDialog(it) }
             }
 
             R.id.menu_pre_manga_number -> {
