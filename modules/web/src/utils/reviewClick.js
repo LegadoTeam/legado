@@ -1,5 +1,5 @@
 const legacyReviewPattern =
-  /["']click["']\s*:\s*["']getDP\(\s*(\d+)\s*,\s*(\d+)\s*\)["']/
+  /(["'])click\1\s*:\s*(["'])(getDP\(\s*\d+\s*,\s*\d+\s*\)|getZP\(\s*\d+\s*\))\2/
 
 export const parseLegacyReviewClick = src => {
   let original = src
@@ -7,16 +7,7 @@ export const parseLegacyReviewClick = src => {
     original = new URL(src, 'http://localhost').searchParams.get('path') || src
   } catch {}
 
-  const match = original.match(legacyReviewPattern)
-  if (!match) return null
-
-  const paragraph = Number(match[1])
-  const count = Number(match[2])
-  if (!Number.isSafeInteger(paragraph) || !Number.isSafeInteger(count)) return null
-
-  return {
-    paraIndex: paragraph + 1,
-    paraData: match[1],
-    count,
-  }
+  const click = original.match(legacyReviewPattern)?.[3]
+  if (!click) return null
+  return { kind: click.startsWith('getDP') ? 'paragraph' : 'chapter', src: original }
 }

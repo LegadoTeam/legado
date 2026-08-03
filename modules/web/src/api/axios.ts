@@ -19,6 +19,9 @@ const protectedSourcePaths = new Set([
   'saveReplaceRule',
   'deleteReplaceRule',
   'testReplaceRule',
+  'openLegacyReview',
+  'legacyReviewPage',
+  'runLegacyReview',
 ])
 
 const ajax = axios.create({

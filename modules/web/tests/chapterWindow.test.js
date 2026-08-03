@@ -32,19 +32,33 @@ test('does not trim while the window has room', () => {
   assert.equal(trimChapterWindowBeforeAppend(loaded), loaded)
 })
 
-test('maps a legacy paragraph review image click to native review data', () => {
-  const source =
+test('keeps legacy paragraph and chapter review image clicks on their script path', () => {
+  const paragraph =
     'http://,{"style":"text","js":"getDPSvg(3,0)","click":"getDP(12,3)"}'
-  const proxy = `http://localhost/image?path=${encodeURIComponent(source)}`
+  const proxy = `http://localhost/image?path=${encodeURIComponent(paragraph)}`
 
   assert.deepEqual(parseLegacyReviewClick(proxy), {
-    paraIndex: 13,
-    paraData: '12',
-    count: 3,
+    kind: 'paragraph',
+    src: paragraph,
   })
+  assert.deepEqual(
+    parseLegacyReviewClick(
+      "http://,{'style':'full','click':'getZP(3)'}",
+    ),
+    {
+      kind: 'chapter',
+      src: "http://,{'style':'full','click':'getZP(3)'}",
+    },
+  )
   assert.equal(
     parseLegacyReviewClick(
-      'http://,{"style":"full","click":"getZP(3)"}',
+      'http://,{"style":"text","click":"getZS(3)"}',
+    ),
+    null,
+  )
+  assert.equal(
+    parseLegacyReviewClick(
+      'http://,{"style":"text","click":"getDP(3)"}',
     ),
     null,
   )

@@ -96,6 +96,7 @@
             :chapterIndex="data.sourceIndex"
             :reviews="data.reviews"
             @open-review="openReview"
+            @open-legacy-review="openLegacyReview"
             v-if="showContent"
           />
         </div>
@@ -104,6 +105,13 @@
       </div>
     </div>
     <ReviewDialog v-model="reviewVisible" :target="selectedReview" />
+    <LegacyReviewDialog
+      v-model="legacyReviewVisible"
+      :page-html="legacyReviewPageHtml"
+      :session-id="legacyReviewSessionId"
+      :session-nonce="legacyReviewSessionNonce"
+      :kind="legacyReviewKind"
+    />
   </div>
 </template>
 
@@ -116,7 +124,10 @@ import { useThrottleFn } from '@vueuse/shared'
 import { isNullOrBlank } from '@/utils/utils'
 import { trimChapterWindowBeforeAppend } from '@/utils/chapterWindow'
 import ReviewDialog from '@/components/ReviewDialog.vue'
+import LegacyReviewDialog from '@/components/LegacyReviewDialog.vue'
+import type { LegacyReviewClick } from '@/utils/reviewClick'
 import type { ParagraphReview, ReviewTarget } from '@/book'
+import { ElLoading } from 'element-plus'
 
 const content = ref<HTMLElement>()
 // loading spinner
@@ -300,10 +311,45 @@ type ChapterData = {
 const chapterData = ref<ChapterData[]>([])
 const reviewVisible = ref(false)
 const selectedReview = ref<ReviewTarget | null>(null)
+const legacyReviewVisible = ref(false)
+const legacyReviewPageHtml = ref('')
+const legacyReviewSessionId = ref('')
+const legacyReviewSessionNonce = ref('')
+const legacyReviewKind = ref<LegacyReviewClick['kind']>('paragraph')
 
 const openReview = (target: ReviewTarget) => {
   selectedReview.value = target
   reviewVisible.value = true
+}
+
+const openLegacyReview = async (
+  target: LegacyReviewClick & { chapterIndex: number },
+) => {
+  const loading = ElLoading.service({ lock: true, text: '正在加载评论' })
+  try {
+    const response = await API.openLegacyReview(
+      store.readingBook.bookUrl,
+      target.chapterIndex,
+      target.src,
+    )
+    if (!response.data.isSuccess) {
+      ElMessage.error(response.data.errorMsg)
+      return
+    }
+    legacyReviewKind.value = target.kind
+    legacyReviewSessionId.value = response.data.data.id
+    legacyReviewSessionNonce.value = response.data.data.nonce
+    const page = await API.getLegacyReviewPage(legacyReviewSessionId.value)
+    legacyReviewPageHtml.value = page.data
+    legacyReviewVisible.value = true
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') {
+      console.error(error)
+      ElMessage.error(error instanceof Error ? error.message : '评论加载失败')
+    }
+  } finally {
+    loading.close()
+  }
 }
 
 const loadReviewSummary = async (

@@ -1,18 +1,43 @@
 package io.legado.app.api.controller
 
 import androidx.collection.LruCache
+import com.google.gson.annotations.SerializedName
+import com.script.rhino.runScriptWithContext
 import io.legado.app.api.ReturnData
+import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
+import io.legado.app.data.entities.BaseSource
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
+import io.legado.app.model.analyzeRule.AnalyzeRule
+import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setChapter
+import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.analyzeRule.ReviewRuleParser
 import io.legado.app.model.jsSource.JsSourceReview
+import io.legado.app.ui.rss.read.RssJsExtensions
+import io.legado.app.utils.GSON
+import io.legado.app.utils.fromJsonObject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import java.util.UUID
 import kotlin.coroutines.coroutineContext
+
+private val legacyReviewClickPattern = Regex(
+    """^(?:getDP\(\s*\d+\s*,\s*\d+\s*\)|getZP\(\s*\d+\s*\))$"""
+)
+
+internal fun parseLegacyReviewClickScript(src: String): String? {
+    val matcher = AnalyzeUrl.paramPattern.matcher(src)
+    if (!matcher.find()) return null
+    val click = GSON.fromJsonObject<Map<String, String>>(src.substring(matcher.end()))
+        .getOrNull()
+        ?.get("click")
+        ?.trim()
+        ?: return null
+    return click.takeIf(legacyReviewClickPattern::matches)
+}
 
 object ReviewController {
 
@@ -43,7 +68,61 @@ object ReviewController {
         val hasMore: Boolean = false,
     )
 
+    private data class LegacyReviewOpenRequest(
+        @SerializedName("url")
+        val url: String = "",
+        @SerializedName("index")
+        val index: Int = -1,
+        @SerializedName("src")
+        val src: String = "",
+    )
+
+    private data class LegacyReviewRunRequest(
+        @SerializedName("id")
+        val id: String = "",
+        @SerializedName("script")
+        val script: String = "",
+    )
+
+    private data class LegacyReviewBrowserPage(
+        val url: String,
+        val html: String?,
+        val preloadJs: String?,
+    )
+
+    private data class LegacyReviewSession(
+        val bookUrl: String,
+        val chapterIndex: Int,
+        val sourceKey: String,
+        val nonce: String,
+        val page: LegacyReviewBrowserPage,
+        val expiresAt: Long,
+    )
+
+    private data class LegacyReviewSessionId(
+        @SerializedName("id")
+        val id: String,
+        @SerializedName("nonce")
+        val nonce: String,
+    )
+
+    private class LegacyReviewJsExtensions(
+        source: BaseSource,
+        private val onShowBrowser: (LegacyReviewBrowserPage) -> Unit = {},
+    ) : RssJsExtensions(null, source, BookType.text) {
+
+        override fun showBrowser(
+            url: String,
+            html: String?,
+            preloadJs: String?,
+            config: String?,
+        ) {
+            onShowBrowser(LegacyReviewBrowserPage(url, html, preloadJs))
+        }
+    }
+
     private val detailCursors = LruCache<String, DetailCursor>(64)
+    private val legacyReviewSessions = LruCache<String, LegacyReviewSession>(16)
 
     fun getSummary(parameters: Map<String, List<String>>): ReturnData = respond {
         val context = requireContext(parameters)
@@ -247,6 +326,146 @@ object ReviewController {
         ReviewPage(items = items, hasMore = items.isNotEmpty())
     }
 
+    fun openLegacyReview(postData: String?): ReturnData = respond {
+        val request = GSON.fromJsonObject<LegacyReviewOpenRequest>(postData).getOrThrow()
+        val context = requireContext(request.url, request.index)
+        val source = requireNotNull(context.source) { "未找到书源" }
+        val click = requireNotNull(parseLegacyReviewClickScript(request.src)) {
+            "不是受支持的旧段评或章评链接"
+        }
+        var browserPage: LegacyReviewBrowserPage? = null
+        executeLegacyReviewScript(context, click, request.src) {
+            browserPage = it
+        }
+        val page = requireNotNull(browserPage) { "旧评论脚本未返回页面" }
+        require(!page.html.isNullOrBlank()) { "旧评论页面内容为空" }
+
+        val id = UUID.randomUUID().toString()
+        val nonce = UUID.randomUUID().toString()
+        synchronized(legacyReviewSessions) {
+            legacyReviewSessions.put(
+                id,
+                LegacyReviewSession(
+                    bookUrl = context.book.bookUrl,
+                    chapterIndex = context.chapter.index,
+                    sourceKey = source.getKey(),
+                    nonce = nonce,
+                    page = page,
+                    expiresAt = System.currentTimeMillis() + LEGACY_REVIEW_SESSION_TTL,
+                )
+            )
+        }
+        LegacyReviewSessionId(id, nonce)
+    }
+
+    fun runLegacyReview(postData: String?): ReturnData = respond {
+        val request = GSON.fromJsonObject<LegacyReviewRunRequest>(postData).getOrThrow()
+        require(request.script.isNotBlank() && request.script.length <= MAX_LEGACY_REVIEW_SCRIPT) {
+            "旧评论脚本为空或过长"
+        }
+        val session = requireNotNull(getLegacyReviewSession(request.id)) {
+            "旧评论会话无效或已过期"
+        }
+        val context = requireContext(session.bookUrl, session.chapterIndex)
+        require(context.source?.getKey() == session.sourceKey) { "书源已变更，请重新打开评论" }
+        val source = requireNotNull(context.source) { "未找到书源" }
+        runScriptWithContext {
+            AnalyzeRule(context.book, source)
+                .setChapter(context.chapter)
+                .setCoroutineContext(coroutineContext)
+                .evalJS(request.script)
+        }?.toString().orEmpty()
+    }
+
+    fun getLegacyReviewPage(parameters: Map<String, List<String>>): String? {
+        val id = parameters["id"]?.firstOrNull()?.takeIf { it.isNotBlank() } ?: return null
+        val session = getLegacyReviewSession(id) ?: return null
+        return injectLegacyReviewBridge(session.nonce, session.page)
+    }
+
+    private suspend fun executeLegacyReviewScript(
+        context: ReviewContext,
+        script: String,
+        result: String,
+        onShowBrowser: (LegacyReviewBrowserPage) -> Unit = {},
+    ): Any? {
+        val source = requireNotNull(context.source) { "未找到书源" }
+        val java = LegacyReviewJsExtensions(source, onShowBrowser)
+        return runScriptWithContext {
+            source.evalJS(script) {
+                put("java", java)
+                put("book", context.book)
+                put("chapter", context.chapter)
+                put("result", result)
+            }
+        }
+    }
+
+    private fun getLegacyReviewSession(id: String): LegacyReviewSession? {
+        return synchronized(legacyReviewSessions) {
+            val session = legacyReviewSessions[id] ?: return@synchronized null
+            if (session.expiresAt <= System.currentTimeMillis()) {
+                legacyReviewSessions.remove(id)
+                null
+            } else {
+                session
+            }
+        }
+    }
+
+    private fun injectLegacyReviewBridge(
+        nonce: String,
+        page: LegacyReviewBrowserPage,
+    ): String {
+        val bridge = """
+            <script>
+            (() => {
+              const nativeSetInterval = window.setInterval.bind(window);
+              window.setInterval = (callback, delay, ...args) =>
+                nativeSetInterval(callback, Math.max(100, Number(delay) || 0), ...args);
+              const nonce = ${GSON.toJson(nonce)};
+              window.run = async function(code) {
+                return new Promise((resolve, reject) => {
+                  const channel = new MessageChannel();
+                  channel.port1.onmessage = event => {
+                    if (event.data?.error) reject(new Error(event.data.error));
+                    else resolve(event.data?.result == null ? '' : String(event.data.result));
+                    channel.port1.close();
+                  };
+                  window.parent.postMessage({
+                    type: 'legado-legacy-review-run',
+                    nonce,
+                    script: String(code)
+                  }, '*', [channel.port2]);
+                });
+              };
+              window.java = { upConfig() {} };
+              const preload = ${GSON.toJson(page.preloadJs.orEmpty()).replace("<", "\\u003c")};
+              if (preload) (0, eval)(preload);
+            })();
+            </script>
+        """.trimIndent()
+        val base = page.url.takeIf { it.isNotBlank() }?.let {
+            "<base href=\"${escapeHtmlAttribute(it)}\">"
+        }.orEmpty()
+        val injection = base + bridge
+        val headIndex = page.html!!.indexOf("<head", ignoreCase = true)
+        if (headIndex >= 0) {
+            val headEnd = page.html.indexOf('>', headIndex)
+            if (headEnd >= 0) {
+                return page.html.substring(0, headEnd + 1) + injection +
+                        page.html.substring(headEnd + 1)
+            }
+        }
+        return injection + page.html
+    }
+
+    private fun escapeHtmlAttribute(value: String): String = value
+        .replace("&", "&amp;")
+        .replace("\"", "&quot;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+
     private fun respond(block: suspend () -> Any): ReturnData {
         return try {
             ReturnData().setData(runBlocking { block() })
@@ -262,6 +481,12 @@ object ReviewController {
             require(it.isNotBlank()) { "参数 url 不能为空" }
         }
         val chapterIndex = requireInt(parameters, "index", 0)
+        return requireContext(bookUrl, chapterIndex)
+    }
+
+    private fun requireContext(bookUrl: String, chapterIndex: Int): ReviewContext {
+        require(bookUrl.isNotBlank()) { "参数 url 不能为空" }
+        require(chapterIndex >= 0) { "参数 index 无效" }
         val book = requireNotNull(appDb.bookDao.getBook(bookUrl)) { "未找到书籍" }
         val chapter = requireNotNull(appDb.bookChapterDao.getChapter(bookUrl, chapterIndex)) {
             "未找到章节"
@@ -297,4 +522,7 @@ object ReviewController {
         require(value >= minimum) { "参数 $name 无效" }
         return value
     }
+
+    private const val LEGACY_REVIEW_SESSION_TTL = 2 * 60 * 60 * 1000L
+    private const val MAX_LEGACY_REVIEW_SCRIPT = 64 * 1024
 }

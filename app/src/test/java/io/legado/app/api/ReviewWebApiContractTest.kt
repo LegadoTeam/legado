@@ -51,6 +51,44 @@ class ReviewWebApiContractTest {
         assertFalse(dialog.contains(":src=\"item.audioUrl\""))
     }
 
+    @Test
+    fun `legacy review pages keep source execution behind the parent token bridge`() {
+        val server = readProjectFile("app/src/main/java/io/legado/app/web/HttpServer.kt")
+        val controller = readProjectFile(
+            "app/src/main/java/io/legado/app/api/controller/ReviewController.kt"
+        )
+        val axios = readProjectFile("modules/web/src/api/axios.ts")
+        val dialog = readProjectFile("modules/web/src/components/LegacyReviewDialog.vue")
+
+        assertTrue(server.contains("uri == \"/legacyReviewPage\""))
+        assertTrue(server.contains("\"/openLegacyReview\" -> ReviewController.openLegacyReview"))
+        assertTrue(server.contains("\"/runLegacyReview\" -> ReviewController.runLegacyReview"))
+        assertTrue(server.contains("sandbox allow-scripts allow-modals"))
+        assertTrue(server.contains("connect-src 'none'"))
+        assertTrue(axios.contains("'openLegacyReview'"))
+        assertTrue(axios.contains("'legacyReviewPage'"))
+        assertTrue(axios.contains("'runLegacyReview'"))
+        assertTrue(dialog.contains(":srcdoc=\"pageHtml\""))
+        assertTrue(dialog.contains("sandbox=\"allow-scripts allow-modals\""))
+        assertTrue(dialog.contains("allow=\"fullscreen\""))
+        assertFalse(dialog.contains("allow-same-origin"))
+        assertTrue(dialog.contains("message.nonce !== props.sessionNonce"))
+        assertTrue(controller.contains("new MessageChannel()"))
+        listOf("url", "index", "src", "id", "script", "nonce").forEach { field ->
+            assertTrue(controller.contains("@SerializedName(\"$field\")"))
+        }
+        assertTrue(controller.contains("[channel.port2]"))
+        assertTrue(dialog.contains("event.ports[0]"))
+        assertTrue(dialog.contains("replyPort.postMessage"))
+        assertFalse(dialog.contains("frameWindow.postMessage"))
+        assertTrue(controller.contains(".replace(\"<\", \"\\\\u003c\")"))
+        assertTrue(controller.contains("Math.max(100, Number(delay) || 0)"))
+        assertFalse(controller.contains("fetch('runLegacyReview'"))
+        assertTrue(server.contains("http-equiv=\\\"Content-Security-Policy\\\""))
+
+        assertTrue(server.contains("frame-ancestors 'none'"))
+    }
+
     private fun readProjectFile(path: String): String {
         val userDirectory = File(requireNotNull(System.getProperty("user.dir"))).absoluteFile
         val repositoryRoot = generateSequence(userDirectory) { it.parentFile }
