@@ -440,9 +440,9 @@ class AudioPlayActivity :
             }
         }
         lyricViewX.visible()
-        lyricViewX.doOnLayout { view ->
+        lyricViewX.doOnLayout {
             if (oldLyric == lyric) {
-                view.loadLyric(lyric)
+                lyricViewX.loadLyric(lyric)
             }
         }
         if (firstLyric) {

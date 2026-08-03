@@ -80,7 +80,7 @@ class AudioEpisodeUnitTest {
             .substringBefore("override fun upLyricP(position: Int)")
         val visible = upLyric.indexOf("lyricViewX.visible()")
         val layout = upLyric.indexOf("lyricViewX.doOnLayout")
-        val load = upLyric.indexOf("view.loadLyric(lyric)")
+        val load = upLyric.indexOf("lyricViewX.loadLyric(lyric)")
 
         assertTrue(visible >= 0)
         assertTrue(layout > visible)
