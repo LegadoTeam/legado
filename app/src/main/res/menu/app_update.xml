@@ -8,6 +8,11 @@
         app:showAsAction="always" />
 
     <item
+        android:id="@+id/menu_open_in_browser"
+        android:title="@string/open_in_browser"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_download_backup"
         android:title="@string/download_from_github"
         app:showAsAction="never" />

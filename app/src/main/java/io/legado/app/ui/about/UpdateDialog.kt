@@ -10,6 +10,7 @@ import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.update.AppUpdate
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.model.Download
+import io.legado.app.utils.openUrl
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
@@ -61,6 +62,10 @@ class UpdateDialog() : BaseDialogFragment(R.layout.dialog_update) {
             when (it.itemId) {
                 R.id.menu_download -> startDownload(arguments?.getString("url"))
                 R.id.menu_download_backup -> startDownload(arguments?.getString("backupUrl"))
+                R.id.menu_open_in_browser -> arguments?.getString("backupUrl").orEmpty()
+                    .ifBlank { arguments?.getString("url").orEmpty() }
+                    .takeIf(String::isNotBlank)
+                    ?.let { url -> requireContext().openUrl(url) }
                 R.id.menu_ignore_version -> {
                     LocalConfig.ignoreUpdateVersion = arguments?.getString("newVersion")
                     toastOnUi(R.string.ignore_this_version)
