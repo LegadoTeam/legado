@@ -22,7 +22,7 @@
     "@element-plus/icons-vue": "^2.3.1",
     "@vueuse/core": "^14.3.0",
     "@vueuse/shared": "^14.3.0",
-    "axios": "^1.7.7",
+    "axios": "^1.19.0",
     "dompurify": "3.4.12",
     "element-plus": "2.14.3",
     "hotkeys-js": "^4.0.4",
