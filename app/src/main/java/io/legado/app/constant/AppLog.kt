@@ -7,6 +7,9 @@ import io.legado.app.utils.LogUtils
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.toastOnUi
 import splitties.init.appCtx
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 object AppLog {
 
@@ -57,6 +60,20 @@ object AppLog {
     @Synchronized
     fun clear() {
         mLogs.clear()
+    }
+
+    fun exportText(entries: List<Triple<Long, String, Throwable?>>): String {
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault())
+        return buildString {
+            entries.asReversed().forEach { (time, message, throwable) ->
+                append(dateFormat.format(Date(time)))
+                append(' ')
+                appendLine(message)
+                throwable?.let {
+                    appendLine(it.stackTraceToString().trimEnd().prependIndent("    "))
+                }
+            }
+        }
     }
 
     fun putDebug(message: String?, throwable: Throwable? = null) {

@@ -23,13 +23,20 @@ import io.legado.app.ui.widget.dialog.TextDialog
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.setLayout
+import io.legado.app.utils.share
 import io.legado.app.utils.showDialogFragment
+import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import splitties.views.onClick
+import java.io.File
 import java.util.*
 
 class AppLogDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
     Toolbar.OnMenuItemClickListener {
+
+    companion object {
+        private const val MAX_SHARE_TEXT = 64_000
+    }
 
     private val binding by viewBinding(DialogRecyclerViewBinding::bind)
     private val adapter by lazy {
@@ -66,8 +73,29 @@ class AppLogDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
                 }
                 noButton()
             }
+
+            R.id.menu_export -> exportLogs()
         }
         return true
+    }
+
+    private fun exportLogs() {
+        val text = AppLog.exportText(AppLog.logs)
+        if (text.isBlank()) {
+            toastOnUi(R.string.no_log)
+            return
+        }
+        if (text.length <= MAX_SHARE_TEXT) {
+            requireContext().share(text, getString(R.string.log))
+            return
+        }
+        runCatching {
+            val file = File(requireContext().cacheDir, "applog.txt")
+            file.writeText(text)
+            requireContext().share(file, "text/plain")
+        }.onFailure {
+            toastOnUi(R.string.can_not_share)
+        }
     }
 
     inner class LogAdapter(context: Context) :
