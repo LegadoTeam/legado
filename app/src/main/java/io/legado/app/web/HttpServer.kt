@@ -72,6 +72,12 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
                     } else {
                         val files = HashMap<String, String>()
                         session.parseBody(files)
+                        if (uri == "/legacyReviewPage") {
+                            return legacyReviewPageResponse(
+                                ReviewController.getLegacyReviewPage(session.parameters),
+                                session.headers["origin"],
+                            )
+                        }
                         val postData = files["postData"]
 
                         returnData = runBlocking {
@@ -88,6 +94,8 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
                                     files,
                                 )
                                 "/saveReadConfig" -> BookController.saveWebReadConfig(postData)
+                                "/openLegacyReview" -> ReviewController.openLegacyReview(postData)
+                                "/runLegacyReview" -> ReviewController.runLegacyReview(postData)
                                 "/saveRssSource" -> RssSourceController.saveSource(postData)
                                 "/saveRssSources" -> RssSourceController.saveSources(postData)
                                 "/deleteRssSources" -> RssSourceController.deleteSources(postData)
@@ -217,6 +225,13 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
                 "script-src 'self'; style-src 'self' 'unsafe-inline'; " +
                 "img-src * data: blob:; font-src 'self' data: http: https:; " +
                 "connect-src * ws: wss:; object-src 'none'; base-uri 'self'"
+        private const val LEGACY_REVIEW_RESOURCE_POLICY =
+            "default-src 'none'; " +
+                "script-src https: 'unsafe-inline' 'unsafe-eval'; " +
+                "style-src http: https: 'unsafe-inline'; img-src http: https: data: blob:; " +
+                "media-src http: https: data: blob:; font-src http: https: data:; " +
+                "connect-src 'none'; object-src 'none'; base-uri http: https:; " +
+                "form-action 'none'"
         private val PROTECTED_SOURCE_WRITE_ROUTES = setOf(
             "/saveBookSource",
             "/saveBookSources",
@@ -227,6 +242,9 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
             "/saveReplaceRule",
             "/deleteReplaceRule",
             "/testReplaceRule",
+            "/openLegacyReview",
+            "/legacyReviewPage",
+            "/runLegacyReview",
         )
         private val PROTECTED_HTTP_LOG_READ_ROUTES = setOf(
             "/getHttpLogs",
@@ -242,6 +260,35 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
         }
         if (uri.startsWith("/vue/") && uri.endsWith(".html")) {
             addHeader("Content-Security-Policy", VUE_CONTENT_SECURITY_POLICY)
+        }
+    }
+
+    private fun legacyReviewPageResponse(html: String?, origin: String?): Response {
+        val protectedHtml = html?.let {
+            val meta = "<meta http-equiv=\"Content-Security-Policy\" " +
+                "content=\"$LEGACY_REVIEW_RESOURCE_POLICY\">"
+            val head = it.indexOf("<head", ignoreCase = true)
+            val headEnd = if (head >= 0) it.indexOf('>', head) else -1
+            if (headEnd >= 0) it.substring(0, headEnd + 1) + meta + it.substring(headEnd + 1)
+            else meta + it
+        }
+        return if (protectedHtml == null) {
+            newFixedLengthResponse(
+                Response.Status.NOT_FOUND,
+                "text/plain; charset=utf-8",
+                "旧评论会话无效或已过期"
+            )
+        } else {
+            newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", protectedHtml)
+        }.apply {
+            addWebHeaders(origin, "/legacyReviewPage")
+            addHeader("Cache-Control", "no-store")
+            addHeader("Referrer-Policy", "no-referrer")
+            addHeader(
+                "Content-Security-Policy",
+                "sandbox allow-scripts allow-modals; $LEGACY_REVIEW_RESOURCE_POLICY; " +
+                    "frame-ancestors 'none'"
+            )
         }
     }
 

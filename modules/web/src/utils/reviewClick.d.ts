@@ -1,7 +1,6 @@
 export type LegacyReviewClick = {
-  paraIndex: number
-  paraData: string
-  count: number
+  kind: 'paragraph' | 'chapter'
+  src: string
 }
 
 export declare const parseLegacyReviewClick: (

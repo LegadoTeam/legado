@@ -55,6 +55,7 @@ import { isLegadoUrl, lazyRegex } from '@/utils/utils'
 import API from '@api'
 import jump from '@/plugins/jump'
 import { parseLegacyReviewClick } from '@/utils/reviewClick'
+import type { LegacyReviewClick } from '@/utils/reviewClick'
 import type { ParagraphReview, ReviewTarget } from '@/book'
 import type { webReadConfig } from '@/web'
 import DOMPurify from 'dompurify'
@@ -77,6 +78,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   openReview: [target: ReviewTarget]
+  openLegacyReview: [target: LegacyReviewClick & { chapterIndex: number }]
 }>()
 
 const reviewCount = (paraIndex: number) => props.reviews[paraIndex]?.count || 0
@@ -94,11 +96,7 @@ const handleReviewImageClick = (event: MouseEvent) => {
   if (!legacy) return
 
   event.stopPropagation()
-  emit('openReview', {
-    ...(props.reviews[legacy.paraIndex] || legacy),
-    chapterIndex: props.chapterIndex,
-    paraIndex: legacy.paraIndex,
-  })
+  emit('openLegacyReview', { ...legacy, chapterIndex: props.chapterIndex })
 }
 
 const imgPatternStr = '<img[^>]*src=[\'"]([^\'"]*(?:[\'"][^>]+\\})?)[\'"][^>]*>'

@@ -26,6 +26,11 @@ export type LeagdoApiResponse<T> = {
   data: T
 }
 
+export type LegacyReviewSession = {
+  id: string
+  nonce: string
+}
+
 export let legado_http_entry_point = ''
 export let legado_webSocket_entry_point = ''
 
@@ -137,6 +142,26 @@ const getReviewReplies = (
       reviewId,
       page,
     },
+  })
+
+const openLegacyReview = (
+  bookUrl: string,
+  chapterIndex: number,
+  src: string,
+) =>
+  ajax.post<LeagdoApiResponse<LegacyReviewSession>>('openLegacyReview', {
+    url: bookUrl,
+    index: chapterIndex,
+    src,
+  })
+
+const runLegacyReview = (id: string, script: string) =>
+  ajax.post<LeagdoApiResponse<string>>('runLegacyReview', { id, script })
+
+const getLegacyReviewPage = (id: string) =>
+  ajax.post<string>('legacyReviewPage', new URLSearchParams({ id }), {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    responseType: 'text',
   })
 
 // webSocket
@@ -296,6 +321,9 @@ export default {
   getReviewSummary,
   getReviewDetail,
   getReviewReplies,
+  openLegacyReview,
+  runLegacyReview,
+  getLegacyReviewPage,
   search,
   saveBook,
   deleteBook,
