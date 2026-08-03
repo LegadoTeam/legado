@@ -66,6 +66,12 @@ open class WelcomeActivity : BaseActivity<ActivityWelcomeBinding>() {
     }
 
     override fun upBackgroundImage() {
+        val isDarkTheme = ThemeConfig.getTheme() == Theme.Dark
+        val showText = if (isDarkTheme) AppConfig.welcomeShowTextDark else AppConfig.welcomeShowText
+        val showIcon = if (isDarkTheme) AppConfig.welcomeShowIconDark else AppConfig.welcomeShowIcon
+        binding.tvLegado.visible(showText)
+        binding.ivBook.visible(showIcon)
+        binding.tvGzh.visible(showText)
         if (getPrefBoolean(PreferKey.customWelcome)) {
             kotlin.runCatching {
                 when (ThemeConfig.getTheme()) {
@@ -82,9 +88,6 @@ open class WelcomeActivity : BaseActivity<ActivityWelcomeBinding>() {
                                 }
                             }
                         }
-                        binding.tvLegado.visible(AppConfig.welcomeShowTextDark)
-                        binding.ivBook.visible(AppConfig.welcomeShowIconDark)
-                        binding.tvGzh.visible(AppConfig.welcomeShowTextDark)
                         return
                     }
                     else -> {
@@ -100,9 +103,6 @@ open class WelcomeActivity : BaseActivity<ActivityWelcomeBinding>() {
                                 }
                             }
                         }
-                        binding.tvLegado.visible(AppConfig.welcomeShowText)
-                        binding.ivBook.visible(AppConfig.welcomeShowIcon)
-                        binding.tvGzh.visible(AppConfig.welcomeShowText)
                         return
                     }
                 }
