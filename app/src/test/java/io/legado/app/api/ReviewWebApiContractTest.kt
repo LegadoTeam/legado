@@ -84,7 +84,7 @@ class ReviewWebApiContractTest {
         assertTrue(controller.contains(".replace(\"<\", \"\\\\u003c\")"))
         assertTrue(controller.contains("Math.max(100, Number(delay) || 0)"))
         assertFalse(controller.contains("fetch('runLegacyReview'"))
-        assertTrue(server.contains("http-equiv=\"Content-Security-Policy\""))
+        assertTrue(server.contains("http-equiv=\\\"Content-Security-Policy\\\""))
 
         assertTrue(server.contains("frame-ancestors 'none'"))
     }
