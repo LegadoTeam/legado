@@ -1,8 +1,22 @@
 <template>
-  <div class="title" data-chapterpos="0">{{ title }}</div>
+  <div class="title" data-chapterpos="0">
+    <span class="title-text">{{ title }}</span>
+    <button
+      v-if="reviewCount(-1) > 0"
+      type="button"
+      class="review-trigger"
+      :aria-label="`查看标题的 ${reviewCount(-1)} 条段评`"
+      :title="`查看 ${reviewCount(-1)} 条段评`"
+      @click.stop="openReview(-1)"
+    >
+      <ChatDotRound aria-hidden="true" />
+      <span>{{ reviewCount(-1) }}</span>
+    </button>
+  </div>
   <div
     v-for="(para, index) in contents"
     :key="index"
+    class="paragraph"
     ref="paragraphRef"
     :data-chapterpos="chapterPos[index]"
   >
@@ -15,6 +29,17 @@
     />
     <p v-else-if="isPlainText(para)" :style="{ fontFamily, fontSize }">{{ para }}</p>
     <p v-else :style="{ fontFamily, fontSize }" v-html="sanitizeContent(para)" @error.capture="handleImgLoadError" />
+    <button
+      v-if="reviewCount(index + 1) > 0"
+      type="button"
+      class="review-trigger"
+      :aria-label="`查看第 ${index + 1} 段的 ${reviewCount(index + 1)} 条段评`"
+      :title="`查看 ${reviewCount(index + 1)} 条段评`"
+      @click.stop="openReview(index + 1)"
+    >
+      <ChatDotRound aria-hidden="true" />
+      <span>{{ reviewCount(index + 1) }}</span>
+    </button>
   </div>
 </template>
 
@@ -22,8 +47,10 @@
 import { isLegadoUrl, lazyRegex } from '@/utils/utils'
 import API from '@api'
 import jump from '@/plugins/jump'
+import type { ParagraphReview, ReviewTarget } from '@/book'
 import type { webReadConfig } from '@/web'
 import DOMPurify from 'dompurify'
+import { ChatDotRound } from '@element-plus/icons-vue'
 
 const store = useBookStore()
 const readWidth = computed(() => store.config.readWidth)
@@ -36,7 +63,21 @@ const props = defineProps<{
   spacing: webReadConfig['spacing']
   fontFamily: string
   fontSize: string
+  chapterIndex: number
+  reviews: Record<number, ParagraphReview>
 }>()
+
+const emit = defineEmits<{
+  openReview: [target: ReviewTarget]
+}>()
+
+const reviewCount = (paraIndex: number) => props.reviews[paraIndex]?.count || 0
+
+const openReview = (paraIndex: number) => {
+  const review = props.reviews[paraIndex]
+  if (!review || review.count <= 0) return
+  emit('openReview', { ...review, chapterIndex: props.chapterIndex, paraIndex })
+}
 
 const imgPatternStr = '<img[^>]*src=[\'"]([^\'"]*(?:[\'"][^>]+\\})?)[\'"][^>]*>'
 const imgPattern = lazyRegex(imgPatternStr)
@@ -138,7 +179,7 @@ const chapterPos = computed(() => {
   })
 })
 
-const paragraphRef = ref<HTMLParagraphElement[]>()
+const paragraphRef = ref<HTMLElement[]>()
 const scrollToReadedLength = (length: number) => {
   if (length === 0) return
   const paragraphIndex = chapterPos.value.findIndex(
@@ -158,6 +199,9 @@ defineExpose({
 
 <style lang="scss" scoped>
 .title {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   margin-bottom: 57px;
   font:
     24px / 32px PingFangSC-Regular,
@@ -165,6 +209,51 @@ defineExpose({
     'Helvetica Neue Light',
     'Microsoft YaHei',
     sans-serif;
+
+  .title-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .review-trigger {
+    flex: 0 0 auto;
+    margin-top: 2px;
+  }
+}
+
+.paragraph {
+  position: relative;
+}
+
+.review-trigger {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  margin: 2px 0 0 auto;
+  padding: 3px 8px;
+  color: var(--el-color-primary);
+  font: inherit;
+  font-size: 13px;
+  background: transparent;
+  border: 0;
+  border-radius: 14px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--el-color-primary-light-9);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--el-color-primary);
+    outline-offset: 2px;
+  }
+
+  svg {
+    width: 17px;
+    height: 17px;
+  }
 }
 
 p {

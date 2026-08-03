@@ -107,3 +107,38 @@ export type BookChapter = {
   endFragmentId?: string //EPUB书籍下一章节的fragmentId
   variable?: string //变量
 }
+
+export type ReviewSummary = {
+  counts: Record<string, number>
+  keys: Record<string, string>
+}
+
+export type ReviewItem = {
+  id?: string | null
+  avatar?: string | null
+  name?: string | null
+  badges?: string[]
+  content?: string | null
+  imageUrl?: string | null
+  audioUrl?: string | null
+  time?: string | null
+  likeCount?: number | null
+  replyCount?: number | null
+  replies?: ReviewItem[]
+}
+
+export type ReviewPage = {
+  items: ReviewItem[]
+  nextCursor?: string | null
+  hasMore: boolean
+}
+
+export type ParagraphReview = {
+  count: number
+  paraData: string
+}
+
+export type ReviewTarget = ParagraphReview & {
+  chapterIndex: number
+  paraIndex: number
+}

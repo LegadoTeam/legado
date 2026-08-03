@@ -7,6 +7,7 @@ import io.legado.app.api.controller.BookController
 import io.legado.app.api.controller.BookSourceController
 import io.legado.app.api.controller.HttpLogController
 import io.legado.app.api.controller.ReplaceRuleController
+import io.legado.app.api.controller.ReviewController
 import io.legado.app.api.controller.RssSourceController
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.service.WebService
@@ -122,6 +123,9 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
                             "/getChapterList" -> BookController.getChapterList(parameters)
                             "/refreshToc" -> BookController.refreshToc(parameters)
                             "/getBookContent" -> BookController.getBookContent(parameters)
+                            "/getReviewSummary" -> ReviewController.getSummary(parameters)
+                            "/getReviewDetail" -> ReviewController.getDetail(parameters)
+                            "/getReviewReplies" -> ReviewController.getReplies(parameters)
                             "/cover" -> BookController.getCover(parameters)
                             "/image" -> BookController.getImg(parameters)
                             "/getReadConfig" -> BookController.getWebReadConfig()

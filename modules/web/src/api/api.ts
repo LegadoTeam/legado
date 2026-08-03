@@ -14,6 +14,8 @@ import type {
   Book,
   BookChapter,
   BookProgress,
+  ReviewPage,
+  ReviewSummary,
   SeachBook,
 } from '@/book'
 import type { Source } from '@/source'
@@ -93,6 +95,49 @@ const getBookContent = (
       '&index=' +
       chapterIndex,
   )
+
+const getReviewSummary = (bookUrl: string, chapterIndex: number) =>
+  ajax.get<LeagdoApiResponse<ReviewSummary>>('getReviewSummary', {
+    params: { url: bookUrl, index: chapterIndex },
+  })
+
+const getReviewDetail = (
+  bookUrl: string,
+  chapterIndex: number,
+  paraIndex: number,
+  paraData: string,
+  page: number,
+  cursor?: string | null,
+) =>
+  ajax.get<LeagdoApiResponse<ReviewPage>>('getReviewDetail', {
+    params: {
+      url: bookUrl,
+      index: chapterIndex,
+      paraIndex,
+      paraData,
+      page,
+      cursor: cursor || undefined,
+    },
+  })
+
+const getReviewReplies = (
+  bookUrl: string,
+  chapterIndex: number,
+  paraIndex: number,
+  paraData: string,
+  reviewId: string,
+  page: number,
+) =>
+  ajax.get<LeagdoApiResponse<ReviewPage>>('getReviewReplies', {
+    params: {
+      url: bookUrl,
+      index: chapterIndex,
+      paraIndex,
+      paraData,
+      reviewId,
+      page,
+    },
+  })
 
 // webSocket
 const search = (
@@ -248,6 +293,9 @@ export default {
   getBookShelf,
   getChapterList,
   getBookContent,
+  getReviewSummary,
+  getReviewDetail,
+  getReviewReplies,
   search,
   saveBook,
   deleteBook,

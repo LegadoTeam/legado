@@ -93,6 +93,9 @@
             :spacing="store.config.spacing"
             :fontSize="fontSize"
             :fontFamily="fontFamily"
+            :chapterIndex="data.sourceIndex"
+            :reviews="data.reviews"
+            @open-review="openReview"
             v-if="showContent"
           />
         </div>
@@ -100,6 +103,7 @@
         <div class="bottom-bar" ref="bottom"></div>
       </div>
     </div>
+    <ReviewDialog v-model="reviewVisible" :target="selectedReview" />
   </div>
 </template>
 
@@ -111,6 +115,8 @@ import { useLoading } from '@/hooks/loading'
 import { useThrottleFn } from '@vueuse/shared'
 import { isNullOrBlank } from '@/utils/utils'
 import { trimChapterWindowBeforeAppend } from '@/utils/chapterWindow'
+import ReviewDialog from '@/components/ReviewDialog.vue'
+import type { ParagraphReview, ReviewTarget } from '@/book'
 
 const content = ref<HTMLElement>()
 // loading spinner
@@ -284,8 +290,50 @@ const toShelf = () => {
 }
 
 // 获取章节内容
-type ChapterData = { index: number; content: string[]; title: string }
+type ChapterData = {
+  index: number
+  sourceIndex: number
+  content: string[]
+  title: string
+  reviews: Record<number, ParagraphReview>
+}
 const chapterData = ref<ChapterData[]>([])
+const reviewVisible = ref(false)
+const selectedReview = ref<ReviewTarget | null>(null)
+
+const openReview = (target: ReviewTarget) => {
+  selectedReview.value = target
+  reviewVisible.value = true
+}
+
+const loadReviewSummary = async (
+  chapter: ChapterData,
+  bookUrl: string,
+  generation: number,
+) => {
+  try {
+    const response = await API.getReviewSummary(bookUrl, chapter.sourceIndex)
+    const currentChapter = chapterData.value.find(
+      item => item.sourceIndex === chapter.sourceIndex,
+    )
+    if (
+      generation !== contentGeneration ||
+      !currentChapter ||
+      !response.data.isSuccess
+    ) return
+    const reviews: Record<number, ParagraphReview> = {}
+    for (const [key, count] of Object.entries(response.data.data.counts || {})) {
+      const paraIndex = Number(key)
+      if (!Number.isInteger(paraIndex) || paraIndex === 0 || count <= 0) continue
+      reviews[paraIndex] = {
+        count,
+        paraData: response.data.data.keys?.[key] || key,
+      }
+    }
+    currentChapter.reviews = reviews
+  } catch {}
+}
+
 const noPoint = ref(true)
 const getContent = (index: number, reloadChapter = true, chapterPos = 0) => {
   const generation = reloadChapter ? ++contentGeneration : contentGeneration
@@ -311,12 +359,26 @@ const getContent = (index: number, reloadChapter = true, chapterPos = 0) => {
       if (res.data.isSuccess) {
         const data = res.data.data
         const content = data.split(/\n+/)
-        chapterData.value.push({ index, content, title })
+        const chapter: ChapterData = {
+          index,
+          sourceIndex: chapterIndex,
+          content,
+          title,
+          reviews: {},
+        }
+        chapterData.value.push(chapter)
+        void loadReviewSummary(chapter, bookUrl, generation)
         if (reloadChapter) toChapterPos(chapterPos)
       } else {
         ElMessage({ message: res.data.errorMsg, type: 'error' })
         const content = [res.data.errorMsg]
-        chapterData.value.push({ index, content, title })
+        chapterData.value.push({
+          index,
+          sourceIndex: chapterIndex,
+          content,
+          title,
+          reviews: {},
+        })
       }
       store.setContentLoading(true)
       noPoint.value = false
@@ -328,7 +390,13 @@ const getContent = (index: number, reloadChapter = true, chapterPos = 0) => {
     err => {
       if (generation !== contentGeneration) return
       const content = ['获取章节内容失败！']
-      chapterData.value.push({ index, content, title })
+      chapterData.value.push({
+        index,
+        sourceIndex: chapterIndex,
+        content,
+        title,
+        reviews: {},
+      })
       store.setShowContent(true)
       throw err
     },
@@ -449,7 +517,7 @@ const toPreChapter = () => {
 let canJump = true
 // 监听方向键
 const handleKeyPress = (event: KeyboardEvent) => {
-  if (!canJump) return
+  if (!canJump || reviewVisible.value) return
   switch (event.key) {
     case 'ArrowLeft':
       event.stopPropagation()
@@ -496,6 +564,7 @@ const handleKeyPress = (event: KeyboardEvent) => {
 
 // 阻止默认滚动事件
 const ignoreKeyPress = (event: KeyboardEvent) => {
+  if (reviewVisible.value) return
   if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
     event.preventDefault()
     event.stopPropagation()
