@@ -1,6 +1,7 @@
 package io.legado.app.api.controller
 
 import androidx.collection.LruCache
+import com.google.gson.annotations.SerializedName
 import com.script.rhino.runScriptWithContext
 import io.legado.app.api.ReturnData
 import io.legado.app.constant.BookType
@@ -68,13 +69,18 @@ object ReviewController {
     )
 
     private data class LegacyReviewOpenRequest(
+        @SerializedName("url")
         val url: String = "",
+        @SerializedName("index")
         val index: Int = -1,
+        @SerializedName("src")
         val src: String = "",
     )
 
     private data class LegacyReviewRunRequest(
+        @SerializedName("id")
         val id: String = "",
+        @SerializedName("script")
         val script: String = "",
     )
 
@@ -94,7 +100,9 @@ object ReviewController {
     )
 
     private data class LegacyReviewSessionId(
+        @SerializedName("id")
         val id: String,
+        @SerializedName("nonce")
         val nonce: String,
     )
 

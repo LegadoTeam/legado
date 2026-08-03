@@ -74,6 +74,9 @@ class ReviewWebApiContractTest {
         assertFalse(dialog.contains("allow-same-origin"))
         assertTrue(dialog.contains("message.nonce !== props.sessionNonce"))
         assertTrue(controller.contains("new MessageChannel()"))
+        listOf("url", "index", "src", "id", "script", "nonce").forEach { field ->
+            assertTrue(controller.contains("@SerializedName(\"$field\")"))
+        }
         assertTrue(controller.contains("[channel.port2]"))
         assertTrue(dialog.contains("event.ports[0]"))
         assertTrue(dialog.contains("replyPort.postMessage"))

@@ -55,7 +55,7 @@ test('keeps legacy paragraph and chapter review image clicks on their script pat
       'http://,{"style":"text","click":"getZS(3)"}',
     ),
     null,
-  })
+  )
   assert.equal(
     parseLegacyReviewClick(
       'http://,{"style":"text","click":"getDP(3)"}',
