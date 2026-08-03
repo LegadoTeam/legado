@@ -1,6 +1,9 @@
 name: Triage labels
 
 on:
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
   issues:
     types: [opened, edited]
   pull_request:
@@ -10,6 +13,7 @@ on:
       - '.github/issue-labeler.yml'
       - '.github/pr-labeler.yml'
       - '.github/pull_request_template.md'
+      - '.github/scripts/backfill-labels.rb'
       - '.github/workflows/triage-labels.yml'
   pull_request_target:
     types: [opened, edited, synchronize, reopened, ready_for_review]
@@ -31,6 +35,10 @@ jobs:
           .github/issue-labeler.yml
           .github/pr-labeler.yml
           .github/workflows/triage-labels.yml
+      - name: Check historical label backfill
+        run: |
+          ruby -c .github/scripts/backfill-labels.rb
+          ruby .github/scripts/backfill-labels.rb --self-test
 
   content-labels:
     if: github.event_name == 'issues' || github.event_name == 'pull_request_target'
@@ -44,6 +52,7 @@ jobs:
         with:
           configuration-path: .github/issue-labeler.yml
           enable-versioned-regex: 0
+          include-title: 1
           repo-token: ${{ github.token }}
 
   changed-file-labels:
@@ -57,3 +66,17 @@ jobs:
         with:
           configuration-path: .github/pr-labeler.yml
           repo-token: ${{ github.token }}
+
+  backfill-labels:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Label existing open issues and pull requests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ruby .github/scripts/backfill-labels.rb

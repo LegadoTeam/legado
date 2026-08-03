@@ -13,7 +13,7 @@
       - any-glob-to-any-file:
           - 'app/src/main/java/io/legado/app/ui/book/read/**'
           - 'app/src/main/java/io/legado/app/model/ReadBook*'
-          - 'app/src/main/java/io/legado/app/help/BookHelp.kt'
+          - 'app/src/main/java/io/legado/app/help/book/BookHelp.kt'
 'area: manga':
   - changed-files:
       - any-glob-to-any-file:
@@ -50,6 +50,7 @@
   - changed-files:
       - any-glob-to-any-file:
           - '**/*.gradle'
+          - '**/*.gradle.kts'
           - 'gradle/**'
           - 'gradle.properties'
           - 'settings.gradle'
