@@ -9,6 +9,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.widget.SeekBar
 import androidx.activity.viewModels
+import androidx.core.view.doOnLayout
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
@@ -422,11 +423,8 @@ class AudioPlayActivity :
             binding.lyricViewX.gone()
             return
         }
-        lyricViewX.loadLyric(lyric)
-        binding.lyricViewX.visible()
-        if (lyricOn) {
-            upLyricP(AudioPlay.durChapterPos)
-        } else {
+        val firstLyric = !lyricOn
+        if (firstLyric) {
             lyricOn = true
             lyricViewX.apply {
                 setNormalTextSize(50F)
@@ -440,9 +438,19 @@ class AudioPlayActivity :
                     }
                 })
             }
+        }
+        lyricViewX.visible()
+        lyricViewX.doOnLayout { view ->
+            if (oldLyric == lyric) {
+                view.loadLyric(lyric)
+            }
+        }
+        if (firstLyric) {
             lyricViewX.postDelayed({
                 upLyricP(AudioPlay.durChapterPos)
             }, 100)
+        } else {
+            upLyricP(AudioPlay.durChapterPos)
         }
     }
     override fun upLyricP(position: Int) {

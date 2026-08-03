@@ -71,6 +71,22 @@ class AudioEpisodeUnitTest {
         )
     }
 
+    @Test
+    fun lyricPlayerWaitsForLayoutBeforeLoading() {
+        val source = projectFile(
+            "src/main/java/io/legado/app/ui/book/audio/AudioPlayActivity.kt"
+        ).readText()
+        val upLyric = source.substringAfter("override fun upLyric(lyric: String?)")
+            .substringBefore("override fun upLyricP(position: Int)")
+        val visible = upLyric.indexOf("lyricViewX.visible()")
+        val layout = upLyric.indexOf("lyricViewX.doOnLayout")
+        val load = upLyric.indexOf("view.loadLyric(lyric)")
+
+        assertTrue(visible >= 0)
+        assertTrue(layout > visible)
+        assertTrue(load > layout)
+    }
+
     private fun chineseString(name: String) = stringValue("values-zh", name)
 
     private fun defaultString(name: String) = stringValue("values", name)
