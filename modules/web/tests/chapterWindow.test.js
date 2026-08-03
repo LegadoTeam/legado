@@ -31,6 +31,22 @@ test('does not trim while the window has room', () => {
   assert.equal(trimChapterWindowBeforeAppend(loaded), loaded)
 })
 
+test('does not report a canceled token prompt as a backend failure', () => {
+  const apiIndex = readFileSync(
+    new URL('../src/api/index.ts', import.meta.url),
+    'utf8',
+  )
+  const cancelGuard = apiIndex.indexOf(
+    "if (err === 'cancel' || err === 'close') throw err",
+  )
+  const backendFailureNotice = apiIndex.indexOf(
+    "message: '后端连接失败，请检查阅读WEB服务或者设置其它可用链接'",
+  )
+
+  assert.ok(cancelGuard >= 0)
+  assert.ok(cancelGuard < backendFailureNotice)
+})
+
 test('tracks reading progress without observing every paragraph', () => {
   const chapterContent = readFileSync(
     new URL('../src/components/ChapterContent.vue', import.meta.url),

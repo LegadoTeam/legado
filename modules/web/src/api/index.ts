@@ -49,6 +49,7 @@ const responseCheckInterceptor = (resp: AxiosResponse) => {
 }
 
 const axiosErrorInterceptor = (err: unknown) => {
+  if (err === 'cancel' || err === 'close') throw err
   notification.error({
     message: '后端连接失败，请检查阅读WEB服务或者设置其它可用链接',
     grouping: true,
