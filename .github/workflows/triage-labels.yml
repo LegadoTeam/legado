@@ -1,0 +1,59 @@
+name: Triage labels
+
+on:
+  issues:
+    types: [opened, edited]
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/issue-labeler.yml'
+      - '.github/pr-labeler.yml'
+      - '.github/pull_request_template.md'
+      - '.github/workflows/triage-labels.yml'
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Parse triage configuration
+        run: >-
+          ruby -e "require 'yaml'; ARGV.each { |file| YAML.load_file(file); puts \"validated #{file}\" }"
+          .github/ISSUE_TEMPLATE/01-bugReport.yml
+          .github/ISSUE_TEMPLATE/02-featureRequest.yml
+          .github/issue-labeler.yml
+          .github/pr-labeler.yml
+          .github/workflows/triage-labels.yml
+
+  content-labels:
+    if: github.event_name == 'issues' || github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: github/issue-labeler@v3.4
+        with:
+          configuration-path: .github/issue-labeler.yml
+          enable-versioned-regex: 0
+          repo-token: ${{ github.token }}
+
+  changed-file-labels:
+    if: github.event_name == 'pull_request_target' && github.event.action != 'edited'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/labeler@v7
+        with:
+          configuration-path: .github/pr-labeler.yml
+          repo-token: ${{ github.token }}

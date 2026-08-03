@@ -1,65 +1,108 @@
-name: BUG提交 / BUG Report
-description: Report bugs to developers
-labels: ["BUG"]
+name: Bug 报告 / Bug Report
+description: 反馈可以稳定复现的问题
+labels: ["bug"]
 body:
   - type: checkboxes
+    id: checks
     attributes:
-      label: 确认 / Assignments
-      description: 提交issue请确保完成以下前提，否则该issue可能被忽略 / Make sure you read checkboxs below
+      label: 提交前确认
+      description: 不满足以下条件的问题可能无法处理。
       options:
-        - label: 搜索现有issues，不存在相似或相关的issue / No similar or related issues
+        - label: 我已搜索现有 Issues，没有相同或相关的问题
           required: true
-        - label: 最新[测试版](https://github.com/LegadoTeam/legado/releases/beta)依然存在此问题 / Latest beta app does not work
+        - label: 我已使用[最新测试版](https://github.com/LegadoTeam/legado/releases/beta)确认问题仍然存在
           required: true
-        - label: 此问题和Xposed、Lsposed、Magisk、手机主题、浏览器插件、无障碍服务等无关 / Make sure your machine is not touched by hook frameworks, plugins, accessibility etc
+        - label: 问题与 Xposed、LSPosed、Magisk、手机主题、浏览器插件或无障碍服务等外部修改无关
           required: true
 
-  - type: textarea
+  - type: dropdown
+    id: platform
     attributes:
-      label: 问题描述 / Describe Bugs
-    validations:
-      required: true
-  - type: textarea
-    attributes:
-      label: 复现步骤 / How to reproduce
-    validations:
-      required: true
-  - type: checkboxes
-    attributes:
-      label: 确认 / Assignment
+      label: 运行平台
       options:
-        - label: 已经提交复现所需要的附加资料 / Submit additions related with bugs
-          required: true
-  - type: textarea
+        - Android
+        - Web
+        - Android 与 Web
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
     attributes:
-      label: 其他信息 / Additions
-      description: |
-        反馈WEB书架前端问题时请提供浏览器版本信息，如Edge 129.0.2792.89
-      placeholder: "请用```将提交的内容包裹"
+      label: 影响模块
+      options:
+        - 阅读文本与翻页
+        - 漫画阅读
+        - 朗读与音频
+        - 书架与书籍管理
+        - 书源与规则解析
+        - Web 服务与前端
+        - 备份、同步与数据
+        - 构建、安装与更新
+        - 其他或不确定
+    validations:
+      required: true
+
+  - type: dropdown
+    id: impact
+    attributes:
+      label: 影响类型
+      options:
+        - 崩溃或无响应
+        - 数据丢失或损坏
+        - 性能或耗电
+        - 兼容性
+        - 界面或交互
+        - 功能结果错误
+        - 其他
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 阅读版本
+      placeholder: 3.26.080404
+    validations:
+      required: true
 
   - type: textarea
+    id: environment
     attributes:
-      label: 日志提交 / Relevant log output
-      description: |
-        阅读日志位于我的-关于-崩溃日志、保存日志、书架-右上角-日志，或者自行使用log工具抓取日志
-        如果崩溃日志中包含`java.lang.OutOfMemoryError`，请安装最新测试版，在其他设置里打开记录堆转储，复现崩溃后去关于那里点保存日志，然后去备份目录里将heapDump文件夹里的文件打包压缩一下上传上来
-      placeholder: "请用```将日志内容包裹"
+      label: 运行环境
+      description: Android 请填写系统版本和机型；Web 请填写操作系统和浏览器版本。
+      placeholder: Android 15 / Pixel 8，或 Windows 11 / Edge 138
+    validations:
+      required: true
 
-  - type: input
+  - type: textarea
+    id: description
     attributes:
-      label: 阅读版本 / Legado version
-      placeholder: "3.22.110823"
+      label: 问题描述
+      description: 说明实际结果、预期结果，以及问题出现的频率。
     validations:
       required: true
-  - type: input
+
+  - type: textarea
+    id: steps
     attributes:
-      label: Android版本 / Android version
-      placeholder: "Android 12"
+      label: 复现步骤
+      placeholder: |
+        1. 打开……
+        2. 点击……
+        3. 出现……
     validations:
       required: true
-  - type: input
+
+  - type: textarea
+    id: logs
     attributes:
-      label: 机型 / Model
-      placeholder: "Redmi K30 Pro"
-    validations:
-      required: true
+      label: 日志或截图
+      description: 阅读日志可从“我的 → 关于 → 崩溃日志/保存日志”或书架右上角日志入口获取。请先移除隐私信息。
+      placeholder: 拖入日志文件、截图或录屏；长日志请使用代码块。
+
+  - type: textarea
+    id: additions
+    attributes:
+      label: 其他信息
+      description: Web 问题请补充服务部署方式；仅特定书源出现时请说明是否可公开复现。
