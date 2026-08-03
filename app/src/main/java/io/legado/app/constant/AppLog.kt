@@ -4,16 +4,19 @@ import android.util.Log
 import io.legado.app.BuildConfig
 import io.legado.app.help.config.AppConfig
 import io.legado.app.utils.LogUtils
-import io.legado.app.utils.postEvent
 import io.legado.app.utils.toastOnUi
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import splitties.init.appCtx
 
 object AppLog {
 
     private val mLogs = arrayListOf<Triple<Long, String, Throwable?>>()
+    private val logUpdates = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     val logs
         @Synchronized get() = mLogs.toList()
+    val updates = logUpdates.asSharedFlow()
 
     @Synchronized
     fun put(message: String?, throwable: Throwable? = null, toast: Boolean = false) {
@@ -30,7 +33,7 @@ object AppLog {
             LogUtils.d("AppLog", "$message\n${throwable.stackTraceToString()}")
         }
         mLogs.add(0, Triple(System.currentTimeMillis(), message, throwable))
-        postEvent(EventBus.APP_LOG_UPDATED, true)
+        logUpdates.tryEmit(Unit)
         if (BuildConfig.DEBUG) {
             val stackTrace = Thread.currentThread().stackTrace
             Log.e(stackTrace[3].className, message, throwable)
@@ -47,7 +50,7 @@ object AppLog {
             mLogs.removeLastOrNull()
         }
         mLogs.add(0, Triple(System.currentTimeMillis(), message, throwable))
-        postEvent(EventBus.APP_LOG_UPDATED, true)
+        logUpdates.tryEmit(Unit)
         if (BuildConfig.DEBUG) {
             val stackTrace = Thread.currentThread().stackTrace
             Log.e(stackTrace[3].className, message, throwable)

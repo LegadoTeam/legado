@@ -6,13 +6,15 @@ import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.widget.Toolbar
+import androidx.lifecycle.Lifecycle.State.STARTED
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.constant.AppLog
-import io.legado.app.constant.EventBus
 import io.legado.app.databinding.DialogRecyclerViewBinding
 import io.legado.app.databinding.ItemAppLogBinding
 import io.legado.app.help.http.HttpLogRecord
@@ -21,10 +23,10 @@ import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.widget.dialog.TextDialog
 import io.legado.app.utils.LogUtils
-import io.legado.app.utils.observeEvent
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.viewbindingdelegate.viewBinding
+import kotlinx.coroutines.launch
 import splitties.views.onClick
 import java.util.*
 
@@ -51,8 +53,12 @@ class AppLogDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
             recyclerView.adapter = adapter
         }
         adapter.setItems(AppLog.logs)
-        observeEvent<Boolean>(EventBus.APP_LOG_UPDATED) {
-            adapter.setItems(AppLog.logs)
+        lifecycleScope.launch {
+            repeatOnLifecycle(STARTED) {
+                AppLog.updates.collect {
+                    adapter.setItems(AppLog.logs)
+                }
+            }
         }
     }
 
