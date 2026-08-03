@@ -9,6 +9,10 @@ Legado
 Legado 是一款免费的 Android 平台开源小说阅读器。
 </div>
 
+# Sponsor-赞助商
+
+> 感谢 [PiPio AI 中转站](https://pipio.io/offer/miaogongzi) 对项目的赞助支持。
+
 # Grateful-感谢 [![](https://img.shields.io/badge/-Grateful-F5F5F5.svg)](#Grateful-感谢-)
 > * org.jsoup:jsoup
 > * cn.wanghaomiao:JsoupXpath
