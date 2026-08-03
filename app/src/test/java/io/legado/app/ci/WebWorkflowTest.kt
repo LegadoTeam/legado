@@ -33,6 +33,7 @@ class WebWorkflowTest {
         assertTrue(workflowText.contains(masterPush))
         assertTrue(workflowText.contains("skip_fetch: true"))
         assertTrue(workflowText.contains("skip_push: true"))
+        assertTrue(workflowText.contains("file_pattern: app/src/main/assets/web/vue/ modules/web/src/components.d.ts"))
         assertTrue(workflowText.contains("bash .github/scripts/push-web-assets.sh"))
     }
 }
