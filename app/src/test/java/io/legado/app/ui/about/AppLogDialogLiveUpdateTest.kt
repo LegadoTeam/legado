@@ -10,19 +10,19 @@ class AppLogDialogLiveUpdateTest {
     private val root = repositoryRoot()
     private val appLog = source("app/src/main/java/io/legado/app/constant/AppLog.kt")
     private val dialog = source("app/src/main/java/io/legado/app/ui/about/AppLogDialog.kt")
+    private val eventBus = source("app/src/main/java/io/legado/app/constant/EventBus.kt")
 
     @Test
     fun `saved logs invalidate the visible dialog snapshot`() {
-        assertTrue(appLog.contains("MutableSharedFlow<Unit>(extraBufferCapacity = 1)"))
         assertEquals(
             2,
-            Regex("logUpdates\\.tryEmit\\(Unit\\)")
+            Regex("postEvent\\(EventBus\\.APP_LOG_UPDATED, true\\)")
                 .findAll(appLog)
                 .count(),
         )
-        assertTrue(dialog.contains("repeatOnLifecycle(STARTED)"))
-        assertTrue(dialog.contains("AppLog.updates.collect"))
-        val observer = dialog.substringAfter("AppLog.updates.collect")
+        assertTrue(eventBus.contains("const val APP_LOG_UPDATED = \"appLogUpdated\""))
+        assertTrue(dialog.contains("observeEvent<Boolean>(EventBus.APP_LOG_UPDATED)"))
+        val observer = dialog.substringAfter("observeEvent<Boolean>(EventBus.APP_LOG_UPDATED)")
             .substringBefore("}")
         assertTrue(observer.contains("adapter.setItems(AppLog.logs)"))
     }
