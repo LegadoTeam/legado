@@ -17,6 +17,7 @@ export const useSourceStore = defineStore('source', {
       rssSources: shallowRef([] as RssSource[]), // 临时存放所有订阅源
       savedSources: [] as Source[], // 批量保存到阅读app成功的源
       currentSource: JSON.parse(JSON.stringify(emptySource)) as Source, // 当前编辑的源
+      sourceMode: 'json' as 'json' | 'javascript',
       currentTab: localStorage.getItem('tabName') || 'editTab',
       editTabSource: {} as Source, // 生成序列化的json数据
       isDebuging: false,
@@ -77,9 +78,20 @@ export const useSourceStore = defineStore('source', {
       map.set(getSourceUniqueKey(source), JSON.parse(JSON.stringify(source)))
       this.saveSources(Array.from(map.values()))
     },
+    saveJsSource(source: BookSoure, openedSourceUrl?: string) {
+      const map = this.sourcesMap
+      if (openedSourceUrl && openedSourceUrl !== source.bookSourceUrl) {
+        map.delete(openedSourceUrl)
+      }
+      map.set(source.bookSourceUrl, JSON.parse(JSON.stringify(source)))
+      this.saveSources(Array.from(map.values()))
+    },
     // 更改当前编辑的源qq
     changeCurrentSource(source: Source) {
       this.currentSource = JSON.parse(JSON.stringify(source))
+      if (isBookSource && (source as BookSoure).mainJs?.trim()) {
+        this.sourceMode = 'javascript'
+      }
     },
     // update editTab tabName and editTab info
     changeTabName(tabName: string) {

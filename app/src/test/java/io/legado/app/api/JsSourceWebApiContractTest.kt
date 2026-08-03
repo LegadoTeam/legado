@@ -10,14 +10,11 @@ import java.io.File
 class JsSourceWebApiContractTest {
 
     @Test
-    fun `web route forwards the script body without a rename parameter`() {
+    fun `web route forwards the script body and opened source URL`() {
         val server = readProjectFile("app/src/main/java/io/legado/app/web/HttpServer.kt")
 
-        assertTrue(
-            server.contains(
-                "\"/saveJsSource\" -> BookSourceController.saveJsSource(postData)"
-            )
-        )
+        assertTrue(server.contains("\"/saveJsSource\" -> BookSourceController.saveJsSource("))
+        assertTrue(server.contains("session.parameters[\"openedSourceUrl\"]?.firstOrNull()"))
     }
 
     @Test
@@ -284,7 +281,7 @@ class JsSourceWebApiContractTest {
         assertTrue(api.contains("不会进入应用备份"))
         assertTrue(api.contains("浏览器同源状态不作为身份凭据"))
         assertTrue(api.contains("旧 JSON 书源写入接口"))
-        assertTrue(api.contains("页面重载后需要重新输入"))
+        assertTrue(api.contains("当前浏览器标签页会话"))
         assertTrue(api.contains("可信局域网"))
         assertTrue(api.contains("/getHttpLogs?limit=50"))
         assertTrue(api.contains("/getHttpLog?id=1"))
@@ -303,6 +300,12 @@ class JsSourceWebApiContractTest {
         assertFalse(sourceToken.contains("localStorage.setItem"))
         assertFalse(sourceToken.contains("localStorage.getItem"))
         assertTrue(sourceToken.contains("localStorage.removeItem('apiToken')"))
+        assertTrue(sourceToken.contains("sessionStorage.getItem"))
+        assertTrue(sourceToken.contains("sessionStorage.setItem"))
+        assertTrue(sourceToken.contains("sessionStorage.removeItem"))
+        assertTrue(sourceToken.contains("bindSourceApiTokenEndpoint"))
+        assertTrue(sourceToken.contains("sourceApiEndpoint !== endpoint"))
+        assertTrue(webApi.contains("bindSourceApiTokenEndpoint(nextHttpEntryPoint)"))
         assertTrue(sourceToken.contains("sourceApiTokenWebSocketProtocol"))
         assertFalse(webApi.contains("apiToken_localStorage_key"))
         assertTrue(webApi.contains("token: string"))
@@ -311,12 +314,64 @@ class JsSourceWebApiContractTest {
         assertTrue(sourceToken.contains("Web 书源访问令牌"))
         assertTrue(webShelf.contains("requestSourceApiToken({ remember: false })"))
         assertTrue(sourceEditor.contains("v-if=\"authorized\""))
-        assertTrue(sourceEditor.contains("onUnmounted(clearSourceApiToken)"))
+        assertTrue(sourceEditor.contains("await requestSourceApiToken()"))
+        assertFalse(sourceEditor.contains("onUnmounted(clearSourceApiToken)"))
         assertTrue(chapterContent.contains("DOMPurify.sanitize"))
         assertTrue(apiIndex.contains("url.pathname += '/'"))
         assertTrue(server.contains("application/json; charset=utf-8"))
         assertTrue(server.contains("X-Content-Type-Options"))
         assertTrue(server.contains("Content-Security-Policy"))
+    }
+
+    @Test
+    fun `web source editor supports JavaScript sources and native review rules`() {
+        val sourceEditor = readProjectFile("modules/web/src/views/SourceEditor.vue")
+        val jsEditor = readProjectFile("modules/web/src/components/JsSourceEditor.vue")
+        val form = readProjectFile("modules/web/src/components/SourceTabForm.vue")
+        val config = readProjectFile("modules/web/src/config/bookSourceEditConfig.ts")
+        val webApi = readProjectFile("modules/web/src/api/api.ts")
+        val controller = readProjectFile(
+            "app/src/main/java/io/legado/app/api/controller/BookSourceController.kt"
+        )
+
+        assertTrue(sourceEditor.contains("JSON 书源"))
+        assertTrue(sourceEditor.contains("JavaScript 书源"))
+        assertTrue(sourceEditor.contains("JsSourceEditor"))
+        assertTrue(jsEditor.contains("API.saveJsSource"))
+        assertTrue(jsEditor.contains("text/javascript;charset=utf-8"))
+        assertFalse(jsEditor.contains("new Function"))
+        assertTrue(webApi.contains("'Content-Type': 'text/plain; charset=utf-8'"))
+        assertTrue(webApi.contains("params: { openedSourceUrl }"))
+        assertTrue(controller.contains("openedSourceUrl = openedSourceUrl"))
+        assertTrue(form.contains("source[namespace] ||= {}"))
+
+        val reviewFields = listOf(
+            "enabled",
+            "reviewSummaryUrl",
+            "summaryListRule",
+            "summaryParagraphIndexRule",
+            "summaryCountRule",
+            "summaryParagraphDataRule",
+            "reviewDetailUrl",
+            "reviewDetailNextPageUrl",
+            "detailListRule",
+            "detailIdRule",
+            "detailAvatarRule",
+            "detailNameRule",
+            "detailBadgeRule",
+            "detailContentRule",
+            "reviewQuoteUrl",
+            "replyListRule",
+            "replyIdRule",
+            "replyAvatarRule",
+            "replyNameRule",
+            "replyBadgeRule",
+            "replyContentRule",
+        )
+        reviewFields.forEach { field ->
+            assertTrue("Missing Web review field: $field", config.contains("id: '$field'"))
+        }
+        assertFalse(config.contains("id: 'reviewUrl'"))
     }
 
     private fun readProjectFile(path: String): String {

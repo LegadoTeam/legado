@@ -30,6 +30,8 @@ type BaseSource = {
   jsLib?: string
 }
 type BookSoure = BaseSource & {
+  // 纯 JavaScript 书源脚本
+  mainJs?: string
   // 地址，包括 http/https
   bookSourceUrl: string
   // 名称
@@ -82,6 +84,38 @@ type BookSoure = BaseSource & {
 type RuleSearch = {
   checkKeyWord?: string
   [prop: string]: string
+}
+type ReviewRule = {
+  reviewUrl?: string
+  avatarRule?: string
+  contentRule?: string
+  postTimeRule?: string
+  reviewQuoteUrl?: string
+  voteUpUrl?: string
+  voteDownUrl?: string
+  postReviewUrl?: string
+  postQuoteUrl?: string
+  deleteUrl?: string
+  enabled?: boolean
+  reviewSummaryUrl?: string
+  summaryListRule?: string
+  summaryParagraphIndexRule?: string
+  summaryParagraphDataRule?: string
+  summaryCountRule?: string
+  reviewDetailUrl?: string
+  reviewDetailNextPageUrl?: string
+  detailListRule?: string
+  detailIdRule?: string
+  detailAvatarRule?: string
+  detailNameRule?: string
+  detailBadgeRule?: string
+  detailContentRule?: string
+  replyListRule?: string
+  replyIdRule?: string
+  replyAvatarRule?: string
+  replyNameRule?: string
+  replyBadgeRule?: string
+  replyContentRule?: string
 }
 /* type ExploreRule = {
     [prop:string]: string

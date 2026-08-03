@@ -274,6 +274,7 @@ const bindHotKeys = () => {
   buttons.value.forEach(({ hotKeys, action }) => {
     if (hotKeys.length == 0) return
     hotkeys(hotKeys.join('+'), event => {
+      if (store.sourceMode !== 'json') return
       event.preventDefault()
       action.call(null)
     })

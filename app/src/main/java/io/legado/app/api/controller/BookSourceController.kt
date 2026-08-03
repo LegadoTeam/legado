@@ -69,7 +69,10 @@ object BookSourceController {
         return ReturnData().setData(okSources)
     }
 
-    suspend fun saveJsSource(postData: String?): ReturnData {
+    suspend fun saveJsSource(
+        postData: String?,
+        openedSourceUrl: String? = null,
+    ): ReturnData {
         val returnData = ReturnData()
         when (JsSourceUpsert.validatePayload(postData)) {
             PayloadIssue.EMPTY -> return returnData.setErrorMsg("数据不能为空")
@@ -79,6 +82,7 @@ object BookSourceController {
         return try {
             val source = JsSourceUpsert.save(
                 requireNotNull(postData),
+                openedSourceUrl = openedSourceUrl,
                 timeoutMillis = JS_SOURCE_SAVE_TIMEOUT_MILLIS,
             )
             returnData.setData(source)

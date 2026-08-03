@@ -10,6 +10,7 @@
   />
   <el-input
     id="debug-text"
+    :class="{ 'with-key': isBookSource }"
     v-model="printDebug"
     type="textarea"
     readonly
@@ -62,6 +63,12 @@ const isBookSource = computed(() => {
 
 <style lang="scss" scoped>
 :deep(#debug-text) {
-  height: calc(100vh - 45px - 36px - 5px);
+  height: 100%;
+}
+:deep(#debug-text.with-key) {
+  height: calc(100% - 40px);
+}
+:deep(#debug-text .el-textarea__inner) {
+  height: 100%;
 }
 </style>

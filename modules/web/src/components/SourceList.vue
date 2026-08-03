@@ -152,7 +152,7 @@ const outExport = () => {
 
 #source-list {
   margin-top: 6px;
-  height: calc(100vh - 112px - 7px);
+  height: calc(100% - 75px);
   :deep(.el-checkbox) {
     margin-bottom: 4px;
     width: 100%;

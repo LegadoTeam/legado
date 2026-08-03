@@ -1,6 +1,9 @@
 import { ElMessageBox } from 'element-plus'
 
-let sourceApiToken: string | undefined
+const sourceApiTokenKey = 'sourceApiToken'
+const sourceApiEndpointKey = 'sourceApiEndpoint'
+let sourceApiToken = sessionStorage.getItem(sourceApiTokenKey) || undefined
+let sourceApiEndpoint = sessionStorage.getItem(sourceApiEndpointKey) || undefined
 
 // Remove credentials persisted by earlier development builds.
 localStorage.removeItem('apiToken')
@@ -9,6 +12,13 @@ export const getSourceApiToken = () => sourceApiToken
 
 export const clearSourceApiToken = () => {
   sourceApiToken = undefined
+  sessionStorage.removeItem(sourceApiTokenKey)
+}
+
+export const bindSourceApiTokenEndpoint = (endpoint: string) => {
+  if (sourceApiEndpoint && sourceApiEndpoint !== endpoint) clearSourceApiToken()
+  sourceApiEndpoint = endpoint
+  sessionStorage.setItem(sourceApiEndpointKey, endpoint)
 }
 
 export const requestSourceApiToken = async (
@@ -31,7 +41,10 @@ export const requestSourceApiToken = async (
     },
   )
   const token = value.trim()
-  if (remember) sourceApiToken = token
+  if (remember) {
+    sourceApiToken = token
+    sessionStorage.setItem(sourceApiTokenKey, token)
+  }
   return token
 }
 

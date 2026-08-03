@@ -4,6 +4,7 @@
 import type { webReadConfig } from '@/web'
 import ajax from './axios'
 import {
+  bindSourceApiTokenEndpoint,
   clearSourceApiToken,
   getSourceApiToken,
   requestSourceApiToken,
@@ -18,7 +19,7 @@ import type {
   ReviewSummary,
   SeachBook,
 } from '@/book'
-import type { Source } from '@/source'
+import type { BookSoure, Source } from '@/source'
 
 export type LeagdoApiResponse<T> = {
   isSuccess: boolean
@@ -42,9 +43,10 @@ export const setApiEntryPoint = (
   http_entry_point: string,
   webSocket_entry_point: string,
 ) => {
-  legado_http_entry_point = new URL(http_entry_point).toString()
+  const nextHttpEntryPoint = new URL(http_entry_point).toString()
+  bindSourceApiTokenEndpoint(nextHttpEntryPoint)
+  legado_http_entry_point = nextHttpEntryPoint
   legado_webSocket_entry_point = new URL(webSocket_entry_point).toString()
-  clearSourceApiToken()
   ajax.defaults.baseURL = legado_http_entry_point
 }
 
@@ -201,6 +203,12 @@ const saveSource = (data: Source) =>
     ? ajax.post<LeagdoApiResponse<string>>('saveBookSource', data)
     : ajax.post<LeagdoApiResponse<string>>('saveRssSource', data)
 
+const saveJsSource = (script: string, openedSourceUrl?: string) =>
+  ajax.post<LeagdoApiResponse<BookSoure>>('saveJsSource', script, {
+    params: { openedSourceUrl },
+    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+  })
+
 const saveSources = (data: Source[]) =>
   isBookSource
     ? ajax.post<LeagdoApiResponse<Source[]>>('saveBookSources', data)
@@ -303,6 +311,7 @@ export default {
   getSources,
   saveSources,
   saveSource,
+  saveJsSource,
   deleteSource,
   debug,
 

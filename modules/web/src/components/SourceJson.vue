@@ -39,6 +39,9 @@ watchEffect(async () => {
   width: 100%;
 }
 :deep(#source-json) {
-  height: calc(100vh - 50px);
+  height: 100%;
+}
+:deep(#source-json .el-textarea__inner) {
+  height: 100%;
 }
 </style>
