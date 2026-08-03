@@ -4,7 +4,6 @@ import android.os.Build
 import androidx.annotation.Keep
 import io.legado.app.constant.AppConst
 import io.legado.app.exception.NoStackTraceException
-import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.http.newCallResponse
 import io.legado.app.help.http.okHttpClient
@@ -18,13 +17,8 @@ import kotlinx.coroutines.CoroutineScope
 object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
 
     private val checkVariant: AppVariant
-        get() = when (AppConfig.updateToVariant) {
-            "official_version" -> AppVariant.OFFICIAL
-            "beta_release_version" -> AppVariant.BETA_RELEASE
-            "beta_releaseA_version" -> AppVariant.BETA_RELEASEA
-            else -> AppConst.appInfo.appVariant.takeUnless { it == AppVariant.UNKNOWN }
-                ?: AppVariant.OFFICIAL
-        }
+        get() = AppConst.appInfo.appVariant.takeUnless { it == AppVariant.UNKNOWN }
+            ?: AppVariant.OFFICIAL
 
     private suspend fun getLatestRelease(): List<AppReleaseInfo> {
         val lastReleaseUrl =
