@@ -43,18 +43,14 @@ internal object PunctuationCompressRule {
     /**标点在挤压表中的下标,非标点返回-1*/
     fun indexOf(char: Char): Int = chars.indexOf(char)
 
-    /**
-     * 簇的基字,变体选择符等零宽修饰字被并入同一列,判定标点要取首字
-     * 代理对的首字是高位代理,不在挤压表内,自然不会被当成标点
-     */
-    fun clusterBase(cluster: String): Char? {
-        return cluster.firstOrNull()
+    /**簇的标点下标,空簇、多码点簇或非标点返回-1*/
+    fun indexOfCluster(cluster: String): Int {
+        return indexOfCluster(cluster, 0, cluster.length)
     }
 
-    /**簇的标点下标,空簇或非标点返回-1*/
-    fun indexOfCluster(cluster: String): Int {
-        val base = clusterBase(cluster) ?: return -1
-        return indexOf(base)
+    /**多码点簇可能改变字宽或墨迹位置,不能复用裸基字符的测量缓存*/
+    fun indexOfCluster(text: String, start: Int, end: Int): Int {
+        return if (end - start == 1) indexOf(text[start]) else -1
     }
 
     fun classOf(index: Int): Int = when {
@@ -167,13 +163,18 @@ internal class PunctuationCompressor(private val paint: TextPaint) {
         var current = nextBase(text, widths, 0)
         while (current >= 0) {
             val next = nextBase(text, widths, current + 1)
-            val index = PunctuationCompressRule.indexOf(text[current])
+            val currentEnd = if (next < 0) text.length else next
+            val index = PunctuationCompressRule.indexOfCluster(text, current, currentEnd)
             val charClass = PunctuationCompressRule.classOf(index)
             if (charClass != PunctuationCompressRule.classNone) {
                 val nextClass = if (next < 0) {
                     PunctuationCompressRule.classNone
                 } else {
-                    PunctuationCompressRule.charClass(text[next])
+                    val afterNext = nextBase(text, widths, next + 1)
+                    val nextEnd = if (afterNext < 0) text.length else afterNext
+                    PunctuationCompressRule.classOf(
+                        PunctuationCompressRule.indexOfCluster(text, next, nextEnd)
+                    )
                 }
                 val hit = mode.compressAll || PunctuationCompressRule.compressAdjacent(
                     charClass, prevClass, nextClass

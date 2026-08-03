@@ -76,17 +76,19 @@ class PunctuationCompressRuleTest {
     }
 
     @Test
-    fun `a punctuation carrying a zero width modifier is still recognised`() {
-        // measureTextSplit 把变体选择符并入同一列,列宽已被挤压,判定必须取簇的首字
-        // 否则字形偏移丢失,整行也不会退回逐列绘制,其后的字与点击区域会错位
+    fun `a punctuation carrying a variation selector is not compressed`() {
         val cluster = "。︀"
+        assertEquals(-1, PunctuationCompressRule.indexOfCluster(cluster))
+        assertEquals(classNone, PunctuationCompressRule.classOf(-1))
+    }
+
+    @Test
+    fun `cluster ranges distinguish plain punctuation from standardized variants`() {
+        val text = "。︀「"
+        assertEquals(-1, PunctuationCompressRule.indexOfCluster(text, 0, 2))
         assertEquals(
-            PunctuationCompressRule.indexOf('。'),
-            PunctuationCompressRule.indexOfCluster(cluster)
-        )
-        assertEquals(
-            classClose,
-            PunctuationCompressRule.classOf(PunctuationCompressRule.indexOfCluster(cluster))
+            PunctuationCompressRule.indexOf('「'),
+            PunctuationCompressRule.indexOfCluster(text, 2, 3)
         )
     }
 
