@@ -12,6 +12,7 @@ import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppConst.dateFormat
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern
+import io.legado.app.constant.EventBus
 import io.legado.app.data.entities.BaseSource
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.config.AppConfig
@@ -24,6 +25,8 @@ import io.legado.app.help.source.SourceHelp
 import io.legado.app.help.source.SourceVerificationHelp
 import io.legado.app.help.source.VerificationResult
 import io.legado.app.help.source.getSourceType
+import io.legado.app.help.book.BookHelp
+import io.legado.app.model.BatchContentContext
 import io.legado.app.model.Debug
 import io.legado.app.model.VideoPlay
 import io.legado.app.model.analyzeRule.AnalyzeUrl
@@ -51,6 +54,7 @@ import io.legado.app.utils.isMainThread
 import io.legado.app.utils.isSameOrDescendantOf
 import io.legado.app.utils.longToastOnUi
 import io.legado.app.utils.mapAsync
+import io.legado.app.utils.postEvent
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.stackTraceStr
 import io.legado.app.utils.startActivity
@@ -120,6 +124,40 @@ interface JsExtensions : JsEncodeUtils {
 
     fun getSource(): BaseSource?
     fun getTag(): String?
+
+    /**
+     * 当前批量正文下载上下文,非批量流程返回 null。
+     * 由 AnalyzeRule / JsSourceEngine 在执行 contentBatch 规则时提供。
+     */
+    fun getBatchContext(): BatchContentContext? = null
+
+    /**
+     * 批量下载时回存单章正文。
+     *
+     * 书源在 contentBatch 规则(或 JS 源的 getContentBatch 函数)里每处理完一章即可调用,
+     * 内容会立刻写入缓存目录,不必等整批结束。只能在批量流程内调用。
+     *
+     * @param chapterUrl 章节地址,取本批章节数组里的 url 字段
+     * @param content 章节正文
+     * @return 是否成功保存
+     */
+    @JavascriptInterface
+    fun cacheContent(chapterUrl: String, content: String): Boolean {
+        rhinoContextOrNull?.ensureActive()
+        val batchContext = getBatchContext()
+            ?: throw NoStackTraceException("java.cacheContent 只能在批量正文规则中调用")
+        val chapter = batchContext.findChapter(chapterUrl)
+            ?: throw NoStackTraceException("java.cacheContent 未匹配到本批次章节: $chapterUrl")
+        if (content.isEmpty()) {
+            log("cacheContent 内容为空,跳过: ${chapter.title}")
+            return false
+        }
+        BookHelp.saveText(batchContext.book, chapter, content)
+        batchContext.markSaved(chapter)
+        postEvent(EventBus.SAVE_CONTENT, Pair(batchContext.book, chapter))
+        log("批量缓存成功: ${chapter.title}")
+        return true
+    }
 
     private val context: CoroutineContext
         get() = rhinoContextOrNull?.coroutineContext ?: EmptyCoroutineContext

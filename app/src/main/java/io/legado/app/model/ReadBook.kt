@@ -52,6 +52,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.collect
@@ -1332,6 +1333,10 @@ object ReadBook : CoroutineScope by MainScope() {
             }
             preDownloadTask?.cancel()
             preDownloadTask = launch(IO) {
+                //书源支持批量正文时先整批预取,没取到的章节走下面的单章流程兜底
+                bookSource?.takeIf { it.supportContentBatch() }?.let { source ->
+                    preDownloadBatch(source)
+                }
                 //预下载
                 launch {
                     val maxChapterIndex =
@@ -1351,6 +1356,39 @@ object ReadBook : CoroutineScope by MainScope() {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * 批量预下载。
+     * 按书源声明的最大批量数量分批,书源没回存的章节留给单章流程兜底。
+     */
+    private suspend fun preDownloadBatch(bookSource: BookSource) {
+        val book = book ?: return
+        val batchSize = bookSource.contentBatchSize()
+        if (batchSize <= 1) return
+        val maxChapterIndex = min(durChapterIndex + AppConfig.preDownloadNum, chapterSize)
+        val minChapterIndex = durChapterIndex - min(5, AppConfig.preDownloadNum)
+        val indexes = (durChapterIndex.plus(2)..maxChapterIndex) +
+            (durChapterIndex.minus(2) downTo minChapterIndex)
+        val pending = indexes.mapNotNull { index ->
+            if (index < 0 || index > chapterSize - 1) return@mapNotNull null
+            if (downloadedChapters.contains(index)) return@mapNotNull null
+            if ((downloadFailChapters[index] ?: 0) >= 3) return@mapNotNull null
+            val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, index)
+                ?: return@mapNotNull null
+            if (chapter.isVolume || BookHelp.hasContent(book, chapter)) {
+                downloadedChapters.add(index)
+                return@mapNotNull null
+            }
+            chapter
+        }
+        if (pending.size < 2) return
+        val cacheBook = CacheBook.getOrCreate(bookSource, book)
+        pending.chunked(batchSize).forEach { batch ->
+            if (batch.size < 2) return@forEach
+            currentCoroutineContext().ensureActive()
+            cacheBook.downloadBatchAwait(batch)
         }
     }
 
