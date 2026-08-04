@@ -58,6 +58,8 @@ class ReviewWebApiContractTest {
             "app/src/main/java/io/legado/app/api/controller/ReviewController.kt"
         )
         val axios = readProjectFile("modules/web/src/api/axios.ts")
+        val api = readProjectFile("modules/web/src/api/api.ts")
+        val interceptor = readProjectFile("modules/web/src/api/index.ts")
         val dialog = readProjectFile("modules/web/src/components/LegacyReviewDialog.vue")
 
         assertTrue(server.contains("uri == \"/legacyReviewPage\""))
@@ -68,6 +70,8 @@ class ReviewWebApiContractTest {
         assertTrue(axios.contains("'openLegacyReview'"))
         assertTrue(axios.contains("'legacyReviewPage'"))
         assertTrue(axios.contains("'runLegacyReview'"))
+        assertTrue(api.contains("responseType: 'text'"))
+        assertTrue(interceptor.contains("if (resp.config.responseType === 'text') return resp"))
         assertTrue(dialog.contains(":srcdoc=\"pageHtml\""))
         assertTrue(dialog.contains("sandbox=\"allow-scripts allow-modals\""))
         assertTrue(dialog.contains("allow=\"fullscreen\""))

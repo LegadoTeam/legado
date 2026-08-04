@@ -21,6 +21,7 @@ const LeagdoApiResponseKeys: string[] = Array.of('isSuccess', 'errorMsg')
 const notification = ElMessage
 /** Axios.Interceptor: check if resp is LeagaoLeagdoApiResponse*/
 const responseCheckInterceptor = (resp: AxiosResponse) => {
+  if (resp.config.responseType === 'text') return resp
   let isLeagdoApiResponse = true
   try {
     const data = resp.data
