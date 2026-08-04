@@ -228,6 +228,7 @@ open class RssJsExtensions(
                 }
 
                 "explore" -> {
+                    if (url.isNullOrBlank()) return@launch
                     val toSource = origin?.let { o ->
                         appDb.bookSourceDao.getBookSource(o)
                     } ?: (source as? BookSource) ?: return@launch
