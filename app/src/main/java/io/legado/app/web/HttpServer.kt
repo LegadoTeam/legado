@@ -236,8 +236,8 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
                 "object-src 'none'; base-uri 'self'"
         private const val LEGACY_REVIEW_RESOURCE_POLICY =
             "default-src 'none'; " +
-                "script-src https: 'unsafe-inline' 'unsafe-eval'; " +
-                "style-src http: https: 'unsafe-inline'; img-src http: https: data: blob:; " +
+                "script-src 'unsafe-inline' 'unsafe-eval'; " +
+                "style-src 'unsafe-inline'; img-src http: https: data: blob:; " +
                 "media-src http: https: data: blob:; font-src http: https: data:; " +
                 "connect-src 'none'; object-src 'none'; base-uri http: https:; " +
                 "form-action 'none'"

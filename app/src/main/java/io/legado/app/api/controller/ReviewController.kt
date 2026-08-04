@@ -448,12 +448,18 @@ object ReviewController {
               window.run = async function(code) {
                 return new Promise((resolve, reject) => {
                   const channel = new MessageChannel();
+                  const timeout = window.setTimeout(() => {
+                    reject(showError('评论加载超时'));
+                    channel.port1.close();
+                  }, 120000);
                   channel.port1.onmessage = event => {
+                    window.clearTimeout(timeout);
                     if (event.data?.error) reject(showError(event.data.error));
                     else resolve(event.data?.result == null ? '' : String(event.data.result));
                     channel.port1.close();
                   };
                   channel.port1.onmessageerror = () => {
+                    window.clearTimeout(timeout);
                     reject(showError('评论响应解析失败'));
                     channel.port1.close();
                   };
