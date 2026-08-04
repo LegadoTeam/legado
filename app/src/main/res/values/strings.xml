@@ -1445,6 +1445,7 @@
     <string name="float_permission_rationale">阅读需要悬浮窗权限来显示播放窗口</string>
     <string name="video">视频</string>
     <string name="float_window">悬浮窗</string>
+    <string name="default_float_window">默认悬浮窗播放</string>
     <string name="video_play">视频播放</string>
     <string name="no_more_chapter">没有更多章节</string>
     <string name="overlay">叠加</string>

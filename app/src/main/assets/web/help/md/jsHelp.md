@@ -606,8 +606,10 @@ java.openUrl(url: String, mimeType: String = null)
 ```js
 * @param url 视频播放链接
 * @param title 视频的标题
+* 省略 isFloat 时使用视频设置中的默认值
+java.openVideoPlayer(url: String, title: String)
 * @param isFloat 是否悬浮窗打开
-java.openVideoPlayer(url: String, title: String, isFloat: Boolean = false)
+java.openVideoPlayer(url: String, title: String, isFloat: Boolean)
 ```
 
 <!-- js-source-guide:start -->
