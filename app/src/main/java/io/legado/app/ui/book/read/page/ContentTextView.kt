@@ -218,6 +218,16 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         pageOffset = 0
     }
 
+    fun restorePageOffset(chapterPos: Int) {
+        val line = textPage.lines.firstOrNull { it.chapterPosition == chapterPos }
+            ?: textPage.lines.firstOrNull {
+                chapterPos in it.chapterPosition..<it.chapterPosition + it.charSize
+            }
+            ?: return
+        if (line === textPage.lines.firstOrNull()) return
+        scroll((ChapterProvider.paddingTop - line.lineTop).toInt())
+    }
+
     /**
      * 长按
      */
@@ -566,6 +576,15 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
             }
         }
         return visiblePage
+    }
+
+    fun getReadPosition(): Pair<Int, TextLine>? {
+        if (textPage.isMsgPage) return null
+        val offset = relativeOffset(0)
+        val line = textPage.lines.firstOrNull { it.isVisible(offset) }
+            ?: textPage.lines.lastOrNull()
+            ?: return null
+        return textPage.chapterIndex to line
     }
 
     fun getReadAloudPos(): Pair<Int, TextLine>? {

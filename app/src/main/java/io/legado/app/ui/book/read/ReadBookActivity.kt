@@ -445,6 +445,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         super.onPause()
         autoPageStop()
         backupJob?.cancel()
+        updateScrollReadPosition()
         ReadBook.saveRead()
         ReadBook.cancelPreDownloadTask()
         unregisterReceiver(timeBatteryReceiver)
@@ -1328,6 +1329,15 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
         executor.execute {
             startBackupJob()
+        }
+    }
+
+    private fun updateScrollReadPosition() {
+        if (!ReadBook.isScroll) return
+        if (ReadBook.msg != null || !ReadBook.isLayoutAvailable) return
+        val (chapterIndex, line) = binding.readView.getReadPosition() ?: return
+        if (chapterIndex == ReadBook.durChapterIndex) {
+            ReadBook.durChapterPos = line.chapterPosition
         }
     }
 
@@ -2480,15 +2490,20 @@ class ReadBookActivity : BaseReadBookActivity(),
                 ReadBook.readAloud(!BaseReadAloudService.pause)
             }
         }
-        observeEvent<ArrayList<Int>>(EventBus.UP_CONFIG) {
-            it.forEach { value ->
+        observeEvent<ArrayList<Int>>(EventBus.UP_CONFIG) { values ->
+            if (5 in values && isInitFinish) {
+                updateScrollReadPosition()
+            }
+            values.forEach { value ->
                 when (value) {
                     0 -> upSystemUiVisibility()
                     1 -> readView.upBg()
                     2 -> readView.upStyle()
                     3 -> readView.upBgAlpha()
                     4 -> readView.upPageSlopSquare()
-                    5 -> if (isInitFinish) ReadBook.loadContent(resetPageOffset = false)
+                    5 -> if (isInitFinish) {
+                        ReadBook.loadContent(resetPageOffset = ReadBook.isScroll)
+                    }
                     6 -> readView.upContent(resetPageOffset = false)
                     8 -> ChapterProvider.upStyle()
                     9 -> readView.invalidateTextPage()
