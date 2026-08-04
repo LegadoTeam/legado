@@ -17,7 +17,7 @@
       ref="frameRef"
       class="legacy-review-frame"
       :title="kind === 'chapter' ? '章评' : '段评'"
-      :srcdoc="pageHtml"
+      :src="pageUrl"
       sandbox="allow-scripts allow-modals"
       allow="fullscreen"
       referrerpolicy="no-referrer"
@@ -31,7 +31,7 @@ import API from '@api'
 
 const props = defineProps<{
   modelValue: boolean
-  pageHtml: string
+  pageUrl: string
   sessionId: string
   sessionNonce: string
   kind: 'paragraph' | 'chapter'

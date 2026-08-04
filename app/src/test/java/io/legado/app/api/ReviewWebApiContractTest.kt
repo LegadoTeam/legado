@@ -59,7 +59,6 @@ class ReviewWebApiContractTest {
         )
         val axios = readProjectFile("modules/web/src/api/axios.ts")
         val api = readProjectFile("modules/web/src/api/api.ts")
-        val interceptor = readProjectFile("modules/web/src/api/index.ts")
         val dialog = readProjectFile("modules/web/src/components/LegacyReviewDialog.vue")
 
         assertTrue(server.contains("uri == \"/legacyReviewPage\""))
@@ -67,12 +66,17 @@ class ReviewWebApiContractTest {
         assertTrue(server.contains("\"/runLegacyReview\" -> ReviewController.runLegacyReview"))
         assertTrue(server.contains("sandbox allow-scripts allow-modals"))
         assertTrue(server.contains("connect-src 'none'"))
+        assertTrue(server.contains("frame-src 'self' http: https:"))
+        assertTrue(server.contains("if (uri == \"/legacyReviewPage\") \"<redacted>\""))
         assertTrue(axios.contains("'openLegacyReview'"))
-        assertTrue(axios.contains("'legacyReviewPage'"))
+        assertFalse(axios.contains("'legacyReviewPage'"))
         assertTrue(axios.contains("'runLegacyReview'"))
-        assertTrue(api.contains("responseType: 'text'"))
-        assertTrue(interceptor.contains("if (resp.config.responseType === 'text') return resp"))
-        assertTrue(dialog.contains(":srcdoc=\"pageHtml\""))
+        assertTrue(api.contains("new URL('legacyReviewPage', legado_http_entry_point)"))
+        assertTrue(api.contains("url.searchParams.set('id', session.id)"))
+        assertTrue(api.contains("url.searchParams.set('nonce', session.nonce)"))
+        assertFalse(api.contains("responseType: 'text'"))
+        assertTrue(dialog.contains(":src=\"pageUrl\""))
+        assertFalse(dialog.contains(":srcdoc=\"pageHtml\""))
         assertTrue(dialog.contains("sandbox=\"allow-scripts allow-modals\""))
         assertTrue(dialog.contains("allow=\"fullscreen\""))
         assertFalse(dialog.contains("allow-same-origin"))
@@ -89,8 +93,11 @@ class ReviewWebApiContractTest {
         assertTrue(controller.contains("Math.max(100, Number(delay) || 0)"))
         assertFalse(controller.contains("fetch('runLegacyReview'"))
         assertTrue(server.contains("http-equiv=\\\"Content-Security-Policy\\\""))
-
-        assertTrue(server.contains("frame-ancestors 'none'"))
+        assertTrue(controller.contains("if (nonce != session.nonce) return null"))
+        assertTrue(controller.contains("showError(event.data.error)"))
+        assertTrue(controller.contains("channel.port1.onmessageerror"))
+        assertTrue(server.contains("allowedFrameAncestor(page?.frameOrigin)"))
+        assertFalse(server.contains("frame-ancestors 'none'"))
     }
 
     private fun readProjectFile(path: String): String {
