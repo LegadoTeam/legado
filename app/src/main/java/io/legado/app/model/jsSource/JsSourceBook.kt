@@ -10,10 +10,12 @@ import io.legado.app.exception.ContentEmptyException
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.exception.TocEmptyException
 import io.legado.app.help.book.BookHelp
+import io.legado.app.help.ConcurrentRateLimiter
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.isWebFile
 import io.legado.app.help.book.removeAllBookType
 import io.legado.app.help.source.getBookType
+import io.legado.app.model.BatchContentContext
 import io.legado.app.model.Debug
 import io.legado.app.model.webBook.BookChapterList
 import kotlinx.coroutines.ensureActive
@@ -136,6 +138,44 @@ object JsSourceBook {
             BookHelp.saveContent(source, book, chapter, content)
         }
         return content
+    }
+
+    /**
+     * 批量正文。
+     *
+     * 把整批章节交给 JS 源的 getContentBatch 函数,书源每处理完一章调用
+     * java.cacheContent(url, content) 回存。返回书源未回存的章节,
+     * 函数缺失或整批失败时返回全部章节,由调用方退回单章流程。
+     */
+    suspend fun getContentBatchAwait(
+        source: BookSource,
+        book: Book,
+        chapters: List<BookChapter>,
+    ): List<BookChapter> {
+        if (chapters.isEmpty()) return emptyList()
+        val batchContext = BatchContentContext(source, book, chapters)
+        Debug.log(source.bookSourceUrl, "≡JS源开始批量下载,本批${chapters.size}章")
+        coroutineContext.ensureActive()
+        //每批算一次并发,批内书源自己发的请求由 AnalyzeUrl 各自限流
+        ConcurrentRateLimiter(source).getConcurrentRecord()
+        val call = JsSourceEngine(source, coroutineContext).callContentBatch(
+            batchContext,
+            listOf(
+                "chapters" to chapters,
+                "book" to book,
+            ),
+        )
+        if (!call.exists) {
+            Debug.log(source.bookSourceUrl, "⇒JS源缺少 getContentBatch 函数,退回单章下载")
+            return chapters
+        }
+        coroutineContext.ensureActive()
+        val missing = batchContext.missingChapters()
+        Debug.log(
+            source.bookSourceUrl,
+            "≡JS源批量下载完成,成功${batchContext.savedCount()}章,未回存${missing.size}章"
+        )
+        return missing
     }
 
     private inline fun logSummary(sourceUrl: String, lines: () -> List<String>) {

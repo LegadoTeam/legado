@@ -568,6 +568,8 @@ class BookSourceEditActivity :
             add(EditEntity("webJs", cr.webJs, R.string.rule_web_js))
             add(EditEntity("payAction", cr.payAction, R.string.rule_pay_action))
             add(EditEntity("callBackJs", cr.callBackJs, R.string.rule_call_back))
+            add(EditEntity("contentBatch", cr.contentBatch, R.string.rule_content_batch))
+            add(EditEntity("maxBatchSize", cr.maxBatchSize?.toString(), R.string.rule_max_batch_size))
         }
         // 段评
         val rr = bs.ruleReview ?: ReviewRule()
@@ -794,6 +796,8 @@ class BookSourceEditActivity :
                 "imageDecode" -> contentRule.imageDecode = it.value
                 "payAction" -> contentRule.payAction = it.value
                 "callBackJs" -> contentRule.callBackJs = it.value
+                "contentBatch" -> contentRule.contentBatch = it.value
+                "maxBatchSize" -> contentRule.maxBatchSize = it.value?.toIntOrNull()
             }
         }
         reviewEntities.forEach {
