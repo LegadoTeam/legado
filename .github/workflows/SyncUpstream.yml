@@ -2,9 +2,8 @@ name: Sync Upstream (gedoor/legado)
 
 on:
   schedule:
-    # 每 12 小时运行一次（UTC 00:00 和 12:00）
     - cron: '0 */12 * * *'
-  workflow_dispatch: {}  # 支持手动触发
+  workflow_dispatch: {}
 
 jobs:
   sync:
@@ -28,50 +27,58 @@ jobs:
           else
             git remote add upstream https://github.com/gedoor/legado.git
           fi
-          git fetch upstream
-
-      - name: Determine default branch
-        id: branch
-        run: |
-          # Determine the default branch pointed to by origin/HEAD (e.g. main or master)
-          DEFAULT_BRANCH=$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null | sed 's@origin/@@')
-          # Fallbacks in case origin/HEAD isn't available
-          if [ -z "$DEFAULT_BRANCH" ]; then
-            if git show-ref --verify --quiet refs/heads/main; then
-              DEFAULT_BRANCH=main
-            elif git show-ref --verify --quiet refs/heads/master; then
-              DEFAULT_BRANCH=master
-            else
-              DEFAULT_BRANCH=main
-            fi
-          fi
-          echo "default_branch=$DEFAULT_BRANCH" >> $GITHUB_OUTPUT
+          git fetch upstream --prune
 
       - name: Check for upstream updates
         id: check
         run: |
-          BRANCH="${{ steps.branch.outputs.default_branch }}"
-          git fetch upstream "$BRANCH"
-          LOCAL=$(git rev-parse "$BRANCH")
-          REMOTE=$(git rev-parse "upstream/$BRANCH")
-          if [ "$LOCAL" = "$REMOTE" ]; then
-            echo "up_to_date=true" >> $GITHUB_OUTPUT
-            echo "✅ Already up to date."
-          else
+          # 获取 upstream 的默认分支（兼容 master/main 等）
+          UPSTREAM_BRANCH=$(git remote show upstream | awk '/HEAD branch/ {print $NF}')
+          # 备用解析方法
+          if [ -z "$UPSTREAM_BRANCH" ]; then
+            UPSTREAM_BRANCH=$(git ls-remote --symref upstream HEAD 2>/dev/null | sed -n 's|^ref: refs/heads/\([^ ]*\) HEAD$|\1|p')
+          fi
+          if [ -z "$UPSTREAM_BRANCH" ]; then
+            echo "Could not determine upstream default branch" >&2
+            exit 1
+          fi
+          echo "branch=$UPSTREAM_BRANCH" >> $GITHUB_OUTPUT
+
+          git fetch upstream "$UPSTREAM_BRANCH"
+
+          LOCAL=$(git rev-parse --verify "origin/$UPSTREAM_BRANCH" 2>/dev/null || git rev-parse --verify "$UPSTREAM_BRANCH" 2>/dev/null || true)
+          REMOTE=$(git rev-parse --verify "upstream/$UPSTREAM_BRANCH" 2>/dev/null || true)
+
+          if [ -z "$LOCAL" ] || [ -z "$REMOTE" ]; then
             echo "up_to_date=false" >> $GITHUB_OUTPUT
-            echo "🔄 Upstream has new commits."
+            echo "🔄 Upstream has new commits or branch missing locally."
+          else
+            if [ "$LOCAL" = "$REMOTE" ]; then
+              echo "up_to_date=true" >> $GITHUB_OUTPUT
+              echo "✅ Already up to date."
+            else
+              echo "up_to_date=false" >> $GITHUB_OUTPUT
+              echo "🔄 Upstream has new commits."
+            fi
           fi
 
       - name: Merge upstream changes
         if: steps.check.outputs.up_to_date == 'false'
         run: |
-          BRANCH="${{ steps.branch.outputs.default_branch }}"
-          # Ensure the local branch exists and tracks origin
-          git checkout "$BRANCH" || git checkout -b "$BRANCH" origin/"$BRANCH"
+          BRANCH="${{ steps.check.outputs.branch }}"
+          if git show-ref --verify --quiet "refs/heads/$BRANCH"; then
+            git checkout "$BRANCH"
+          else
+            if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+              git checkout -b "$BRANCH" "origin/$BRANCH"
+            else
+              git checkout -b "$BRANCH"
+            fi
+          fi
           git merge --no-edit "upstream/$BRANCH" || true
 
       - name: Push to origin
         if: steps.check.outputs.up_to_date == 'false'
         run: |
-          BRANCH="${{ steps.branch.outputs.default_branch }}"
-          git push "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "$BRANCH"
+          BRANCH="${{ steps.check.outputs.branch }}"
+          git push "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "HEAD:${BRANCH}"
