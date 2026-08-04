@@ -30,12 +30,30 @@ jobs:
           fi
           git fetch upstream
 
+      - name: Determine default branch
+        id: branch
+        run: |
+          # Determine the default branch pointed to by origin/HEAD (e.g. main or master)
+          DEFAULT_BRANCH=$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null | sed 's@origin/@@')
+          # Fallbacks in case origin/HEAD isn't available
+          if [ -z "$DEFAULT_BRANCH" ]; then
+            if git show-ref --verify --quiet refs/heads/main; then
+              DEFAULT_BRANCH=main
+            elif git show-ref --verify --quiet refs/heads/master; then
+              DEFAULT_BRANCH=master
+            else
+              DEFAULT_BRANCH=main
+            fi
+          fi
+          echo "default_branch=$DEFAULT_BRANCH" >> $GITHUB_OUTPUT
+
       - name: Check for upstream updates
         id: check
         run: |
-          git fetch upstream master
-          LOCAL=$(git rev-parse master)
-          REMOTE=$(git rev-parse upstream/master)
+          BRANCH="${{ steps.branch.outputs.default_branch }}"
+          git fetch upstream "$BRANCH"
+          LOCAL=$(git rev-parse "$BRANCH")
+          REMOTE=$(git rev-parse "upstream/$BRANCH")
           if [ "$LOCAL" = "$REMOTE" ]; then
             echo "up_to_date=true" >> $GITHUB_OUTPUT
             echo "✅ Already up to date."
@@ -47,10 +65,13 @@ jobs:
       - name: Merge upstream changes
         if: steps.check.outputs.up_to_date == 'false'
         run: |
-          git checkout master
-          git merge --no-edit upstream/master || true
+          BRANCH="${{ steps.branch.outputs.default_branch }}"
+          # Ensure the local branch exists and tracks origin
+          git checkout "$BRANCH" || git checkout -b "$BRANCH" origin/"$BRANCH"
+          git merge --no-edit "upstream/$BRANCH" || true
 
       - name: Push to origin
         if: steps.check.outputs.up_to_date == 'false'
         run: |
-          git push "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" master
+          BRANCH="${{ steps.branch.outputs.default_branch }}"
+          git push "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "$BRANCH"
