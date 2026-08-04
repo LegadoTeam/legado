@@ -376,12 +376,12 @@ object ReviewController {
         val context = requireContext(session.bookUrl, session.chapterIndex)
         require(context.source?.getKey() == session.sourceKey) { "书源已变更，请重新打开评论" }
         val source = requireNotNull(context.source) { "未找到书源" }
-        runScriptWithContext {
+        requireNotNull(runScriptWithContext {
             AnalyzeRule(context.book, source)
                 .setChapter(context.chapter)
                 .setCoroutineContext(coroutineContext)
                 .evalJS(request.script)
-        }?.toString().orEmpty()
+        }) { "旧评论脚本未返回结果" }.toString()
     }
 
     internal fun getLegacyReviewPage(
@@ -454,8 +454,11 @@ object ReviewController {
                   }, 120000);
                   channel.port1.onmessage = event => {
                     window.clearTimeout(timeout);
-                    if (event.data?.error) reject(showError(event.data.error));
-                    else resolve(event.data?.result == null ? '' : String(event.data.result));
+                    if (event.data?.error || event.data?.result == null) {
+                      reject(showError(event.data?.error));
+                    } else {
+                      resolve(String(event.data.result));
+                    }
                     channel.port1.close();
                   };
                   channel.port1.onmessageerror = () => {

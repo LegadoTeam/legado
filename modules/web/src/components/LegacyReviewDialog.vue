@@ -70,12 +70,15 @@ const handleMessage = async (event: MessageEvent) => {
     if (sessionId !== props.sessionId || sessionNonce !== props.sessionNonce) return
     replyPort.postMessage({
       result: response.data.isSuccess ? response.data.data : undefined,
-      error: response.data.isSuccess ? undefined : response.data.errorMsg,
+      error: response.data.isSuccess
+        ? undefined
+        : response.data.errorMsg || '评论加载失败',
     })
   } catch (error) {
     if (sessionId !== props.sessionId || sessionNonce !== props.sessionNonce) return
     replyPort.postMessage({
-      error: error instanceof Error ? error.message : String(error),
+      error:
+        (error instanceof Error ? error.message : String(error)) || '评论加载失败',
     })
   }
 }

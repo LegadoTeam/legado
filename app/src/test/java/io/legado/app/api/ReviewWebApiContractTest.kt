@@ -59,6 +59,7 @@ class ReviewWebApiContractTest {
         )
         val axios = readProjectFile("modules/web/src/api/axios.ts")
         val api = readProjectFile("modules/web/src/api/api.ts")
+        val apiIndex = readProjectFile("modules/web/src/api/index.ts")
         val dialog = readProjectFile("modules/web/src/components/LegacyReviewDialog.vue")
 
         assertTrue(server.contains("uri == \"/legacyReviewPage\""))
@@ -98,12 +99,20 @@ class ReviewWebApiContractTest {
         assertFalse(controller.contains("fetch('runLegacyReview'"))
         assertTrue(server.contains("http-equiv=\\\"Content-Security-Policy\\\""))
         assertTrue(controller.contains("if (nonce != session.nonce) return null"))
-        assertTrue(controller.contains("showError(event.data.error)"))
+        assertTrue(controller.contains("showError(event.data?.error)"))
+        assertTrue(controller.contains("event.data?.result == null"))
+        assertTrue(controller.contains("resolve(String(event.data.result))"))
+        assertTrue(controller.contains("旧评论脚本未返回结果"))
+        assertFalse(controller.contains("?.toString().orEmpty()"))
         assertTrue(controller.contains("channel.port1.onmessageerror"))
         assertTrue(controller.contains("showError('评论加载超时')"))
         assertTrue(controller.contains("window.clearTimeout(timeout)"))
         assertTrue(server.contains("allowedFrameAncestor(page?.frameOrigin)"))
         assertFalse(server.contains("frame-ancestors 'none'"))
+        assertFalse(apiIndex.contains("LeagdoApiResponseKeys.length = 0"))
+        assertTrue(apiIndex.contains("throw new Error('后端返回内容格式错误')"))
+        assertTrue(dialog.contains("response.data.errorMsg || '评论加载失败'"))
+        assertTrue(dialog.contains("String(error)) || '评论加载失败'"))
     }
 
     private fun readProjectFile(path: String): String {
