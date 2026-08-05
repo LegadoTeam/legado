@@ -438,9 +438,11 @@ object ReviewController {
               window.setInterval = (callback, delay, ...args) =>
                 nativeSetInterval(callback, Math.max(100, Number(delay) || 0), ...args);
               const nonce = ${GSON.toJson(nonce)};
+              const finishLoading = () =>
+                document.getElementById('loading')?.classList.add('hidden');
               const showError = error => {
                 const message = String(error || '评论加载失败');
-                document.getElementById('loading')?.classList.add('hidden');
+                finishLoading();
                 const viewer = document.getElementById('viewer');
                 if (viewer) viewer.textContent = message;
                 return new Error(message);
@@ -457,6 +459,7 @@ object ReviewController {
                     if (event.data?.error || event.data?.result == null) {
                       reject(showError(event.data?.error));
                     } else {
+                      finishLoading();
                       resolve(String(event.data.result));
                     }
                     channel.port1.close();
