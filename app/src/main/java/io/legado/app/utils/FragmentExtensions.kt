@@ -42,7 +42,7 @@ fun Fragment.showDialogFragment(dialogFragment: DialogFragment) {
 }
 
 fun Fragment.getPrefBoolean(key: String, defValue: Boolean = false) =
-    requireContext().defaultSharedPreferences.getBoolean(key, defValue)
+    requireContext().defaultSharedPreferences.getBooleanCompat(key, defValue)
 
 fun Fragment.putPrefBoolean(key: String, value: Boolean = false) =
     requireContext().defaultSharedPreferences.edit { putBoolean(key, value) }

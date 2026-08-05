@@ -178,7 +178,7 @@ val Context.defaultSharedPreferences: SharedPreferences
     get() = PreferenceManager.getDefaultSharedPreferences(this)
 
 fun Context.getPrefBoolean(key: String, defValue: Boolean = false) =
-    defaultSharedPreferences.getBoolean(key, defValue)
+    defaultSharedPreferences.getBooleanCompat(key, defValue)
 
 fun Context.putPrefBoolean(key: String, value: Boolean = false) =
     defaultSharedPreferences.edit { putBoolean(key, value) }

@@ -60,8 +60,21 @@ fun SharedPreferences.putString(key: String, value: String) {
 }
 
 fun SharedPreferences.getBoolean(key: String): Boolean {
-    return getBoolean(key, false)
+    return getBooleanCompat(key, false)
 }
+
+fun SharedPreferences.getBooleanCompat(key: String, defValue: Boolean): Boolean {
+    return try {
+        getBoolean(key, defValue)
+    } catch (_: ClassCastException) {
+        val value = parseBooleanPreference(all[key], defValue)
+        edit { putBoolean(key, value) }
+        value
+    }
+}
+
+internal fun parseBooleanPreference(value: Any?, defValue: Boolean): Boolean =
+    (value as? String)?.trim()?.toBooleanStrictOrNull() ?: defValue
 
 fun SharedPreferences.putBoolean(key: String, value: Boolean) {
     edit {
