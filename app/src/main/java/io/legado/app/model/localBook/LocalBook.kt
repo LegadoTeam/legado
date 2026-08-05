@@ -44,6 +44,7 @@ import io.legado.app.utils.GSON
 import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.delete
 import io.legado.app.utils.externalFiles
+import io.legado.app.utils.exists
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.inputStream
 import io.legado.app.utils.isAbsUrl
