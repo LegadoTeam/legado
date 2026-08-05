@@ -334,7 +334,7 @@ object LocalBook {
         )
     }
 
-    private fun <T> withParserCacheInvalidated(book: Book, action: () -> T): T {
+    internal fun <T> withParserCacheInvalidated(book: Book, action: () -> T): T {
         return withParserCacheInvalidated(book.bookUrl, book.originName, action)
     }
 
