@@ -41,7 +41,16 @@ class AudioEpisodeUnitTest {
         assertTrue(activity.contains("AudioPlay.durChapterIndex + 1"))
         assertTrue(activity.contains("binding.tvChapterIndex.visible()"))
         assertTrue(activity.contains("binding.tvChapterIndex.gone()"))
-        assertEquals(2, Regex("AudioPlay\\.upData\\(book\\)").findAll(viewModel).count())
+        assertEquals(
+            1,
+            Regex("AudioPlay\\.upData\\(book, preserveProgress = true\\)")
+                .findAll(viewModel).count(),
+        )
+        assertEquals(
+            1,
+            Regex("AudioPlay\\.upData\\(book, preserveProgress = false\\)")
+                .findAll(viewModel).count(),
+        )
         assertTrue(
             Regex(
                 "SleepTimerDialog\\.newInstance\\(\\s*" +
