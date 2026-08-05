@@ -137,8 +137,7 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
             ?.isChecked = AppConfig.changeSourceLoadInfo
         binding.toolBar.menu.findItem(R.id.menu_load_toc)
             ?.isChecked = AppConfig.changeSourceLoadToc
-        binding.toolBar.menu.findItem(R.id.menu_load_word_count)
-            ?.isChecked = AppConfig.changeSourceLoadWordCount
+        binding.toolBar.menu.syncChangeSourceResultOptions()
     }
 
     private fun initRecyclerView() {
@@ -289,8 +288,20 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
 
             R.id.menu_load_word_count -> {
                 AppConfig.changeSourceLoadWordCount = !item.isChecked
-                item.isChecked = !item.isChecked
-                viewModel.onLoadWordCountChecked(item.isChecked)
+                binding.toolBar.menu.syncChangeSourceResultOptions()
+                viewModel.onLoadWordCountChecked()
+            }
+
+            R.id.menu_sort_respond_time -> {
+                val enabled = !item.isChecked
+                AppConfig.changeSourceSortRespondTime = enabled
+                binding.toolBar.menu.syncChangeSourceResultOptions()
+                viewModel.onResultOptionsChanged(enabled)
+            }
+
+            R.id.menu_word_count_filter -> showChangeSourceWordCountFilter { reload ->
+                binding.toolBar.menu.syncChangeSourceResultOptions()
+                viewModel.onResultOptionsChanged(reload)
             }
 
             R.id.menu_start_stop -> viewModel.startOrStopSearch()

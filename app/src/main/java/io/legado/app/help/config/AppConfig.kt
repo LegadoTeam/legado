@@ -547,9 +547,40 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         }
 
     var changeSourceLoadWordCount: Boolean
-        get() = appCtx.getPrefBoolean(PreferKey.changeSourceLoadWordCount)
+        get() = appCtx.getPrefBoolean(PreferKey.changeSourceLoadWordCount) ||
+                appCtx.getPrefBoolean(PreferKey.changeSourceSortRespondTime) ||
+                appCtx.getPrefInt(PreferKey.changeSourceWordCountFilterMode) != 0
         set(value) {
             appCtx.putPrefBoolean(PreferKey.changeSourceLoadWordCount, value)
+            if (!value) {
+                changeSourceSortRespondTime = false
+                changeSourceWordCountFilterMode = 0
+            }
+        }
+
+    var changeSourceSortRespondTime: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.changeSourceSortRespondTime)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.changeSourceSortRespondTime, value)
+        }
+
+    var changeSourceWordCountFilterMode: Int
+        get() = appCtx.getPrefInt(PreferKey.changeSourceWordCountFilterMode).coerceIn(0, 2)
+        set(value) {
+            val mode = value.coerceIn(0, 2)
+            appCtx.putPrefInt(PreferKey.changeSourceWordCountFilterMode, mode)
+        }
+
+    var changeSourceWordCountFilterMin: Int
+        get() = appCtx.getPrefInt(PreferKey.changeSourceWordCountFilterMin)
+        set(value) {
+            appCtx.putPrefInt(PreferKey.changeSourceWordCountFilterMin, value.coerceAtLeast(0))
+        }
+
+    var changeSourceWordCountFilterMax: Int
+        get() = appCtx.getPrefInt(PreferKey.changeSourceWordCountFilterMax)
+        set(value) {
+            appCtx.putPrefInt(PreferKey.changeSourceWordCountFilterMax, value.coerceAtLeast(0))
         }
 
     var openBookInfoByClickTitle: Boolean

@@ -1288,6 +1288,14 @@
     <string name="only_latest_backup_s">本地备份仅保留最新备份文件</string>
     <string name="webdav_application_authorization_error">webDav应用验证失败</string>
     <string name="load_word_count">加载字数</string>
+    <string name="change_source_sort_respond_time">按响应时间排序</string>
+    <string name="change_source_word_count_filter">字数过滤</string>
+    <string name="change_source_word_count_filter_off">关闭</string>
+    <string name="change_source_word_count_filter_absolute">绝对字数范围</string>
+    <string name="change_source_word_count_filter_relative">相对当前源字数百分比</string>
+    <string name="change_source_word_count_minimum">下限</string>
+    <string name="change_source_word_count_maximum">上限</string>
+    <string name="change_source_relative_word_count_unavailable">无法获取当前源字数，未应用相对过滤</string>
     <string name="replace_exclude_scope">排除范围，选填书名或者书源 URL</string>
     <string name="format_js_rule">格式化规则(formatJs)</string>
     <string name="adjust_pos">调整位置</string>

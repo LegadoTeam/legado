@@ -1298,6 +1298,14 @@
     <string name="webdav_application_authorization_error">Fail to authorize WebDav application</string>
     <string name="respondTime">respondTime: %1$d ms</string>
     <string name="load_word_count">Load word count</string>
+    <string name="change_source_sort_respond_time">Sort by response time</string>
+    <string name="change_source_word_count_filter">Word count filter</string>
+    <string name="change_source_word_count_filter_off">Off</string>
+    <string name="change_source_word_count_filter_absolute">Absolute word count range</string>
+    <string name="change_source_word_count_filter_relative">Relative to current source (%)</string>
+    <string name="change_source_word_count_minimum">Minimum</string>
+    <string name="change_source_word_count_maximum">Maximum</string>
+    <string name="change_source_relative_word_count_unavailable">Current source word count is unavailable; relative filtering was not applied</string>
     <string name="replace_exclude_scope">Exclude range, optional title or source URL</string>
     <string name="format_js_rule">格式化规则(formatJs)</string>
     <string name="adjust_pos">Adjustment position</string>
