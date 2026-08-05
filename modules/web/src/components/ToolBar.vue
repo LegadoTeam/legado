@@ -362,10 +362,16 @@ function readHotkeysConfig() {
   justify-content: center;
 }
 
+.menu {
+  justify-content: safe center;
+  overflow-y: auto;
+}
+
 .menu > .el-button {
+  flex: none;
   margin: 4px;
   padding: 1em;
-  width: 6em;
+  width: 8em;
 }
 
 .hotkeys-item {

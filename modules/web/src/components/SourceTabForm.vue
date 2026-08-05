@@ -118,4 +118,20 @@ const { currentSource } = storeToRefs(store);
   white-space: normal;
   overflow-wrap: anywhere;
 }
+
+@media screen and (max-width: 600px) {
+  :deep(.el-form-item) {
+    display: block;
+  }
+
+  :deep(.el-form-item__label) {
+    width: auto !important;
+    justify-content: flex-start;
+    margin-bottom: 6px;
+  }
+
+  :deep(.el-form-item__content) {
+    margin-left: 0 !important;
+  }
+}
 </style>
