@@ -43,6 +43,7 @@ import io.legado.app.help.GlideImageGetter
 import io.legado.app.help.TextViewTagHandler
 import io.legado.app.help.WebCacheManager
 import io.legado.app.help.book.addType
+import io.legado.app.help.book.getLocalUri
 import io.legado.app.help.book.getRemoteUrl
 import io.legado.app.help.book.isAudio
 import io.legado.app.help.book.isImage
@@ -829,7 +830,7 @@ class BookInfoActivity :
             var kinds = book.getKindList()
             if (book.isLocal) {
                 withContext(IO) {
-                    val size = FileDoc.fromFile(book.bookUrl).size
+                    val size = FileDoc.fromUri(book.getLocalUri(), false).size
                     if (size > 0) {
                         kinds = kinds.toMutableList()
                         kinds.add(ConvertUtils.formatFileSize(size))

@@ -22,6 +22,7 @@ import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.archiveName
+import io.legado.app.help.book.cacheLocalUri
 import io.legado.app.help.book.getArchiveUri
 import io.legado.app.help.book.getLocalUri
 import io.legado.app.help.book.getRemoteUrl
@@ -41,6 +42,7 @@ import io.legado.app.utils.FileDoc
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.MD5Utils
+import io.legado.app.utils.delete
 import io.legado.app.utils.externalFiles
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.inputStream
@@ -102,12 +104,8 @@ object LocalBook {
                 val localArchiveUri = book.getArchiveUri()
                 val webDavUrl = book.getRemoteUrl()
                 if (localArchiveUri != null) {
-                    // 重新导入对应的压缩包
-                    importArchiveFile(localArchiveUri, book.originName) {
-                        it.contains(book.originName)
-                    }.firstOrNull()?.let {
-                        getBookInputStream(it)
-                    }
+                    restoreArchiveBookFile(book, localArchiveUri)
+                    getBookInputStream(book)
                 } else if (webDavUrl != null && downloadRemoteBook(book)) {
                     // 下载远程链接
                     getBookInputStream(book)
@@ -122,13 +120,10 @@ object LocalBook {
 
     fun getLastModified(book: Book): Result<Long> {
         return kotlin.runCatching {
-            val uri = book.bookUrl.toUri()
-            if (uri.isContentScheme()) {
-                return@runCatching DocumentFile.fromSingleUri(appCtx, uri)!!.lastModified()
-            }
-            val file = File(uri.path!!)
-            if (file.exists()) {
-                return@runCatching file.lastModified()
+            val uri = book.getLocalUri()
+            val fileDoc = FileDoc.fromUri(uri, false)
+            if (fileDoc.exists()) {
+                return@runCatching fileDoc.lastModified
             }
             throw FileNotFoundException("${uri.path} 文件不存在")
         }
@@ -459,12 +454,7 @@ object LocalBook {
                 FileUtils.delete(book.coverUrl!!)
             }
             if (deleteOriginal) {
-                if (book.bookUrl.isContentScheme()) {
-                    val uri = book.bookUrl.toUri()
-                    DocumentFile.fromSingleUri(appCtx, uri)?.delete()
-                } else {
-                    FileUtils.delete(book.bookUrl)
-                }
+                FileDoc.fromUri(book.getLocalUri(), false).delete()
             }
         }
     }
@@ -547,6 +537,19 @@ object LocalBook {
         return appDb.bookDao.hasFile(fileName)
     }
 
+    private fun restoreArchiveBookFile(book: Book, archiveUri: Uri) {
+        val archiveFileDoc = FileDoc.fromUri(archiveUri, false)
+        val extractedFile = ArchiveUtils.deCompress(
+            archiveFileDoc,
+            filter = { it.contains(book.originName) }
+        ).firstOrNull()
+            ?: throw NoStackTraceException(appCtx.getString(R.string.unsupport_archivefile_entry))
+        val fileUri = saveBookFile(FileInputStream(extractedFile), book.originName)
+        withParserCacheInvalidated(book) {
+            book.cacheLocalUri(fileUri)
+        }
+    }
+
     //文件类书源 合并在线书籍信息 在线 > 本地
     fun mergeBook(localBook: Book, onLineBook: Book?): Book {
         onLineBook ?: return localBook
@@ -578,18 +581,13 @@ object LocalBook {
             }
             inputStream.use {
                 if (localBook.isArchive) {
-                    // 压缩包
                     val archiveUri = saveBookFile(it, localBook.archiveName)
-                    val newBook = importArchiveFile(archiveUri, localBook.originName) { name ->
-                        name.contains(localBook.originName)
-                    }.first()
-                    localBook.origin = newBook.origin
-                    localBook.bookUrl = newBook.bookUrl
+                    restoreArchiveBookFile(localBook, archiveUri)
                 } else {
-                    // txt epub pdf umd
                     val fileUri = saveBookFile(it, localBook.originName)
-                    localBook.bookUrl = FileDoc.fromUri(fileUri, false).toString()
-                    localBook.save()
+                    withParserCacheInvalidated(localBook) {
+                        localBook.cacheLocalUri(fileUri)
+                    }
                 }
             }
             return true
