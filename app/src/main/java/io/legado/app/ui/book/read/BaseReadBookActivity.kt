@@ -24,6 +24,7 @@ import io.legado.app.databinding.ActivityBookReadBinding
 import io.legado.app.databinding.DialogDownloadChoiceBinding
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.databinding.DialogSimulatedReadingBinding
+import io.legado.app.help.book.cacheLocalUri
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
@@ -33,6 +34,7 @@ import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.model.CacheBook
 import io.legado.app.model.ReadBook
+import io.legado.app.model.localBook.LocalBook
 import io.legado.app.ui.book.read.config.BgTextConfigDialog
 import io.legado.app.ui.book.read.config.ClickActionConfigDialog
 import io.legado.app.ui.book.read.config.PaddingConfigDialog
@@ -99,8 +101,10 @@ abstract class BaseReadBookActivity :
         it.uri?.let { uri ->
             ReadBook.book?.let { book ->
                 FileDoc.fromUri(uri, true).find(book.originName)?.let { doc ->
-                    book.bookUrl = doc.uri.toString()
-                    book.save()
+                    AppConfig.importBookPath = uri.toString()
+                    LocalBook.withParserCacheInvalidated(book) {
+                        book.cacheLocalUri(doc.uri)
+                    }
                     viewModel.loadChapterList(book)
                 } ?: ReadBook.upMsg("找不到文件")
             }

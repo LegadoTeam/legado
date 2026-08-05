@@ -169,6 +169,7 @@ object PreferKey {
     const val lastSleepChapter = "lastSleepChapter"
     const val noAnimScrollPage = "noAnimScrollPage"
     const val webDavDeviceName = "webDavDeviceName"
+    const val webDavBookAutoRestore = "webDavBookAutoRestore"
     const val webServiceWakeLock = "webServiceWakeLock"
     const val audioPlayWakeLock = "audioPlayWakeLock"
     const val readAloudWakeLock = "readAloudWakeLock"

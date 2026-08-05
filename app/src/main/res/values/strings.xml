@@ -1236,6 +1236,8 @@
     <string name="sure_clear_search_history">Are you sure to clear all search history</string>
     <string name="no_anim_scroll_page">Disable scroll click animation</string>
     <string name="webdav_device_name">Device name</string>
+    <string name="webdav_book_auto_restore_t">Restore missing local books</string>
+    <string name="webdav_book_auto_restore_s">Restore an exact-name match from the WebDAV books directory when a local book file is missing</string>
     <string name="web_service_wake_lock">WebService Wake up Lock</string>
     <string name="web_service_wake_lock_summary">The wake-up lock is enabled when the web service is enabled, and some phones will be killed when the wake-up lock is enabled.</string>
     <string name="read_aloud_wake_lock">Read aloud service wake-up lock</string>

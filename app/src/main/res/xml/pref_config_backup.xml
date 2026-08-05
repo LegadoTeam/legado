@@ -42,6 +42,15 @@
             app:iconSpaceReserved="false" />
 
         <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="false"
+            android:key="webDavBookAutoRestore"
+            android:summary="@string/webdav_book_auto_restore_s"
+            android:title="@string/webdav_book_auto_restore_t"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.SwitchPreference
             android:defaultValue="true"
             android:key="syncBookProgress"
             android:summary="@string/sync_book_progress_s"

@@ -37,6 +37,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.webdav.WebDav
 import io.legado.app.lib.webdav.WebDavException
 import io.legado.app.model.analyzeRule.AnalyzeUrl
+import io.legado.app.model.remote.RemoteBook
 import io.legado.app.utils.ArchiveUtils
 import io.legado.app.utils.FileDoc
 import io.legado.app.utils.FileUtils
@@ -60,9 +61,28 @@ import java.io.FileInputStream
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.InputStream
+import java.util.concurrent.CancellationException
 import java.util.regex.Pattern
 import androidx.core.net.toUri
 import kotlinx.coroutines.currentCoroutineContext
+
+internal fun isMissingLocalBookFile(
+    isContentUri: Boolean,
+    localFileExists: Boolean,
+    error: Throwable,
+): Boolean {
+    if (error is SecurityException || error is CancellationException) return false
+    return if (isContentUri) {
+        error is FileNotFoundException
+    } else {
+        !localFileExists
+    }
+}
+
+internal fun findExactRemoteBook(
+    remoteBooks: List<RemoteBook>,
+    fileName: String,
+): RemoteBook? = remoteBooks.firstOrNull { !it.isDir && it.filename == fileName }
 
 internal fun resolveLocalBookOutputFile(root: File, relativePath: String): File {
     val canonicalRoot = root.canonicalFile
@@ -99,24 +119,30 @@ object LocalBook {
     @Throws(FileNotFoundException::class, SecurityException::class)
     fun getBookInputStream(book: Book): InputStream {
         val uri = book.getLocalUri()
-        val inputStream = uri.inputStream(appCtx).getOrNull()
-            ?: let {
-                book.removeLocalUriCache()
-                val localArchiveUri = book.getArchiveUri()
-                val webDavUrl = book.getRemoteUrl()
-                if (localArchiveUri != null) {
-                    restoreArchiveBookFile(book, localArchiveUri)
-                    getBookInputStream(book)
-                } else if (webDavUrl != null && downloadRemoteBook(book)) {
-                    // 下载远程链接
-                    getBookInputStream(book)
-                } else {
-                    null
-                }
-            }
-        if (inputStream != null) return inputStream
+        val inputStreamResult = uri.inputStream(appCtx)
+        inputStreamResult.getOrNull()?.let { return it }
+        val readError = inputStreamResult.exceptionOrNull()
+            ?: FileNotFoundException("${uri.path} 文件不存在")
+        if (!isMissingLocalBookFile(
+                isContentUri = uri.isContentScheme(),
+                localFileExists = uri.path?.let(::File)?.exists() == true,
+                error = readError,
+            )
+        ) {
+            throw readError
+        }
         book.removeLocalUriCache()
-        throw FileNotFoundException("${uri.path} 文件不存在")
+        val localArchiveUri = book.getArchiveUri()
+        if (localArchiveUri != null) {
+            restoreArchiveBookFile(book, localArchiveUri)
+            return getBookInputStream(book)
+        }
+        if (downloadRemoteBook(book)) {
+            return getBookInputStream(book)
+        }
+        throw FileNotFoundException("${uri.path} 文件不存在").apply {
+            addSuppressed(readError)
+        }
     }
 
     fun getLastModified(book: Book): Result<Long> {
@@ -563,20 +589,35 @@ object LocalBook {
         return localBook
     }
 
-    //下载book对应的远程文件 并更新Book
-    private fun downloadRemoteBook(localBook: Book): Boolean {
-        val webDavUrl = localBook.getRemoteUrl()
-        if (webDavUrl.isNullOrBlank()) throw NoStackTraceException("Book file is not webDav File")
+    // 下载 book 对应的远程文件并绑定本地路径
+    internal fun downloadRemoteBook(localBook: Book): Boolean {
+        val webDavUrl = localBook.getRemoteUrl()?.takeIf(String::isNotBlank)
+        if (webDavUrl == null && !AppConfig.webDavBookAutoRestore) return false
+        val defaultBookWebDav = if (webDavUrl == null) {
+            AppWebDav.defaultBookWebDav ?: return false
+        } else null
         try {
             AppConfig.defaultBookTreeUri
                 ?: throw NoBooksDirException()
-            // 兼容旧版链接
-            val webdav: WebDav = kotlin.runCatching {
-                WebDav.fromPath(webDavUrl)
-            }.getOrElse {
-                AppWebDav.authorization?.let { WebDav(webDavUrl, it) }
-                    ?: throw WebDavException("Unexpected defaultBookWebDav")
-            }
+            val webdav = webDavUrl?.let { url ->
+                // 兼容旧版链接
+                kotlin.runCatching {
+                    WebDav.fromPath(url)
+                }.getOrElse {
+                    AppWebDav.authorization?.let { WebDav(url, it) }
+                        ?: throw WebDavException("Unexpected defaultBookWebDav")
+                }
+            } ?: defaultBookWebDav?.let { bookWebDav ->
+                val fileName = if (localBook.isArchive) {
+                    localBook.archiveName
+                } else {
+                    localBook.originName
+                }
+                val remoteBook = runBlocking {
+                    bookWebDav.getRemoteBookList(bookWebDav.rootBookUrl)
+                }.let { findExactRemoteBook(it, fileName) } ?: return false
+                WebDav(remoteBook.path, bookWebDav.authorization)
+            } ?: return false
             val inputStream = runBlocking {
                 webdav.downloadInputStream()
             }
