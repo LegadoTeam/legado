@@ -38,6 +38,7 @@ import { useDark } from '@vueuse/core'
 import type { SourceConfig } from '@/config/sourceConfig'
 import { Key } from '@element-plus/icons-vue'
 import { ElSegmented } from 'element-plus'
+import 'element-plus/es/components/segmented/style/css'
 import { requestSourceApiToken } from '@/api/sourceToken'
 import JsSourceEditor from '@/components/JsSourceEditor.vue'
 
@@ -88,6 +89,7 @@ onMounted(authorize)
 
 .source-mode {
   height: 48px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -115,6 +117,47 @@ onMounted(authorize)
     min-height: 0;
     width: 360px;
     margin-right: 20px;
+  }
+}
+
+@media screen and (max-width: 900px) {
+  .source-editor {
+    overflow-y: auto;
+  }
+
+  .source-mode {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: var(--el-bg-color);
+  }
+
+  .editor {
+    display: block;
+    height: auto;
+    overflow: visible;
+
+    .left,
+    .right {
+      flex: none;
+      width: auto;
+      height: 100vh;
+      min-height: 520px;
+      margin: 0 12px;
+    }
+
+    .right {
+      margin-bottom: 12px;
+    }
+  }
+
+  .editor.with-mode {
+    height: auto;
+
+    .left,
+    .right {
+      height: calc(100vh - 48px);
+    }
   }
 }
 
