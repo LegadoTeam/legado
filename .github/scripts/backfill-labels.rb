@@ -106,6 +106,8 @@ if ARGV == ['--self-test']
   expected = ['area: manga', 'impact: performance']
   abort("missing labels: #{expected - labels}") unless (expected - labels).empty?
   abort('missing historical Web label') unless labels_for('增加web端', content_rules).include?('area: web')
+  abort('audio progress sync matched data') if labels_for('朗读进度和文字显示不同步', content_rules).include?('area: data')
+  abort('backup sync missed data') unless labels_for('书架书籍备份同步', content_rules).include?('area: data')
 
   files = [
     'app/src/main/java/io/legado/app/ui/book/manga/ReadMangaActivity.kt',

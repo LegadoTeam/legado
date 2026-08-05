@@ -198,6 +198,7 @@ object SourceHelp {
             ContextCompat.startForegroundService(appCtx, intent)
         } else {
             appCtx.startActivity<VideoPlayerActivity> {
+                putExtra("forceNormalPlayer", true)
                 putExtra("videoUrl", url)
                 putExtra("videoTitle", title)
                 putExtra("sourceKey", source?.getKey())

@@ -74,6 +74,12 @@ object VideoPlay : CoroutineScope by MainScope(){
         set(value) {
             videoPrefs.edit { putBoolean("startFull", value) }
         }
+    /**  默认使用悬浮窗播放  **/
+    var defaultFloatWindow
+        get() = videoPrefs.getBoolean("defaultFloatWindow", false)
+        set(value) {
+            videoPrefs.edit { putBoolean("defaultFloatWindow", value) }
+        }
     /**  长按倍速  **/
     var longPressSpeed
         get() = videoPrefs.getInt("longPressSpeed", 30)

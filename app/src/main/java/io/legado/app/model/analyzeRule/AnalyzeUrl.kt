@@ -8,6 +8,7 @@ import cn.hutool.core.codec.PercentCodec
 import cn.hutool.core.net.RFC3986
 import cn.hutool.core.util.HexUtil
 import com.bumptech.glide.load.model.GlideUrl
+import com.google.gson.annotations.SerializedName
 import com.script.buildScriptBindings
 import com.script.rhino.RhinoScriptEngine
 import com.script.rhino.runScriptWithContext
@@ -844,6 +845,7 @@ class AnalyzeUrl(
         /**
          * 自定义的域名ip
          **/
+        @SerializedName(value = "dnsIp", alternate = ["resolveIp"])
         private var dnsIp: String? = null,
         /**
          * 解析完url参数时执行的js

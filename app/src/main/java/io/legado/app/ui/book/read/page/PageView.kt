@@ -282,6 +282,9 @@ class PageView(context: Context) : FrameLayout(context) {
             resetPageOffset()
         }
         binding.contentTextView.setContent(textPage)
+        if (resetPageOffset && isMainView && isScroll) {
+            binding.contentTextView.restorePageOffset(ReadBook.durChapterPos)
+        }
     }
 
     fun invalidateContentView() {
@@ -382,6 +385,10 @@ class PageView(context: Context) : FrameLayout(context) {
 
     fun getCurVisiblePage(): TextPage {
         return binding.contentTextView.getCurVisiblePage()
+    }
+
+    fun getReadPosition(): Pair<Int, TextLine>? {
+        return binding.contentTextView.getReadPosition()
     }
 
     fun getReadAloudPos(): Pair<Int, TextLine>? {

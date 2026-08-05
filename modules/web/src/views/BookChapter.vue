@@ -107,7 +107,7 @@
     <ReviewDialog v-model="reviewVisible" :target="selectedReview" />
     <LegacyReviewDialog
       v-model="legacyReviewVisible"
-      :page-html="legacyReviewPageHtml"
+      :page-url="legacyReviewPageUrl"
       :session-id="legacyReviewSessionId"
       :session-nonce="legacyReviewSessionNonce"
       :kind="legacyReviewKind"
@@ -312,7 +312,7 @@ const chapterData = ref<ChapterData[]>([])
 const reviewVisible = ref(false)
 const selectedReview = ref<ReviewTarget | null>(null)
 const legacyReviewVisible = ref(false)
-const legacyReviewPageHtml = ref('')
+const legacyReviewPageUrl = ref('')
 const legacyReviewSessionId = ref('')
 const legacyReviewSessionNonce = ref('')
 const legacyReviewKind = ref<LegacyReviewClick['kind']>('paragraph')
@@ -336,11 +336,11 @@ const openLegacyReview = async (
       ElMessage.error(response.data.errorMsg)
       return
     }
+    const session = response.data.data
     legacyReviewKind.value = target.kind
-    legacyReviewSessionId.value = response.data.data.id
-    legacyReviewSessionNonce.value = response.data.data.nonce
-    const page = await API.getLegacyReviewPage(legacyReviewSessionId.value)
-    legacyReviewPageHtml.value = page.data
+    legacyReviewSessionId.value = session.id
+    legacyReviewSessionNonce.value = session.nonce
+    legacyReviewPageUrl.value = API.getLegacyReviewPageUrl(session)
     legacyReviewVisible.value = true
   } catch (error) {
     if (error !== 'cancel' && error !== 'close') {

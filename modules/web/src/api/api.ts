@@ -160,11 +160,12 @@ const openLegacyReview = (
 const runLegacyReview = (id: string, script: string) =>
   ajax.post<LeagdoApiResponse<string>>('runLegacyReview', { id, script })
 
-const getLegacyReviewPage = (id: string) =>
-  ajax.post<string>('legacyReviewPage', new URLSearchParams({ id }), {
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    responseType: 'text',
-  })
+const getLegacyReviewPageUrl = (session: LegacyReviewSession) => {
+  const url = new URL('legacyReviewPage', legado_http_entry_point)
+  url.searchParams.set('id', session.id)
+  url.searchParams.set('nonce', session.nonce)
+  return url.toString()
+}
 
 // webSocket
 const search = (
@@ -331,7 +332,7 @@ export default {
   getReviewReplies,
   openLegacyReview,
   runLegacyReview,
-  getLegacyReviewPage,
+  getLegacyReviewPageUrl,
   search,
   saveBook,
   deleteBook,

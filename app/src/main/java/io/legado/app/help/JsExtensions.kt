@@ -25,6 +25,7 @@ import io.legado.app.help.source.SourceVerificationHelp
 import io.legado.app.help.source.VerificationResult
 import io.legado.app.help.source.getSourceType
 import io.legado.app.model.Debug
+import io.legado.app.model.VideoPlay
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.analyzeRule.QueryTTF
 import io.legado.app.ui.association.OnLineImportActivity
@@ -329,7 +330,7 @@ interface JsExtensions : JsEncodeUtils {
 
     @JavascriptInterface
     fun openVideoPlayer(url: String, title: String) {
-        openVideoPlayer(url, title, false)
+        openVideoPlayer(url, title, VideoPlay.defaultFloatWindow)
     }
 
     /**

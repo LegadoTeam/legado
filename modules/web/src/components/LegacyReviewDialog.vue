@@ -17,7 +17,7 @@
       ref="frameRef"
       class="legacy-review-frame"
       :title="kind === 'chapter' ? '章评' : '段评'"
-      :srcdoc="pageHtml"
+      :src="pageUrl"
       sandbox="allow-scripts allow-modals"
       allow="fullscreen"
       referrerpolicy="no-referrer"
@@ -31,7 +31,7 @@ import API from '@api'
 
 const props = defineProps<{
   modelValue: boolean
-  pageHtml: string
+  pageUrl: string
   sessionId: string
   sessionNonce: string
   kind: 'paragraph' | 'chapter'
@@ -70,12 +70,15 @@ const handleMessage = async (event: MessageEvent) => {
     if (sessionId !== props.sessionId || sessionNonce !== props.sessionNonce) return
     replyPort.postMessage({
       result: response.data.isSuccess ? response.data.data : undefined,
-      error: response.data.isSuccess ? undefined : response.data.errorMsg,
+      error: response.data.isSuccess
+        ? undefined
+        : response.data.errorMsg || '评论加载失败',
     })
   } catch (error) {
     if (sessionId !== props.sessionId || sessionNonce !== props.sessionNonce) return
     replyPort.postMessage({
-      error: error instanceof Error ? error.message : String(error),
+      error:
+        (error instanceof Error ? error.message : String(error)) || '评论加载失败',
     })
   }
 }

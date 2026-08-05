@@ -2,6 +2,8 @@ package io.legado.app.ui.rss.read
 
 import io.legado.app.data.entities.RssArticle
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReadRssTitleTest {
@@ -120,5 +122,16 @@ class ReadRssTitleTest {
                 ruleContent = null,
             ),
         )
+    }
+
+    @Test
+    fun `description only source preserves the article when refreshing`() {
+        assertTrue(shouldPreserveRssArticleOnRefresh(null))
+        assertTrue(shouldPreserveRssArticleOnRefresh("  "))
+    }
+
+    @Test
+    fun `content source refreshes through its content rule`() {
+        assertFalse(shouldPreserveRssArticleOnRefresh("article rule"))
     }
 }
