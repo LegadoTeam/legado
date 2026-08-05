@@ -111,13 +111,27 @@ class AudioPlayBookResolverTest {
         assertTrue(viewModel.contains("cachedBook = cachedBook"))
         assertFalse(viewModel.contains("cachedBook.takeUnless"))
         assertFalse(viewModel.contains("getBooleanExtra(\"inBookshelf\""))
-        assertTrue(viewModel.contains("durChapterIndex = cachedChapterIndex"))
-        assertTrue(viewModel.contains("durChapterPos = cachedChapterPos"))
+        assertTrue(viewModel.contains("val resolvedBook = resolveAudioPlayBook("))
+        assertFalse(viewModel.contains("cachedChapterIndex"))
+        assertFalse(viewModel.contains("cachedChapterPos"))
         assertTrue(viewModel.contains("val temporaryBook = targetBook.copy().apply"))
         assertTrue(viewModel.contains("appDb.bookDao.insertIgnore(temporaryBook)"))
         assertTrue(viewModel.contains("val concurrentBook = appDb.bookDao.getBook(requestedBookUrl)"))
         assertTrue(viewModel.contains("databaseBook = concurrentBook"))
         assertTrue(viewModel.contains("else -> !(databaseBook ?: targetBook).isNotShelf"))
+
+        val audioPlay = projectFile(
+            "src/main/java/io/legado/app/model/AudioPlay.kt"
+        ).readText()
+        val upData = audioPlay.substringAfter("fun upData(book: Book, preserveProgress: Boolean)")
+            .substringBefore("fun resetData(book: Book)")
+        assertTrue(upData.contains("val playbackChanged = synchronized(this)"))
+        assertTrue(upData.contains("if (preserveProgress &&"))
+        assertTrue(upData.contains("book.durChapterIndex = durChapterIndex"))
+        assertTrue(upData.contains("book.durChapterPos = durChapterPos"))
+        assertTrue(upData.contains("AudioPlay.book = book"))
+        assertTrue(viewModel.contains("AudioPlay.upData(book, preserveProgress = true)"))
+        assertTrue(viewModel.contains("AudioPlay.upData(book, preserveProgress = false)"))
     }
 
     @Test
