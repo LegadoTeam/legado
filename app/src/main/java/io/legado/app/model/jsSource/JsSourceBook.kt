@@ -153,7 +153,7 @@ object JsSourceBook {
         chapters: List<BookChapter>,
     ): List<BookChapter> {
         if (chapters.isEmpty()) return emptyList()
-        val batchContext = BatchContentContext(source, book, chapters)
+        val batchContext = BatchContentContext(source, book, chapters, coroutineContext)
         Debug.log(source.bookSourceUrl, "≡JS源开始批量下载,本批${chapters.size}章")
         coroutineContext.ensureActive()
         //每批算一次并发,批内书源自己发的请求由 AnalyzeUrl 各自限流
