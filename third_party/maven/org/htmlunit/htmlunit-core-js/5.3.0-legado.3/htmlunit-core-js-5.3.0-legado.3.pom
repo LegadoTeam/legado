@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.htmlunit</groupId>
+    <artifactId>htmlunit-core-js</artifactId>
+    <version>5.3.0-legado.3</version>
+    <name>HtmlUnit JavaScript Engine</name>
+    <description>Legado-compatible build of HtmlUnit's Rhino fork.</description>
+    <url>https://github.com/skybbk1001/htmlunit-core-js</url>
+    <licenses>
+        <license>
+            <name>Mozilla Public License 2.0</name>
+            <url>https://www.mozilla.org/MPL/2.0/</url>
+        </license>
+    </licenses>
+</project>
