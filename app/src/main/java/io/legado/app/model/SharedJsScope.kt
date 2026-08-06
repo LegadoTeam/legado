@@ -131,20 +131,10 @@ object SharedJsScope {
         val creationLock = acquireScopeCreationLock(scopeCreationLocks, key)
         try {
             synchronized(creationLock.monitor) {
-                if (jsLib.isJsonObject()) {
-                    val jsMap: Map<String, String> = GSON.fromJson(
-                        jsLib,
-                        TypeToken.getParameterized(
-                            Map::class.java,
-                            String::class.java,
-                            String::class.java,
-                        ).type,
-                    )
-                    jsMap.values.forEach { value ->
-                        if (value.isAbsUrl()) {
-                            val fileName = MD5Utils.md5Encode(value)
-                            aCache.remove(fileName)
-                        }
+                parseJsLibMap(jsLib)?.values?.forEach { value ->
+                    if (value.isAbsUrl()) {
+                        val fileName = MD5Utils.md5Encode(value)
+                        aCache.remove(fileName)
                     }
                 }
                 synchronized(scopeLock) {
@@ -243,15 +233,8 @@ object SharedJsScope {
         scope: ScriptBindings,
         coroutineContext: CoroutineContext?,
     ) {
-        if (jsLib.isJsonObject()) {
-            val jsMap: Map<String, String> = GSON.fromJson(
-                jsLib,
-                TypeToken.getParameterized(
-                    Map::class.java,
-                    String::class.java,
-                    String::class.java,
-                ).type,
-            )
+        val jsMap = parseJsLibMap(jsLib)
+        if (jsMap != null) {
             jsMap.values.forEach { value ->
                 if (value.isAbsUrl()) {
                     val fileName = MD5Utils.md5Encode(value)
@@ -274,6 +257,20 @@ object SharedJsScope {
         } else {
             RhinoScriptEngine.eval(jsLib, scope, coroutineContext)
         }
+    }
+
+    private fun parseJsLibMap(jsLib: String): Map<String, String>? {
+        if (!jsLib.isJsonObject()) return null
+        return runCatching {
+            GSON.fromJson<Map<String, String>>(
+                jsLib,
+                TypeToken.getParameterized(
+                    Map::class.java,
+                    String::class.java,
+                    String::class.java,
+                ).type,
+            )
+        }.getOrNull()
     }
 
     private fun preventExtensions(scope: ScriptBindings) {
