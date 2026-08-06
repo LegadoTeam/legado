@@ -293,7 +293,8 @@ object BookContent {
         if (chapters.isEmpty()) {
             return emptyList()
         }
-        val batchContext = BatchContentContext(bookSource, book, chapters)
+        val batchContext =
+            BatchContentContext(bookSource, book, chapters, currentCoroutineContext())
         val analyzeRule = AnalyzeRule(book, bookSource)
         analyzeRule.setCoroutineContext(currentCoroutineContext())
         analyzeRule.setChapter(chapters.first())

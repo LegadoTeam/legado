@@ -421,15 +421,13 @@ object CacheBook {
                 batchChapters.add(chapter)
             }
             if (batchChapters.size < 2) return false
-            batchChapters.forEach {
-                waitDownloadSet.remove(it.index)
-                onDownloadSet.add(it.index)
-            }
+            //候选已排除进行中的章节,且与领取同处一把锁内,这里必然全部领取成功
+            val claimed = BatchChapterClaim.claim(batchChapters, onDownloadSet, waitDownloadSet)
             Coroutine.async(scope, context, executeContext = context) {
-                WebBook.getContentBatchAwait(bookSource, book, batchChapters)
+                WebBook.getContentBatchAwait(bookSource, book, claimed)
             }.onSuccess { missingChapters ->
                 val missingIndexes = missingChapters.mapTo(hashSetOf()) { it.index }
-                batchChapters.forEach { chapter ->
+                claimed.forEach { chapter ->
                     if (missingIndexes.contains(chapter.index)) return@forEach
                     val content = BookHelp.getContent(book, chapter)
                     if (content.isNullOrEmpty()) {
@@ -441,12 +439,12 @@ object CacheBook {
                     onSuccess(chapter)
                     downloadFinish(chapter, content)
                 }
-                onBatchMissing(batchChapters.filter { missingIndexes.contains(it.index) })
+                onBatchMissing(claimed.filter { missingIndexes.contains(it.index) })
             }.onError { error ->
                 AppLog.put("《${book.name}》批量下载失败,退回单章下载\n${error.localizedMessage}", error)
-                onBatchMissing(batchChapters)
+                onBatchMissing(claimed)
             }.onCancel {
-                onBatchCancel(batchChapters)
+                onBatchCancel(claimed)
             }.onFinally {
                 onFinally()
             }.apply {
@@ -483,16 +481,23 @@ object CacheBook {
          */
         suspend fun downloadBatchAwait(chapters: List<BookChapter>): List<BookChapter> {
             if (chapters.isEmpty()) return emptyList()
-            synchronized(this) {
-                chapters.forEach {
-                    onDownloadSet.add(it.index)
-                    waitDownloadSet.remove(it.index)
-                }
+            //只领取没被手动缓存等任务占用的章节,别人在下的不碰
+            val claimed = synchronized(this) {
+                BatchChapterClaim.claim(chapters, onDownloadSet, waitDownloadSet)
+            }
+            if (claimed.size < 2) {
+                synchronized(this) { BatchChapterClaim.release(claimed, onDownloadSet) }
+                return chapters
+            }
+            //已走完成回调的章节标记已被释放,finally 不能重复归还
+            val completed = hashSetOf<Int>()
+            val unclaimed = chapters.filterNot { chapter ->
+                claimed.any { it.index == chapter.index }
             }
             try {
-                val missingIndexes = WebBook.getContentBatchAwait(bookSource, book, chapters)
+                val missingIndexes = WebBook.getContentBatchAwait(bookSource, book, claimed)
                     .mapTo(hashSetOf()) { it.index }
-                chapters.forEach { chapter ->
+                claimed.forEach { chapter ->
                     if (missingIndexes.contains(chapter.index)) return@forEach
                     val content = BookHelp.getContent(book, chapter)
                     if (content.isNullOrEmpty()) {
@@ -501,11 +506,12 @@ object CacheBook {
                     }
                     BookHelp.saveImages(bookSource, book, chapter, content, 1)
                     onSuccess(chapter)
+                    completed.add(chapter.index)
                     ReadBook.downloadedChapters.add(chapter.index)
                     ReadBook.downloadFailChapters.remove(chapter.index)
                     downloadFinish(chapter, content)
                 }
-                return chapters.filter { missingIndexes.contains(it.index) }
+                return unclaimed + claimed.filter { missingIndexes.contains(it.index) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -513,7 +519,10 @@ object CacheBook {
                 return chapters
             } finally {
                 synchronized(this) {
-                    chapters.forEach { onDownloadSet.remove(it.index) }
+                    BatchChapterClaim.release(
+                        claimed.filterNot { completed.contains(it.index) },
+                        onDownloadSet
+                    )
                 }
                 postEvent(EventBus.UP_DOWNLOAD, book.bookUrl)
             }

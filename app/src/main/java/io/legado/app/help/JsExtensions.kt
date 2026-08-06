@@ -72,6 +72,7 @@ import org.htmlunit.corejs.javascript.Function
 import org.htmlunit.corejs.javascript.Scriptable
 import org.htmlunit.corejs.javascript.ScriptableObject
 import org.htmlunit.corejs.javascript.Undefined
+import org.htmlunit.corejs.javascript.Wrapper
 import splitties.init.appCtx
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -137,25 +138,30 @@ interface JsExtensions : JsEncodeUtils {
      * 书源在 contentBatch 规则(或 JS 源的 getContentBatch 函数)里每处理完一章即可调用,
      * 内容会立刻写入缓存目录,不必等整批结束。只能在批量流程内调用。
      *
-     * @param chapterUrl 章节地址,取本批章节数组里的 url 字段
-     * @param content 章节正文
+     * @param chapter 本批章节数组里的章节对象,也可传章节 url;
+     *   目录里存在多章共用同一 url 时必须传章节对象,否则无法区分是哪一章
+     * @param content 章节正文,会套用书源的正文替换规则后保存
      * @return 是否成功保存
      */
     @JavascriptInterface
-    fun cacheContent(chapterUrl: String, content: String): Boolean {
+    fun cacheContent(chapter: Any?, content: String): Boolean {
         rhinoContextOrNull?.ensureActive()
         val batchContext = getBatchContext()
             ?: throw NoStackTraceException("java.cacheContent 只能在批量正文规则中调用")
-        val chapter = batchContext.findChapter(chapterUrl)
-            ?: throw NoStackTraceException("java.cacheContent 未匹配到本批次章节: $chapterUrl")
+        val identifier = if (chapter is Wrapper) chapter.unwrap() else chapter
+        val target = batchContext.resolveChapter(identifier)
+            ?: throw NoStackTraceException(
+                "java.cacheContent 未匹配到本批次章节: $identifier" +
+                    ",重复 url 的目录请直接传入章节对象"
+            )
         if (content.isEmpty()) {
-            log("cacheContent 内容为空,跳过: ${chapter.title}")
+            log("cacheContent 内容为空,跳过: ${target.title}")
             return false
         }
-        BookHelp.saveText(batchContext.book, chapter, content)
-        batchContext.markSaved(chapter)
-        postEvent(EventBus.SAVE_CONTENT, Pair(batchContext.book, chapter))
-        log("批量缓存成功: ${chapter.title}")
+        BookHelp.saveText(batchContext.book, target, batchContext.applyContentReplace(target, content))
+        batchContext.markSaved(target)
+        postEvent(EventBus.SAVE_CONTENT, Pair(batchContext.book, target))
+        log("批量缓存成功: ${target.title}")
         return true
     }
 
