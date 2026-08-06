@@ -44,7 +44,6 @@ import io.legado.app.help.TextViewTagHandler
 import io.legado.app.help.WebCacheManager
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.getLocalUri
-import io.legado.app.help.book.getRemoteUrl
 import io.legado.app.help.book.isAudio
 import io.legado.app.help.book.isImage
 import io.legado.app.help.book.isLocal
@@ -121,6 +120,8 @@ import io.noties.markwon.html.HtmlPlugin
 import io.noties.markwon.image.glide.GlideImagesPlugin
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
@@ -436,16 +437,7 @@ class BookInfoActivity :
 
             R.id.menu_delete_alert -> LocalConfig.bookInfoDeleteAlert = !item.isChecked
             R.id.menu_upload -> {
-                viewModel.getBook()?.let { book ->
-                    book.getRemoteUrl()?.let {
-                        alert(R.string.draw, R.string.sure_upload) {
-                            okButton {
-                                upLoadBook(book)
-                            }
-                            cancelButton()
-                        }
-                    } ?: upLoadBook(book)
-                }
+                viewModel.getBook()?.let { confirmAndUploadBook(it) }
             }
         }
         return super.onCompatOptionsItemSelected(item)
@@ -518,21 +510,59 @@ class BookInfoActivity :
     private fun upLoadBook(
         book: Book,
         bookWebDav: RemoteBookWebDav? = AppWebDav.defaultBookWebDav,
+        onFinished: () -> Unit = {},
     ) {
         lifecycleScope.launch {
-            waitDialog.setText("上传中.....")
+            waitDialog.setText(R.string.loading)
             waitDialog.show()
             try {
                 bookWebDav
                     ?.upload(book)
-                    ?: throw NoStackTraceException("未配置webDav")
+                    ?: throw NoStackTraceException(getString(R.string.webdav_not_configured))
                 //更新书籍最后更新时间,使之比远程书籍的时间新
                 book.lastCheckTime = System.currentTimeMillis()
                 viewModel.saveBook(book)
             } catch (e: Exception) {
+                currentCoroutineContext().ensureActive()
                 toastOnUi(e.localizedMessage)
             } finally {
                 waitDialog.dismiss()
+            }
+            onFinished()
+        }
+    }
+
+    private fun confirmAndUploadBook(
+        book: Book,
+        onFinished: () -> Unit = {},
+    ) {
+        val bookWebDav = AppWebDav.defaultBookWebDav
+        if (bookWebDav == null) {
+            toastOnUi(R.string.webdav_not_configured)
+            onFinished()
+            return
+        }
+        lifecycleScope.launch {
+            waitDialog.setText(R.string.loading)
+            waitDialog.show()
+            val remoteExists = try {
+                bookWebDav.hasRemoteBook(book)
+            } catch (e: Exception) {
+                currentCoroutineContext().ensureActive()
+                toastOnUi(e.localizedMessage)
+                onFinished()
+                return@launch
+            } finally {
+                waitDialog.dismiss()
+            }
+            if (!remoteExists) {
+                upLoadBook(book, bookWebDav, onFinished)
+                return@launch
+            }
+            alert(R.string.draw, R.string.webdav_book_exists_confirm) {
+                yesButton { upLoadBook(book, bookWebDav, onFinished) }
+                noButton { onFinished() }
+                onCancelled { onFinished() }
             }
         }
     }
@@ -1266,42 +1296,70 @@ class BookInfoActivity :
             toastOnUi("Unexpected webFileData")
             return
         }
-        selector(
-            R.string.download_and_import_file,
-            webFiles
-        ) { _, webFile, _ ->
-            if (webFile.isSupported) {
-                /* import */
-                viewModel.importOrDownloadWebFile<Book>(webFile) {
-                    onClick?.invoke(it)
-                }
-            } else if (webFile.isSupportDecompress) {
-                /* 解压筛选后再选择导入项 */
-                viewModel.importOrDownloadWebFile<Uri>(webFile) { uri ->
-                    viewModel.getArchiveFilesName(uri) { fileNames ->
-                        if (fileNames.size == 1) {
-                            viewModel.importArchiveBook(uri, fileNames[0]) {
-                                onClick?.invoke(it)
+        val uploadCheckBox = CheckBox(this).apply {
+            setText(R.string.upload_imported_book_to_webdav)
+            isChecked = LocalConfig.uploadImportedBookToWebDav
+            setOnCheckedChangeListener { _, isChecked ->
+                LocalConfig.uploadImportedBookToWebDav = isChecked
+            }
+        }
+        alert(titleResource = R.string.download_and_import_file) {
+            items(webFiles) { _, webFile, _ ->
+                val uploadToWebDav = uploadCheckBox.isChecked
+                if (webFile.isSupported) {
+                    /* import */
+                    viewModel.importOrDownloadWebFile<Book>(webFile) {
+                        onWebBookImported(it, uploadToWebDav, onClick)
+                    }
+                } else if (webFile.isSupportDecompress) {
+                    /* 解压筛选后再选择导入项 */
+                    viewModel.importOrDownloadWebFile<Uri>(webFile) { uri ->
+                        viewModel.getArchiveFilesName(uri) { fileNames ->
+                            if (fileNames.size == 1) {
+                                viewModel.importArchiveBook(uri, fileNames[0]) {
+                                    onWebBookImported(it, uploadToWebDav, onClick)
+                                }
+                            } else {
+                                showDecompressFileImportAlert(uri, fileNames) {
+                                    onWebBookImported(it, uploadToWebDav, onClick)
+                                }
                             }
-                        } else {
-                            showDecompressFileImportAlert(uri, fileNames, onClick)
                         }
                     }
-                }
-            } else {
-                alert(
-                    title = getString(R.string.draw),
-                    message = getString(R.string.file_not_supported, webFile.name)
-                ) {
-                    neutralButton(R.string.open_fun) {
-                        /* download only */
-                        viewModel.importOrDownloadWebFile<Uri>(webFile) {
-                            openFileUri(it, "*/*")
+                } else {
+                    alert(
+                        title = getString(R.string.draw),
+                        message = getString(R.string.file_not_supported, webFile.name)
+                    ) {
+                        neutralButton(R.string.open_fun) {
+                            /* download only */
+                            viewModel.importOrDownloadWebFile<Uri>(webFile) {
+                                openFileUri(it, "*/*")
+                            }
                         }
+                        noButton()
                     }
-                    noButton()
                 }
             }
+            customView {
+                LinearLayout(this@BookInfoActivity).apply {
+                    setPadding(16.dpToPx(), 0, 16.dpToPx(), 8.dpToPx())
+                    addView(uploadCheckBox)
+                }
+            }
+        }
+    }
+
+    private fun onWebBookImported(
+        book: Book,
+        uploadToWebDav: Boolean,
+        onClick: ((Book) -> Unit)?,
+    ) {
+        val onFinished: () -> Unit = { onClick?.invoke(book) }
+        if (uploadToWebDav) {
+            confirmAndUploadBook(book, onFinished)
+        } else {
+            onFinished()
         }
     }
 

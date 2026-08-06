@@ -6,7 +6,10 @@ import io.legado.app.constant.AppPattern.bookFileRegex
 import io.legado.app.constant.BookType
 import io.legado.app.data.entities.Book
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.book.archiveName
+import io.legado.app.help.book.getArchiveUri
 import io.legado.app.help.book.getLocalUri
+import io.legado.app.help.book.isArchive
 import io.legado.app.help.book.update
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.webdav.Authorization
@@ -14,9 +17,13 @@ import io.legado.app.lib.webdav.WebDav
 import io.legado.app.lib.webdav.WebDavFile
 import io.legado.app.model.analyzeRule.CustomUrl
 import io.legado.app.model.localBook.LocalBook
+import io.legado.app.model.localBook.findExactRemoteBook
 import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.isContentScheme
 import kotlinx.coroutines.runBlocking
+
+internal fun remoteBookUploadFileName(book: Book): String =
+    if (book.isArchive) book.archiveName else book.originName
 
 class RemoteBookWebDav(
     val rootBookUrl: String,
@@ -67,10 +74,20 @@ class RemoteBookWebDav(
         }
     }
 
+    suspend fun hasRemoteBook(book: Book): Boolean {
+        val fileName = remoteBookUploadFileName(book)
+        return findExactRemoteBook(getRemoteBookList(rootBookUrl), fileName) != null
+    }
+
     override suspend fun upload(book: Book) {
         if (!NetworkUtils.isAvailable()) throw NoStackTraceException("网络不可用")
-        val localBookUri = book.getLocalUri()
-        val putUrl = "$rootBookUrl${book.originName}"
+        val fileName = remoteBookUploadFileName(book)
+        val localBookUri = if (book.isArchive) {
+            book.getArchiveUri() ?: throw NoStackTraceException("未找到压缩文件: $fileName")
+        } else {
+            book.getLocalUri()
+        }
+        val putUrl = "$rootBookUrl$fileName"
         val webDav = WebDav(putUrl, authorization)
         if (localBookUri.isContentScheme()) {
             webDav.upload(localBookUri)

@@ -1148,6 +1148,9 @@
     <string name="auto_save_cookie">CookieJar</string>
     <string name="cookie">清除 Cookie</string>
     <string name="download_and_import_file">导入在线书籍文件</string>
+    <string name="upload_imported_book_to_webdav">下载后同步到 WebDAV</string>
+    <string name="webdav_book_exists_confirm">WebDAV 已存在同名书籍，是否覆盖？</string>
+    <string name="webdav_not_configured">未配置 WebDAV</string>
     <string name="upload_book_success">上传成功</string>
     <string name="upload_book_fail">上传失败</string>
     <string name="download_book_success">下载成功</string>

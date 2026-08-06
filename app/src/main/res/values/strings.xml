@@ -1153,6 +1153,9 @@
     <string name="auto_save_cookie">CookieJar</string>
     <string name="cookie">Clear cookie</string>
     <string name="download_and_import_file">Import online book files</string>
+    <string name="upload_imported_book_to_webdav">Sync downloaded book to WebDAV</string>
+    <string name="webdav_book_exists_confirm">A book with the same name already exists on WebDAV. Overwrite it?</string>
+    <string name="webdav_not_configured">WebDAV is not configured</string>
     <string name="upload_book_success">Upload Success</string>
     <string name="upload_book_fail">Upload Fail</string>
     <string name="download_book_success">Download Success</string>
