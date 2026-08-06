@@ -785,6 +785,8 @@
     <string name="plus">Plus</string>
     <string name="system_typeface">System typeface</string>
     <string name="delete_book_file">Delete source file</string>
+    <string name="delete_webdav_book_file">Also delete the same-named WebDAV file</string>
+    <string name="delete_webdav_book_file_fail">Failed to delete the same-named WebDAV file</string>
     <string name="text_default">Default</string>
     <string name="default1">Default-1</string>
     <string name="default2">Default-2</string>

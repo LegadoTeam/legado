@@ -83,6 +83,39 @@ class RemoteBookWebDavUploadTest {
         assertFalse(importedBook.contains("book.bookUrl ="))
     }
 
+    @Test
+    fun `local book deletion resolves the exact WebDAV file before local removal`() {
+        val activity = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/info/BookInfoActivity.kt"
+        )
+        val remoteBook = readProjectFile(
+            "src/main/java/io/legado/app/model/remote/RemoteBookWebDav.kt"
+        )
+
+        assertTrue(activity.contains("AppWebDav.defaultBookWebDav != null"))
+        assertTrue(activity.contains("deleteRemote = deleteRemoteCheckBox?.isChecked == true"))
+        val deleteBook = activity.substringAfter(
+            "private fun deleteBook(book: Book, deleteOriginal: Boolean, deleteRemote: Boolean)"
+        ).substringBefore("private fun finishDeleteBook")
+        val remoteDelete = deleteBook.indexOf("bookWebDav.delete(book)")
+        val failedDelete = deleteBook.indexOf("if (!deleted)")
+        val failedDeleteReturn = deleteBook.indexOf("return@launch", failedDelete)
+        val localDelete = deleteBook.lastIndexOf("finishDeleteBook(book, deleteOriginal)")
+        assertTrue(
+            remoteDelete >= 0 &&
+                failedDelete > remoteDelete &&
+                failedDeleteReturn > failedDelete &&
+                localDelete > failedDeleteReturn
+        )
+        assertTrue(remoteBook.contains("val fileName = remoteBookUploadFileName(book)"))
+        assertTrue(
+            remoteBook.contains(
+                "findExactRemoteBook(getRemoteBookList(rootBookUrl), fileName)"
+            )
+        )
+        assertTrue(remoteBook.contains("WebDav(remoteBook.path, authorization).delete()"))
+    }
+
     private fun readProjectFile(pathInApp: String): String {
         val file = sequenceOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull(File::isFile)

@@ -104,6 +104,13 @@ class RemoteBookWebDav(
         book.update()
     }
 
+    suspend fun delete(book: Book): Boolean {
+        val fileName = remoteBookUploadFileName(book)
+        val remoteBook = findExactRemoteBook(getRemoteBookList(rootBookUrl), fileName)
+            ?: return true
+        return WebDav(remoteBook.path, authorization).delete()
+    }
+
     override suspend fun delete(remoteBookUrl: String) {
         if (!NetworkUtils.isAvailable()) throw NoStackTraceException("网络不可用")
         WebDav(remoteBookUrl, authorization).delete()

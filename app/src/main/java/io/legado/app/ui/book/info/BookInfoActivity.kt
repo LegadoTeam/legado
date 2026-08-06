@@ -1234,37 +1234,79 @@ class BookInfoActivity :
                     titleResource = R.string.draw,
                     messageResource = R.string.sure_del
                 ) {
-                    var checkBox: CheckBox? = null
+                    var deleteOriginalCheckBox: CheckBox? = null
+                    var deleteRemoteCheckBox: CheckBox? = null
                     if (book.isLocal) {
-                        checkBox = CheckBox(this@BookInfoActivity).apply {
+                        deleteOriginalCheckBox = CheckBox(this@BookInfoActivity).apply {
                             setText(R.string.delete_book_file)
                             isChecked = LocalConfig.deleteBookOriginal
                         }
                         val view = LinearLayout(this@BookInfoActivity).apply {
+                            orientation = LinearLayout.VERTICAL
                             setPadding(16.dpToPx(), 0, 16.dpToPx(), 0)
-                            addView(checkBox)
+                            addView(deleteOriginalCheckBox)
+                            if (AppWebDav.defaultBookWebDav != null) {
+                                deleteRemoteCheckBox = CheckBox(this@BookInfoActivity).apply {
+                                    setText(R.string.delete_webdav_book_file)
+                                }
+                                addView(deleteRemoteCheckBox)
+                            }
                         }
                         customView { view }
                     }
                     yesButton {
-                        if (checkBox != null) {
-                            LocalConfig.deleteBookOriginal = checkBox.isChecked
+                        if (deleteOriginalCheckBox != null) {
+                            LocalConfig.deleteBookOriginal = deleteOriginalCheckBox.isChecked
                         }
-                        SourceCallBack.callBackBook(SourceCallBack.DEL_BOOK_SHELF, viewModel.bookSource, book) //确认后删除书架
-                        viewModel.delBook(LocalConfig.deleteBookOriginal) {
-                            setResult(RESULT_OK)
-                            finish()
-                        }
+                        deleteBook(
+                            book = book,
+                            deleteOriginal = LocalConfig.deleteBookOriginal,
+                            deleteRemote = deleteRemoteCheckBox?.isChecked == true,
+                        )
                     }
                     noButton()
                 }
             } else {
-                SourceCallBack.callBackBook(SourceCallBack.DEL_BOOK_SHELF, viewModel.bookSource, book) //点按钮直接删除书架
-                viewModel.delBook(LocalConfig.deleteBookOriginal) {
-                    setResult(RESULT_OK)
-                    finish()
-                }
+                deleteBook(book, LocalConfig.deleteBookOriginal, deleteRemote = false)
             }
+        }
+    }
+
+    private fun deleteBook(book: Book, deleteOriginal: Boolean, deleteRemote: Boolean) {
+        if (!deleteRemote) {
+            finishDeleteBook(book, deleteOriginal)
+            return
+        }
+        val bookWebDav = AppWebDav.defaultBookWebDav
+        if (bookWebDav == null) {
+            toastOnUi(R.string.webdav_not_configured)
+            return
+        }
+        lifecycleScope.launch {
+            waitDialog.setText(R.string.loading)
+            waitDialog.show()
+            val deleted = try {
+                withContext(IO) { bookWebDav.delete(book) }
+            } catch (e: Exception) {
+                currentCoroutineContext().ensureActive()
+                toastOnUi(e.localizedMessage ?: getString(R.string.delete_webdav_book_file_fail))
+                return@launch
+            } finally {
+                waitDialog.dismiss()
+            }
+            if (!deleted) {
+                toastOnUi(R.string.delete_webdav_book_file_fail)
+                return@launch
+            }
+            finishDeleteBook(book, deleteOriginal)
+        }
+    }
+
+    private fun finishDeleteBook(book: Book, deleteOriginal: Boolean) {
+        SourceCallBack.callBackBook(SourceCallBack.DEL_BOOK_SHELF, viewModel.bookSource, book)
+        viewModel.delBook(deleteOriginal) {
+            setResult(RESULT_OK)
+            finish()
         }
     }
 

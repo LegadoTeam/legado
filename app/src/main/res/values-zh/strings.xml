@@ -781,6 +781,8 @@
     <string name="plus">加</string>
     <string name="system_typeface">系统内置字体样式</string>
     <string name="delete_book_file">删除源文件</string>
+    <string name="delete_webdav_book_file">同时删除 WebDAV 同名文件</string>
+    <string name="delete_webdav_book_file_fail">删除 WebDAV 同名文件失败</string>
     <string name="text_default">默认</string>
     <string name="default1">预设一</string>
     <string name="default2">预设二</string>
