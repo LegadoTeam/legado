@@ -26,3 +26,11 @@ test('uses bounded labels and stable source list rows', () => {
   assert.match(list, /class="source-list-panel"/)
   assert.doesNotMatch(list, /calc\(100% - 75px\)/)
 })
+
+test('keeps the JavaScript source toolbar balanced on narrow screens', () => {
+  const editor = readSource('components/JsSourceEditor.vue')
+
+  assert.match(editor, /max-width: 600px/)
+  assert.match(editor, /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/)
+  assert.match(editor, /grid-column: 1 \/ -1/)
+})
