@@ -1,7 +1,10 @@
 package io.legado.app.ui.book.read.page
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class PullBookmarkGestureTest {
 
@@ -23,5 +26,19 @@ class PullBookmarkGestureTest {
             PullBookmarkGestureState.READY,
             classifyPullBookmarkGesture(4f, 48f, 8, 48),
         )
+    }
+
+    @Test
+    fun `bookmark actions use the metadata-bearing current page`() {
+        val source = source("app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
+        assertTrue(source.contains("val page = binding.readView.curPage.textPage"))
+        assertFalse(source.contains("val page = binding.readView.getCurVisiblePage()"))
+    }
+
+    private fun source(relativePath: String): String {
+        val userDir = requireNotNull(System.getProperty("user.dir"))
+        val root = generateSequence(File(userDir)) { it.parentFile }
+            .first { File(it, "app/src/main").isDirectory }
+        return File(root, relativePath).readText()
     }
 }

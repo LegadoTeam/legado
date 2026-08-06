@@ -2415,7 +2415,7 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     override fun toggleBookmark() {
         val book = ReadBook.book ?: return
-        val page = binding.readView.getCurVisiblePage()
+        val page = binding.readView.curPage.textPage
         if (page.lines.isEmpty()) {
             toastOnUi(R.string.create_bookmark_error)
             return
@@ -2485,7 +2485,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     fun upBookmarkIndicator() {
-        val page = binding.readView.getCurVisiblePage()
+        val page = binding.readView.curPage.textPage
         val hasBookmark = page.lines.isNotEmpty() && bookmarks.any {
             it.chapterIndex == page.chapterIndex && page.containPos(it.chapterPos)
         }
