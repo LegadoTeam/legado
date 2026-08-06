@@ -34,3 +34,20 @@ test('keeps the JavaScript source toolbar balanced on narrow screens', () => {
   assert.match(editor, /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/)
   assert.match(editor, /grid-column: 1 \/ -1/)
 })
+
+test('keeps source editor state and mobile controls reachable', () => {
+  const editor = readSource('components/JsSourceEditor.vue')
+  const view = readSource('views/SourceEditor.vue')
+  const tools = readSource('components/SourceTabTools.vue')
+  const json = readSource('components/SourceJson.vue')
+  const config = readSource('config/bookSourceEditConfig.ts')
+
+  assert.match(editor, /store\.currentSource !== source/)
+  assert.match(editor, /if \(openedSource\) store\.changeCurrentSource\(openedSource\)/)
+  assert.match(editor, /source\.bookSourceName.*source\.bookSourceUrl/)
+  assert.match(view, /height: 100dvh/)
+  assert.match(view, /height: calc\(100dvh - 48px\)/)
+  assert.match(tools, /set: val => store\.changeTabName\(val\)/)
+  assert.doesNotMatch(json, /margin-bottom: 4px/)
+  assert.match(config, /返回 -1 表示章评，1 开始表示正文段落/)
+})

@@ -84,6 +84,7 @@ onMounted(authorize)
 <style lang="scss" scoped>
 .source-editor {
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -142,6 +143,7 @@ onMounted(authorize)
       flex: none;
       width: auto;
       height: 100vh;
+      height: 100dvh;
       min-height: 520px;
       margin: 0 12px;
     }
@@ -157,6 +159,7 @@ onMounted(authorize)
     .left,
     .right {
       height: calc(100vh - 48px);
+      height: calc(100dvh - 48px);
     }
   }
 }
@@ -167,6 +170,7 @@ onMounted(authorize)
 
 .authorization {
   height: 100vh;
+  height: 100dvh;
   display: grid;
   place-items: center;
 }

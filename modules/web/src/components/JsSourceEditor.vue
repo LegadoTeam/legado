@@ -12,7 +12,7 @@
         <el-option
           v-for="source in jsSources"
           :key="source.bookSourceUrl"
-          :label="source.bookSourceName"
+          :label="`${source.bookSourceName} · ${source.bookSourceUrl}`"
           :value="source.bookSourceUrl"
         />
       </el-select>
@@ -79,6 +79,9 @@ const loadSource = (source: BookSoure) => {
   selectedSourceUrl.value = source.bookSourceUrl
   script.value = sourceScript
   savedScript.value = sourceScript
+  if (store.currentSource !== source) {
+    store.changeCurrentSource(source)
+  }
 }
 
 const resetEditor = () => {
@@ -213,13 +216,14 @@ watch(
   async ([active, source]) => {
     if (!active) return
     if (!sourcesLoaded && store.bookSources.length === 0) await pullSources()
-    if (
-      isJsSource(source) &&
-      source.bookSourceUrl !== openedSourceUrl.value &&
-      (await confirmDiscard())
-    ) {
-      loadSource(source)
-    }
+    if (!isJsSource(source) || source.bookSourceUrl === openedSourceUrl.value)
+      return
+    if (await confirmDiscard()) return loadSource(source)
+
+    const openedSource = jsSources.value.find(
+      item => item.bookSourceUrl === openedSourceUrl.value,
+    )
+    if (openedSource) store.changeCurrentSource(openedSource)
   },
   { immediate: true },
 )

@@ -511,6 +511,7 @@ export default {
         namespace: 'ruleReview',
         id: 'summaryParagraphIndexRule',
         type: 'String',
+        hint: '返回 -1 表示章评，1 开始表示正文段落',
       },
       {
         title: '段评数量（summaryCountRule）',
