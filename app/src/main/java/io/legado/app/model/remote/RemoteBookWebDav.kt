@@ -80,6 +80,10 @@ class RemoteBookWebDav(
     }
 
     override suspend fun upload(book: Book) {
+        upload(book, overwrite = true)
+    }
+
+    suspend fun upload(book: Book, overwrite: Boolean) {
         if (!NetworkUtils.isAvailable()) throw NoStackTraceException("网络不可用")
         val fileName = remoteBookUploadFileName(book)
         val localBookUri = if (book.isArchive) {
@@ -90,9 +94,9 @@ class RemoteBookWebDav(
         val putUrl = "$rootBookUrl$fileName"
         val webDav = WebDav(putUrl, authorization)
         if (localBookUri.isContentScheme()) {
-            webDav.upload(localBookUri)
+            webDav.upload(localBookUri, overwrite = overwrite)
         } else {
-            webDav.upload(localBookUri.path!!)
+            webDav.upload(localBookUri.path!!, overwrite = overwrite)
         }
         book.origin = BookType.webDavTag + CustomUrl(putUrl)
             .putAttribute("serverID", serverID)

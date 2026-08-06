@@ -63,6 +63,8 @@ import io.legado.app.help.webView.WebJsExtensions.Companion.nameSource
 import io.legado.app.help.webView.WebViewPool
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
+import io.legado.app.lib.webdav.WebDavException
+import io.legado.app.lib.webdav.isWebDavOverwriteConflict
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.bottomBackground
@@ -510,25 +512,39 @@ class BookInfoActivity :
     private fun upLoadBook(
         book: Book,
         bookWebDav: RemoteBookWebDav? = AppWebDav.defaultBookWebDav,
+        overwrite: Boolean = true,
+        onConflict: (() -> Unit)? = null,
         onFinished: () -> Unit = {},
     ) {
         lifecycleScope.launch {
             waitDialog.setText(R.string.loading)
             waitDialog.show()
+            var uploadConflict = false
             try {
                 bookWebDav
-                    ?.upload(book)
+                    ?.upload(book, overwrite)
                     ?: throw NoStackTraceException(getString(R.string.webdav_not_configured))
                 //更新书籍最后更新时间,使之比远程书籍的时间新
                 book.lastCheckTime = System.currentTimeMillis()
                 viewModel.saveBook(book)
             } catch (e: Exception) {
                 currentCoroutineContext().ensureActive()
-                toastOnUi(e.localizedMessage)
+                if (!overwrite &&
+                    e is WebDavException &&
+                    isWebDavOverwriteConflict(e.responseCode)
+                ) {
+                    uploadConflict = true
+                } else {
+                    toastOnUi(e.localizedMessage)
+                }
             } finally {
                 waitDialog.dismiss()
             }
-            onFinished()
+            if (uploadConflict) {
+                onConflict?.invoke() ?: onFinished()
+            } else {
+                onFinished()
+            }
         }
     }
 
@@ -546,7 +562,7 @@ class BookInfoActivity :
             waitDialog.setText(R.string.loading)
             waitDialog.show()
             val remoteExists = try {
-                bookWebDav.hasRemoteBook(book)
+                withContext(IO) { bookWebDav.hasRemoteBook(book) }
             } catch (e: Exception) {
                 currentCoroutineContext().ensureActive()
                 toastOnUi(e.localizedMessage)
@@ -556,14 +572,37 @@ class BookInfoActivity :
                 waitDialog.dismiss()
             }
             if (!remoteExists) {
-                upLoadBook(book, bookWebDav, onFinished)
+                upLoadBook(
+                    book = book,
+                    bookWebDav = bookWebDav,
+                    overwrite = false,
+                    onConflict = {
+                        showUploadOverwriteConfirm(book, bookWebDav, onFinished)
+                    },
+                    onFinished = onFinished,
+                )
                 return@launch
             }
-            alert(R.string.draw, R.string.webdav_book_exists_confirm) {
-                yesButton { upLoadBook(book, bookWebDav, onFinished) }
-                noButton { onFinished() }
-                onCancelled { onFinished() }
+            showUploadOverwriteConfirm(book, bookWebDav, onFinished)
+        }
+    }
+
+    private fun showUploadOverwriteConfirm(
+        book: Book,
+        bookWebDav: RemoteBookWebDav,
+        onFinished: () -> Unit,
+    ) {
+        alert(R.string.draw, R.string.webdav_book_exists_confirm) {
+            yesButton {
+                upLoadBook(
+                    book = book,
+                    bookWebDav = bookWebDav,
+                    overwrite = true,
+                    onFinished = onFinished,
+                )
             }
+            noButton { onFinished() }
+            onCancelled { onFinished() }
         }
     }
 

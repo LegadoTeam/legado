@@ -18,6 +18,7 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.RuleBigDataHelp
 import io.legado.app.help.config.AppConfig
+import io.legado.app.model.analyzeRule.CustomUrl
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.utils.FileDoc
 import io.legado.app.utils.GSON
@@ -91,7 +92,10 @@ val Book.archiveName: String
         if (!isArchive) throw NoStackTraceException("Book is not deCompressed from archive")
         // local_book::archive.rar
         // webDav::https://...../archive.rar
-        return origin.substringAfter("::").substringAfterLast("/")
+        val archivePath = origin.substringAfter("::").let {
+            if (origin.startsWith(BookType.webDavTag)) CustomUrl(it).getUrl() else it
+        }
+        return archivePath.substringAfterLast("/")
     }
 
 fun Book.contains(word: String?): Boolean {
