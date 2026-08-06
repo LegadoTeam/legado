@@ -163,6 +163,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
@@ -261,6 +263,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     private var menu: Menu? = null
     private var backupJob: Job? = null
     private var bookmarkJob: Job? = null
+    private val bookmarkToggleMutex = Mutex()
     private var bookmarkBookKey: Pair<String, String>? = null
     private var bookmarks: List<Bookmark> = emptyList()
     private var tts: TTS? = null
@@ -2423,42 +2426,55 @@ class ReadBookActivity : BaseReadBookActivity(),
         val pageStart = page.chapterPosition
         val pageEnd = pageStart + page.charSize
         lifecycleScope.launch {
-            val pageBookmarks = withContext(IO) {
-                appDb.bookmarkDao.getByBook(book.name, book.author).filter {
-                    it.chapterIndex == page.chapterIndex && it.chapterPos in pageStart..<pageEnd
+            val confirmDelete = bookmarkToggleMutex.withLock {
+                val pageBookmarks = withContext(IO) {
+                    appDb.bookmarkDao.getByBook(book.name, book.author).filter {
+                        it.chapterIndex == page.chapterIndex && it.chapterPos in pageStart..<pageEnd
+                    }
+                }
+                when {
+                    pageBookmarks.size > 1 -> pageBookmarks
+                    pageBookmarks.isNotEmpty() -> {
+                        deleteBookmarks(pageBookmarks)
+                        null
+                    }
+
+                    else -> {
+                        val bookmark = book.createBookMark().apply {
+                            chapterIndex = page.chapterIndex
+                            chapterPos = pageStart
+                            chapterName = page.title
+                            bookText = page.text.trim()
+                        }
+                        withContext(IO) {
+                            appDb.bookmarkDao.insert(bookmark)
+                        }
+                        toastOnUi(R.string.bookmark_added)
+                        null
+                    }
                 }
             }
-            when {
-                pageBookmarks.size > 1 -> alert(titleResource = R.string.bookmark) {
+            confirmDelete?.let { pageBookmarks ->
+                alert(titleResource = R.string.bookmark) {
                     setMessage(getString(R.string.delete_page_bookmarks, pageBookmarks.size))
-                    okButton { deleteBookmarks(pageBookmarks) }
+                    okButton {
+                        lifecycleScope.launch {
+                            bookmarkToggleMutex.withLock {
+                                deleteBookmarks(pageBookmarks)
+                            }
+                        }
+                    }
                     noButton()
-                }
-
-                pageBookmarks.isNotEmpty() -> deleteBookmarks(pageBookmarks)
-                else -> {
-                    val bookmark = book.createBookMark().apply {
-                        chapterIndex = page.chapterIndex
-                        chapterPos = pageStart
-                        chapterName = page.title
-                        bookText = page.text.trim()
-                    }
-                    withContext(IO) {
-                        appDb.bookmarkDao.insert(bookmark)
-                    }
-                    toastOnUi(R.string.bookmark_added)
                 }
             }
         }
     }
 
-    private fun deleteBookmarks(pageBookmarks: List<Bookmark>) {
-        lifecycleScope.launch {
-            withContext(IO) {
-                appDb.bookmarkDao.delete(*pageBookmarks.toTypedArray())
-            }
-            toastOnUi(R.string.bookmark_removed)
+    private suspend fun deleteBookmarks(pageBookmarks: List<Bookmark>) {
+        withContext(IO) {
+            appDb.bookmarkDao.delete(*pageBookmarks.toTypedArray())
         }
+        toastOnUi(R.string.bookmark_removed)
     }
 
     private fun observeBookmarks() {

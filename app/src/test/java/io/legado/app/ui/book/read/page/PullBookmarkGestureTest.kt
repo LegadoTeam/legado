@@ -33,6 +33,8 @@ class PullBookmarkGestureTest {
         val source = source("app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
         assertTrue(source.contains("val page = binding.readView.curPage.textPage"))
         assertFalse(source.contains("val page = binding.readView.getCurVisiblePage()"))
+        assertTrue(source.contains("private val bookmarkToggleMutex = Mutex()"))
+        assertTrue(source.contains("bookmarkToggleMutex.withLock"))
     }
 
     @Test
