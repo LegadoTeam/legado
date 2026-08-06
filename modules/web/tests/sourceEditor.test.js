@@ -43,7 +43,9 @@ test('keeps source editor state and mobile controls reachable', () => {
   const config = readSource('config/bookSourceEditConfig.ts')
 
   assert.match(editor, /store\.currentSource !== source/)
-  assert.match(editor, /if \(openedSource\) store\.changeCurrentSource\(openedSource\)/)
+  assert.match(editor, /let restoringCurrentSource = false/)
+  assert.match(editor, /const previousSource = previous\?\.\[1\]/)
+  assert.match(editor, /store\.changeCurrentSource\(previousSource\)/)
   assert.match(editor, /source\.bookSourceName.*source\.bookSourceUrl/)
   assert.match(view, /height: 100dvh/)
   assert.match(view, /height: calc\(100dvh - 48px\)/)

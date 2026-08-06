@@ -64,6 +64,7 @@ const selectedSourceUrl = ref('')
 const loadingSources = ref(false)
 const saving = ref(false)
 let sourcesLoaded = false
+let restoringCurrentSource = false
 
 const jsSources = computed(() =>
   store.bookSources.filter(source => source.mainJs?.trim()),
@@ -213,17 +214,22 @@ const saveScript = async () => {
 
 watch(
   () => [props.active, store.currentSource] as const,
-  async ([active, source]) => {
+  async ([active, source], previous) => {
+    if (restoringCurrentSource) {
+      restoringCurrentSource = false
+      return
+    }
     if (!active) return
     if (!sourcesLoaded && store.bookSources.length === 0) await pullSources()
     if (!isJsSource(source) || source.bookSourceUrl === openedSourceUrl.value)
       return
     if (await confirmDiscard()) return loadSource(source)
 
-    const openedSource = jsSources.value.find(
-      item => item.bookSourceUrl === openedSourceUrl.value,
-    )
-    if (openedSource) store.changeCurrentSource(openedSource)
+    const previousSource = previous?.[1]
+    if (previousSource) {
+      restoringCurrentSource = true
+      store.changeCurrentSource(previousSource)
+    }
   },
   { immediate: true },
 )
