@@ -35,6 +35,14 @@ class PullBookmarkGestureTest {
         assertFalse(source.contains("val page = binding.readView.getCurVisiblePage()"))
     }
 
+    @Test
+    fun `long press clears pull candidate before selecting text`() {
+        val source = source("app/src/main/java/io/legado/app/ui/book/read/page/ReadView.kt")
+        val selection = source.substringAfter("curPage.longPress(startX, startY)")
+            .substringBefore("val startPos = textPos.copy()")
+        assertTrue(selection.contains("resetPullBookmarkGesture()"))
+    }
+
     private fun source(relativePath: String): String {
         val userDir = requireNotNull(System.getProperty("user.dir"))
         val root = generateSequence(File(userDir)) { it.parentFile }

@@ -394,6 +394,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
     private fun onLongPress() {
         kotlin.runCatching {
             curPage.longPress(startX, startY) { textPos: TextPos ->
+                resetPullBookmarkGesture()
                 isTextSelected = true
                 pressOnTextSelected = true
                 initialTextPos.upData(textPos)
