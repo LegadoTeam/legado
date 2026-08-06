@@ -20,7 +20,6 @@ const protectedSourcePaths = new Set([
   'deleteReplaceRule',
   'testReplaceRule',
   'openLegacyReview',
-  'legacyReviewPage',
   'runLegacyReview',
 ])
 

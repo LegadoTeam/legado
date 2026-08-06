@@ -82,6 +82,12 @@ class AnalyzeUrlNetworkOptionsTest {
         assertEquals(5_000L, option.getTimeout())
         assertEquals(false, option.getFollowRedirects())
         assertEquals("1.1.1.1", option.getDnsIp())
+
+        val legacyOption = GSONStrict.fromJson(
+            """{"resolveIp":"8.8.8.8"}""",
+            AnalyzeUrl.UrlOption::class.java,
+        )
+        assertEquals("8.8.8.8", legacyOption.getDnsIp())
     }
 
     @Test

@@ -108,6 +108,7 @@ object Backup {
     }
 
     fun autoBack(context: Context) {
+        if (!AppConfig.autoBackup) return
         if (shouldBackup()) {
             Coroutine.async {
                 mutex.withLock {

@@ -286,4 +286,21 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     flex-basis: 100%;
   }
 }
+
+@media screen and (max-width: 600px) {
+  .js-source-toolbar {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .js-source-select {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .js-source-toolbar > .el-button {
+    width: 100%;
+    margin: 0;
+  }
+}
 </style>

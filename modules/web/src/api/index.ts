@@ -21,7 +21,6 @@ const LeagdoApiResponseKeys: string[] = Array.of('isSuccess', 'errorMsg')
 const notification = ElMessage
 /** Axios.Interceptor: check if resp is LeagaoLeagdoApiResponse*/
 const responseCheckInterceptor = (resp: AxiosResponse) => {
-  if (resp.config.responseType === 'text') return resp
   let isLeagdoApiResponse = true
   try {
     const data = resp.data
@@ -29,7 +28,7 @@ const responseCheckInterceptor = (resp: AxiosResponse) => {
     for (const key of LeagdoApiResponseKeys) {
       if (!(key in data)) {
         isLeagdoApiResponse = false
-        LeagdoApiResponseKeys.length = 0
+        break
       }
     }
     if ((data as LeagdoApiResponse<unknown>).isSuccess === true) {
@@ -42,7 +41,7 @@ const responseCheckInterceptor = (resp: AxiosResponse) => {
   }
   if (isLeagdoApiResponse === false) {
     notification.warning({ message: '后端返回内容格式错误', grouping: true })
-    throw new Error()
+    throw new Error('后端返回内容格式错误')
   }
   connectionStore.setConnectType('primary')
   connectionStore.setConnectStatus('已连接 ' + legado_http_entry_point)

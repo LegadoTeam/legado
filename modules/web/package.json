@@ -12,7 +12,7 @@
     "build": "pnpm test && run-p type-check \"build-only {@}\" -- && node ./scripts/sync.js",
     "preview": "vite preview",
     "build-only": "vite build",
-    "test": "node --test tests/chapterWindow.test.js",
+    "test": "node --test",
     "type-check": "vue-tsc --build --force",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write src/"

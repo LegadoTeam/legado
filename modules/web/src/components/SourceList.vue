@@ -1,43 +1,44 @@
 <template>
-  <el-input
-    v-model="searchKey"
-    class="search"
-    :prefix-icon="Search"
-    placeholder="筛选源"
-  />
-  <div class="tool">
-    <el-button @click="importSourceFile" :icon="Folder">打开</el-button>
-    <el-button
-      :disabled="sourcesFiltered.length === 0"
-      @click="outExport"
-      :icon="Download"
-    >
-      导出</el-button
-    >
-    <el-button
-      type="danger"
-      :icon="Delete"
-      @click="deleteSelectSources"
-      :disabled="sourceSelect.length === 0"
-      >删除</el-button
-    >
-    <el-button
-      type="danger"
-      :icon="Delete"
-      @click="clearAllSources"
-      :disabled="sources.length === 0"
-      >清空</el-button
-    >
-  </div>
-  <el-checkbox-group id="source-list" v-model="sourceUrlSelect">
-    <virtual-list
-      style="height: 100%; overflow-y: auto; overflow-x: hidden"
-      :data-key="(source: Source) => getSourceName(source)"
-      :data-sources="sourcesFiltered"
-      :data-component="SourceItem"
-      :estimate-size="45"
+  <div class="source-list-panel">
+    <el-input
+      v-model="searchKey"
+      class="search"
+      :prefix-icon="Search"
+      placeholder="筛选源"
     />
-  </el-checkbox-group>
+    <div class="tool">
+      <el-button @click="importSourceFile" :icon="Folder">打开</el-button>
+      <el-button
+        :disabled="sourcesFiltered.length === 0"
+        @click="outExport"
+        :icon="Download"
+      >
+        导出</el-button
+      >
+      <el-button
+        type="danger"
+        :icon="Delete"
+        @click="deleteSelectSources"
+        :disabled="sourceSelect.length === 0"
+        >删除</el-button
+      >
+      <el-button
+        :icon="Delete"
+        @click="clearAllSources"
+        :disabled="sources.length === 0"
+        >清空列表</el-button
+      >
+    </div>
+    <el-checkbox-group id="source-list" v-model="sourceUrlSelect">
+      <virtual-list
+        style="height: 100%; overflow-y: auto; overflow-x: hidden"
+        :data-key="getSourceUniqueKey"
+        :data-sources="sourcesFiltered"
+        :data-component="SourceItem"
+        :estimate-size="45"
+      />
+    </el-checkbox-group>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -46,7 +47,6 @@ import { Folder, Delete, Download, Search } from '@element-plus/icons-vue'
 import {
   isSourceMatches,
   getSourceUniqueKey,
-  getSourceName,
   convertSourcesToMap,
 } from '@utils/souce'
 import VirtualList from 'vue3-virtual-scroll-list'
@@ -144,15 +144,28 @@ const outExport = () => {
 </script>
 
 <style lang="scss" scoped>
+.source-list-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
 .tool {
   display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
   margin: 4px 0;
   justify-content: center;
+
+  .el-button + .el-button {
+    margin-left: 0;
+  }
 }
 
 #source-list {
+  flex: 1;
+  min-height: 0;
   margin-top: 6px;
-  height: calc(100% - 75px);
   :deep(.el-checkbox) {
     margin-bottom: 4px;
     width: 100%;

@@ -42,7 +42,6 @@ import io.legado.app.model.SourceCallBack
 import io.legado.app.ui.login.SourceLoginJsExtensions
 import io.legado.app.utils.ArchiveUtils
 import io.legado.app.utils.UrlUtil
-import io.legado.app.utils.isContentScheme
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.CoroutineScope
@@ -199,9 +198,9 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     val remoteBook = bookWebDav.getRemoteBook(it)
                     if (remoteBook == null) {
                         book.origin = BookType.localTag
-                    } else if (remoteBook.lastModify > book.lastCheckTime) {
-                        val uri = bookWebDav.downloadRemoteBook(remoteBook)
-                        book.bookUrl = if (uri.isContentScheme()) uri.toString() else uri.path!!
+                    } else if (remoteBook.lastModify > book.lastCheckTime &&
+                        LocalBook.downloadRemoteBook(book)
+                    ) {
                         book.lastCheckTime = remoteBook.lastModify
                     }
                 }

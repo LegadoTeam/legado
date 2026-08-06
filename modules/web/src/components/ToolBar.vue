@@ -4,16 +4,21 @@
       v-for="button in buttons"
       size="large"
       :key="button.name"
+      :icon="button.icon"
       @click="button.action"
     >
       {{ button.name }}
     </el-button>
-    <el-button size="large" @click="() => (hotkeysDialogVisible = true)"
+    <el-button
+      size="large"
+      :icon="Setting"
+      @click="() => (hotkeysDialogVisible = true)"
       >快捷键</el-button
     >
   </div>
   <el-dialog
     v-model="hotkeysDialogVisible"
+    width="min(720px, calc(100vw - 32px))"
     :show-close="false"
     :before-close="stopRecordKeyDown"
   >
@@ -66,7 +71,19 @@
 
 <script setup lang="ts">
 import API from '@api'
-import { CircleCheckFilled, Edit } from '@element-plus/icons-vue'
+import {
+  Check,
+  CircleCheckFilled,
+  Delete,
+  DocumentAdd,
+  Download,
+  Edit,
+  EditPen,
+  Search,
+  Setting,
+  Upload,
+} from '@element-plus/icons-vue'
+import type { Component } from 'vue'
 import hotkeys from 'hotkeys-js'
 import { getSourceName, isInvaildSource, normalizeSource } from '../utils/souce'
 
@@ -144,25 +161,22 @@ const conver2Source = () => {
   store.changeCurrentSource(store.editTabSource)
 }
 
-const undo = () => {
-  store.editHistoryUndo()
-}
-
-const clearEdit = () => {
+const clearEdit = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '当前表单尚未保存的内容会丢失，是否继续？',
+      '清空表单',
+      {
+        confirmButtonText: '清空',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+  } catch {
+    return
+  }
   store.clearEdit()
-  ElMessage({
-    message: '已清除',
-    type: 'success',
-  })
-}
-
-const redo = () => {
-  store.clearEdit()
-  store.clearAllHistory()
-  ElMessage({
-    message: '已清除所有历史记录',
-    type: 'success',
-  })
+  ElMessage.success('已清空表单')
 }
 
 const saveSource = () => {
@@ -197,20 +211,40 @@ const debug = () => {
   store.startDebug()
 }
 
-const buttons = ref<{ name: string; hotKeys: string[]; action: () => void }[]>(
+const buttons = ref<
+  {
+    name: string
+    icon: Component
+    hotKeys: string[]
+    action: () => void
+  }[]
+>(
   Array.of(
-    { name: '⇈推送源', hotKeys: [], action: push },
-    { name: '⇊拉取源', hotKeys: [], action: pull },
-    { name: '⋙生成源', hotKeys: [], action: conver2Tab },
-    { name: '⋘编辑源', hotKeys: [], action: conver2Source },
-    { name: '✗清空表单', hotKeys: [], action: clearEdit },
-    { name: '↶撤销操作', hotKeys: [], action: undo },
-    { name: '↷重做操作', hotKeys: [], action: redo },
-    { name: '⇏调试源', hotKeys: [], action: debug },
-    { name: '✓保存源', hotKeys: [], action: saveSource },
+    { name: '推送源', icon: markRaw(Upload), hotKeys: [], action: push },
+    { name: '拉取源', icon: markRaw(Download), hotKeys: [], action: pull },
+    {
+      name: '生成源',
+      icon: markRaw(DocumentAdd),
+      hotKeys: [],
+      action: conver2Tab,
+    },
+    {
+      name: '编辑源',
+      icon: markRaw(EditPen),
+      hotKeys: [],
+      action: conver2Source,
+    },
+    {
+      name: '清空表单',
+      icon: markRaw(Delete),
+      hotKeys: [],
+      action: clearEdit,
+    },
+    { name: '调试源', icon: markRaw(Search), hotKeys: [], action: debug },
+    { name: '保存源', icon: markRaw(Check), hotKeys: [], action: saveSource },
   ),
 )
-const hotkeysDialogVisible = ref(true)
+const hotkeysDialogVisible = ref(false)
 
 const recordKeyDowning = ref(false)
 
@@ -292,8 +326,20 @@ function readHotkeysConfig() {
   try {
     const localStorageConfig = localStorage.getItem('legado_web_hotkeys')
     if (localStorageConfig === null) return false
-    const config = JSON.parse(localStorageConfig)
-    if (!Array.isArray(config) || config.length == 0) return false
+    const storedConfig = JSON.parse(localStorageConfig)
+    const config =
+      Array.isArray(storedConfig) && storedConfig.length === 9
+        ? [0, 1, 2, 3, 4, 7, 8].map(index => storedConfig[index])
+        : storedConfig
+    if (
+      !Array.isArray(config) ||
+      config.length !== buttons.value.length ||
+      config.some(keys => !Array.isArray(keys))
+    ) {
+      localStorage.removeItem('legado_web_hotkeys')
+      return false
+    }
+    if (config !== storedConfig) saveHotkeysConfig(config)
     buttons.value.forEach((button, index) => (button.hotKeys = config[index]))
     return true
   } catch {
@@ -302,13 +348,6 @@ function readHotkeysConfig() {
   }
   return false
 }
-
-onMounted(() => {
-  /**读取热键配置 */
-  if (readHotkeysConfig()) {
-    hotkeysDialogVisible.value = false
-  }
-})
 </script>
 
 <style lang="scss" scoped>
@@ -323,10 +362,16 @@ onMounted(() => {
   justify-content: center;
 }
 
+.menu {
+  justify-content: safe center;
+  overflow-y: auto;
+}
+
 .menu > .el-button {
+  flex: none;
   margin: 4px;
   padding: 1em;
-  width: 6em;
+  width: 8em;
 }
 
 .hotkeys-item {
@@ -346,6 +391,21 @@ onMounted(() => {
     span {
       margin: 0.5em;
     }
+  }
+}
+
+@media screen and (max-width: 900px) {
+  .menu {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 12px;
+  }
+
+  .menu > .el-button {
+    width: auto;
+    min-width: 7em;
+    margin: 0;
   }
 }
 </style>

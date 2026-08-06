@@ -87,7 +87,9 @@ class VideoPlayService : BaseService() {
     private var broadcastReceiver: BroadcastReceiver? = null
     private val activityLifecycleCallbacks = object : Application.ActivityLifecycleCallbacks {
         override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
-            if (activity is VideoPlayerActivity) {
+            if (activity is VideoPlayerActivity &&
+                !activity.intent.getBooleanExtra("forwardedToFloatingWindow", false)
+            ) {
                 // 确保 Activity 创建完成后才停止服务,留够时间复制播放器
                 stop()
             }

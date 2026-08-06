@@ -15,7 +15,7 @@ import io.legado.app.R
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.databinding.DialogEditTextBinding
-import io.legado.app.help.book.BookHelp
+import io.legado.app.help.book.cacheLocalUri
 import io.legado.app.help.book.removeLocalUriCache
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
@@ -318,20 +318,12 @@ class ImportBookActivity : BaseImportBookActivity<ImportBookViewModel>(),
                 val book = appDb.bookDao.getBook(filePath)
                     ?: appDb.bookDao.getBookByFileName(fileDoc.name)
                     ?: return@launch
-                val oldBook = book.copy()
-                val pathChanged = oldBook.bookUrl != filePath
                 LocalBook.withParserCacheInvalidated(
-                    oldBook.bookUrl,
-                    oldBook.originName,
+                    book.bookUrl,
+                    book.originName,
                 ) {
-                    oldBook.removeLocalUriCache()
-                    if (pathChanged) {
-                        book.bookUrl = filePath
-                        appDb.bookDao.replace(oldBook, book)
-                    }
-                }
-                if (pathChanged) {
-                    BookHelp.updateCacheFolder(oldBook, book)
+                    book.removeLocalUriCache()
+                    book.cacheLocalUri(fileDoc.uri)
                 }
                 withContext(Main) {
                     if (!isFinishing && !isDestroyed) {

@@ -133,6 +133,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         })
     }
     private var isNew = true
+    private var forwardedToFloatingWindow = false
     private var isFullScreen = false
     private var orientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
     private var menuCustomBtn: MenuItem? = null
@@ -174,8 +175,23 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
 
     @OptIn(UnstableApi::class)
     override fun onActivityCreated(savedInstanceState: Bundle?) {
-        playerView.enlargeImageRes = R.drawable.ic_fullscreen
         isNew = intent.getBooleanExtra("isNew", true)
+        if (isNew &&
+            intent.action == null &&
+            VideoPlay.defaultFloatWindow &&
+            !intent.getBooleanExtra("forceNormalPlayer", false)
+        ) {
+            forwardedToFloatingWindow = true
+            intent.putExtra("forwardedToFloatingWindow", true)
+            playerView.needDestroy = false
+            ContextCompat.startForegroundService(
+                this,
+                Intent(intent).setClass(this, VideoPlayService::class.java)
+            )
+            super.finish()
+            return
+        }
+        playerView.enlargeImageRes = R.drawable.ic_fullscreen
         if (isNew) {
             intent.getStringExtra("videoUrl")?.let {
                 VideoPlay.videoUrl = it
@@ -795,9 +811,11 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         if (initGetter) {
             glideImageGetter.clear()
         }
-        VideoPlay.saveRead()
-        VideoPlay.stopLoading()
-        playerView.getCurrentPlayer().release()
+        if (!forwardedToFloatingWindow) {
+            VideoPlay.saveRead()
+            VideoPlay.stopLoading()
+            playerView.getCurrentPlayer().release()
+        }
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 

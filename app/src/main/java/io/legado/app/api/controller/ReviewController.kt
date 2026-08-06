@@ -90,12 +90,18 @@ object ReviewController {
         val preloadJs: String?,
     )
 
+    internal data class LegacyReviewWebPage(
+        val html: String,
+        val frameOrigin: String?,
+    )
+
     private data class LegacyReviewSession(
         val bookUrl: String,
         val chapterIndex: Int,
         val sourceKey: String,
         val nonce: String,
         val page: LegacyReviewBrowserPage,
+        val frameOrigin: String?,
         val expiresAt: Long,
     )
 
@@ -326,7 +332,7 @@ object ReviewController {
         ReviewPage(items = items, hasMore = items.isNotEmpty())
     }
 
-    fun openLegacyReview(postData: String?): ReturnData = respond {
+    fun openLegacyReview(postData: String?, frameOrigin: String?): ReturnData = respond {
         val request = GSON.fromJsonObject<LegacyReviewOpenRequest>(postData).getOrThrow()
         val context = requireContext(request.url, request.index)
         val source = requireNotNull(context.source) { "未找到书源" }
@@ -351,6 +357,7 @@ object ReviewController {
                     sourceKey = source.getKey(),
                     nonce = nonce,
                     page = page,
+                    frameOrigin = frameOrigin,
                     expiresAt = System.currentTimeMillis() + LEGACY_REVIEW_SESSION_TTL,
                 )
             )
@@ -369,18 +376,25 @@ object ReviewController {
         val context = requireContext(session.bookUrl, session.chapterIndex)
         require(context.source?.getKey() == session.sourceKey) { "书源已变更，请重新打开评论" }
         val source = requireNotNull(context.source) { "未找到书源" }
-        runScriptWithContext {
+        requireNotNull(runScriptWithContext {
             AnalyzeRule(context.book, source)
                 .setChapter(context.chapter)
                 .setCoroutineContext(coroutineContext)
                 .evalJS(request.script)
-        }?.toString().orEmpty()
+        }) { "旧评论脚本未返回结果" }.toString()
     }
 
-    fun getLegacyReviewPage(parameters: Map<String, List<String>>): String? {
+    internal fun getLegacyReviewPage(
+        parameters: Map<String, List<String>>,
+    ): LegacyReviewWebPage? {
         val id = parameters["id"]?.firstOrNull()?.takeIf { it.isNotBlank() } ?: return null
+        val nonce = parameters["nonce"]?.firstOrNull()?.takeIf { it.isNotBlank() } ?: return null
         val session = getLegacyReviewSession(id) ?: return null
-        return injectLegacyReviewBridge(session.nonce, session.page)
+        if (nonce != session.nonce) return null
+        return LegacyReviewWebPage(
+            html = injectLegacyReviewBridge(session.nonce, session.page),
+            frameOrigin = session.frameOrigin,
+        )
     }
 
     private suspend fun executeLegacyReviewScript(
@@ -424,12 +438,35 @@ object ReviewController {
               window.setInterval = (callback, delay, ...args) =>
                 nativeSetInterval(callback, Math.max(100, Number(delay) || 0), ...args);
               const nonce = ${GSON.toJson(nonce)};
+              const finishLoading = () =>
+                document.getElementById('loading')?.classList.add('hidden');
+              const showError = error => {
+                const message = String(error || '评论加载失败');
+                finishLoading();
+                const viewer = document.getElementById('viewer');
+                if (viewer) viewer.textContent = message;
+                return new Error(message);
+              };
               window.run = async function(code) {
                 return new Promise((resolve, reject) => {
                   const channel = new MessageChannel();
+                  const timeout = window.setTimeout(() => {
+                    reject(showError('评论加载超时'));
+                    channel.port1.close();
+                  }, 120000);
                   channel.port1.onmessage = event => {
-                    if (event.data?.error) reject(new Error(event.data.error));
-                    else resolve(event.data?.result == null ? '' : String(event.data.result));
+                    window.clearTimeout(timeout);
+                    if (event.data?.error || event.data?.result == null) {
+                      reject(showError(event.data?.error));
+                    } else {
+                      finishLoading();
+                      resolve(String(event.data.result));
+                    }
+                    channel.port1.close();
+                  };
+                  channel.port1.onmessageerror = () => {
+                    window.clearTimeout(timeout);
+                    reject(showError('评论响应解析失败'));
                     channel.port1.close();
                   };
                   window.parent.postMessage({
