@@ -348,6 +348,10 @@ class PageView(context: Context) : FrameLayout(context) {
         binding.contentTextView.scroll(offset)
     }
 
+    fun isAtChapterTop(): Boolean {
+        return binding.contentTextView.isAtChapterTop()
+    }
+
     /**
      * 更新是否开启选择功能
      */

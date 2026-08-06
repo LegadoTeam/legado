@@ -163,6 +163,10 @@ class MoreConfigDialog : BasePrefDialogFragment() {
                     ReadBook.callBack?.upPageAnim()
                 }
 
+                PreferKey.pullToToggleBookmark -> {
+                    (activity as? ReadBookActivity)?.upBookmarkIndicator()
+                }
+
                 PreferKey.optimizeRender -> {
                     ChapterProvider.upStyle()
                     ReadBook.callBack?.upPageAnim(true)
