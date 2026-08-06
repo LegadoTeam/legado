@@ -87,13 +87,15 @@ class AudioEpisodeUnitTest {
         ).readText()
         val upLyric = source.substringAfter("override fun upLyric(lyric: String?)")
             .substringBefore("override fun upLyricP(position: Int)")
-        val visible = upLyric.indexOf("lyricViewX.visible()")
+        val invisible = upLyric.indexOf("lyricViewX.invisible()")
         val layout = upLyric.indexOf("lyricViewX.doOnLayout")
         val load = upLyric.indexOf("lyricViewX.loadLyric(lyric)")
+        val visible = upLyric.indexOf("lyricViewX.visible()")
 
-        assertTrue(visible >= 0)
-        assertTrue(layout > visible)
+        assertTrue(invisible >= 0)
+        assertTrue(layout > invisible)
         assertTrue(load > layout)
+        assertTrue(visible > load)
     }
 
     private fun chineseString(name: String) = stringValue("values-zh", name)
