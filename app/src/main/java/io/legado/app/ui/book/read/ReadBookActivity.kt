@@ -264,6 +264,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     private var backupJob: Job? = null
     private var bookmarkJob: Job? = null
     private val bookmarkToggleMutex = Mutex()
+    private var bookmarkTogglePending = false
     private var bookmarkBookKey: Pair<String, String>? = null
     private var bookmarks: List<Bookmark> = emptyList()
     private var tts: TTS? = null
@@ -2417,6 +2418,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     override fun toggleBookmark() {
+        if (bookmarkTogglePending) return
         val book = ReadBook.book ?: return
         val page = binding.readView.curPage.textPage
         if (page.lines.isEmpty()) {
@@ -2425,46 +2427,66 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
         val pageStart = page.chapterPosition
         val pageEnd = pageStart + page.charSize
+        bookmarkTogglePending = true
         lifecycleScope.launch {
-            val confirmDelete = bookmarkToggleMutex.withLock {
-                val pageBookmarks = withContext(IO) {
-                    appDb.bookmarkDao.getByBook(book.name, book.author).filter {
-                        it.chapterIndex == page.chapterIndex && it.chapterPos in pageStart..<pageEnd
+            var awaitingConfirmation = false
+            try {
+                val confirmDelete = bookmarkToggleMutex.withLock {
+                    val pageBookmarks = withContext(IO) {
+                        appDb.bookmarkDao.getByBook(book.name, book.author).filter {
+                            it.chapterIndex == page.chapterIndex && it.chapterPos in pageStart..<pageEnd
+                        }
                     }
-                }
-                when {
-                    pageBookmarks.size > 1 -> pageBookmarks
-                    pageBookmarks.isNotEmpty() -> {
-                        deleteBookmarks(pageBookmarks)
-                        null
-                    }
+                    when {
+                        pageBookmarks.size > 1 -> pageBookmarks
+                        pageBookmarks.isNotEmpty() -> {
+                            deleteBookmarks(pageBookmarks)
+                            null
+                        }
 
-                    else -> {
-                        val bookmark = book.createBookMark().apply {
-                            chapterIndex = page.chapterIndex
-                            chapterPos = pageStart
-                            chapterName = page.title
-                            bookText = page.text.trim()
+                        else -> {
+                            val bookmark = book.createBookMark().apply {
+                                chapterIndex = page.chapterIndex
+                                chapterPos = pageStart
+                                chapterName = page.title
+                                bookText = page.text.trim()
+                            }
+                            withContext(IO) {
+                                appDb.bookmarkDao.insert(bookmark)
+                            }
+                            toastOnUi(R.string.bookmark_added)
+                            null
                         }
-                        withContext(IO) {
-                            appDb.bookmarkDao.insert(bookmark)
-                        }
-                        toastOnUi(R.string.bookmark_added)
-                        null
                     }
                 }
-            }
-            confirmDelete?.let { pageBookmarks ->
-                alert(titleResource = R.string.bookmark) {
-                    setMessage(getString(R.string.delete_page_bookmarks, pageBookmarks.size))
-                    okButton {
-                        lifecycleScope.launch {
-                            bookmarkToggleMutex.withLock {
-                                deleteBookmarks(pageBookmarks)
+                confirmDelete?.let { pageBookmarks ->
+                    var deleteConfirmed = false
+                    alert(titleResource = R.string.bookmark) {
+                        setMessage(getString(R.string.delete_page_bookmarks, pageBookmarks.size))
+                        okButton {
+                            deleteConfirmed = true
+                            lifecycleScope.launch {
+                                try {
+                                    bookmarkToggleMutex.withLock {
+                                        deleteBookmarks(pageBookmarks)
+                                    }
+                                } finally {
+                                    bookmarkTogglePending = false
+                                }
+                            }
+                        }
+                        noButton()
+                        onDismiss {
+                            if (!deleteConfirmed) {
+                                bookmarkTogglePending = false
                             }
                         }
                     }
-                    noButton()
+                    awaitingConfirmation = true
+                }
+            } finally {
+                if (!awaitingConfirmation) {
+                    bookmarkTogglePending = false
                 }
             }
         }

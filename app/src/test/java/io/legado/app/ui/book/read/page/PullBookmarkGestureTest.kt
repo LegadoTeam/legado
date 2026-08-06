@@ -31,10 +31,26 @@ class PullBookmarkGestureTest {
     @Test
     fun `bookmark actions use the metadata-bearing current page`() {
         val source = source("app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
-        assertTrue(source.contains("val page = binding.readView.curPage.textPage"))
-        assertFalse(source.contains("val page = binding.readView.getCurVisiblePage()"))
+        val toggleBookmark = source.substringAfter("override fun toggleBookmark()")
+            .substringBefore("private suspend fun deleteBookmarks")
+        assertTrue(toggleBookmark.contains("val page = binding.readView.curPage.textPage"))
+        assertFalse(toggleBookmark.contains("binding.readView.getCurVisiblePage()"))
         assertTrue(source.contains("private val bookmarkToggleMutex = Mutex()"))
         assertTrue(source.contains("bookmarkToggleMutex.withLock"))
+    }
+
+    @Test
+    fun `bookmark toggle remains pending until confirmation finishes`() {
+        val source = source("app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
+        val toggleBookmark = source.substringAfter("override fun toggleBookmark()")
+            .substringBefore("private suspend fun deleteBookmarks")
+        assertTrue(toggleBookmark.contains("if (bookmarkTogglePending) return"))
+        assertTrue(toggleBookmark.contains("onDismiss"))
+        assertTrue(toggleBookmark.substringAfter("okButton {")
+            .substringBefore("noButton()")
+            .contains("bookmarkTogglePending = false"))
+        assertTrue(toggleBookmark.substringAfter("onDismiss {")
+            .contains("bookmarkTogglePending = false"))
     }
 
     @Test
