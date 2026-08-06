@@ -11,8 +11,12 @@
     <url>https://github.com/skybbk1001/htmlunit-core-js</url>
     <licenses>
         <license>
-            <name>Mozilla Public License 2.0</name>
+            <name>Mozilla Public License 2.0 (Rhino-derived engine)</name>
             <url>https://www.mozilla.org/MPL/2.0/</url>
+        </license>
+        <license>
+            <name>Apache License 2.0 (upstream packaging project)</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
         </license>
     </licenses>
 </project>

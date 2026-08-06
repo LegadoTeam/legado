@@ -224,6 +224,17 @@ jobs:
               echo "$package_kind APK contains unexpected native ABIs: $packaged_abis"
               exit 1
             fi
+            required_license_assets=(
+              LICENSE.txt LICENSE-core-js.txt LICENSE-APACHE-2.0.txt
+              NOTICE.txt NOTICE-tools.txt SOURCE.md rhinoDiff.txt
+            )
+            for asset in "${required_license_assets[@]}"; do
+              if ! unzip -Z1 "$apk" | grep -qx \
+                "assets/licenses/htmlunit-core-js/5.3.0-legado.3/$asset"; then
+                echo "$package_kind APK is missing htmlunit-core-js asset: $asset"
+                exit 1
+              fi
+            done
             verified[$package_kind]=$apk
           done
 

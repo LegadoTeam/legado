@@ -17,4 +17,6 @@ SHA-256 of `htmlunit-core-js-5.3.0-legado.3.jar`:
 9684b7d1780b9dbfe39c6f2b5f9e35c44371912e2e508dea4393a5c1ac3e081c
 ```
 
-The corresponding source remains available from the revisions above under MPL 2.0.
+Source changes, licenses, and notices are stored in
+`app/src/main/assets/licenses/htmlunit-core-js/5.3.0-legado.3/` so they are
+also distributed with the APK.
