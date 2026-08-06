@@ -19,25 +19,44 @@ object HighlightRuleMatcher {
         val applyToTitle: Boolean
     )
 
+    data class MatchResult(
+        val matches: List<RuleMatch>,
+        val completed: Boolean
+    )
+
     fun match(
         text: String,
         rules: List<Rule>,
         shouldContinue: () -> Boolean = { true },
         maxMatches: Int = DEFAULT_MAX_MATCHES
-    ): List<RuleMatch> {
+    ): List<RuleMatch> = matchDetailed(text, rules, shouldContinue, maxMatches).matches
+
+    internal fun matchDetailed(
+        text: String,
+        rules: List<Rule>,
+        shouldContinue: () -> Boolean = { true },
+        maxMatches: Int = DEFAULT_MAX_MATCHES
+    ): MatchResult {
         val limit = maxMatches.coerceAtLeast(0)
-        if (text.isEmpty() || rules.isEmpty() || limit == 0) return emptyList()
+        if (text.isEmpty() || rules.isEmpty() || limit == 0) {
+            return MatchResult(emptyList(), completed = true)
+        }
         val matches = ArrayList<RuleMatch>()
         for (rule in rules) {
-            if (!shouldContinue() || matches.size >= limit) break
+            if (!shouldContinue()) {
+                return MatchResult(matches, completed = false)
+            }
             if (rule.pattern.isEmpty()) continue
-            if (rule.isRegex) {
+            val completed = if (rule.isRegex) {
                 matchRegex(text, rule, matches, shouldContinue, limit)
             } else {
                 matchLiteral(text, rule, matches, shouldContinue, limit)
             }
+            if (!completed) {
+                return MatchResult(matches, completed = false)
+            }
         }
-        return matches
+        return MatchResult(matches, completed = true)
     }
 
     private fun matchLiteral(
@@ -46,15 +65,17 @@ object HighlightRuleMatcher {
         out: MutableList<RuleMatch>,
         shouldContinue: () -> Boolean,
         maxMatches: Int
-    ) {
+    ): Boolean {
         var from = 0
-        while (from <= text.length && out.size < maxMatches && shouldContinue()) {
+        while (shouldContinue()) {
             val start = text.indexOf(rule.pattern, from)
-            if (start < 0) return
+            if (start < 0) return true
+            if (out.size >= maxMatches) return false
             val end = start + rule.pattern.length
             out.add(rule.match(start, end))
             from = end
         }
+        return false
     }
 
     private fun matchRegex(
@@ -63,9 +84,15 @@ object HighlightRuleMatcher {
         out: MutableList<RuleMatch>,
         shouldContinue: () -> Boolean,
         maxMatches: Int
-    ) {
+    ): Boolean {
+        val regex = try {
+            Regex(rule.pattern)
+        } catch (_: Exception) {
+            return true
+        } catch (_: StackOverflowError) {
+            return false
+        }
         try {
-            val regex = Regex(rule.pattern)
             val timeoutNanos = rule.timeoutMs
                 .coerceAtLeast(1L)
                 .coerceAtMost(Long.MAX_VALUE / 1_000_000L) * 1_000_000L
@@ -76,26 +103,28 @@ object HighlightRuleMatcher {
                 timeoutNanos,
                 shouldContinue
             )
-            var from = 0
-            while (from <= text.length &&
-                out.size < maxMatches &&
-                shouldContinue() &&
-                System.nanoTime() - startedAt <= timeoutNanos
-            ) {
-                val result = regex.find(input, from) ?: return
+            var result = regex.find(input)
+            while (result != null) {
+                if (!shouldContinue() || System.nanoTime() - startedAt > timeoutNanos) {
+                    return false
+                }
+                if (out.size >= maxMatches) return false
                 val start = result.range.first
                 val end = result.range.last + 1
                 if (end > start) {
                     out.add(rule.match(start, end))
-                    from = end
-                } else {
-                    from = start + 1
                 }
+                result = result.next()
             }
+            return true
+        } catch (_: MatchCancelledException) {
+            return false
+        } catch (_: RegexTimeoutException) {
+            return false
         } catch (_: Exception) {
-            return
+            return false
         } catch (_: StackOverflowError) {
-            return
+            return false
         }
     }
 
