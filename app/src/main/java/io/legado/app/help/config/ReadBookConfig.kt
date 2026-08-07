@@ -144,7 +144,7 @@ object ReadBookConfig {
 
     fun getAllPicBgStr(): ArrayList<String> {
         val list = arrayListOf<String>()
-        configList.forEach {
+        (configList + shareConfig).forEach {
             if (it.bgType == 2) {
                 list.add(it.bgStr)
             }
@@ -175,7 +175,7 @@ object ReadBookConfig {
 
     fun clearBgAndCache() {
         val bgs = hashSetOf<String>()
-        configList.forEach { config ->
+        (configList + shareConfig).forEach { config ->
             repeat(3) {
                 config.getBgPath(it)?.let { path ->
                     bgs.add(path)

@@ -7,11 +7,43 @@ internal val backupMediaDirectoryNames = listOf("covers", "bg")
 internal fun findBackupMediaDirectories(externalFilesRoot: File): List<File> {
     return backupMediaDirectoryNames.mapNotNull { name ->
         File(externalFilesRoot, name).takeIf { directory ->
-            directory.isDirectory && runCatching {
-                directory.walkTopDown().any { it.isFile }
-            }.getOrDefault(false)
+            directory.hasFiles()
         }
     }
+}
+
+internal fun prepareBackupMediaDirectories(
+    externalFilesRoot: File,
+    backupRoot: File,
+    referencedBackgroundPaths: Collection<String>,
+): List<File> {
+    val directories = arrayListOf<File>()
+    File(externalFilesRoot, "covers").takeIf { it.hasFiles() }?.let(directories::add)
+
+    val backgroundRoot = File(externalFilesRoot, "bg").canonicalFile
+    val backgroundRootPrefix = backgroundRoot.path.trimEnd(File.separatorChar) + File.separator
+    val stagedBackgroundRoot = File(backupRoot, "bg")
+    stagedBackgroundRoot.deleteRecursively()
+    referencedBackgroundPaths.asSequence()
+        .map { path ->
+            if (path.contains(File.separator)) File(path) else File(backgroundRoot, path)
+        }
+        .mapNotNull { runCatching { it.canonicalFile }.getOrNull() }
+        .filter { it.isFile && it.path.startsWith(backgroundRootPrefix) }
+        .distinctBy { it.path }
+        .forEach { source ->
+            val target = File(stagedBackgroundRoot, source.relativeTo(backgroundRoot).path)
+            target.parentFile?.mkdirs()
+            source.copyTo(target, overwrite = true)
+        }
+    stagedBackgroundRoot.takeIf { it.hasFiles() }?.let(directories::add)
+    return directories
+}
+
+private fun File.hasFiles(): Boolean {
+    return isDirectory && runCatching {
+        walkTopDown().any { it.isFile }
+    }.getOrDefault(false)
 }
 
 /**

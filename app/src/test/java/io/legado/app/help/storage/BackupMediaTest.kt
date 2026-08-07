@@ -31,6 +31,46 @@ class BackupMediaTest {
     }
 
     @Test
+    fun onlyReferencedInternalBackgroundsArePreparedForBackup() = withTempDirectory { root ->
+        val externalRoot = root.resolve("external")
+        val backupRoot = root.resolve("backup").apply { mkdirs() }
+        backupRoot.resolve("bg/stale.png").apply {
+            parentFile?.mkdirs()
+            writeText("stale")
+        }
+        externalRoot.resolve("covers").mkdirs()
+        externalRoot.resolve("covers/cover.png").writeText("cover")
+        externalRoot.resolve("bg").mkdirs()
+        val kept = externalRoot.resolve("bg/kept.png").apply { writeText("kept") }
+        val shared = externalRoot.resolve("bg/shared.png").apply { writeText("shared") }
+        val orphan = externalRoot.resolve("bg/orphan.png").apply { writeText("orphan") }
+        val outside = root.resolve("outside.png").apply { writeText("outside") }
+
+        val directories = prepareBackupMediaDirectories(
+            externalRoot,
+            backupRoot,
+            listOf(
+                kept.name,
+                shared.absolutePath,
+                shared.absolutePath,
+                outside.absolutePath,
+                externalRoot.resolve("bg/../../outside.png").path,
+            ),
+        )
+
+        assertEquals(listOf("covers", "bg"), directories.map { it.name })
+        assertEquals(
+            listOf("kept.png", "shared.png"),
+            backupRoot.resolve("bg").list()?.sorted(),
+        )
+        assertEquals("kept", backupRoot.resolve("bg/kept.png").readText())
+        assertEquals("shared", backupRoot.resolve("bg/shared.png").readText())
+        assertFalse(backupRoot.resolve("bg/orphan.png").exists())
+        assertFalse(backupRoot.resolve("bg/outside.png").exists())
+        assertTrue(orphan.exists())
+    }
+
+    @Test
     fun restoreReplacesDirectoryAfterStagingCompletes() = withTempDirectory { root ->
         val backupRoot = root.resolve("backup")
         val externalRoot = root.resolve("external")
