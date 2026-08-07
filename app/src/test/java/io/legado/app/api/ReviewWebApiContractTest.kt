@@ -52,6 +52,20 @@ class ReviewWebApiContractTest {
     }
 
     @Test
+    fun `web review response models keep JSON names after minification`() {
+        val parser = readProjectFile(
+            "app/src/main/java/io/legado/app/model/analyzeRule/ReviewRuleParser.kt"
+        )
+        val controller = readProjectFile(
+            "app/src/main/java/io/legado/app/api/controller/ReviewController.kt"
+        )
+
+        assertTrue(parser.contains("@Keep\n    internal data class SummaryResult("))
+        assertTrue(parser.contains("@Keep\n    internal data class DetailItem("))
+        assertTrue(controller.contains("@Keep\n    private data class ReviewPage("))
+    }
+
+    @Test
     fun `legacy review pages keep source execution behind the parent token bridge`() {
         val server = readProjectFile("app/src/main/java/io/legado/app/web/HttpServer.kt")
         val controller = readProjectFile(

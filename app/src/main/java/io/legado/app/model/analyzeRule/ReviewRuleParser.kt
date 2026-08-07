@@ -1,5 +1,6 @@
 package io.legado.app.model.analyzeRule
 
+import androidx.annotation.Keep
 import com.jayway.jsonpath.PathNotFoundException
 import io.legado.app.constant.AppLog
 import io.legado.app.data.entities.BaseSource
@@ -19,6 +20,7 @@ import kotlin.coroutines.CoroutineContext
 
 internal object ReviewRuleParser {
 
+    @Keep
     internal data class SummaryResult(
         val counts: Map<Int, Int>,
         val keys: Map<Int, String>,
@@ -29,6 +31,7 @@ internal object ReviewRuleParser {
         val nextPageUrl: String?,
     )
 
+    @Keep
     internal data class DetailItem(
         val id: String?,
         val avatar: String?,

@@ -1,5 +1,6 @@
 package io.legado.app.api.controller
 
+import androidx.annotation.Keep
 import androidx.collection.LruCache
 import com.google.gson.annotations.SerializedName
 import com.script.rhino.runScriptWithContext
@@ -62,6 +63,7 @@ object ReviewController {
         val url: String,
     )
 
+    @Keep
     private data class ReviewPage(
         val items: List<ReviewRuleParser.DetailItem>,
         val nextCursor: String? = null,
