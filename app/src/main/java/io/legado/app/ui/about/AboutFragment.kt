@@ -91,6 +91,7 @@ class AboutFragment : PreferenceFragmentCompat() {
         AppUpdate.gitHubUpdate.run {
             check(lifecycleScope)
                 .onSuccess {
+                    if (childFragmentManager.isStateSaved) return@onSuccess
                     showDialogFragment(
                         UpdateDialog(it)
                     )
