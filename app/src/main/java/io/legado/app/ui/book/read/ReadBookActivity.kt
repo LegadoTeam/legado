@@ -100,6 +100,7 @@ import io.legado.app.ui.book.read.config.MoreConfigDialog
 import io.legado.app.ui.book.read.config.ReadAloudDialog
 import io.legado.app.ui.book.read.config.ReadStyleDialog
 import io.legado.app.ui.book.read.config.TextSelectMenuConfigDialog
+import io.legado.app.ui.book.read.config.TipConfigDialog.Companion.TITLE_NUMBER_COLOR
 import io.legado.app.ui.book.read.config.TipConfigDialog.Companion.TIP_COLOR
 import io.legado.app.ui.book.read.config.TipConfigDialog.Companion.TIP_DIVIDER_COLOR
 import io.legado.app.ui.book.read.page.ContentTextView
@@ -2243,6 +2244,12 @@ class ReadBookActivity : BaseReadBookActivity(),
                 ReadTipConfig.tipDividerColor = color
                 postEvent(EventBus.TIP_COLOR, "")
                 postEvent(EventBus.UP_CONFIG, arrayListOf(2))
+            }
+
+            TITLE_NUMBER_COLOR -> {
+                ReadBookConfig.titleNumberColor = color
+                postEvent(EventBus.TIP_COLOR, "")
+                postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
             }
         }
     }

@@ -38,6 +38,13 @@
                 android:text="@string/title_center" />
 
             <RadioButton
+                android:id="@+id/rb_title_mode4"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="3dp"
+                android:text="@string/right" />
+
+            <RadioButton
                 android:id="@+id/rb_title_mode3"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -52,6 +59,58 @@
             android:padding="3dp"
             app:max="20"
             app:title="@string/title_font_size" />
+
+        <io.legado.app.lib.theme.view.ThemeSwitch
+            android:id="@+id/sw_split_chapter_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="6dp"
+            android:text="@string/split_chapter_title"
+            tools:ignore="TouchTargetSizeCheck" />
+
+        <LinearLayout
+            android:id="@+id/ll_title_number_style"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <io.legado.app.ui.widget.DetailSeekBar
+                android:id="@+id/dsb_title_number_size"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="3dp"
+                app:max="20"
+                app:title="@string/title_number_font_size" />
+
+            <LinearLayout
+                android:id="@+id/ll_title_number_color"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="?attr/selectableItemBackground"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:padding="6dp"
+                    android:text="@string/title_number_color"
+                    android:textColor="@color/primaryText" />
+
+                <TextView
+                    android:id="@+id/tv_title_number_color"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:padding="6dp"
+                    android:textColor="@color/primaryText"
+                    tools:text="#E53935" />
+
+            </LinearLayout>
+
+        </LinearLayout>
 
         <io.legado.app.ui.widget.DetailSeekBar
             android:id="@+id/dsb_title_top"

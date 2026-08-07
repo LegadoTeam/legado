@@ -316,7 +316,7 @@ object ReadBookConfig {
         }
 
     /**
-     * 标题位置 0:居左 1:居中 2:隐藏
+     * 标题位置 0:居左 1:居中 2:隐藏 3:居右
      */
     var titleMode: Int
         get() = config.titleMode
@@ -333,6 +333,29 @@ object ReadBookConfig {
      * 是否标题居中
      */
     val isMiddleTitle get() = titleMode == 1
+
+    val isRightTitle get() = titleMode == 3
+
+    var splitChapterTitle: Boolean
+        get() = config.splitChapterTitle
+        set(value) {
+            config.splitChapterTitle = value
+        }
+
+    var titleNumberSize: Int
+        get() = config.titleNumberSize
+        set(value) {
+            config.titleNumberSize = value
+        }
+
+    var titleNumberColor: Int
+        get() = config.titleNumberColor
+        set(value) {
+            config.titleNumberColor = value
+        }
+
+    val titleNumberTextColor: Int
+        get() = titleNumberColor.takeIf { it != 0 } ?: textColor
 
     var titleTopSpacing: Int
         get() = config.titleTopSpacing
@@ -471,6 +494,9 @@ object ReadBookConfig {
             exportConfig.paragraphSpacing = shareConfig.paragraphSpacing
             exportConfig.titleMode = shareConfig.titleMode
             exportConfig.titleSize = shareConfig.titleSize
+            exportConfig.splitChapterTitle = shareConfig.splitChapterTitle
+            exportConfig.titleNumberSize = shareConfig.titleNumberSize
+            exportConfig.titleNumberColor = shareConfig.titleNumberColor
             exportConfig.titleTopSpacing = shareConfig.titleTopSpacing
             exportConfig.titleBottomSpacing = shareConfig.titleBottomSpacing
             exportConfig.paddingBottom = shareConfig.paddingBottom
@@ -607,8 +633,11 @@ object ReadBookConfig {
         var letterSpacing: Float = 0.1f,//字间距
         var lineSpacingExtra: Int = 12,//行间距
         var paragraphSpacing: Int = 2,//段距
-        var titleMode: Int = 0,//标题位置 0:居左 1:居中 2:隐藏
+        var titleMode: Int = 0,//标题位置 0:居左 1:居中 2:隐藏 3:居右
         var titleSize: Int = 0,
+        var splitChapterTitle: Boolean = false,
+        var titleNumberSize: Int = 0,
+        var titleNumberColor: Int = 0,
         var titleTopSpacing: Int = 0,
         var titleBottomSpacing: Int = 0,
         var paragraphIndent: String = "　　",//段落缩进
@@ -907,6 +936,9 @@ object ReadBookConfig {
             "paragraphSpacing" to paragraphSpacing,
             "titleMode" to titleMode,
             "titleSize" to titleSize,
+            "splitChapterTitle" to splitChapterTitle,
+            "titleNumberSize" to titleNumberSize,
+            "titleNumberColor" to titleNumberColor,
             "titleTopSpacing" to titleTopSpacing,
             "titleBottomSpacing" to titleBottomSpacing,
             "paragraphIndent" to paragraphIndent,

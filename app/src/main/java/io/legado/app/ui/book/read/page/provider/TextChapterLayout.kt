@@ -84,6 +84,9 @@ class TextChapterLayout(
     private val titlePaint = ChapterProvider.titlePaint
     private val titlePaintTextHeight = ChapterProvider.titlePaintTextHeight
     private val titlePaintFontMetrics = ChapterProvider.titlePaintFontMetrics
+    private val titleNumberPaint = ChapterProvider.titleNumberPaint
+    private val titleNumberPaintTextHeight = ChapterProvider.titleNumberPaintTextHeight
+    private val titleNumberPaintFontMetrics = ChapterProvider.titleNumberPaintFontMetrics
 
     private val contentPaint = ChapterProvider.contentPaint
     private val reviewCharWidth by lazy { contentPaint.measureText(srcReplaceStr) * 1.5556f }
@@ -107,6 +110,7 @@ class TextChapterLayout(
     private val titleMode = ReadBookConfig.titleMode
     private val useZhLayout = ReadBookConfig.useZhLayout
     private val isMiddleTitle = ReadBookConfig.isMiddleTitle
+    private val isRightTitle = ReadBookConfig.isRightTitle
     private val textFullJustify = ReadBookConfig.textFullJustify
     private val hangingPunctuation = ReadBookConfig.hangingPunctuation
     private val punctuationCompressMode = ReadBookConfig.punctuationCompress
@@ -235,8 +239,16 @@ class TextChapterLayout(
 
         if (titleMode != 2 || bookChapter.isVolume || contents.isEmpty()) {
             var firstLine = true
+            val splitTitle = ChapterTitleParser.split(
+                displayTitle,
+                ReadBookConfig.splitChapterTitle,
+                bookChapter.isVolume
+            )
+            val titleLines = splitTitle?.let {
+                listOf(it.first to true, it.second to false)
+            } ?: displayTitle.splitNotBlank("\n").map { it to false }
             //标题非隐藏
-            displayTitle.splitNotBlank("\n").forEach { text ->
+            titleLines.forEachIndexed { index, (text, isTitleNumber) ->
                 val srcList = LinkedList<String>()
                 val clickList = LinkedList<String?>()
                 val titleImg = if (firstLine) {
@@ -315,17 +327,19 @@ class TextChapterLayout(
                 setTypeText(
                     book,
                     if (imgText != null) text + imgText else text,
-                    titlePaint,
-                    titlePaintTextHeight,
-                    titlePaintFontMetrics,
+                    if (isTitleNumber) titleNumberPaint else titlePaint,
+                    if (isTitleNumber) titleNumberPaintTextHeight else titlePaintTextHeight,
+                    if (isTitleNumber) titleNumberPaintFontMetrics else titlePaintFontMetrics,
                     imageStyle,
                     srcList = srcList,
                     clickList = clickList,
                     isTitle = true,
+                    isTitleNumber = isTitleNumber,
                     emptyContent = contents.isEmpty(),
                     isVolumeTitle = bookChapter.isVolume
                 )
-                pendingTextPage.lines.lastOrNull()?.isParagraphEnd = true
+                pendingTextPage.lines.lastOrNull()?.isParagraphEnd =
+                    splitTitle == null || index == titleLines.lastIndex
                 stringBuilder.append("\n")
             }
             durY += titleBottomSpacing
@@ -943,6 +957,7 @@ class TextChapterLayout(
         fontMetrics: Paint.FontMetrics,
         imageStyle: String?,
         isTitle: Boolean = false,
+        isTitleNumber: Boolean = false,
         isFirstLine: Boolean = true,
         emptyContent: Boolean = false,
         isVolumeTitle: Boolean = false,
@@ -1010,6 +1025,7 @@ class TextChapterLayout(
         for (lineIndex in 0 until layout.lineCount) {
             val textLine = TextLine(
                 isTitle = isTitle,
+                isTitleNumber = isTitleNumber,
                 reviewTitleOffset = reviewTitleOffset,
             )
             prepareNextPageIfNeed(durY + textHeight)
@@ -1031,6 +1047,16 @@ class TextChapterLayout(
             }
             val desiredWidth = widths.fastSum()
             textLine.text = lineText
+            val titleStartX = when {
+                !isTitle -> null
+                emptyContent || isVolumeTitle ||
+                        imageStyle?.uppercase() == Book.imgStyleSingle -> {
+                    (visibleWidth - desiredWidth) / 2
+                }
+                isMiddleTitle -> (visibleWidth - desiredWidth) / 2
+                isRightTitle -> (visibleWidth - desiredWidth).coerceAtLeast(0f)
+                else -> null
+            }
             when (lineIndex) {
                 0 if layout.lineCount > 1 && !isTitle && isFirstLine -> {
                     //多行的第一行 非标题
@@ -1041,33 +1067,18 @@ class TextChapterLayout(
                 }
                 layout.lineCount - 1 -> {
                     //最后一行、单行
-                    //标题x轴居中
-                    val startX = if (
-                        isTitle &&
-                        (isMiddleTitle || emptyContent || isVolumeTitle
-                                || imageStyle?.uppercase() == Book.imgStyleSingle)
-                    ) {
-                        (visibleWidth - desiredWidth) / 2
-                    } else {
-                        0f
-                    }
                     addCharsToLineNatural(
                         book, absStartX, textLine, words,
-                        startX, !isTitle && lineIndex == 0, widths, srcList, clickList,
+                        titleStartX ?: 0f, !isTitle && lineIndex == 0,
+                        widths, srcList, clickList,
                         if (lineIndex == 0) hangingWidth else 0f, drawOffsets
                     )
                 }
                 else -> {
-                    if (
-                        isTitle &&
-                        (isMiddleTitle || emptyContent || isVolumeTitle
-                                || imageStyle?.uppercase() == Book.imgStyleSingle)
-                    ) {
-                        //标题居中
-                        val startX = (visibleWidth - desiredWidth) / 2
+                    if (titleStartX != null) {
                         addCharsToLineNatural(
                             book, absStartX, textLine, words,
-                            startX, false, widths, srcList, clickList
+                            titleStartX, false, widths, srcList, clickList
                         )
                     } else {
                         //中间行

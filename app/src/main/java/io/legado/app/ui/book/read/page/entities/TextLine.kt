@@ -40,6 +40,7 @@ data class TextLine(
     var chapterPosition: Int = 0,
     var pagePosition: Int = 0,
     val isTitle: Boolean = false,
+    val isTitleNumber: Boolean = false,
     var isParagraphEnd: Boolean = false,
     var isImage: Boolean = false,
     var isHtml: Boolean = false,
@@ -61,6 +62,24 @@ data class TextLine(
     val lineEnd: Float get() = textColumns.lastOrNull()?.end ?: 0f
     val chapterIndices: IntRange get() = chapterPosition..chapterPosition + charSize
     val height: Float inline get() = lineBottom - lineTop
+    val textPaint
+        get() = when {
+            isTitleNumber -> ChapterProvider.titleNumberPaint
+            isTitle -> ChapterProvider.titlePaint
+            else -> ChapterProvider.contentPaint
+        }
+    val textColor: Int
+        get() = if (isTitleNumber) {
+            ReadBookConfig.titleNumberTextColor
+        } else {
+            ReadBookConfig.textColor
+        }
+    val textFontMetrics: FontMetrics
+        get() = when {
+            isTitleNumber -> ChapterProvider.titleNumberPaintFontMetrics
+            isTitle -> ChapterProvider.titlePaintFontMetrics
+            else -> ChapterProvider.contentPaintFontMetrics
+        }
     val hasOverflowTextStyle: Boolean
         get() = styledColumnCount > 0 && textColumns.any {
             (it as? TextBaseColumn)?.highlightStyle?.let { style ->
@@ -218,21 +237,17 @@ data class TextLine(
 
     @SuppressLint("NewApi")
     private fun fastDrawTextLine(view: ContentTextView, canvas: Canvas) {
-        val textPaint = if (isTitle) {
-            ChapterProvider.titlePaint
-        } else {
-            ChapterProvider.contentPaint
-        }
-        val textColor = if (isReadAloud) {
+        val basePaint = textPaint
+        val drawColor = if (isReadAloud) {
             ReadBookConfig.textAccentColor
         } else {
-            ReadBookConfig.textColor
+            textColor
         }
-        if (textPaint.color != textColor) {
-            textPaint.color = textColor
+        if (basePaint.color != drawColor) {
+            basePaint.color = drawColor
         }
         val paint = PaintPool.obtain()
-        paint.set(textPaint)
+        paint.set(basePaint)
         val letterSpacing = paint.letterSpacing * paint.textSize
         val letterSpacingHalf = letterSpacing * 0.5f
         if (extraLetterSpacing != 0f) {
@@ -284,11 +299,7 @@ data class TextLine(
 
     private fun drawHighlightFills(canvas: Canvas) {
         val baseline = lineBase - lineTop
-        val baseTextSize = if (isTitle) {
-            ChapterProvider.titlePaint.textSize
-        } else {
-            ChapterProvider.contentPaint.textSize
-        }
+        val baseTextSize = textPaint.textSize
         var index = 0
         while (index < columns.size) {
             val first = columns[index] as? TextBaseColumn
@@ -338,15 +349,8 @@ data class TextLine(
 
     private fun drawHighlightRuns(canvas: Canvas) {
         val baseline = lineBase - lineTop
-        val baseTextSize: Float
-        val fontMetrics: FontMetrics
-        if (isTitle) {
-            baseTextSize = ChapterProvider.titlePaint.textSize
-            fontMetrics = ChapterProvider.titlePaintFontMetrics
-        } else {
-            baseTextSize = ChapterProvider.contentPaint.textSize
-            fontMetrics = ChapterProvider.contentPaintFontMetrics
-        }
+        val baseTextSize = textPaint.textSize
+        val fontMetrics = textFontMetrics
         var index = 0
         while (index < columns.size) {
             val first = columns[index] as? TextBaseColumn
@@ -384,7 +388,7 @@ data class TextLine(
                 }
             }
             val last = columns[endIndex - 1] as TextBaseColumn
-            val fallbackColor = style.textColor.takeIf { it != 0 } ?: ReadBookConfig.textColor
+            val fallbackColor = style.textColor.takeIf { it != 0 } ?: textColor
             val metricScale = textSize / baseTextSize
             HighlightDraw.drawRun(
                 canvas,

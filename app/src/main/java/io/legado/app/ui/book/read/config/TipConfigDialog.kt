@@ -3,7 +3,7 @@ package io.legado.app.ui.book.read.config
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
-import androidx.core.view.indices
+import androidx.core.view.isVisible
 import com.jaredrummler.android.colorpicker.ColorPickerDialog
 import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
@@ -16,9 +16,7 @@ import io.legado.app.help.config.ReaderInfoTemplate
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.ui.widget.text.AccentBgTextView
-import io.legado.app.utils.checkByIndex
 import io.legado.app.utils.dpToPx
-import io.legado.app.utils.getIndexById
 import io.legado.app.utils.hexString
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.postEvent
@@ -30,6 +28,7 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
     companion object {
         const val TIP_COLOR = 7897
         const val TIP_DIVIDER_COLOR = 7898
+        const val TITLE_NUMBER_COLOR = 7899
     }
 
     private val binding by viewBinding(DialogTipConfigBinding::bind)
@@ -43,17 +42,29 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
         initView()
         initEvent()
         observeEvent<String>(EventBus.TIP_COLOR) {
+            upTitleNumberColor()
             upTvTipColor()
             upTvTipDividerColor()
         }
     }
 
     private fun initView() {
-        if (ReadBookConfig.titleMode !in binding.rgTitleMode.indices) {
+        if (ReadBookConfig.titleMode !in 0..3) {
             ReadBookConfig.titleMode = 0
         }
-        binding.rgTitleMode.checkByIndex(ReadBookConfig.titleMode)
+        binding.rgTitleMode.check(
+            when (ReadBookConfig.titleMode) {
+                1 -> R.id.rb_title_mode2
+                2 -> R.id.rb_title_mode3
+                3 -> R.id.rb_title_mode4
+                else -> R.id.rb_title_mode1
+            }
+        )
         binding.dsbTitleSize.progress = ReadBookConfig.titleSize
+        binding.swSplitChapterTitle.isChecked = ReadBookConfig.splitChapterTitle
+        binding.dsbTitleNumberSize.progress = ReadBookConfig.titleNumberSize
+        upTitleNumberOptions()
+        upTitleNumberColor()
         binding.dsbTitleTop.progress = ReadBookConfig.titleTopSpacing
         binding.dsbTitleBottom.progress = ReadBookConfig.titleBottomSpacing
 
@@ -97,14 +108,59 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
         }
     }
 
+    private fun upTitleNumberOptions() {
+        binding.llTitleNumberStyle.isVisible = ReadBookConfig.splitChapterTitle
+    }
+
+    private fun upTitleNumberColor() {
+        val color = ReadBookConfig.titleNumberColor
+        binding.tvTitleNumberColor.text = if (color == 0) {
+            ReadTipConfig.tipColorNames.first()
+        } else {
+            "#${color.hexString}"
+        }
+    }
+
     private fun initEvent() = binding.run {
         rgTitleMode.setOnCheckedChangeListener { _, checkedId ->
-            ReadBookConfig.titleMode = rgTitleMode.getIndexById(checkedId)
+            ReadBookConfig.titleMode = when (checkedId) {
+                R.id.rb_title_mode2 -> 1
+                R.id.rb_title_mode3 -> 2
+                R.id.rb_title_mode4 -> 3
+                else -> 0
+            }
             postEvent(EventBus.UP_CONFIG, arrayListOf(5))
         }
         dsbTitleSize.onChanged = {
             ReadBookConfig.titleSize = it
             postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
+        }
+        swSplitChapterTitle.setOnCheckedChangeListener { _, isChecked ->
+            ReadBookConfig.splitChapterTitle = isChecked
+            upTitleNumberOptions()
+            postEvent(EventBus.UP_CONFIG, arrayListOf(5))
+        }
+        dsbTitleNumberSize.onChanged = {
+            ReadBookConfig.titleNumberSize = it
+            postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
+        }
+        llTitleNumberColor.setOnClickListener {
+            context?.selector(items = ReadTipConfig.tipColorNames) { _, i ->
+                when (i) {
+                    0 -> {
+                        ReadBookConfig.titleNumberColor = 0
+                        upTitleNumberColor()
+                        postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
+                    }
+
+                    1 -> ColorPickerDialog.newBuilder()
+                        .setColor(ReadBookConfig.titleNumberTextColor)
+                        .setShowAlphaSlider(false)
+                        .setDialogType(ColorPickerDialog.TYPE_CUSTOM)
+                        .setDialogId(TITLE_NUMBER_COLOR)
+                        .show(requireActivity())
+                }
+            }
         }
         dsbTitleTop.onChanged = {
             ReadBookConfig.titleTopSpacing = it

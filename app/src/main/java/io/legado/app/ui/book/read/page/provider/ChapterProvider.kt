@@ -132,11 +132,18 @@ object ChapterProvider {
         private set
 
     @JvmStatic
+    var titleNumberPaintTextHeight = 0f
+        private set
+
+    @JvmStatic
     var contentPaintTextHeight = 0f
         private set
 
     @JvmStatic
     var titlePaintFontMetrics = FontMetrics()
+
+    @JvmStatic
+    var titleNumberPaintFontMetrics = FontMetrics()
 
     @JvmStatic
     var contentPaintFontMetrics = FontMetrics()
@@ -147,6 +154,9 @@ object ChapterProvider {
 
     @JvmStatic
     var titlePaint: TextPaint = TextPaint()
+
+    @JvmStatic
+    var titleNumberPaint: TextPaint = TextPaint()
 
     @JvmStatic
     var contentPaint: TextPaint = TextPaint()
@@ -232,6 +242,11 @@ object ChapterProvider {
         getPaints(typeface).let {
             titlePaint = it.first
             contentPaint = it.second
+            titleNumberPaint = TextPaint(titlePaint).apply {
+                color = ReadBookConfig.titleNumberTextColor
+                textSize = (ReadBookConfig.textSize + ReadBookConfig.titleNumberSize)
+                    .toFloat().spToPx()
+            }
         }
         reviewPaint.color = ReadBookConfig.reviewIconColor.takeIf { it != 0 }
             ?: if (AppConfig.isNightTheme) {
@@ -258,8 +273,10 @@ object ChapterProvider {
             0f
         }
         titlePaintTextHeight = titlePaint.textHeight
+        titleNumberPaintTextHeight = titleNumberPaint.textHeight
         contentPaintTextHeight = contentPaint.textHeight
         titlePaintFontMetrics = titlePaint.fontMetrics
+        titleNumberPaintFontMetrics = titleNumberPaint.fontMetrics
         contentPaintFontMetrics = contentPaint.fontMetrics
         upLayout()
     }
