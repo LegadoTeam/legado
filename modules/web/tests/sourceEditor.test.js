@@ -58,3 +58,21 @@ test('keeps source editor state and mobile controls reachable', () => {
   assert.doesNotMatch(json, /margin-bottom: 4px/)
   assert.match(config, /返回 -1 表示章评，1 开始表示正文段落/)
 })
+
+test('keeps a validated source token after debug transport errors', () => {
+  const debugView = readSource('components/SourceDebug.vue')
+  const api = readSource('api/api.ts')
+  const axios = readSource('api/axios.ts')
+  const debugApi = api.slice(
+    api.indexOf('const debug = async'),
+    api.indexOf('const getProxyCoverUrl'),
+  )
+
+  assert.match(debugView, /await API\.saveSource[\s\S]*await API\.debug/)
+  assert.doesNotMatch(debugApi, /clearSourceApiToken/)
+  assert.match(axios, /'saveBookSource'[\s\S]*'saveRssSource'/)
+  assert.match(
+    axios,
+    /errorMsg\.includes\('访问令牌'\)[\s\S]*clearSourceApiToken\(\)/,
+  )
+})
