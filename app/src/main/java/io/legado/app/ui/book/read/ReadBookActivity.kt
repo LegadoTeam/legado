@@ -1993,7 +1993,12 @@ class ReadBookActivity : BaseReadBookActivity(),
             }
         )
         reviewSummaryAppliedKey = key
-        binding.readView.upContent(relativePosition = 0, resetPageOffset = false)
+        if (ReadBookConfig.isRightTitle && (result.counts[-1] ?: 0) > 0) {
+            ReadBook.curTextChapter = null
+            ReadBook.loadContent(chapterIndex, resetPageOffset = false)
+        } else {
+            binding.readView.upContent(relativePosition = 0, resetPageOffset = false)
+        }
     }
 
     private fun prefetchAdjacentReviewSummary(

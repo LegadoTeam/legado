@@ -126,7 +126,13 @@ class TextChapterLayout(
     }
     private val adaptSpecialStyle = AppConfig.adaptSpecialStyle
     private val pageAnim = book.getPageAnim()
-    private val rightTitleReviewInset = if (isRightTitle) {
+    private val rightTitleReviewInset = if (
+        isRightTitle && ChapterProvider.getReviewCount(
+            paragraphNum = 0,
+            isTitle = true,
+            chapterIndex = bookChapter.index,
+        ) > 0
+    ) {
         ReviewColumnGeometry.trailingInset(
             ChapterProvider.getReviewWidth(true),
             paddingRight.toFloat(),
@@ -257,85 +263,78 @@ class TextChapterLayout(
                 listOf(it.first to true, it.second to false)
             } ?: displayTitle.splitNotBlank("\n").map { it to false }
             val titleImageIndex = titleLines.indexOfFirst { !it.second }.coerceAtLeast(0)
+            val titleImg = bookChapter.imgUrl?.takeIf { it.isNotBlank() }
+            var titleImgClick: String? = null
+            var parsedTitleImgText: Char? = null
+            if (titleImg != null) {
+                val urlMatcher = paramPattern.matcher(titleImg)
+                var style: String? = null
+                var imgSize = ImageProvider.getImageSize(book, titleImg, ReadBook.bookSource)
+                if (urlMatcher.find()) {
+                    var width: String? = null
+                    val urlOptionStr = titleImg.substring(urlMatcher.end())
+                    GSON.fromJsonObject<Map<String, String>>(urlOptionStr).getOrNull()
+                        ?.let { map ->
+                            map.forEach { (key, value) ->
+                                when (key) {
+                                    "style" -> style = value
+                                    "width" -> width = value
+                                    "click" -> titleImgClick = value
+                                }
+                            }
+                        }
+                    width?.let { widthValue ->
+                        if (widthValue.endsWith("%")) {
+                            widthValue.dropLast(1).toIntOrNull()?.let { percentage ->
+                                val imgWidth = visibleWidth * percentage / 100
+                                val (sizeHeight, sizeWidth) = imgSize
+                                imgSize = Size(imgWidth, sizeHeight * imgWidth / sizeWidth)
+                            }
+                        } else {
+                            widthValue.toIntOrNull()?.let { width ->
+                                val (sizeHeight, sizeWidth) = imgSize
+                                imgSize = Size(width, sizeHeight * width / sizeWidth)
+                            }
+                        }
+                    }
+                }
+                if (style == null) {
+                    style = if (imgSize.width < 80 && imgSize.height < 80) {
+                        "text"
+                    } else {
+                        imageStyle
+                    }
+                }
+                when (style) {
+                    "text" -> parsedTitleImgText = srcReplaceChar
+                    "TEXT" -> parsedTitleImgText = reviewChar
+                    else -> setTypeImage(
+                        book,
+                        titleImg,
+                        contentPaintTextHeight,
+                        style,
+                        imgSize,
+                        titleImgClick,
+                        isTitle = true
+                    )
+                }
+            }
+            val titleImgText = parsedTitleImgText
             //标题非隐藏
             titleLines.forEachIndexed { lineIndex, (text, isTitleNumber) ->
                 val srcList = LinkedList<String>()
                 val clickList = LinkedList<String?>()
-                val titleImg = if (lineIndex == titleImageIndex) {
-                    bookChapter.imgUrl
-                } else {
-                    null
-                }
-                val imgText = if (titleImg.isNullOrEmpty()) {
-                    null
-                } else {
-                    val urlMatcher = paramPattern.matcher(titleImg)
-                    var click: String? = null
-                    var style: String? = null
-                    var imgSize = ImageProvider.getImageSize(book, titleImg, ReadBook.bookSource)
-                    if (urlMatcher.find()) {
-                        var width: String? = null
-                        val urlOptionStr = titleImg.substring(urlMatcher.end())
-                        GSON.fromJsonObject<Map<String, String>>(urlOptionStr).getOrNull()
-                            ?.let { map ->
-                                map.forEach { (key, value) ->
-                                    when (key) {
-                                        "style" -> style = value
-                                        "width" -> width = value
-                                        "click" -> click = value
-                                    }
-                                }
-                            }
-                        width?.let {
-                            if (width.endsWith("%")) {
-                                width.dropLast(1).toIntOrNull()?.let { percentage ->
-                                    val imgWidth = visibleWidth * percentage / 100
-                                    val (sizeHeight, sizeWidth) = imgSize
-                                    imgSize = Size(imgWidth, sizeHeight * imgWidth / sizeWidth)
-                                }
-                            } else {
-                                width.toIntOrNull()?.let { width ->
-                                    val (sizeHeight, sizeWidth) = imgSize
-                                    imgSize = Size(width, sizeHeight * width / sizeWidth)
-                                }
-                            }
-                        }
-                    }
-                    if (style == null) {
-                        style = if (imgSize.width < 80 && imgSize.height < 80) {
-                            "text"
-                        } else {
-                            imageStyle
-                        }
-                    }
-                    when (style) {
-                        "text" -> {
-                            srcList.add(titleImg)
-                            clickList.add(click)
-                            srcReplaceChar
-                        }
-                        "TEXT" -> {
-                            srcList.add(titleImg)
-                            clickList.add(click)
-                            reviewChar
-                        }
-                        else -> {
-                            setTypeImage(
-                                book,
-                                titleImg,
-                                contentPaintTextHeight,
-                                style,
-                                imgSize,
-                                click,
-                                isTitle = true
-                            )
-                            null
-                        }
-                    }
+                if (lineIndex == titleImageIndex && titleImg != null && titleImgText != null) {
+                    srcList.add(titleImg)
+                    clickList.add(titleImgClick)
                 }
                 setTypeText(
                     book,
-                    if (imgText != null) text + imgText else text,
+                    if (lineIndex == titleImageIndex && titleImgText != null) {
+                        text + titleImgText
+                    } else {
+                        text
+                    },
                     if (isTitleNumber) titleNumberPaint else titlePaint,
                     if (isTitleNumber) titleNumberPaintTextHeight else titlePaintTextHeight,
                     if (isTitleNumber) titleNumberPaintFontMetrics else titlePaintFontMetrics,
@@ -979,22 +978,30 @@ class TextChapterLayout(
         val compressor = if (isTitle) null else punctuationCompressor
         compressor?.beginParagraph(text, widthsArray, punctuationCompressMode)
         val hangingWidth = hangingPunctuationWidth(text, widthsArray, isTitle, isFirstLine)
+        val textLayoutWidth = if (
+            isTitle && isRightTitle && !emptyContent && !isVolumeTitle &&
+            imageStyle?.uppercase() != Book.imgStyleSingle
+        ) {
+            (visibleWidth - rightTitleReviewInset).toInt().coerceAtLeast(1)
+        } else {
+            visibleWidth
+        }
         val layout = if (useZhLayout) {
             val (words, widths) = measureTextSplit(text, widthsArray)
             val indentSize = if (isFirstLine) paragraphIndent.length else 0
-            ZhLayout(text, textPaint, visibleWidth, words, widths, indentSize, hangingWidth)
+            ZhLayout(text, textPaint, textLayoutWidth, words, widths, indentSize, hangingWidth)
         } else if (hangingWidth > 0f) {
             //悬挂标点不占行宽,首行放宽后其余行缩回版心
-            val layoutWidth = HangingLineWidth.layoutWidth(visibleWidth, hangingWidth)
+            val layoutWidth = HangingLineWidth.layoutWidth(textLayoutWidth, hangingWidth)
             StaticLayout.Builder
                 .obtain(text, 0, text.length, textPaint, layoutWidth)
                 .setAlignment(Layout.Alignment.ALIGN_NORMAL)
                 .setLineSpacing(0f, 0f)
                 .setIncludePad(true)
-                .setIndents(null, HangingLineWidth.rightIndents(visibleWidth, layoutWidth))
+                .setIndents(null, HangingLineWidth.rightIndents(textLayoutWidth, layoutWidth))
                 .build()
         } else {
-            StaticLayout(text, textPaint, visibleWidth, Layout.Alignment.ALIGN_NORMAL, 0f, 0f, true)
+            StaticLayout(text, textPaint, textLayoutWidth, Layout.Alignment.ALIGN_NORMAL, 0f, 0f, true)
         }
         durY = when {
             //标题y轴居中
