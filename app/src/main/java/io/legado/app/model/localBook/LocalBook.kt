@@ -73,7 +73,9 @@ internal fun isMissingLocalBookFile(
 ): Boolean {
     if (error is SecurityException || error is CancellationException) return false
     return if (isContentUri) {
-        error is FileNotFoundException
+        error is FileNotFoundException ||
+                error is IllegalArgumentException &&
+                error.message?.contains(FileNotFoundException::class.java.name) == true
     } else {
         !localFileExists
     }
