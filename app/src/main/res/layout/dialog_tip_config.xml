@@ -60,6 +60,32 @@
             app:max="20"
             app:title="@string/title_font_size" />
 
+        <LinearLayout
+            android:id="@+id/ll_title_color"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:padding="6dp"
+                android:text="@string/title_color"
+                android:textColor="@color/primaryText" />
+
+            <TextView
+                android:id="@+id/tv_title_color"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="6dp"
+                android:textColor="@color/primaryText"
+                tools:text="#E53935" />
+
+        </LinearLayout>
+
         <io.legado.app.lib.theme.view.ThemeSwitch
             android:id="@+id/sw_split_chapter_title"
             android:layout_width="match_parent"
@@ -83,6 +109,14 @@
                 android:padding="3dp"
                 app:max="20"
                 app:title="@string/title_number_font_size" />
+
+            <io.legado.app.ui.widget.DetailSeekBar
+                android:id="@+id/dsb_title_number_spacing"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="3dp"
+                app:max="100"
+                app:title="@string/title_number_spacing" />
 
             <LinearLayout
                 android:id="@+id/ll_title_number_color"

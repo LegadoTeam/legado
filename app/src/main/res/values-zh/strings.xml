@@ -796,8 +796,10 @@
     <string name="title_left">靠左</string>
     <string name="title_center">居中</string>
     <string name="title_hide">隐藏</string>
+    <string name="title_color">章节名颜色</string>
     <string name="split_chapter_title">章节编号与标题分行</string>
     <string name="title_number_font_size">章节编号字号</string>
+    <string name="title_number_spacing">章节编号下边距</string>
     <string name="title_number_color">章节编号颜色</string>
     <string name="add_to_group">加入分组</string>
     <string name="save_image">保存图片</string>

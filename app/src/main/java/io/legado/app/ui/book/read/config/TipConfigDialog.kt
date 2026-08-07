@@ -29,6 +29,7 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
         const val TIP_COLOR = 7897
         const val TIP_DIVIDER_COLOR = 7898
         const val TITLE_NUMBER_COLOR = 7899
+        const val TITLE_COLOR = 7900
     }
 
     private val binding by viewBinding(DialogTipConfigBinding::bind)
@@ -42,6 +43,7 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
         initView()
         initEvent()
         observeEvent<String>(EventBus.TIP_COLOR) {
+            upTitleColor()
             upTitleNumberColor()
             upTvTipColor()
             upTvTipDividerColor()
@@ -61,8 +63,10 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
             }
         )
         binding.dsbTitleSize.progress = ReadBookConfig.titleSize
+        upTitleColor()
         binding.swSplitChapterTitle.isChecked = ReadBookConfig.splitChapterTitle
         binding.dsbTitleNumberSize.progress = ReadBookConfig.titleNumberSize
+        binding.dsbTitleNumberSpacing.progress = ReadBookConfig.titleNumberSpacing
         upTitleNumberOptions()
         upTitleNumberColor()
         binding.dsbTitleTop.progress = ReadBookConfig.titleTopSpacing
@@ -112,6 +116,15 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
         binding.llTitleNumberStyle.isVisible = ReadBookConfig.splitChapterTitle
     }
 
+    private fun upTitleColor() {
+        val color = ReadBookConfig.titleColor
+        binding.tvTitleColor.text = if (color == 0) {
+            ReadTipConfig.tipColorNames.first()
+        } else {
+            "#${color.hexString}"
+        }
+    }
+
     private fun upTitleNumberColor() {
         val color = ReadBookConfig.titleNumberColor
         binding.tvTitleNumberColor.text = if (color == 0) {
@@ -135,6 +148,24 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
             ReadBookConfig.titleSize = it
             postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
         }
+        llTitleColor.setOnClickListener {
+            context?.selector(items = ReadTipConfig.tipColorNames) { _, i ->
+                when (i) {
+                    0 -> {
+                        ReadBookConfig.titleColor = 0
+                        upTitleColor()
+                        postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
+                    }
+
+                    1 -> ColorPickerDialog.newBuilder()
+                        .setColor(ReadBookConfig.titleTextColor)
+                        .setShowAlphaSlider(false)
+                        .setDialogType(ColorPickerDialog.TYPE_CUSTOM)
+                        .setDialogId(TITLE_COLOR)
+                        .show(requireActivity())
+                }
+            }
+        }
         swSplitChapterTitle.setOnCheckedChangeListener { _, isChecked ->
             ReadBookConfig.splitChapterTitle = isChecked
             upTitleNumberOptions()
@@ -143,6 +174,10 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
         dsbTitleNumberSize.onChanged = {
             ReadBookConfig.titleNumberSize = it
             postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
+        }
+        dsbTitleNumberSpacing.onChanged = {
+            ReadBookConfig.titleNumberSpacing = it
+            postEvent(EventBus.UP_CONFIG, arrayListOf(5))
         }
         llTitleNumberColor.setOnClickListener {
             context?.selector(items = ReadTipConfig.tipColorNames) { _, i ->

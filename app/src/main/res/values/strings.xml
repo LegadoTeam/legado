@@ -800,8 +800,10 @@
     <string name="title_left">Left</string>
     <string name="title_center">Center</string>
     <string name="title_hide">Hide</string>
+    <string name="title_color">Chapter title color</string>
     <string name="split_chapter_title">Separate chapter number and title</string>
     <string name="title_number_font_size">Chapter number font size</string>
+    <string name="title_number_spacing">Space below chapter number</string>
     <string name="title_number_color">Chapter number color</string>
     <string name="add_to_group">Add to Group</string>
     <string name="save_image">Save image</string>

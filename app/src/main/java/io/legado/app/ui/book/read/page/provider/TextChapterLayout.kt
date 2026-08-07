@@ -95,6 +95,7 @@ class TextChapterLayout(
 
     private val titleTopSpacing = ChapterProvider.titleTopSpacing
     private val titleBottomSpacing = ChapterProvider.titleBottomSpacing
+    private val titleNumberSpacing = ReadBookConfig.titleNumberSpacing.dpToPx()
     private val lineSpacingExtra = ChapterProvider.lineSpacingExtra
     private val paragraphSpacing = ChapterProvider.paragraphSpacing
 
@@ -105,6 +106,10 @@ class TextChapterLayout(
     private val doublePage = ChapterProvider.doublePage
     private val indentCharWidth = ChapterProvider.indentCharWidth
     private val stringBuilder = StringBuilder()
+
+    private val bookChapter inline get() = textChapter.chapter
+    private val displayTitle inline get() = textChapter.title
+    private val chaptersSize inline get() = textChapter.chaptersSize
 
     private val paragraphIndent = ReadBookConfig.paragraphIndent
     private val titleMode = ReadBookConfig.titleMode
@@ -121,19 +126,29 @@ class TextChapterLayout(
     }
     private val adaptSpecialStyle = AppConfig.adaptSpecialStyle
     private val pageAnim = book.getPageAnim()
+    private val rightTitleReviewInset = if (isRightTitle) {
+        ReviewColumnGeometry.trailingInset(
+            ChapterProvider.getReviewWidth(true),
+            paddingRight.toFloat(),
+            1.dpToPx().toFloat()
+        )
+    } else {
+        0f
+    }
+    private val splitTitle = ChapterTitleParser.split(
+        displayTitle,
+        ReadBookConfig.splitChapterTitle,
+        bookChapter.isVolume
+    )
     private val reviewTitleOffset = if (
         titleMode != 2 || bookChapter.isVolume || !textChapter.hasBodyContent
     ) {
-        1
+        if (splitTitle == null) 1 else 2
     } else {
         0
     }
 
     private var pendingTextPage = TextPage()
-
-    private val bookChapter inline get() = textChapter.chapter
-    private val displayTitle inline get() = textChapter.title
-    private val chaptersSize inline get() = textChapter.chaptersSize
 
     private var durY = 0f
     private var absStartX = paddingLeft
@@ -238,21 +253,15 @@ class TextChapterLayout(
         val isSingleImageStyle = imageStyle.equals(Book.imgStyleSingle, true)
 
         if (titleMode != 2 || bookChapter.isVolume || contents.isEmpty()) {
-            var firstLine = true
-            val splitTitle = ChapterTitleParser.split(
-                displayTitle,
-                ReadBookConfig.splitChapterTitle,
-                bookChapter.isVolume
-            )
             val titleLines = splitTitle?.let {
                 listOf(it.first to true, it.second to false)
             } ?: displayTitle.splitNotBlank("\n").map { it to false }
+            val titleImageIndex = titleLines.indexOfFirst { !it.second }.coerceAtLeast(0)
             //标题非隐藏
-            titleLines.forEachIndexed { index, (text, isTitleNumber) ->
+            titleLines.forEachIndexed { lineIndex, (text, isTitleNumber) ->
                 val srcList = LinkedList<String>()
                 val clickList = LinkedList<String?>()
-                val titleImg = if (firstLine) {
-                    firstLine = false
+                val titleImg = if (lineIndex == titleImageIndex) {
                     bookChapter.imgUrl
                 } else {
                     null
@@ -338,8 +347,8 @@ class TextChapterLayout(
                     emptyContent = contents.isEmpty(),
                     isVolumeTitle = bookChapter.isVolume
                 )
-                pendingTextPage.lines.lastOrNull()?.isParagraphEnd =
-                    splitTitle == null || index == titleLines.lastIndex
+                pendingTextPage.lines.lastOrNull()?.isParagraphEnd = true
+                if (isTitleNumber) durY += titleNumberSpacing
                 stringBuilder.append("\n")
             }
             durY += titleBottomSpacing
@@ -1054,7 +1063,8 @@ class TextChapterLayout(
                     (visibleWidth - desiredWidth) / 2
                 }
                 isMiddleTitle -> (visibleWidth - desiredWidth) / 2
-                isRightTitle -> (visibleWidth - desiredWidth).coerceAtLeast(0f)
+                isRightTitle ->
+                    (visibleWidth - desiredWidth - rightTitleReviewInset).coerceAtLeast(0f)
                 else -> null
             }
             when (lineIndex) {

@@ -62,6 +62,7 @@ data class TextLine(
     val lineEnd: Float get() = textColumns.lastOrNull()?.end ?: 0f
     val chapterIndices: IntRange get() = chapterPosition..chapterPosition + charSize
     val height: Float inline get() = lineBottom - lineTop
+    val isReviewTitle get() = isTitle && !isTitleNumber
     val textPaint
         get() = when {
             isTitleNumber -> ChapterProvider.titleNumberPaint
@@ -69,10 +70,10 @@ data class TextLine(
             else -> ChapterProvider.contentPaint
         }
     val textColor: Int
-        get() = if (isTitleNumber) {
-            ReadBookConfig.titleNumberTextColor
-        } else {
-            ReadBookConfig.textColor
+        get() = when {
+            isTitleNumber -> ReadBookConfig.titleNumberTextColor
+            isTitle -> ReadBookConfig.titleTextColor
+            else -> ReadBookConfig.textColor
         }
     val textFontMetrics: FontMetrics
         get() = when {

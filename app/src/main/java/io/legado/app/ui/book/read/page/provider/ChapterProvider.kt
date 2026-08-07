@@ -36,6 +36,10 @@ import splitties.init.appCtx
 import androidx.core.net.toUri
 
 internal object ReviewColumnGeometry {
+    fun trailingInset(width: Float, trailingPadding: Float, edgeInset: Float): Float {
+        return (width + edgeInset - trailingPadding).coerceAtLeast(0f)
+    }
+
     fun start(
         textEnd: Float,
         width: Float,
@@ -332,7 +336,7 @@ object ChapterProvider {
             page.lines.forEach { line ->
                 val count = getReviewCount(
                     paragraphNum = line.paragraphNum,
-                    isTitle = line.isTitle,
+                    isTitle = line.isReviewTitle,
                     titleOffset = line.reviewTitleOffset,
                     chapterIndex = chapterIndex,
                 )
@@ -385,7 +389,7 @@ object ChapterProvider {
         if (textLine.columns.any { it is ReviewColumn }) return
         val count = getReviewCount(
             paragraphNum = textLine.paragraphNum,
-            isTitle = textLine.isTitle,
+            isTitle = textLine.isReviewTitle,
             titleOffset = titleOffset ?: textLine.reviewTitleOffset,
             chapterIndex = chapterIndex,
         )
@@ -399,7 +403,7 @@ object ChapterProvider {
         reviewColumn: ReviewColumn,
         textLine: TextLine,
     ): Boolean {
-        val width = getReviewWidth(textLine.isTitle)
+        val width = getReviewWidth(textLine.isReviewTitle)
         val textEnd = textLine.columns.lastOrNull { it !is ReviewColumn }?.end
             ?: textLine.lineEnd
         val start = ReviewColumnGeometry.start(
@@ -571,7 +575,7 @@ object ChapterProvider {
 
         //标题
         val tPaint = TextPaint()
-        tPaint.color = ReadBookConfig.textColor
+        tPaint.color = ReadBookConfig.titleTextColor
         tPaint.letterSpacing = ReadBookConfig.letterSpacing
         tPaint.typeface = titleFont
         tPaint.textSize = with(ReadBookConfig) { textSize + titleSize }.toFloat().spToPx()
