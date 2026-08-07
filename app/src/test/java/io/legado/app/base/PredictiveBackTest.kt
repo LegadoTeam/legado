@@ -1,6 +1,7 @@
 package io.legado.app.base
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
@@ -18,6 +19,6 @@ class PredictiveBackTest {
         assertFalse(blanketFinishCallback.containsMatchIn(baseActivity))
 
         val manifest = File("src/main/AndroidManifest.xml").readText()
-        assertFalse(manifest.contains("""android:enableOnBackInvokedCallback="false"""))
+        assertTrue(manifest.contains("""android:enableOnBackInvokedCallback="true"""))
     }
 }
