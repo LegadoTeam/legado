@@ -289,7 +289,11 @@ abstract class BaseReadAloudService : BaseService(),
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
+        if (intent == null) {
+            stopSelfResult(startId)
+            return START_NOT_STICKY
+        }
+        when (intent.action) {
             IntentAction.play -> newReadAloud(
                 intent.getBooleanExtra("play", true),
                 intent.getIntExtra("pageIndex", ReadBook.durPageIndex),
@@ -308,7 +312,8 @@ abstract class BaseReadAloudService : BaseService(),
             IntentAction.setChapterStop -> setChapterStop(intent.getIntExtra("count", 0))
             IntentAction.stop -> stopSelf()
         }
-        return super.onStartCommand(intent, flags, startId)
+        super.onStartCommand(intent, flags, startId)
+        return START_NOT_STICKY
     }
 
     private fun newReadAloud(play: Boolean, pageIndex: Int, startPos: Int) {
