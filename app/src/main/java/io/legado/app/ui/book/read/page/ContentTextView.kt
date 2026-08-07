@@ -218,6 +218,10 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         pageOffset = 0
     }
 
+    fun isAtChapterTop(): Boolean {
+        return textPage.index == 0 && pageOffset == 0
+    }
+
     fun restorePageOffset(chapterPos: Int) {
         val line = textPage.lines.firstOrNull { it.chapterPosition == chapterPos }
             ?: textPage.lines.firstOrNull {

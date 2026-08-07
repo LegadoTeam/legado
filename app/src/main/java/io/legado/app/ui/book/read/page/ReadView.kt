@@ -45,6 +45,26 @@ import java.text.BreakIterator
 import java.util.Locale
 import kotlin.math.abs
 
+internal enum class PullBookmarkGestureState {
+    NONE, PULLING, READY
+}
+
+internal fun classifyPullBookmarkGesture(
+    deltaX: Float,
+    deltaY: Float,
+    touchSlop: Int,
+    triggerDistance: Int,
+): PullBookmarkGestureState {
+    if (deltaY <= touchSlop || deltaY <= abs(deltaX)) {
+        return PullBookmarkGestureState.NONE
+    }
+    return if (deltaY >= triggerDistance) {
+        PullBookmarkGestureState.READY
+    } else {
+        PullBookmarkGestureState.PULLING
+    }
+}
+
 /**
  * 阅读视图
  */
@@ -96,6 +116,9 @@ class ReadView(context: Context, attrs: AttributeSet) :
     private val initialTextPos = TextPos(0, 0, 0)
 
     private val slopSquare by lazy { ViewConfiguration.get(context).scaledTouchSlop }
+    private val pullBookmarkDistance by lazy { slopSquare * 6 }
+    private var pullBookmarkCandidate = false
+    private var pullBookmarkState = PullBookmarkGestureState.NONE
     private var pageSlopSquare: Int = slopSquare
     var pageSlopSquare2: Int = pageSlopSquare * pageSlopSquare
     private var pageTouchClick: Int = 0
@@ -189,6 +212,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
 
         //在多点触控时，事件不走ACTION_DOWN分支而产生的特殊事件处理
         if (event.actionMasked == MotionEvent.ACTION_POINTER_DOWN || event.actionMasked == MotionEvent.ACTION_POINTER_UP) {
+            resetPullBookmarkGesture()
             pageDelegate?.onTouch(event)
         }
         when (event.action) {
@@ -205,6 +229,10 @@ class ReadView(context: Context, attrs: AttributeSet) :
                 postDelayed(longPressRunnable, longPressTimeout)
                 pressDown = true
                 isMove = false
+                pullBookmarkCandidate = AppConfig.pullToToggleBookmark &&
+                        !pressOnTextSelected && !isAutoPage &&
+                        (!isScroll || curPage.isAtChapterTop())
+                pullBookmarkState = PullBookmarkGestureState.NONE
                 pageDelegate?.onTouch(event)
                 pageDelegate?.onDown()
                 setStartPoint(event.x, event.y, false)
@@ -214,6 +242,30 @@ class ReadView(context: Context, attrs: AttributeSet) :
                 if (!pressDown) return true
                 val absX = abs(startX - event.x)
                 val absY = abs(startY - event.y)
+                if (pullBookmarkCandidate || pullBookmarkState != PullBookmarkGestureState.NONE) {
+                    val state = classifyPullBookmarkGesture(
+                        event.x - startX,
+                        event.y - startY,
+                        slopSquare,
+                        pullBookmarkDistance,
+                    )
+                    if (pullBookmarkState != PullBookmarkGestureState.NONE ||
+                        state != PullBookmarkGestureState.NONE
+                    ) {
+                        pullBookmarkState = if (state == PullBookmarkGestureState.NONE) {
+                            PullBookmarkGestureState.PULLING
+                        } else {
+                            state
+                        }
+                        isMove = true
+                        longPressed = false
+                        removeCallbacks(longPressRunnable)
+                        return true
+                    }
+                    if (absX > slopSquare || absY > slopSquare) {
+                        pullBookmarkCandidate = false
+                    }
+                }
                 if (!isMove) {
                     isMove = absX > slopSquare || absY > slopSquare
                 }
@@ -233,6 +285,16 @@ class ReadView(context: Context, attrs: AttributeSet) :
                 removeCallbacks(longPressRunnable)
                 if (!pressDown) return true
                 pressDown = false
+                if (pullBookmarkState != PullBookmarkGestureState.NONE) {
+                    val toggleBookmark = pullBookmarkState == PullBookmarkGestureState.READY
+                    resetPullBookmarkGesture()
+                    pressOnTextSelected = false
+                    if (toggleBookmark) {
+                        callBack.toggleBookmark()
+                    }
+                    return true
+                }
+                resetPullBookmarkGesture()
                 if (!pageDelegate!!.isMoved && !isMove) {
                     if (!longPressed && !pressOnTextSelected) {
                         if (!curPage.onClick(startX, startY)) {
@@ -253,6 +315,14 @@ class ReadView(context: Context, attrs: AttributeSet) :
                 removeCallbacks(longPressRunnable)
                 if (!pressDown) return true
                 pressDown = false
+                val wasPullingBookmark =
+                    pullBookmarkState != PullBookmarkGestureState.NONE
+                resetPullBookmarkGesture()
+                if (wasPullingBookmark) {
+                    pressOnTextSelected = false
+                    autoPager.resume()
+                    return true
+                }
                 if (isTextSelected) {
                     callBack.showTextActionMenu()
                 } else if (pageDelegate!!.isMoved) {
@@ -263,6 +333,11 @@ class ReadView(context: Context, attrs: AttributeSet) :
             }
         }
         return true
+    }
+
+    private fun resetPullBookmarkGesture() {
+        pullBookmarkCandidate = false
+        pullBookmarkState = PullBookmarkGestureState.NONE
     }
 
     fun cancelSelect(clearSearchResult: Boolean = false) {
@@ -319,6 +394,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
     private fun onLongPress() {
         kotlin.runCatching {
             curPage.longPress(startX, startY) { textPos: TextPos ->
+                resetPullBookmarkGesture()
                 isTextSelected = true
                 pressOnTextSelected = true
                 initialTextPos.upData(textPos)
@@ -763,6 +839,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
         fun autoPageStop()
         fun openChapterList()
         fun addBookmark()
+        fun toggleBookmark()
         fun changeReplaceRuleState()
         fun openSearchActivity(searchWord: String?)
         fun upSystemUiVisibility()

@@ -140,6 +140,14 @@
         app:iconSpaceReserved="false"
         app:isBottomBackground="true" />
 
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:defaultValue="false"
+        android:key="pullToToggleBookmark"
+        android:summary="@string/pull_to_toggle_bookmark_summary"
+        android:title="@string/pull_to_toggle_bookmark"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
     <io.legado.app.lib.prefs.Preference
         android:key="pageTouchSlop"
         android:summary="@string/page_touch_slop_summary"

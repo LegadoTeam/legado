@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.annotation.CallSuper
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import io.legado.app.R
 import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
@@ -52,6 +53,8 @@ import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
@@ -68,11 +71,12 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
     var author: String = ""
     private var fromReadBookActivity = false
     private var oldBook: Book? = null
+    private var referenceWordCount: Int? = null
+    private var relativeFilterWarningShown = false
     private var screenKey: String = ""
     private var bookSourceParts = arrayListOf<BookSourcePart>()
     val totalSourceCount: Int
         get() = bookSourceParts.size
-    private var searchBookList = arrayListOf<SearchBook>()
     private val searchBooks = Collections.synchronizedList(arrayListOf<SearchBook>())
     private val tocMap = ConcurrentHashMap<String, List<BookChapter>>()
     private val _changeSourceProgress = MutableStateFlow(0 to "")
@@ -96,7 +100,37 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
             .thenByDescending { it.chapterWordCount }
             .thenBy { it.originOrder }
     }
+
+    private fun currentResults(): List<SearchBook> {
+        val books = synchronized(searchBooks) { searchBooks.toList() }
+        val filterMode = if (AppConfig.changeSourceLoadWordCount) {
+            AppConfig.changeSourceWordCountFilterMode
+        } else {
+            ChangeSourceResultOptions.FILTER_OFF
+        }
+        val comparator = when {
+            AppConfig.changeSourceSortRespondTime ->
+                ChangeSourceResultOptions.responseTimeComparator(defaultComparator)
+
+            filterMode != ChangeSourceResultOptions.FILTER_OFF ->
+                ChangeSourceResultOptions.measuredFirstComparator(wordCountComparator)
+
+            AppConfig.changeSourceLoadWordCount -> wordCountComparator
+            else -> defaultComparator
+        }
+        return ChangeSourceResultOptions.apply(
+            books = books,
+            filterMode = filterMode,
+            minimum = AppConfig.changeSourceWordCountFilterMin,
+            maximum = AppConfig.changeSourceWordCountFilterMax,
+            referenceWordCount = getReferenceWordCount(books),
+            comparator = comparator,
+        )
+    }
+
     private var task: Job? = null
+    private val operationState = ChangeSourceOperationState()
+    private val operationPreparation = Mutex()
     val bookMap = ConcurrentHashMap<String, Book>()
     val searchDataFlow = callbackFlow {
 
@@ -105,10 +139,10 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
             override fun searchSuccess(searchBook: SearchBook) {
                 searchBook.releaseHtmlData()
                 appDb.searchBookDao.insert(searchBook)
-                when {
-                    screenKey.isEmpty() -> searchBooks.add(searchBook)
-                    searchBook.name.contains(screenKey) -> searchBooks.add(searchBook)
-                    else -> return
+                val visible = screenKey.isEmpty() || searchBook.name.contains(screenKey)
+                synchronized(searchBooks) {
+                    searchBooks.remove(searchBook)
+                    if (visible) searchBooks.add(searchBook)
                 }
                 trySend(arrayOf(searchBooks))
             }
@@ -119,14 +153,15 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
 
         }
 
-        getDbSearchBooks().let {
+        getDbSearchBooks().let { cachedBooks ->
             searchBooks.clear()
-            searchBooks.addAll(it)
+            searchBooks.addAll(cachedBooks)
             trySend(arrayOf(searchBooks))
         }
 
-        if (searchBooks.isEmpty()) {
-            startSearch()
+        when {
+            searchBooks.isEmpty() -> startSearch()
+            AppConfig.changeSourceLoadWordCount -> startRefreshList(true)
         }
 
         awaitClose {
@@ -134,12 +169,7 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
         }
     }.map {
         kotlin.runCatching {
-            val comparator = if (AppConfig.changeSourceLoadWordCount) {
-                wordCountComparator
-            } else {
-                defaultComparator
-            }
-            searchBooks.sortedWith(comparator)
+            currentResults()
         }.onFailure {
             AppLog.put("换源排序出错\n${it.localizedMessage}", it)
         }.getOrDefault(searchBooks)
@@ -175,57 +205,77 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
             searchBooks.addAll(it)
             searchCallback?.upAdapter()
         }
-        return searchBooks.isEmpty()
+        return searchBooks.isEmpty().also { isEmpty ->
+            if (!isEmpty && AppConfig.changeSourceLoadWordCount) {
+                refreshResultMeasurements()
+            }
+        }
     }
 
     /**
      * 搜索书籍
      */
     fun startSearch() {
+        val operation = operationState.reserveOperation()
         execute {
-            stopSearch()
-            if (searchBooks.isNotEmpty()) {
-                appDb.searchBookDao.delete(*searchBooks.toTypedArray())
-                searchBooks.clear()
-            }
-            searchCallback?.upAdapter()
-            bookSourceParts.clear()
-            tocMap.clear()
-            bookMap.clear()
-            tocMapChapterCount = 0
-            _changeSourceProgress.value = 0 to ""
-            val searchGroup = AppConfig.searchGroup
-            if (searchGroup.isBlank()) {
-                bookSourceParts.addAll(appDb.bookSourceDao.allEnabledPart)
-            } else {
-                val sources = appDb.bookSourceDao.getEnabledPartByGroup(searchGroup)
-                if (sources.isEmpty()) {
-                    AppConfig.searchGroup = ""
+            operationPreparation.withLock {
+                if (!operationState.runIfCurrent(operation, ::stopCurrentTask)) {
+                    return@withLock
+                }
+                referenceWordCount = getCachedReferenceWordCount()
+                relativeFilterWarningShown = false
+                if (searchBooks.isNotEmpty()) {
+                    appDb.searchBookDao.delete(*searchBooks.toTypedArray())
+                    searchBooks.clear()
+                }
+                searchCallback?.upAdapter()
+                bookSourceParts.clear()
+                tocMap.clear()
+                bookMap.clear()
+                tocMapChapterCount = 0
+                _changeSourceProgress.value = 0 to ""
+                val searchGroup = AppConfig.searchGroup
+                if (searchGroup.isBlank()) {
                     bookSourceParts.addAll(appDb.bookSourceDao.allEnabledPart)
                 } else {
-                    bookSourceParts.addAll(sources)
+                    val sources = appDb.bookSourceDao.getEnabledPartByGroup(searchGroup)
+                    if (sources.isEmpty()) {
+                        AppConfig.searchGroup = ""
+                        bookSourceParts.addAll(appDb.bookSourceDao.allEnabledPart)
+                    } else {
+                        bookSourceParts.addAll(sources)
+                    }
+                }
+                operationState.startTaskIfCurrent(operation) {
+                    initSearchPool()
+                    search(operation)
                 }
             }
-            initSearchPool()
-            search()
-        }
+        }.invokeOnCompletion { finishPreparingOperation(operation) }
     }
 
     fun startSearch(origin: String) {
+        val operation = operationState.reserveOperation()
         execute {
-            stopSearch()
-            bookSourceParts.clear()
-            tocMap.clear()
-            bookMap.clear()
-            tocMapChapterCount = 0
-            bookSourceParts.add(appDb.bookSourceDao.getBookSourcePart(origin)!!)
-            searchBooks.removeIf { it.origin == origin }
-            initSearchPool()
-            search()
-        }
+            operationPreparation.withLock {
+                if (!operationState.runIfCurrent(operation, ::stopCurrentTask)) {
+                    return@withLock
+                }
+                bookSourceParts.clear()
+                tocMap.clear()
+                bookMap.clear()
+                tocMapChapterCount = 0
+                bookSourceParts.add(appDb.bookSourceDao.getBookSourcePart(origin)!!)
+                searchBooks.removeIf { it.origin == origin }
+                operationState.startTaskIfCurrent(operation) {
+                    initSearchPool()
+                    search(operation)
+                }
+            }
+        }.invokeOnCompletion { finishPreparingOperation(operation) }
     }
 
-    private fun search() {
+    private fun search(operation: Long) {
         task = viewModelScope.launch(searchPool!!) {
             flow {
                 for (bs in bookSourceParts) {
@@ -251,10 +301,13 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
             }.onCompletion {
                 ensureActive()
                 searchStateData.postValue(false)
+                warnIfRelativeReferenceUnavailable()
                 searchFinishCallback?.invoke(searchBooks.isEmpty())
             }.catch {
                 AppLog.put("换源搜索出错\n${it.localizedMessage}", it)
             }.collect()
+        }.also { task ->
+            task.invokeOnCompletion { refreshPendingMeasurements(operation) }
         }
     }
 
@@ -348,9 +401,88 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
         searchCallback?.searchSuccess(searchBook)
     }
 
-    fun onLoadWordCountChecked(isChecked: Boolean) {
-        if (isChecked) {
-            startRefreshList(true)
+    private fun getReferenceWordCount(
+        books: List<SearchBook> = synchronized(searchBooks) { searchBooks.toList() },
+    ): Int? {
+        referenceWordCount?.let { return it }
+        val book = oldBook ?: return null
+        val measured = books.firstOrNull {
+            it.origin == book.origin && it.bookUrl == book.bookUrl
+        }?.chapterWordCount?.takeIf { it > 0 }
+        if (measured != null) referenceWordCount = measured
+        return measured
+    }
+
+    private fun getCachedReferenceWordCount(): Int? {
+        if (AppConfig.changeSourceWordCountFilterMode !=
+            ChangeSourceResultOptions.FILTER_RELATIVE
+        ) {
+            return null
+        }
+        val book = oldBook ?: return null
+        val chapterIndex = if (fromReadBookActivity) {
+            book.durChapterIndex
+        } else {
+            book.totalChapterNum - 1
+        }
+        if (chapterIndex < 0) return null
+        val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex) ?: return null
+        val content = BookHelp.getContent(book, chapter) ?: return null
+        return kotlin.runCatching {
+            contentProcessor.getContent(book, chapter, content, false).toString().length
+        }.getOrNull()?.takeIf { it > 0 }
+    }
+
+    private fun warnIfRelativeReferenceUnavailable() {
+        if (
+            AppConfig.changeSourceWordCountFilterMode ==
+            ChangeSourceResultOptions.FILTER_RELATIVE &&
+            getReferenceWordCount() == null &&
+            !operationState.hasPendingMeasurementRefresh() &&
+            !relativeFilterWarningShown
+        ) {
+            relativeFilterWarningShown = true
+            context.toastOnUi(R.string.change_source_relative_word_count_unavailable)
+        }
+    }
+
+    fun onLoadWordCountChecked() {
+        if (AppConfig.changeSourceLoadWordCount) {
+            refreshResultMeasurements()
+        } else {
+            searchCallback?.upAdapter()
+        }
+    }
+
+    fun onResultOptionsChanged(reloadMeasurements: Boolean) {
+        if (reloadMeasurements) {
+            refreshResultMeasurements()
+        } else {
+            searchCallback?.upAdapter()
+        }
+    }
+
+    private fun refreshResultMeasurements() {
+        val operation = operationState.reserveMeasurementRefresh(
+            enabled = AppConfig.changeSourceLoadWordCount,
+            hasResults = searchBooks.isNotEmpty(),
+        )
+        if (operation == null) {
+            searchCallback?.upAdapter()
+        } else {
+            startRefreshList(true, operation)
+        }
+    }
+
+    private fun refreshPendingMeasurements(operation: Long) {
+        operationState.finishTask(operation)?.let {
+            startRefreshList(true, it)
+        }
+    }
+
+    private fun finishPreparingOperation(operation: Long) {
+        operationState.finishPreparation(operation)?.let {
+            startRefreshList(true, it)
         }
     }
 
@@ -358,28 +490,49 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
      * 刷新列表
      */
     fun startRefreshList(onlyRefreshNoWordCountBook: Boolean = false) {
-        execute {
-            stopSearch()
-            searchBookList.clear()
-            if (onlyRefreshNoWordCountBook) {
-                searchBooks.filterTo(searchBookList) {
-                    it.chapterWordCountText == null
-                }
-                searchBooks.removeIf { it.chapterWordCountText == null }
-            } else {
-                searchBookList.addAll(searchBooks)
-                searchBooks.clear()
-            }
-            searchCallback?.upAdapter()
-            initSearchPool()
-            refreshList()
-        }
+        startRefreshList(onlyRefreshNoWordCountBook, operationState.reserveOperation())
     }
 
-    private fun refreshList() {
+    private fun startRefreshList(
+        onlyRefreshNoWordCountBook: Boolean,
+        operation: Long,
+    ) {
+        execute {
+            operationPreparation.withLock {
+                if (!operationState.runIfCurrent(operation, ::stopCurrentTask)) {
+                    return@withLock
+                }
+                if (onlyRefreshNoWordCountBook && !AppConfig.changeSourceLoadWordCount) {
+                    return@withLock
+                }
+                referenceWordCount = getCachedReferenceWordCount()
+                relativeFilterWarningShown = false
+                val books = synchronized(searchBooks) {
+                    if (onlyRefreshNoWordCountBook) {
+                        searchBooks.filter { it.chapterWordCountText == null }
+                    } else {
+                        searchBooks.toList()
+                    }
+                }
+                searchCallback?.upAdapter()
+                if (books.isEmpty()) {
+                    operationState.runIfCurrent(operation) {
+                        warnIfRelativeReferenceUnavailable()
+                    }
+                    return@withLock
+                }
+                operationState.startTaskIfCurrent(operation) {
+                    initSearchPool()
+                    refreshList(books, operation)
+                }
+            }
+        }.invokeOnCompletion { finishPreparingOperation(operation) }
+    }
+
+    private fun refreshList(books: List<SearchBook>, operation: Long) {
         task = viewModelScope.launch(searchPool!!) {
             flow {
-                for (searchBook in searchBookList) {
+                for (searchBook in books) {
                     emit(searchBook)
                 }
             }.onStart {
@@ -390,10 +543,14 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
                     loadBookInfo(source, it.toBook())
                 }
             }.onCompletion {
+                currentCoroutineContext().ensureActive()
                 searchStateData.postValue(false)
+                warnIfRelativeReferenceUnavailable()
             }.catch {
                 AppLog.put("换源刷新列表出错\n${it.localizedMessage}", it)
             }.collect()
+        }.also { task ->
+            task.invokeOnCompletion { refreshPendingMeasurements(operation) }
         }
     }
 
@@ -436,14 +593,18 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
     }
 
     fun startOrStopSearch() {
-        if (task == null || !task!!.isActive) {
-            startSearch()
-        } else {
+        if (operationState.isRunning()) {
             stopSearch()
+        } else {
+            startSearch()
         }
     }
 
     fun stopSearch() {
+        operationState.cancel(::stopCurrentTask)
+    }
+
+    private fun stopCurrentTask() {
         task?.cancel()
         searchPool?.close()
         searchStateData.postValue(false)
@@ -537,7 +698,7 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
         onSuccess: (book: Book, toc: List<BookChapter>, source: BookSource) -> Unit
     ) {
         execute {
-            searchBooks.forEach {
+            currentResults().forEach {
                 if (it.type == bookType) {
                     val book = it.toBook()
                     val result = getToc(book).getOrNull()

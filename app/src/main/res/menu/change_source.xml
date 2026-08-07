@@ -41,6 +41,18 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_sort_respond_time"
+        android:title="@string/change_source_sort_respond_time"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_word_count_filter"
+        android:title="@string/change_source_word_count_filter"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_load_info"
         android:title="@string/load_info"
         android:checkable="true"

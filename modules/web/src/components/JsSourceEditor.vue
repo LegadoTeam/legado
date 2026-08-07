@@ -12,7 +12,7 @@
         <el-option
           v-for="source in jsSources"
           :key="source.bookSourceUrl"
-          :label="source.bookSourceName"
+          :label="`${source.bookSourceName} · ${source.bookSourceUrl}`"
           :value="source.bookSourceUrl"
         />
       </el-select>
@@ -64,6 +64,7 @@ const selectedSourceUrl = ref('')
 const loadingSources = ref(false)
 const saving = ref(false)
 let sourcesLoaded = false
+let restoringCurrentSource = false
 
 const jsSources = computed(() =>
   store.bookSources.filter(source => source.mainJs?.trim()),
@@ -79,6 +80,9 @@ const loadSource = (source: BookSoure) => {
   selectedSourceUrl.value = source.bookSourceUrl
   script.value = sourceScript
   savedScript.value = sourceScript
+  if (store.currentSource !== source) {
+    store.changeCurrentSource(source)
+  }
 }
 
 const resetEditor = () => {
@@ -210,15 +214,21 @@ const saveScript = async () => {
 
 watch(
   () => [props.active, store.currentSource] as const,
-  async ([active, source]) => {
+  async ([active, source], previous) => {
+    if (restoringCurrentSource) {
+      restoringCurrentSource = false
+      return
+    }
     if (!active) return
     if (!sourcesLoaded && store.bookSources.length === 0) await pullSources()
-    if (
-      isJsSource(source) &&
-      source.bookSourceUrl !== openedSourceUrl.value &&
-      (await confirmDiscard())
-    ) {
-      loadSource(source)
+    if (!isJsSource(source) || source.bookSourceUrl === openedSourceUrl.value)
+      return
+    if (await confirmDiscard()) return loadSource(source)
+
+    const previousSource = previous?.[1]
+    if (previousSource) {
+      restoringCurrentSource = true
+      store.changeCurrentSource(previousSource)
     }
   },
   { immediate: true },
@@ -284,6 +294,23 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 
   .js-source-select {
     flex-basis: 100%;
+  }
+}
+
+@media screen and (max-width: 600px) {
+  .js-source-toolbar {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .js-source-select {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .js-source-toolbar > .el-button {
+    width: 100%;
+    margin: 0;
   }
 }
 </style>

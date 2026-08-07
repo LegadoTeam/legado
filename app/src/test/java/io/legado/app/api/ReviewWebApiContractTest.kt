@@ -101,6 +101,7 @@ class ReviewWebApiContractTest {
         assertTrue(controller.contains("if (nonce != session.nonce) return null"))
         assertTrue(controller.contains("showError(event.data?.error)"))
         assertTrue(controller.contains("event.data?.result == null"))
+        assertTrue(controller.contains("finishLoading();\n                      resolve"))
         assertTrue(controller.contains("resolve(String(event.data.result))"))
         assertTrue(controller.contains("旧评论脚本未返回结果"))
         assertFalse(controller.contains("?.toString().orEmpty()"))

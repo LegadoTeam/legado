@@ -38,6 +38,7 @@ import { useDark } from '@vueuse/core'
 import type { SourceConfig } from '@/config/sourceConfig'
 import { Key } from '@element-plus/icons-vue'
 import { ElSegmented } from 'element-plus'
+import 'element-plus/es/components/segmented/style/css'
 import { requestSourceApiToken } from '@/api/sourceToken'
 import JsSourceEditor from '@/components/JsSourceEditor.vue'
 
@@ -83,11 +84,13 @@ onMounted(authorize)
 <style lang="scss" scoped>
 .source-editor {
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 
 .source-mode {
   height: 48px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -118,12 +121,50 @@ onMounted(authorize)
   }
 }
 
+@media screen and (max-width: 900px) {
+  .source-editor {
+    overflow: hidden;
+  }
+
+  .source-mode {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: var(--el-bg-color);
+  }
+
+  .editor {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
+    overflow: hidden;
+
+    .left,
+    .right {
+      flex: none;
+      width: auto;
+      height: auto;
+      min-height: 0;
+      margin: 0 12px;
+    }
+
+    .right {
+      margin-bottom: 12px;
+    }
+  }
+
+  .editor.with-mode {
+    height: calc(100vh - 48px);
+    height: calc(100dvh - 48px);
+  }
+}
+
 .js-editor {
   height: calc(100% - 48px);
 }
 
 .authorization {
   height: 100vh;
+  height: 100dvh;
   display: grid;
   place-items: center;
 }

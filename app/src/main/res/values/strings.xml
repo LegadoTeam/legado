@@ -313,6 +313,11 @@
     <string name="group_yf">Awaiting more</string>
     <string name="bookmark">Bookmarks</string>
     <string name="bookmark_add">Add to Bookmarks</string>
+    <string name="bookmark_added">Bookmark added</string>
+    <string name="bookmark_removed">Bookmark removed</string>
+    <string name="delete_page_bookmarks">This page contains %1$d bookmarks. Delete them all?</string>
+    <string name="pull_to_toggle_bookmark">Pull down to toggle bookmark</string>
+    <string name="pull_to_toggle_bookmark_summary">Works in paged modes and at the top of a chapter in scroll mode</string>
     <string name="highlight">Highlight</string>
     <string name="highlight_tab">Highlights</string>
     <string name="highlight_bg_color">Background color</string>
@@ -785,6 +790,8 @@
     <string name="plus">Plus</string>
     <string name="system_typeface">System typeface</string>
     <string name="delete_book_file">Delete source file</string>
+    <string name="delete_webdav_book_file">Also delete the same-named WebDAV file</string>
+    <string name="delete_webdav_book_file_fail">Failed to delete the same-named WebDAV file</string>
     <string name="text_default">Default</string>
     <string name="default1">Default-1</string>
     <string name="default2">Default-2</string>
@@ -1153,6 +1160,9 @@
     <string name="auto_save_cookie">CookieJar</string>
     <string name="cookie">Clear cookie</string>
     <string name="download_and_import_file">Import online book files</string>
+    <string name="upload_imported_book_to_webdav">Sync downloaded book to WebDAV</string>
+    <string name="webdav_book_exists_confirm">A book with the same name already exists on WebDAV. Overwrite it?</string>
+    <string name="webdav_not_configured">WebDAV is not configured</string>
     <string name="upload_book_success">Upload Success</string>
     <string name="upload_book_fail">Upload Fail</string>
     <string name="download_book_success">Download Success</string>
@@ -1236,6 +1246,8 @@
     <string name="sure_clear_search_history">Are you sure to clear all search history</string>
     <string name="no_anim_scroll_page">Disable scroll click animation</string>
     <string name="webdav_device_name">Device name</string>
+    <string name="webdav_book_auto_restore_t">Restore missing local books</string>
+    <string name="webdav_book_auto_restore_s">Restore an exact-name match from the WebDAV books directory when a local book file is missing</string>
     <string name="web_service_wake_lock">WebService Wake up Lock</string>
     <string name="web_service_wake_lock_summary">The wake-up lock is enabled when the web service is enabled, and some phones will be killed when the wake-up lock is enabled.</string>
     <string name="read_aloud_wake_lock">Read aloud service wake-up lock</string>
@@ -1298,6 +1310,14 @@
     <string name="webdav_application_authorization_error">Fail to authorize WebDav application</string>
     <string name="respondTime">respondTime: %1$d ms</string>
     <string name="load_word_count">Load word count</string>
+    <string name="change_source_sort_respond_time">Sort by response time</string>
+    <string name="change_source_word_count_filter">Word count filter</string>
+    <string name="change_source_word_count_filter_off">Off</string>
+    <string name="change_source_word_count_filter_absolute">Absolute word count range</string>
+    <string name="change_source_word_count_filter_relative">Relative to current source (%)</string>
+    <string name="change_source_word_count_minimum">Minimum</string>
+    <string name="change_source_word_count_maximum">Maximum</string>
+    <string name="change_source_relative_word_count_unavailable">Current source word count is unavailable; relative filtering was not applied</string>
     <string name="replace_exclude_scope">Exclude range, optional title or source URL</string>
     <string name="format_js_rule">格式化规则(formatJs)</string>
     <string name="adjust_pos">Adjustment position</string>
@@ -1488,6 +1508,8 @@
     <string name="change_page">选择页数</string>
     <string name="auto_check_new_backup_t">自动检查新备份</string>
     <string name="auto_check_new_backup_s">打开软件时检查是否有新备份，有新备份时提示是否更新</string>
+    <string name="auto_backup_t">Automatic backup</string>
+    <string name="auto_backup_s">Automatically back up at most once a day; manual backups are unaffected</string>
     <string name="r_preloadJs">预注入Js（preloadJs）</string>
     <string name="cache_first">优先加载缓存</string>
     <string name="rule_sub_content">副文规则（subContent）</string>

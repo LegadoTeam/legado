@@ -215,13 +215,18 @@ object AudioPlay : CoroutineScope by MainScope() {
         postEvent(EventBus.PLAY_MODE_CHANGED, playMode)
     }
 
-    fun upData(book: Book) {
-        val playbackChanged = AudioPlay.book?.bookUrl != book.bookUrl ||
-                durChapterIndex != book.durChapterIndex
-        if (playbackChanged) {
-            stopPlay()
+    fun upData(book: Book, preserveProgress: Boolean) {
+        val playbackChanged = synchronized(this) {
+            if (preserveProgress && AudioPlay.book?.bookUrl == book.bookUrl) {
+                book.durChapterIndex = durChapterIndex
+                book.durChapterPos = durChapterPos
+            }
+            val changed = AudioPlay.book?.bookUrl != book.bookUrl ||
+                    durChapterIndex != book.durChapterIndex
+            if (changed) stopPlay()
+            AudioPlay.book = book
+            changed
         }
-        AudioPlay.book = book
         chapterSize = appDb.bookChapterDao.getChapterCount(book.bookUrl)
         simulatedChapterSize = if (book.readSimulating()) {
             book.simulatedTotalChapterNum()

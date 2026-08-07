@@ -42,6 +42,15 @@
             app:iconSpaceReserved="false" />
 
         <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="false"
+            android:key="webDavBookAutoRestore"
+            android:summary="@string/webdav_book_auto_restore_s"
+            android:title="@string/webdav_book_auto_restore_t"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.SwitchPreference
             android:defaultValue="true"
             android:key="syncBookProgress"
             android:summary="@string/sync_book_progress_s"
@@ -97,6 +106,15 @@
             android:key="onlyLatestBackup"
             android:summary="@string/only_latest_backup_s"
             android:title="@string/only_latest_backup_t"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="true"
+            android:key="autoBackup"
+            android:summary="@string/auto_backup_s"
+            android:title="@string/auto_backup_t"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
             app:iconSpaceReserved="false" />
 
         <io.legado.app.lib.prefs.SwitchPreference

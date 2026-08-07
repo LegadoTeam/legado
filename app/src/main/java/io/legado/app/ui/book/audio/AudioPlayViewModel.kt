@@ -36,8 +36,6 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
         val requestedBookUrl = intent.getStringExtra("bookUrl")
         val cachedBook = AudioPlay.book
         val cachedInBookshelf = AudioPlay.inBookshelf
-        val cachedChapterIndex = AudioPlay.durChapterIndex
-        val cachedChapterPos = AudioPlay.durChapterPos
         initTask?.cancel()
         initTask = execute(semaphore = initSemaphore) {
             var databaseBook = requestedBookUrl
@@ -51,10 +49,6 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
             ) ?: return@execute null
             var targetBook = databaseBook
                 ?.takeIf { resolvedBook === cachedBook }
-                ?.apply {
-                    durChapterIndex = cachedChapterIndex
-                    durChapterPos = cachedChapterPos
-                }
                 ?: resolvedBook
             if (!requestedBookUrl.isNullOrBlank()
                 && databaseBook == null
@@ -67,10 +61,7 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
                     val concurrentBook = appDb.bookDao.getBook(requestedBookUrl)
                         ?: return@execute null
                     databaseBook = concurrentBook
-                    targetBook = concurrentBook.apply {
-                        durChapterIndex = cachedChapterIndex
-                        durChapterPos = cachedChapterPos
-                    }
+                    targetBook = concurrentBook
                 } else {
                     targetBook = temporaryBook
                 }
@@ -107,7 +98,7 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
     private suspend fun initBook(book: Book): Boolean {
         val isSameBook = AudioPlay.book?.bookUrl == book.bookUrl
         if (isSameBook) {
-            AudioPlay.upData(book)
+            AudioPlay.upData(book, preserveProgress = true)
         } else {
             AudioPlay.resetData(book)
         }
@@ -180,7 +171,7 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
             AudioPlay.inBookshelf = !wasNotShelf
             AudioPlay.setBookSource(source)
             appDb.bookChapterDao.insert(*toc.toTypedArray())
-            AudioPlay.upData(book)
+            AudioPlay.upData(book, preserveProgress = false)
             AudioPlayService.updateNotification(context)
         }.onFinally {
             postEvent(EventBus.SOURCE_CHANGED, book.bookUrl)

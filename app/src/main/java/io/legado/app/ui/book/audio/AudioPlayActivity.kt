@@ -70,6 +70,7 @@ import io.legado.app.lib.theme.ThemeStore.Companion.accentColor
 import io.legado.app.ui.book.audio.SliderPopup.Companion.SPEED
 import io.legado.app.model.SourceCallBack
 import io.legado.app.utils.gone
+import io.legado.app.utils.invisible
 
 /**
  * 音频播放
@@ -439,10 +440,12 @@ class AudioPlayActivity :
                 })
             }
         }
-        lyricViewX.visible()
+        // Keep the lyric view out of the draw pass until ConstraintLayout has assigned its width.
+        lyricViewX.invisible()
         lyricViewX.doOnLayout {
             if (oldLyric == lyric) {
                 lyricViewX.loadLyric(lyric)
+                lyricViewX.visible()
             }
         }
         if (firstLyric) {

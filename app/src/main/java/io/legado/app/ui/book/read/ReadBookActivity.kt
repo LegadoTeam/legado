@@ -40,6 +40,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookHighlight
 import io.legado.app.data.entities.BookProgress
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.entities.rule.ReviewRule
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppWebDav
@@ -160,7 +161,10 @@ import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
@@ -258,6 +262,11 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
     private var menu: Menu? = null
     private var backupJob: Job? = null
+    private var bookmarkJob: Job? = null
+    private val bookmarkToggleMutex = Mutex()
+    private var bookmarkTogglePending = false
+    private var bookmarkBookKey: Pair<String, String>? = null
+    private var bookmarks: List<Bookmark> = emptyList()
     private var tts: TTS? = null
     val textActionMenu: TextActionMenu by lazy {
         TextActionMenu(this, this)
@@ -331,6 +340,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         super.onActivityCreated(savedInstanceState)
         binding.cursorLeft.setColorFilter(accentColor)
         binding.cursorRight.setColorFilter(accentColor)
+        binding.bookmarkIndicator.setColorFilter(accentColor)
         binding.cursorLeft.setOnTouchListener(this)
         binding.cursorRight.setOnTouchListener(this)
         binding.readAloudFloatBarContainer.llBackToSpeech.setOnClickListener {
@@ -384,6 +394,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         super.onNewIntent(intent)
         setIntent(intent)
         editingHighlight = null
+        resetBookmarkObserver()
         resetReviewSummaryState()
         viewModel.initData(intent)
     }
@@ -402,6 +413,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         super.onConfigurationChanged(newConfig)
         upSystemUiVisibility()
         binding.readView.upStatusBar()
+        upBookmarkIndicator()
     }
 
     override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
@@ -1257,6 +1269,7 @@ class ReadBookActivity : BaseReadBookActivity(),
      */
     override fun contentLoadFinish() {
         lifecycleScope.launch(Main.immediate) {
+            observeBookmarks()
             if (intent.getBooleanExtra("readAloud", false)) {
                 intent.removeExtra("readAloud")
                 ReadBook.readAloud()
@@ -1276,6 +1289,8 @@ class ReadBookActivity : BaseReadBookActivity(),
     ) {
         lifecycleScope.launch {
             binding.readView.upContent(relativePosition, resetPageOffset)
+            observeBookmarks()
+            upBookmarkIndicator()
             if (relativePosition == 0) {
                 upSeekBarProgress()
             }
@@ -1291,6 +1306,8 @@ class ReadBookActivity : BaseReadBookActivity(),
         success: (() -> Unit)?
     ) = withContext(Main.immediate) {
         binding.readView.upContent(relativePosition, resetPageOffset)
+        observeBookmarks()
+        upBookmarkIndicator()
         if (relativePosition == 0) {
             upSeekBarProgress()
         }
@@ -1301,6 +1318,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     override fun upPageAnim(upRecorder: Boolean) {
         lifecycleScope.launch {
             binding.readView.upPageAnim(upRecorder)
+            upBookmarkIndicator()
         }
     }
 
@@ -1323,6 +1341,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     override fun pageChanged() {
         pageChanged = true
         binding.readView.onPageChange()
+        upBookmarkIndicator()
         highlightPopup?.dismiss()
         handler.post {
             upSeekBarProgress()
@@ -2395,6 +2414,128 @@ class ReadBookActivity : BaseReadBookActivity(),
                 bookText = page.text.trim()
             }
             showDialogFragment(BookmarkDialog(bookmark))
+        }
+    }
+
+    override fun toggleBookmark() {
+        if (bookmarkTogglePending) return
+        val book = ReadBook.book ?: return
+        val page = binding.readView.curPage.textPage
+        if (page.lines.isEmpty()) {
+            toastOnUi(R.string.create_bookmark_error)
+            return
+        }
+        val pageStart = page.chapterPosition
+        val pageEnd = pageStart + page.charSize
+        bookmarkTogglePending = true
+        lifecycleScope.launch {
+            var awaitingConfirmation = false
+            try {
+                val confirmDelete = bookmarkToggleMutex.withLock {
+                    val pageBookmarks = withContext(IO) {
+                        appDb.bookmarkDao.getByBook(book.name, book.author).filter {
+                            it.chapterIndex == page.chapterIndex && it.chapterPos in pageStart..<pageEnd
+                        }
+                    }
+                    when {
+                        pageBookmarks.size > 1 -> pageBookmarks
+                        pageBookmarks.isNotEmpty() -> {
+                            deleteBookmarks(pageBookmarks)
+                            null
+                        }
+
+                        else -> {
+                            val bookmark = book.createBookMark().apply {
+                                chapterIndex = page.chapterIndex
+                                chapterPos = pageStart
+                                chapterName = page.title
+                                bookText = page.text.trim()
+                            }
+                            withContext(IO) {
+                                appDb.bookmarkDao.insert(bookmark)
+                            }
+                            toastOnUi(R.string.bookmark_added)
+                            null
+                        }
+                    }
+                }
+                confirmDelete?.let { pageBookmarks ->
+                    var deleteConfirmed = false
+                    alert(titleResource = R.string.bookmark) {
+                        setMessage(getString(R.string.delete_page_bookmarks, pageBookmarks.size))
+                        okButton {
+                            deleteConfirmed = true
+                            lifecycleScope.launch {
+                                try {
+                                    bookmarkToggleMutex.withLock {
+                                        deleteBookmarks(pageBookmarks)
+                                    }
+                                } finally {
+                                    bookmarkTogglePending = false
+                                }
+                            }
+                        }
+                        noButton()
+                        onDismiss {
+                            if (!deleteConfirmed) {
+                                bookmarkTogglePending = false
+                            }
+                        }
+                    }
+                    awaitingConfirmation = true
+                }
+            } finally {
+                if (!awaitingConfirmation) {
+                    bookmarkTogglePending = false
+                }
+            }
+        }
+    }
+
+    private suspend fun deleteBookmarks(pageBookmarks: List<Bookmark>) {
+        withContext(IO) {
+            appDb.bookmarkDao.delete(*pageBookmarks.toTypedArray())
+        }
+        toastOnUi(R.string.bookmark_removed)
+    }
+
+    private fun observeBookmarks() {
+        val book = ReadBook.book ?: return
+        val bookKey = book.name to book.author
+        if (bookmarkBookKey == bookKey) return
+        bookmarkJob?.cancel()
+        bookmarkBookKey = bookKey
+        bookmarks = emptyList()
+        bookmarkJob = lifecycleScope.launch {
+            appDb.bookmarkDao.flowByBook(book.name, book.author).collect {
+                bookmarks = it
+                upBookmarkIndicator()
+            }
+        }
+    }
+
+    private fun resetBookmarkObserver() {
+        bookmarkJob?.cancel()
+        bookmarkJob = null
+        bookmarkBookKey = null
+        bookmarks = emptyList()
+        binding.bookmarkIndicator.isGone = true
+    }
+
+    fun upBookmarkIndicator() {
+        val page = binding.readView.curPage.textPage
+        val hasBookmark = page.lines.isNotEmpty() && bookmarks.any {
+            it.chapterIndex == page.chapterIndex && page.containPos(it.chapterPos)
+        }
+        binding.bookmarkIndicator.isVisible = AppConfig.pullToToggleBookmark &&
+                !binding.readView.isScroll && hasBookmark
+        if (binding.bookmarkIndicator.isVisible) {
+            binding.bookmarkIndicator.post {
+                if (binding.bookmarkIndicator.isVisible) {
+                    binding.bookmarkIndicator.translationY =
+                        (binding.readView.curPage.headerHeight + 8.dpToPx()).toFloat()
+                }
+            }
         }
     }
 

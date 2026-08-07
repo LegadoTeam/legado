@@ -9,6 +9,18 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <ImageView
+        android:id="@+id/bookmark_indicator"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_gravity="top|end"
+        android:layout_marginEnd="12dp"
+        android:alpha="0.88"
+        android:contentDescription="@string/bookmark"
+        android:padding="4dp"
+        android:src="@drawable/ic_bookmark"
+        android:visibility="gone" />
+
     <View
         android:id="@+id/text_menu_position"
         android:layout_width="0dp"

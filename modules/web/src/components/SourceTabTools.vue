@@ -21,7 +21,7 @@ const store = useSourceStore()
 
 const current_tab = computed({
   get: () => store.currentTab,
-  set: val => (store.currentTab = val),
+  set: val => store.changeTabName(val),
 })
 
 const tabData = ref([

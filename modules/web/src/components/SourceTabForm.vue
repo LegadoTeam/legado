@@ -5,7 +5,7 @@
       :label="name"
       :key="name"
     >
-      <el-form label-position="right" label-width="auto">
+      <el-form label-position="right" label-width="220px">
         <el-form-item
           v-for="{
             type,
@@ -73,7 +73,11 @@ const getFieldValue = (id: string, namespace?: string) => {
   return namespace ? source[namespace]?.[id] : source[id]
 }
 
-const setFieldValue = (id: string, namespace: string | undefined, value: any) => {
+const setFieldValue = (
+  id: string,
+  namespace: string | undefined,
+  value: any,
+) => {
   const source = currentSource.value as Record<string, any>
   if (!namespace) {
     source[id] = value
@@ -107,5 +111,27 @@ const { currentSource } = storeToRefs(store);
 }
 :deep(.el-tabs__header) {
   margin: 0;
+}
+:deep(.el-form-item__label) {
+  height: auto;
+  line-height: 20px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+@media screen and (max-width: 600px) {
+  :deep(.el-form-item) {
+    display: block;
+  }
+
+  :deep(.el-form-item__label) {
+    width: auto !important;
+    justify-content: flex-start;
+    margin-bottom: 6px;
+  }
+
+  :deep(.el-form-item__content) {
+    margin-left: 0 !important;
+  }
 }
 </style>

@@ -565,6 +565,14 @@ class CryptoJsCompatibilityTest {
     }
 
     @Test
+    fun `brace wrapped JavaScript is not parsed as a library map`() {
+        val jsLib = "{}{}"
+
+        requireNotNull(SharedJsScope.getScope(jsLib, null))
+        SharedJsScope.remove(jsLib)
+    }
+
+    @Test
     fun `same custom library is constructed once under concurrent access`() {
         clearCustomScopes()
         val jsLib = "var concurrentCryptoScope = 'ready';"

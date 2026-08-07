@@ -310,6 +310,11 @@
     <string name="group_yf">养肥区</string>
     <string name="bookmark">书签</string>
     <string name="bookmark_add">添加书签</string>
+    <string name="bookmark_added">已添加书签</string>
+    <string name="bookmark_removed">已删除书签</string>
+    <string name="delete_page_bookmarks">当前页有 %1$d 个书签，是否全部删除？</string>
+    <string name="pull_to_toggle_bookmark">下拉切换书签</string>
+    <string name="pull_to_toggle_bookmark_summary">适用于翻页模式；滚动模式仅在章节顶部触发</string>
     <string name="highlight">高亮</string>
     <string name="highlight_tab">标注</string>
     <string name="highlight_bg_color">背景色</string>
@@ -781,6 +786,8 @@
     <string name="plus">加</string>
     <string name="system_typeface">系统内置字体样式</string>
     <string name="delete_book_file">删除源文件</string>
+    <string name="delete_webdav_book_file">同时删除 WebDAV 同名文件</string>
+    <string name="delete_webdav_book_file_fail">删除 WebDAV 同名文件失败</string>
     <string name="text_default">默认</string>
     <string name="default1">预设一</string>
     <string name="default2">预设二</string>
@@ -1148,6 +1155,9 @@
     <string name="auto_save_cookie">CookieJar</string>
     <string name="cookie">清除 Cookie</string>
     <string name="download_and_import_file">导入在线书籍文件</string>
+    <string name="upload_imported_book_to_webdav">下载后同步到 WebDAV</string>
+    <string name="webdav_book_exists_confirm">WebDAV 已存在同名书籍，是否覆盖？</string>
+    <string name="webdav_not_configured">未配置 WebDAV</string>
     <string name="upload_book_success">上传成功</string>
     <string name="upload_book_fail">上传失败</string>
     <string name="download_book_success">下载成功</string>
@@ -1229,6 +1239,8 @@
     <string name="sure_clear_search_history">是否确认清除所有搜索历史记录</string>
     <string name="no_anim_scroll_page">禁用滚动点击动画</string>
     <string name="webdav_device_name">设备名称</string>
+    <string name="webdav_book_auto_restore_t">恢复缺失的本地书</string>
+    <string name="webdav_book_auto_restore_s">本地书文件缺失时，从 WebDAV 的 books 目录恢复同名文件</string>
     <string name="web_service_wake_lock">WebService唤醒锁</string>
     <string name="web_service_wake_lock_summary">开启web服务的时候启用唤醒锁,有些手机开启唤醒锁会被杀后台</string>
     <string name="read_aloud_wake_lock">朗读服务唤醒锁</string>
@@ -1288,6 +1300,14 @@
     <string name="only_latest_backup_s">本地备份仅保留最新备份文件</string>
     <string name="webdav_application_authorization_error">webDav应用验证失败</string>
     <string name="load_word_count">加载字数</string>
+    <string name="change_source_sort_respond_time">按响应时间排序</string>
+    <string name="change_source_word_count_filter">字数过滤</string>
+    <string name="change_source_word_count_filter_off">关闭</string>
+    <string name="change_source_word_count_filter_absolute">绝对字数范围</string>
+    <string name="change_source_word_count_filter_relative">相对当前源字数百分比</string>
+    <string name="change_source_word_count_minimum">下限</string>
+    <string name="change_source_word_count_maximum">上限</string>
+    <string name="change_source_relative_word_count_unavailable">无法获取当前源字数，未应用相对过滤</string>
     <string name="replace_exclude_scope">排除范围，选填书名或者书源 URL</string>
     <string name="format_js_rule">格式化规则(formatJs)</string>
     <string name="adjust_pos">调整位置</string>
@@ -1397,6 +1417,8 @@
     <string name="sure_cache_book">是否确认开始缓存？</string>
     <string name="auto_check_new_backup_t">自动检查新备份</string>
     <string name="auto_check_new_backup_s">打开软件时检查是否有新备份，有新备份时提示是否更新</string>
+    <string name="auto_backup_t">自动备份</string>
+    <string name="auto_backup_s">开启后每天最多自动备份一次，手动备份不受影响</string>
     <string name="sys_image_picker">系统图片选择器</string>
     <string name="text_select_menu_config">自定义选择菜单</string>
     <string name="text_select_menu_config_summary">调整浮动条与更多菜单中的操作及顺序</string>

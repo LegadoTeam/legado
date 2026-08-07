@@ -18,6 +18,7 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.RuleBigDataHelp
 import io.legado.app.help.config.AppConfig
+import io.legado.app.model.analyzeRule.CustomUrl
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.utils.FileDoc
 import io.legado.app.utils.GSON
@@ -91,7 +92,10 @@ val Book.archiveName: String
         if (!isArchive) throw NoStackTraceException("Book is not deCompressed from archive")
         // local_book::archive.rar
         // webDav::https://...../archive.rar
-        return origin.substringAfter("::").substringAfterLast("/")
+        val archivePath = origin.substringAfter("::").let {
+            if (origin.startsWith(BookType.webDavTag)) CustomUrl(it).getUrl() else it
+        }
+        return archivePath.substringAfterLast("/")
     }
 
 fun Book.contains(word: String?): Boolean {
@@ -125,11 +129,12 @@ fun Book.getLocalUri(): Uri {
     }
     //先检测uri是否有效,这个比较快
     uri.inputStream(appCtx).getOrNull()?.use {
-        localUriCache[bookUrl] = uri
+        cacheLocalUri(uri)
     }?.let {
         return uri
     }
     //不同的设备书籍保存路径可能不一样, uri无效时尝试寻找当前保存路径下的文件
+    //bookUrl 关联章节和标注，找到新路径后只更新运行时 URI 缓存
     val defaultBookDir = AppConfig.defaultBookTreeUri
     val importBookDir = AppConfig.importBookPath
 
@@ -142,10 +147,7 @@ fun Book.getLocalUri(): Uri {
         } else {
             val fileDoc = treeFileDoc.find(originName, 5, 100)
             if (fileDoc != null) {
-                localUriCache[bookUrl] = fileDoc.uri
-                //更新bookUrl 重启不用再找一遍
-                bookUrl = fileDoc.toString()
-                save()
+                cacheLocalUri(fileDoc.uri)
                 return fileDoc.uri
             }
         }
@@ -161,14 +163,12 @@ fun Book.getLocalUri(): Uri {
         val treeFileDoc = FileDoc.fromUri(treeUri, true)
         val fileDoc = treeFileDoc.find(originName, 5, 100)
         if (fileDoc != null) {
-            localUriCache[bookUrl] = fileDoc.uri
-            bookUrl = fileDoc.toString()
-            save()
+            cacheLocalUri(fileDoc.uri)
             return fileDoc.uri
         }
     }
 
-    localUriCache[bookUrl] = uri
+    cacheLocalUri(uri)
     return uri
 }
 
