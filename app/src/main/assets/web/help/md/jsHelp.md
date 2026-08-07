@@ -231,7 +231,7 @@ java.webView(html: String?, url: String?, js: String?, cacheFirst: Boolean = fal
 java.webViewGetOverrideUrl(html: String?, url: String?, js: String?, overrideUrlRegex: String, cacheFirst: Boolean = false, delayTime: Long = 0): String?
 
 * 使用webView获取资源url
-java.webViewGetOverrideUrl(html: String?, url: String?, js: String?, overrideUrlRegex: String, cacheFirst: Boolean = false, delayTime: Long = 0): String?
+java.webViewGetSource(html: String?, url: String?, js: String?, sourceRegex: String, cacheFirst: Boolean = false, delayTime: Long = 0): String?
 
 * 使用内置浏览器打开链接，可用于获取验证码 手动验证网站防爬
 * @param url 要打开的链接
