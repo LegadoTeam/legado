@@ -11,6 +11,14 @@ import java.io.File
 class AudioPlayBookResolverTest {
 
     @Test
+    fun `existing audio screen is reused for notification and task entry`() {
+        assertTrue(shouldReuseCurrentAudioPlay(null, "book-a"))
+        assertTrue(shouldReuseCurrentAudioPlay("book-a", "book-a"))
+        assertFalse(shouldReuseCurrentAudioPlay("book-b", "book-a"))
+        assertFalse(shouldReuseCurrentAudioPlay("book-a", null))
+    }
+
+    @Test
     fun `requested book is loaded instead of another cached book`() {
         val cachedBook = TestBook("book-b")
         val databaseBook = TestBook("book-a")
@@ -93,8 +101,10 @@ class AudioPlayBookResolverTest {
         ).readText()
         val onNewIntent = activity.substringAfter("override fun onNewIntent(intent: Intent)")
             .substringBefore("override fun onCompatCreateOptionsMenu")
+        val beforeInit = onNewIntent.substringBefore("viewModel.initData(")
 
         assertTrue(onNewIntent.contains("setIntent(intent)"))
+        assertTrue(beforeInit.contains("shouldReuseCurrentAudioPlay("))
         assertTrue(onNewIntent.contains("viewModel.initData("))
         assertTrue(onNewIntent.contains("intent = intent"))
     }
