@@ -69,6 +69,8 @@ class JsSourceAuthorGuideTest {
             "getReviewSummary(chapter, book)",
             "getReviewDetail(chapter, book, paraIndex, paraData, page)",
             "nextPageUrl",
+            "{text, img, audio, time, likeCount, replyCount}",
+            "`badge` 可返回字符串或字符串数组",
         )
 
         requiredText.forEach { text ->

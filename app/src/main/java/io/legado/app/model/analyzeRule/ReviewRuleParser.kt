@@ -311,7 +311,7 @@ internal object ReviewRuleParser {
         }
     }
 
-    private data class ContentProtocol(
+    internal data class ContentProtocol(
         val text: String?,
         val imageUrl: String?,
         val audioUrl: String?,
@@ -320,7 +320,7 @@ internal object ReviewRuleParser {
         val replyCount: Int?,
     )
 
-    private fun parseContentProtocol(raw: String?, baseUrl: String): ContentProtocol? {
+    internal fun parseContentProtocol(raw: String?, baseUrl: String): ContentProtocol? {
         val value = raw?.trim().orEmpty()
         if (!value.startsWith("{") || !value.endsWith("}")) return null
         val content = GSON.fromJsonObject<Map<String, Any?>>(value).getOrNull() ?: return null
@@ -421,7 +421,7 @@ internal object ReviewRuleParser {
         if (loggedRules.add(key)) logRuleError(message, rule, error)
     }
 
-    private fun splitBadgeValue(value: String?): List<String> {
+    internal fun splitBadgeValue(value: String?): List<String> {
         val raw = value?.trim().orEmpty()
         if (raw.isEmpty()) return emptyList()
         if (raw.isDataUrl()) return listOf(raw)
