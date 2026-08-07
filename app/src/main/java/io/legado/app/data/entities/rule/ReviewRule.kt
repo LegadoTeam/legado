@@ -41,6 +41,15 @@ data class ReviewRule(
     var replyContentRule: String? = null,
 ) : Parcelable {
 
+    fun configuredSummaryUrl(): String? {
+        if (!enabled || summaryListRule.isNullOrBlank() ||
+            summaryParagraphIndexRule.isNullOrBlank() || summaryCountRule.isNullOrBlank()
+        ) {
+            return null
+        }
+        return reviewSummaryUrl?.takeIf { it.isNotBlank() }
+    }
+
     companion object {
 
         val jsonDeserializer = JsonDeserializer<ReviewRule?> { json, _, _ ->

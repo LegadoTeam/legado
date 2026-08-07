@@ -12,6 +12,13 @@ class ReviewColumnGeometryTest {
     }
 
     @Test
+    fun `title shift follows review visibility and width changes`() {
+        assertEquals(-30f, ReviewColumnGeometry.trailingShift(30f, false, 30f, true), 0f)
+        assertEquals(-20f, ReviewColumnGeometry.trailingShift(30f, true, 50f, true), 0f)
+        assertEquals(50f, ReviewColumnGeometry.trailingShift(50f, true, 50f, false), 0f)
+    }
+
+    @Test
     fun `short lines keep the review icon after text`() {
         assertEquals(
             700f,

@@ -23,6 +23,7 @@ import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.ImageProvider
 import io.legado.app.model.ReadBook
+import io.legado.app.model.jsSource.JsSourceReview
 import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.book.read.page.entities.TextPage
@@ -126,13 +127,25 @@ class TextChapterLayout(
     }
     private val adaptSpecialStyle = AppConfig.adaptSpecialStyle
     private val pageAnim = book.getPageAnim()
-    private val rightTitleReviewInset = if (
-        isRightTitle && ChapterProvider.getReviewCount(
-            paragraphNum = 0,
-            isTitle = true,
-            chapterIndex = bookChapter.index,
-        ) > 0
+    private val rightTitleHasReview = isRightTitle && ChapterProvider.getReviewCount(
+        paragraphNum = 0,
+        isTitle = true,
+        chapterIndex = bookChapter.index,
+    ) > 0
+    private val rightTitleMayHaveReview = isRightTitle && if (
+        ChapterProvider.hasReviewCountProvider(bookChapter.index)
     ) {
+        rightTitleHasReview
+    } else {
+        ReadBook.bookSource?.let { source ->
+            if (source.isJsSource()) {
+                JsSourceReview.hasReviewCapability(source)
+            } else {
+                source.ruleReview?.configuredSummaryUrl() != null
+            }
+        } == true
+    }
+    private val rightTitleReviewInset = if (isRightTitle) {
         ReviewColumnGeometry.trailingInset(
             ChapterProvider.getReviewWidth(true),
             paddingRight.toFloat(),
@@ -208,6 +221,9 @@ class TextChapterLayout(
         textPage.upLinesPosition()
         textPage.upRenderHeight()
         textPages.add(textPage)
+        if (ChapterProvider.hasReviewCountProvider(bookChapter.index)) {
+            ChapterProvider.refreshReviewColumns(textPage, bookChapter.index)
+        }
         channel.trySend(textPage)
         try {
             listener?.onLayoutPageCompleted(textPages.lastIndex, textPage)
@@ -346,7 +362,15 @@ class TextChapterLayout(
                     emptyContent = contents.isEmpty(),
                     isVolumeTitle = bookChapter.isVolume
                 )
-                pendingTextPage.lines.lastOrNull()?.isParagraphEnd = true
+                pendingTextPage.lines.lastOrNull()?.let { titleLine ->
+                    titleLine.isParagraphEnd = true
+                    if (rightTitleHasReview) {
+                        ChapterProvider.appendReviewColumnIfNeeded(
+                            titleLine,
+                            chapterIndex = bookChapter.index,
+                        )
+                    }
+                }
                 if (isTitleNumber) durY += titleNumberSpacing
                 stringBuilder.append("\n")
             }
@@ -978,10 +1002,11 @@ class TextChapterLayout(
         val compressor = if (isTitle) null else punctuationCompressor
         compressor?.beginParagraph(text, widthsArray, punctuationCompressMode)
         val hangingWidth = hangingPunctuationWidth(text, widthsArray, isTitle, isFirstLine)
-        val textLayoutWidth = if (
-            isTitle && isRightTitle && !emptyContent && !isVolumeTitle &&
+        val usesRightTitleReviewInset =
+            isTitle && rightTitleMayHaveReview && !emptyContent && !isVolumeTitle &&
             imageStyle?.uppercase() != Book.imgStyleSingle
-        ) {
+        // 章评统计异步返回时先稳定换行，出现图标后只平移标题列。
+        val textLayoutWidth = if (usesRightTitleReviewInset) {
             (visibleWidth - rightTitleReviewInset).toInt().coerceAtLeast(1)
         } else {
             visibleWidth
@@ -1043,6 +1068,14 @@ class TextChapterLayout(
                 isTitle = isTitle,
                 isTitleNumber = isTitleNumber,
                 reviewTitleOffset = reviewTitleOffset,
+                reviewTrailingInset = if (usesRightTitleReviewInset) {
+                    rightTitleReviewInset
+                } else {
+                    0f
+                },
+                reviewTrailingPadding = paddingRight.toFloat()
+                    .takeIf { usesRightTitleReviewInset },
+                isReviewTrailingInsetApplied = usesRightTitleReviewInset && rightTitleHasReview,
             )
             prepareNextPageIfNeed(durY + textHeight)
             val lineStart = layout.getLineStart(lineIndex)
@@ -1070,8 +1103,14 @@ class TextChapterLayout(
                     (visibleWidth - desiredWidth) / 2
                 }
                 isMiddleTitle -> (visibleWidth - desiredWidth) / 2
-                isRightTitle ->
-                    (visibleWidth - desiredWidth - rightTitleReviewInset).coerceAtLeast(0f)
+                isRightTitle -> {
+                    val trailingInset = if (textLine.isReviewTrailingInsetApplied) {
+                        textLine.reviewTrailingInset
+                    } else {
+                        0f
+                    }
+                    (visibleWidth - desiredWidth - trailingInset).coerceAtLeast(0f)
+                }
                 else -> null
             }
             when (lineIndex) {

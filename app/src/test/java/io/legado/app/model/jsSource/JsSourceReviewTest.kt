@@ -232,6 +232,7 @@ class JsSourceReviewTest {
         val result = JsSourceReview.getReviewSummaryAwait(source, book, chapter)
 
         assertNull(result)
+        assertEquals(false, JsSourceReview.hasReviewCapability(source))
     }
 
     private fun source(reviewFunctions: String): BookSource {

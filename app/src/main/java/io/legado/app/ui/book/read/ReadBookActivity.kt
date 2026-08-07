@@ -1822,13 +1822,8 @@ class ReadBookActivity : BaseReadBookActivity(),
             clearReviewSummaryProviders()
             return
         }
-        val summaryUrl = rule.reviewSummaryUrl?.takeIf { it.isNotBlank() }
-        if (!rule.enabled ||
-            summaryUrl == null ||
-            rule.summaryListRule.isNullOrBlank() ||
-            rule.summaryParagraphIndexRule.isNullOrBlank() ||
-            rule.summaryCountRule.isNullOrBlank()
-        ) {
+        val summaryUrl = rule.configuredSummaryUrl()
+        if (summaryUrl == null) {
             clearReviewSummaryProviders()
             return
         }
@@ -1990,15 +1985,11 @@ class ReadBookActivity : BaseReadBookActivity(),
             },
             keyProvider = { targetChapterIndex, reviewId ->
                 if (targetChapterIndex == chapterIndex) result.keys[reviewId] else null
-            }
+            },
+            chapterIndex = chapterIndex,
         )
         reviewSummaryAppliedKey = key
-        if (ReadBookConfig.isRightTitle && (result.counts[-1] ?: 0) > 0) {
-            ReadBook.curTextChapter = null
-            ReadBook.loadContent(chapterIndex, resetPageOffset = false)
-        } else {
-            binding.readView.upContent(relativePosition = 0, resetPageOffset = false)
-        }
+        binding.readView.upContent(relativePosition = 0, resetPageOffset = false)
     }
 
     private fun prefetchAdjacentReviewSummary(

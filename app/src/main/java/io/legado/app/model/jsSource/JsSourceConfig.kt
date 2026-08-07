@@ -16,6 +16,7 @@ import org.htmlunit.corejs.javascript.Parser
 import org.htmlunit.corejs.javascript.Scriptable
 import org.htmlunit.corejs.javascript.ScriptableObject
 import org.htmlunit.corejs.javascript.ast.FunctionCall
+import org.htmlunit.corejs.javascript.ast.FunctionNode
 import org.htmlunit.corejs.javascript.ast.Name
 import org.htmlunit.corejs.javascript.ast.NumberLiteral
 import org.htmlunit.corejs.javascript.ast.ObjectLiteral
@@ -28,6 +29,7 @@ object JsSourceConfig {
 
     private const val CONFIG_PROPERTY = "config"
     private const val LEGACY_CONFIG_PROPERTY = "source"
+    private val reviewFunctionNames = setOf("getReviewSummary", "getReviewDetail")
 
     val requiredFunctions = listOf("search", "getChapters", "getContent")
     private val fileSourceRequiredFunctions = listOf("search", "getBookInfo")
@@ -52,6 +54,30 @@ object JsSourceConfig {
             if (cancellation != null) throw cancellation
             throw error
         }
+    }
+
+    fun declaresReviewFunctions(text: String): Boolean {
+        val declared = hashSetOf<String>()
+        val root = runCatching { Parser().parse(text, null, 1) }.getOrNull() ?: return false
+        root.visit { node ->
+            when (node) {
+                is FunctionNode -> if (
+                    node.enclosingFunction == null && node.name in reviewFunctionNames
+                ) {
+                    declared.add(node.name)
+                }
+
+                is VariableInitializer -> if (
+                    node.enclosingFunction == null && node.initializer is FunctionNode
+                ) {
+                    (node.target as? Name)?.identifier
+                        ?.takeIf { it in reviewFunctionNames }
+                        ?.let(declared::add)
+                }
+            }
+            declared.size < reviewFunctionNames.size
+        }
+        return declared.containsAll(reviewFunctionNames)
     }
 
     private fun extractInternal(

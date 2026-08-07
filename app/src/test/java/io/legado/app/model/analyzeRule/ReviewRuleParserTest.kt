@@ -25,6 +25,21 @@ class ReviewRuleParserTest {
     )
 
     @Test
+    fun `summary configuration requires every lookup rule`() {
+        val rule = ReviewRule(
+            enabled = true,
+            reviewSummaryUrl = "https://example.com/reviews",
+            summaryListRule = "$.items",
+            summaryParagraphIndexRule = "$.index",
+            summaryCountRule = "$.count",
+        )
+
+        assertEquals("https://example.com/reviews", rule.configuredSummaryUrl())
+        rule.summaryCountRule = null
+        assertEquals(null, rule.configuredSummaryUrl())
+    }
+
+    @Test
     fun `parses JSON summary returned as a native array`() {
         val result = ReviewRuleParser.parseSummary(
             body = """

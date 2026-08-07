@@ -20,6 +20,14 @@ internal object JsSourceReview {
         capabilityCache.put(capabilityKey(source), enabled)
     }
 
+    fun hasReviewCapability(source: BookSource): Boolean {
+        val key = capabilityKey(source)
+        capabilityCache[key]?.let { return it }
+        return JsSourceConfig.declaresReviewFunctions(source.mainJs.orEmpty()).also {
+            capabilityCache.put(key, it)
+        }
+    }
+
     suspend fun getReviewSummaryAwait(
         source: BookSource,
         book: Book,

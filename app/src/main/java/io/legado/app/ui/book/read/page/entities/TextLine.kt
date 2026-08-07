@@ -52,6 +52,9 @@ data class TextLine(
     var exceed: Boolean = false,
     var onlyTextColumn: Boolean = true,
     var reviewTitleOffset: Int = 0,
+    var reviewTrailingInset: Float = 0f,
+    var reviewTrailingPadding: Float? = null,
+    var isReviewTrailingInsetApplied: Boolean = false,
     var hangingPunctuation: Boolean = false,
     var compressedPunctuation: Boolean = false,
 ) {
