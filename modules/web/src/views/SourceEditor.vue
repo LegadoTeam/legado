@@ -123,7 +123,7 @@ onMounted(authorize)
 
 @media screen and (max-width: 900px) {
   .source-editor {
-    overflow-y: auto;
+    overflow: hidden;
   }
 
   .source-mode {
@@ -134,17 +134,16 @@ onMounted(authorize)
   }
 
   .editor {
-    display: block;
-    height: auto;
-    overflow: visible;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
+    overflow: hidden;
 
     .left,
     .right {
       flex: none;
       width: auto;
-      height: 100vh;
-      height: 100dvh;
-      min-height: 520px;
+      height: auto;
+      min-height: 0;
       margin: 0 12px;
     }
 
@@ -154,13 +153,8 @@ onMounted(authorize)
   }
 
   .editor.with-mode {
-    height: auto;
-
-    .left,
-    .right {
-      height: calc(100vh - 48px);
-      height: calc(100dvh - 48px);
-    }
+    height: calc(100vh - 48px);
+    height: calc(100dvh - 48px);
   }
 }
 

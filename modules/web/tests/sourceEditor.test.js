@@ -21,7 +21,7 @@ test('uses bounded labels and stable source list rows', () => {
   const form = readSource('components/SourceTabForm.vue')
   const list = readSource('components/SourceList.vue')
 
-  assert.match(form, /label-width="140px"/)
+  assert.match(form, /label-width="220px"/)
   assert.match(list, /:data-key="getSourceUniqueKey"/)
   assert.match(list, /class="source-list-panel"/)
   assert.doesNotMatch(list, /calc\(100% - 75px\)/)
@@ -49,6 +49,11 @@ test('keeps source editor state and mobile controls reachable', () => {
   assert.match(editor, /source\.bookSourceName.*source\.bookSourceUrl/)
   assert.match(view, /height: 100dvh/)
   assert.match(view, /height: calc\(100dvh - 48px\)/)
+  assert.match(
+    view,
+    /grid-template-rows: minmax\(0, 1fr\) auto minmax\(0, 1fr\)/,
+  )
+  assert.doesNotMatch(view, /min-height: 520px/)
   assert.match(tools, /set: val => store\.changeTabName\(val\)/)
   assert.doesNotMatch(json, /margin-bottom: 4px/)
   assert.match(config, /返回 -1 表示章评，1 开始表示正文段落/)
