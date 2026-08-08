@@ -530,6 +530,7 @@ object BookHelp {
                 }
             }
         }
+        if (nameSim > 0.96) return newIndex
         if (searchAllChapterNumbers && oldChapterNum > 0) {
             findNearestChapterNumberIndex(
                 newChapterList.map { getChapterNum(it.title) },
@@ -537,7 +538,6 @@ object BookHelp {
                 durIndex,
             )?.let { return it }
         }
-        if (nameSim > 0.96) return newIndex
         if (oldChapterNum > 0) {
             for (i in min..max) {
                 if (getChapterNum(newChapterList[i].title) == oldChapterNum) return i

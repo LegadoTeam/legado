@@ -34,6 +34,9 @@ class BookHelpChapterIndexContractTest {
 
     @Test
     fun `chapter number lookup is not limited to the nearby index window`() {
+        val bookHelpSource = projectFile("src/main/java/io/legado/app/help/book/BookHelp.kt")
+            .readText()
+            .replace("\r\n", "\n")
         val dialogSource = projectFile(
             "src/main/java/io/legado/app/ui/book/changesource/ChangeChapterSourceDialog.kt"
         )
@@ -41,6 +44,10 @@ class BookHelpChapterIndexContractTest {
             .replace("\r\n", "\n")
 
         assertTrue(dialogSource.contains("searchAllChapterNumbers = true"))
+        assertTrue(
+            bookHelpSource.indexOf("if (nameSim > 0.96) return newIndex") <
+                    bookHelpSource.indexOf("if (searchAllChapterNumbers && oldChapterNum > 0)")
+        )
         assertEquals(
             174,
             findNearestChapterNumberIndex(chapterNumbers(144 to 114, 174 to 144), 144, 144)
