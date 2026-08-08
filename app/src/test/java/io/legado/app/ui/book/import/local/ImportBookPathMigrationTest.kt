@@ -101,6 +101,34 @@ class ImportBookPathMigrationTest {
     }
 
     @Test
+    fun `local scan matches shelf files without per-file queries`() {
+        val shelfFiles = ImportBookShelfFiles(
+            fileNames = listOf("book.txt"),
+            alternateOrigins = listOf(
+                "loc_book::ARCHIVE.ZIP",
+                "webDav::https://example.com/books/remote.epub",
+            ),
+        )
+
+        assertTrue("book.txt" in shelfFiles)
+        assertTrue("archive.zip" in shelfFiles)
+        assertTrue("remote.epub" in shelfFiles)
+        assertFalse("BOOK.TXT" in shelfFiles)
+        assertFalse("missing.txt" in shelfFiles)
+
+        val importBook = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/import/local/ImportBook.kt"
+        )
+        val viewModel = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/import/local/ImportBookViewModel.kt"
+        )
+        assertFalse(importBook.contains("LocalBook.isOnBookShelf"))
+        assertFalse(viewModel.contains("private var shelfFiles"))
+        assertTrue(viewModel.contains("appDb.bookDao.localBookFileNames"))
+        assertTrue(viewModel.contains("appDb.bookDao.localBookAlternateOrigins"))
+    }
+
+    @Test
     fun `local file consumers use the rebound uri`() {
         val extensions = readProjectFile(
             "src/main/java/io/legado/app/help/book/BookExtensions.kt"

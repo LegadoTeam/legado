@@ -6,6 +6,7 @@ import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern.archiveFileRegex
 import io.legado.app.constant.AppPattern.bookFileRegex
 import io.legado.app.constant.PreferKey
+import io.legado.app.data.appDb
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.utils.AlphanumComparator
 import io.legado.app.utils.FileDoc
@@ -43,17 +44,23 @@ class ImportBookViewModel(application: Application) : BaseViewModel(application)
 
         dataCallback = object : DataCallback {
 
-            override fun setItems(fileDocs: List<FileDoc>) {
+            override fun setItems(
+                fileDocs: List<FileDoc>,
+                shelfFiles: ImportBookShelfFiles,
+            ) {
                 list.clear()
                 fileDocs.mapTo(list) {
-                    ImportBook(it)
+                    ImportBook(it, !it.isDir && it.name in shelfFiles)
                 }
                 trySend(list)
             }
 
-            override fun addItems(fileDocs: List<FileDoc>) {
+            override fun addItems(
+                fileDocs: List<FileDoc>,
+                shelfFiles: ImportBookShelfFiles,
+            ) {
                 fileDocs.mapTo(list) {
-                    ImportBook(it)
+                    ImportBook(it, !it.isDir && it.name in shelfFiles)
                 }
                 trySend(list)
             }
@@ -118,6 +125,7 @@ class ImportBookViewModel(application: Application) : BaseViewModel(application)
 
     fun loadDoc(fileDoc: FileDoc) {
         execute {
+            val shelfFiles = loadShelfFiles()
             val docList = fileDoc.list { item ->
                 when {
                     item.name.startsWith(".") -> false
@@ -125,13 +133,14 @@ class ImportBookViewModel(application: Application) : BaseViewModel(application)
                     else -> item.name.matches(bookFileRegex) || item.name.matches(archiveFileRegex)
                 }
             }
-            dataCallback?.setItems(docList!!)
+            dataCallback?.setItems(docList!!, shelfFiles)
         }.onError {
             context.toastOnUi("获取文件列表出错\n${it.localizedMessage}")
         }
     }
 
     suspend fun scanDoc(fileDoc: FileDoc) {
+        val shelfFiles = loadShelfFiles()
         dataCallback?.clear()
         val channel = Channel<FileDoc>(UNLIMITED)
         var n = 1
@@ -153,12 +162,19 @@ class ImportBookViewModel(application: Application) : BaseViewModel(application)
                         list.add(it)
                     }
                 }
-                dataCallback?.addItems(list)
+                dataCallback?.addItems(list, shelfFiles)
             }.takeWhile {
                 n > 0
             }.catch {
                 context.toastOnUi("扫描文件夹出错\n${it.localizedMessage}")
             }.collect()
+    }
+
+    private fun loadShelfFiles(): ImportBookShelfFiles {
+        return ImportBookShelfFiles(
+            appDb.bookDao.localBookFileNames,
+            appDb.bookDao.localBookAlternateOrigins
+        )
     }
 
     fun updateCallBackFlow(filterKey: String?) {
@@ -168,9 +184,9 @@ class ImportBookViewModel(application: Application) : BaseViewModel(application)
 
     interface DataCallback {
 
-        fun setItems(fileDocs: List<FileDoc>)
+        fun setItems(fileDocs: List<FileDoc>, shelfFiles: ImportBookShelfFiles)
 
-        fun addItems(fileDocs: List<FileDoc>)
+        fun addItems(fileDocs: List<FileDoc>, shelfFiles: ImportBookShelfFiles)
 
         fun clear()
 
