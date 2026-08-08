@@ -38,8 +38,10 @@ class ReadBookPopupActionMigrationTest {
         assertOrdered(
             changeMenu,
             "item(getString(R.string.chapter_change_source), \"chapter\")",
+            "item(getString(R.string.batch_chapter_change_source), \"batchChapter\")",
             "item(getString(R.string.book_change_source), \"book\")",
             "\"chapter\" -> showChapterChangeSource()",
+            "\"batchChapter\" -> showChapterChangeSource(batchMode = true)",
             "\"book\" -> showBookChangeSource()"
         )
         assertOrdered(
@@ -59,11 +61,11 @@ class ReadBookPopupActionMigrationTest {
         val book = section(
             source,
             "private fun showBookChangeSource()",
-            "private fun showChapterChangeSource()"
+            "private fun showChapterChangeSource(batchMode: Boolean = false)"
         )
         val chapter = section(
             source,
-            "private fun showChapterChangeSource()",
+            "private fun showChapterChangeSource(batchMode: Boolean = false)",
             "private fun refreshDurChapter()"
         )
 
@@ -79,7 +81,8 @@ class ReadBookPopupActionMigrationTest {
             "val book = ReadBook.book ?: return@launch",
             "appDb.bookChapterDao.getChapter(book.bookUrl, ReadBook.durChapterIndex)",
             "binding.readMenu.runMenuOut()",
-            "ChangeChapterSourceDialog(book.name, book.author, chapter.index, chapter.title)"
+            "ChangeChapterSourceDialog(",
+            "batchMode = batchMode"
         )
     }
 

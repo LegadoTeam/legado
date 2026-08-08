@@ -542,10 +542,12 @@ class ReadBookActivity : BaseReadBookActivity(),
     private fun showChangeSourceMenu(anchor: View) {
         popupActionMenu(this) {
             item(getString(R.string.chapter_change_source), "chapter")
+            item(getString(R.string.batch_chapter_change_source), "batchChapter")
             item(getString(R.string.book_change_source), "book")
         }.show(anchor) { action ->
             when (action) {
                 "chapter" -> showChapterChangeSource()
+                "batchChapter" -> showChapterChangeSource(batchMode = true)
                 "book" -> showBookChangeSource()
             }
         }
@@ -572,14 +574,20 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
     }
 
-    private fun showChapterChangeSource() {
+    private fun showChapterChangeSource(batchMode: Boolean = false) {
         lifecycleScope.launch {
             val book = ReadBook.book ?: return@launch
             val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, ReadBook.durChapterIndex)
                 ?: return@launch
             binding.readMenu.runMenuOut()
             showDialogFragment(
-                ChangeChapterSourceDialog(book.name, book.author, chapter.index, chapter.title)
+                ChangeChapterSourceDialog(
+                    book.name,
+                    book.author,
+                    chapter.index,
+                    chapter.title,
+                    batchMode = batchMode,
+                )
             )
         }
     }
@@ -1451,6 +1459,13 @@ class ReadBookActivity : BaseReadBookActivity(),
     override fun replaceContent(content: String) {
         ReadBook.book?.let {
             viewModel.saveContent(it, content)
+        }
+    }
+
+    override fun contentCached(chapterIndex: Int) {
+        if (chapterIndex in ReadBook.durChapterIndex - 1..ReadBook.durChapterIndex + 1) {
+            ReadBook.clearTextChapter()
+            ReadBook.loadContent(resetPageOffset = false)
         }
     }
 

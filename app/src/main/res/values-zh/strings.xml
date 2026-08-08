@@ -1121,6 +1121,11 @@
     <string name="menu_refresh_all">刷新全部章节</string>
     <string name="edit_content">编辑内容</string>
     <string name="chapter_change_source">单章换源</string>
+    <string name="batch_chapter_change_source">批量单章换源</string>
+    <string name="chapter_source_skip">跳过本章</string>
+    <string name="chapter_source_cache_next">缓存并下一章</string>
+    <string name="chapter_source_selected_count">已选 %1$d 个目标章节</string>
+    <string name="chapter_source_finished">原目录已处理完成</string>
     <string name="book_change_source">整书换源</string>
     <string name="sort_by_time">时间排序</string>
     <string name="enable_record">开启记录</string>

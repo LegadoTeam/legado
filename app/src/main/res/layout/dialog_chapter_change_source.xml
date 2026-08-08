@@ -101,8 +101,9 @@
             <androidx.constraintlayout.utils.widget.ImageFilterView
                 android:id="@+id/iv_hide_toc"
                 android:layout_width="match_parent"
-                android:layout_height="36dp"
+                android:layout_height="48dp"
                 android:background="?android:attr/selectableItemBackground"
+                android:contentDescription="@string/close"
                 android:src="@drawable/ic_arrow_down"
                 app:tint="@color/primaryText" />
 
@@ -113,8 +114,50 @@
             android:layout_width="match_parent"
             android:layout_height="0dp"
             app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintBottom_toTopOf="@+id/ll_batch_actions"
             app:layout_constraintTop_toBottomOf="@+id/fl_hide_toc" />
+
+        <LinearLayout
+            android:id="@+id/ll_batch_actions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/background"
+            android:orientation="horizontal"
+            android:paddingHorizontal="4dp"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent">
+
+            <io.legado.app.ui.widget.text.AccentStrokeTextView
+                android:id="@+id/btn_batch_skip"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_margin="4dp"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="@string/chapter_source_skip"
+                app:isBottomBackground="true" />
+
+            <io.legado.app.ui.widget.text.AccentStrokeTextView
+                android:id="@+id/btn_batch_cache_next"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_margin="4dp"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="@string/chapter_source_cache_next"
+                app:isBottomBackground="true" />
+
+            <io.legado.app.ui.widget.text.AccentStrokeTextView
+                android:id="@+id/btn_batch_finish"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_margin="4dp"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="@string/complete"
+                app:isBottomBackground="true" />
+
+        </LinearLayout>
 
         <io.legado.app.ui.widget.anima.RotateLoading
             android:id="@+id/loading_toc"

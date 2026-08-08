@@ -2,6 +2,8 @@ package io.legado.app.ui.book.changesource
 
 import android.content.Context
 import android.view.ViewGroup
+import androidx.core.view.ViewCompat
+import androidx.core.view.isVisible
 import io.legado.app.R
 import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.base.adapter.RecyclerAdapter
@@ -17,6 +19,23 @@ class ChangeChapterTocAdapter(context: Context, val callback: Callback) :
     RecyclerAdapter<BookChapter, ItemChapterListBinding>(context) {
 
     var durChapterIndex = 0
+    var batchMode = false
+    var selectionEnabled = true
+        set(value) {
+            if (field == value) return
+            field = value
+            notifyItemRangeChanged(0, itemCount)
+        }
+    private val selectedIndices = hashSetOf<Int>()
+
+    val selectedChapters: List<Pair<BookChapter, String?>>
+        get() = selectedChapterSourceItems(getItems(), selectedIndices)
+
+    val selectionCount: Int
+        get() = selectedIndices.size
+
+    val lastSelectedPosition: Int
+        get() = getItems().indexOfLast { it.index in selectedIndices }
 
     override fun getViewBinding(parent: ViewGroup): ItemChapterListBinding {
         return ItemChapterListBinding.inflate(inflater, parent, false)
@@ -30,6 +49,7 @@ class ChangeChapterTocAdapter(context: Context, val callback: Callback) :
     ) {
         binding.run {
             val isDur = durChapterIndex == item.index
+            val isSelected = batchMode && item.index in selectedIndices
             if (isDur) {
                 tvChapterName.setTextColor(context.accentColor)
             } else {
@@ -52,19 +72,56 @@ class ChangeChapterTocAdapter(context: Context, val callback: Callback) :
                 tvTag.gone()
             }
             ivChecked.setImageResource(R.drawable.ic_check)
-            ivChecked.visible(isDur)
+            ivChecked.isVisible = !batchMode && isDur
+            cbSelected.isVisible = batchMode && !item.isVolume
+            cbSelected.isChecked = isSelected
+            tvChapterItem.isClickable = !batchMode || (!item.isVolume && selectionEnabled)
+            tvChapterItem.isSelected = isSelected
+            ViewCompat.setAccessibilityHeading(tvChapterItem, item.isVolume)
         }
     }
 
     override fun registerListener(holder: ItemViewHolder, binding: ItemChapterListBinding) {
         holder.itemView.setOnClickListener {
-            getItem(holder.layoutPosition)?.let {
-                callback.clickChapter(it, getItem(holder.layoutPosition + 1)?.url)
+            val position = holder.bindingAdapterPosition
+            getItem(position)?.let { chapter ->
+                if (batchMode) {
+                    if (chapter.isVolume || !selectionEnabled) return@let
+                    if (!selectedIndices.add(chapter.index)) {
+                        selectedIndices.remove(chapter.index)
+                    }
+                    notifyItemChanged(position)
+                    callback.selectionChanged()
+                } else {
+                    callback.clickChapter(chapter, getItem(position + 1)?.url)
+                }
             }
         }
     }
 
+    fun clearSelection() {
+        if (selectedIndices.isEmpty()) return
+        val positions = getItems().mapIndexedNotNull { position, chapter ->
+            position.takeIf { chapter.index in selectedIndices }
+        }
+        selectedIndices.clear()
+        positions.forEach(::notifyItemChanged)
+        callback.selectionChanged()
+    }
+
     interface Callback {
         fun clickChapter(bookChapter: BookChapter, nextChapterUrl: String?)
+        fun selectionChanged()
+    }
+}
+
+internal fun selectedChapterSourceItems(
+    chapters: List<BookChapter>,
+    selectedIndices: Set<Int>,
+): List<Pair<BookChapter, String?>> = chapters.mapIndexedNotNull { position, chapter ->
+    if (!chapter.isVolume && chapter.index in selectedIndices) {
+        chapter to chapters.getOrNull(position + 1)?.url
+    } else {
+        null
     }
 }

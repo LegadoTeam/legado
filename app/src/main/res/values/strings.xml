@@ -1126,6 +1126,11 @@
     <string name="menu_refresh_all">Refresh all chapters</string>
     <string name="edit_content">Edit Content</string>
     <string name="chapter_change_source">Single chapter source switching</string>
+    <string name="batch_chapter_change_source">Batch chapter source switching</string>
+    <string name="chapter_source_skip">Skip chapter</string>
+    <string name="chapter_source_cache_next">Cache and next</string>
+    <string name="chapter_source_selected_count">%1$d target chapter(s) selected</string>
+    <string name="chapter_source_finished">No more original chapters</string>
     <string name="book_change_source">Change the source of the whole book</string>
     <string name="sort_by_time">Sort by time</string>
     <string name="enable_record">Enable record</string>
