@@ -16,7 +16,7 @@ class ReviewDetailMediaSourceTest {
                 "RequestOptions().set(OkHttpModelLoader.sourceOriginOption, sourceKey)"
             )
         )
-        listOf("item.avatar", "item.imageUrl", "badge").forEach { image ->
+        listOf("item.avatar", "badge").forEach { image ->
             val model = Regex.escape(image)
             assertTrue(
                 Regex(
@@ -25,6 +25,13 @@ class ReviewDetailMediaSourceTest {
                 ).containsMatchIn(source)
             )
         }
+        assertTrue(source.contains("bindReviewImage(binding, item.imageUrl)"))
+        assertTrue(
+            Regex(
+                """ImageLoader\.load\(context, imageUrl\)\s*""" +
+                    """\.apply\(sourceImageOptions\)"""
+            ).containsMatchIn(source)
+        )
         assertTrue(source.contains("PhotoDialog(imageUrl, sourceKey)"))
     }
 
@@ -55,6 +62,43 @@ class ReviewDetailMediaSourceTest {
         assertTrue(badgeBinding in 0 until replyBranch)
         assertTrue(contentVisibility > replyBranch)
         assertFalse(binding.substring(replyBranch, contentVisibility).contains("llBadges.gone()"))
+    }
+
+    @Test
+    fun `review image restores its cached aspect ratio before reloading`() {
+        val binding = dialogSource()
+            .substringAfter("private fun bindReviewImage(")
+            .substringBefore("override fun registerListener")
+        val clearRequest = binding.indexOf("Glide.with(context).clear(imageView)")
+        val resetHeight = binding.indexOf("height = ViewGroup.LayoutParams.WRAP_CONTENT")
+        val emptyImage = binding.indexOf("if (imageUrl.isNullOrBlank())")
+        val cachedSize = binding.indexOf("imageSizes[imageUrl]?.let")
+        val intoImage = binding.indexOf("imageRequest.into(imageView)")
+
+        assertTrue(clearRequest in 0 until emptyImage)
+        assertTrue(resetHeight in 0 until emptyImage)
+        assertTrue(cachedSize in emptyImage until intoImage)
+        assertFalse(binding.contains("imageView.width"))
+        assertTrue(binding.contains("val width = resource.intrinsicWidth"))
+        assertTrue(binding.contains("val height = resource.intrinsicHeight"))
+        assertTrue(binding.contains("if (width > 0 && height > 0)"))
+        assertTrue(binding.contains("imageSizes[imageUrl] = Size(width, height)"))
+        assertTrue(binding.contains("intrinsicWidth = size.width"))
+        assertTrue(binding.contains("intrinsicHeight = size.height"))
+        assertTrue(binding.contains("imageRequest.placeholder(placeholder).error(placeholder)"))
+    }
+
+    @Test
+    fun `review list only applies diff updates while resumed`() {
+        val source = dialogSource()
+        val resumeBlock = source.substringAfter("override fun onResume()")
+            .substringBefore("override fun onPause()")
+        val pauseBlock = source.substringAfter("override fun onPause()")
+            .substringBefore("override fun onFragmentCreated")
+
+        assertTrue(resumeBlock.contains("adapter.upResumed(true)"))
+        assertTrue(pauseBlock.contains("adapter.upResumed(false)"))
+        assertTrue(pauseBlock.indexOf("adapter.upResumed(false)") < pauseBlock.indexOf("super.onPause()"))
     }
 
     private fun dialogSource(): String = projectFile(
