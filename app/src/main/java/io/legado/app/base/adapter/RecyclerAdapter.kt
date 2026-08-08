@@ -10,9 +10,10 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
 import io.legado.app.help.coroutine.Coroutine
-import io.legado.app.utils.buildMainHandler
 import io.legado.app.utils.withTimeoutOrNullAsync
+import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 import splitties.views.onLongClick
 import java.util.Collections
 import androidx.core.util.size
@@ -172,19 +173,16 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
                     DiffUtil.calculateDiff(callback, itemsSize < 2000)
                 }
                 ensureActive()
-                handler.post {
-                    if (isResumed || diffResult == null) {
+                withContext(Main) {
+                    if (!isResumed || diffResult == null) {
                         setItems(items)
-                        return@post
+                        return@withContext
                     }
                     if (this@RecyclerAdapter.items.isNotEmpty()) {
                         this@RecyclerAdapter.items.clear()
                     }
                     if (items != null) {
                         this@RecyclerAdapter.items.addAll(items)
-                    }
-                    if (!isResumed) {
-                        return@post
                     }
                     ensureActive()
                     diffResult.dispatchUpdatesTo(this@RecyclerAdapter)
@@ -450,7 +448,6 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
         if (!isResumed) {
             diffJob?.cancel()
             diffJob = null
-            handler.removeCallbacksAndMessages(null)
         }
         this.isResumed = isResumed
     }
@@ -500,7 +497,6 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
     companion object {
         private const val TYPE_HEADER_VIEW = Int.MIN_VALUE
         const val TYPE_FOOTER_VIEW = Int.MAX_VALUE - 999
-        private val handler by lazy { buildMainHandler() }
     }
 
 }
