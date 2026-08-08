@@ -54,6 +54,46 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
+internal data class ContentSaveKey(val bookUrl: String, val chapterIndex: Int)
+internal data class ContentSaveState(val version: Long = 0L, val fileName: String? = null)
+data class ContentSaveToken internal constructor(
+    internal val key: ContentSaveKey,
+    internal val folderName: String,
+    val version: Long,
+)
+
+internal class ContentSaveFence {
+    private val states = ConcurrentHashMap<ContentSaveKey, ContentSaveState>()
+
+    fun state(key: ContentSaveKey): ContentSaveState = states[key] ?: ContentSaveState()
+
+    fun writeIfCurrent(
+        key: ContentSaveKey,
+        expectedVersion: Long,
+        fileName: String,
+        write: () -> Unit,
+    ): Boolean {
+        var written = false
+        states.compute(key) { _, current ->
+            if ((current?.version ?: 0L) == expectedVersion) {
+                write()
+                written = true
+                current?.copy(fileName = fileName)
+            } else {
+                current
+            }
+        }
+        return written
+    }
+
+    fun replace(key: ContentSaveKey, fileName: String, write: () -> Unit) {
+        states.compute(key) { _, current ->
+            write()
+            ContentSaveState((current?.version ?: 0L) + 1L, fileName)
+        }
+    }
+}
+
 @Suppress("unused", "ConstPropertyName")
 object BookHelp {
     private val downloadDir: File = appCtx.externalFiles
@@ -61,6 +101,7 @@ object BookHelp {
     private const val cacheImageFolderName = "images"
     private const val cacheEpubFolderName = "epub"
     private val downloadImages = ConcurrentHashMap<String, Mutex>()
+    private val contentSaveFence = ContentSaveFence()
 
     val cachePath = FileUtils.getPath(downloadDir, cacheFolderName)
 
@@ -166,15 +207,35 @@ object BookHelp {
         bookSource: BookSource,
         book: Book,
         bookChapter: BookChapter,
-        content: String
-    ) {
-        try {
-            saveText(book, bookChapter, content)
-            //saveImages(bookSource, book, bookChapter, content)
-            postEvent(EventBus.SAVE_CONTENT, Pair(book, bookChapter))
+        content: String,
+        token: ContentSaveToken = contentSaveToken(book, bookChapter),
+    ): Boolean {
+        return try {
+            if (token.key.bookUrl != book.bookUrl ||
+                token.key.chapterIndex != bookChapter.index ||
+                token.folderName != book.getFolderName()
+            ) {
+                return false
+            }
+            val fileName = bookChapter.getFileName()
+            val saved = contentSaveFence.writeIfCurrent(
+                token.key,
+                token.version,
+                fileName,
+            ) {
+                if (content.isNotEmpty()) {
+                    writeText(book, bookChapter, token.folderName, fileName, content)
+                }
+            }
+            if (saved) {
+                //saveImages(bookSource, book, bookChapter, content)
+                postEvent(EventBus.SAVE_CONTENT, Pair(book, bookChapter))
+            }
+            saved
         } catch (e: Exception) {
             e.printStackTrace()
             AppLog.put("保存正文失败 ${book.name} ${bookChapter.title}", e)
+            false
         }
     }
 
@@ -184,12 +245,42 @@ object BookHelp {
         content: String
     ) {
         if (content.isEmpty()) return
+        val folderName = book.getFolderName()
+        val fileName = bookChapter.getFileName()
+        contentSaveFence.replace(contentSaveKey(book, bookChapter), fileName) {
+            writeText(book, bookChapter, folderName, fileName, content)
+        }
+    }
+
+    internal fun contentSaveToken(book: Book, bookChapter: BookChapter): ContentSaveToken {
+        val key = contentSaveKey(book, bookChapter)
+        return ContentSaveToken(
+            key,
+            book.getFolderName(),
+            contentSaveFence.state(key).version,
+        )
+    }
+
+    private fun contentSaveFileName(book: Book, bookChapter: BookChapter): String? {
+        return contentSaveFence.state(contentSaveKey(book, bookChapter)).fileName
+    }
+
+    private fun contentSaveKey(book: Book, bookChapter: BookChapter) =
+        ContentSaveKey(book.bookUrl, bookChapter.index)
+
+    private fun writeText(
+        book: Book,
+        bookChapter: BookChapter,
+        folderName: String,
+        fileName: String,
+        content: String,
+    ) {
         //保存文本
         FileUtils.createFileIfNotExist(
             downloadDir,
             cacheFolderName,
-            book.getFolderName(),
-            bookChapter.getFileName(),
+            folderName,
+            fileName,
         ).writeText(content)
         if (book.isOnLineTxt && AppConfig.tocCountWords) {
             val wordCount = StringUtils.wordCountFormat(content.length)
@@ -349,10 +440,12 @@ object BookHelp {
         ) {
             true
         } else {
+            val fileName = contentSaveFileName(book, bookChapter)
+                ?: bookChapter.getFileName()
             downloadDir.exists(
                 cacheFolderName,
                 book.getFolderName(),
-                bookChapter.getFileName()
+                fileName,
             )
         }
     }
@@ -403,10 +496,37 @@ object BookHelp {
      * 读取章节内容
      */
     fun getContent(book: Book, bookChapter: BookChapter): String? {
+        val fileName = contentSaveFileName(book, bookChapter)
+            ?: bookChapter.getFileName()
+        return readContent(book, bookChapter, book.getFolderName(), fileName)
+    }
+
+    internal fun getContent(
+        book: Book,
+        bookChapter: BookChapter,
+        token: ContentSaveToken,
+    ): String? {
+        if (token.key.bookUrl != book.bookUrl ||
+            token.key.chapterIndex != bookChapter.index ||
+            token.folderName != book.getFolderName()
+        ) {
+            return null
+        }
+        val fileName = contentSaveFence.state(token.key).fileName
+            ?: bookChapter.getFileName()
+        return readContent(book, bookChapter, token.folderName, fileName)
+    }
+
+    private fun readContent(
+        book: Book,
+        bookChapter: BookChapter,
+        folderName: String,
+        fileName: String,
+    ): String? {
         val file = downloadDir.getFile(
             cacheFolderName,
-            book.getFolderName(),
-            bookChapter.getFileName()
+            folderName,
+            fileName,
         )
         if (file.exists()) {
             val string = file.readText()
@@ -429,11 +549,14 @@ object BookHelp {
      * 删除章节内容
      */
     fun delContent(book: Book, bookChapter: BookChapter) {
+        val folderName = book.getFolderName()
+        val fileName = contentSaveFileName(book, bookChapter)
+            ?: bookChapter.getFileName()
         FileUtils.createFileIfNotExist(
             downloadDir,
             cacheFolderName,
-            book.getFolderName(),
-            bookChapter.getFileName()
+            folderName,
+            fileName,
         ).delete()
     }
 

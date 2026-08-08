@@ -165,10 +165,7 @@ object AutoTaskProtocol {
             }
         ) { chapter ->
             if (!BookHelp.hasContent(book, chapter)) {
-                val content = WebBook.getContentAwait(bookSource, book, chapter)
-                if (!BookHelp.hasContent(book, chapter)) {
-                    BookHelp.saveContent(bookSource, book, chapter, content)
-                }
+                WebBook.getContentAwait(bookSource, book, chapter)
                 check(BookHelp.hasContent(book, chapter)) {
                     "Failed to cache ${book.name.ifBlank { book.bookUrl }}: ${chapter.title}"
                 }
