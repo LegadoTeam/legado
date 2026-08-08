@@ -3,7 +3,9 @@ package io.legado.app.ui.book.changesource
 import io.legado.app.data.entities.BookChapter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class ChangeChapterSourceBatchTest {
 
@@ -52,5 +54,27 @@ class ChangeChapterSourceBatchTest {
 
         assertEquals(10, nextChapterSourceOriginal(chapters, 8)?.index)
         assertNull(nextChapterSourceOriginal(chapters, 10))
+    }
+
+    @Test
+    fun `batch cache cancels reader loads before its final save`() {
+        val source = projectFile(
+            "src/main/java/io/legado/app/ui/book/changesource/ChangeChapterSourceViewModel.kt"
+        ).readText()
+        val merged = source.indexOf("val mergedContent = mergeChapterSourceContents(contents)")
+        val cancel = source.indexOf("ReadBook.cancelContentLoading()")
+        val ensure = source.indexOf("ensureActive()", cancel)
+        val save = source.indexOf("BookHelp.saveText(", ensure)
+
+        assertTrue(merged >= 0)
+        assertTrue(cancel > merged)
+        assertTrue(ensure > cancel)
+        assertTrue(save > ensure)
+    }
+
+    private fun projectFile(pathInApp: String): File {
+        return sequenceOf(File(pathInApp), File("app/$pathInApp"))
+            .firstOrNull(File::isFile)
+            ?: error("Project file not found: $pathInApp")
     }
 }

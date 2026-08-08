@@ -52,10 +52,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -1357,6 +1359,16 @@ object ReadBook : CoroutineScope by MainScope() {
         if (contentLoadFinish) {
             preDownloadTask?.cancel()
             downloadScope.coroutineContext.cancelChildren()
+        }
+    }
+
+    internal suspend fun cancelContentLoading() {
+        preDownloadTask?.cancelAndJoin()
+        val downloadJobs = downloadScope.coroutineContext[Job]?.children?.toList().orEmpty()
+        downloadJobs.forEach { it.cancel() }
+        downloadJobs.joinAll()
+        synchronized(this) {
+            loadingChapters.clear()
         }
     }
 

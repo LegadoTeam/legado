@@ -8,6 +8,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.coroutine.Coroutine
+import io.legado.app.model.ReadBook
 import io.legado.app.model.webBook.WebBook
 import kotlinx.coroutines.ensureActive
 
@@ -80,11 +81,15 @@ class ChangeChapterSourceViewModel(application: Application) :
                     false,
                 )
             }
+            val mergedContent = mergeChapterSourceContents(contents)
+            if (ReadBook.book?.bookUrl == originalBook.bookUrl) {
+                ReadBook.cancelContentLoading()
+            }
             ensureActive()
             BookHelp.saveText(
                 originalBook,
                 originalChapter,
-                mergeChapterSourceContents(contents),
+                mergedContent,
             )
         }.onSuccess {
             success.invoke()
