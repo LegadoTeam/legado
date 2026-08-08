@@ -86,6 +86,10 @@ class ReviewWebApiContractTest {
         assertFalse(server.contains("script-src https: 'unsafe-inline'"))
         assertFalse(server.contains("style-src http: https: 'unsafe-inline'"))
         assertTrue(server.contains("frame-src 'self' http: https:"))
+        val vueHtmlHeaders = server.substringAfter(
+            "if (uri.startsWith(\"/vue/\") && uri.endsWith(\".html\"))"
+        ).substringBefore("}")
+        assertTrue(vueHtmlHeaders.contains("addHeader(\"Cache-Control\", \"no-cache\")"))
         assertTrue(server.contains("if (uri == \"/legacyReviewPage\") \"<redacted>\""))
         assertTrue(axios.contains("'openLegacyReview'"))
         assertFalse(axios.contains("'legacyReviewPage'"))
