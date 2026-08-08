@@ -1343,9 +1343,9 @@ class ReadBookActivity : BaseReadBookActivity(),
     override fun pageChanged() {
         pageChanged = true
         binding.readView.onPageChange()
-        upBookmarkIndicator()
         highlightPopup?.dismiss()
         handler.post {
+            upBookmarkIndicator()
             upSeekBarProgress()
         }
         executor.execute {
