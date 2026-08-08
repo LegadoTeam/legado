@@ -478,6 +478,17 @@ object ReviewController {
                   }, '*', [channel.port2]);
                 });
               };
+              document.addEventListener('click', event => {
+                const image = event.target;
+                if (!(image instanceof HTMLImageElement)) return;
+                const src = image.currentSrc || image.src;
+                if (!src) return;
+                window.parent.postMessage({
+                  type: 'legado-legacy-review-image',
+                  nonce,
+                  src
+                }, '*');
+              }, true);
               window.java = { upConfig() {} };
               const preload = ${GSON.toJson(page.preloadJs.orEmpty()).replace("<", "\\u003c")};
               if (preload) (0, eval)(preload);
