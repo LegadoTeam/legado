@@ -368,6 +368,47 @@ readTxtFile(path: String): String
 //删除文件
 deleteFile(path: String) 
 ```
+* 批量正文
+> 只能在书源正文页的 `contentBatch` 规则里调用,其它场景调用会抛错。
+```js
+//回存本批次内某一章的正文,第一个参数传本批数组里的章节对象
+java.cacheContent(chapter: Object, content: String): Boolean
+//也接受章节 url,但仅限该 url 在本批内唯一
+java.cacheContent(chapterUrl: String, content: String): Boolean
+```
+`contentBatch` 规则执行时,阅读会额外注入两个变量:
+
+| 变量 | 说明 |
+| --- | --- |
+| `chapters` | 本批次需要缓存的章节数组,每项含 `url`、`title`、`index` 等字段 |
+| `result` | 同 `chapters`,与其它规则的 `result` 惯例保持一致 |
+
+**优先传章节对象。** 目录允许多章共用同一 url(靠序号、标题或 tag 区分),
+传 url 时阅读只能按批内顺序猜是哪一章,同 url 的章节全部回存后再传该 url 会直接报错。
+传对象则始终精确对应。参数不接受数组下标等纯数字,避免和 `chapter.index` 混淆。
+
+书源自行决定怎么取(合并成一次请求、并发拉取、按站点接口一次拿多章都可以),
+每处理完一章就调用 `java.cacheContent` 回存,不必等整批结束。回存的正文会自动
+套用书源的正文替换规则(`replaceRegex`),与单章下载保持一致。没有回存的章节
+阅读会自动退回普通单章流程重新下载,因此单章失败不会影响同批其它章节。
+
+批量下载在手动缓存和阅读时的自动预下载中都会启用。每批算一次书源并发率,
+批内书源自己发出的请求仍各自受并发率限制。
+
+```js
+// 正文页 › 批量正文规则(contentBatch)示例
+<js>
+    for (var i = 0; i < chapters.length; i++) {
+        var chapter = chapters[i];
+        try {
+            var html = java.ajax(chapter.url);
+            java.cacheContent(chapter, 提取正文(html));
+        } catch (e) {
+            // 单章失败跳过,交给阅读退回单章下载
+        }
+    }
+</js>
+```
 
 ### [js加解密类](https://github.com/LegadoTeam/legado/blob/master/app/src/main/java/io/legado/app/help/JsEncodeUtils.kt) 部分函数
 
@@ -725,6 +766,7 @@ function getContent(chapter, book, nextChapterUrl) {
 |`getBookInfo(book)`|文件源必选，其他类型可选|详情字段对象|
 |`getChapters(book)`|非文件源必选|非空章节数组|
 |`getContent(chapter, book, nextChapterUrl)`|非文件源必选|非空正文字符串|
+|`getContentBatch(chapters, book)`|可选，与 `config.maxBatchSize` 成对声明|返回值忽略，正文用 `java.cacheContent` 回存|
 |`login()`|`loginUi` 非空时必选|返回值不限，失败时可 `throw`|
 |`loginUi(state)`|动态登录界面，与 `loginAction` 成对声明|`{rows:[...]}`|
 |`loginAction(action, state, form)`|动态登录界面，与 `loginUi` 成对声明|命令对象或空值|
@@ -848,8 +890,45 @@ function getContent(chapter, book, nextChapterUrl) {
 应用不会自动把任意网页 HTML 转换成正文，需要时应由脚本提取正文节点，或显式调用
 `java.htmlFormat`；第二个参数用于按当前页面地址补全正文中的相对图片链接。
 
-### 登录与发现
+#### getContentBatch
 
+可选的批量正文函数,和 `config.maxBatchSize` 成对声明:只写其中一个会在导入/保存时报错。
+`maxBatchSize` 是每批最多的章节数,必须是大于 1 的整数,上限 50;不启用批量时删除该字段。
+
+```js
+const config = {
+    bookSourceName: "示例源",
+    bookSourceUrl: "https://example.com",
+    maxBatchSize: 10
+};
+
+function getContentBatch(chapters, book) {
+    // 站点支持一次取多章时,整批只发一次请求
+    var urls = chapters.map(function (c) { return c.url; });
+    var list = JSON.parse(java.post(
+        config.bookSourceUrl + "/api/contents",
+        JSON.stringify({ urls: urls }),
+        { "Content-Type": "application/json" }
+    ).body());
+    list.forEach(function (item, i) {
+        // 优先传章节对象,重复 url 的目录只有对象能精确对应
+        java.cacheContent(chapters[i], item.content);
+    });
+}
+```
+
+`chapters` 是本批需要缓存的章节数组,每项含 `url`、`title`、`index` 等字段。
+函数返回值会被忽略,正文一律通过 `java.cacheContent(chapter, content)` 回存,
+每回存一章即刻写入缓存,不必等整批结束。第一个参数也接受 url 字符串,但仅限该 url
+在本批内唯一;目录允许多章共用同一 url,传对象才能保证不写错章节。
+
+回存的正文会自动套用书源的正文替换规则(`replaceRegex`)。没有回存的章节会自动
+退回 `getContent` 单章下载,所以部分章节失败不影响同批其它章节,也不需要在脚本里自己重试。
+
+手动缓存和阅读时的自动预下载都会使用批量。每批算一次书源并发率,批内脚本自己
+发出的请求仍各自受并发率限制。
+
+### 登录与发现
 - 只设置 `loginUrl` 时使用 WebView 登录，不要求实现 `login`。
 - 设置非空 `loginUi` 时必须实现顶层 `login` 函数。
 - 设置非空 `exploreUrl` 时必须实现顶层 `explore` 函数。

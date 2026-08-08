@@ -6,6 +6,7 @@ import com.script.rhino.RhinoInterruptError
 import com.script.rhino.RhinoScriptEngine
 import io.legado.app.constant.BookSourceType
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.rule.ContentRule
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.model.SharedJsScope
 import io.legado.app.model.login.LoginUiV2
@@ -98,6 +99,7 @@ object JsSourceConfig {
             ?: throw NoStackTraceException("$configName 配置对象无法解析")
         val jsonObject = runCatching { GSON.fromJson(json, JsonObject::class.java) }.getOrNull()
             ?: throw NoStackTraceException("$configName 配置对象不是合法对象")
+        val maxBatchSize = readMaxBatchSize(jsonObject, configName)
         strippedKeys.forEach(jsonObject::remove)
         normalizeExploreUrl(jsonObject)
         normalizeLoginUi(jsonObject)
@@ -158,7 +160,29 @@ object JsSourceConfig {
         if (declaresReviewSummary) {
             JsSourceReview.rememberReviewCapability(source, enabled = true)
         }
+        if (maxBatchSize != null) {
+            if (ScriptableObject.getProperty(scope, "getContentBatch") !is Function) {
+                throw NoStackTraceException("JS源声明了 maxBatchSize,缺少配对的 getContentBatch 函数")
+            }
+            //ruleContent 已被剥离,批量数量单独回填,供批量下载调度使用
+            source.ruleContent = ContentRule(maxBatchSize = maxBatchSize)
+        } else if (ScriptableObject.getProperty(scope, "getContentBatch") is Function) {
+            throw NoStackTraceException("JS源声明了 getContentBatch,缺少配对的 config.maxBatchSize")
+        }
         return source
+    }
+
+    /**
+     * 读取 config.maxBatchSize:批量正文每批的章节数,缺省表示不启用批量
+     */
+    private fun readMaxBatchSize(jsonObject: JsonObject, configName: String): Int? {
+        val element = jsonObject.get("maxBatchSize") ?: return null
+        val size = runCatching { element.asInt }.getOrNull()
+            ?: throw NoStackTraceException("$configName.maxBatchSize 必须是整数")
+        if (size <= 1) {
+            throw NoStackTraceException("$configName.maxBatchSize 必须大于1,不启用批量时删除该字段")
+        }
+        return size.coerceAtMost(BookSource.MAX_CONTENT_BATCH_SIZE)
     }
 
     private fun findConfig(

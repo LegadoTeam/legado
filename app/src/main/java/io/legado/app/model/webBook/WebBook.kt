@@ -477,6 +477,28 @@ object WebBook {
     }
 
     /**
+     * 批量章节内容。
+     *
+     * 常规源走 contentBatch 规则,JS源走 getContentBatch 函数,
+     * 两者都通过 java.cacheContent 回存。
+     * 返回书源未回存的章节,调用方按普通单章流程兜底。
+     */
+    suspend fun getContentBatchAwait(
+        bookSource: BookSource,
+        book: Book,
+        chapters: List<BookChapter>
+    ): List<BookChapter> {
+        if (bookSource.isJsSource()) {
+            return JsSourceBook.getContentBatchAwait(bookSource, book, chapters)
+        }
+        return BookContent.analyzeContentBatch(
+            bookSource = bookSource,
+            book = book,
+            chapters = chapters
+        )
+    }
+
+    /**
      * 精准搜索
      */
     fun preciseSearch(

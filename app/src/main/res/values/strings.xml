@@ -1481,6 +1481,8 @@
     <string name="enable_preload">预加载</string>
     <string name="is_event_listener">事件监听</string>
     <string name="rule_call_back">回调操作（callBackJs）</string>
+    <string name="rule_content_batch">批量正文规则（contentBatch）</string>
+    <string name="rule_max_batch_size">最大批量数量（maxBatchSize）</string>
     <string name="time_hour">小时</string>
     <string name="custom_button">定制按钮</string>
     <string name="welcome_show_time">欢迎页显示时间</string>
