@@ -110,8 +110,20 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud),
         llEngine.setOnClickListener {
             SpeakEngineDialog().show(childFragmentManager, "speakEngineDialog")
         }
-        tvPre.setOnClickListener { ReadAloud.prevChapter(requireContext()) }
-        tvNext.setOnClickListener { ReadAloud.nextChapter(requireContext()) }
+        tvPre.setOnClickListener {
+            if (ReadAloud.followReadAloudPosition) {
+                ReadAloud.prevChapter(requireContext())
+            } else {
+                ReadBook.moveToPrevChapter(upContent = true, toLast = false)
+            }
+        }
+        tvNext.setOnClickListener {
+            if (ReadAloud.followReadAloudPosition) {
+                ReadAloud.nextChapter(requireContext())
+            } else {
+                ReadBook.moveToNextChapter(upContent = true)
+            }
+        }
         ivStop.setOnClickListener {
             ReadAloud.stop(requireContext())
             dismissAllowingStateLoss()
