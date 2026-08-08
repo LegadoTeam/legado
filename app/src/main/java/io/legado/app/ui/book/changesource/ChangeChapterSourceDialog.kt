@@ -322,7 +322,12 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
         val book = searchBook.toBook()
         viewModel.getToc(book, { toc: List<BookChapter>, _: BookSource ->
             tocAdapter.durChapterIndex =
-                BookHelp.getDurChapter(viewModel.chapterIndex, viewModel.chapterTitle, toc)
+                BookHelp.getDurChapter(
+                    viewModel.chapterIndex,
+                    viewModel.chapterTitle,
+                    toc,
+                    searchAllChapterNumbers = true,
+                )
             binding.loadingToc.gone()
             tocAdapter.setItems(toc)
             binding.recyclerViewToc.scrollToPosition(tocAdapter.durChapterIndex - 5)

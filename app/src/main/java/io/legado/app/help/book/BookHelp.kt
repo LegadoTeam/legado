@@ -505,7 +505,8 @@ object BookHelp {
         oldDurChapterIndex: Int,
         oldDurChapterName: String?,
         newChapterList: List<BookChapter>,
-        oldChapterListSize: Int = 0
+        oldChapterListSize: Int = 0,
+        searchAllChapterNumbers: Boolean = false,
     ): Int {
         if (oldDurChapterIndex <= 0) return 0
         if (newChapterList.isEmpty()) return oldDurChapterIndex
@@ -519,7 +520,6 @@ object BookHelp {
         val max = min(newChapterSize - 1, max(oldDurChapterIndex, durIndex) + 10)
         var nameSim = 0.0
         var newIndex = 0
-        var newNum = 0
         if (oldName.isNotEmpty()) {
             for (i in min..max) {
                 val newName = getPureChapterName(newChapterList[i].title)
@@ -530,24 +530,20 @@ object BookHelp {
                 }
             }
         }
-        if (nameSim < 0.96 && oldChapterNum > 0) {
+        if (searchAllChapterNumbers && oldChapterNum > 0) {
+            findNearestChapterNumberIndex(
+                newChapterList.map { getChapterNum(it.title) },
+                oldChapterNum,
+                durIndex,
+            )?.let { return it }
+        }
+        if (nameSim > 0.96) return newIndex
+        if (oldChapterNum > 0) {
             for (i in min..max) {
-                val temp = getChapterNum(newChapterList[i].title)
-                if (temp == oldChapterNum) {
-                    newNum = temp
-                    newIndex = i
-                    break
-                } else if (abs(temp - oldChapterNum) < abs(newNum - oldChapterNum)) {
-                    newNum = temp
-                    newIndex = i
-                }
+                if (getChapterNum(newChapterList[i].title) == oldChapterNum) return i
             }
         }
-        return if (nameSim > 0.96 || abs(newNum - oldChapterNum) < 1) {
-            newIndex
-        } else {
-            min(max(0, newChapterList.size - 1), oldDurChapterIndex)
-        }
+        return min(max(0, newChapterList.size - 1), oldDurChapterIndex)
     }
 
     fun getDurChapter(
@@ -613,4 +609,14 @@ object BookHelp {
             .replace(regexOther, "")
     }
 
+}
+
+internal fun findNearestChapterNumberIndex(
+    chapterNumbers: List<Int>,
+    chapterNumber: Int,
+    expectedIndex: Int,
+): Int? {
+    return chapterNumbers.indices
+        .filter { chapterNumbers[it] == chapterNumber }
+        .minByOrNull { abs(it - expectedIndex) }
 }
