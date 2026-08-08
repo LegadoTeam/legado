@@ -304,7 +304,7 @@ class ReviewRuleParserTest {
                 detailNameRule = "$.UserName",
                 detailBadgeRule = "$.TitleInfoList[*].TitleImage",
                 detailContentRule = contentRule,
-                replyListRule = "$.replyList[*]",
+                replyListRule = "replyList",
                 replyIdRule = "$.Id",
                 replyNameRule = "$.UserName",
                 replyBadgeRule = "$.TitleInfoList[*].TitleImage",
