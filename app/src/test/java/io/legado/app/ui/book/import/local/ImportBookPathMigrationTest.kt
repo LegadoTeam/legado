@@ -129,6 +129,34 @@ class ImportBookPathMigrationTest {
     }
 
     @Test
+    fun `partial imports only mark successful files on shelf`() {
+        val localBook = readProjectFile(
+            "src/main/java/io/legado/app/model/localBook/LocalBook.kt"
+        ).substringAfter("fun importFiles(uris: List<Uri>)")
+            .substringBefore("private fun analyzeNameAuthor")
+        val viewModel = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/import/local/ImportBookViewModel.kt"
+        ).substringAfter("fun addToBookshelf(")
+            .substringBefore("fun deleteDoc(")
+        val activity = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/import/local/ImportBookActivity.kt"
+        ).substringAfter("override fun onClickSelectBarMainAction()")
+            .substringBefore("private fun initView()")
+
+        assertTrue(localBook.contains("importedUris.add(uri)"))
+        assertTrue(localBook.contains("if (importedUris.isEmpty())"))
+        assertTrue(localBook.contains("return importedUris"))
+        assertTrue(
+            localBook.indexOf("kotlin.runCatching") <
+                    localBook.indexOf("FileDoc.fromUri(uri, false)")
+        )
+        assertTrue(viewModel.contains(".onSuccess { importedUris ->"))
+        assertFalse(viewModel.contains(".onFinally"))
+        assertTrue(viewModel.contains("importedUris.size == fileUris.size"))
+        assertTrue(activity.contains("it.file.uri in importedUris"))
+    }
+
+    @Test
     fun `local file consumers use the rebound uri`() {
         val extensions = readProjectFile(
             "src/main/java/io/legado/app/help/book/BookExtensions.kt"

@@ -411,11 +411,11 @@ object LocalBook {
         return books
     }
 
-    fun importFiles(uris: List<Uri>) {
-        var errorCount = 0
+    fun importFiles(uris: List<Uri>): Set<Uri> {
+        val importedUris = linkedSetOf<Uri>()
         uris.forEach { uri ->
-            val fileDoc = FileDoc.fromUri(uri, false)
             kotlin.runCatching {
+                val fileDoc = FileDoc.fromUri(uri, false)
                 if (ArchiveUtils.isArchive(fileDoc.name)) {
                     importArchiveFile(uri) {
                         it.matches(AppPattern.bookFileRegex)
@@ -423,14 +423,16 @@ object LocalBook {
                 } else {
                     importFile(uri)
                 }
+            }.onSuccess {
+                importedUris.add(uri)
             }.onFailure {
-                AppLog.put("ImportFile Error:\nFile $fileDoc\n${it.localizedMessage}", it)
-                errorCount += 1
+                AppLog.put("ImportFile Error:\nUri $uri\n${it.localizedMessage}", it)
             }
         }
-        if (errorCount == uris.size) {
+        if (importedUris.isEmpty()) {
             throw NoStackTraceException("ImportFiles Error:\nAll input files occur error")
         }
+        return importedUris
     }
 
     /**

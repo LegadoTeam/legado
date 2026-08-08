@@ -121,8 +121,8 @@ class ImportBookActivity : BaseImportBookActivity<ImportBookViewModel>(),
     }
 
     override fun onClickSelectBarMainAction() {
-        viewModel.addToBookshelf(adapter.selected) {
-            adapter.selected.forEach {
+        viewModel.addToBookshelf(adapter.selected) { importedUris ->
+            adapter.selected.filter { it.file.uri in importedUris }.forEach {
                 it.isOnBookShelf = true
             }
             adapter.selectAll(false)
