@@ -116,7 +116,9 @@ class CodeView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (super.dispatchKeyEvent(event)) return true
-        return event.keyCode == KeyEvent.KEYCODE_MOVE_HOME ||
+        return event.keyCode == KeyEvent.KEYCODE_PAGE_UP ||
+                event.keyCode == KeyEvent.KEYCODE_PAGE_DOWN ||
+                event.keyCode == KeyEvent.KEYCODE_MOVE_HOME ||
                 event.keyCode == KeyEvent.KEYCODE_MOVE_END
     }
 

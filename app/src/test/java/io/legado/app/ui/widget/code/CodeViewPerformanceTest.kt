@@ -16,7 +16,7 @@ class CodeViewPerformanceTest {
     }
 
     @Test
-    fun `home and end stay inside the code editor`() {
+    fun `navigation keys stay inside the code editor`() {
         val codeView = File(
             repositoryRoot(),
             "app/src/main/java/io/legado/app/ui/widget/code/CodeView.kt"
@@ -24,6 +24,8 @@ class CodeViewPerformanceTest {
             .substringBefore("override fun showDropDown")
 
         assertTrue(codeView.contains("if (super.dispatchKeyEvent(event)) return true"))
+        assertTrue(codeView.contains("KeyEvent.KEYCODE_PAGE_UP"))
+        assertTrue(codeView.contains("KeyEvent.KEYCODE_PAGE_DOWN"))
         assertTrue(codeView.contains("KeyEvent.KEYCODE_MOVE_HOME"))
         assertTrue(codeView.contains("KeyEvent.KEYCODE_MOVE_END"))
     }
