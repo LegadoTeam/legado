@@ -913,9 +913,10 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
             val primaryColor = context.getCompatColor(R.color.primaryText)
             val secondaryColor = context.getCompatColor(R.color.secondaryText)
             val contentColor = context.getCompatColor(R.color.reviewContentText)
+            binding.llBadges.visibility = if (item.badges.isEmpty()) View.GONE else View.VISIBLE
+            bindBadges(binding.llBadges, item.badges)
             if (item.isReply) {
                 binding.tvName.gone()
-                binding.llBadges.gone()
                 val name = item.name.orEmpty().trim()
                 val content = item.content.orEmpty().trim()
                 binding.tvContent.text = when {
@@ -937,7 +938,6 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
                 binding.tvName.text = item.name.orEmpty()
                 binding.tvName.visibility = if (item.name.isNullOrBlank()) View.GONE else View.VISIBLE
                 binding.tvName.setTextColor(primaryColor)
-                binding.llBadges.visibility = if (item.badges.isEmpty()) View.GONE else View.VISIBLE
                 binding.tvContent.text = item.content.orEmpty()
             }
             val hasText = binding.tvContent.text?.isNotBlank() == true
@@ -977,9 +977,6 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
                 binding.llLikeArea.gone()
             }
 
-            if (!item.isReply) {
-                bindBadges(binding.llBadges, item.badges)
-            }
         }
 
         override fun registerListener(holder: ItemViewHolder, binding: ItemReviewCommentBinding) {

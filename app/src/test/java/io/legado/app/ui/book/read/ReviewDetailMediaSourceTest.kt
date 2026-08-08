@@ -1,5 +1,6 @@
 package io.legado.app.ui.book.read
 
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -38,6 +39,22 @@ class ReviewDetailMediaSourceTest {
         assertTrue(toggleBlock.contains(").getMediaItem()"))
         assertTrue(source.contains("val source: BaseSource"))
         assertTrue(source.contains("result?.source?.let { reviewSource = it }"))
+    }
+
+    @Test
+    fun `reply badges use the shared badge binding path`() {
+        val binding = dialogSource()
+            .substringAfter("val replyIndent = mainAvatarSize")
+            .substringBefore("override fun registerListener")
+        val replyBranch = binding.indexOf("\n            if (item.isReply) {")
+        val badgeVisibility = binding.indexOf("binding.llBadges.visibility")
+        val badgeBinding = binding.indexOf("bindBadges(binding.llBadges, item.badges)")
+        val contentVisibility = binding.indexOf("val hasText")
+
+        assertTrue(badgeVisibility in 0 until replyBranch)
+        assertTrue(badgeBinding in 0 until replyBranch)
+        assertTrue(contentVisibility > replyBranch)
+        assertFalse(binding.substring(replyBranch, contentVisibility).contains("llBadges.gone()"))
     }
 
     private fun dialogSource(): String = projectFile(
