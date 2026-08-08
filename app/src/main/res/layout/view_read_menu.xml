@@ -64,12 +64,12 @@
                 android:paddingStart="8dp"
                 android:paddingEnd="4dp"
                 android:src="@drawable/ic_custom"
+                android:contentDescription="@string/custom_button"
                 android:visibility="gone"
                 app:layout_constraintBottom_toBottomOf="@+id/tv_chapter_url"
                 app:layout_constraintRight_toLeftOf="@+id/tv_source_action"
                 app:layout_constraintTop_toTopOf="parent"
-                tools:visibility="visible"
-                tools:ignore="ContentDescription" />
+                tools:visibility="visible" />
 
             <io.legado.app.ui.widget.text.AccentBgTextView
                 android:id="@+id/tv_source_action"
