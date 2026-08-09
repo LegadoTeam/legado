@@ -16,6 +16,30 @@ import org.junit.Test
 class JsSourceBookTest {
 
     @Test
+    fun `volume placeholder skips js content and ignores its tag`() = runBlocking {
+        val source = BookSource(
+            bookSourceUrl = "https://source.example",
+            bookSourceName = "Test source",
+            mainJs = "function getContent() { throw 'must not run'; }",
+        )
+        val chapter = BookChapter(
+            url = "Volume 1#0",
+            title = "Volume 1",
+            isVolume = true,
+            tag = "2026-08-10",
+        )
+
+        val content = JsSourceBook.getContentAwait(
+            source = source,
+            book = Book(bookUrl = "https://source.example/book/1", name = "Book"),
+            chapter = chapter,
+            needSave = false,
+        )
+
+        assertEquals("", content)
+    }
+
+    @Test
     fun `blank content is allowed only for volume chapters`() = runBlocking {
         val source = BookSource(
             bookSourceUrl = "https://source.example",
