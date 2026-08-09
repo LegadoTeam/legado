@@ -231,7 +231,7 @@ java.webView(html: String?, url: String?, js: String?, cacheFirst: Boolean = fal
 java.webViewGetOverrideUrl(html: String?, url: String?, js: String?, overrideUrlRegex: String, cacheFirst: Boolean = false, delayTime: Long = 0): String?
 
 * 使用webView获取资源url
-java.webViewGetOverrideUrl(html: String?, url: String?, js: String?, overrideUrlRegex: String, cacheFirst: Boolean = false, delayTime: Long = 0): String?
+java.webViewGetSource(html: String?, url: String?, js: String?, sourceRegex: String, cacheFirst: Boolean = false, delayTime: Long = 0): String?
 
 * 使用内置浏览器打开链接，可用于获取验证码 手动验证网站防爬
 * @param url 要打开的链接
@@ -900,7 +900,8 @@ function getReviewDetail(chapter, book, paraIndex, paraData, page) {
 - `getReviewSummary(chapter, book)` 返回数组，每项包含 `paraIndex`（正文段落序号，`-1` 表示章节标题）、`count`（评论数）和可选的
   `paraData`。`count` 小于等于 0 的条目不会显示图标；缺少 `paraData` 时默认使用段落序号字符串。
 - `getReviewDetail(chapter, book, paraIndex, paraData, page)` 返回 `{items, nextPageUrl}`。每项的 `content` 必填，
-  可选 `id`、`name`、`avatar`、`badge` 和递归 `replies`；缺少内容的条目会被忽略，递归回复会在界面中按顺序展示。
+  可返回文本或 `{text, img, audio, time, likeCount, replyCount}`；`badge` 可返回字符串或字符串数组。其他可选字段包括
+  `id`、`name`、`avatar` 和递归 `replies`；缺少可显示内容的条目会被忽略，递归回复会在界面中按顺序展示。
 - `nextPageUrl` 只是是否继续请求的信号，不会作为 URL 使用。返回任意非空值表示还有下一页，返回 `null` 或省略表示结束；
   下一次调用会把 `page` 加一。
 - 段评函数异常会记录到日志，详情加载错误同时显示在弹窗中；返回空数组表示没有内容。

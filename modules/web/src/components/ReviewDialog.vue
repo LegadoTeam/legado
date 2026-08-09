@@ -6,6 +6,7 @@
     append-to-body
     destroy-on-close
     @click.stop
+    @closed="previewUrl = ''"
   >
     <template #header>
       <div class="dialog-title">
@@ -75,6 +76,11 @@
             :src="proxyImageUrl(item.imageUrl, 620)"
             alt="段评图片"
             loading="lazy"
+            role="button"
+            tabindex="0"
+            @click.stop="openImage(item.imageUrl)"
+            @keydown.enter.stop="openImage(item.imageUrl)"
+            @keydown.space.stop.prevent="openImage(item.imageUrl)"
           />
           <div v-if="item.time || item.likeCount != null" class="meta">
             <span v-if="item.time">{{ item.time }}</span>
@@ -114,6 +120,11 @@
                   :src="proxyImageUrl(reply.imageUrl, 560)"
                   alt="回复图片"
                   loading="lazy"
+                  role="button"
+                  tabindex="0"
+                  @click.stop="openImage(reply.imageUrl)"
+                  @keydown.enter.stop="openImage(reply.imageUrl)"
+                  @keydown.space.stop.prevent="openImage(reply.imageUrl)"
                 />
                 <div v-if="reply.time || reply.likeCount != null" class="meta">
                   <span v-if="reply.time">{{ reply.time }}</span>
@@ -165,6 +176,13 @@
       </template>
     </div>
   </el-dialog>
+  <el-image-viewer
+    v-if="previewUrl"
+    :url-list="[previewUrl]"
+    teleported
+    hide-on-click-modal
+    @close="previewUrl = ''"
+  />
 </template>
 
 <script setup lang="ts">
@@ -208,6 +226,7 @@ const nextCursor = ref<string | null>(null)
 const hasMore = ref(false)
 const loading = ref(false)
 const error = ref('')
+const previewUrl = ref('')
 let requestVersion = 0
 let itemSequence = 0
 
@@ -249,6 +268,7 @@ const reset = () => {
   hasMore.value = false
   loading.value = false
   error.value = ''
+  previewUrl.value = ''
   itemSequence = 0
 }
 
@@ -357,6 +377,10 @@ const isImageBadge = (badge: string) => /^(?:data:|blob:|https?:\/\/)/i.test(bad
 const proxyImageUrl = (url: string, width: number) => {
   if (url.startsWith('data:') || url.startsWith('blob:')) return url
   return API.getProxyImageUrl(bookUrl.value, url, width)
+}
+
+const openImage = (url: string) => {
+  previewUrl.value = proxyImageUrl(url, 2048)
 }
 
 watch(visible, open => {
@@ -483,6 +507,7 @@ watch(visible, open => {
   max-height: 60vh;
   margin-top: 12px;
   object-fit: contain;
+  cursor: zoom-in;
 }
 
 .meta {

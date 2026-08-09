@@ -369,9 +369,11 @@ object CacheBook {
                 start = CoroutineStart.LAZY,
                 executeContext = context
             ).onSuccess { content ->
-                BookHelp.saveImages(bookSource, book, chapter, content, 1)
+                val imageContent = BookHelp.getContent(book, chapter) ?: content
+                BookHelp.saveImages(bookSource, book, chapter, imageContent, 1)
+                val currentContent = BookHelp.getContent(book, chapter) ?: imageContent
                 onSuccess(chapter)
-                downloadFinish(chapter, content)
+                downloadFinish(chapter, currentContent)
             }.onError {
                 onPreError(chapter, it)
                 //出现错误等待一秒后重新加入待下载列表
@@ -394,10 +396,11 @@ object CacheBook {
             }
             try {
                 val content = WebBook.getContentAwait(bookSource, book, chapter)
+                val currentContent = BookHelp.getContent(book, chapter) ?: content
                 onSuccess(chapter)
                 ReadBook.downloadedChapters.add(chapter.index)
                 ReadBook.downloadFailChapters.remove(chapter.index)
-                return content
+                return currentContent
             } catch (e: CancellationException) {
                 onReadCancel(chapter.index)
                 throw e
@@ -432,10 +435,11 @@ object CacheBook {
                 executeContext = IO,
                 semaphore = semaphore
             ).onSuccess { content ->
+                val currentContent = BookHelp.getContent(book, chapter) ?: content
                 onSuccess(chapter)
                 ReadBook.downloadedChapters.add(chapter.index)
                 ReadBook.downloadFailChapters.remove(chapter.index)
-                downloadFinish(chapter, content, resetPageOffset)
+                downloadFinish(chapter, currentContent, resetPageOffset)
             }.onError {
                 onReadError(chapter, it)
                 ReadBook.downloadFailChapters[chapter.index] =

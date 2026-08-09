@@ -9,7 +9,6 @@ import io.legado.app.ui.book.read.page.ContentTextView
 import io.legado.app.ui.book.read.page.HighlightDraw
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.book.read.page.entities.TextLine.Companion.emptyTextLine
-import io.legado.app.ui.book.read.page.provider.ChapterProvider
 
 /**
  * 文字列
@@ -63,22 +62,18 @@ data class TextColumn(
         }
 
     override fun draw(view: ContentTextView, canvas: Canvas) {
-        val textPaint = if (textLine.isTitle) {
-            ChapterProvider.titlePaint
-        } else {
-            ChapterProvider.contentPaint
-        }
+        val textPaint = textLine.textPaint
         val style = highlightStyle
         val styleTextColor = style?.textColor ?: 0
         val baseTextColor = if (textLine.isReadAloud || isSearchResult) {
             ReadBookConfig.textAccentColor
         } else {
-            ReadBookConfig.textColor
+            textLine.textColor
         }
         val textColor = when {
             textLine.isReadAloud || isSearchResult -> ReadBookConfig.textAccentColor
             styleTextColor != 0 -> styleTextColor
-            else -> ReadBookConfig.textColor
+            else -> textLine.textColor
         }
         if (textPaint.color != baseTextColor) {
             textPaint.color = baseTextColor

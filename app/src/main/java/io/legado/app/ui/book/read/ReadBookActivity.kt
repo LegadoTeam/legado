@@ -100,6 +100,8 @@ import io.legado.app.ui.book.read.config.MoreConfigDialog
 import io.legado.app.ui.book.read.config.ReadAloudDialog
 import io.legado.app.ui.book.read.config.ReadStyleDialog
 import io.legado.app.ui.book.read.config.TextSelectMenuConfigDialog
+import io.legado.app.ui.book.read.config.TipConfigDialog.Companion.TITLE_COLOR
+import io.legado.app.ui.book.read.config.TipConfigDialog.Companion.TITLE_NUMBER_COLOR
 import io.legado.app.ui.book.read.config.TipConfigDialog.Companion.TIP_COLOR
 import io.legado.app.ui.book.read.config.TipConfigDialog.Companion.TIP_DIVIDER_COLOR
 import io.legado.app.ui.book.read.page.ContentTextView
@@ -540,10 +542,12 @@ class ReadBookActivity : BaseReadBookActivity(),
     private fun showChangeSourceMenu(anchor: View) {
         popupActionMenu(this) {
             item(getString(R.string.chapter_change_source), "chapter")
+            item(getString(R.string.batch_chapter_change_source), "batchChapter")
             item(getString(R.string.book_change_source), "book")
         }.show(anchor) { action ->
             when (action) {
                 "chapter" -> showChapterChangeSource()
+                "batchChapter" -> showChapterChangeSource(batchMode = true)
                 "book" -> showBookChangeSource()
             }
         }
@@ -570,14 +574,20 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
     }
 
-    private fun showChapterChangeSource() {
+    private fun showChapterChangeSource(batchMode: Boolean = false) {
         lifecycleScope.launch {
             val book = ReadBook.book ?: return@launch
             val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, ReadBook.durChapterIndex)
                 ?: return@launch
             binding.readMenu.runMenuOut()
             showDialogFragment(
-                ChangeChapterSourceDialog(book.name, book.author, chapter.index, chapter.title)
+                ChangeChapterSourceDialog(
+                    book.name,
+                    book.author,
+                    chapter.index,
+                    chapter.title,
+                    batchMode = batchMode,
+                )
             )
         }
     }
@@ -1341,9 +1351,9 @@ class ReadBookActivity : BaseReadBookActivity(),
     override fun pageChanged() {
         pageChanged = true
         binding.readView.onPageChange()
-        upBookmarkIndicator()
         highlightPopup?.dismiss()
         handler.post {
+            upBookmarkIndicator()
             upSeekBarProgress()
         }
         executor.execute {
@@ -1449,6 +1459,13 @@ class ReadBookActivity : BaseReadBookActivity(),
     override fun replaceContent(content: String) {
         ReadBook.book?.let {
             viewModel.saveContent(it, content)
+        }
+    }
+
+    override fun contentCached(chapterIndex: Int) {
+        if (chapterIndex in ReadBook.durChapterIndex - 1..ReadBook.durChapterIndex + 1) {
+            ReadBook.clearTextChapter()
+            ReadBook.loadContent(resetPageOffset = false)
         }
     }
 
@@ -1820,13 +1837,8 @@ class ReadBookActivity : BaseReadBookActivity(),
             clearReviewSummaryProviders()
             return
         }
-        val summaryUrl = rule.reviewSummaryUrl?.takeIf { it.isNotBlank() }
-        if (!rule.enabled ||
-            summaryUrl == null ||
-            rule.summaryListRule.isNullOrBlank() ||
-            rule.summaryParagraphIndexRule.isNullOrBlank() ||
-            rule.summaryCountRule.isNullOrBlank()
-        ) {
+        val summaryUrl = rule.configuredSummaryUrl()
+        if (summaryUrl == null) {
             clearReviewSummaryProviders()
             return
         }
@@ -1988,7 +2000,8 @@ class ReadBookActivity : BaseReadBookActivity(),
             },
             keyProvider = { targetChapterIndex, reviewId ->
                 if (targetChapterIndex == chapterIndex) result.keys[reviewId] else null
-            }
+            },
+            chapterIndex = chapterIndex,
         )
         reviewSummaryAppliedKey = key
         binding.readView.upContent(relativePosition = 0, resetPageOffset = false)
@@ -2243,6 +2256,18 @@ class ReadBookActivity : BaseReadBookActivity(),
                 ReadTipConfig.tipDividerColor = color
                 postEvent(EventBus.TIP_COLOR, "")
                 postEvent(EventBus.UP_CONFIG, arrayListOf(2))
+            }
+
+            TITLE_NUMBER_COLOR -> {
+                ReadBookConfig.titleNumberColor = color
+                postEvent(EventBus.TIP_COLOR, "")
+                postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
+            }
+
+            TITLE_COLOR -> {
+                ReadBookConfig.titleColor = color
+                postEvent(EventBus.TIP_COLOR, "")
+                postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
             }
         }
     }

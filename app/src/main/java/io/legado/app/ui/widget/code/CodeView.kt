@@ -12,6 +12,7 @@ import android.text.style.BackgroundColorSpan
 import android.text.style.ForegroundColorSpan
 import android.text.style.ReplacementSpan
 import android.util.AttributeSet
+import android.view.KeyEvent
 import androidx.annotation.ColorInt
 import io.legado.app.ui.widget.text.ScrollMultiAutoCompleteTextView
 import java.util.*
@@ -111,6 +112,14 @@ class CodeView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
             }
         )
         addTextChangedListener(mEditorTextWatcher)
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (super.dispatchKeyEvent(event)) return true
+        return event.keyCode == KeyEvent.KEYCODE_PAGE_UP ||
+                event.keyCode == KeyEvent.KEYCODE_PAGE_DOWN ||
+                event.keyCode == KeyEvent.KEYCODE_MOVE_HOME ||
+                event.keyCode == KeyEvent.KEYCODE_MOVE_END
     }
 
     override fun showDropDown() {

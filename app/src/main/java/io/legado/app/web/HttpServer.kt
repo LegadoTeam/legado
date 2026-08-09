@@ -267,6 +267,7 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
             addHeader("Cache-Control", "no-store")
         }
         if (uri.startsWith("/vue/") && uri.endsWith(".html")) {
+            addHeader("Cache-Control", "no-cache")
             addHeader("Content-Security-Policy", VUE_CONTENT_SECURITY_POLICY)
         }
     }

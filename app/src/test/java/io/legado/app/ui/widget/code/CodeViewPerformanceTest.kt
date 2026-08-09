@@ -16,6 +16,21 @@ class CodeViewPerformanceTest {
     }
 
     @Test
+    fun `navigation keys stay inside the code editor`() {
+        val codeView = File(
+            repositoryRoot(),
+            "app/src/main/java/io/legado/app/ui/widget/code/CodeView.kt"
+        ).readText().substringAfter("override fun dispatchKeyEvent")
+            .substringBefore("override fun showDropDown")
+
+        assertTrue(codeView.contains("if (super.dispatchKeyEvent(event)) return true"))
+        assertTrue(codeView.contains("KeyEvent.KEYCODE_PAGE_UP"))
+        assertTrue(codeView.contains("KeyEvent.KEYCODE_PAGE_DOWN"))
+        assertTrue(codeView.contains("KeyEvent.KEYCODE_MOVE_HOME"))
+        assertTrue(codeView.contains("KeyEvent.KEYCODE_MOVE_END"))
+    }
+
+    @Test
     fun `dead diff adapter APIs and orphan layout stay removed`() {
         val root = repositoryRoot()
         val codeView = File(

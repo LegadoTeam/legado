@@ -20,6 +20,14 @@ internal object JsSourceReview {
         capabilityCache.put(capabilityKey(source), enabled)
     }
 
+    fun hasReviewCapability(source: BookSource): Boolean {
+        val key = capabilityKey(source)
+        capabilityCache[key]?.let { return it }
+        return JsSourceConfig.declaresReviewFunctions(source.mainJs.orEmpty()).also {
+            capabilityCache.put(key, it)
+        }
+    }
+
     suspend fun getReviewSummaryAwait(
         source: BookSource,
         book: Book,
@@ -103,21 +111,22 @@ internal object JsSourceReview {
         baseUrl: String,
         replies: List<ReviewRuleParser.DetailItem> = emptyList(),
     ): ReviewRuleParser.DetailItem? {
-        val content = item.optString("content")?.takeIf { it.isNotBlank() } ?: return null
+        val rawContent = item.optContent("content")?.takeIf { it.isNotBlank() } ?: return null
+        val protocol = ReviewRuleParser.parseContentProtocol(rawContent, baseUrl)
+        val content = protocol?.text ?: if (protocol == null) rawContent else ""
         return ReviewRuleParser.DetailItem(
             id = item.optString("id"),
             avatar = item.optString("avatar")?.let { NetworkUtils.getAbsoluteURL(baseUrl, it) },
             name = item.optString("name"),
-            badges = item.optString("badge")
-                ?.takeIf { it.isNotBlank() }
-                ?.let(::listOf)
-                .orEmpty(),
+            badges = item.optStrings("badge")
+                .flatMap { ReviewRuleParser.splitBadgeValue(it) }
+                .distinct(),
             content = content,
-            imageUrl = null,
-            audioUrl = null,
-            time = null,
-            likeCount = null,
-            replyCount = null,
+            imageUrl = protocol?.imageUrl,
+            audioUrl = protocol?.audioUrl,
+            time = protocol?.time,
+            likeCount = protocol?.likeCount,
+            replyCount = protocol?.replyCount,
             replies = replies,
         )
     }
@@ -154,6 +163,25 @@ internal object JsSourceReview {
         val element = get(key) ?: return null
         if (element.isJsonNull) return null
         return runCatching { element.asString }.getOrNull()
+    }
+
+    private fun JsonObject.optContent(key: String): String? {
+        val element = get(key) ?: return null
+        if (element.isJsonNull) return null
+        if (element.isJsonObject) return element.toString()
+        return runCatching { element.asString }.getOrNull()
+    }
+
+    private fun JsonObject.optStrings(key: String): List<String> {
+        val element = get(key) ?: return emptyList()
+        if (element.isJsonNull) return emptyList()
+        return if (element.isJsonArray) {
+            element.asJsonArray.mapNotNull {
+                if (it.isJsonNull) null else runCatching { it.asString }.getOrNull()
+            }
+        } else {
+            listOfNotNull(runCatching { element.asString }.getOrNull())
+        }
     }
 
     private fun JsonObject.optInt(key: String): Int? {

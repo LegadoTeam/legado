@@ -69,7 +69,7 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
         ivChapterBottom.setColorFilter(foreground, PorterDuff.Mode.SRC_IN)
         initRecyclerView()
         initView()
-        viewModel.bookData.observe(this@ChapterListFragment) {
+        viewModel.bookData.observe(viewLifecycleOwner) {
             initBook(it)
         }
     }

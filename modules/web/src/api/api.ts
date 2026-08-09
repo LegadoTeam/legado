@@ -5,7 +5,6 @@ import type { webReadConfig } from '@/web'
 import ajax from './axios'
 import {
   bindSourceApiTokenEndpoint,
-  clearSourceApiToken,
   getSourceApiToken,
   requestSourceApiToken,
   sourceApiTokenWebSocketProtocol,
@@ -263,7 +262,6 @@ const debug = async (
     sourceApiTokenWebSocketProtocol(token),
   ])
   socket.onerror = event => {
-    clearSourceApiToken()
     wsOnError?.call(socket, event)
   }
   socket.onopen = () => {
@@ -279,8 +277,7 @@ const debug = async (
     wsOnMessage?.call(socket, event)
   }
 
-  socket.onclose = event => {
-    if (event.code === 1008) clearSourceApiToken()
+  socket.onclose = () => {
     onFinish()
   }
 }

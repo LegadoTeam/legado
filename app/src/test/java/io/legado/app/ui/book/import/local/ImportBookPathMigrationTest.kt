@@ -19,6 +19,17 @@ class ImportBookPathMigrationTest {
     @Test
     fun `automatic restore only handles confirmed missing files`() {
         assertTrue(isMissingLocalBookFile(true, false, FileNotFoundException()))
+        assertTrue(
+            isMissingLocalBookFile(
+                true,
+                false,
+                IllegalArgumentException(
+                    "Failed to determine if child is child of parent: " +
+                            "java.io.FileNotFoundException: Missing file for child"
+                )
+            )
+        )
+        assertFalse(isMissingLocalBookFile(true, false, IllegalArgumentException()))
         assertFalse(isMissingLocalBookFile(true, false, IOException()))
         assertFalse(isMissingLocalBookFile(true, false, SecurityException()))
         assertFalse(isMissingLocalBookFile(false, false, CancellationException()))
@@ -87,6 +98,62 @@ class ImportBookPathMigrationTest {
             startRead.indexOf("book.removeLocalUriCache()") <
                     startRead.indexOf("book.cacheLocalUri(fileDoc.uri)")
         )
+    }
+
+    @Test
+    fun `local scan matches shelf files without per-file queries`() {
+        val shelfFiles = ImportBookShelfFiles(
+            fileNames = listOf("book.txt"),
+            alternateOrigins = listOf(
+                "loc_book::ARCHIVE.ZIP",
+                "webDav::https://example.com/books/remote.epub",
+            ),
+        )
+
+        assertTrue("book.txt" in shelfFiles)
+        assertTrue("archive.zip" in shelfFiles)
+        assertTrue("remote.epub" in shelfFiles)
+        assertFalse("BOOK.TXT" in shelfFiles)
+        assertFalse("missing.txt" in shelfFiles)
+
+        val importBook = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/import/local/ImportBook.kt"
+        )
+        val viewModel = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/import/local/ImportBookViewModel.kt"
+        )
+        assertFalse(importBook.contains("LocalBook.isOnBookShelf"))
+        assertFalse(viewModel.contains("private var shelfFiles"))
+        assertTrue(viewModel.contains("appDb.bookDao.localBookFileNames"))
+        assertTrue(viewModel.contains("appDb.bookDao.localBookAlternateOrigins"))
+    }
+
+    @Test
+    fun `partial imports only mark successful files on shelf`() {
+        val localBook = readProjectFile(
+            "src/main/java/io/legado/app/model/localBook/LocalBook.kt"
+        ).substringAfter("fun importFiles(uris: List<Uri>)")
+            .substringBefore("private fun analyzeNameAuthor")
+        val viewModel = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/import/local/ImportBookViewModel.kt"
+        ).substringAfter("fun addToBookshelf(")
+            .substringBefore("fun deleteDoc(")
+        val activity = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/import/local/ImportBookActivity.kt"
+        ).substringAfter("override fun onClickSelectBarMainAction()")
+            .substringBefore("private fun initView()")
+
+        assertTrue(localBook.contains("importedUris.add(uri)"))
+        assertTrue(localBook.contains("if (importedUris.isEmpty())"))
+        assertTrue(localBook.contains("return importedUris"))
+        assertTrue(
+            localBook.indexOf("kotlin.runCatching") <
+                    localBook.indexOf("FileDoc.fromUri(uri, false)")
+        )
+        assertTrue(viewModel.contains(".onSuccess { importedUris ->"))
+        assertFalse(viewModel.contains(".onFinally"))
+        assertTrue(viewModel.contains("importedUris.size == fileUris.size"))
+        assertTrue(activity.contains("it.file.uri in importedUris"))
     }
 
     @Test

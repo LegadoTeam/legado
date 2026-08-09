@@ -73,14 +73,24 @@ class KeyboardToolPop(
     fun attachToWindow(window: Window) {
         window.decorView.viewTreeObserver.addOnGlobalLayoutListener(this)
         contentView.activity?.observeEvent<Int>(PreferKey.showBoardLine) { rows ->
-            (binding.recyclerView.layoutManager as GridLayoutManager).spanCount =
-                rows.coerceIn(1, 5)
-            binding.recyclerView.layoutManager?.requestLayout()
+            updateRowCount(rows)
         }
         contentView.measure(
             View.MeasureSpec.UNSPECIFIED,
             View.MeasureSpec.UNSPECIFIED,
         )
+    }
+
+    private fun updateRowCount(rows: Int) {
+        val recyclerView = binding.recyclerView
+        if (recyclerView.isComputingLayout) {
+            recyclerView.post { updateRowCount(rows) }
+            return
+        }
+        (recyclerView.layoutManager as GridLayoutManager).run {
+            spanCount = rows.coerceIn(1, 5)
+            requestLayout()
+        }
     }
 
     override fun onGlobalLayout() {

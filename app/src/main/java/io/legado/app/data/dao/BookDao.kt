@@ -95,6 +95,15 @@ interface BookDao {
     @Query("select * from books where originName = :fileName")
     fun getBookByFileName(fileName: String): Book?
 
+    @get:Query("SELECT originName FROM books WHERE type & ${BookType.local} > 0")
+    val localBookFileNames: List<String>
+
+    @get:Query(
+        "SELECT origin FROM books WHERE type & ${BookType.local} > 0 " +
+            "AND origin != '${BookType.localTag}'"
+    )
+    val localBookAlternateOrigins: List<String>
+
     @Query("SELECT * FROM books WHERE bookUrl = :bookUrl")
     fun getBook(bookUrl: String): Book?
 

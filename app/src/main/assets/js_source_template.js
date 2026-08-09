@@ -75,7 +75,8 @@ function getContent(chapter, book, nextChapterUrl) {
 /*
  * 段评统计与详情函数为可选功能。启用时请同时取消下面两个函数的注释。
  * getReviewSummary 返回 [{ paraIndex: 1, count: 5, paraData: "token" }]，paraIndex 为 -1 时表示章节标题；
- * getReviewDetail 返回 { items: [{ content: "评论内容", replies: [] }], nextPageUrl: null }。
+ * getReviewDetail 返回 { items: [{ content: "评论内容", badge: ["作者"], replies: [] }], nextPageUrl: null }。
+ * content 也可返回 { text, img, audio, time, likeCount, replyCount }。
  * nextPageUrl 只是“是否还有下一页”的信号，翻页时应用会递增 page 参数再次调用。
  *
 function getReviewSummary(chapter, book) {

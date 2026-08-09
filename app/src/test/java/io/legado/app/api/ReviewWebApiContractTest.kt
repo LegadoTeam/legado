@@ -48,7 +48,26 @@ class ReviewWebApiContractTest {
         assertTrue(dialog.contains("API.getReviewReplies"))
         assertTrue(dialog.contains("isImageBadge"))
         assertTrue(dialog.contains("reviewIdentity"))
+        assertTrue(dialog.contains("openImage(item.imageUrl)"))
+        assertTrue(dialog.contains("openImage(reply.imageUrl)"))
+        assertTrue(dialog.contains("proxyImageUrl(url, 2048)"))
+        assertTrue(dialog.contains(":url-list=\"[previewUrl]\""))
+        assertTrue(dialog.contains("@closed=\"previewUrl = ''\""))
         assertFalse(dialog.contains(":src=\"item.audioUrl\""))
+    }
+
+    @Test
+    fun `web review response models keep JSON names after minification`() {
+        val parser = readProjectFile(
+            "app/src/main/java/io/legado/app/model/analyzeRule/ReviewRuleParser.kt"
+        )
+        val controller = readProjectFile(
+            "app/src/main/java/io/legado/app/api/controller/ReviewController.kt"
+        )
+
+        assertTrue(parser.contains("@Keep\n    internal data class SummaryResult("))
+        assertTrue(parser.contains("@Keep\n    internal data class DetailItem("))
+        assertTrue(controller.contains("@Keep\n    private data class ReviewPage("))
     }
 
     @Test
@@ -72,6 +91,10 @@ class ReviewWebApiContractTest {
         assertFalse(server.contains("script-src https: 'unsafe-inline'"))
         assertFalse(server.contains("style-src http: https: 'unsafe-inline'"))
         assertTrue(server.contains("frame-src 'self' http: https:"))
+        val vueHtmlHeaders = server.substringAfter(
+            "if (uri.startsWith(\"/vue/\") && uri.endsWith(\".html\"))"
+        ).substringBefore("}")
+        assertTrue(vueHtmlHeaders.contains("addHeader(\"Cache-Control\", \"no-cache\")"))
         assertTrue(server.contains("if (uri == \"/legacyReviewPage\") \"<redacted>\""))
         assertTrue(axios.contains("'openLegacyReview'"))
         assertFalse(axios.contains("'legacyReviewPage'"))
@@ -96,6 +119,10 @@ class ReviewWebApiContractTest {
         assertFalse(dialog.contains("frameWindow.postMessage"))
         assertTrue(controller.contains(".replace(\"<\", \"\\\\u003c\")"))
         assertTrue(controller.contains("Math.max(100, Number(delay) || 0)"))
+        assertTrue(controller.contains("document.addEventListener('click'"))
+        assertTrue(controller.contains("image instanceof HTMLImageElement"))
+        assertTrue(controller.contains("type: 'legado-legacy-review-image'"))
+        assertTrue(controller.contains("image.currentSrc || image.src"))
         assertFalse(controller.contains("fetch('runLegacyReview'"))
         assertTrue(server.contains("http-equiv=\\\"Content-Security-Policy\\\""))
         assertTrue(controller.contains("if (nonce != session.nonce) return null"))
@@ -114,6 +141,13 @@ class ReviewWebApiContractTest {
         assertTrue(apiIndex.contains("throw new Error('后端返回内容格式错误')"))
         assertTrue(dialog.contains("response.data.errorMsg || '评论加载失败'"))
         assertTrue(dialog.contains("String(error)) || '评论加载失败'"))
+        assertTrue(dialog.contains("<el-image-viewer"))
+        assertTrue(dialog.contains(":url-list=\"[previewUrl]\""))
+        assertTrue(dialog.contains("message.type === 'legado-legacy-review-image'"))
+        assertTrue(dialog.contains("previewUrl.value = message.src"))
+        val imageBranch = dialog.indexOf("message.type === 'legado-legacy-review-image'")
+        assertTrue(dialog.indexOf("event.source !== frameWindow") in 0 until imageBranch)
+        assertTrue(dialog.indexOf("message.nonce !== props.sessionNonce") in 0 until imageBranch)
     }
 
     private fun readProjectFile(path: String): String {

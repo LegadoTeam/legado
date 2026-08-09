@@ -7,6 +7,7 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.removeAllBookType
 import io.legado.app.help.coroutine.Coroutine
@@ -396,14 +397,30 @@ object WebBook {
         nextChapterUrl: String? = null,
         needSave: Boolean = true
     ): String {
+        val saveToken = if (needSave) {
+            BookHelp.contentSaveToken(book, bookChapter)
+        } else {
+            null
+        }
+        if (saveToken != null && saveToken.version > 0L) {
+            BookHelp.getContent(book, bookChapter, saveToken)?.let { return it }
+        }
         if (bookSource.isJsSource()) {
-            return JsSourceBook.getContentAwait(
+            val content = JsSourceBook.getContentAwait(
                 bookSource,
                 book,
                 bookChapter,
                 nextChapterUrl,
-                needSave
+                false,
             )
+            if (saveToken != null) {
+                val saved = BookHelp.saveContent(
+                    bookSource, book, bookChapter, content, saveToken
+                )
+                BookHelp.getContent(book, bookChapter, saveToken)?.let { return it }
+                if (!saved) throw NoStackTraceException("正文缓存已更新,请重试")
+            }
+            return content
         }
         val contentRule = bookSource.getContentRule()
         if (contentRule.content.isNullOrEmpty()) {
@@ -414,7 +431,7 @@ object WebBook {
             Debug.log(bookSource.bookSourceUrl, "⇒一级目录正文不解析规则")
             return ""
         }
-        return if (bookChapter.url == book.bookUrl && !book.tocHtml.isNullOrEmpty()) {
+        val content = if (bookChapter.url == book.bookUrl && !book.tocHtml.isNullOrEmpty()) {
             BookContent.analyzeContent(
                 bookSource = bookSource,
                 book = book,
@@ -423,7 +440,7 @@ object WebBook {
                 redirectUrl = bookChapter.getAbsoluteURL(),
                 body = book.tocHtml,
                 nextChapterUrl = nextChapterUrl,
-                needSave = needSave
+                needSave = false
             )
         } else {
             val analyzeUrl = AnalyzeUrl(
@@ -471,9 +488,22 @@ object WebBook {
                 redirectUrl = res.url,
                 body = res.body,
                 nextChapterUrl = nextChapterUrl,
-                needSave = needSave
+                needSave = false
             )
         }
+        if (saveToken != null) {
+            val saved = BookHelp.saveContent(
+                bookSource,
+                book,
+                bookChapter,
+                content,
+                saveToken,
+                saveChapterMetadata = true,
+            )
+            BookHelp.getContent(book, bookChapter, saveToken)?.let { return it }
+            if (!saved) throw NoStackTraceException("正文缓存已更新,请重试")
+        }
+        return content
     }
 
     /**

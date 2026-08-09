@@ -131,58 +131,22 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
         endBottomY: Int
     ) {
         upMenu()
-        if (moreMenuItems.isEmpty()) {
-            when {
-                startTopY > 500 -> {
-                    showAtLocation(
-                        view,
-                        Gravity.BOTTOM or Gravity.START,
-                        startX,
-                        windowHeight - startTopY
-                    )
-                }
-
-                endBottomY - startBottomY > 500 -> {
-                    showAtLocation(view, Gravity.TOP or Gravity.START, startX, startBottomY)
-                }
-
-                else -> {
-                    showAtLocation(view, Gravity.TOP or Gravity.START, endX, endBottomY)
-                }
+        when {
+            startTopY > 500 -> {
+                showAtLocation(
+                    view,
+                    Gravity.BOTTOM or Gravity.START,
+                    startX,
+                    windowHeight - startTopY
+                )
             }
-        } else {
-            contentView.measure(
-                View.MeasureSpec.UNSPECIFIED,
-                View.MeasureSpec.UNSPECIFIED,
-            )
-            val popupHeight = contentView.measuredHeight
-            when {
-                startBottomY > 500 -> {
-                    showAtLocation(
-                        view,
-                        Gravity.TOP or Gravity.START,
-                        startX,
-                        startTopY - popupHeight
-                    )
-                }
 
-                endBottomY - startBottomY > 500 -> {
-                    showAtLocation(
-                        view,
-                        Gravity.TOP or Gravity.START,
-                        startX,
-                        startBottomY
-                    )
-                }
+            endBottomY - startBottomY > 500 -> {
+                showAtLocation(view, Gravity.TOP or Gravity.START, startX, startBottomY)
+            }
 
-                else -> {
-                    showAtLocation(
-                        view,
-                        Gravity.TOP or Gravity.START,
-                        endX,
-                        endBottomY
-                    )
-                }
+            else -> {
+                showAtLocation(view, Gravity.TOP or Gravity.START, endX, endBottomY)
             }
         }
     }

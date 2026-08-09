@@ -5,6 +5,7 @@
     width="min(960px, calc(100vw - 32px))"
     append-to-body
     destroy-on-close
+    @closed="previewUrl = ''"
     @click.stop
   >
     <template #header>
@@ -23,6 +24,13 @@
       referrerpolicy="no-referrer"
     />
   </el-dialog>
+  <el-image-viewer
+    v-if="previewUrl"
+    :url-list="[previewUrl]"
+    teleported
+    hide-on-click-modal
+    @close="previewUrl = ''"
+  />
 </template>
 
 <script setup lang="ts">
@@ -47,21 +55,33 @@ const visible = computed({
 })
 
 const frameRef = ref<HTMLIFrameElement>()
+const previewUrl = ref('')
 
 const handleMessage = async (event: MessageEvent) => {
   const frameWindow = frameRef.value?.contentWindow
   const message = event.data
-  const replyPort = event.ports[0]
   if (
     !frameWindow ||
-    !replyPort ||
+    !message ||
     event.source !== frameWindow ||
-    message?.type !== 'legado-legacy-review-run' ||
-    message.nonce !== props.sessionNonce ||
-    typeof message.script !== 'string'
+    message.nonce !== props.sessionNonce
   ) {
     return
   }
+
+  if (message.type === 'legado-legacy-review-image') {
+    if (typeof message.src === 'string' && message.src)
+      previewUrl.value = message.src
+    return
+  }
+
+  const replyPort = event.ports[0]
+  if (
+    !replyPort ||
+    message.type !== 'legado-legacy-review-run' ||
+    typeof message.script !== 'string'
+  )
+    return
 
   const sessionId = props.sessionId
   const sessionNonce = props.sessionNonce

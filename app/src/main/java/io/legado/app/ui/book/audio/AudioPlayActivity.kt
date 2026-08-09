@@ -160,6 +160,8 @@ class AudioPlayActivity :
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        val requestedBookUrl = intent.getStringExtra("bookUrl")
+        if (shouldReuseCurrentAudioPlay(requestedBookUrl, AudioPlay.book?.bookUrl)) return
         viewModel.initData(
             intent = intent,
             success = ::initListener,

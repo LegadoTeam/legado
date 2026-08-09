@@ -6,6 +6,19 @@ import org.junit.Test
 class ReviewColumnGeometryTest {
 
     @Test
+    fun `right aligned titles reserve only icon overflow`() {
+        assertEquals(31f, ReviewColumnGeometry.trailingInset(60f, 30f, 1f), 0f)
+        assertEquals(0f, ReviewColumnGeometry.trailingInset(20f, 30f, 1f), 0f)
+    }
+
+    @Test
+    fun `title shift follows review visibility and width changes`() {
+        assertEquals(-30f, ReviewColumnGeometry.trailingShift(30f, false, 30f, true), 0f)
+        assertEquals(-20f, ReviewColumnGeometry.trailingShift(30f, true, 50f, true), 0f)
+        assertEquals(50f, ReviewColumnGeometry.trailingShift(50f, true, 50f, false), 0f)
+    }
+
+    @Test
     fun `short lines keep the review icon after text`() {
         assertEquals(
             700f,

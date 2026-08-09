@@ -113,6 +113,49 @@ class JsSourceReviewTest {
     }
 
     @Test
+    fun `detail parses structured content and badge arrays`() = runBlocking {
+        val source = source(
+            """
+            function getReviewSummary() { return []; }
+            function getReviewDetail() {
+                return { items: [{
+                    name: "用户",
+                    badge: ["作者", "置顶", "作者"],
+                    content: {
+                        text: "评论内容",
+                        img: "/review.png",
+                        audio: "/review.mp3",
+                        time: "刚刚",
+                        likeCount: 12,
+                        replyCount: 3
+                    },
+                    replies: [{
+                        badge: ["读者"],
+                        content: { img: "/reply.png" }
+                    }]
+                }] };
+            }
+            """.trimIndent(),
+        )
+
+        val item = JsSourceReview.getReviewDetailAwait(
+            source, book, chapter, 1, "", 1,
+        )!!.items.single()
+
+        assertEquals(listOf("作者", "置顶"), item.badges)
+        assertEquals("评论内容", item.content)
+        assertEquals("https://example.com/review.png", item.imageUrl)
+        assertEquals("https://example.com/review.mp3", item.audioUrl)
+        assertEquals("刚刚", item.time)
+        assertEquals(12, item.likeCount)
+        assertEquals(3, item.replyCount)
+        val reply = item.replies.single()
+        assertEquals(listOf("读者"), reply.badges)
+        assertEquals("", reply.content)
+        assertEquals("https://example.com/reply.png", reply.imageUrl)
+    }
+
+    @Test
     fun `detail flattens recursive replies for the native dialog`() = runBlocking {
         val source = source(
             """
@@ -232,6 +275,7 @@ class JsSourceReviewTest {
         val result = JsSourceReview.getReviewSummaryAwait(source, book, chapter)
 
         assertNull(result)
+        assertEquals(false, JsSourceReview.hasReviewCapability(source))
     }
 
     private fun source(reviewFunctions: String): BookSource {

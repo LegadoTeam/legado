@@ -219,7 +219,9 @@ class AnalyzeRule(
                 val sourceRule = ruleList.first()
                 putRule(sourceRule.putMap)
                 sourceRule.makeUpRule(result)
-                result = if (sourceRule.mode == Mode.Json) {
+                result = if (sourceRule.mode == Mode.Js) {
+                    evalJS(sourceRule.rule, result)
+                } else if (sourceRule.mode == Mode.Json) {
                     getAnalyzeByJSonPath(result).getStringList(sourceRule.rule)
                 } else if (sourceRule.getParamSize() > 1) {
                     // get {{}}

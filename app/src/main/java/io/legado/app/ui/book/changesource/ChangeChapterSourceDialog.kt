@@ -26,6 +26,7 @@ import io.legado.app.data.entities.SearchBook
 import io.legado.app.databinding.DialogChapterChangeSourceBinding
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.elevation
 import io.legado.app.lib.theme.primaryColor
@@ -56,16 +57,24 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
     ChangeChapterSourceAdapter.CallBack,
     ChangeChapterTocAdapter.Callback {
 
-    constructor(name: String, author: String, chapterIndex: Int, chapterTitle: String) : this() {
+    constructor(
+        name: String,
+        author: String,
+        chapterIndex: Int,
+        chapterTitle: String,
+        batchMode: Boolean = false,
+    ) : this() {
         arguments = Bundle().apply {
             putString("name", name)
             putString("author", author)
             putInt("chapterIndex", chapterIndex)
             putString("chapterTitle", chapterTitle)
+            putBoolean("batchMode", batchMode)
         }
     }
 
     private val binding by viewBinding(DialogChapterChangeSourceBinding::bind)
+    private val batchMode: Boolean get() = arguments?.getBoolean("batchMode") == true
     private val groups = linkedSetOf<String>()
     private val callBack: CallBack? get() = activity as? CallBack
     private val viewModel: ChangeChapterSourceViewModel by viewModels()
@@ -84,7 +93,12 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
         callBack?.replaceContent(it)
         dismissAllowingStateLoss()
     }
-    private var searchBook: SearchBook? = null
+    private var targetBook: Book? = null
+    private var originalChapters = emptyList<BookChapter>()
+    private var originalChapter: BookChapter? = null
+    private var tocLoading = false
+    private var batchCaching = false
+    private var cacheTask: Coroutine<*>? = null
     private val searchFinishCallback: (isEmpty: Boolean) -> Unit = {
         if (it) {
             val searchGroup = AppConfig.searchGroup
@@ -118,9 +132,17 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
         initRecyclerView()
         initSearchView()
         initBottomBar()
+        initBatchMode()
         initLiveData()
         viewModel.searchFinishCallback = searchFinishCallback
         activity?.onBackPressedDispatcher?.addCallback(this) {
+            if (batchCaching) {
+                cacheTask?.cancel()
+                cacheTask = null
+                setBatchCaching(false)
+                return@addCallback
+            }
+            if (batchMode && tocLoading) return@addCallback
             if (binding.clToc.isVisible) {
                 binding.clToc.gone()
                 return@addCallback
@@ -130,12 +152,19 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
     }
 
     override fun onDestroy() {
+        cacheTask?.cancel()
         super.onDestroy()
         viewModel.searchFinishCallback = null
     }
 
     private fun showTitle() {
-        binding.toolBar.title = viewModel.chapterTitle
+        binding.toolBar.title = originalChapter?.title ?: viewModel.chapterTitle
+        if (batchMode) {
+            binding.toolBar.subtitle = getString(
+                R.string.chapter_source_selected_count,
+                tocAdapter.selectionCount,
+            )
+        }
     }
 
     private fun initMenu() {
@@ -153,9 +182,19 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
 
     private fun initView() {
         binding.ivHideToc.setOnClickListener {
+            if (batchMode && (tocLoading || batchCaching)) return@setOnClickListener
             binding.clToc.gone()
         }
         binding.flHideToc.elevation = requireContext().elevation
+        binding.btnBatchSkip.setOnClickListener {
+            originalChapter?.let(::advanceOriginalChapter)
+        }
+        binding.btnBatchCacheNext.setOnClickListener {
+            cacheSelectedChapters()
+        }
+        binding.btnBatchFinish.setOnClickListener {
+            dismissAllowingStateLoss()
+        }
     }
 
     private fun initRecyclerView() {
@@ -211,6 +250,29 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
         binding.ivBottom.setOnClickListener {
             binding.recyclerView.scrollToPosition(searchBookAdapter.itemCount - 1)
         }
+    }
+
+    private fun initBatchMode() {
+        tocAdapter.batchMode = batchMode
+        binding.llBatchActions.isVisible = batchMode
+        if (!batchMode) return
+        binding.toolBar.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        updateBatchActions()
+        val oldBook = callBack?.oldBook ?: return
+        viewModel.getOriginalChapters(oldBook.bookUrl, { chapters ->
+            originalChapters = chapters
+            originalChapter = chapters.firstOrNull { it.index == viewModel.chapterIndex }
+            if (originalChapter == null) {
+                toastOnUi(R.string.chapter_list_empty)
+                dismissAllowingStateLoss()
+                return@getOriginalChapters
+            }
+            showTitle()
+            updateBatchActions()
+        }, { message ->
+            toastOnUi(message)
+            dismissAllowingStateLoss()
+        })
     }
 
     private fun initLiveData() {
@@ -315,18 +377,33 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
     }
 
     override fun openToc(searchBook: SearchBook) {
-        this.searchBook = searchBook
+        tocAdapter.clearSelection()
         tocAdapter.setItems(null)
         binding.clToc.visible()
-        binding.loadingToc.visible()
+        if (batchMode) {
+            setTocLoading(true)
+        } else {
+            binding.loadingToc.visible()
+        }
         val book = searchBook.toBook()
+        targetBook = book
         viewModel.getToc(book, { toc: List<BookChapter>, _: BookSource ->
             tocAdapter.durChapterIndex =
-                BookHelp.getDurChapter(viewModel.chapterIndex, viewModel.chapterTitle, toc)
-            binding.loadingToc.gone()
+                BookHelp.getDurChapter(
+                    viewModel.chapterIndex,
+                    viewModel.chapterTitle,
+                    toc,
+                    searchAllChapterNumbers = true,
+                )
+            if (batchMode) {
+                setTocLoading(false)
+            } else {
+                binding.loadingToc.gone()
+            }
             tocAdapter.setItems(toc)
             binding.recyclerViewToc.scrollToPosition(tocAdapter.durChapterIndex - 5)
         }, {
+            if (batchMode) setTocLoading(false)
             binding.clToc.gone()
             AppLog.put("单章换源获取目录出错\n$it", it, true)
         })
@@ -371,14 +448,91 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
     }
 
     override fun clickChapter(bookChapter: BookChapter, nextChapterUrl: String?) {
-        searchBook?.let {
+        if (batchMode) return
+        targetBook?.let {
             binding.loadingToc.visible()
-            viewModel.getContent(it.toBook(), bookChapter, nextChapterUrl, contentSuccess) { msg ->
+            viewModel.getContent(it, bookChapter, nextChapterUrl, contentSuccess) { msg ->
                 binding.loadingToc.gone()
                 binding.clToc.gone()
                 toastOnUi(msg)
             }
         }
+    }
+
+    override fun selectionChanged() {
+        showTitle()
+        updateBatchActions()
+    }
+
+    private fun cacheSelectedChapters() {
+        val sourceBook = targetBook ?: return
+        val sourceChapters = tocAdapter.selectedChapters
+        val originalBook = callBack?.oldBook ?: return
+        val chapter = originalChapter ?: return
+        if (sourceChapters.isEmpty() || tocLoading || batchCaching) return
+        val lastSelectedPosition = tocAdapter.lastSelectedPosition
+        setBatchCaching(true)
+        cacheTask = viewModel.cacheContents(
+            sourceBook,
+            sourceChapters,
+            originalBook,
+            chapter,
+            success = {
+                cacheTask = null
+                setBatchCaching(false)
+                callBack?.contentCached(chapter.index)
+                advanceOriginalChapter(chapter, lastSelectedPosition + 1)
+            },
+            error = { message ->
+                cacheTask = null
+                setBatchCaching(false)
+                toastOnUi(message)
+            },
+        )
+    }
+
+    private fun advanceOriginalChapter(chapter: BookChapter, targetPosition: Int? = null) {
+        val nextChapter = nextChapterSourceOriginal(originalChapters, chapter.index)
+        tocAdapter.clearSelection()
+        if (targetPosition != null && tocAdapter.itemCount > 0) {
+            binding.recyclerViewToc.scrollToPosition(
+                targetPosition.coerceAtMost(tocAdapter.itemCount - 1)
+            )
+        }
+        if (nextChapter == null) {
+            toastOnUi(R.string.chapter_source_finished)
+            dismissAllowingStateLoss()
+            return
+        }
+        originalChapter = nextChapter
+        viewModel.chapterIndex = nextChapter.index
+        viewModel.chapterTitle = nextChapter.title
+        showTitle()
+        updateBatchActions()
+    }
+
+    private fun setTocLoading(loading: Boolean) {
+        tocLoading = loading
+        binding.loadingToc.isVisible = loading
+        updateBatchActions()
+    }
+
+    private fun setBatchCaching(caching: Boolean) {
+        batchCaching = caching
+        binding.loadingToc.isVisible = caching
+        updateBatchActions()
+    }
+
+    private fun updateBatchActions() {
+        if (!batchMode) return
+        val hasOriginalChapter = originalChapter != null
+        val busy = tocLoading || batchCaching
+        tocAdapter.selectionEnabled = !busy
+        binding.ivHideToc.isEnabled = !busy
+        binding.btnBatchSkip.isEnabled = hasOriginalChapter && !busy
+        binding.btnBatchCacheNext.isEnabled = hasOriginalChapter &&
+                tocAdapter.selectionCount > 0 && !busy
+        binding.btnBatchFinish.isEnabled = !batchCaching
     }
 
     /**
@@ -421,6 +575,7 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
         val oldBook: Book?
         fun changeTo(source: BookSource, book: Book, toc: List<BookChapter>)
         fun replaceContent(content: String)
+        fun contentCached(chapterIndex: Int)
     }
 
 }

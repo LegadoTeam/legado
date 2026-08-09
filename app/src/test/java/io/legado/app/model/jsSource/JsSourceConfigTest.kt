@@ -10,6 +10,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -28,6 +29,29 @@ class JsSourceConfigTest {
         function getChapters(book) { return []; }
         function getContent(chapter, book) { return "content"; }
     """.trimIndent()
+
+    @Test
+    fun `review capability ignores comments and requires both functions`() {
+        assertFalse(
+            JsSourceConfig.declaresReviewFunctions(
+                "/* function getReviewSummary() {} function getReviewDetail() {} */"
+            )
+        )
+        assertFalse(
+            JsSourceConfig.declaresReviewFunctions("function getReviewSummary() {}")
+        )
+        assertTrue(
+            JsSourceConfig.declaresReviewFunctions(
+                "function getReviewSummary() {} function getReviewDetail() {}"
+            )
+        )
+        assertTrue(
+            JsSourceConfig.declaresReviewFunctions(
+                "var getReviewSummary = function() {}; " +
+                    "var getReviewDetail = function() {};"
+            )
+        )
+    }
 
     @Test
     fun `extracts metadata and keeps full script`() {

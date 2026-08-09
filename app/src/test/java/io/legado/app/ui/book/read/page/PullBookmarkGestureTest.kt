@@ -54,6 +54,18 @@ class PullBookmarkGestureTest {
     }
 
     @Test
+    fun `bookmark indicator refresh waits for page content update`() {
+        val source = source("app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
+        val pageChanged = source.substringAfter("override fun pageChanged()")
+            .substringBefore("private fun updateScrollReadPosition")
+        assertFalse(pageChanged.substringBefore("handler.post {")
+            .contains("upBookmarkIndicator()"))
+        assertTrue(pageChanged.substringAfter("handler.post {")
+            .substringBefore("}")
+            .contains("upBookmarkIndicator()"))
+    }
+
+    @Test
     fun `long press clears pull candidate before selecting text`() {
         val source = source("app/src/main/java/io/legado/app/ui/book/read/page/ReadView.kt")
         val selection = source.substringAfter("curPage.longPress(startX, startY)")

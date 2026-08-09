@@ -1,5 +1,6 @@
 package io.legado.app.api.controller
 
+import androidx.annotation.Keep
 import androidx.collection.LruCache
 import com.google.gson.annotations.SerializedName
 import com.script.rhino.runScriptWithContext
@@ -62,6 +63,7 @@ object ReviewController {
         val url: String,
     )
 
+    @Keep
     private data class ReviewPage(
         val items: List<ReviewRuleParser.DetailItem>,
         val nextCursor: String? = null,
@@ -476,6 +478,17 @@ object ReviewController {
                   }, '*', [channel.port2]);
                 });
               };
+              document.addEventListener('click', event => {
+                const image = event.target;
+                if (!(image instanceof HTMLImageElement)) return;
+                const src = image.currentSrc || image.src;
+                if (!src) return;
+                window.parent.postMessage({
+                  type: 'legado-legacy-review-image',
+                  nonce,
+                  src
+                }, '*');
+              }, true);
               window.java = { upConfig() {} };
               const preload = ${GSON.toJson(page.preloadJs.orEmpty()).replace("<", "\\u003c")};
               if (preload) (0, eval)(preload);

@@ -25,6 +25,21 @@ class ReviewRuleParserTest {
     )
 
     @Test
+    fun `summary configuration requires every lookup rule`() {
+        val rule = ReviewRule(
+            enabled = true,
+            reviewSummaryUrl = "https://example.com/reviews",
+            summaryListRule = "$.items",
+            summaryParagraphIndexRule = "$.index",
+            summaryCountRule = "$.count",
+        )
+
+        assertEquals("https://example.com/reviews", rule.configuredSummaryUrl())
+        rule.summaryCountRule = null
+        assertEquals(null, rule.configuredSummaryUrl())
+    }
+
+    @Test
     fun `parses JSON summary returned as a native array`() {
         val result = ReviewRuleParser.parseSummary(
             body = """
@@ -289,7 +304,7 @@ class ReviewRuleParserTest {
                 detailNameRule = "$.UserName",
                 detailBadgeRule = "$.TitleInfoList[*].TitleImage",
                 detailContentRule = contentRule,
-                replyListRule = "$.replyList[*]",
+                replyListRule = "replyList",
                 replyIdRule = "$.Id",
                 replyNameRule = "$.UserName",
                 replyBadgeRule = "$.TitleInfoList[*].TitleImage",
@@ -320,6 +335,30 @@ class ReviewRuleParserTest {
                 assertTrue(badges.isEmpty())
             }
         }
+    }
+
+    @Test
+    fun `detail JavaScript list fields execute against native objects`() {
+        val result = ReviewRuleParser.parseDetailPage(
+            body = """{"items":[{"name":"Alice","badges":["author","vip"],"content":"Hello"}]}""",
+            rule = ReviewRule(
+                detailListRule = "@js:JSON.parse(result).items",
+                detailNameRule = "@js:result.name",
+                detailBadgeRule = "@js:result.badges",
+                detailContentRule = "@js:result.content",
+            ),
+            nextPageRule = null,
+            baseUrl = chapter.url,
+            source = source,
+            book = book,
+            chapter = chapter,
+            context = EmptyCoroutineContext,
+            paraIndex = "1",
+            paraData = "0",
+            page = "1",
+        )
+
+        assertEquals(listOf("author", "vip"), result.items.single().badges)
     }
 
     @Test

@@ -18,6 +18,18 @@ class JsSourceWebApiContractTest {
     }
 
     @Test
+    fun `token storage commits before process exit`() {
+        val appConfig = readProjectFile(
+            "app/src/main/java/io/legado/app/help/config/AppConfig.kt"
+        )
+        val tokenStorage = appConfig.substringAfter("var jsSourceApiToken")
+            .substringBefore("var tocUiUseReplace")
+
+        assertTrue(tokenStorage.contains(".commit()"))
+        assertFalse(tokenStorage.contains(".apply()"))
+    }
+
+    @Test
     fun `request boundary rejects unsafe bodies before parsing`() {
         val validHeaders = mapOf(
             "x-legado-token" to "secret",

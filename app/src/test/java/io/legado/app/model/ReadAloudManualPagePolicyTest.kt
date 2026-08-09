@@ -13,7 +13,8 @@ class ReadAloudManualPagePolicyTest {
             ReadAloudManualPagePolicy.shouldRestartFromVisiblePage(
                 isReadAloudRunning = true,
                 speechDrivenNavigation = false,
-                followManualPageTurns = true
+                followManualPageTurns = true,
+                followingReadAloudPosition = true
             )
         )
     }
@@ -24,23 +25,54 @@ class ReadAloudManualPagePolicyTest {
             ReadAloudManualPagePolicy.shouldRestartFromVisiblePage(
                 isReadAloudRunning = true,
                 speechDrivenNavigation = false,
-                followManualPageTurns = false
+                followManualPageTurns = false,
+                followingReadAloudPosition = true
             )
         )
         assertFalse(
             ReadAloudManualPagePolicy.shouldRestartFromVisiblePage(
                 isReadAloudRunning = true,
                 speechDrivenNavigation = true,
-                followManualPageTurns = true
+                followManualPageTurns = true,
+                followingReadAloudPosition = true
             )
         )
         assertFalse(
             ReadAloudManualPagePolicy.shouldRestartFromVisiblePage(
                 isReadAloudRunning = false,
                 speechDrivenNavigation = false,
-                followManualPageTurns = true
+                followManualPageTurns = true,
+                followingReadAloudPosition = true
             )
         )
+        assertFalse(
+            ReadAloudManualPagePolicy.shouldRestartFromVisiblePage(
+                isReadAloudRunning = true,
+                speechDrivenNavigation = false,
+                followManualPageTurns = true,
+                followingReadAloudPosition = false
+            )
+        )
+    }
+
+    @Test
+    fun `dialog chapter controls follow the visible position after detaching`() {
+        val dialog = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/read/config/ReadAloudDialog.kt"
+        )
+        val chapterControls = dialog.substringAfter("tvPre.setOnClickListener")
+            .substringBefore("ivStop.setOnClickListener")
+
+        listOf(
+            "if (ReadAloud.followReadAloudPosition)",
+            "ReadAloud.prevChapter(requireContext())",
+            "ReadBook.moveToPrevChapter(upContent = true, toLast = false)",
+            "ReadAloud.nextChapter(requireContext())",
+            "ReadBook.moveToNextChapter(upContent = true)",
+        ).forEach { assertTrue(chapterControls.contains(it)) }
+        listOf("prevParagraph", "nextParagraph").forEach {
+            assertTrue(dialog.contains("ReadAloud.$it(requireContext())"))
+        }
     }
 
     @Test

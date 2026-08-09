@@ -288,6 +288,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
                             if (isIgnoredAppUpdate(it.tagName, LocalConfig.ignoreUpdateVersion)) {
                                 return@onSuccess
                             }
+                            if (supportFragmentManager.isStateSaved) return@onSuccess
                             showDialogFragment(
                                 UpdateDialog(it)
                             )

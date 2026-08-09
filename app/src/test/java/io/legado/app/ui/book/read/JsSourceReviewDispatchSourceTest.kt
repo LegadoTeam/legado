@@ -82,6 +82,7 @@ class JsSourceReviewDispatchSourceTest {
                     applyBlock.indexOf("binding.readView.upContent(")
         )
         assertTrue(!applyBlock.contains("ReadBook.loadContent("))
+        assertTrue(applyBlock.contains("chapterIndex = chapterIndex"))
         assertTrue(contentLoadFinishBlock.contains("lifecycleScope.launch(Main.immediate)"))
     }
 

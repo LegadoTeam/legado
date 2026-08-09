@@ -196,9 +196,16 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
     private inner class TTSUtteranceListener : UtteranceProgressListener() {
 
         private val TAG = "TTSUtteranceListener"
+        private var startCallbackLogged = false
+        private var rangeCallbackLogged = false
 
         override fun onStart(s: String) {
-            LogUtils.d(TAG, "onStart nowSpeak:$nowSpeak pageIndex:$pageIndex utteranceId:$s")
+            val msg = "onStart nowSpeak:$nowSpeak pageIndex:$pageIndex utteranceId:$s"
+            LogUtils.d(TAG, msg)
+            if (AppConfig.recordLog && !startCallbackLogged) {
+                startCallbackLogged = true
+                AppLog.putDebug("$TAG $msg")
+            }
             if (textChapter != null) {
                 if (contentList[nowSpeak].matches(AppPattern.notReadAloudRegex)) {
                     nextParagraph()
@@ -218,6 +225,10 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
             val msg =
                 "onRangeStart nowSpeak:$nowSpeak pageIndex:$pageIndex utteranceId:$utteranceId start:$start end:$end frame:$frame"
             LogUtils.d(TAG, msg)
+            if (AppConfig.recordLog && !rangeCallbackLogged) {
+                rangeCallbackLogged = true
+                AppLog.putDebug("$TAG $msg")
+            }
             val position = readAloudNumber + start
             if (moveToSpeechPage(position)) {
                 upTtsProgress(position)

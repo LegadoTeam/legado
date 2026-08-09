@@ -1,5 +1,6 @@
 package io.legado.app.model.analyzeRule
 
+import androidx.annotation.Keep
 import com.jayway.jsonpath.PathNotFoundException
 import io.legado.app.constant.AppLog
 import io.legado.app.data.entities.BaseSource
@@ -19,6 +20,7 @@ import kotlin.coroutines.CoroutineContext
 
 internal object ReviewRuleParser {
 
+    @Keep
     internal data class SummaryResult(
         val counts: Map<Int, Int>,
         val keys: Map<Int, String>,
@@ -29,6 +31,7 @@ internal object ReviewRuleParser {
         val nextPageUrl: String?,
     )
 
+    @Keep
     internal data class DetailItem(
         val id: String?,
         val avatar: String?,
@@ -308,7 +311,7 @@ internal object ReviewRuleParser {
         }
     }
 
-    private data class ContentProtocol(
+    internal data class ContentProtocol(
         val text: String?,
         val imageUrl: String?,
         val audioUrl: String?,
@@ -317,7 +320,7 @@ internal object ReviewRuleParser {
         val replyCount: Int?,
     )
 
-    private fun parseContentProtocol(raw: String?, baseUrl: String): ContentProtocol? {
+    internal fun parseContentProtocol(raw: String?, baseUrl: String): ContentProtocol? {
         val value = raw?.trim().orEmpty()
         if (!value.startsWith("{") || !value.endsWith("}")) return null
         val content = GSON.fromJsonObject<Map<String, Any?>>(value).getOrNull() ?: return null
@@ -418,7 +421,7 @@ internal object ReviewRuleParser {
         if (loggedRules.add(key)) logRuleError(message, rule, error)
     }
 
-    private fun splitBadgeValue(value: String?): List<String> {
+    internal fun splitBadgeValue(value: String?): List<String> {
         val raw = value?.trim().orEmpty()
         if (raw.isEmpty()) return emptyList()
         if (raw.isDataUrl()) return listOf(raw)

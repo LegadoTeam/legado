@@ -800,6 +800,11 @@
     <string name="title_left">Left</string>
     <string name="title_center">Center</string>
     <string name="title_hide">Hide</string>
+    <string name="title_color">Chapter title color</string>
+    <string name="split_chapter_title">Separate chapter number and title</string>
+    <string name="title_number_font_size">Chapter number font size</string>
+    <string name="title_number_spacing">Space below chapter number</string>
+    <string name="title_number_color">Chapter number color</string>
     <string name="add_to_group">Add to Group</string>
     <string name="save_image">Save image</string>
     <string name="no_default_path">No default path</string>
@@ -1121,6 +1126,11 @@
     <string name="menu_refresh_all">Refresh all chapters</string>
     <string name="edit_content">Edit Content</string>
     <string name="chapter_change_source">Single chapter source switching</string>
+    <string name="batch_chapter_change_source">Batch chapter source switching</string>
+    <string name="chapter_source_skip">Skip chapter</string>
+    <string name="chapter_source_cache_next">Cache and next</string>
+    <string name="chapter_source_selected_count">%1$d target chapter(s) selected</string>
+    <string name="chapter_source_finished">No more original chapters</string>
     <string name="book_change_source">Change the source of the whole book</string>
     <string name="sort_by_time">Sort by time</string>
     <string name="enable_record">Enable record</string>
