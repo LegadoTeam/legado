@@ -863,7 +863,8 @@ function getContent(chapter, book, nextChapterUrl) {
 ### 段评
 
 段评由两个成对的顶层函数提供。只有同时声明 `getReviewSummary` 和 `getReviewDetail` 才会启用，缺少任意一个
-函数时导入/保存会提示配对错误。章节加载后先调用统计函数，点击正文段评图标时再调用详情函数。
+函数时导入/保存会提示配对错误。可选声明 `getReviewReplies` 后，评论中的“查看更多回复”会按页调用它。
+章节加载后先调用统计函数，点击正文段评图标时再调用详情函数。
 
 ```js
 function getReviewSummary(chapter, book) {
@@ -888,11 +889,22 @@ function getReviewDetail(chapter, book, paraIndex, paraData, page) {
                 name: item.name,
                 avatar: item.avatar,
                 badge: item.badge,
-                content: item.content,
-                replies: item.replies || []
+                content: {
+                    text: item.content,
+                    replyCount: item.replyCount
+                }
             };
         }),
         nextPageUrl: json.hasNext ? "more" : null
+    };
+}
+
+function getReviewReplies(chapter, book, paraIndex, paraData, reviewId, page) {
+    var json = JSON.parse(java.ajax(
+        config.bookSourceUrl + "/review/replies?id=" + reviewId + "&page=" + page
+    ));
+    return {
+        items: json.items || []
     };
 }
 ```
@@ -904,6 +916,10 @@ function getReviewDetail(chapter, book, paraIndex, paraData, page) {
   `id`、`name`、`avatar` 和递归 `replies`；缺少可显示内容的条目会被忽略，递归回复会在界面中按顺序展示。
 - `nextPageUrl` 只是是否继续请求的信号，不会作为 URL 使用。返回任意非空值表示还有下一页，返回 `null` 或省略表示结束；
   下一次调用会把 `page` 加一。
+- `getReviewReplies(chapter, book, paraIndex, paraData, reviewId, page)` 是可选的回复分页函数，返回 `{items}`；
+  `reviewId` 是主评论的非空 `id`，且详情项需要提供正数 `replyCount` 才会显示加载入口。页面从 `1` 开始，
+  返回首批回复，空数组表示没有更多回复。声明该函数时详情项不要内嵌 `replies`；未声明时仍可使用内嵌回复。
+  它必须与上述两个段评函数一起声明。
 - 段评函数异常会记录到日志，详情加载错误同时显示在弹窗中；返回空数组表示没有内容。
 
 ### 运行环境与并发

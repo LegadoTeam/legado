@@ -31,6 +31,10 @@ class ReviewWebApiContractTest {
         assertTrue(controller.contains("ReviewRuleParser.parseReplyPage"))
         assertTrue(controller.contains("JsSourceReview.getReviewSummaryAwait"))
         assertTrue(controller.contains("JsSourceReview.getReviewDetailAwait"))
+        assertTrue(controller.contains("JsSourceReview.getReviewRepliesAwait"))
+        val replies = controller.substringAfter("fun getReplies(")
+            .substringBefore("fun openLegacyReview(")
+        assertTrue(replies.indexOf("if (source.isJsSource())") < replies.indexOf("val rule = source.ruleReview"))
         assertFalse(controller.contains("parameters[\"nextUrl\"]"))
     }
 
@@ -155,6 +159,6 @@ class ReviewWebApiContractTest {
         val repositoryRoot = generateSequence(userDirectory) { it.parentFile }
             .firstOrNull { File(it, "app/src/main").isDirectory }
         requireNotNull(repositoryRoot) { "Repository root not found from $userDirectory" }
-        return File(repositoryRoot, path).readText()
+        return File(repositoryRoot, path).readText().replace("\r\n", "\n")
     }
 }

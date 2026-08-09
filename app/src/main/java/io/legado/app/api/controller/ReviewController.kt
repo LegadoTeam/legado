@@ -285,7 +285,25 @@ object ReviewController {
     fun getReplies(parameters: Map<String, List<String>>): ReturnData = respond {
         val context = requireContext(parameters)
         val source = context.source ?: return@respond ReviewPage(emptyList())
-        if (source.isJsSource()) return@respond ReviewPage(emptyList())
+        if (source.isJsSource()) {
+            val paragraphIndex = requireParagraphIndex(parameters)
+            val paragraphData = parameters["paraData"]?.firstOrNull() ?: paragraphIndex.toString()
+            val reviewId = requireParameter(parameters, "reviewId").also {
+                require(it.isNotBlank()) { "参数 reviewId 不能为空" }
+            }
+            val page = requireInt(parameters, "page", 1)
+            val items = JsSourceReview.getReviewRepliesAwait(
+                source = source,
+                book = context.book,
+                chapter = context.chapter,
+                paragraphIndex = paragraphIndex,
+                paragraphData = paragraphData,
+                reviewId = reviewId,
+                page = page,
+            ).orEmpty()
+            return@respond ReviewPage(items = items, hasMore = items.isNotEmpty())
+        }
+
         val rule = source.ruleReview ?: return@respond ReviewPage(emptyList())
         val replyUrl = rule.reviewQuoteUrl?.takeIf { it.isNotBlank() }
             ?: return@respond ReviewPage(emptyList())
@@ -294,7 +312,6 @@ object ReviewController {
         ) {
             return@respond ReviewPage(emptyList())
         }
-
         val paragraphIndex = requireParagraphIndex(parameters)
         val paragraphData = parameters["paraData"]?.firstOrNull() ?: paragraphIndex.toString()
         val reviewId = requireParameter(parameters, "reviewId").also {

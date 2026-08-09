@@ -54,6 +54,25 @@ class JsSourceConfigTest {
     }
 
     @Test
+    fun `review reply capability ignores comments and accepts a top level function`() {
+        assertFalse(
+            JsSourceConfig.declaresReviewRepliesFunction(
+                "/* function getReviewReplies() {} */"
+            )
+        )
+        assertTrue(
+            JsSourceConfig.declaresReviewRepliesFunction(
+                "function getReviewReplies() {}"
+            )
+        )
+        assertTrue(
+            JsSourceConfig.declaresReviewRepliesFunction(
+                "var getReviewReplies = function() {};"
+            )
+        )
+    }
+
+    @Test
     fun `extracts metadata and keeps full script`() {
         val source = JsSourceConfig.extract(validScript)
 
@@ -351,17 +370,21 @@ class JsSourceConfigTest {
     }
 
     @Test
-    fun `review functions are accepted as a pair`() {
+    fun `review functions accept optional paged replies`() {
         val source = JsSourceConfig.extract(
             validScript + "\n" + """
                 function getReviewSummary(chapter, book) { return []; }
                 function getReviewDetail(chapter, book, paraIndex, paraData, page) {
                     return { items: [] };
                 }
+                function getReviewReplies(chapter, book, paraIndex, paraData, reviewId, page) {
+                    return { items: [] };
+                }
             """.trimIndent()
         )
 
         assertTrue(source.mainJs.orEmpty().contains("getReviewSummary"))
+        assertTrue(JsSourceReview.hasReviewRepliesCapability(source))
     }
 
     @Test
@@ -403,6 +426,26 @@ class JsSourceConfigTest {
                 var getReviewDetail = {};
             """.trimIndent(),
             "getReviewSummary",
+        )
+    }
+
+    @Test
+    fun `review replies require the review function pair`() {
+        assertExtractError(
+            validScript + "\nfunction getReviewReplies() { return { items: [] }; }",
+            "getReviewSummary/getReviewDetail",
+        )
+    }
+
+    @Test
+    fun `review replies property must be a function`() {
+        assertExtractError(
+            validScript + "\n" + """
+                function getReviewSummary() { return []; }
+                function getReviewDetail() { return { items: [] }; }
+                var getReviewReplies = [];
+            """.trimIndent(),
+            "getReviewReplies",
         )
     }
 

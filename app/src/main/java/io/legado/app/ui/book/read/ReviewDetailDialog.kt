@@ -457,7 +457,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
                     items = result.items,
                     nextPageUrl = result.nextPageUrl,
                     hasNextPageRule = true,
-                    hasReplyUrl = false,
+                    hasReplyUrl = JsSourceReview.hasReviewRepliesCapability(source),
                     source = source,
                 )
             }
@@ -572,11 +572,28 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
         renderUiItems()
         Coroutine.async(lifecycleScope, IO, start = CoroutineStart.LAZY) {
             val source = ReadBook.bookSource ?: return@async null
-            if (source.getKey() != sourceKey || source.isJsSource()) return@async null
+            if (source.getKey() != sourceKey) return@async null
             val book = ReadBook.book ?: return@async null
             if (book.bookUrl != bookUrl) return@async null
             val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)
                 ?: return@async null
+            if (source.isJsSource()) {
+                if (source.mainJs.hashCode() != ruleHash) return@async null
+                val replies = JsSourceReview.getReviewRepliesAwait(
+                    source = source,
+                    book = book,
+                    chapter = chapter,
+                    paragraphIndex = paragraphNum,
+                    paragraphData = paragraphData,
+                    reviewId = reviewId,
+                    page = page,
+                ) ?: return@async null
+                return@async ReplyResult(
+                    replies = replies,
+                    page = page,
+                    source = source,
+                )
+            }
             val rule = source.ruleReview ?: return@async null
             if (!rule.enabled || rule.hashCode() != ruleHash) return@async null
             val replyUrlRule = rule.reviewQuoteUrl?.takeIf { it.isNotBlank() }
@@ -640,7 +657,9 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
             } else {
                 val replies = mergeReplies(current.replies, result.replies)
                 detailItems[currentIndex] = current.copy(replies = replies)
-                if (current.replyCount != null && replies.size >= current.replyCount) {
+                if (replies.size == current.replies.size ||
+                    current.replyCount != null && replies.size >= current.replyCount
+                ) {
                     replyExhaustedParentKeys.add(parentKey)
                 }
             }

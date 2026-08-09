@@ -6,6 +6,7 @@ import com.google.gson.JsonObject
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
+import io.legado.app.exception.NoStackTraceException
 import io.legado.app.model.analyzeRule.ReviewRuleParser
 import io.legado.app.utils.GSON
 import io.legado.app.utils.NetworkUtils
@@ -15,6 +16,7 @@ import kotlin.coroutines.coroutineContext
 internal object JsSourceReview {
 
     private val capabilityCache = LruCache<String, Boolean>(64)
+    private val replyCapabilityCache = LruCache<String, Boolean>(64)
 
     fun rememberReviewCapability(source: BookSource, enabled: Boolean) {
         capabilityCache.put(capabilityKey(source), enabled)
@@ -25,6 +27,18 @@ internal object JsSourceReview {
         capabilityCache[key]?.let { return it }
         return JsSourceConfig.declaresReviewFunctions(source.mainJs.orEmpty()).also {
             capabilityCache.put(key, it)
+        }
+    }
+
+    fun rememberReviewRepliesCapability(source: BookSource, enabled: Boolean) {
+        replyCapabilityCache.put(capabilityKey(source), enabled)
+    }
+
+    fun hasReviewRepliesCapability(source: BookSource): Boolean {
+        val key = capabilityKey(source)
+        replyCapabilityCache[key]?.let { return it }
+        return JsSourceConfig.declaresReviewRepliesFunction(source.mainJs.orEmpty()).also {
+            replyCapabilityCache.put(key, it)
         }
     }
 
@@ -85,6 +99,35 @@ internal object JsSourceReview {
         return parseDetailObject(result, chapter.url)
     }
 
+    suspend fun getReviewRepliesAwait(
+        source: BookSource,
+        book: Book,
+        chapter: BookChapter,
+        paragraphIndex: Int,
+        paragraphData: String,
+        reviewId: String,
+        page: Int,
+    ): List<ReviewRuleParser.DetailItem>? {
+        val call = JsSourceEngine(source, coroutineContext).callOptionalFunction(
+            "getReviewReplies",
+            listOf(
+                "chapter" to chapter,
+                "book" to book,
+                "paraIndex" to paragraphIndex,
+                "paraData" to paragraphData,
+                "reviewId" to reviewId,
+                "page" to page,
+            ),
+        )
+        rememberReviewRepliesCapability(source, call.exists)
+        if (!call.exists) return null
+        val json = call.value ?: return emptyList()
+        val result = runCatching { GSON.fromJson(json, JsonObject::class.java) }.getOrNull()
+            ?: throw NoStackTraceException("JS源 getReviewReplies 返回格式错误")
+        return parseReplyObject(result, chapter.url)
+            ?: throw NoStackTraceException("JS源 getReviewReplies 返回格式错误,缺少 items 数组")
+    }
+
     internal fun parseDetailObject(
         result: JsonObject,
         baseUrl: String,
@@ -94,6 +137,14 @@ internal object JsSourceReview {
             items = parseDetailItems(items, baseUrl),
             nextPageUrl = result.optString("nextPageUrl")?.takeIf { it.isNotBlank() },
         )
+    }
+
+    internal fun parseReplyObject(
+        result: JsonObject,
+        baseUrl: String,
+    ): List<ReviewRuleParser.DetailItem>? {
+        val items = result.optArray("items") ?: return null
+        return flattenReplies(items, baseUrl)
     }
 
     private fun parseDetailItems(

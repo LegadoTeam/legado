@@ -68,6 +68,9 @@ class JsSourceAuthorGuideTest {
             "只选择一个 JavaScript 书源导出或分享",
             "getReviewSummary(chapter, book)",
             "getReviewDetail(chapter, book, paraIndex, paraData, page)",
+            "getReviewReplies(chapter, book, paraIndex, paraData, reviewId, page)",
+            "replyCount",
+            "页面从 `1` 开始",
             "nextPageUrl",
             "{text, img, audio, time, likeCount, replyCount}",
             "`badge` 可返回字符串或字符串数组",
@@ -77,6 +80,7 @@ class JsSourceAuthorGuideTest {
             assertTrue("Missing current JS source contract: $text", guide.contains(text))
         }
         assertTrue(guide.contains("只有同时声明 `getReviewSummary` 和 `getReviewDetail`"))
+        assertTrue(guide.contains("可选声明 `getReviewReplies`"))
     }
 
     @Test
