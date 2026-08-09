@@ -48,6 +48,11 @@ class ReviewWebApiContractTest {
         assertTrue(dialog.contains("API.getReviewReplies"))
         assertTrue(dialog.contains("isImageBadge"))
         assertTrue(dialog.contains("reviewIdentity"))
+        assertTrue(dialog.contains("openImage(item.imageUrl)"))
+        assertTrue(dialog.contains("openImage(reply.imageUrl)"))
+        assertTrue(dialog.contains("proxyImageUrl(url, 2048)"))
+        assertTrue(dialog.contains(":url-list=\"[previewUrl]\""))
+        assertTrue(dialog.contains("@closed=\"previewUrl = ''\""))
         assertFalse(dialog.contains(":src=\"item.audioUrl\""))
     }
 
