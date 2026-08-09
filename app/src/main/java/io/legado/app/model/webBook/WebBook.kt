@@ -493,7 +493,12 @@ object WebBook {
         }
         if (saveToken != null) {
             val saved = BookHelp.saveContent(
-                bookSource, book, bookChapter, content, saveToken
+                bookSource,
+                book,
+                bookChapter,
+                content,
+                saveToken,
+                saveChapterMetadata = true,
             )
             BookHelp.getContent(book, bookChapter, saveToken)?.let { return it }
             if (!saved) throw NoStackTraceException("正文缓存已更新,请重试")

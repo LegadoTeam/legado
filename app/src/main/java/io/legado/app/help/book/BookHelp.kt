@@ -209,6 +209,7 @@ object BookHelp {
         bookChapter: BookChapter,
         content: String,
         token: ContentSaveToken = contentSaveToken(book, bookChapter),
+        saveChapterMetadata: Boolean = false,
     ): Boolean {
         return try {
             if (token.key.bookUrl != book.bookUrl ||
@@ -226,6 +227,14 @@ object BookHelp {
                 if (content.isNotEmpty()) {
                     writeText(book, bookChapter, token.folderName, fileName, content)
                 }
+                if (saveChapterMetadata) {
+                    appDb.bookChapterDao.updateContentMetadata(
+                        bookChapter.bookUrl,
+                        bookChapter.index,
+                        bookChapter.title,
+                        bookChapter.imgUrl,
+                    )
+                }
             }
             if (saved) {
                 //saveImages(bookSource, book, bookChapter, content)
@@ -242,13 +251,22 @@ object BookHelp {
     fun saveText(
         book: Book,
         bookChapter: BookChapter,
-        content: String
+        content: String,
+        saveChapterMetadata: Boolean = false,
     ) {
         if (content.isEmpty()) return
         val folderName = book.getFolderName()
         val fileName = bookChapter.getFileName()
         contentSaveFence.replace(contentSaveKey(book, bookChapter), fileName) {
             writeText(book, bookChapter, folderName, fileName, content)
+            if (saveChapterMetadata) {
+                appDb.bookChapterDao.updateContentMetadata(
+                    bookChapter.bookUrl,
+                    bookChapter.index,
+                    bookChapter.title,
+                    bookChapter.imgUrl,
+                )
+            }
         }
     }
 

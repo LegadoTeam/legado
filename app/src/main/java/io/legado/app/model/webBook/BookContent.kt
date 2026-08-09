@@ -194,7 +194,6 @@ object BookContent {
                 }
                 bookChapter.title = title
                 bookChapter.titleMD5 = null
-                bookChapter.update()
             }
         }
         Debug.log(bookSource.bookSourceUrl, "┌获取章节名称")
@@ -205,7 +204,13 @@ object BookContent {
             throw ContentEmptyException("内容为空")
         }
         if (needSave) {
-            BookHelp.saveContent(bookSource, book, bookChapter, contentStr)
+            BookHelp.saveContent(
+                bookSource,
+                book,
+                bookChapter,
+                contentStr,
+                saveChapterMetadata = true,
+            )
         }
         return contentStr
     }

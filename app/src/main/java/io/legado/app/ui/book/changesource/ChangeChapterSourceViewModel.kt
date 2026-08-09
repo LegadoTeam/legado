@@ -86,6 +86,7 @@ class ChangeChapterSourceViewModel(application: Application) :
                 originalBook,
                 originalChapter,
                 mergedContent,
+                saveChapterMetadata = true,
             )
         }.onSuccess {
             success.invoke()
