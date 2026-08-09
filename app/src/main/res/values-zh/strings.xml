@@ -1143,6 +1143,8 @@
     <string name="show_default_book_icon">显示默认书籍图标</string>
     <string name="cache_export">缓存/导出</string>
     <string name="assists_key_config">辅助按键配置</string>
+    <string name="show_line_number">展示%d行</string>
+    <string name="setting_show_line_number">设置辅助按键展示的行数</string>
     <string name="url_option">URL 参数</string>
     <string name="only_wifi">仅 WiFi</string>
     <string name="only_wifi_summary">仅在 WiFi 下加载网络封面</string>

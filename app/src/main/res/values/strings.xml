@@ -1513,8 +1513,8 @@
     <string name="open_other_video_player">其它播放器打开</string>
     <string name="show_source_comment">显示源注释</string>
     <string name="adapt_special_style">适配特殊样式</string>
-    <string name="show_line_number">展示%d行</string>
-    <string name="setting_show_line_number">设置辅助按键展示的行数</string>
+    <string name="show_line_number">Show %d rows</string>
+    <string name="setting_show_line_number">Number of secondary button rows</string>
     <string name="menu_page">第 %d 页</string>
     <string name="change_page">选择页数</string>
     <string name="auto_check_new_backup_t">自动检查新备份</string>
