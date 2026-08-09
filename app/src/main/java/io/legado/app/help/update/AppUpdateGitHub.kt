@@ -55,11 +55,13 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
                 ?.let {
                     val downloadUrl = resolveAppUpdateDownloadUrl(it.name, it.downloadUrl)
                     return@async AppUpdate.UpdateInfo(
-                        it.versionName,
-                        it.note,
-                        downloadUrl,
-                        it.name,
-                        resolveAppUpdateBackupUrl(downloadUrl, it.downloadUrl)
+                        tagName = it.versionName,
+                        updateLog = it.note,
+                        downloadUrl = downloadUrl,
+                        fileName = it.name,
+                        backupDownloadUrl = resolveAppUpdateBackupUrl(downloadUrl, it.downloadUrl),
+                        size = it.size,
+                        createdAt = it.createdAt
                     )
                 }
             throw NoStackTraceException("已是最新版本")

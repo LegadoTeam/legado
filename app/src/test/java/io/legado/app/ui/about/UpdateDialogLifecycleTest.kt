@@ -23,6 +23,18 @@ class UpdateDialogLifecycleTest {
         assertGuardBeforeDialog(about, "childFragmentManager.isStateSaved")
     }
 
+    @Test
+    fun `update dialog carries release metadata into the toolbar`() {
+        val source = projectFile(
+            "src/main/java/io/legado/app/ui/about/UpdateDialog.kt"
+        ).readText()
+
+        assertTrue(source.contains("putLong(\"size\", updateInfo.size)"))
+        assertTrue(source.contains("putLong(\"createdAt\", updateInfo.createdAt)"))
+        assertTrue(source.contains("ConvertUtils.formatFileSize(size)"))
+        assertTrue(source.contains("DateTimeFormatter.ISO_LOCAL_DATE"))
+    }
+
     private fun assertGuardBeforeDialog(source: String, guard: String) {
         assertTrue(source.indexOf(guard) in 0 until source.indexOf("UpdateDialog(it)"))
     }

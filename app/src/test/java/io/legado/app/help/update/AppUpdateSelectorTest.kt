@@ -6,6 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Instant
 
 class AppUpdateSelectorTest {
 
@@ -62,6 +63,30 @@ class AppUpdateSelectorTest {
                 assetName = "legado_app_3.26071313_release.apk"
             )
         )
+    }
+
+    @Test
+    fun githubAssetMetadataIsKeptForTheUpdateDialog() {
+        val asset = Asset(
+            apkUrl = "https://example.com/app.apk",
+            contentType = "application/vnd.android.package-archive",
+            createdAt = "2026-08-09T18:12:00Z",
+            downloadCount = 0,
+            id = 1,
+            name = "legado_app_3.26080918_release.apk",
+            state = "uploaded",
+            url = "https://api.github.com/assets/1",
+            size = 17_800_000
+        )
+
+        val release = asset.assetToAppReleaseInfo(
+            preRelease = false,
+            note = "",
+            releaseTag = "3.26080918"
+        )
+
+        assertEquals(17_800_000, release.size)
+        assertEquals(Instant.parse("2026-08-09T18:12:00Z").toEpochMilli(), release.createdAt)
     }
 
     @Test

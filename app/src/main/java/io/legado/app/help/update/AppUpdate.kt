@@ -14,7 +14,9 @@ object AppUpdate {
         val updateLog: String,
         val downloadUrl: String,
         val fileName: String,
-        val backupDownloadUrl: String? = null
+        val backupDownloadUrl: String? = null,
+        val size: Long = 0L,
+        val createdAt: Long = 0L
     )
 
     interface AppUpdateInterface {

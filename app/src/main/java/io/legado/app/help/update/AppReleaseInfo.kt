@@ -12,7 +12,8 @@ data class AppReleaseInfo(
     val name: String,
     val downloadUrl: String,
     val assetUrl: String,
-    val versionName: String
+    val versionName: String,
+    val size: Long = 0L
 )
 
 enum class AppVariant {
@@ -56,7 +57,8 @@ data class Asset(
     val id: Int,
     val name: String,
     val state: String,
-    val url: String
+    val url: String,
+    val size: Long = 0L
 ) {
     val isValid: Boolean
         get() = (contentType == "application/vnd.android.package-archive") && (state == "uploaded")
@@ -70,13 +72,14 @@ data class Asset(
         val timestamp: Long = instant.toEpochMilli()
         val appVariant = inferAppVariant(name, preRelease)
         return AppReleaseInfo(
-            appVariant,
-            timestamp,
-            note,
-            name,
-            apkUrl,
-            url,
-            parseReleaseVersionName(releaseTag, name)
+            appVariant = appVariant,
+            createdAt = timestamp,
+            note = note,
+            name = name,
+            downloadUrl = apkUrl,
+            assetUrl = url,
+            versionName = parseReleaseVersionName(releaseTag, name),
+            size = size
         )
     }
 }

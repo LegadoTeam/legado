@@ -10,6 +10,7 @@ import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.update.AppUpdate
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.model.Download
+import io.legado.app.utils.ConvertUtils
 import io.legado.app.utils.openUrl
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.toastOnUi
@@ -18,6 +19,9 @@ import io.noties.markwon.Markwon
 import io.noties.markwon.ext.tables.TablePlugin
 import io.noties.markwon.html.HtmlPlugin
 import io.noties.markwon.image.glide.GlideImagesPlugin
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 class UpdateDialog() : BaseDialogFragment(R.layout.dialog_update) {
 
@@ -28,6 +32,8 @@ class UpdateDialog() : BaseDialogFragment(R.layout.dialog_update) {
             putString("url", updateInfo.downloadUrl)
             putString("name", updateInfo.fileName)
             putString("backupUrl", updateInfo.backupDownloadUrl)
+            putLong("size", updateInfo.size)
+            putLong("createdAt", updateInfo.createdAt)
         }
     }
 
@@ -41,6 +47,10 @@ class UpdateDialog() : BaseDialogFragment(R.layout.dialog_update) {
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         binding.toolBar.setBackgroundColor(primaryColor)
         binding.toolBar.title = arguments?.getString("newVersion")
+        binding.toolBar.subtitle = formatUpdateMetadata(
+            size = arguments?.getLong("size") ?: 0L,
+            createdAt = arguments?.getLong("createdAt") ?: 0L
+        ).takeIf(String::isNotBlank)
         val updateBody = arguments?.getString("updateBody")
         if (updateBody == null) {
             toastOnUi("没有数据")
@@ -74,6 +84,17 @@ class UpdateDialog() : BaseDialogFragment(R.layout.dialog_update) {
             }
             return@setOnMenuItemClickListener true
         }
+    }
+
+    private fun formatUpdateMetadata(size: Long, createdAt: Long): String {
+        val metadata = mutableListOf<String>()
+        if (size > 0) metadata += ConvertUtils.formatFileSize(size)
+        if (createdAt > 0) {
+            metadata += Instant.ofEpochMilli(createdAt)
+                .atZone(ZoneId.systemDefault())
+                .format(DateTimeFormatter.ISO_LOCAL_DATE)
+        }
+        return metadata.joinToString(" · ")
     }
 
     private fun startDownload(url: String?) {
