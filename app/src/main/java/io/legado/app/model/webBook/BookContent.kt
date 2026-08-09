@@ -10,9 +10,12 @@ import io.legado.app.data.entities.rule.ContentRule
 import io.legado.app.exception.ContentEmptyException
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.book.BookHelp
+import io.legado.app.help.ConcurrentRateLimiter
 import io.legado.app.help.config.AppConfig
+import io.legado.app.model.BatchContentContext
 import io.legado.app.model.Debug
 import io.legado.app.model.analyzeRule.AnalyzeRule
+import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setBatchContext
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setChapter
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setNextChapterUrl
@@ -266,5 +269,48 @@ object BookContent {
             }
         }
         return Pair(content, nextUrlList)
+    }
+
+    /**
+     * 批量获取正文。
+     *
+     * 把整批章节交给书源的 contentBatch 规则,书源自行决定怎么取(合并请求、并发、
+     * 一次拿多章等),每处理完一章调用 java.cacheContent(url, content) 回存。
+     *
+     * 返回本批次里书源没有回存的章节,交由调用方按普通单章流程兜底。
+     */
+    @Throws(Exception::class)
+    suspend fun analyzeContentBatch(
+        bookSource: BookSource,
+        book: Book,
+        chapters: List<BookChapter>
+    ): List<BookChapter> {
+        val contentRule = bookSource.getContentRule()
+        val contentBatch = contentRule.contentBatch
+        if (contentBatch.isNullOrBlank()) {
+            throw NoStackTraceException("书源未配置批量正文规则")
+        }
+        if (chapters.isEmpty()) {
+            return emptyList()
+        }
+        val batchContext =
+            BatchContentContext(bookSource, book, chapters, currentCoroutineContext())
+        val analyzeRule = AnalyzeRule(book, bookSource)
+        analyzeRule.setCoroutineContext(currentCoroutineContext())
+        analyzeRule.setChapter(chapters.first())
+        analyzeRule.setBatchContext(batchContext)
+        analyzeRule.setBaseUrl(book.tocUrl.ifBlank { bookSource.bookSourceUrl })
+        Debug.log(bookSource.bookSourceUrl, "≡开始批量下载,本批${chapters.size}章")
+        currentCoroutineContext().ensureActive()
+        //每批算一次并发,批内书源自己发的请求由 AnalyzeUrl 各自限流
+        ConcurrentRateLimiter(bookSource).getConcurrentRecord()
+        analyzeRule.evalJS(contentBatch, chapters)
+        currentCoroutineContext().ensureActive()
+        val missing = batchContext.missingChapters()
+        Debug.log(
+            bookSource.bookSourceUrl,
+            "≡批量下载完成,成功${batchContext.savedCount()}章,未回存${missing.size}章"
+        )
+        return missing
     }
 }

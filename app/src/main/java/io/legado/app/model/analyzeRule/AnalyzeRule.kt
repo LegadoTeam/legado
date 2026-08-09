@@ -21,6 +21,7 @@ import io.legado.app.help.http.BackstageWebView
 import io.legado.app.help.http.CookieStore
 import io.legado.app.help.source.getShareScope
 import io.legado.app.help.source.getSharedGlobalStateKey
+import io.legado.app.model.BatchContentContext
 import io.legado.app.model.Debug
 import io.legado.app.model.SharedJsScope
 import io.legado.app.model.webBook.WebBook
@@ -70,6 +71,7 @@ class AnalyzeRule(
 
     private var chapter: BookChapter? = null
     private var nextChapterUrl: String? = null
+    private var batchContext: BatchContentContext? = null
     private var content: Any? = null
     private var baseUrl: String? = null
     private var redirectUrl: URL? = null
@@ -900,6 +902,7 @@ class AnalyzeRule(
             bindings["result"] = result
             bindings["baseUrl"] = baseUrl
             bindings["chapter"] = chapter
+            bindings["chapters"] = batchContext?.chapters
             bindings["title"] = chapter?.title
             bindings["src"] = content
             bindings["nextChapterUrl"] = nextChapterUrl
@@ -939,6 +942,10 @@ class AnalyzeRule(
 
     override fun getSource(): BaseSource? {
         return source
+    }
+
+    override fun getBatchContext(): BatchContentContext? {
+        return batchContext
     }
 
     override fun getTag(): String? {
@@ -1038,6 +1045,11 @@ class AnalyzeRule(
 
         fun AnalyzeRule.setChapter(chapter: BookChapter?): AnalyzeRule {
             this.chapter = chapter
+            return this
+        }
+
+        fun AnalyzeRule.setBatchContext(batchContext: BatchContentContext?): AnalyzeRule {
+            this.batchContext = batchContext
             return this
         }
 

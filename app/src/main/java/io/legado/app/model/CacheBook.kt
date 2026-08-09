@@ -194,6 +194,8 @@ object CacheBook {
 
         private val waitDownloadSet = linkedSetOf<Int>()
         private val onDownloadSet = linkedSetOf<Int>()
+        /** 批量下载没能拿到正文的章节,退回单章流程,不再进入后续批次 */
+        private val batchFallbackSet = linkedSetOf<Int>()
         private val tasks = CompositeCoroutine()
         private var isStopped = false
         private var waitingRetry = false
@@ -229,6 +231,7 @@ object CacheBook {
         @Synchronized
         fun stop() {
             waitDownloadSet.clear()
+            batchFallbackSet.clear()
             tasks.clear()
             isStopped = true
             isLoading = false
@@ -312,6 +315,9 @@ object CacheBook {
          */
         @Synchronized
         fun download(scope: CoroutineScope, context: CoroutineContext) {
+            if (bookSource.supportContentBatch() && downloadBatch(scope, context)) {
+                return
+            }
             val chapterIndex = waitDownloadSet.firstOrNull()
             if (chapterIndex == null) {
                 if (!isLoading && onDownloadSet.isEmpty()) {
@@ -387,6 +393,139 @@ object CacheBook {
             }.apply {
                 tasks.add(this)
             }.start()
+        }
+
+        /**
+         * 批量下载:一次把多章交给书源的 contentBatch 规则处理。
+         * 成功启动批次返回 true;可批量的章节不足两章时返回 false,由单章流程接手。
+         */
+        @Synchronized
+        private fun downloadBatch(scope: CoroutineScope, context: CoroutineContext): Boolean {
+            val batchSize = bookSource.contentBatchSize()
+            if (batchSize <= 1) return false
+            val batchChapters = arrayListOf<BookChapter>()
+            for (chapterIndex in waitDownloadSet.toList()) {
+                if (batchChapters.size >= batchSize) break
+                if (batchFallbackSet.contains(chapterIndex)) continue
+                if (onDownloadSet.contains(chapterIndex)) {
+                    waitDownloadSet.remove(chapterIndex)
+                    continue
+                }
+                val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)
+                if (chapter == null) {
+                    waitDownloadSet.remove(chapterIndex)
+                    continue
+                }
+                //卷名和已缓存章节交给单章流程,批量只处理需要联网的正文
+                if (chapter.isVolume || BookHelp.hasContent(book, chapter)) continue
+                batchChapters.add(chapter)
+            }
+            if (batchChapters.size < 2) return false
+            //候选已排除进行中的章节,且与领取同处一把锁内,这里必然全部领取成功
+            val claimed = BatchChapterClaim.claim(batchChapters, onDownloadSet, waitDownloadSet)
+            Coroutine.async(scope, context, executeContext = context) {
+                WebBook.getContentBatchAwait(bookSource, book, claimed)
+            }.onSuccess { missingChapters ->
+                val missingIndexes = missingChapters.mapTo(hashSetOf()) { it.index }
+                claimed.forEach { chapter ->
+                    if (missingIndexes.contains(chapter.index)) return@forEach
+                    val content = BookHelp.getContent(book, chapter)
+                    if (content.isNullOrEmpty()) {
+                        //书源声称已回存但读不到内容,同样退回单章流程
+                        missingIndexes.add(chapter.index)
+                        return@forEach
+                    }
+                    BookHelp.saveImages(bookSource, book, chapter, content, 1)
+                    onSuccess(chapter)
+                    downloadFinish(chapter, content)
+                }
+                onBatchMissing(claimed.filter { missingIndexes.contains(it.index) })
+            }.onError { error ->
+                AppLog.put("《${book.name}》批量下载失败,退回单章下载\n${error.localizedMessage}", error)
+                onBatchMissing(claimed)
+            }.onCancel {
+                onBatchCancel(claimed)
+            }.onFinally {
+                onFinally()
+            }.apply {
+                tasks.add(this)
+            }.start()
+            return true
+        }
+
+        /**
+         * 书源没有回存的章节退回单章流程,并标记不再参与后续批次,避免反复空跑
+         */
+        @Synchronized
+        private fun onBatchMissing(chapters: List<BookChapter>) {
+            chapters.forEach { chapter ->
+                onDownloadSet.remove(chapter.index)
+                if (!isStopped) {
+                    batchFallbackSet.add(chapter.index)
+                    waitDownloadSet.add(chapter.index)
+                }
+            }
+        }
+
+        @Synchronized
+        private fun onBatchCancel(chapters: List<BookChapter>) {
+            chapters.forEach { chapter ->
+                onDownloadSet.remove(chapter.index)
+                if (!isStopped) waitDownloadSet.add(chapter.index)
+            }
+        }
+
+        /**
+         * 阅读预下载用的批量下载。
+         * 返回书源未回存的章节,调用方按单章流程兜底。
+         */
+        suspend fun downloadBatchAwait(chapters: List<BookChapter>): List<BookChapter> {
+            if (chapters.isEmpty()) return emptyList()
+            //只领取没被手动缓存等任务占用的章节,别人在下的不碰
+            val claimed = synchronized(this) {
+                BatchChapterClaim.claim(chapters, onDownloadSet, waitDownloadSet)
+            }
+            if (claimed.size < 2) {
+                synchronized(this) { BatchChapterClaim.release(claimed, onDownloadSet) }
+                return chapters
+            }
+            //已走完成回调的章节标记已被释放,finally 不能重复归还
+            val completed = hashSetOf<Int>()
+            val unclaimed = chapters.filterNot { chapter ->
+                claimed.any { it.index == chapter.index }
+            }
+            try {
+                val missingIndexes = WebBook.getContentBatchAwait(bookSource, book, claimed)
+                    .mapTo(hashSetOf()) { it.index }
+                claimed.forEach { chapter ->
+                    if (missingIndexes.contains(chapter.index)) return@forEach
+                    val content = BookHelp.getContent(book, chapter)
+                    if (content.isNullOrEmpty()) {
+                        missingIndexes.add(chapter.index)
+                        return@forEach
+                    }
+                    BookHelp.saveImages(bookSource, book, chapter, content, 1)
+                    onSuccess(chapter)
+                    completed.add(chapter.index)
+                    ReadBook.downloadedChapters.add(chapter.index)
+                    ReadBook.downloadFailChapters.remove(chapter.index)
+                    downloadFinish(chapter, content)
+                }
+                return unclaimed + claimed.filter { missingIndexes.contains(it.index) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.put("《${book.name}》批量预下载失败,退回单章下载\n${e.localizedMessage}", e)
+                return chapters
+            } finally {
+                synchronized(this) {
+                    BatchChapterClaim.release(
+                        claimed.filterNot { completed.contains(it.index) },
+                        onDownloadSet
+                    )
+                }
+                postEvent(EventBus.UP_DOWNLOAD, book.bookUrl)
+            }
         }
 
         suspend fun downloadAwait(chapter: BookChapter): String {
