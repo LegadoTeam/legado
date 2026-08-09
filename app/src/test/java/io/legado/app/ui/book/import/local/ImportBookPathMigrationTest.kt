@@ -144,6 +144,9 @@ class ImportBookPathMigrationTest {
             .substringBefore("private fun initView()")
 
         assertTrue(localBook.contains("importedUris.add(uri)"))
+        assertTrue(localBook.contains("var firstError: Throwable? = null"))
+        assertTrue(localBook.contains("if (firstError == null) firstError = it"))
+        assertTrue(localBook.contains("throw firstError"))
         assertTrue(localBook.contains("if (importedUris.isEmpty())"))
         assertTrue(localBook.contains("return importedUris"))
         assertTrue(
@@ -152,8 +155,39 @@ class ImportBookPathMigrationTest {
         )
         assertTrue(viewModel.contains(".onSuccess { importedUris ->"))
         assertFalse(viewModel.contains(".onFinally"))
+        assertTrue(viewModel.contains("it.localizedMessage"))
         assertTrue(viewModel.contains("importedUris.size == fileUris.size"))
         assertTrue(activity.contains("it.file.uri in importedUris"))
+    }
+
+    @Test
+    fun `new local import never replaces a book with the same identity`() {
+        val localBook = readProjectFile(
+            "src/main/java/io/legado/app/model/localBook/LocalBook.kt"
+        ).substringAfter("fun importFile(uri: Uri): Book")
+            .substringBefore("fun upBookInfo(book: Book)")
+        val bookDao = readProjectFile(
+            "src/main/java/io/legado/app/data/dao/BookDao.kt"
+        )
+        val book = readProjectFile(
+            "src/main/java/io/legado/app/data/entities/Book.kt"
+        )
+
+        assertTrue(localBook.contains("appDb.bookDao.insertIgnore(book) == -1L"))
+        assertTrue(localBook.contains("R.string.local_book_identity_conflict"))
+        assertFalse(localBook.contains("appDb.bookDao.insert(book)"))
+        assertTrue(bookDao.contains("@Insert(onConflict = OnConflictStrategy.IGNORE)"))
+        assertTrue(bookDao.contains("fun insertIgnore(book: Book): Long"))
+        assertTrue(book.contains("Index(value = [\"name\", \"author\"], unique = true)"))
+
+        val baseActivity = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/import/BaseImportBookActivity.kt"
+        )
+        val archiveImport = baseActivity.substringAfter("private inline fun addArchiveToBookShelf(")
+            .substringBefore("private fun showImportAlert(")
+        assertTrue(archiveImport.contains("catch (error: Exception)"))
+        assertTrue(archiveImport.contains("toastOnUi("))
+        assertTrue(archiveImport.contains("error.localizedMessage"))
     }
 
     @Test

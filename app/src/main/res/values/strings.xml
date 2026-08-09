@@ -464,6 +464,7 @@
     <string name="fattening_book">Awaiting more chapters books</string>
     <string name="finish_book">Finished books</string>
     <string name="local_book">Local books</string>
+    <string name="local_book_identity_conflict">A book named "%1$s" by "%2$s" is already on the bookshelf</string>
     <string name="status_bar_immersion">The status bar color becomes transparent</string>
     <string name="imm_navigation_bar">immersion navigation bar</string>
     <string name="imm_navigation_bar_s">The navigation bar becomes transparent</string>

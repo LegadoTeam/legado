@@ -461,6 +461,7 @@
     <string name="fattening_book">养肥书籍</string>
     <string name="finish_book">完结书籍</string>
     <string name="local_book">本地书籍</string>
+    <string name="local_book_identity_conflict">书架中已存在同名同作者书籍：%1$s / %2$s</string>
     <string name="status_bar_immersion">状态栏颜色透明</string>
     <string name="imm_navigation_bar">沉浸式导航栏</string>
     <string name="imm_navigation_bar_s">导航栏颜色透明</string>

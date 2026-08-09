@@ -2,6 +2,7 @@ package io.legado.app.ui.book.import.local
 
 import android.app.Application
 import android.net.Uri
+import io.legado.app.R
 import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern.archiveFileRegex
@@ -103,7 +104,10 @@ class ImportBookViewModel(application: Application) : BaseViewModel(application)
         execute {
             LocalBook.importFiles(fileUris)
         }.onError {
-            context.toastOnUi("添加书架失败，请尝试重新选择文件夹")
+            context.toastOnUi(
+                it.localizedMessage
+                    ?: context.getString(R.string.add_loaded_books_to_bookshelf_failed)
+            )
             AppLog.put("添加书架失败\n${it.localizedMessage}", it)
         }.onSuccess { importedUris ->
             if (importedUris.size == fileUris.size) {
