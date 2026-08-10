@@ -36,12 +36,16 @@ import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-internal class PendingContent(private val content: String) {
+internal class PendingContent(
+    private val content: String,
+    private val revision: Long,
+) {
     private var pending = true
 
-    fun take(): String? {
+    fun take(currentRevision: Long): String? {
         if (!pending) return null
         pending = false
+        if (revision != currentRevision) return null
         return content
     }
 }
@@ -118,7 +122,8 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
         viewModel.contentLiveData.observe(owner) { event ->
             owner.lifecycleScope.launch {
                 owner.lifecycle.withStateAtLeast(Lifecycle.State.RESUMED) {
-                    val content = event.take() ?: return@withStateAtLeast
+                    val content = event.take(viewModel.draftRevision)
+                        ?: return@withStateAtLeast
                     contentView.setText(content)
                     contentView.post {
                         if (!owner.lifecycle.currentState.isAtLeast(Lifecycle.State.CREATED)) {
@@ -215,6 +220,8 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
         private val draftState = ContentDraftState()
         internal val draftText: String?
             get() = draftState.text
+        internal val draftRevision: Long
+            get() = draftState.snapshot()
         var content: String? = null
         private var contentTask: Coroutine<String?>? = null
         private var contentTaskIsReset = false
@@ -258,7 +265,7 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
                     ReadBook.loadContent(ReadBook.durChapterIndex, resetPageOffset = false)
                 }
                 draftState.applyLoaded(draftRevision, it.orEmpty())?.let { content ->
-                    contentLiveData.value = PendingContent(content)
+                    contentLiveData.value = PendingContent(content, draftState.snapshot())
                 }
             }.onFinally {
                 contentTask = null

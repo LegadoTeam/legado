@@ -43,7 +43,7 @@ class DialogViewLifecycleContractTest {
         assertTrue(created.contains("contentLiveData.observe(owner)"))
         assertTrue(created.contains("titleLiveData.observe(owner)"))
         assertTrue(created.contains("withStateAtLeast(Lifecycle.State.RESUMED)"))
-        assertTrue(created.contains("val content = event.take()"))
+        assertTrue(created.contains("val content = event.take(viewModel.draftRevision)"))
         assertTrue(created.contains("owner.lifecycle.currentState.isAtLeast"))
         assertTrue(created.contains("contentView.post"))
         assertFalse(created.contains("binding.contentView.post"))
@@ -77,10 +77,10 @@ class DialogViewLifecycleContractTest {
 
     @Test
     fun `content result is delivered only once across recreated views`() {
-        val result = PendingContent("original")
+        val result = PendingContent("original", revision = 0)
 
-        assertEquals("original", result.take())
-        assertNull(result.take())
+        assertEquals("original", result.take(currentRevision = 0))
+        assertNull(result.take(currentRevision = 0))
     }
 
     @Test
@@ -103,6 +103,20 @@ class DialogViewLifecycleContractTest {
 
         assertEquals("reset content", state.applyLoaded(request, "reset content"))
         assertEquals("reset content", state.text)
+    }
+
+    @Test
+    fun `published content is ignored after a later draft edit`() {
+        val state = ContentDraftState()
+        state.initialize("original")
+        val request = state.snapshot()
+        val loaded = requireNotNull(state.applyLoaded(request, "loaded content"))
+        val result = PendingContent(loaded, state.snapshot())
+
+        state.update("later edit")
+
+        assertNull(result.take(state.snapshot()))
+        assertEquals("later edit", state.text)
     }
 
     @Test
