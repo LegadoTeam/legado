@@ -95,7 +95,7 @@ jobs:
         run: bash .github/scripts/test-push-web-assets.sh
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6.2.0
+        uses: gradle/actions/setup-gradle@v6.3.0
 
       - name: Prepare Assets
         run: |
