@@ -6,6 +6,7 @@ import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import androidx.activity.addCallback
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.core.view.isVisible
@@ -88,6 +89,7 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
     private val tocAdapter by lazy {
         ChangeChapterTocAdapter(requireContext(), this)
     }
+    private var searchFinishDialog: AlertDialog? = null
     private var adapterDataObserver: RecyclerView.AdapterDataObserver? = null
     private var targetBook: Book? = null
     private var tocLoading = false
@@ -129,6 +131,8 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
         adapterDataObserver = null
         binding.recyclerView.adapter = null
         binding.recyclerViewToc.adapter = null
+        searchFinishDialog?.dismiss()
+        searchFinishDialog = null
         super.onDestroyView()
     }
 
@@ -257,7 +261,7 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
             binding.toolBar.menu.applyTint(requireContext())
         }
         viewModel.searchFinishData.observe(owner) { event ->
-            if (event.take() == true) showEmptySearchGroupDialog(owner)
+            showEmptySearchGroupDialog(event, owner)
         }
         viewModel.originalChaptersState.observe(owner, ::showOriginalChaptersState)
         viewModel.tocState.observe(owner, ::showTocState)
@@ -274,6 +278,7 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
 
                 is ChapterContentResult.Error -> {
                     binding.clToc.gone()
+                    viewModel.clearToc()
                     toastOnUi(result.message)
                 }
 
@@ -322,19 +327,33 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
         }
     }
 
-    private fun showEmptySearchGroupDialog(owner: LifecycleOwner) {
+    private fun showEmptySearchGroupDialog(
+        event: PendingEvent<Boolean>,
+        owner: LifecycleOwner,
+    ) {
+        if (event.peek() != true) {
+            event.take()
+            return
+        }
         val searchGroup = AppConfig.searchGroup
-        if (searchGroup.isEmpty()) return
-        context?.alert("搜索结果为空") {
+        if (searchGroup.isEmpty()) {
+            event.take()
+            return
+        }
+        if (searchFinishDialog != null) return
+        searchFinishDialog = context?.alert("搜索结果为空") {
             setMessage("${searchGroup}分组搜索结果为空,是否切换到全部分组")
-            noButton()
+            noButton { event.take() }
             yesButton {
+                event.take()
                 AppConfig.searchGroup = ""
                 viewModel.startSearch()
                 owner.lifecycleScope.launch {
                     upGroupMenu()
                 }
             }
+            onCancelled { event.take() }
+            onDismiss { searchFinishDialog = null }
         }
     }
 

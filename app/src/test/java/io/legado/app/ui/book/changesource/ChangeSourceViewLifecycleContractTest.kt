@@ -72,19 +72,62 @@ class ChangeSourceViewLifecycleContractTest {
 
         assertTrue(bookDestroy.contains("unregisterAdapterDataObserver"))
         assertTrue(bookDestroy.contains("binding.recyclerView.adapter = null"))
+        assertTrue(bookDestroy.contains("searchFinishDialog?.dismiss()"))
         assertTrue(bookDestroy.contains("waitDialog?.dismiss()"))
         assertTrue(chapterDestroy.contains("unregisterAdapterDataObserver"))
         assertTrue(chapterDestroy.contains("binding.recyclerView.adapter = null"))
         assertTrue(chapterDestroy.contains("binding.recyclerViewToc.adapter = null"))
+        assertTrue(chapterDestroy.contains("searchFinishDialog?.dismiss()"))
         assertTrue(chapter.contains("addCallback(viewLifecycleOwner)"))
     }
 
     @Test
-    fun `pending result is delivered once after a collector gap`() {
+    fun `pending result can be inspected before one-time delivery`() {
         val event = PendingEvent("result")
 
+        assertEquals("result", event.peek())
+        assertEquals("result", event.peek())
         assertEquals("result", event.take())
+        assertNull(event.peek())
         assertNull(event.take())
+    }
+
+    @Test
+    fun `search prompt stays pending until the dialog finishes`() {
+        listOf(
+            source("ChangeBookSourceDialog.kt"),
+            source("ChangeChapterSourceDialog.kt"),
+        ).forEach { dialog ->
+            val prompt = if (dialog.contains("private fun showChangeSourceLoading")) {
+                dialog.section(
+                    "private fun showEmptySearchGroupDialog(",
+                    "private fun showChangeSourceLoading",
+                )
+            } else {
+                dialog.section(
+                    "private fun showEmptySearchGroupDialog(",
+                    "private val startStopMenuItem",
+                )
+            }
+            assertTrue(prompt.contains("if (event.peek() != true)"))
+            assertTrue(prompt.contains("onCancelled { event.take() }"))
+            assertTrue(prompt.contains("onDismiss { searchFinishDialog = null }"))
+        }
+    }
+
+    @Test
+    fun `content errors clear the replayed toc state`() {
+        val observer = source("ChangeChapterSourceDialog.kt").section(
+            "viewModel.contentResult.observe(owner)",
+            "viewModel.changeSourceResult.observe(owner)",
+        )
+        val error = observer.section(
+            "is ChapterContentResult.Error",
+            "null -> Unit",
+        )
+
+        assertTrue(error.contains("binding.clToc.gone()"))
+        assertTrue(error.contains("viewModel.clearToc()"))
     }
 
     private fun source(fileName: String): String {

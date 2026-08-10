@@ -6,9 +6,11 @@ import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.Lifecycle.State.STARTED
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -70,6 +72,7 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
     private val callBack: CallBack? get() = activity as? CallBack
     private val viewModel: ChangeBookSourceViewModel by viewModels()
     private var waitDialog: WaitDialog? = null
+    private var searchFinishDialog: AlertDialog? = null
     private var adapterDataObserver: RecyclerView.AdapterDataObserver? = null
     private val adapter by lazy { ChangeBookSourceAdapter(requireContext(), viewModel, this) }
     private val editSourceResult =
@@ -98,6 +101,8 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
         adapterDataObserver?.let(adapter::unregisterAdapterDataObserver)
         adapterDataObserver = null
         binding.recyclerView.adapter = null
+        searchFinishDialog?.dismiss()
+        searchFinishDialog = null
         waitDialog?.dismiss()
         waitDialog = null
         super.onDestroyView()
@@ -217,22 +222,7 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
             binding.toolBar.menu.applyTint(requireContext())
         }
         viewModel.searchFinishData.observe(owner) { event ->
-            if (event.take() == true) {
-                val searchGroup = AppConfig.searchGroup
-                if (searchGroup.isNotEmpty()) {
-                    context?.alert("搜索结果为空") {
-                        setMessage("${searchGroup}分组搜索结果为空,是否切换到全部分组")
-                        cancelButton()
-                        okButton {
-                            AppConfig.searchGroup = ""
-                            viewModel.startSearch()
-                            owner.lifecycleScope.launch {
-                                upGroupMenuName()
-                            }
-                        }
-                    }
-                }
-            }
+            showEmptySearchGroupDialog(event, owner)
         }
         viewModel.changeSourceLoading.observe(owner, ::showChangeSourceLoading)
         viewModel.changeSourceResult.observe(owner) { event ->
@@ -285,6 +275,36 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
                 groups.addAll(it)
                 upGroupMenu()
             }
+        }
+    }
+
+    private fun showEmptySearchGroupDialog(
+        event: PendingEvent<Boolean>,
+        owner: LifecycleOwner,
+    ) {
+        if (event.peek() != true) {
+            event.take()
+            return
+        }
+        val searchGroup = AppConfig.searchGroup
+        if (searchGroup.isEmpty()) {
+            event.take()
+            return
+        }
+        if (searchFinishDialog != null) return
+        searchFinishDialog = context?.alert("搜索结果为空") {
+            setMessage("${searchGroup}分组搜索结果为空,是否切换到全部分组")
+            cancelButton { event.take() }
+            okButton {
+                event.take()
+                AppConfig.searchGroup = ""
+                viewModel.startSearch()
+                owner.lifecycleScope.launch {
+                    upGroupMenuName()
+                }
+            }
+            onCancelled { event.take() }
+            onDismiss { searchFinishDialog = null }
         }
     }
 

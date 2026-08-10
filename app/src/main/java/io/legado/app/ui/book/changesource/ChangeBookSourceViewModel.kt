@@ -68,6 +68,8 @@ import kotlin.math.min
 internal class PendingEvent<out T>(private val value: T) {
     private val handled = AtomicBoolean(false)
 
+    fun peek(): T? = value.takeIf { !handled.get() }
+
     fun take(): T? = value.takeIf { handled.compareAndSet(false, true) }
 }
 
