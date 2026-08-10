@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.app.AlertDialog
+import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.MutableLiveData
@@ -45,6 +46,30 @@ internal class PendingContent(private val content: String) {
     }
 }
 
+internal class ContentDraftState {
+    var text: String? = null
+        private set
+    private var revision = 0L
+
+    fun initialize(text: String) {
+        if (this.text == null) this.text = text
+    }
+
+    fun update(text: String) {
+        if (this.text == text) return
+        this.text = text
+        revision++
+    }
+
+    fun snapshot(): Long = revision
+
+    fun applyLoaded(snapshot: Long, text: String): String? {
+        if (snapshot != revision) return null
+        this.text = text
+        return text
+    }
+}
+
 /**
  * 内容编辑
  */
@@ -62,10 +87,19 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         val owner = viewLifecycleOwner
         val contentView = binding.contentView
+        viewModel.draftText?.let(contentView::setText)
+        viewModel.initializeDraft(contentView.text?.toString().orEmpty())
+        contentView.doAfterTextChanged {
+            viewModel.updateDraft(it?.toString().orEmpty())
+        }
         binding.toolBar.setBackgroundColor(primaryColor)
-        binding.toolBar.title = ReadBook.curTextChapter?.title
+        binding.toolBar.title = viewModel.titleLiveData.value ?: ReadBook.curTextChapter?.title
+        viewModel.titleLiveData.observe(owner) {
+            binding.toolBar.title = it
+        }
         initMenu()
         binding.toolBar.setOnClickListener {
+            if (editTitleDialog != null) return@setOnClickListener
             owner.lifecycleScope.launch {
                 val book = ReadBook.book ?: return@launch
                 val chapter = withContext(IO) {
@@ -126,8 +160,9 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
     }
 
     private fun editTitle(chapter: BookChapter) {
-        val owner = viewLifecycleOwner
-        val toolBar = binding.toolBar
+        if (editTitleDialog != null) return
+        val bookUrl = chapter.bookUrl
+        val chapterIndex = chapter.index
         editTitleDialog = alert {
             setTitle(R.string.edit)
             val alertBinding = DialogEditTextBinding.inflate(layoutInflater)
@@ -139,15 +174,15 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
                 Coroutine.async {
                     chapter.update()
                     withContext(Main) {
-                        ReadBook.loadContent(
-                            ReadBook.durChapterIndex,
-                            resetPageOffset = false,
-                        )
+                        if (ReadBook.book?.bookUrl == bookUrl &&
+                            ReadBook.durChapterIndex == chapterIndex
+                        ) {
+                            ReadBook.loadContent(chapterIndex, resetPageOffset = false)
+                        }
                     }
-                }.onSuccess {
-                    owner.lifecycleScope.launch {
-                        toolBar.title = chapter.getDisplayTitle()
-                    }
+                    chapter.getDisplayTitle()
+                }.onSuccess { title ->
+                    viewModel.titleLiveData.value = title
                 }
             }
             onDismiss { dialog ->
@@ -176,10 +211,18 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
     class ContentEditViewModel(application: Application) : BaseViewModel(application) {
         val loadStateLiveData = MutableLiveData<Boolean>()
         internal val contentLiveData = MutableLiveData<PendingContent>()
+        internal val titleLiveData = MutableLiveData<String>()
+        private val draftState = ContentDraftState()
+        internal val draftText: String?
+            get() = draftState.text
         var content: String? = null
         private var contentTask: Coroutine<String?>? = null
         private var contentTaskIsReset = false
         private var resetPending = false
+
+        fun initializeDraft(text: String) = draftState.initialize(text)
+
+        fun updateDraft(text: String) = draftState.update(text)
 
         fun initContent(reset: Boolean = false) {
             if (!reset && contentLiveData.value != null) return
@@ -187,6 +230,7 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
                 if (reset && !contentTaskIsReset) resetPending = true
                 return
             }
+            val draftRevision = draftState.snapshot()
             contentTaskIsReset = reset
             contentTask = execute {
                 val book = ReadBook.book ?: return@execute null
@@ -213,7 +257,9 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
                 if (reset) {
                     ReadBook.loadContent(ReadBook.durChapterIndex, resetPageOffset = false)
                 }
-                contentLiveData.value = PendingContent(it.orEmpty())
+                draftState.applyLoaded(draftRevision, it.orEmpty())?.let { content ->
+                    contentLiveData.value = PendingContent(content)
+                }
             }.onFinally {
                 contentTask = null
                 contentTaskIsReset = false

@@ -1,5 +1,6 @@
 package io.legado.app.ui
 
+import io.legado.app.ui.book.read.ContentDraftState
 import io.legado.app.ui.book.read.PendingContent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -37,7 +38,10 @@ class DialogViewLifecycleContractTest {
 
         assertTrue(created.contains("val owner = viewLifecycleOwner"))
         assertTrue(created.contains("val contentView = binding.contentView"))
+        assertTrue(created.contains("viewModel.draftText?.let(contentView::setText)"))
+        assertTrue(created.contains("contentView.doAfterTextChanged"))
         assertTrue(created.contains("contentLiveData.observe(owner)"))
+        assertTrue(created.contains("titleLiveData.observe(owner)"))
         assertTrue(created.contains("withStateAtLeast(Lifecycle.State.RESUMED)"))
         assertTrue(created.contains("val content = event.take()"))
         assertTrue(created.contains("owner.lifecycle.currentState.isAtLeast"))
@@ -47,22 +51,23 @@ class DialogViewLifecycleContractTest {
         assertTrue(viewModel.contains("private var contentTask"))
         assertTrue(viewModel.contains("if (!reset && contentLiveData.value != null) return"))
         assertTrue(viewModel.contains("if (contentTask?.isActive == true)"))
+        assertTrue(viewModel.contains("val draftRevision = draftState.snapshot()"))
+        assertTrue(viewModel.contains("draftState.applyLoaded(draftRevision"))
         assertTrue(viewModel.contains("if (reset) {\n                    ReadBook.loadContent"))
         assertTrue(viewModel.contains("contentLiveData.value = PendingContent("))
         assertTrue(resetMenu.contains("viewModel.initContent(true)"))
         assertFalse(resetMenu.contains("ReadBook.loadContent"))
         assertTrue(source.contains("editTitleDialog?.dismiss()"))
         assertTrue(source.contains("override fun onDestroyView()"))
-        assertTrue(editTitle.contains("val owner = viewLifecycleOwner"))
-        assertTrue(editTitle.contains("val toolBar = binding.toolBar"))
+        assertTrue(editTitle.contains("if (editTitleDialog != null) return"))
+        assertTrue(editTitle.contains("val bookUrl = chapter.bookUrl"))
+        assertTrue(editTitle.contains("val chapterIndex = chapter.index"))
         assertTrue(editTitle.contains("Coroutine.async"))
         assertTrue(editTitle.contains("withContext(Main)"))
-        assertTrue(editTitle.contains("owner.lifecycleScope.launch"))
+        assertTrue(editTitle.contains("ReadBook.book?.bookUrl == bookUrl"))
+        assertTrue(editTitle.contains("ReadBook.durChapterIndex == chapterIndex"))
+        assertTrue(editTitle.contains("viewModel.titleLiveData.value = title"))
         assertTrue(editTitle.contains("val title = alertBinding.editView.text.toString()"))
-        assertTrue(
-            editTitle.indexOf("ReadBook.loadContent") <
-                editTitle.indexOf("owner.lifecycleScope.launch")
-        )
         assertFalse(created.contains("\n            lifecycleScope.launch"))
         assertFalse(editTitle.contains("binding.toolBar.title"))
         assertFalse(editTitle.contains("viewLifecycleOwner.lifecycleScope.launch"))
@@ -76,6 +81,28 @@ class DialogViewLifecycleContractTest {
 
         assertEquals("original", result.take())
         assertNull(result.take())
+    }
+
+    @Test
+    fun `stale content result does not replace an edited draft`() {
+        val state = ContentDraftState()
+        state.initialize("original")
+        val request = state.snapshot()
+
+        state.update("edited draft")
+
+        assertNull(state.applyLoaded(request, "loaded content"))
+        assertEquals("edited draft", state.text)
+    }
+
+    @Test
+    fun `content result applies when the draft has not changed`() {
+        val state = ContentDraftState()
+        state.initialize("edited draft")
+        val request = state.snapshot()
+
+        assertEquals("reset content", state.applyLoaded(request, "reset content"))
+        assertEquals("reset content", state.text)
     }
 
     @Test
