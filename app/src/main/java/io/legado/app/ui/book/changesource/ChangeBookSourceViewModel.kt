@@ -771,7 +771,7 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
     }
 
     fun del(searchBook: SearchBook) {
-        execute {
+        Coroutine.async {
             SourceHelp.deleteBookSource(searchBook.origin)
             appDb.searchBookDao.delete(searchBook)
         }

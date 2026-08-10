@@ -116,10 +116,13 @@ class ChangeSourceViewLifecycleContractTest {
         }
 
         val autoChange = viewModel.section("fun autoChangeSource", "fun setBookScore")
+        val delete = viewModel.section("fun del", "fun autoChangeSource")
         val loading = bookDialog.section(
             "private fun showChangeSourceLoading",
             "private val startStopMenuItem",
         )
+        assertTrue(delete.contains("Coroutine.async"))
+        assertFalse(delete.contains("execute {"))
         assertTrue(autoChange.contains("deleteAfterChange: SearchBook"))
         assertTrue(autoChange.contains("it.origin != deleteAfterChange.origin"))
         assertTrue(autoChange.contains("deleteAfterChange = deleteAfterChange"))
