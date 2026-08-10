@@ -22,6 +22,15 @@ import java.lang.ref.WeakReference
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.regex.Pattern
 
+internal fun sameTitleLineMatcher(
+    content: String,
+    namePattern: String,
+    titlePattern: String
+) = Pattern.compile(
+    "^(\\s|\\p{P}|$namePattern)*$titlePattern" +
+        "[\\t\\x0B\\f\\p{Zs}]*(?:(?:\\r\\n|\\r|\\n)\\s*|$)"
+).matcher(content)
+
 class ContentProcessor private constructor(
     private val bookName: String,
     private val bookOrigin: String
@@ -108,8 +117,7 @@ class ContentProcessor private constructor(
             if (!removeSameTitleCache.contains(fileName)) try {
                 val name = Pattern.quote(book.name)
                 var title = chapter.title.escapeRegex().replace(spaceRegex, "\\\\s*")
-                var matcher = Pattern.compile("^(\\s|\\p{P}|${name})*${title}(\\s)*")
-                    .matcher(mContent)
+                var matcher = sameTitleLineMatcher(mContent, name, title)
                 if (matcher.find()) {
                     mContent = mContent.substring(matcher.end())
                     sameTitleRemoved = true
@@ -121,8 +129,7 @@ class ContentProcessor private constructor(
                             replaceBook = replaceBook
                         )
                     )
-                    matcher = Pattern.compile("^(\\s|\\p{P}|${name})*${title}(\\s)*")
-                        .matcher(mContent)
+                    matcher = sameTitleLineMatcher(mContent, name, title)
                     if (matcher.find()) {
                         mContent = mContent.substring(matcher.end())
                         sameTitleRemoved = true
