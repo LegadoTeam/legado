@@ -9,6 +9,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
+import android.provider.DocumentsContract
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
@@ -690,8 +691,11 @@ class ExportBookService : BaseService() {
             val target = source.parentFile?.resolve(newName) ?: return null
             if (source.renameTo(target)) return FileDoc.fromFile(target)
         }
-        file.asDocumentFile()?.let { document ->
-            if (document.renameTo(newName)) return FileDoc.fromDocumentFile(document)
+        if (file.isContentScheme) {
+            val renamedUri = runCatching {
+                DocumentsContract.renameDocument(appCtx.contentResolver, file.uri, newName)
+            }.getOrNull()
+            if (renamedUri != null) return FileDoc.fromUri(renamedUri, false)
         }
         return null
     }
