@@ -70,32 +70,15 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
     private val groups = linkedSetOf<String>()
     private val callBack: CallBack? get() = activity as? CallBack
     private val viewModel: ChangeBookSourceViewModel by viewModels()
-    private val waitDialog by lazy { WaitDialog(requireContext()) }
+    private var waitDialog: WaitDialog? = null
+    private var searchFinishCallback: ((isEmpty: Boolean) -> Unit)? = null
+    private var adapterDataObserver: RecyclerView.AdapterDataObserver? = null
     private val adapter by lazy { ChangeBookSourceAdapter(requireContext(), viewModel, this) }
     private val editSourceResult =
         registerForActivityResult(StartActivityContract(BookSourceEditActivity::class.java)) {
             val origin = it.data?.getStringExtra("origin") ?: return@registerForActivityResult
             viewModel.startSearch(origin)
         }
-    private val searchFinishCallback: (isEmpty: Boolean) -> Unit = {
-        if (it) {
-            val searchGroup = AppConfig.searchGroup
-            if (searchGroup.isNotEmpty()) {
-                lifecycleScope.launch {
-                    context?.alert("搜索结果为空") {
-                        setMessage("${searchGroup}分组搜索结果为空,是否切换到全部分组")
-                        cancelButton()
-                        okButton {
-                            AppConfig.searchGroup = ""
-                            upGroupMenuName()
-                            viewModel.startSearch()
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     override fun onStart() {
         super.onStart()
         setLayout(1f, ViewGroup.LayoutParams.MATCH_PARENT)
@@ -111,12 +94,48 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
         initSearchView()
         initBottomBar()
         initLiveData()
-        viewModel.searchFinishCallback = searchFinishCallback
+        bindSearchFinishCallback()
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        viewModel.searchFinishCallback = null
+    override fun onDestroyView() {
+        searchFinishCallback?.let { callback ->
+            if (viewModel.searchFinishCallback === callback) {
+                viewModel.searchFinishCallback = null
+            }
+        }
+        searchFinishCallback = null
+        adapterDataObserver?.let(adapter::unregisterAdapterDataObserver)
+        adapterDataObserver = null
+        binding.recyclerView.adapter = null
+        waitDialog?.dismiss()
+        waitDialog = null
+        super.onDestroyView()
+    }
+
+    private fun bindSearchFinishCallback() {
+        val owner = viewLifecycleOwner
+        val callback: (Boolean) -> Unit = { isEmpty ->
+            if (isEmpty) {
+                val searchGroup = AppConfig.searchGroup
+                if (searchGroup.isNotEmpty()) {
+                    owner.lifecycleScope.launch {
+                        context?.alert("搜索结果为空") {
+                            setMessage("${searchGroup}分组搜索结果为空,是否切换到全部分组")
+                            cancelButton()
+                            okButton {
+                                AppConfig.searchGroup = ""
+                                viewModel.startSearch()
+                                owner.lifecycleScope.launch {
+                                    upGroupMenuName()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        searchFinishCallback = callback
+        viewModel.searchFinishCallback = callback
     }
 
     private fun showTitle() {
@@ -141,21 +160,22 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
     }
 
     private fun initRecyclerView() {
-        binding.recyclerView.addItemDecoration(VerticalDivider(requireContext()))
-        binding.recyclerView.adapter = adapter
-        adapter.registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
+        val recyclerView = binding.recyclerView
+        recyclerView.addItemDecoration(VerticalDivider(requireContext()))
+        recyclerView.adapter = adapter
+        adapterDataObserver = object : RecyclerView.AdapterDataObserver() {
             override fun onItemRangeInserted(positionStart: Int, itemCount: Int) {
                 if (positionStart == 0) {
-                    binding.recyclerView.scrollToPosition(0)
+                    recyclerView.scrollToPosition(0)
                 }
             }
 
             override fun onItemRangeMoved(fromPosition: Int, toPosition: Int, itemCount: Int) {
                 if (toPosition == 0) {
-                    binding.recyclerView.scrollToPosition(0)
+                    recyclerView.scrollToPosition(0)
                 }
             }
-        })
+        }.also(adapter::registerAdapterDataObserver)
     }
 
     private fun initSearchView() {
@@ -215,6 +235,7 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
     }
 
     private fun initLiveData() {
+        val owner = viewLifecycleOwner
         viewModel.searchStateData.observe(viewLifecycleOwner) {
             binding.refreshProgressBar.isAutoLoading = it
             if (it) {
@@ -230,16 +251,16 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
             }
             binding.toolBar.menu.applyTint(requireContext())
         }
-        lifecycleScope.launch {
-            lifecycle.currentStateFlow.first { it.isAtLeast(STARTED) }
+        owner.lifecycleScope.launch {
+            owner.lifecycle.currentStateFlow.first { it.isAtLeast(STARTED) }
             viewModel.searchDataFlow.conflate().collect {
                 adapter.setItems(it)
                 delay(1000)
             }
         }
 
-        lifecycleScope.launch {
-            repeatOnLifecycle(STARTED) {
+        owner.lifecycleScope.launch {
+            owner.repeatOnLifecycle(STARTED) {
                 viewModel.changeSourceProgress
                     .drop(1)
                     .collect { (count, name) ->
@@ -256,7 +277,7 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
             }
         }
 
-        lifecycleScope.launch {
+        owner.lifecycleScope.launch {
             appDb.bookSourceDao.flowEnabledGroups().conflate().collect {
                 groups.clear()
                 groups.addAll(it)
@@ -397,29 +418,42 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
     }
 
     private fun changeSource(searchBook: SearchBook, onSuccess: (() -> Unit)? = null) {
-        waitDialog.setText(R.string.load_toc)
-        waitDialog.show()
+        val owner = viewLifecycleOwner
+        val progressDialog = WaitDialog(requireContext())
+        waitDialog?.dismiss()
+        waitDialog = progressDialog
+        progressDialog.setText(R.string.load_toc)
+        progressDialog.show()
         val book = viewModel.bookMap[searchBook.primaryStr()] ?: searchBook.toBook()
         if (book.isWebFile) { //文件类书源不解析目录
             val source = appDb.bookSourceDao.getBookSource(book.origin)
             if (source == null) {
+                progressDialog.dismiss()
+                waitDialog = null
                 AppLog.put("书源不存在", null, true)
                 return
             }
-            waitDialog.dismiss()
+            progressDialog.dismiss()
+            waitDialog = null
             callBack?.changeTo(source, book, emptyList())
             onSuccess?.invoke()
             return
         }
         val coroutine = viewModel.getToc(book, { toc, source ->
-            waitDialog.dismiss()
             callBack?.changeTo(source, book, toc)
-            onSuccess?.invoke()
+            owner.lifecycleScope.launch {
+                progressDialog.dismiss()
+                if (waitDialog === progressDialog) waitDialog = null
+                onSuccess?.invoke()
+            }
         }, {
-            waitDialog.dismiss()
             AppLog.put("换源获取目录出错\n$it", it, true)
+            owner.lifecycleScope.launch {
+                progressDialog.dismiss()
+                if (waitDialog === progressDialog) waitDialog = null
+            }
         })
-        waitDialog.setOnCancelListener {
+        progressDialog.setOnCancelListener {
             coroutine.cancel()
         }
     }
