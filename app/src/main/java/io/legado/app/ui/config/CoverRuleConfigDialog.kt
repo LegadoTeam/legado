@@ -54,7 +54,7 @@ class CoverRuleConfigDialog : BaseDialogFragment(R.layout.dialog_cover_rule_conf
     }
 
     private fun initData() {
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             val rule = withContext(IO) {
                 BookCover.getCoverRule()
             }

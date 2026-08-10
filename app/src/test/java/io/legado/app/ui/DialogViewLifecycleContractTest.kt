@@ -1,0 +1,88 @@
+package io.legado.app.ui
+
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.io.File
+
+class DialogViewLifecycleContractTest {
+
+    @Test
+    fun `dialog data loaders are cancelled with their views`() {
+        val cover = source("config/CoverRuleConfigDialog.kt")
+            .section("private fun initData()", "\n    }")
+        val search = source("book/search/SearchScopeDialog.kt")
+
+        assertTrue(cover.contains("viewLifecycleOwner.lifecycleScope.launch"))
+        assertFalse(cover.contains("\n        lifecycleScope.launch"))
+
+        val initData = search.section("private fun initData()", "@SuppressLint")
+        val upBookSource = search.section("private fun upBookSource", "inner class RecyclerAdapter")
+        assertTrue(initData.contains("viewLifecycleOwner.lifecycleScope.launch"))
+        assertTrue(upBookSource.contains("viewLifecycleOwner.lifecycleScope.launch"))
+        assertTrue(upBookSource.contains("viewLifecycleOwner.lifecycle"))
+        assertFalse(upBookSource.contains("\n        sourceFlowJob = lifecycleScope.launch"))
+    }
+
+    @Test
+    fun `content editor callbacks only update the current view`() {
+        val source = source("book/read/ContentEditDialog.kt")
+        val created = source.section("override fun onFragmentCreated", "private fun loadContent")
+        val loadContent = source.section("private fun loadContent", "private fun initMenu")
+        val editTitle = source.section("private fun editTitle", "override fun onCancel")
+
+        assertTrue(created.contains("val owner = viewLifecycleOwner"))
+        assertTrue(created.contains("val contentView = binding.contentView"))
+        assertTrue(created.contains("owner.lifecycleScope.launch"))
+        assertTrue(created.contains("owner.lifecycle.currentState.isAtLeast"))
+        assertTrue(created.contains("contentView.post"))
+        assertFalse(created.contains("binding.contentView.post"))
+        assertTrue(loadContent.contains("val owner = viewLifecycleOwner"))
+        assertTrue(loadContent.contains("owner.lifecycleScope.launch"))
+        assertTrue(editTitle.contains("val owner = viewLifecycleOwner"))
+        assertTrue(editTitle.contains("val toolBar = binding.toolBar"))
+        assertTrue(editTitle.contains("lifecycleScope.launch"))
+        assertTrue(editTitle.contains("owner.lifecycleScope.launch"))
+        assertTrue(editTitle.contains("val title = alertBinding.editView.text.toString()"))
+        assertTrue(
+            editTitle.indexOf("ReadBook.loadContent") <
+                editTitle.indexOf("owner.lifecycleScope.launch")
+        )
+        assertFalse(created.contains("\n            lifecycleScope.launch"))
+        assertFalse(editTitle.contains("binding.toolBar.title"))
+        assertFalse(editTitle.contains("viewLifecycleOwner.lifecycleScope.launch"))
+    }
+
+    @Test
+    fun `text dialog countdown is cancelled with the view`() {
+        val source = source("widget/dialog/TextDialog.kt")
+        val countdown = source.section("if (time > 0)", "} else {")
+
+        assertTrue(countdown.contains("val owner = viewLifecycleOwner"))
+        assertTrue(countdown.contains("owner.lifecycleScope.launch"))
+        assertTrue(countdown.contains("val badgeView = binding.badgeView"))
+        assertTrue(countdown.contains("badgeView.setBadgeCount"))
+        assertFalse(countdown.contains("view.post"))
+    }
+
+    private fun source(relativePath: String): String {
+        return projectFile("src/main/java/io/legado/app/ui/$relativePath")
+            .readText()
+            .replace("\r\n", "\n")
+    }
+
+    private fun String.section(startMarker: String, endMarker: String): String {
+        val start = indexOf(startMarker)
+        val end = indexOf(endMarker, start + startMarker.length)
+        require(start >= 0 && end > start) {
+            "Missing section $startMarker .. $endMarker"
+        }
+        return substring(start, end)
+    }
+
+    private fun projectFile(pathInApp: String): File {
+        return listOf(File(pathInApp), File("app/$pathInApp"))
+            .firstOrNull { it.isFile }
+            ?: error("Missing project file: $pathInApp")
+    }
+}

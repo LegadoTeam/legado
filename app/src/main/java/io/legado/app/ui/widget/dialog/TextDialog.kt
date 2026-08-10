@@ -9,6 +9,7 @@ import android.view.textclassifier.TextClassifier
 import android.widget.ArrayAdapter
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import io.legado.app.R
@@ -156,23 +157,26 @@ class TextDialog() : BaseDialogFragment(R.layout.dialog_text_view) {
             time = it.getLong("time", 0L)
         }
         if (time > 0) {
-            binding.badgeView.setBadgeCount((time / 1000).toInt())
-            lifecycleScope.launch {
+            val owner = viewLifecycleOwner
+            val badgeView = binding.badgeView
+            badgeView.setBadgeCount((time / 1000).toInt())
+            owner.lifecycleScope.launch {
                 while (time > 0) {
                     delay(1000)
                     time -= 1000
-                    binding.badgeView.setBadgeCount((time / 1000).toInt())
+                    badgeView.setBadgeCount((time / 1000).toInt())
                     if (time <= 0) {
-                        view.post {
-                            dialog?.setCancelable(true)
-                            if (autoClose) dialog?.cancel()
-                        }
+                        dialog?.setCancelable(true)
+                        if (autoClose) dialog?.cancel()
                     }
                 }
             }
         } else {
+            val owner = viewLifecycleOwner
             view.post {
-                dialog?.setCancelable(true)
+                if (owner.lifecycle.currentState.isAtLeast(Lifecycle.State.CREATED)) {
+                    dialog?.setCancelable(true)
+                }
             }
         }
     }

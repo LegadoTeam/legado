@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
@@ -45,11 +46,13 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
+        val owner = viewLifecycleOwner
+        val contentView = binding.contentView
         binding.toolBar.setBackgroundColor(primaryColor)
         binding.toolBar.title = ReadBook.curTextChapter?.title
         initMenu()
         binding.toolBar.setOnClickListener {
-            lifecycleScope.launch {
+            owner.lifecycleScope.launch {
                 val book = ReadBook.book ?: return@launch
                 val chapter = withContext(IO) {
                     appDb.bookChapterDao.getChapter(book.bookUrl, ReadBook.durChapterIndex)
@@ -64,14 +67,24 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
                 binding.rlLoading.gone()
             }
         }
-        viewModel.initContent {
-            binding.contentView.setText(it)
-            binding.contentView.post {
-                binding.contentView.apply {
+        loadContent {
+            contentView.setText(it)
+            contentView.post {
+                if (!owner.lifecycle.currentState.isAtLeast(Lifecycle.State.CREATED)) return@post
+                contentView.apply {
                     val lineIndex = layout.getLineForOffset(ReadBook.durChapterPos)
                     val lineHeight = layout.getLineTop(lineIndex)
                     scrollTo(0, lineHeight)
                 }
+            }
+        }
+    }
+
+    private fun loadContent(reset: Boolean = false, onLoaded: (String) -> Unit) {
+        val owner = viewLifecycleOwner
+        viewModel.initContent(reset) { content ->
+            owner.lifecycleScope.launch {
+                onLoaded(content)
             }
         }
     }
@@ -85,7 +98,7 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
                     save()
                     dismiss()
                 }
-                R.id.menu_reset -> viewModel.initContent(true) { content ->
+                R.id.menu_reset -> loadContent(true) { content ->
                     binding.contentView.setText(content)
                     ReadBook.loadContent(ReadBook.durChapterIndex, resetPageOffset = false)
                 }
@@ -97,19 +110,24 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
     }
 
     private fun editTitle(chapter: BookChapter) {
+        val owner = viewLifecycleOwner
+        val toolBar = binding.toolBar
         alert {
             setTitle(R.string.edit)
             val alertBinding = DialogEditTextBinding.inflate(layoutInflater)
             alertBinding.editView.setText(chapter.title)
             setCustomView(alertBinding.root)
             okButton {
-                chapter.title = alertBinding.editView.text.toString()
+                val title = alertBinding.editView.text.toString()
                 lifecycleScope.launch {
+                    chapter.title = title
                     withContext(IO) {
                         chapter.update()
                     }
-                    binding.toolBar.title = chapter.getDisplayTitle()
                     ReadBook.loadContent(ReadBook.durChapterIndex, resetPageOffset = false)
+                    owner.lifecycleScope.launch {
+                        toolBar.title = chapter.getDisplayTitle()
+                    }
                 }
             }
         }
