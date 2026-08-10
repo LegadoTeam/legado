@@ -1,6 +1,8 @@
 package io.legado.app.ui.book.changesource
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -21,9 +23,9 @@ class ChangeSourceViewLifecycleContractTest {
     @Test
     fun `dialog collectors are cancelled with the current view`() {
         val book = source("ChangeBookSourceDialog.kt")
-            .section("private fun initLiveData()", "private val startStopMenuItem")
+            .section("private fun initLiveData()", "private fun showChangeSourceLoading")
         val chapter = source("ChangeChapterSourceDialog.kt")
-            .section("private fun initLiveData()", "private val startStopMenuItem")
+            .section("private fun initLiveData()", "private fun showEmptySearchGroupDialog")
 
         listOf(book, chapter).forEach { initLiveData ->
             assertTrue(initLiveData.contains("val owner = viewLifecycleOwner"))
@@ -35,26 +37,39 @@ class ChangeSourceViewLifecycleContractTest {
     }
 
     @Test
-    fun `per view callbacks and adapter observers are released`() {
+    fun `view model owns asynchronous results instead of fragment callbacks`() {
+        val bookViewModel = source("ChangeBookSourceViewModel.kt")
+        val chapterViewModel = source("ChangeChapterSourceViewModel.kt")
+        val bookDialog = source("ChangeBookSourceDialog.kt")
+        val chapterDialog = source("ChangeChapterSourceDialog.kt")
+
+        assertTrue(bookViewModel.contains("searchFinishData.postValue(PendingEvent("))
+        assertTrue(bookViewModel.contains("changeSourceResult.value = PendingEvent("))
+        assertFalse(bookViewModel.contains("searchFinishCallback"))
+        assertFalse(bookDialog.contains("viewModel.getToc(book,"))
+        assertFalse(chapterDialog.contains("viewModel.getToc(book,"))
+        assertFalse(chapterDialog.contains("viewModel.getContent("))
+        assertFalse(chapterDialog.contains("cacheTask?.cancel()"))
+        assertTrue(chapterViewModel.contains("contentResult.value = PendingEvent("))
+        assertTrue(chapterViewModel.contains("batchCacheResult.value = PendingEvent("))
+        assertTrue(chapterViewModel.contains("tocState.value = ChapterTocState.Success("))
+        assertTrue(chapterViewModel.contains("withContext(NonCancellable)"))
+        assertTrue(chapterViewModel.contains("if (cacheCommitStarted) return"))
+    }
+
+    @Test
+    fun `per view adapter observers are released`() {
         val book = source("ChangeBookSourceDialog.kt")
         val chapter = source("ChangeChapterSourceDialog.kt")
         val bookDestroy = book.section(
             "override fun onDestroyView()",
-            "private fun bindSearchFinishCallback",
+            "private fun showTitle()",
         )
         val chapterDestroy = chapter.section(
             "override fun onDestroyView()",
-            "private fun bindSearchFinishCallback",
+            "private fun showTitle()",
         )
 
-        listOf(book, chapter).forEach { dialog ->
-            val callback = dialog.section(
-                "private fun bindSearchFinishCallback()",
-                "private fun showTitle()",
-            )
-            assertTrue(callback.contains("val owner = viewLifecycleOwner"))
-            assertTrue(callback.contains("owner.lifecycleScope.launch"))
-        }
         assertTrue(bookDestroy.contains("unregisterAdapterDataObserver"))
         assertTrue(bookDestroy.contains("binding.recyclerView.adapter = null"))
         assertTrue(bookDestroy.contains("waitDialog?.dismiss()"))
@@ -65,35 +80,11 @@ class ChangeSourceViewLifecycleContractTest {
     }
 
     @Test
-    fun `chapter callbacks separate durable work from view rendering`() {
-        val source = source("ChangeChapterSourceDialog.kt")
-        val initBatch = source.section("private fun initBatchMode()", "private fun initLiveData()")
-        val openToc = source.section("override fun openToc", "override val oldBookUrl")
-        val clickChapter = source.section("override fun clickChapter", "override fun selectionChanged")
-        val cache = source.section("private fun cacheSelectedChapters()", "private fun advanceOriginalChapter")
-        val cacheSuccess = cache.section("success = {", "error =")
+    fun `pending result is delivered once after a collector gap`() {
+        val event = PendingEvent("result")
 
-        assertTrue(initBatch.contains("val owner = viewLifecycleOwner"))
-        assertTrue(initBatch.contains("owner.lifecycleScope.launch"))
-        assertTrue(openToc.contains("val owner = viewLifecycleOwner"))
-        assertTrue(openToc.contains("owner.lifecycleScope.launch"))
-        assertTrue(clickChapter.contains("callBack?.replaceContent(content)"))
-        assertTrue(clickChapter.contains("owner.lifecycleScope.launch"))
-        assertTrue(
-            clickChapter.indexOf("callBack?.replaceContent(content)") <
-                    clickChapter.indexOf("owner.lifecycleScope.launch")
-        )
-        assertTrue(cacheSuccess.contains("batchCaching = false"))
-        assertTrue(cacheSuccess.contains("callBack?.contentCached"))
-        assertTrue(cacheSuccess.contains("owner?.lifecycleScope?.launch"))
-        assertTrue(
-            cacheSuccess.indexOf("batchCaching = false") <
-                    cacheSuccess.indexOf("callBack?.contentCached")
-        )
-        assertTrue(
-            cacheSuccess.indexOf("callBack?.contentCached") <
-                    cacheSuccess.indexOf("owner?.lifecycleScope?.launch")
-        )
+        assertEquals("result", event.take())
+        assertNull(event.take())
     }
 
     private fun source(fileName: String): String {

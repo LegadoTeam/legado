@@ -24,7 +24,6 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.databinding.DialogBookChangeSourceBinding
-import io.legado.app.help.book.isWebFile
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.elevation
@@ -71,7 +70,6 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
     private val callBack: CallBack? get() = activity as? CallBack
     private val viewModel: ChangeBookSourceViewModel by viewModels()
     private var waitDialog: WaitDialog? = null
-    private var searchFinishCallback: ((isEmpty: Boolean) -> Unit)? = null
     private var adapterDataObserver: RecyclerView.AdapterDataObserver? = null
     private val adapter by lazy { ChangeBookSourceAdapter(requireContext(), viewModel, this) }
     private val editSourceResult =
@@ -94,48 +92,15 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
         initSearchView()
         initBottomBar()
         initLiveData()
-        bindSearchFinishCallback()
     }
 
     override fun onDestroyView() {
-        searchFinishCallback?.let { callback ->
-            if (viewModel.searchFinishCallback === callback) {
-                viewModel.searchFinishCallback = null
-            }
-        }
-        searchFinishCallback = null
         adapterDataObserver?.let(adapter::unregisterAdapterDataObserver)
         adapterDataObserver = null
         binding.recyclerView.adapter = null
         waitDialog?.dismiss()
         waitDialog = null
         super.onDestroyView()
-    }
-
-    private fun bindSearchFinishCallback() {
-        val owner = viewLifecycleOwner
-        val callback: (Boolean) -> Unit = { isEmpty ->
-            if (isEmpty) {
-                val searchGroup = AppConfig.searchGroup
-                if (searchGroup.isNotEmpty()) {
-                    owner.lifecycleScope.launch {
-                        context?.alert("搜索结果为空") {
-                            setMessage("${searchGroup}分组搜索结果为空,是否切换到全部分组")
-                            cancelButton()
-                            okButton {
-                                AppConfig.searchGroup = ""
-                                viewModel.startSearch()
-                                owner.lifecycleScope.launch {
-                                    upGroupMenuName()
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        searchFinishCallback = callback
-        viewModel.searchFinishCallback = callback
     }
 
     private fun showTitle() {
@@ -251,6 +216,43 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
             }
             binding.toolBar.menu.applyTint(requireContext())
         }
+        viewModel.searchFinishData.observe(owner) { event ->
+            if (event.take() == true) {
+                val searchGroup = AppConfig.searchGroup
+                if (searchGroup.isNotEmpty()) {
+                    context?.alert("搜索结果为空") {
+                        setMessage("${searchGroup}分组搜索结果为空,是否切换到全部分组")
+                        cancelButton()
+                        okButton {
+                            AppConfig.searchGroup = ""
+                            viewModel.startSearch()
+                            owner.lifecycleScope.launch {
+                                upGroupMenuName()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        viewModel.changeSourceLoading.observe(owner, ::showChangeSourceLoading)
+        viewModel.changeSourceResult.observe(owner) { event ->
+            when (val result = event.take()) {
+                is SourceChangeResult.Success -> {
+                    callBack?.changeTo(result.source, result.book, result.toc)
+                    if (result.dismissDialog) dismissAllowingStateLoss()
+                }
+
+                is SourceChangeResult.Error -> {
+                    AppLog.put(
+                        "换源获取目录出错\n${result.throwable.localizedMessage}",
+                        result.throwable,
+                        true,
+                    )
+                }
+
+                null -> Unit
+            }
+        }
         owner.lifecycleScope.launch {
             owner.lifecycle.currentStateFlow.first { it.isAtLeast(STARTED) }
             viewModel.searchDataFlow.conflate().collect {
@@ -283,6 +285,22 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
                 groups.addAll(it)
                 upGroupMenu()
             }
+        }
+    }
+
+    private fun showChangeSourceLoading(loading: Boolean) {
+        if (!loading) {
+            waitDialog?.dismiss()
+            waitDialog = null
+            return
+        }
+        if (waitDialog != null) return
+        waitDialog = WaitDialog(requireContext()).also { dialog ->
+            dialog.setText(R.string.load_toc)
+            dialog.setOnCancelListener {
+                viewModel.cancelChangeSource()
+            }
+            dialog.show()
         }
     }
 
@@ -361,18 +379,14 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
     override fun changeTo(searchBook: SearchBook) {
         val oldBookType = callBack?.oldBook?.type ?: 0
         if (searchBook.sameBookTypeLocal(oldBookType)) {
-            changeSource(searchBook) {
-                dismissAllowingStateLoss()
-            }
+            changeSource(searchBook)
         } else {
             alert(
                 titleResource = R.string.book_type_different,
                 messageResource = R.string.soure_change_source
             ) {
                 okButton {
-                    changeSource(searchBook) {
-                        dismissAllowingStateLoss()
-                    }
+                    changeSource(searchBook)
                 }
                 cancelButton()
             }
@@ -403,9 +417,7 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
     override fun deleteSource(searchBook: SearchBook) {
         viewModel.del(searchBook)
         if (oldBookUrl == searchBook.bookUrl) {
-            viewModel.autoChangeSource(callBack?.oldBook?.type) { book, toc, source ->
-                callBack?.changeTo(source, book, toc)
-            }
+            viewModel.autoChangeSource(callBack?.oldBook?.type)
         }
     }
 
@@ -417,45 +429,9 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
         return viewModel.getBookScore(searchBook)
     }
 
-    private fun changeSource(searchBook: SearchBook, onSuccess: (() -> Unit)? = null) {
-        val owner = viewLifecycleOwner
-        val progressDialog = WaitDialog(requireContext())
-        waitDialog?.dismiss()
-        waitDialog = progressDialog
-        progressDialog.setText(R.string.load_toc)
-        progressDialog.show()
+    private fun changeSource(searchBook: SearchBook) {
         val book = viewModel.bookMap[searchBook.primaryStr()] ?: searchBook.toBook()
-        if (book.isWebFile) { //文件类书源不解析目录
-            val source = appDb.bookSourceDao.getBookSource(book.origin)
-            if (source == null) {
-                progressDialog.dismiss()
-                waitDialog = null
-                AppLog.put("书源不存在", null, true)
-                return
-            }
-            progressDialog.dismiss()
-            waitDialog = null
-            callBack?.changeTo(source, book, emptyList())
-            onSuccess?.invoke()
-            return
-        }
-        val coroutine = viewModel.getToc(book, { toc, source ->
-            callBack?.changeTo(source, book, toc)
-            owner.lifecycleScope.launch {
-                progressDialog.dismiss()
-                if (waitDialog === progressDialog) waitDialog = null
-                onSuccess?.invoke()
-            }
-        }, {
-            AppLog.put("换源获取目录出错\n$it", it, true)
-            owner.lifecycleScope.launch {
-                progressDialog.dismiss()
-                if (waitDialog === progressDialog) waitDialog = null
-            }
-        })
-        progressDialog.setOnCancelListener {
-            coroutine.cancel()
-        }
+        viewModel.changeSource(book)
     }
 
     /**

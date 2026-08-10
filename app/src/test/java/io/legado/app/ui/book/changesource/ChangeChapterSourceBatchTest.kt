@@ -53,4 +53,33 @@ class ChangeChapterSourceBatchTest {
         assertEquals(10, nextChapterSourceOriginal(chapters, 8)?.index)
         assertNull(nextChapterSourceOriginal(chapters, 10))
     }
+
+    @Test
+    fun `batch progress survives repeated fragment initialization`() {
+        val progress = ChapterSourceProgress()
+        val chapters = listOf(
+            BookChapter(index = 8, title = "当前章"),
+            BookChapter(index = 9, title = "第二卷", isVolume = true),
+            BookChapter(index = 10, title = "下一章"),
+        )
+
+        progress.initialize(8, "当前章")
+        assertEquals(10, progress.advance(chapters, chapters.first())?.index)
+        progress.initialize(8, "重建参数中的旧章节")
+
+        assertEquals(10, progress.chapterIndex)
+        assertEquals("下一章", progress.chapterTitle)
+        assertEquals(10, progress.currentChapter(chapters)?.index)
+    }
+
+    @Test
+    fun `batch progress records completion without an attached view`() {
+        val progress = ChapterSourceProgress()
+        val chapter = BookChapter(index = 8, title = "最后一章")
+        progress.initialize(chapter.index, chapter.title)
+
+        assertNull(progress.advance(listOf(chapter), chapter))
+        assertEquals(true, progress.isFinished)
+        assertNull(progress.currentChapter(listOf(chapter)))
+    }
 }
