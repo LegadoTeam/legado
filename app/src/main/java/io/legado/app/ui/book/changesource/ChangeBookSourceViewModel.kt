@@ -73,12 +73,25 @@ internal class PendingEvent<out T>(private val value: T) {
     fun take(): T? = value.takeIf { handled.compareAndSet(false, true) }
 }
 
+internal class SourceChangeCompletion(
+    private val deleteAfterChange: SearchBook?,
+    private val delete: (SearchBook) -> Unit,
+) {
+    private val completed = AtomicBoolean(false)
+
+    fun success() {
+        val source = deleteAfterChange ?: return
+        if (completed.compareAndSet(false, true)) delete(source)
+    }
+}
+
 internal sealed interface SourceChangeResult {
     data class Success(
         val book: Book,
         val toc: List<BookChapter>,
         val source: BookSource,
         val dismissDialog: Boolean,
+        val deleteAfterChange: SearchBook? = null,
     ) : SourceChangeResult
 
     data class Error(val throwable: Throwable) : SourceChangeResult
@@ -91,6 +104,7 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
     val searchStateData = MutableLiveData<Boolean>()
     internal val searchFinishData = MutableLiveData<PendingEvent<Boolean>>()
     val changeSourceLoading = MutableLiveData(false)
+    val changeSourceCancelable = MutableLiveData(true)
     internal val changeSourceResult = MutableLiveData<PendingEvent<SourceChangeResult>>()
     var name: String = ""
     var author: String = ""
@@ -663,6 +677,7 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
 
     fun changeSource(book: Book) {
         changeSourceTask?.cancel()
+        changeSourceCancelable.value = true
         changeSourceLoading.value = true
         changeSourceTask = execute {
             if (book.isWebFile) {
@@ -682,20 +697,24 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
         }.onSuccess { (resultBook, toc, source) ->
             changeSourceTask = null
             changeSourceLoading.value = false
+            changeSourceCancelable.value = true
             changeSourceResult.value = PendingEvent(
                 SourceChangeResult.Success(resultBook, toc, source, dismissDialog = true)
             )
         }.onError { throwable ->
             changeSourceTask = null
             changeSourceLoading.value = false
+            changeSourceCancelable.value = true
             changeSourceResult.value = PendingEvent(SourceChangeResult.Error(throwable))
         }
     }
 
     fun cancelChangeSource() {
+        if (changeSourceCancelable.value == false) return
         changeSourceTask?.cancel()
         changeSourceTask = null
         changeSourceLoading.value = false
+        changeSourceCancelable.value = true
     }
 
     suspend fun getToc(book: Book): Result<Pair<List<BookChapter>, BookSource>> {
@@ -760,12 +779,13 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
         searchCallback?.upAdapter()
     }
 
-    fun autoChangeSource(bookType: Int?) {
+    fun autoChangeSource(bookType: Int?, deleteAfterChange: SearchBook) {
         changeSourceTask?.cancel()
+        changeSourceCancelable.value = false
         changeSourceLoading.value = true
         changeSourceTask = execute {
             currentResults().forEach {
-                if (it.type == bookType) {
+                if (it.origin != deleteAfterChange.origin && it.type == bookType) {
                     val book = it.toBook()
                     val result = getToc(book).getOrNull()
                     if (result != null) {
@@ -777,12 +797,20 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
         }.onSuccess { (book, toc, source) ->
             changeSourceTask = null
             changeSourceLoading.value = false
+            changeSourceCancelable.value = true
             changeSourceResult.value = PendingEvent(
-                SourceChangeResult.Success(book, toc, source, dismissDialog = false)
+                SourceChangeResult.Success(
+                    book,
+                    toc,
+                    source,
+                    dismissDialog = false,
+                    deleteAfterChange = deleteAfterChange,
+                )
             )
         }.onError { throwable ->
             changeSourceTask = null
             changeSourceLoading.value = false
+            changeSourceCancelable.value = true
             changeSourceResult.value = PendingEvent(SourceChangeResult.Error(throwable))
         }
     }

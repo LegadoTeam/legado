@@ -241,7 +241,7 @@ class ReadMangaViewModel(application: Application) : BaseViewModel(application) 
     /**
      * 换源
      */
-    fun changeTo(book: Book, toc: List<BookChapter>) {
+    fun changeTo(book: Book, toc: List<BookChapter>, onSuccess: () -> Unit = {}) {
         changeSourceCoroutine?.cancel()
         changeSourceCoroutine = execute {
             //换源中
@@ -252,6 +252,8 @@ class ReadMangaViewModel(application: Application) : BaseViewModel(application) 
             appDb.bookChapterDao.insert(*toc.toTypedArray())
             ReadManga.resetData(book)
             ReadManga.loadContent()
+        }.onSuccess {
+            onSuccess()
         }.onError {
             AppLog.put("换源失败\n$it", it, true)
         }.onFinally {

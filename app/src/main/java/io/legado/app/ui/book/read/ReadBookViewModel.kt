@@ -296,7 +296,7 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
     /**
      * 换源
      */
-    fun changeTo(book: Book, toc: List<BookChapter>) {
+    fun changeTo(book: Book, toc: List<BookChapter>, onSuccess: () -> Unit = {}) {
         changeSourceCoroutine?.cancel()
         changeSourceCoroutine = execute {
             ReadBook.upMsg(context.getString(R.string.loading))
@@ -308,6 +308,8 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
             ReadBook.resetData(book)
             ReadBook.upMsg(null)
             ReadBook.loadContent(resetPageOffset = true)
+        }.onSuccess {
+            onSuccess()
         }.onError {
             AppLog.put("换源失败\n$it", it, true)
             ReadBook.upMsg(null)

@@ -12,8 +12,10 @@ import androidx.appcompat.widget.Toolbar
 import androidx.core.view.isVisible
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.Lifecycle.State.RESUMED
 import androidx.lifecycle.Lifecycle.State.STARTED
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.withStateAtLeast
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.R
@@ -261,7 +263,11 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
             binding.toolBar.menu.applyTint(requireContext())
         }
         viewModel.searchFinishData.observe(owner) { event ->
-            showEmptySearchGroupDialog(event, owner)
+            owner.lifecycleScope.launch {
+                owner.lifecycle.withStateAtLeast(RESUMED) {
+                    showEmptySearchGroupDialog(event, owner)
+                }
+            }
         }
         viewModel.originalChaptersState.observe(owner, ::showOriginalChaptersState)
         viewModel.tocState.observe(owner, ::showTocState)
@@ -270,45 +276,69 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
             updateLoadingIndicator()
         }
         viewModel.contentResult.observe(owner) { event ->
-            when (val result = event.take()) {
-                is ChapterContentResult.Success -> {
-                    callBack?.replaceContent(result.content)
-                    dismissAllowingStateLoss()
-                }
+            owner.lifecycleScope.launch {
+                owner.lifecycle.withStateAtLeast(RESUMED) {
+                    when (val result = event.take()) {
+                        is ChapterContentResult.Success -> {
+                            val callback = callBack ?: return@withStateAtLeast
+                            callback.replaceContent(result.content)
+                            dismissAllowingStateLoss()
+                        }
 
-                is ChapterContentResult.Error -> {
-                    binding.clToc.gone()
-                    viewModel.clearToc()
-                    toastOnUi(result.message)
-                }
+                        is ChapterContentResult.Error -> {
+                            binding.clToc.gone()
+                            viewModel.clearToc()
+                            toastOnUi(result.message)
+                        }
 
-                null -> Unit
+                        null -> Unit
+                    }
+                }
             }
         }
         viewModel.changeSourceResult.observe(owner) { event ->
-            when (val result = event.take()) {
-                is SourceChangeResult.Success -> {
-                    callBack?.changeTo(result.source, result.book, result.toc)
-                    if (result.dismissDialog) dismissAllowingStateLoss()
-                }
+            owner.lifecycleScope.launch {
+                owner.lifecycle.withStateAtLeast(RESUMED) {
+                    when (val result = event.take()) {
+                        is SourceChangeResult.Success -> {
+                            val callback = callBack ?: return@withStateAtLeast
+                            val sourceViewModel = viewModel
+                            val completion = SourceChangeCompletion(
+                                result.deleteAfterChange,
+                                sourceViewModel::del,
+                            )
+                            callback.changeTo(
+                                result.source,
+                                result.book,
+                                result.toc,
+                                completion::success,
+                            )
+                            if (result.dismissDialog) dismissAllowingStateLoss()
+                        }
 
-                is SourceChangeResult.Error -> {
-                    AppLog.put(
-                        "自动换源失败\n${result.throwable.localizedMessage}",
-                        result.throwable,
-                        true,
-                    )
-                }
+                        is SourceChangeResult.Error -> {
+                            AppLog.put(
+                                "自动换源失败\n${result.throwable.localizedMessage}",
+                                result.throwable,
+                                true,
+                            )
+                        }
 
-                null -> Unit
+                        null -> Unit
+                    }
+                }
             }
         }
         viewModel.batchCaching.observe(owner, ::setBatchCaching)
         viewModel.batchCacheResult.observe(owner) { event ->
-            when (val result = event.take()) {
-                is ChapterCacheResult.Success -> showCacheSuccess(result)
-                is ChapterCacheResult.Error -> toastOnUi(result.message)
-                null -> Unit
+            owner.lifecycleScope.launch {
+                owner.lifecycle.withStateAtLeast(RESUMED) {
+                    when (val result = event.take()) {
+                        is ChapterCacheResult.Success -> showCacheSuccess(result)
+                        is ChapterCacheResult.Error -> toastOnUi(result.message)
+                        null -> Unit
+                    }
+                }
             }
         }
         owner.lifecycleScope.launch {
@@ -353,7 +383,9 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
                 }
             }
             onCancelled { event.take() }
-            onDismiss { searchFinishDialog = null }
+            onDismiss { dialog ->
+                if (searchFinishDialog === dialog) searchFinishDialog = null
+            }
         }
     }
 
@@ -522,9 +554,10 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
     }
 
     override fun deleteSource(searchBook: SearchBook) {
-        viewModel.del(searchBook)
         if (oldBookUrl == searchBook.bookUrl) {
-            viewModel.autoChangeSource(callBack?.oldBook?.type)
+            viewModel.autoChangeSource(callBack?.oldBook?.type, searchBook)
+        } else {
+            viewModel.del(searchBook)
         }
     }
 
@@ -666,7 +699,12 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
 
     interface CallBack {
         val oldBook: Book?
-        fun changeTo(source: BookSource, book: Book, toc: List<BookChapter>)
+        fun changeTo(
+            source: BookSource,
+            book: Book,
+            toc: List<BookChapter>,
+            onSuccess: () -> Unit,
+        )
         fun replaceContent(content: String)
         fun contentCached(chapterIndex: Int)
     }

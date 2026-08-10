@@ -480,9 +480,14 @@ class AudioPlayActivity :
     override val oldBook: Book?
         get() = AudioPlay.book
 
-    override fun changeTo(source: BookSource, book: Book, toc: List<BookChapter>) {
+    override fun changeTo(
+        source: BookSource,
+        book: Book,
+        toc: List<BookChapter>,
+        onSuccess: () -> Unit,
+    ) {
         if (book.isAudio) {
-            viewModel.changeTo(source, book, toc)
+            viewModel.changeTo(source, book, toc, onSuccess)
         } else {
             AudioPlay.stop()
             lifecycleScope.launch {
@@ -492,6 +497,7 @@ class AudioPlayActivity :
                     AudioPlay.book?.delete()
                     appDb.bookDao.insert(book)
                 }
+                onSuccess()
                 startActivityForBook(book)
                 finish()
             }

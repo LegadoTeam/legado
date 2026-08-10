@@ -4,9 +4,11 @@ import android.content.Context
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
+import androidx.appcompat.app.AlertDialog
 import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.R
 import io.legado.app.base.adapter.DiffRecyclerAdapter
 import io.legado.app.base.adapter.ItemViewHolder
@@ -28,6 +30,8 @@ class ChangeBookSourceAdapter(
     val viewModel: ChangeBookSourceViewModel,
     val callBack: CallBack
 ) : DiffRecyclerAdapter<SearchBook, ItemChangeSourceBinding>(context) {
+
+    private var deleteSourceDialog: AlertDialog? = null
 
     override val diffItemCallback = object : DiffUtil.ItemCallback<SearchBook>() {
         override fun areItemsTheSame(oldItem: SearchBook, newItem: SearchBook): Boolean {
@@ -201,16 +205,32 @@ class ChangeBookSourceAdapter(
                 "bottomSource" -> callBack.bottomSource(searchBook)
                 "editSource" -> callBack.editSource(searchBook)
                 "disableSource" -> callBack.disableSource(searchBook)
-                "deleteSource" -> context.alert(R.string.draw) {
-                    setMessage(context.getString(R.string.sure_del) + "\n" + searchBook.originName)
-                    noButton()
-                    yesButton {
-                        callBack.deleteSource(searchBook)
-                        updateItems(0, itemCount, listOf<Int>())
+                "deleteSource" -> {
+                    if (deleteSourceDialog == null) {
+                        deleteSourceDialog = context.alert(R.string.draw) {
+                            setMessage(
+                                context.getString(R.string.sure_del) +
+                                    "\n" + searchBook.originName
+                            )
+                            noButton()
+                            yesButton {
+                                callBack.deleteSource(searchBook)
+                                updateItems(0, itemCount, listOf<Int>())
+                            }
+                            onDismiss { dialog ->
+                                if (deleteSourceDialog === dialog) deleteSourceDialog = null
+                            }
+                        }
                     }
                 }
             }
         }
+    }
+
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        deleteSourceDialog?.dismiss()
+        deleteSourceDialog = null
+        super.onDetachedFromRecyclerView(recyclerView)
     }
 
     interface CallBack {

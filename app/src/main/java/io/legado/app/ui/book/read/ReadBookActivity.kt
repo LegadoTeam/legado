@@ -1437,10 +1437,15 @@ class ReadBookActivity : BaseReadBookActivity(),
     override val oldBook: Book?
         get() = ReadBook.book
 
-    override fun changeTo(source: BookSource, book: Book, toc: List<BookChapter>) {
+    override fun changeTo(
+        source: BookSource,
+        book: Book,
+        toc: List<BookChapter>,
+        onSuccess: () -> Unit,
+    ) {
         resetReviewSummaryState()
         if (!book.isAudio) {
-            viewModel.changeTo(book, toc)
+            viewModel.changeTo(book, toc, onSuccess)
         } else {
             ReadAloud.stop(this)
             lifecycleScope.launch {
@@ -1450,6 +1455,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                     ReadBook.book?.delete()
                     appDb.bookDao.insert(book)
                 }
+                onSuccess()
                 startActivityForBook(book)
                 finish()
             }

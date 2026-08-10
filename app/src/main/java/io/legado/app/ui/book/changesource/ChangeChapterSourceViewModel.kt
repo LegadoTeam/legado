@@ -168,6 +168,7 @@ class ChangeChapterSourceViewModel(application: Application) :
     }
 
     fun loadToc(book: Book) {
+        cancelContent()
         tocTask?.cancel()
         tocState.value = ChapterTocState.Loading(book)
         tocTask = getToc(book, { toc, source ->
@@ -180,9 +181,16 @@ class ChangeChapterSourceViewModel(application: Application) :
     }
 
     fun clearToc() {
+        cancelContent()
         tocTask?.cancel()
         tocTask = null
         tocState.value = ChapterTocState.Idle
+    }
+
+    private fun cancelContent() {
+        contentTask?.cancel()
+        contentTask = null
+        contentLoading.value = false
     }
 
     fun cacheContents(

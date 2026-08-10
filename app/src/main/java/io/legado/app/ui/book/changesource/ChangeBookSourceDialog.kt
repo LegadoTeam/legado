@@ -11,9 +11,11 @@ import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.Lifecycle.State.RESUMED
 import androidx.lifecycle.Lifecycle.State.STARTED
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.withStateAtLeast
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.R
@@ -49,7 +51,6 @@ import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.conflate
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -73,6 +74,7 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
     private val viewModel: ChangeBookSourceViewModel by viewModels()
     private var waitDialog: WaitDialog? = null
     private var searchFinishDialog: AlertDialog? = null
+    private var typeMismatchDialog: AlertDialog? = null
     private var adapterDataObserver: RecyclerView.AdapterDataObserver? = null
     private val adapter by lazy { ChangeBookSourceAdapter(requireContext(), viewModel, this) }
     private val editSourceResult =
@@ -103,6 +105,8 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
         binding.recyclerView.adapter = null
         searchFinishDialog?.dismiss()
         searchFinishDialog = null
+        typeMismatchDialog?.dismiss()
+        typeMismatchDialog = null
         waitDialog?.dismiss()
         waitDialog = null
         super.onDestroyView()
@@ -222,25 +226,44 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
             binding.toolBar.menu.applyTint(requireContext())
         }
         viewModel.searchFinishData.observe(owner) { event ->
-            showEmptySearchGroupDialog(event, owner)
+            owner.lifecycleScope.launch {
+                owner.lifecycle.withStateAtLeast(RESUMED) {
+                    showEmptySearchGroupDialog(event, owner)
+                }
+            }
         }
         viewModel.changeSourceLoading.observe(owner, ::showChangeSourceLoading)
         viewModel.changeSourceResult.observe(owner) { event ->
-            when (val result = event.take()) {
-                is SourceChangeResult.Success -> {
-                    callBack?.changeTo(result.source, result.book, result.toc)
-                    if (result.dismissDialog) dismissAllowingStateLoss()
-                }
+            owner.lifecycleScope.launch {
+                owner.lifecycle.withStateAtLeast(RESUMED) {
+                    when (val result = event.take()) {
+                        is SourceChangeResult.Success -> {
+                            val callback = callBack ?: return@withStateAtLeast
+                            val sourceViewModel = viewModel
+                            val completion = SourceChangeCompletion(
+                                result.deleteAfterChange,
+                                sourceViewModel::del,
+                            )
+                            callback.changeTo(
+                                result.source,
+                                result.book,
+                                result.toc,
+                                completion::success,
+                            )
+                            if (result.dismissDialog) dismissAllowingStateLoss()
+                        }
 
-                is SourceChangeResult.Error -> {
-                    AppLog.put(
-                        "换源获取目录出错\n${result.throwable.localizedMessage}",
-                        result.throwable,
-                        true,
-                    )
-                }
+                        is SourceChangeResult.Error -> {
+                            AppLog.put(
+                                "换源获取目录出错\n${result.throwable.localizedMessage}",
+                                result.throwable,
+                                true,
+                            )
+                        }
 
-                null -> Unit
+                        null -> Unit
+                    }
+                }
             }
         }
         owner.lifecycleScope.launch {
@@ -254,9 +277,10 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
         owner.lifecycleScope.launch {
             owner.repeatOnLifecycle(STARTED) {
                 viewModel.changeSourceProgress
-                    .drop(1)
                     .collect { (count, name) ->
-                        binding.tvDur.text =
+                        binding.tvDur.text = if (count == 0 && name.isEmpty()) {
+                            callBack?.oldBook?.originName
+                        } else {
                             getString(
                                 R.string.change_source_progress,
                                 adapter.itemCount,
@@ -264,6 +288,7 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
                                 viewModel.totalSourceCount,
                                 name
                             )
+                        }
                         delay(500)
                     }
             }
@@ -304,7 +329,9 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
                 }
             }
             onCancelled { event.take() }
-            onDismiss { searchFinishDialog = null }
+            onDismiss { dialog ->
+                if (searchFinishDialog === dialog) searchFinishDialog = null
+            }
         }
     }
 
@@ -316,9 +343,13 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
         }
         if (waitDialog != null) return
         waitDialog = WaitDialog(requireContext()).also { dialog ->
+            val cancelable = viewModel.changeSourceCancelable.value != false
             dialog.setText(R.string.load_toc)
-            dialog.setOnCancelListener {
-                viewModel.cancelChangeSource()
+            dialog.setCancelable(cancelable)
+            if (cancelable) {
+                dialog.setOnCancelListener {
+                    viewModel.cancelChangeSource()
+                }
             }
             dialog.show()
         }
@@ -401,7 +432,8 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
         if (searchBook.sameBookTypeLocal(oldBookType)) {
             changeSource(searchBook)
         } else {
-            alert(
+            if (typeMismatchDialog != null) return
+            typeMismatchDialog = alert(
                 titleResource = R.string.book_type_different,
                 messageResource = R.string.soure_change_source
             ) {
@@ -409,6 +441,9 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
                     changeSource(searchBook)
                 }
                 cancelButton()
+                onDismiss { dialog ->
+                    if (typeMismatchDialog === dialog) typeMismatchDialog = null
+                }
             }
         }
     }
@@ -435,9 +470,10 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
     }
 
     override fun deleteSource(searchBook: SearchBook) {
-        viewModel.del(searchBook)
         if (oldBookUrl == searchBook.bookUrl) {
-            viewModel.autoChangeSource(callBack?.oldBook?.type)
+            viewModel.autoChangeSource(callBack?.oldBook?.type, searchBook)
+        } else {
+            viewModel.del(searchBook)
         }
     }
 
@@ -510,7 +546,12 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
 
     interface CallBack {
         val oldBook: Book?
-        fun changeTo(source: BookSource, book: Book, toc: List<BookChapter>)
+        fun changeTo(
+            source: BookSource,
+            book: Book,
+            toc: List<BookChapter>,
+            onSuccess: () -> Unit,
+        )
     }
 
 }

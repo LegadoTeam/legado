@@ -156,7 +156,12 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
         }
     }
 
-    fun changeTo(source: BookSource, book: Book, toc: List<BookChapter>) {
+    fun changeTo(
+        source: BookSource,
+        book: Book,
+        toc: List<BookChapter>,
+        onSuccess: () -> Unit = {},
+    ) {
         execute {
             val oldBook = AudioPlay.book
             val wasNotShelf = oldBook?.let {
@@ -173,6 +178,8 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
             appDb.bookChapterDao.insert(*toc.toTypedArray())
             AudioPlay.upData(book, preserveProgress = false)
             AudioPlayService.updateNotification(context)
+        }.onSuccess {
+            onSuccess()
         }.onFinally {
             postEvent(EventBus.SOURCE_CHANGED, book.bookUrl)
         }

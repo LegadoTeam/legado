@@ -1,5 +1,6 @@
 package io.legado.app.ui.book.changesource
 
+import io.legado.app.data.entities.SearchBook
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -34,6 +35,165 @@ class ChangeSourceViewLifecycleContractTest {
             assertFalse(initLiveData.contains("\n        lifecycleScope.launch"))
         }
         assertTrue(book.contains("owner.repeatOnLifecycle(STARTED)"))
+    }
+
+    @Test
+    fun `progress replay is not discarded when a view restarts`() {
+        val dialog = source("ChangeBookSourceDialog.kt")
+        val progress = dialog.section(
+            "viewModel.changeSourceProgress",
+            "appDb.bookSourceDao.flowEnabledGroups()",
+        )
+
+        assertFalse(progress.contains(".drop("))
+        assertTrue(progress.contains("if (count == 0 && name.isEmpty())"))
+        assertTrue(progress.contains("callBack?.oldBook?.originName"))
+    }
+
+    @Test
+    fun `pending business results wait for the current host to resume`() {
+        val book = source("ChangeBookSourceDialog.kt")
+        val chapter = source("ChangeChapterSourceDialog.kt")
+        val observers = listOf(
+            book.section(
+                "viewModel.changeSourceResult.observe(owner)",
+                "viewModel.changeSourceProgress",
+            ),
+            chapter.section(
+                "viewModel.contentResult.observe(owner)",
+                "viewModel.changeSourceResult.observe(owner)",
+            ),
+            chapter.section(
+                "viewModel.changeSourceResult.observe(owner)",
+                "viewModel.batchCaching.observe(owner",
+            ),
+            chapter.section(
+                "viewModel.batchCacheResult.observe(owner)",
+                "viewModel.searchDataFlow",
+            ),
+        )
+
+        observers.forEach { observer ->
+            assertTrue(observer.contains("withStateAtLeast(RESUMED)"))
+            assertTrue(
+                observer.indexOf("withStateAtLeast(RESUMED)") <
+                    observer.indexOf("event.take()")
+            )
+        }
+    }
+
+    @Test
+    fun `closing or replacing a toc cancels its pending content request`() {
+        val viewModel = source("ChangeChapterSourceViewModel.kt")
+        val loadToc = viewModel.section("fun loadToc", "fun clearToc")
+        val clearToc = viewModel.section("fun clearToc", "private fun cancelContent")
+        val cancelContent = viewModel.section("private fun cancelContent", "fun cacheContents")
+
+        assertTrue(loadToc.contains("cancelContent()"))
+        assertTrue(clearToc.contains("cancelContent()"))
+        assertTrue(cancelContent.contains("contentTask?.cancel()"))
+        assertTrue(cancelContent.contains("contentTask = null"))
+        assertTrue(cancelContent.contains("contentLoading.value = false"))
+    }
+
+    @Test
+    fun `deleting the current source waits for a successful replacement`() {
+        val bookDialog = source("ChangeBookSourceDialog.kt")
+        val chapterDialog = source("ChangeChapterSourceDialog.kt")
+        val viewModel = source("ChangeBookSourceViewModel.kt")
+
+        listOf(bookDialog, chapterDialog).forEach { dialog ->
+            val deleteSource = dialog.section(
+                "override fun deleteSource",
+                "override fun setBookScore",
+            )
+
+            assertTrue(deleteSource.contains("viewModel.autoChangeSource("))
+            assertTrue(deleteSource.contains(", searchBook)"))
+            assertTrue(deleteSource.contains("else {\n            viewModel.del(searchBook)"))
+            assertTrue(dialog.contains("SourceChangeCompletion("))
+            assertTrue(dialog.contains("completion::success"))
+        }
+
+        val autoChange = viewModel.section("fun autoChangeSource", "fun setBookScore")
+        val loading = bookDialog.section(
+            "private fun showChangeSourceLoading",
+            "private val startStopMenuItem",
+        )
+        assertTrue(autoChange.contains("deleteAfterChange: SearchBook"))
+        assertTrue(autoChange.contains("it.origin != deleteAfterChange.origin"))
+        assertTrue(autoChange.contains("deleteAfterChange = deleteAfterChange"))
+        assertTrue(loading.contains("dialog.setCancelable(cancelable)"))
+        assertTrue(loading.contains("if (cancelable)"))
+        assertTrue(loading.contains("viewModel.cancelChangeSource()"))
+    }
+
+    @Test
+    fun `old source deletion runs once only after migration success`() {
+        val source = SearchBook(origin = "old")
+        val deleted = mutableListOf<SearchBook>()
+        val completion = SourceChangeCompletion(source, deleted::add)
+
+        assertTrue(deleted.isEmpty())
+        completion.success()
+        completion.success()
+        assertEquals(listOf(source), deleted)
+
+        SourceChangeCompletion(null, deleted::add).success()
+        assertEquals(listOf(source), deleted)
+    }
+
+    @Test
+    fun `hosts acknowledge source changes only from successful migration callbacks`() {
+        val viewModels = listOf(
+            appSource("book/read/ReadBookViewModel.kt")
+                .section("fun changeTo(", "/**\n     * 自动换源"),
+            appSource("book/audio/AudioPlayViewModel.kt")
+                .section("fun changeTo(", "fun removeFromBookshelf"),
+            appSource("book/info/BookInfoViewModel.kt")
+                .section("fun changeTo(", "fun saveBook"),
+            appSource("book/manga/ReadMangaViewModel.kt")
+                .section("fun changeTo(", "private fun checkLocalBookFileExist"),
+        )
+        viewModels.forEach { changeTo ->
+            assertTrue(changeTo.contains("onSuccess: () -> Unit"))
+            assertTrue(changeTo.contains(".onSuccess {\n            onSuccess()"))
+            assertFalse(changeTo.contains(".onFinally {\n            onSuccess()"))
+        }
+
+        val readActivity = appSource("book/read/ReadBookActivity.kt")
+            .section("override fun changeTo(", "override fun replaceContent")
+        val audioActivity = appSource("book/audio/AudioPlayActivity.kt")
+            .section("override fun changeTo(", "override fun finish")
+        val infoActivity = appSource("book/info/BookInfoActivity.kt")
+            .section("override fun changeTo(", "override fun coverChangeTo")
+        val mangaActivity = appSource("book/manga/ReadMangaActivity.kt")
+            .section("override fun changeTo(", "override fun updateColorFilter")
+
+        assertTrue(readActivity.contains("viewModel.changeTo(book, toc, onSuccess)"))
+        assertTrue(audioActivity.contains("viewModel.changeTo(source, book, toc, onSuccess)"))
+        assertTrue(infoActivity.contains("viewModel.changeTo(source, book, toc, onSuccess)"))
+        assertTrue(mangaActivity.contains("viewModel.changeTo(book, toc, onSuccess)"))
+        listOf(readActivity, audioActivity).forEach { changeTo ->
+            assertTrue(
+                changeTo.indexOf("appDb.bookDao.insert(book)") <
+                    changeTo.indexOf("onSuccess()")
+            )
+        }
+    }
+
+    @Test
+    fun `adapter delete confirmation is released with the recycler view`() {
+        val adapter = source("ChangeBookSourceAdapter.kt")
+        val detach = adapter.section(
+            "override fun onDetachedFromRecyclerView",
+            "interface CallBack",
+        )
+
+        assertTrue(adapter.contains("if (deleteSourceDialog == null)"))
+        assertTrue(adapter.contains("if (deleteSourceDialog === dialog)"))
+        assertTrue(detach.contains("deleteSourceDialog?.dismiss()"))
+        assertTrue(detach.contains("deleteSourceDialog = null"))
     }
 
     @Test
@@ -111,7 +271,7 @@ class ChangeSourceViewLifecycleContractTest {
             }
             assertTrue(prompt.contains("if (event.peek() != true)"))
             assertTrue(prompt.contains("onCancelled { event.take() }"))
-            assertTrue(prompt.contains("onDismiss { searchFinishDialog = null }"))
+            assertTrue(prompt.contains("if (searchFinishDialog === dialog)"))
         }
     }
 
@@ -131,7 +291,11 @@ class ChangeSourceViewLifecycleContractTest {
     }
 
     private fun source(fileName: String): String {
-        return projectFile("src/main/java/io/legado/app/ui/book/changesource/$fileName")
+        return appSource("book/changesource/$fileName")
+    }
+
+    private fun appSource(relativePath: String): String {
+        return projectFile("src/main/java/io/legado/app/ui/$relativePath")
             .readText()
             .replace("\r\n", "\n")
     }
