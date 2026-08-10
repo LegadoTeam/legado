@@ -213,8 +213,12 @@
 
             <TextView
                 android:id="@+id/tv_header_left"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:gravity="end"
+                android:maxLines="1"
                 android:padding="6dp"
                 android:textColor="@color/primaryText"
                 tools:text="@string/title" />
@@ -239,8 +243,12 @@
 
             <TextView
                 android:id="@+id/tv_header_middle"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:gravity="end"
+                android:maxLines="1"
                 android:padding="6dp"
                 android:textColor="@color/primaryText"
                 tools:text="@string/title" />
@@ -265,8 +273,12 @@
 
             <TextView
                 android:id="@+id/tv_header_right"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:gravity="end"
+                android:maxLines="1"
                 android:padding="6dp"
                 android:textColor="@color/primaryText"
                 tools:text="@string/title" />
@@ -323,8 +335,12 @@
 
             <TextView
                 android:id="@+id/tv_footer_left"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:gravity="end"
+                android:maxLines="1"
                 android:padding="6dp"
                 android:textColor="@color/primaryText"
                 tools:text="@string/title" />
@@ -349,8 +365,12 @@
 
             <TextView
                 android:id="@+id/tv_footer_middle"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:gravity="end"
+                android:maxLines="1"
                 android:padding="6dp"
                 android:textColor="@color/primaryText"
                 tools:text="@string/title" />
@@ -375,8 +395,12 @@
 
             <TextView
                 android:id="@+id/tv_footer_right"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:gravity="end"
+                android:maxLines="1"
                 android:padding="6dp"
                 android:textColor="@color/primaryText"
                 tools:text="@string/title" />
