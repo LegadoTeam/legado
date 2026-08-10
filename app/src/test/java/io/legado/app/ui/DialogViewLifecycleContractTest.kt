@@ -1,7 +1,6 @@
 package io.legado.app.ui
 
 import io.legado.app.ui.book.read.ContentDraftState
-import io.legado.app.ui.book.read.PendingContent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -31,30 +30,41 @@ class DialogViewLifecycleContractTest {
     @Test
     fun `content editor callbacks only update the current view`() {
         val source = source("book/read/ContentEditDialog.kt")
-        val created = source.section("override fun onFragmentCreated", "override fun onDestroyView")
+        val created = source.section("override fun onFragmentCreated", "override fun onViewStateRestored")
+        val restored = source.section("override fun onViewStateRestored", "override fun onSaveInstanceState")
+        val savedState = source.section("override fun onSaveInstanceState", "override fun onDestroyView")
         val viewModel = source.section("class ContentEditViewModel", "\n    }\n\n}")
         val resetMenu = source.section("R.id.menu_reset", "R.id.menu_copy_all")
         val editTitle = source.section("private fun editTitle", "override fun onCancel")
+        val save = source.section("private fun save", "class ContentEditViewModel")
 
         assertTrue(created.contains("val owner = viewLifecycleOwner"))
         assertTrue(created.contains("val contentView = binding.contentView"))
-        assertTrue(created.contains("viewModel.draftText?.let(contentView::setText)"))
-        assertTrue(created.contains("contentView.doAfterTextChanged"))
         assertTrue(created.contains("contentLiveData.observe(owner)"))
         assertTrue(created.contains("titleLiveData.observe(owner)"))
-        assertTrue(created.contains("withStateAtLeast(Lifecycle.State.RESUMED)"))
-        assertTrue(created.contains("val content = event.take(viewModel.draftRevision)"))
+        assertTrue(created.contains("return@observe"))
         assertTrue(created.contains("owner.lifecycle.currentState.isAtLeast"))
         assertTrue(created.contains("contentView.post"))
         assertFalse(created.contains("binding.contentView.post"))
-        assertTrue(created.contains("if (savedInstanceState == null) viewModel.initContent()"))
+        assertFalse(created.contains("contentView.doAfterTextChanged"))
+        assertFalse(created.contains("withStateAtLeast"))
+        assertTrue(restored.contains("super.onViewStateRestored(savedInstanceState)"))
+        assertTrue(restored.contains("viewModel.restoreDraft"))
+        assertTrue(restored.contains("viewModel.draftText?.let"))
+        assertTrue(restored.contains("contentView.doAfterTextChanged"))
+        assertTrue(restored.contains("viewModel.initContent()"))
+        assertTrue(savedState.contains("outState.putBoolean(STATE_HAS_DRAFT, viewModel.hasDraft)"))
         assertTrue(viewModel.contains("private var contentTask"))
-        assertTrue(viewModel.contains("if (!reset && contentLiveData.value != null) return"))
+        assertTrue(viewModel.contains("private var pendingReset"))
+        assertTrue(viewModel.contains("if (!reset && (draftState.hasDraft || contentTask?.isActive == true))"))
+        assertTrue(viewModel.contains("draft = draftState.newRequest()"))
         assertTrue(viewModel.contains("if (contentTask?.isActive == true)"))
-        assertTrue(viewModel.contains("val draftRevision = draftState.snapshot()"))
-        assertTrue(viewModel.contains("draftState.applyLoaded(draftRevision"))
-        assertTrue(viewModel.contains("if (reset) {\n                    ReadBook.loadContent"))
-        assertTrue(viewModel.contains("contentLiveData.value = PendingContent("))
+        assertTrue(viewModel.contains("pendingReset = request"))
+        assertTrue(viewModel.contains("draftState.applyLoaded(request.draft"))
+        assertTrue(viewModel.contains("contentLiveData.value = content"))
+        assertTrue(viewModel.contains("startContent(next)"))
+        assertTrue(viewModel.contains("request.book.bookUrl"))
+        assertTrue(viewModel.contains("request.chapterIndex"))
         assertTrue(resetMenu.contains("viewModel.initContent(true)"))
         assertFalse(resetMenu.contains("ReadBook.loadContent"))
         assertTrue(source.contains("editTitleDialog?.dismiss()"))
@@ -66,28 +76,35 @@ class DialogViewLifecycleContractTest {
         assertTrue(editTitle.contains("withContext(Main)"))
         assertTrue(editTitle.contains("ReadBook.book?.bookUrl == bookUrl"))
         assertTrue(editTitle.contains("ReadBook.durChapterIndex == chapterIndex"))
-        assertTrue(editTitle.contains("viewModel.titleLiveData.value = title"))
+        assertTrue(editTitle.contains("viewModel.titleLiveData.value = it"))
         assertTrue(editTitle.contains("val title = alertBinding.editView.text.toString()"))
         assertFalse(created.contains("\n            lifecycleScope.launch"))
         assertFalse(editTitle.contains("binding.toolBar.title"))
         assertFalse(editTitle.contains("viewLifecycleOwner.lifecycleScope.launch"))
         assertFalse(editTitle.contains("\n                lifecycleScope.launch"))
         assertTrue(editTitle.contains("if (editTitleDialog === dialog)"))
+        assertTrue(save.contains("val book = ReadBook.book ?: return"))
+        assertTrue(save.contains("val chapterIndex = ReadBook.durChapterIndex"))
+        assertTrue(save.contains("ReadBook.book?.bookUrl == book.bookUrl"))
     }
 
     @Test
-    fun `content result is delivered only once across recreated views`() {
-        val result = PendingContent("original", revision = 0)
+    fun `newer content request invalidates an older result`() {
+        val state = ContentDraftState()
+        state.restore("original")
+        val older = state.newRequest()
+        val newer = state.newRequest()
 
-        assertEquals("original", result.take(currentRevision = 0))
-        assertNull(result.take(currentRevision = 0))
+        assertNull(state.applyLoaded(older, "older content"))
+        assertEquals("newer content", state.applyLoaded(newer, "newer content"))
+        assertEquals("newer content", state.text)
     }
 
     @Test
     fun `stale content result does not replace an edited draft`() {
         val state = ContentDraftState()
-        state.initialize("original")
-        val request = state.snapshot()
+        state.restore("original")
+        val request = state.newRequest()
 
         state.update("edited draft")
 
@@ -98,25 +115,22 @@ class DialogViewLifecycleContractTest {
     @Test
     fun `content result applies when the draft has not changed`() {
         val state = ContentDraftState()
-        state.initialize("edited draft")
-        val request = state.snapshot()
+        state.restore("edited draft")
+        val request = state.newRequest()
 
         assertEquals("reset content", state.applyLoaded(request, "reset content"))
         assertEquals("reset content", state.text)
     }
 
     @Test
-    fun `published content is ignored after a later draft edit`() {
+    fun `restored draft is kept as the authoritative text`() {
         val state = ContentDraftState()
-        state.initialize("original")
-        val request = state.snapshot()
-        val loaded = requireNotNull(state.applyLoaded(request, "loaded content"))
-        val result = PendingContent(loaded, state.snapshot())
 
-        state.update("later edit")
+        assertTrue(state.restore("restored draft"))
+        assertFalse(state.restore("older framework state"))
 
-        assertNull(result.take(state.snapshot()))
-        assertEquals("later edit", state.text)
+        assertEquals("restored draft", state.text)
+        assertTrue(state.hasDraft)
     }
 
     @Test

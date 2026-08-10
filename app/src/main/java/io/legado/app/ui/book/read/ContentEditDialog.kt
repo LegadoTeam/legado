@@ -11,12 +11,13 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.withStateAtLeast
 import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.base.BaseViewModel
 import io.legado.app.data.appDb
+import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
+import io.legado.app.data.entities.BookSource
 import io.legado.app.databinding.DialogContentEditBinding
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.book.BookHelp
@@ -36,39 +37,37 @@ import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-internal class PendingContent(
-    private val content: String,
-    private val revision: Long,
-) {
-    private var pending = true
-
-    fun take(currentRevision: Long): String? {
-        if (!pending) return null
-        pending = false
-        if (revision != currentRevision) return null
-        return content
-    }
-}
+internal data class ContentDraftRequest(val generation: Long, val revision: Long)
 
 internal class ContentDraftState {
     var text: String? = null
         private set
     private var revision = 0L
+    private var requestGeneration = 0L
 
-    fun initialize(text: String) {
-        if (this.text == null) this.text = text
+    val hasDraft: Boolean
+        get() = text != null
+
+    fun restore(text: String): Boolean {
+        if (this.text != null) return false
+        this.text = text
+        return true
     }
 
-    fun update(text: String) {
-        if (this.text == text) return
+    fun update(text: String): Boolean {
+        if (this.text == text) return false
         this.text = text
         revision++
+        return true
     }
 
-    fun snapshot(): Long = revision
+    fun newRequest(): ContentDraftRequest {
+        return ContentDraftRequest(++requestGeneration, revision)
+    }
 
-    fun applyLoaded(snapshot: Long, text: String): String? {
-        if (snapshot != revision) return null
+    fun applyLoaded(request: ContentDraftRequest, text: String): String? {
+        if (request.generation != requestGeneration || request.revision != revision) return null
+        if (this.text != text) revision++
         this.text = text
         return text
     }
@@ -78,6 +77,10 @@ internal class ContentDraftState {
  * 内容编辑
  */
 class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
+
+    companion object {
+        private const val STATE_HAS_DRAFT = "hasDraft"
+    }
 
     val binding by viewBinding(DialogContentEditBinding::bind)
     val viewModel by viewModels<ContentEditViewModel>()
@@ -91,11 +94,6 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         val owner = viewLifecycleOwner
         val contentView = binding.contentView
-        viewModel.draftText?.let(contentView::setText)
-        viewModel.initializeDraft(contentView.text?.toString().orEmpty())
-        contentView.doAfterTextChanged {
-            viewModel.updateDraft(it?.toString().orEmpty())
-        }
         binding.toolBar.setBackgroundColor(primaryColor)
         binding.toolBar.title = viewModel.titleLiveData.value ?: ReadBook.curTextChapter?.title
         viewModel.titleLiveData.observe(owner) {
@@ -106,8 +104,9 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
             if (editTitleDialog != null) return@setOnClickListener
             owner.lifecycleScope.launch {
                 val book = ReadBook.book ?: return@launch
+                val chapterIndex = ReadBook.durChapterIndex
                 val chapter = withContext(IO) {
-                    appDb.bookChapterDao.getChapter(book.bookUrl, ReadBook.durChapterIndex)
+                    appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)
                 } ?: return@launch
                 editTitle(chapter)
             }
@@ -119,26 +118,40 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
                 binding.rlLoading.gone()
             }
         }
-        viewModel.contentLiveData.observe(owner) { event ->
-            owner.lifecycleScope.launch {
-                owner.lifecycle.withStateAtLeast(Lifecycle.State.RESUMED) {
-                    val content = event.take(viewModel.draftRevision)
-                        ?: return@withStateAtLeast
-                    contentView.setText(content)
-                    contentView.post {
-                        if (!owner.lifecycle.currentState.isAtLeast(Lifecycle.State.CREATED)) {
-                            return@post
-                        }
-                        contentView.apply {
-                            val lineIndex = layout.getLineForOffset(ReadBook.durChapterPos)
-                            val lineHeight = layout.getLineTop(lineIndex)
-                            scrollTo(0, lineHeight)
-                        }
-                    }
+        viewModel.contentLiveData.observe(owner) { content ->
+            if (contentView.text?.toString() == content) return@observe
+            contentView.setText(content)
+            contentView.post {
+                if (!owner.lifecycle.currentState.isAtLeast(Lifecycle.State.CREATED)) {
+                    return@post
+                }
+                contentView.apply {
+                    val lineIndex = layout.getLineForOffset(ReadBook.durChapterPos)
+                    val lineHeight = layout.getLineTop(lineIndex)
+                    scrollTo(0, lineHeight)
                 }
             }
         }
-        if (savedInstanceState == null) viewModel.initContent()
+    }
+
+    override fun onViewStateRestored(savedInstanceState: Bundle?) {
+        super.onViewStateRestored(savedInstanceState)
+        val contentView = binding.contentView
+        if (savedInstanceState?.getBoolean(STATE_HAS_DRAFT) == true) {
+            viewModel.restoreDraft(contentView.text?.toString().orEmpty())
+        }
+        viewModel.draftText?.let { draft ->
+            if (contentView.text?.toString() != draft) contentView.setText(draft)
+        }
+        contentView.doAfterTextChanged {
+            viewModel.updateDraft(it?.toString().orEmpty())
+        }
+        viewModel.initContent()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(STATE_HAS_DRAFT, viewModel.hasDraft)
     }
 
     override fun onDestroyView() {
@@ -183,11 +196,13 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
                             ReadBook.durChapterIndex == chapterIndex
                         ) {
                             ReadBook.loadContent(chapterIndex, resetPageOffset = false)
+                            chapter.getDisplayTitle()
+                        } else {
+                            null
                         }
                     }
-                    chapter.getDisplayTitle()
                 }.onSuccess { title ->
-                    viewModel.titleLiveData.value = title
+                    title?.let { viewModel.titleLiveData.value = it }
                 }
             }
             onDismiss { dialog ->
@@ -203,77 +218,117 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
 
     private fun save() {
         val content = binding.contentView.text?.toString() ?: return
+        val book = ReadBook.book ?: return
+        val chapterIndex = ReadBook.durChapterIndex
         Coroutine.async {
-            val book = ReadBook.book ?: return@async
             val chapter = appDb.bookChapterDao
-                .getChapter(book.bookUrl, ReadBook.durChapterIndex)
+                .getChapter(book.bookUrl, chapterIndex)
                 ?: return@async
             BookHelp.saveText(book, chapter, content)
-            ReadBook.loadContent(ReadBook.durChapterIndex, resetPageOffset = false)
+            withContext(Main) {
+                if (ReadBook.book?.bookUrl == book.bookUrl &&
+                    ReadBook.durChapterIndex == chapterIndex
+                ) {
+                    ReadBook.loadContent(chapterIndex, resetPageOffset = false)
+                }
+            }
         }
     }
 
     class ContentEditViewModel(application: Application) : BaseViewModel(application) {
         val loadStateLiveData = MutableLiveData<Boolean>()
-        internal val contentLiveData = MutableLiveData<PendingContent>()
+        internal val contentLiveData = MutableLiveData<String>()
         internal val titleLiveData = MutableLiveData<String>()
         private val draftState = ContentDraftState()
         internal val draftText: String?
             get() = draftState.text
-        internal val draftRevision: Long
-            get() = draftState.snapshot()
+        internal val hasDraft: Boolean
+            get() = draftState.hasDraft
         var content: String? = null
         private var contentTask: Coroutine<String?>? = null
-        private var contentTaskIsReset = false
-        private var resetPending = false
+        private var pendingReset: ContentLoadRequest? = null
 
-        fun initializeDraft(text: String) = draftState.initialize(text)
+        private data class ContentLoadRequest(
+            val draft: ContentDraftRequest,
+            val reset: Boolean,
+            val book: Book,
+            val chapterIndex: Int,
+            val bookSource: BookSource?,
+        )
 
-        fun updateDraft(text: String) = draftState.update(text)
+        fun restoreDraft(text: String) {
+            if (draftState.restore(text)) contentLiveData.value = text
+        }
+
+        fun updateDraft(text: String) {
+            if (draftState.update(text)) contentLiveData.value = text
+        }
 
         fun initContent(reset: Boolean = false) {
-            if (!reset && contentLiveData.value != null) return
+            if (!reset && (draftState.hasDraft || contentTask?.isActive == true)) return
+            val book = ReadBook.book ?: return
+            val request = ContentLoadRequest(
+                draft = draftState.newRequest(),
+                reset = reset,
+                book = book,
+                chapterIndex = ReadBook.durChapterIndex,
+                bookSource = ReadBook.bookSource,
+            )
             if (contentTask?.isActive == true) {
-                if (reset && !contentTaskIsReset) resetPending = true
+                pendingReset = request
                 return
             }
-            val draftRevision = draftState.snapshot()
-            contentTaskIsReset = reset
+            startContent(request)
+        }
+
+        private fun startContent(request: ContentLoadRequest) {
             contentTask = execute {
-                val book = ReadBook.book ?: return@execute null
                 val chapter = appDb.bookChapterDao
-                    .getChapter(book.bookUrl, ReadBook.durChapterIndex)
+                    .getChapter(request.book.bookUrl, request.chapterIndex)
                     ?: return@execute null
-                if (reset) {
+                if (request.reset) {
                     content = null
-                    BookHelp.delContent(book, chapter)
-                    if (!book.isLocal) ReadBook.bookSource?.let { bookSource ->
-                        WebBook.getContentAwait(bookSource, book, chapter)
+                    BookHelp.delContent(request.book, chapter)
+                    if (!request.book.isLocal) request.bookSource?.let { bookSource ->
+                        WebBook.getContentAwait(bookSource, request.book, chapter)
                     }
                 }
                 return@execute content ?: let {
-                    val contentProcessor = ContentProcessor.get(book.name, book.origin)
-                    val content = BookHelp.getContent(book, chapter) ?: return@let null
-                    contentProcessor.getContent(book, chapter, content, includeTitle = false)
+                    val contentProcessor = ContentProcessor.get(
+                        request.book.name,
+                        request.book.origin
+                    )
+                    val content = BookHelp.getContent(request.book, chapter) ?: return@let null
+                    contentProcessor.getContent(
+                        request.book,
+                        chapter,
+                        content,
+                        includeTitle = false
+                    )
                         .toString()
                 }
             }.onStart {
                 loadStateLiveData.postValue(true)
             }.onSuccess {
                 content = it
-                if (reset) {
-                    ReadBook.loadContent(ReadBook.durChapterIndex, resetPageOffset = false)
-                }
-                draftState.applyLoaded(draftRevision, it.orEmpty())?.let { content ->
-                    contentLiveData.value = PendingContent(content, draftState.snapshot())
+                if (ReadBook.book?.bookUrl == request.book.bookUrl &&
+                    ReadBook.durChapterIndex == request.chapterIndex
+                ) {
+                    if (request.reset) {
+                        ReadBook.loadContent(request.chapterIndex, resetPageOffset = false)
+                    }
+                    draftState.applyLoaded(request.draft, it.orEmpty())?.let { content ->
+                        contentLiveData.value = content
+                    }
                 }
             }.onFinally {
                 contentTask = null
-                contentTaskIsReset = false
-                loadStateLiveData.postValue(false)
-                if (resetPending) {
-                    resetPending = false
-                    initContent(reset = true)
+                val next = pendingReset
+                pendingReset = null
+                if (next == null) {
+                    loadStateLiveData.postValue(false)
+                } else {
+                    startContent(next)
                 }
             }
         }
