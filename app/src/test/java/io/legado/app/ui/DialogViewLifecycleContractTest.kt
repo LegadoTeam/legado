@@ -1,6 +1,9 @@
 package io.legado.app.ui
 
+import io.legado.app.ui.book.read.PendingContent
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -27,21 +30,33 @@ class DialogViewLifecycleContractTest {
     @Test
     fun `content editor callbacks only update the current view`() {
         val source = source("book/read/ContentEditDialog.kt")
-        val created = source.section("override fun onFragmentCreated", "private fun loadContent")
-        val loadContent = source.section("private fun loadContent", "private fun initMenu")
+        val created = source.section("override fun onFragmentCreated", "override fun onDestroyView")
+        val viewModel = source.section("class ContentEditViewModel", "\n    }\n\n}")
+        val resetMenu = source.section("R.id.menu_reset", "R.id.menu_copy_all")
         val editTitle = source.section("private fun editTitle", "override fun onCancel")
 
         assertTrue(created.contains("val owner = viewLifecycleOwner"))
         assertTrue(created.contains("val contentView = binding.contentView"))
-        assertTrue(created.contains("owner.lifecycleScope.launch"))
+        assertTrue(created.contains("contentLiveData.observe(owner)"))
+        assertTrue(created.contains("withStateAtLeast(Lifecycle.State.RESUMED)"))
+        assertTrue(created.contains("val content = event.take()"))
         assertTrue(created.contains("owner.lifecycle.currentState.isAtLeast"))
         assertTrue(created.contains("contentView.post"))
         assertFalse(created.contains("binding.contentView.post"))
-        assertTrue(loadContent.contains("val owner = viewLifecycleOwner"))
-        assertTrue(loadContent.contains("owner.lifecycleScope.launch"))
+        assertTrue(created.contains("if (savedInstanceState == null) viewModel.initContent()"))
+        assertTrue(viewModel.contains("private var contentTask"))
+        assertTrue(viewModel.contains("if (!reset && contentLiveData.value != null) return"))
+        assertTrue(viewModel.contains("if (contentTask?.isActive == true)"))
+        assertTrue(viewModel.contains("if (reset) {\n                    ReadBook.loadContent"))
+        assertTrue(viewModel.contains("contentLiveData.value = PendingContent("))
+        assertTrue(resetMenu.contains("viewModel.initContent(true)"))
+        assertFalse(resetMenu.contains("ReadBook.loadContent"))
+        assertTrue(source.contains("editTitleDialog?.dismiss()"))
+        assertTrue(source.contains("override fun onDestroyView()"))
         assertTrue(editTitle.contains("val owner = viewLifecycleOwner"))
         assertTrue(editTitle.contains("val toolBar = binding.toolBar"))
-        assertTrue(editTitle.contains("lifecycleScope.launch"))
+        assertTrue(editTitle.contains("Coroutine.async"))
+        assertTrue(editTitle.contains("withContext(Main)"))
         assertTrue(editTitle.contains("owner.lifecycleScope.launch"))
         assertTrue(editTitle.contains("val title = alertBinding.editView.text.toString()"))
         assertTrue(
@@ -51,6 +66,16 @@ class DialogViewLifecycleContractTest {
         assertFalse(created.contains("\n            lifecycleScope.launch"))
         assertFalse(editTitle.contains("binding.toolBar.title"))
         assertFalse(editTitle.contains("viewLifecycleOwner.lifecycleScope.launch"))
+        assertFalse(editTitle.contains("\n                lifecycleScope.launch"))
+        assertTrue(editTitle.contains("if (editTitleDialog === dialog)"))
+    }
+
+    @Test
+    fun `content result is delivered only once across recreated views`() {
+        val result = PendingContent("original")
+
+        assertEquals("original", result.take())
+        assertNull(result.take())
     }
 
     @Test
