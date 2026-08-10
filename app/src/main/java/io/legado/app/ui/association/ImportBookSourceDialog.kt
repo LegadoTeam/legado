@@ -300,11 +300,17 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
                 } else {
                     showComment.gone()
                 }
-                tvSourceState.text = when {
-                    viewModel.newSourceStatus[holder.layoutPosition] -> "新增"
-                    viewModel.updateSourceStatus[holder.layoutPosition] -> "更新"
-                    else -> "已有"
-                }
+                tvSourceState.setText(
+                    when {
+                        viewModel.newSourceStatus[holder.layoutPosition] ->
+                            R.string.import_status_new
+
+                        viewModel.updateSourceStatus[holder.layoutPosition] ->
+                            R.string.import_status_update
+
+                        else -> R.string.import_status_exist
+                    }
+                )
             }
         }
 

@@ -141,11 +141,13 @@ class ImportThemeDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
                 cbSourceName.isChecked = viewModel.selectStatus[holder.layoutPosition]
                 cbSourceName.text = item.themeName
                 val localSource = viewModel.checkSources[holder.layoutPosition]
-                tvSourceState.text = when {
-                    localSource == null -> "新增"
-                    localSource != item -> "更新"
-                    else -> "已有"
-                }
+                tvSourceState.setText(
+                    when {
+                        localSource == null -> R.string.import_status_new
+                        localSource != item -> R.string.import_status_update
+                        else -> R.string.import_status_exist
+                    }
+                )
             }
         }
 

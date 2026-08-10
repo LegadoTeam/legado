@@ -107,6 +107,39 @@ class ImportBookSourceStateTest {
         assertTrue(layout.contains("android:maxLines=\"3\""))
     }
 
+    @Test
+    fun `association import status labels use localized resources`() {
+        val importDialogs = listOf(
+            "ImportBookSourceDialog.kt",
+            "ImportDictRuleDialog.kt",
+            "ImportHttpTtsDialog.kt",
+            "ImportReplaceRuleDialog.kt",
+            "ImportRssSourceDialog.kt",
+            "ImportThemeDialog.kt",
+            "ImportTxtTocRuleDialog.kt",
+        )
+
+        importDialogs.forEach { fileName ->
+            val source = readProjectFile(
+                "src/main/java/io/legado/app/ui/association/$fileName"
+            )
+            assertTrue(source.contains("R.string.import_status_new"))
+            assertTrue(source.contains("R.string.import_status_exist"))
+            assertFalse(source.contains("\"新增\""))
+            assertFalse(source.contains("\"更新\""))
+            assertFalse(source.contains("\"已有\""))
+        }
+
+        importDialogs
+            .filterNot { it == "ImportDictRuleDialog.kt" }
+            .forEach { fileName ->
+                val source = readProjectFile(
+                    "src/main/java/io/legado/app/ui/association/$fileName"
+                )
+                assertTrue(source.contains("R.string.import_status_update"))
+            }
+    }
+
     private fun readProjectFile(pathInApp: String): String {
         val file = sequenceOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull(File::isFile)
