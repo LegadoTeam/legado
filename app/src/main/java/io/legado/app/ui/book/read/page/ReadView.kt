@@ -520,7 +520,9 @@ class ReadView(context: Context, attrs: AttributeSet) :
             5 -> ReadAloud.prevParagraph(context)
             6 -> ReadAloud.nextParagraph(context)
             7 -> callBack.addBookmark()
-            8 -> activity?.showDialogFragment(ContentEditDialog())
+            8 -> ContentEditDialog.newInstance()?.let {
+                activity?.showDialogFragment(it)
+            }
             9 -> callBack.changeReplaceRuleState()
             10 -> callBack.openChapterList()
             11 -> callBack.openSearchActivity(null)

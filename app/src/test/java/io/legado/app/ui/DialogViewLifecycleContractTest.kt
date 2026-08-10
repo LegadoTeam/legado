@@ -1,6 +1,7 @@
 package io.legado.app.ui
 
 import io.legado.app.ui.book.read.ContentDraftState
+import io.legado.app.ui.book.read.ContentEditTarget
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -37,9 +38,14 @@ class DialogViewLifecycleContractTest {
         val resetMenu = source.section("R.id.menu_reset", "R.id.menu_copy_all")
         val editTitle = source.section("private fun editTitle", "override fun onCancel")
         val save = source.section("private fun save", "class ContentEditViewModel")
+        val activity = source("book/read/ReadBookActivity.kt")
+        val readView = source("book/read/page/ReadView.kt")
 
         assertTrue(created.contains("val owner = viewLifecycleOwner"))
         assertTrue(created.contains("val contentView = binding.contentView"))
+        assertTrue(created.contains("editTarget.bookUrl"))
+        assertTrue(created.contains("editTarget.chapterIndex"))
+        assertTrue(created.contains("editTarget.chapterPos"))
         assertTrue(created.contains("contentLiveData.observe(owner)"))
         assertTrue(created.contains("titleLiveData.observe(owner)"))
         assertTrue(created.contains("return@observe"))
@@ -52,7 +58,7 @@ class DialogViewLifecycleContractTest {
         assertTrue(restored.contains("viewModel.restoreDraft"))
         assertTrue(restored.contains("viewModel.draftText?.let"))
         assertTrue(restored.contains("contentView.doAfterTextChanged"))
-        assertTrue(restored.contains("viewModel.initContent()"))
+        assertTrue(restored.contains("viewModel.initContent(editTarget)"))
         assertTrue(savedState.contains("outState.putBoolean(STATE_HAS_DRAFT, viewModel.hasDraft)"))
         assertTrue(viewModel.contains("private var contentTask"))
         assertTrue(viewModel.contains("private var pendingReset"))
@@ -63,29 +69,42 @@ class DialogViewLifecycleContractTest {
         assertTrue(viewModel.contains("draftState.applyLoaded(request.draft"))
         assertTrue(viewModel.contains("contentLiveData.value = content"))
         assertTrue(viewModel.contains("startContent(next)"))
-        assertTrue(viewModel.contains("request.book.bookUrl"))
-        assertTrue(viewModel.contains("request.chapterIndex"))
-        assertTrue(resetMenu.contains("viewModel.initContent(true)"))
+        assertTrue(viewModel.contains("request.target.bookUrl"))
+        assertTrue(viewModel.contains("request.target.chapterIndex"))
+        assertTrue(resetMenu.contains("viewModel.initContent(editTarget, true)"))
         assertFalse(resetMenu.contains("ReadBook.loadContent"))
         assertTrue(source.contains("editTitleDialog?.dismiss()"))
         assertTrue(source.contains("override fun onDestroyView()"))
         assertTrue(editTitle.contains("if (editTitleDialog != null) return"))
-        assertTrue(editTitle.contains("val bookUrl = chapter.bookUrl"))
-        assertTrue(editTitle.contains("val chapterIndex = chapter.index"))
         assertTrue(editTitle.contains("Coroutine.async"))
         assertTrue(editTitle.contains("withContext(Main)"))
-        assertTrue(editTitle.contains("ReadBook.book?.bookUrl == bookUrl"))
-        assertTrue(editTitle.contains("ReadBook.durChapterIndex == chapterIndex"))
-        assertTrue(editTitle.contains("viewModel.titleLiveData.value = it"))
+        assertTrue(editTitle.contains("editTarget.matches("))
+        assertTrue(editTitle.contains("editTarget.chapterIndex"))
+        assertTrue(editTitle.contains("viewModel.titleLiveData.value = title"))
         assertTrue(editTitle.contains("val title = alertBinding.editView.text.toString()"))
         assertFalse(created.contains("\n            lifecycleScope.launch"))
         assertFalse(editTitle.contains("binding.toolBar.title"))
         assertFalse(editTitle.contains("viewLifecycleOwner.lifecycleScope.launch"))
         assertFalse(editTitle.contains("\n                lifecycleScope.launch"))
         assertTrue(editTitle.contains("if (editTitleDialog === dialog)"))
-        assertTrue(save.contains("val book = ReadBook.book ?: return"))
-        assertTrue(save.contains("val chapterIndex = ReadBook.durChapterIndex"))
-        assertTrue(save.contains("ReadBook.book?.bookUrl == book.bookUrl"))
+        assertTrue(save.contains("it.bookUrl == editTarget.bookUrl"))
+        assertTrue(save.contains("appDb.bookDao.getBook(editTarget.bookUrl)"))
+        assertTrue(save.contains("editTarget.bookUrl, editTarget.chapterIndex"))
+        assertTrue(save.contains("editTarget.matches("))
+        assertFalse(save.contains("val chapterIndex = ReadBook.durChapterIndex"))
+        assertTrue(activity.contains("ContentEditDialog.newInstance()"))
+        assertTrue(readView.contains("ContentEditDialog.newInstance()"))
+        assertFalse(activity.contains("showDialogFragment(ContentEditDialog())"))
+        assertFalse(readView.contains("showDialogFragment(ContentEditDialog())"))
+    }
+
+    @Test
+    fun `content editor target does not follow the global reader chapter`() {
+        val target = ContentEditTarget("book-a", chapterIndex = 3, chapterPos = 120)
+
+        assertTrue(target.matches("book-a", 3))
+        assertFalse(target.matches("book-a", 4))
+        assertFalse(target.matches("book-b", 3))
     }
 
     @Test

@@ -642,7 +642,9 @@ class ReadBookActivity : BaseReadBookActivity(),
             R.id.menu_add_bookmark -> addBookmark()
             R.id.menu_highlight_rule -> startActivity<HighlightRuleActivity>()
             R.id.menu_simulated_reading -> showSimulatedReading()
-            R.id.menu_edit_content -> showDialogFragment(ContentEditDialog())
+            R.id.menu_edit_content -> ContentEditDialog.newInstance()?.let {
+                showDialogFragment(it)
+            }
             R.id.menu_update_toc -> ReadBook.book?.let {
                 if (it.isEpub) {
                     BookHelp.clearCache(it)
