@@ -95,10 +95,17 @@ object BookSourceController {
         }
     }
 
-    fun validateJsSourceRequest(
+    fun validateJsSourceRequest(headers: Map<String, String>): ReturnData? =
+        validateJsSourceRequest(
+            headers,
+            AppConfig.jsSourceApiToken,
+            AppConfig.jsSourceApiTokenRequired,
+        )
+
+    internal fun validateJsSourceRequest(
         headers: Map<String, String>,
-        configuredToken: String? = AppConfig.jsSourceApiToken,
-        tokenRequired: Boolean = AppConfig.jsSourceApiTokenRequired,
+        configuredToken: String?,
+        tokenRequired: Boolean = true,
     ): ReturnData? {
         val returnData = ReturnData()
         if (!hasValidJsSourceApiToken(headers, configuredToken, tokenRequired)) {
@@ -121,19 +128,33 @@ object BookSourceController {
         return null
     }
 
-    fun hasValidJsSourceApiToken(
+    fun hasValidJsSourceApiToken(headers: Map<String, String>): Boolean =
+        hasValidJsSourceApiToken(
+            headers,
+            AppConfig.jsSourceApiToken,
+            AppConfig.jsSourceApiTokenRequired,
+        )
+
+    internal fun hasValidJsSourceApiToken(
         headers: Map<String, String>,
-        configuredToken: String? = AppConfig.jsSourceApiToken,
-        tokenRequired: Boolean = AppConfig.jsSourceApiTokenRequired,
+        configuredToken: String?,
+        tokenRequired: Boolean = true,
     ): Boolean {
         if (!tokenRequired) return true
         return matchesJsSourceApiToken(configuredToken, headers.header(JS_SOURCE_TOKEN_HEADER))
     }
 
-    fun hasValidJsSourceWebSocketProtocol(
+    fun hasValidJsSourceWebSocketProtocol(headers: Map<String, String>): Boolean =
+        hasValidJsSourceWebSocketProtocol(
+            headers,
+            AppConfig.jsSourceApiToken,
+            AppConfig.jsSourceApiTokenRequired,
+        )
+
+    internal fun hasValidJsSourceWebSocketProtocol(
         headers: Map<String, String>,
-        configuredToken: String? = AppConfig.jsSourceApiToken,
-        tokenRequired: Boolean = AppConfig.jsSourceApiTokenRequired,
+        configuredToken: String?,
+        tokenRequired: Boolean = true,
     ): Boolean {
         if (!tokenRequired) return true
         val expected = jsSourceWebSocketProtocol(configuredToken) ?: return false
