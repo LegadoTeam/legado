@@ -55,8 +55,9 @@ def upload_file(file_dir, folder_id):
         "id": "WU_FILE_0",
         "name": file_name,
     }
-    files = {'upload_file': (file_name, open(file_dir, "rb"), 'application/octet-stream')}
-    res = requests.post(url_upload, data=post_data, files=files, headers=headers, cookies=cookie, timeout=120).json()
+    with open(file_dir, "rb") as upload_stream:
+        files = {'upload_file': (file_name, upload_stream, 'application/octet-stream')}
+        res = requests.post(url_upload, data=post_data, files=files, headers=headers, cookies=cookie, timeout=120).json()
     log(f"{file_dir} -> {res['info']}")
     return res['zt'] == 1
 
@@ -64,35 +65,37 @@ def upload_file(file_dir, folder_id):
 # 上传文件夹内的文件
 def upload_folder(folder_dir, folder_id):
     file_list = sorted(os.listdir(folder_dir), reverse=True)
+    success = True
     for file in file_list:
         path = os.path.join(folder_dir, file)
         if os.path.isfile(path):
-            upload_file(path, folder_id)
+            success = upload_file(path, folder_id) and success
         else:
-            upload_folder(path, folder_id)
+            success = upload_folder(path, folder_id) and success
+    return success
 
 
 # 上传
 def upload(dir, folder_id):
     if dir is None:
         log('ERROR: 请指定上传的文件路径')
-        return
+        return False
     if folder_id is None:
         log('ERROR: 请指定蓝奏云的文件夹id')
-        return
+        return False
     if os.path.isfile(dir):
-        upload_file(dir, str(folder_id))
-    else:
-        upload_folder(dir, str(folder_id))
+        return upload_file(dir, str(folder_id))
+    return upload_folder(dir, str(folder_id))
+
+
+def main(argv):
+    if len(argv) != 2:
+        log('ERROR: 参数错误,请以这种格式重新尝试\npython lzy_web.py 需上传的路径 蓝奏云文件夹id')
+        return 2
+    if not login_by_cookie():
+        return 1
+    return 0 if upload(argv[0], argv[1]) else 1
 
 
 if __name__ == '__main__':
-    argv = sys.argv[1:]
-    if len(argv) != 2:
-        log('ERROR: 参数错误,请以这种格式重新尝试\npython lzy_web.py 需上传的路径 蓝奏云文件夹id')
-    # 需上传的路径
-    upload_path = argv[0]
-    # 蓝奏云文件夹id
-    lzy_folder_id = argv[1]
-    if login_by_cookie():
-        upload(upload_path, lzy_folder_id)
+    sys.exit(main(sys.argv[1:]))

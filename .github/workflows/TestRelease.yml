@@ -1,0 +1,262 @@
+name: Test Release
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: test-release-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+
+  prepare:
+    if: >-
+      ${{ !github.event.pull_request.draft &&
+          github.event.pull_request.user.login == 'mgz0227' &&
+          github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.set-ver.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+
+      - name: Test Lanzou Upload Helper
+        run: python3 .github/scripts/test_lzy_web.py
+
+      - id: set-ver
+        run: |
+          version="3.$(TZ=Asia/Shanghai date +%y%m%d%H)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Verify Release Credentials
+        env:
+          RELEASE_KEY_STORE: ${{ secrets.RELEASE_KEY_STORE }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          LANZOU_ID: ${{ secrets.LANZOU_ID }}
+          LANZOU_PSD: ${{ secrets.LANZOU_PSD }}
+          LANZOU_FOLDER_ID: ${{ secrets.LANZOU_FOLDER_ID }}
+        run: |
+          for name in \
+            RELEASE_KEY_STORE RELEASE_KEY_PASSWORD RELEASE_STORE_PASSWORD \
+            LANZOU_ID LANZOU_PSD LANZOU_FOLDER_ID; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required secret: $name"
+              exit 1
+            fi
+          done
+
+  build:
+    needs: prepare
+    strategy:
+      matrix:
+        product: [app]
+        type: [release, releaseA]
+      fail-fast: false
+    runs-on: ubuntu-latest
+    env:
+      product: ${{ matrix.product }}
+      type: ${{ matrix.type }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+          fetch-depth: 0
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6.3.0
+
+      - name: Prepare Assets
+        run: echo "" > "$GITHUB_WORKSPACE/app/src/main/assets/18PlusList.txt"
+
+      - name: Release APK Sign
+        run: |
+          echo "${{ secrets.RELEASE_KEY_STORE }}" | base64 --decode \
+            > "$GITHUB_WORKSPACE/app/legado.jks"
+          {
+            echo "RELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}"
+            echo "RELEASE_STORE_PASSWORD=${{ secrets.RELEASE_STORE_PASSWORD }}"
+            echo "RELEASE_STORE_FILE=./legado.jks"
+            echo "RELEASE_KEY_ALIAS=legado"
+          } >> "$GITHUB_WORKSPACE/gradle.properties"
+
+      - name: Build With Gradle
+        run: |
+          sed -i "s/^def version = .*/def version = \"$VERSION\"/" \
+            "$GITHUB_WORKSPACE/app/build.gradle"
+
+          if [ "$type" = "release" ]; then
+            typeName="新包名"
+          else
+            typeName="新共存"
+            sed -i "s/'.release'/'.releaseA'/" \
+              "$GITHUB_WORKSPACE/app/build.gradle"
+            if [ -f "$GITHUB_WORKSPACE/app/google-services.json" ]; then
+              sed -i 's/.release/.releaseA/' \
+                "$GITHUB_WORKSPACE/app/google-services.json"
+            fi
+          fi
+
+          chmod +x gradlew
+          ./gradlew :$product:assembleRelease -ParmOnly=true \
+            --build-cache --parallel --daemon --warning-mode all
+          mkdir -p "$GITHUB_WORKSPACE/apk"
+          bash "$GITHUB_WORKSPACE/.github/scripts/collect-apks.sh" \
+            "$GITHUB_WORKSPACE/app/build/outputs/apk" \
+            "$GITHUB_WORKSPACE/apk" \
+            "$product" "$VERSION" "$typeName" arm
+
+          ./gradlew :$product:assembleRelease \
+            --build-cache --parallel --daemon --warning-mode all
+          bash "$GITHUB_WORKSPACE/.github/scripts/collect-apks.sh" \
+            "$GITHUB_WORKSPACE/app/build/outputs/apk" \
+            "$GITHUB_WORKSPACE/apk" \
+            "$product" "$VERSION" "$typeName" universal
+
+      - name: Check Build Result
+        run: |
+          expected_packages=(arm universal)
+          mapfile -d '' apks < <(find "$GITHUB_WORKSPACE/apk" -maxdepth 1 \
+            -type f -name 'legado_*.apk' -print0)
+          if [[ ${#apks[@]} -ne ${#expected_packages[@]} ]]; then
+            echo "Expected ${#expected_packages[@]} APKs, found ${#apks[@]}"
+            exit 1
+          fi
+
+          declare -A verified=()
+          for apk in "${apks[@]}"; do
+            file_name=$(basename "$apk")
+            case "$file_name" in
+              *_universal_*) package_kind=universal ;;
+              *) package_kind=arm ;;
+            esac
+            if [[ -n "${verified[$package_kind]:-}" ]]; then
+              echo "Multiple APKs detected for $package_kind"
+              exit 1
+            fi
+
+            packaged_abis=$(unzip -Z1 "$apk" \
+              | sed -n 's#^lib/\([^/]*\)/.*#\1#p' \
+              | sort -u \
+              | paste -sd ' ' -)
+            if [[ "$package_kind" = "universal" ]]; then
+              expected_native_abis="arm64-v8a armeabi-v7a x86 x86_64"
+            else
+              expected_native_abis="arm64-v8a armeabi-v7a"
+            fi
+            if [[ "$packaged_abis" != "$expected_native_abis" ]]; then
+              echo "$package_kind APK contains unexpected native ABIs: $packaged_abis"
+              exit 1
+            fi
+            verified[$package_kind]=$apk
+          done
+
+          for package_kind in "${expected_packages[@]}"; do
+            if [[ -z "${verified[$package_kind]:-}" ]]; then
+              echo "Missing APK for $package_kind"
+              exit 1
+            fi
+          done
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: legado.test.${{ env.type }}
+          if-no-files-found: error
+          path: ${{ github.workspace }}/apk/*.apk
+
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: test-release-publish
+      cancel-in-progress: false
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      PR_TITLE: ${{ github.event.pull_request.title }}
+      PR_URL: ${{ github.event.pull_request.html_url }}
+      PR_SHA: ${{ github.sha }}
+      ylogin: ${{ secrets.LANZOU_ID }}
+      phpdisk_info: ${{ secrets.LANZOU_PSD }}
+      LANZOU_FOLDER_ID: ${{ secrets.LANZOU_FOLDER_ID }}
+      LANZOU_URL: ${{ secrets.LANZOU_URL }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: apk/
+
+      - name: Prepare APKs
+        working-directory: apk/
+        run: |
+          mv */*.apk .
+          rm -rf -- */
+          for file in *.apk; do
+            if [[ "$file" = *新包名* ]]; then
+              mv -- "$file" "${file/新包名/release}"
+            else
+              mv -- "$file" "${file/新共存/releaseA}"
+            fi
+          done
+
+      - name: Prepare Release Notes
+        run: |
+          printf '此版本为 PR 测试版，可能存在不稳定情况，升级前请备份数据。\n\nPR #%s: %s\n\n%s\n\nCommit: %s\n' \
+            "$PR_NUMBER" "$PR_TITLE" "$PR_URL" "$PR_SHA" \
+            > "$GITHUB_WORKSPACE/release-notes.md"
+
+      - name: Update Beta Tag
+        run: |
+          git tag --force beta "$(git rev-parse HEAD)"
+          git push origin refs/tags/beta --force
+
+      - name: Publish Beta Release
+        uses: ncipollo/release-action@v1
+        with:
+          name: legado_test_PR${{ github.event.pull_request.number }}_${{ env.VERSION }}
+          tag: beta
+          bodyFile: ${{ github.workspace }}/release-notes.md
+          prerelease: true
+          makeLatest: false
+          allowUpdates: true
+          removeArtifacts: true
+          artifactErrorsFailBuild: true
+          artifacts: ${{ github.workspace }}/apk/*.apk
+
+      - name: Prepare Lanzou APKs
+        working-directory: apk/
+        run: |
+          bash "$GITHUB_WORKSPACE/.github/scripts/remove-universal-apks.sh" \
+            "$GITHUB_WORKSPACE/apk"
+          for file in *.apk; do
+            renamed="${file/新包名/release}"
+            renamed="${renamed/新共存/releaseA}"
+            mv -- "$file" "${renamed%.apk}_测试版_PR${PR_NUMBER}.apk"
+          done
+
+      - name: Upload To Lanzou
+        run: |
+          python3 "$GITHUB_WORKSPACE/.github/scripts/lzy_web.py" \
+            "$GITHUB_WORKSPACE/apk" "$LANZOU_FOLDER_ID"
+          echo "[$(TZ=Asia/Shanghai date '+%Y.%m.%d %H:%M:%S')] 分享链接: $LANZOU_URL"
