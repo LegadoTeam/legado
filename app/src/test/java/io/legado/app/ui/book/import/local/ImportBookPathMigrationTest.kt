@@ -262,7 +262,13 @@ class ImportBookPathMigrationTest {
         val bookInfoActivity = readProjectFile(
             "src/main/java/io/legado/app/ui/book/info/BookInfoActivity.kt"
         )
-        assertTrue(bookInfoActivity.contains("FileDoc.fromUri(book.getLocalUri(), false).size"))
+        val localBookSize = bookInfoActivity.substringAfter("private fun upKinds")
+            .substringBefore("if (kinds.isEmpty())")
+        assertTrue(localBookSize.contains("val size = try"))
+        assertTrue(localBookSize.contains("FileDoc.fromUri(book.getLocalUri(), false).size"))
+        assertTrue(localBookSize.contains("catch (e: Exception)"))
+        assertTrue(localBookSize.contains("currentCoroutineContext().ensureActive()"))
+        assertTrue(localBookSize.contains("0L"))
         assertFalse(bookInfoActivity.contains("FileDoc.fromFile(book.bookUrl).size"))
 
         val bookInfoViewModel = readProjectFile(

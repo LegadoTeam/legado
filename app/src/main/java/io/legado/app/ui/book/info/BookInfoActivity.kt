@@ -899,7 +899,12 @@ class BookInfoActivity :
             var kinds = book.getKindList()
             if (book.isLocal) {
                 withContext(IO) {
-                    val size = FileDoc.fromUri(book.getLocalUri(), false).size
+                    val size = try {
+                        FileDoc.fromUri(book.getLocalUri(), false).size
+                    } catch (e: Exception) {
+                        currentCoroutineContext().ensureActive()
+                        0L
+                    }
                     if (size > 0) {
                         kinds = kinds.toMutableList()
                         kinds.add(ConvertUtils.formatFileSize(size))
