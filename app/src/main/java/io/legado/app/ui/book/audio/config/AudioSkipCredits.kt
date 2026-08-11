@@ -9,6 +9,7 @@ import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.data.entities.Book
 import io.legado.app.databinding.DialogAudioSkipCreditsBinding
+import io.legado.app.help.book.savePreservingCustomCoverUrl
 import io.legado.app.help.config.AppConfig
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.viewbindingdelegate.viewBinding
@@ -73,6 +74,6 @@ class AudioSkipCredits : BaseDialogFragment(R.layout.dialog_audio_skip_credits) 
 
     override fun onDismiss(dialog: DialogInterface) {
         super.onDismiss(dialog)
-        book.save()
+        book.savePreservingCustomCoverUrl()
     }
 }

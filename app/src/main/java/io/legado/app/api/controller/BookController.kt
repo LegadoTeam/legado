@@ -14,6 +14,7 @@ import io.legado.app.help.CacheManager
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.isLocal
+import io.legado.app.help.book.update
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.glide.ImageLoader
 import io.legado.app.model.BookCover
@@ -154,7 +155,7 @@ object BookController {
                 val toc = LocalBook.getChapterList(book)
                 appDb.bookChapterDao.delByBook(book.bookUrl)
                 appDb.bookChapterDao.insert(*toc.toTypedArray())
-                appDb.bookDao.update(book)
+                book.update()
                 return returnData.setData(toc)
             } else {
                 val bookSource = appDb.bookSourceDao.getBookSource(book.origin)
@@ -167,7 +168,7 @@ object BookController {
                 }
                 appDb.bookChapterDao.delByBook(book.bookUrl)
                 appDb.bookChapterDao.insert(*toc.toTypedArray())
-                appDb.bookDao.update(book)
+                book.update()
                 return returnData.setData(toc)
             }
         } catch (e: Exception) {
@@ -285,7 +286,7 @@ object BookController {
                     AppWebDav.uploadBookProgress(bookProgress) {
                         book.syncTime = System.currentTimeMillis()
                     }
-                    appDb.bookDao.update(book)
+                    book.update()
                     ReadBook.book?.let {
                         if (it.name == bookProgress.name &&
                             it.author == bookProgress.author

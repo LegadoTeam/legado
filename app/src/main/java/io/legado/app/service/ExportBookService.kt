@@ -38,6 +38,7 @@ import io.legado.app.help.book.getExportFileName
 import io.legado.app.help.book.isImage
 import io.legado.app.help.book.isLocalModified
 import io.legado.app.help.book.isPdf
+import io.legado.app.help.book.update
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.glide.OkHttpModelLoader
 import io.legado.app.model.ImageProvider
@@ -346,7 +347,7 @@ class ExportBookService : BaseService() {
         }.onSuccess {
             appDb.bookChapterDao.delByBook(book.bookUrl)
             appDb.bookChapterDao.insert(*it.toTypedArray())
-            appDb.bookDao.update(book)
+            book.update()
             ReadBook.onChapterListUpdated(book)
         }
     }

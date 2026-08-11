@@ -346,7 +346,7 @@ object ReadManga : CoroutineScope by MainScope() {
                         )
                     }
                 }
-                appDb.bookDao.update(book)
+                book.update()
             }.onFailure {
                 AppLog.put("保存漫画阅读进度信息出错\n$it", it)
             }
@@ -476,7 +476,7 @@ object ReadManga : CoroutineScope by MainScope() {
             ensureActive()
             if (cList.size > chapterSize) {
                 if (oldBook.bookUrl == book.bookUrl) {
-                    appDb.bookDao.update(book)
+                    book.update()
                 } else {
                     appDb.bookDao.replace(oldBook, book)
                     BookHelp.updateCacheFolder(oldBook, book)

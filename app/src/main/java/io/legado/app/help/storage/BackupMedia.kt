@@ -12,6 +12,17 @@ internal fun findBackupMediaDirectories(externalFilesRoot: File): List<File> {
     }
 }
 
+internal fun remapRestoredCoverPath(
+    path: String,
+    backupRoot: File,
+    externalFilesRoot: File,
+): String {
+    val source = File(path)
+    if (!source.isAbsolute || source.parentFile?.name != "covers") return path
+    if (!File(backupRoot, "covers/${source.name}").isFile) return path
+    return File(externalFilesRoot, "covers/${source.name}").absolutePath
+}
+
 internal fun prepareBackupMediaDirectories(
     externalFilesRoot: File,
     backupRoot: File,

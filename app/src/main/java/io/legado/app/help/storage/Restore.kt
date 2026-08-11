@@ -108,10 +108,14 @@ object Restore {
 
     private suspend fun restore(path: String) {
         val aes = BackupAES()
+        val backupRoot = File(path)
         val restoredAutoTasks = fileToListT<AutoTaskRule>(path, "autoTask.json")
         fileToListT<Book>(path, "bookshelf.json")?.let {
             it.forEach { book ->
                 book.upType()
+                book.customCoverUrl = book.customCoverUrl?.let { coverPath ->
+                    remapRestoredCoverPath(coverPath, backupRoot, appCtx.externalFiles)
+                }
             }
             it.filter { book -> book.isLocal }
                 .forEach { book ->

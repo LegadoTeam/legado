@@ -17,6 +17,7 @@ import io.legado.app.help.book.getBookSource
 import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.simulatedTotalChapterNum
+import io.legado.app.help.book.update
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.AudioPlay
 import io.legado.app.model.webBook.WebBook
@@ -132,7 +133,7 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
             val cList = WebBook.getChapterListAwait(bookSource, book).getOrThrow()
             if (cList.isEmpty()) return false
             if (oldBook.bookUrl == book.bookUrl) {
-                appDb.bookDao.update(book)
+                book.update()
             } else {
                 appDb.bookDao.replace(oldBook, book)
             }

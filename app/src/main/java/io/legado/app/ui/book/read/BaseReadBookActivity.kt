@@ -25,6 +25,7 @@ import io.legado.app.databinding.DialogDownloadChoiceBinding
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.databinding.DialogSimulatedReadingBinding
 import io.legado.app.help.book.cacheLocalUri
+import io.legado.app.help.book.savePreservingCustomCoverUrl
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
@@ -346,7 +347,7 @@ abstract class BaseReadBookActivity :
                     book.setDailyChapters(num)
                     book.setStartChapter(start)
                     book.setReadSimulating(enabled)
-                    book.save()
+                    book.savePreservingCustomCoverUrl()
                     ReadBook.clearTextChapter()
                     viewModel.initData(intent)
                 }

@@ -52,6 +52,7 @@ import io.legado.app.help.book.isVideo
 import io.legado.app.help.book.isWebFile
 import io.legado.app.help.book.readProgress
 import io.legado.app.help.book.removeType
+import io.legado.app.help.book.update
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.webView.PooledWebView
@@ -1360,7 +1361,7 @@ class BookInfoActivity :
             } else {
                 lifecycleScope.launch {
                     withContext(IO) {
-                        appDb.bookDao.update(book)
+                        book.update()
                     }
                     startReadActivity(
                         book,
@@ -1547,7 +1548,7 @@ class BookInfoActivity :
             book.customCoverUrl = coverUrl
             showCover(book)
             if (viewModel.inBookshelf) {
-                viewModel.saveBook(book)
+                viewModel.saveBook(book, preserveCustomCoverUrl = false)
             }
         }
     }

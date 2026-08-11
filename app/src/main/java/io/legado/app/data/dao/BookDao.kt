@@ -203,8 +203,25 @@ interface BookDao {
     @Update
     fun update(vararg book: Book)
 
-    @Query("update books set customCoverUrl = :customCoverUrl where bookUrl = :bookUrl")
-    fun updateCustomCoverUrl(bookUrl: String, customCoverUrl: String?): Int
+    @Query("select customCoverUrl from books where bookUrl = :bookUrl")
+    fun getCustomCoverUrl(bookUrl: String): String?
+
+    @Transaction
+    fun updatePreservingCustomCoverUrl(vararg books: Book) {
+        books.forEach { book ->
+            update(book.copy(customCoverUrl = getCustomCoverUrl(book.bookUrl)))
+        }
+    }
+
+    @Query(
+        """update books set customCoverUrl = :customCoverUrl
+        where bookUrl = :bookUrl and customCoverUrl is :expectedCustomCoverUrl"""
+    )
+    fun updateCustomCoverUrlIfUnchanged(
+        bookUrl: String,
+        expectedCustomCoverUrl: String?,
+        customCoverUrl: String?,
+    ): Int
 
     @Query("select readConfig from books where bookUrl = :bookUrl")
     fun getReadConfigJson(bookUrl: String): String?
@@ -215,7 +232,7 @@ interface BookDao {
     @Transaction
     fun updatePreservingReadConfig(book: Book) {
         val readConfig = getReadConfigJson(book.bookUrl)
-        update(book)
+        updatePreservingCustomCoverUrl(book)
         updateReadConfigJson(book.bookUrl, readConfig)
     }
 
@@ -234,8 +251,13 @@ interface BookDao {
 
     @Transaction
     fun replace(oldBook: Book, newBook: Book) {
+        val customCoverUrl = if (has(newBook.bookUrl)) {
+            getCustomCoverUrl(newBook.bookUrl)
+        } else {
+            getCustomCoverUrl(oldBook.bookUrl)
+        }
         delete(oldBook)
-        insert(newBook)
+        insert(newBook.copy(customCoverUrl = customCoverUrl))
     }
 
     @Query("update books set durChapterPos = :pos where bookUrl = :bookUrl")

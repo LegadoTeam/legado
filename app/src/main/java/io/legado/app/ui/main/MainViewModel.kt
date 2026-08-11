@@ -19,6 +19,7 @@ import io.legado.app.help.book.addType
 import io.legado.app.help.book.isUpError
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.sync
+import io.legado.app.help.book.update
 import io.legado.app.help.config.AppConfig
 import io.legado.app.model.CacheBook
 import io.legado.app.model.ReadBook
@@ -207,7 +208,7 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
             if (source == null) {
                 if (!book.isUpError) {
                     book.addType(BookType.updateError)
-                    appDb.bookDao.update(book)
+                    book.update()
                 }
                 return
             }
@@ -255,7 +256,7 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
                         replacedBook = currentBook
                         appDb.bookDao.replace(currentBook, book)
                     } else {
-                        appDb.bookDao.update(book)
+                        book.update()
                     }
                     appDb.bookChapterDao.delByBook(bookUrl)
                     appDb.bookChapterDao.insert(*toc.toTypedArray())
@@ -277,7 +278,7 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
                 //这里可能因为时间太长书籍信息已经更改,所以重新获取
                 appDb.bookDao.getBook(persistedBookUrl)?.let { book ->
                     book.addType(BookType.updateError)
-                    appDb.bookDao.update(book)
+                    book.update()
                 }
             }
         } finally {

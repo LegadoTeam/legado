@@ -71,6 +71,31 @@ class BackupMediaTest {
     }
 
     @Test
+    fun `restored cover paths follow the current external files directory`() =
+        withTempDirectory { root ->
+            val backupRoot = root.resolve("backup").apply { mkdirs() }
+            backupRoot.resolve("covers/hash.cover").apply {
+                parentFile?.mkdirs()
+                writeText("cover")
+            }
+            val externalRoot = root.resolve("external")
+            val oldPath = root.resolve("old/external/covers/hash.cover").absolutePath
+
+            assertEquals(
+                externalRoot.resolve("covers/hash.cover").absolutePath,
+                remapRestoredCoverPath(oldPath, backupRoot, externalRoot),
+            )
+            assertEquals(
+                "https://images.example/covers/hash.cover",
+                remapRestoredCoverPath(
+                    "https://images.example/covers/hash.cover",
+                    backupRoot,
+                    externalRoot,
+                ),
+            )
+        }
+
+    @Test
     fun restoreReplacesDirectoryAfterStagingCompletes() = withTempDirectory { root ->
         val backupRoot = root.resolve("backup")
         val externalRoot = root.resolve("external")

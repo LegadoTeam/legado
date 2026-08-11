@@ -33,6 +33,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.sync.Semaphore
 import java.io.File
 
 internal data class PersistentCoverResult(
@@ -50,6 +51,8 @@ class BookshelfManageViewModel(application: Application) : BaseViewModel(applica
     val batchPersistCoverState = MutableLiveData<Boolean>()
     val batchPersistCoverProcess = MutableLiveData<String>()
     internal var batchPersistCoverCoroutine: Coroutine<PersistentCoverResult>? = null
+    private val coverOperationSemaphore = Semaphore(1)
+    private var coverOperationId = 0
 
     fun upCanUpdate(books: List<Book>, canUpdate: Boolean) {
         execute {
@@ -60,13 +63,13 @@ class BookshelfManageViewModel(application: Application) : BaseViewModel(applica
                     }
                 }
             }
-            appDb.bookDao.update(*array)
+            appDb.bookDao.updatePreservingCustomCoverUrl(*array)
         }
     }
 
     fun updateBook(vararg book: Book) {
         execute {
-            appDb.bookDao.update(*book)
+            appDb.bookDao.updatePreservingCustomCoverUrl(*book)
         }
     }
 
@@ -150,21 +153,25 @@ class BookshelfManageViewModel(application: Application) : BaseViewModel(applica
     }
 
     fun persistNetworkCovers(books: List<Book>) {
+        val operationId = ++coverOperationId
         batchPersistCoverCoroutine?.cancel()
-        batchPersistCoverCoroutine = execute {
+        batchPersistCoverCoroutine = execute(semaphore = coverOperationSemaphore) {
             var saved = 0
             var skipped = 0
             var failed = 0
             val coversDir = File(context.externalFiles, "covers")
             books.forEachIndexed { index, book ->
-                batchPersistCoverProcess.postValue(
-                    context.getString(R.string.persist_cover_progress, index + 1, books.size)
-                )
+                if (operationId == coverOperationId) {
+                    batchPersistCoverProcess.postValue(
+                        context.getString(R.string.persist_cover_progress, index + 1, books.size)
+                    )
+                }
                 val coverUrl = book.networkCoverForPersistence()
                 if (coverUrl == null) {
                     skipped++
                     return@forEachIndexed
                 }
+                val expectedCoverUrl = book.customCoverUrl
                 try {
                     var options = RequestOptions().set(
                         OkHttpModelLoader.loadOnlyWifiOption,
@@ -179,15 +186,27 @@ class BookshelfManageViewModel(application: Application) : BaseViewModel(applica
                     try {
                         val downloaded = runInterruptible { target.get() }
                         currentCoroutineContext().ensureActive()
+                        val validationTarget = Glide.with(context)
+                            .load(downloaded)
+                            .submit(1, 1)
+                        try {
+                            runInterruptible { validationTarget.get() }
+                        } finally {
+                            Glide.with(context).clear(validationTarget)
+                        }
                         val persistent = installPersistentCover(downloaded, coversDir)
                         currentCoroutineContext().ensureActive()
-                        check(
-                            appDb.bookDao.updateCustomCoverUrl(
+                        if (
+                            appDb.bookDao.updateCustomCoverUrlIfUnchanged(
                                 book.bookUrl,
+                                expectedCoverUrl,
                                 persistent.absolutePath
                             ) == 1
-                        ) { "Book no longer exists" }
-                        saved++
+                        ) {
+                            saved++
+                        } else {
+                            skipped++
+                        }
                     } finally {
                         Glide.with(context).clear(target)
                     }
@@ -199,7 +218,9 @@ class BookshelfManageViewModel(application: Application) : BaseViewModel(applica
             }
             PersistentCoverResult(saved, skipped, failed)
         }.onStart {
-            batchPersistCoverState.postValue(true)
+            if (operationId == coverOperationId) {
+                batchPersistCoverState.postValue(true)
+            }
         }.onSuccess {
             context.toastOnUi(
                 context.getString(
@@ -210,14 +231,31 @@ class BookshelfManageViewModel(application: Application) : BaseViewModel(applica
                 )
             )
         }.onFinally {
-            batchPersistCoverState.postValue(false)
+            if (operationId == coverOperationId) {
+                batchPersistCoverState.postValue(false)
+            }
         }
     }
 
     fun restoreSourceCovers(books: List<Book>) {
-        execute {
-            books.filter { !it.customCoverUrl.isNullOrEmpty() }
-                .sumOf { appDb.bookDao.updateCustomCoverUrl(it.bookUrl, null) }
+        ++coverOperationId
+        batchPersistCoverCoroutine?.cancel()
+        batchPersistCoverState.postValue(false)
+        execute(semaphore = coverOperationSemaphore) {
+            books.sumOf { book ->
+                val expectedCoverUrl = book.customCoverUrl ?: return@sumOf 0
+                if (
+                    appDb.bookDao.updateCustomCoverUrlIfUnchanged(
+                        book.bookUrl,
+                        expectedCoverUrl,
+                        null
+                    ) == 1
+                ) {
+                    1
+                } else {
+                    0
+                }
+            }
         }.onSuccess {
             context.toastOnUi(context.getString(R.string.restore_source_cover_result, it))
         }

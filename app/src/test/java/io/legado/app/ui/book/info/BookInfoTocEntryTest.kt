@@ -81,7 +81,7 @@ class BookInfoTocEntryTest {
         assertTrue(notShelfFlow.contains("book.save()"))
         assertTrue(notShelfFlow.contains("viewModel.saveChapterList"))
         assertTrue(notShelfFlow.contains("highlightLayoutTitleLength.takeIf"))
-        assertTrue(shelfFlow.contains("appDb.bookDao.update(book)"))
+        assertTrue(shelfFlow.contains("book.update()"))
         assertTrue(shelfFlow.contains("highlightLayoutTitleLength.takeIf"))
         assertTrue(readFlow.contains("highlightLayoutTitleLength.takeIf { deferHighlightPosition }"))
         assertTrue(readFlow.contains("highlightAnchorText.takeIf { deferHighlightPosition }"))
