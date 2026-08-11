@@ -28,6 +28,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.databinding.DialogChapterChangeSourceBinding
+import io.legado.app.databinding.DialogDownloadChoiceBinding
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
@@ -114,6 +115,10 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
         initLiveData()
         initBatchMode()
         activity?.onBackPressedDispatcher?.addCallback(viewLifecycleOwner) {
+            if (viewModel.isAutomationActive) {
+                viewModel.stopAutomation()
+                return@addCallback
+            }
             if (batchCaching) {
                 viewModel.cancelCacheContents()
                 return@addCallback
@@ -141,10 +146,43 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
     private fun showTitle() {
         binding.toolBar.title = viewModel.currentOriginalChapter?.title ?: viewModel.chapterTitle
         if (batchMode) {
-            binding.toolBar.subtitle = getString(
-                R.string.chapter_source_selected_count,
-                tocAdapter.selectionCount,
-            )
+            binding.toolBar.subtitle = when (val state = viewModel.automationState.value) {
+                is ChapterSourceAutomationState.Ready -> getString(
+                    R.string.chapter_source_automation_progress,
+                    state.position + 1,
+                    state.total,
+                )
+
+                is ChapterSourceAutomationState.Caching -> getString(
+                    R.string.chapter_source_automation_progress,
+                    state.position + 1,
+                    state.total,
+                )
+
+                is ChapterSourceAutomationState.Paused -> when (val reason = state.reason) {
+                    ChapterSourceAutomationPause.Ambiguous -> getString(
+                        R.string.chapter_source_automation_paused_ambiguous
+                    )
+
+                    ChapterSourceAutomationPause.Missing -> getString(
+                        R.string.chapter_source_automation_paused_missing
+                    )
+
+                    is ChapterSourceAutomationPause.ContentError -> getString(
+                        R.string.chapter_source_automation_paused_error,
+                        reason.message,
+                    )
+                }
+
+                is ChapterSourceAutomationState.Finished -> getString(
+                    R.string.chapter_source_finished
+                )
+
+                else -> getString(
+                    R.string.chapter_source_selected_count,
+                    tocAdapter.selectionCount,
+                )
+            }
         }
     }
 
@@ -158,6 +196,8 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
             ?.isChecked = AppConfig.changeSourceLoadInfo
         binding.toolBar.menu.findItem(R.id.menu_load_toc)
             ?.isChecked = AppConfig.changeSourceLoadToc
+        binding.toolBar.menu.findItem(R.id.menu_chapter_source_automation)
+            ?.isVisible = batchMode
         binding.toolBar.menu.syncChangeSourceResultOptions()
     }
 
@@ -169,12 +209,22 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
         }
         binding.flHideToc.elevation = requireContext().elevation
         binding.btnBatchSkip.setOnClickListener {
-            viewModel.currentOriginalChapter?.let(::advanceOriginalChapter)
+            if (viewModel.isAutomationActive) {
+                if (viewModel.skipAutomationChapter() &&
+                    viewModel.automationState.value is ChapterSourceAutomationState.Finished
+                ) {
+                    toastOnUi(R.string.chapter_source_finished)
+                    dismissAllowingStateLoss()
+                }
+            } else {
+                viewModel.currentOriginalChapter?.let(::advanceOriginalChapter)
+            }
         }
         binding.btnBatchCacheNext.setOnClickListener {
             cacheSelectedChapters()
         }
         binding.btnBatchFinish.setOnClickListener {
+            viewModel.stopAutomation()
             dismissAllowingStateLoss()
         }
     }
@@ -330,6 +380,18 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
             }
         }
         viewModel.batchCaching.observe(owner, ::setBatchCaching)
+        viewModel.automationState.observe(owner) { state ->
+            showAutomationState(state)
+            if (state is ChapterSourceAutomationState.Ready) {
+                owner.lifecycleScope.launch {
+                    owner.lifecycle.withStateAtLeast(RESUMED) {
+                        if (viewModel.automationState.value == state) {
+                            viewModel.runNextAutomationIfReady()
+                        }
+                    }
+                }
+            }
+        }
         viewModel.batchCacheResult.observe(owner) { event ->
             owner.lifecycleScope.launch {
                 owner.lifecycle.withStateAtLeast(RESUMED) {
@@ -457,6 +519,14 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
             }
 
             R.id.menu_start_stop -> viewModel.startOrStopSearch()
+            R.id.menu_chapter_source_automation -> {
+                if (viewModel.isAutomationActive) {
+                    viewModel.stopAutomation()
+                } else {
+                    showAutomationRangeDialog()
+                }
+            }
+
             R.id.menu_source_manage -> startActivity<BookSourceActivity>()
             else -> if (item?.groupId == R.id.source_group && !item.isChecked) {
                 item.isChecked = true
@@ -487,6 +557,7 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
     }
 
     override fun openToc(searchBook: SearchBook) {
+        if (viewModel.isAutomationActive || batchCaching || tocLoading) return
         viewModel.loadToc(searchBook.toBook())
     }
 
@@ -584,15 +655,18 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
     }
 
     private fun cacheSelectedChapters() {
+        if (tocAdapter.selectionCount == 0 || tocLoading || batchCaching) return
+        if (viewModel.isAutomationActive) {
+            viewModel.cacheAutomationSelection(tocAdapter.selectedPositions)
+            return
+        }
         val sourceBook = targetBook ?: return
-        val sourceChapters = tocAdapter.selectedChapters
         val originalBook = callBack?.oldBook ?: return
         val chapter = viewModel.currentOriginalChapter ?: return
-        if (sourceChapters.isEmpty() || tocLoading || batchCaching) return
         val lastSelectedPosition = tocAdapter.lastSelectedPosition
         viewModel.cacheContents(
             sourceBook,
-            sourceChapters,
+            tocAdapter.selectedChapters,
             originalBook,
             chapter,
             lastSelectedPosition + 1,
@@ -606,6 +680,21 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
             binding.recyclerViewToc.scrollToPosition(
                 result.targetPosition.coerceAtMost(tocAdapter.itemCount - 1)
             )
+        }
+        result.automationSessionId?.let { sessionId ->
+            if (!viewModel.acknowledgeAutomationCache(sessionId, result.cachedChapterIndex)) {
+                showTitle()
+                updateBatchActions()
+                return
+            }
+            if (viewModel.automationState.value is ChapterSourceAutomationState.Finished) {
+                toastOnUi(R.string.chapter_source_finished)
+                dismissAllowingStateLoss()
+            } else {
+                showTitle()
+                updateBatchActions()
+            }
+            return
         }
         if (result.nextChapter == null) {
             toastOnUi(R.string.chapter_source_finished)
@@ -653,13 +742,88 @@ class ChangeChapterSourceDialog() : BaseDialogFragment(R.layout.dialog_chapter_c
         if (!batchMode) return
         val hasOriginalChapter = viewModel.currentOriginalChapter != null
         val busy = tocLoading || batchCaching
-        tocAdapter.selectionEnabled = !busy
-        binding.ivHideToc.isEnabled = !busy
+        val automationState = viewModel.automationState.value
+        val automationActive = viewModel.isAutomationActive
+        val canSelect = !automationActive || automationState is ChapterSourceAutomationState.Paused
+        tocAdapter.selectionEnabled = !busy && canSelect
+        binding.ivHideToc.isEnabled = !busy && !automationActive
         binding.btnBatchSkip.isEnabled = hasOriginalChapter && !busy
         binding.btnBatchCacheNext.isEnabled = hasOriginalChapter &&
-                tocAdapter.selectionCount > 0 && !busy
+                tocAdapter.selectionCount > 0 && !busy && canSelect
         binding.btnBatchFinish.isEnabled = !batchCaching
     }
+
+    private fun showAutomationRangeDialog() {
+        val tocState = viewModel.tocState.value as? ChapterTocState.Success
+        if (tocState == null) {
+            toastOnUi(R.string.chapter_source_automation_select_target)
+            return
+        }
+        val originalBook = callBack?.oldBook ?: return
+        val range = viewModel.automationRangeDefaults()
+        if (range == null) {
+            toastOnUi(R.string.chapter_list_empty)
+            return
+        }
+        alert(titleResource = R.string.chapter_source_automation) {
+            val rangeBinding = DialogDownloadChoiceBinding.inflate(layoutInflater).apply {
+                editStart.setText(range.first.toString())
+                editEnd.setText(range.last.toString())
+            }
+            customView { rangeBinding.root }
+            okButton {
+                val start = rangeBinding.editStart.text?.toString()?.trim()?.toIntOrNull()
+                val end = rangeBinding.editEnd.text?.toString()?.trim()?.toIntOrNull()
+                if (start == null || end == null || !viewModel.startAutomation(
+                        originalBook,
+                        tocState.book,
+                        tocState.toc,
+                        start,
+                        end,
+                    )
+                ) {
+                    toastOnUi(R.string.chapter_source_automation_invalid_range)
+                }
+            }
+            cancelButton()
+        }
+    }
+
+    private fun showAutomationState(state: ChapterSourceAutomationState) {
+        automationMenuItem?.setTitle(
+            if (viewModel.isAutomationActive) {
+                R.string.chapter_source_automation_stop
+            } else {
+                R.string.chapter_source_automation
+            }
+        )
+        when (state) {
+            is ChapterSourceAutomationState.Caching -> {
+                tocAdapter.selectPositions(state.targetPositions)
+            }
+
+            is ChapterSourceAutomationState.Paused -> when (state.reason) {
+                is ChapterSourceAutomationPause.ContentError -> {
+                    tocAdapter.selectPositions(state.targetPositions)
+                }
+
+                else -> {
+                    tocAdapter.clearSelection()
+                    state.targetPositions.firstOrNull()?.let(binding.recyclerViewToc::scrollToPosition)
+                }
+            }
+
+            is ChapterSourceAutomationState.Ready,
+            is ChapterSourceAutomationState.Finished -> tocAdapter.clearSelection()
+
+            ChapterSourceAutomationState.Idle -> Unit
+        }
+        showTitle()
+        updateBatchActions()
+    }
+
+    private val automationMenuItem: MenuItem?
+        get() = binding.toolBar.menu.findItem(R.id.menu_chapter_source_automation)
 
     /**
      * 更新分组菜单

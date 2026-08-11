@@ -56,6 +56,12 @@ import kotlin.math.min
 
 internal data class ContentSaveKey(val bookUrl: String, val chapterIndex: Int)
 internal data class ContentSaveState(val version: Long = 0L, val fileName: String? = null)
+internal sealed interface ChapterSourceMatch {
+    data class Unique(val targetPosition: Int) : ChapterSourceMatch
+    data class Ambiguous(val targetPositions: List<Int>) : ChapterSourceMatch
+    data object Missing : ChapterSourceMatch
+}
+
 data class ContentSaveToken internal constructor(
     internal val key: ContentSaveKey,
     internal val folderName: String,
@@ -704,60 +710,90 @@ object BookHelp {
         }
     }
 
-    private val chapterNamePattern1 by lazy {
-        Pattern.compile(
-            ".*?第([\\d零〇一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]+)[章节篇回集话]"
-        )
-    }
+}
 
-    @Suppress("RegExpSimplifiable")
-    private val chapterNamePattern2 by lazy {
-        Pattern.compile(
-            "^(?:[\\d零〇一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]+[,:、])*([\\d零〇一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]+)(?:[,:、]|\\.[^\\d])"
-        )
+internal fun matchChapterSource(
+    originalChapter: BookChapter,
+    targetChapters: List<BookChapter>,
+): ChapterSourceMatch {
+    val candidates = targetChapters.withIndex().filterNot { it.value.isVolume }
+    val originalName = getPureChapterName(originalChapter.title)
+    if (originalName.isNotEmpty()) {
+        val titleMatches = candidates.mapNotNull { (position, chapter) ->
+            position.takeIf { originalName == getPureChapterName(chapter.title) }
+        }
+        chapterSourceMatch(titleMatches)?.let { return it }
     }
-
-    private val regexA by lazy {
-        return@lazy "\\s".toRegex()
+    val originalNumber = getChapterNum(originalChapter.title)
+    if (originalNumber > 0) {
+        val numberMatches = candidates.mapNotNull { (position, chapter) ->
+            position.takeIf { getChapterNum(chapter.title) == originalNumber }
+        }
+        chapterSourceMatch(numberMatches)?.let { return it }
     }
+    return ChapterSourceMatch.Missing
+}
 
-    private fun getChapterNum(chapterName: String?): Int {
-        chapterName ?: return -1
-        val chapterName1 = StringUtils.fullToHalf(chapterName).replace(regexA, "")
-        return StringUtils.stringToInt(
-            (
-                    chapterNamePattern1.matcher(chapterName1).takeIf { it.find() }
-                        ?: chapterNamePattern2.matcher(chapterName1).takeIf { it.find() }
-                    )?.group(1)
-                ?: "-1"
-        )
+private fun chapterSourceMatch(positions: List<Int>): ChapterSourceMatch? {
+    return when (positions.size) {
+        0 -> null
+        1 -> ChapterSourceMatch.Unique(positions.first())
+        else -> ChapterSourceMatch.Ambiguous(positions)
     }
+}
 
-    private val regexOther by lazy {
-        // 所有非字母数字中日韩文字 CJK区+扩展A-F区
-        @Suppress("RegExpDuplicateCharacterInClass")
-        return@lazy "[^\\w\\u4E00-\\u9FEF〇\\u3400-\\u4DBF\\u20000-\\u2A6DF\\u2A700-\\u2EBEF]".toRegex()
-    }
+private val chapterNamePattern1 by lazy {
+    Pattern.compile(
+        ".*?第([\\d零〇一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]+)[章节篇回集话]"
+    )
+}
 
-    @Suppress("RegExpUnnecessaryNonCapturingGroup", "RegExpSimplifiable")
-    private val regexB by lazy {
-        //章节序号，排除处于结尾的状况，避免将章节名替换为空字串
-        return@lazy "^.*?第(?:[\\d零〇一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]+)[章节篇回集话](?!$)|^(?:[\\d零〇一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]+[,:、])*(?:[\\d零〇一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]+)(?:[,:、](?!$)|\\.(?=[^\\d]))".toRegex()
-    }
+@Suppress("RegExpSimplifiable")
+private val chapterNamePattern2 by lazy {
+    Pattern.compile(
+        "^(?:[\\d零〇一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]+[,:、])*([\\d零〇一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]+)(?:[,:、]|\\.[^\\d])"
+    )
+}
 
-    private val regexC by lazy {
-        //前后附加内容，整个章节名都在括号中时只剔除首尾括号，避免将章节名替换为空字串
-        return@lazy "(?!^)(?:[〖【《〔\\[{(][^〖【《〔\\[{()〕》】〗\\]}]+)?[)〕》】〗\\]}]$|^[〖【《〔\\[{(](?:[^〖【《〔\\[{()〕》】〗\\]}]+[〕》】〗\\]})])?(?!$)".toRegex()
-    }
+private val regexA by lazy {
+    "\\s".toRegex()
+}
 
-    private fun getPureChapterName(chapterName: String?): String {
-        return if (chapterName == null) "" else StringUtils.fullToHalf(chapterName)
-            .replace(regexA, "")
-            .replace(regexB, "")
-            .replace(regexC, "")
-            .replace(regexOther, "")
-    }
+private fun getChapterNum(chapterName: String?): Int {
+    chapterName ?: return -1
+    val chapterName1 = StringUtils.fullToHalf(chapterName).replace(regexA, "")
+    return StringUtils.stringToInt(
+        (
+                chapterNamePattern1.matcher(chapterName1).takeIf { it.find() }
+                    ?: chapterNamePattern2.matcher(chapterName1).takeIf { it.find() }
+                )?.group(1)
+            ?: "-1"
+    )
+}
 
+private val regexOther by lazy {
+    // 所有非字母数字中日韩文字 CJK区+扩展A-F区
+    @Suppress("RegExpDuplicateCharacterInClass")
+    "[^\\w\\u4E00-\\u9FEF〇\\u3400-\\u4DBF\\u20000-\\u2A6DF\\u2A700-\\u2EBEF]".toRegex()
+}
+
+@Suppress("RegExpUnnecessaryNonCapturingGroup", "RegExpSimplifiable")
+private val regexB by lazy {
+    //章节序号，排除处于结尾的状况，避免将章节名替换为空字串
+    "^.*?第(?:[\\d零〇一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]+)[章节篇回集话](?!$)|^(?:[\\d零〇一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]+[,:、])*(?:[\\d零〇一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]+)(?:[,:、](?!$)|\\.(?=[^\\d]))".toRegex()
+}
+
+private val regexC by lazy {
+    //前后附加内容，整个章节名都在括号中时只剔除首尾括号，避免将章节名替换为空字串
+    "(?!^)(?:[〖【《〔\\[{(][^〖【《〔\\[{()〕》】〗\\]}]+)?[)〕》】〗\\]}]$|^[〖【《〔\\[{(](?:[^〖【《〔\\[{()〕》】〗\\]}]+[〕》】〗\\]})])?(?!$)".toRegex()
+}
+
+private fun getPureChapterName(chapterName: String?): String {
+    return if (chapterName == null) "" else StringUtils.fullToHalf(chapterName)
+        .replace(regexA, "")
+        .replace(regexB, "")
+        .replace(regexC, "")
+        .replace(regexOther, "")
 }
 
 internal fun findNearestChapterNumberIndex(

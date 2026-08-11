@@ -1140,6 +1140,14 @@
     <string name="chapter_source_cache_next">Cache and next</string>
     <string name="chapter_source_selected_count">%1$d target chapter(s) selected</string>
     <string name="chapter_source_finished">No more original chapters</string>
+    <string name="chapter_source_automation">Automatic processing</string>
+    <string name="chapter_source_automation_stop">Stop automatic processing</string>
+    <string name="chapter_source_automation_progress">Automatic %1$d/%2$d</string>
+    <string name="chapter_source_automation_paused_ambiguous">Paused: multiple matching chapters</string>
+    <string name="chapter_source_automation_paused_missing">Paused: no reliable chapter match</string>
+    <string name="chapter_source_automation_paused_error">Paused: %1$s</string>
+    <string name="chapter_source_automation_select_target">Select a target book and table of contents first</string>
+    <string name="chapter_source_automation_invalid_range">Invalid chapter range</string>
     <string name="book_change_source">Change the source of the whole book</string>
     <string name="sort_by_time">Sort by time</string>
     <string name="enable_record">Enable record</string>

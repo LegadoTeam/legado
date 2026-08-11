@@ -293,6 +293,53 @@ class ChangeSourceViewLifecycleContractTest {
         assertTrue(error.contains("viewModel.clearToc()"))
     }
 
+    @Test
+    fun `chapter automation advances only while the current view is resumed`() {
+        val dialog = source("ChangeChapterSourceDialog.kt")
+        val observer = dialog.section(
+            "viewModel.automationState.observe(owner)",
+            "viewModel.batchCacheResult.observe(owner)",
+        )
+        val viewModel = source("ChangeChapterSourceViewModel.kt")
+        val runner = viewModel.section(
+            "fun runNextAutomationIfReady()",
+            "fun cacheAutomationSelection",
+        )
+
+        assertTrue(observer.contains("withStateAtLeast(RESUMED)"))
+        assertTrue(
+            observer.indexOf("withStateAtLeast(RESUMED)") <
+                    observer.indexOf("viewModel.runNextAutomationIfReady()")
+        )
+        assertFalse(runner.contains("delay("))
+        assertFalse(runner.substringAfter("{").contains("runNextAutomationIfReady()"))
+    }
+
+    @Test
+    fun `chapter automation freezes its target and rejects blank content`() {
+        val dialog = source("ChangeChapterSourceDialog.kt")
+        val openToc = dialog.section("override fun openToc", "private fun showTocState")
+        val viewModel = source("ChangeChapterSourceViewModel.kt")
+        val loadToc = viewModel.section("fun loadToc", "fun clearToc")
+        val cache = viewModel.section("private fun cacheContents", "fun automationRangeDefaults")
+        val stop = viewModel.section("fun stopAutomation", "private fun cacheAutomationPositions")
+        val renderState = dialog.section(
+            "private fun showAutomationState",
+            "private val automationMenuItem",
+        )
+
+        assertTrue(openToc.contains("viewModel.isAutomationActive"))
+        assertTrue(openToc.contains("batchCaching"))
+        assertTrue(loadToc.contains("isAutomationActive"))
+        assertTrue(loadToc.contains("batchCaching.value == true"))
+        assertTrue(cache.contains("mergedContent.isBlank()"))
+        assertTrue(stop.contains("cacheCommitStarted"))
+        assertTrue(stop.contains("requestStopAfterCurrent()"))
+        assertTrue(renderState.contains("is ChapterSourceAutomationPause.ContentError"))
+        assertTrue(renderState.contains("else ->"))
+        assertTrue(renderState.contains("tocAdapter.clearSelection()"))
+    }
+
     private fun source(fileName: String): String {
         return appSource("book/changesource/$fileName")
     }
