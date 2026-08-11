@@ -203,6 +203,9 @@ interface BookDao {
     @Update
     fun update(vararg book: Book)
 
+    @Query("update books set customCoverUrl = :customCoverUrl where bookUrl = :bookUrl")
+    fun updateCustomCoverUrl(bookUrl: String, customCoverUrl: String?): Int
+
     @Query("select readConfig from books where bookUrl = :bookUrl")
     fun getReadConfigJson(bookUrl: String): String?
 

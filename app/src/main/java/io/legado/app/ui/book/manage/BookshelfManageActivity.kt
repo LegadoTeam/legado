@@ -136,6 +136,17 @@ class BookshelfManageActivity :
         viewModel.batchChangeSourceProcessLiveData.observe(this) {
             waitDialog.setText(it)
         }
+        viewModel.batchPersistCoverState.observe(this) {
+            if (it) {
+                waitDialog.setText(R.string.persist_network_covers)
+                waitDialog.show()
+            } else {
+                waitDialog.dismiss()
+            }
+        }
+        viewModel.batchPersistCoverProcess.observe(this) {
+            waitDialog.setText(it)
+        }
     }
 
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
@@ -205,6 +216,7 @@ class BookshelfManageActivity :
         binding.selectActionBar.setCallBack(this)
         waitDialog.setOnCancelListener {
             viewModel.batchChangeSourceCoroutine?.cancel()
+            viewModel.batchPersistCoverCoroutine?.cancel()
         }
     }
 
@@ -317,11 +329,25 @@ class BookshelfManageActivity :
             R.id.menu_remove_to_group -> selectGroup(removeToGroupRequestCode, 0)
             R.id.menu_change_source -> showDialogFragment<SourcePickerDialog>()
             R.id.menu_clear_cache -> viewModel.clearCache(adapter.selection)
+            R.id.menu_persist_covers -> viewModel.persistNetworkCovers(adapter.selection)
+            R.id.menu_restore_source_covers -> alertRestoreSourceCovers()
             R.id.menu_check_selected_interval -> adapter.checkSelectedInterval()
             R.id.menu_update_toc -> updateBooksToc()
             R.id.menu_create_book_update_tasks -> showCreateBookUpdateTasksDialog()
         }
         return false
+    }
+
+    private fun alertRestoreSourceCovers() {
+        alert(
+            titleResource = R.string.restore_source_covers,
+            messageResource = R.string.restore_source_covers_confirm
+        ) {
+            okButton {
+                viewModel.restoreSourceCovers(adapter.selection)
+            }
+            noButton()
+        }
     }
 
     private fun showCreateBookUpdateTasksDialog() {
