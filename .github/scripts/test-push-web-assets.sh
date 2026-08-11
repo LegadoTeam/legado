@@ -35,6 +35,8 @@ git -C "$worker" config user.email test@example.com
 printf 'generated\n' > "$worker/generated.txt"
 git -C "$worker" add generated.txt
 git -C "$worker" commit -m "Generate web assets" >/dev/null
+printf 'build byproduct\n' >> "$worker/base.txt"
+printf 'untracked byproduct\n' > "$worker/byproduct.txt"
 
 git clone --branch master "$remote" "$upstream" >/dev/null 2>&1
 git -C "$upstream" config user.name test
@@ -60,6 +62,8 @@ chmod +x "$remote/hooks/pre-receive"
 git clone --branch master "$remote" "$verify" >/dev/null 2>&1
 test -f "$verify/generated.txt"
 test -f "$verify/upstream.txt"
+test ! -e "$verify/byproduct.txt"
+test "$(cat "$verify/base.txt")" = "base"
 test -f "$reject_marker"
 git -C "$verify" log --format=%s | grep -Fxq "Generate web assets"
 git -C "$verify" log --format=%s | grep -Fxq "Advance master"
