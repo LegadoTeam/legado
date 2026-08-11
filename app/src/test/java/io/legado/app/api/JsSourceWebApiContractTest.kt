@@ -130,7 +130,21 @@ class JsSourceWebApiContractTest {
         )
         assertTrue(
             BookSourceController.hasValidJsSourceWebSocketProtocol(
+                mapOf("sec-websocket-protocol" to "legado"),
+                null,
+                tokenRequired = false,
+            )
+        )
+        assertFalse(
+            BookSourceController.hasValidJsSourceWebSocketProtocol(
                 emptyMap(),
+                null,
+                tokenRequired = false,
+            )
+        )
+        assertTrue(
+            BookSourceController.hasValidJsSourceWebSocketProtocol(
+                mapOf("sec-websocket-protocol" to "legado, legado.token.stale"),
                 null,
                 tokenRequired = false,
             )

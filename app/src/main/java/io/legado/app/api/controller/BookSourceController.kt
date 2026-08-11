@@ -156,12 +156,12 @@ object BookSourceController {
         configuredToken: String?,
         tokenRequired: Boolean = true,
     ): Boolean {
-        if (!tokenRequired) return true
-        val expected = jsSourceWebSocketProtocol(configuredToken) ?: return false
         val protocols = headers.header(JS_SOURCE_WEBSOCKET_PROTOCOL_HEADER)
             ?.split(',')
             ?.map(String::trim)
             ?: return false
+        if (!tokenRequired) return protocols.firstOrNull() == JS_SOURCE_WEBSOCKET_PROTOCOL
+        val expected = jsSourceWebSocketProtocol(configuredToken) ?: return false
         if (protocols.size != 2 || protocols.first() != JS_SOURCE_WEBSOCKET_PROTOCOL) {
             return false
         }

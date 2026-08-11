@@ -89,6 +89,16 @@ class McpApplicationTest {
             setBody("not-json")
         }
         assertEquals(HttpStatusCode.Forbidden, hostileResponse.status)
+
+        val hostileOriginResponse = client.request(McpAccess.PATH) {
+            method = HttpMethod.Post
+            header(HttpHeaders.Host, "localhost")
+            header(HttpHeaders.Origin, "http://example.test")
+            header(HttpHeaders.Accept, "application/json, text/event-stream")
+            contentType(ContentType.Application.Json)
+            setBody("not-json")
+        }
+        assertEquals(HttpStatusCode.Forbidden, hostileOriginResponse.status)
     }
 
     @Test
