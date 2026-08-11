@@ -104,8 +104,10 @@ import splitties.systemservices.powerManager
 import java.net.URLDecoder
 import androidx.core.graphics.createBitmap
 
-internal fun shouldPreserveRssArticleOnRefresh(ruleContent: String?) =
-    ruleContent.isNullOrBlank()
+internal fun shouldPreserveRssArticleOnRefresh(
+    ruleDescription: String?,
+    ruleContent: String?,
+) = ruleContent.isNullOrBlank() || !ruleDescription.isNullOrBlank()
 
 /**
  * rss阅读界面
@@ -144,7 +146,11 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
             refreshNameList.add(it)
         }
         viewModel.rssArticle?.let {
-            if (shouldPreserveRssArticleOnRefresh(viewModel.rssSource?.ruleContent)) {
+            if (shouldPreserveRssArticleOnRefresh(
+                    viewModel.rssSource?.ruleDescription,
+                    viewModel.rssSource?.ruleContent,
+                )
+            ) {
                 start(this@ReadRssActivity, it.origin, it.title, it.link, it.sort)
             } else {
                 start(this@ReadRssActivity, true, it.origin, it.title, it.link)
