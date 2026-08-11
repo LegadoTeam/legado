@@ -98,9 +98,10 @@ object BookSourceController {
     fun validateJsSourceRequest(
         headers: Map<String, String>,
         configuredToken: String? = AppConfig.jsSourceApiToken,
+        tokenRequired: Boolean = AppConfig.jsSourceApiTokenRequired,
     ): ReturnData? {
         val returnData = ReturnData()
-        if (!hasValidJsSourceApiToken(headers, configuredToken)) {
+        if (!hasValidJsSourceApiToken(headers, configuredToken, tokenRequired)) {
             return returnData.setErrorMsg("Web 书源访问令牌未配置或不正确")
         }
         if (headers.header("transfer-encoding") != null) {
@@ -123,14 +124,18 @@ object BookSourceController {
     fun hasValidJsSourceApiToken(
         headers: Map<String, String>,
         configuredToken: String? = AppConfig.jsSourceApiToken,
+        tokenRequired: Boolean = AppConfig.jsSourceApiTokenRequired,
     ): Boolean {
+        if (!tokenRequired) return true
         return matchesJsSourceApiToken(configuredToken, headers.header(JS_SOURCE_TOKEN_HEADER))
     }
 
     fun hasValidJsSourceWebSocketProtocol(
         headers: Map<String, String>,
         configuredToken: String? = AppConfig.jsSourceApiToken,
+        tokenRequired: Boolean = AppConfig.jsSourceApiTokenRequired,
     ): Boolean {
+        if (!tokenRequired) return true
         val expected = jsSourceWebSocketProtocol(configuredToken) ?: return false
         val protocols = headers.header(JS_SOURCE_WEBSOCKET_PROTOCOL_HEADER)
             ?.split(',')
@@ -159,6 +164,9 @@ object BookSourceController {
             actual.toByteArray(Charsets.UTF_8),
         )
     }
+
+    val isJsSourceApiTokenRequired: ReturnData
+        get() = ReturnData().setData(AppConfig.jsSourceApiTokenRequired)
 
     private fun Map<String, String>.header(name: String): String? {
         return entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value

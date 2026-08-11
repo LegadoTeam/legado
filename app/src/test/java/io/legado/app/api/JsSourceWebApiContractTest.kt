@@ -30,6 +30,34 @@ class JsSourceWebApiContractTest {
     }
 
     @Test
+    fun `token protection defaults on and restarts active services`() {
+        val appConfig = readProjectFile(
+            "app/src/main/java/io/legado/app/help/config/AppConfig.kt"
+        )
+        val preferences = readProjectFile("app/src/main/res/xml/pref_config_other.xml")
+        val settings = readProjectFile(
+            "app/src/main/java/io/legado/app/ui/config/OtherConfigFragment.kt"
+        )
+        val protectionPreference = preferences
+            .substringBefore("android:key=\"jsSourceApiToken\"")
+            .substringAfterLast("<io.legado.app.lib.prefs.SwitchPreference")
+        val protectionChange = settings
+            .substringAfter("PreferKey.jsSourceApiTokenRequired ->")
+            .substringBefore("PreferKey.defaultBookTreeUri ->")
+
+        assertTrue(
+            appConfig.contains(
+                "getPrefBoolean(PreferKey.jsSourceApiTokenRequired, true)"
+            )
+        )
+        assertTrue(protectionPreference.contains("android:defaultValue=\"true\""))
+        assertTrue(protectionPreference.contains("android:key=\"jsSourceApiTokenRequired\""))
+        assertTrue(protectionChange.contains("WebService.stop(requireContext())"))
+        assertTrue(protectionChange.contains("WebService.start(requireContext())"))
+        assertTrue(protectionChange.contains("McpService.restart(requireContext())"))
+    }
+
+    @Test
     fun `request boundary rejects unsafe bodies before parsing`() {
         val validHeaders = mapOf(
             "x-legado-token" to "secret",
@@ -85,6 +113,27 @@ class JsSourceWebApiContractTest {
                 validHeaders,
                 null,
             )!!.isSuccess
+        )
+        assertTrue(
+            BookSourceController.validateJsSourceRequest(
+                validHeaders - "x-legado-token",
+                null,
+                tokenRequired = false,
+            ) == null
+        )
+        assertTrue(
+            BookSourceController.hasValidJsSourceApiToken(
+                emptyMap(),
+                null,
+                tokenRequired = false,
+            )
+        )
+        assertTrue(
+            BookSourceController.hasValidJsSourceWebSocketProtocol(
+                emptyMap(),
+                null,
+                tokenRequired = false,
+            )
         )
         assertFalse(
             BookSourceController.validateJsSourceRequest(
@@ -287,7 +336,7 @@ class JsSourceWebApiContractTest {
         assertTrue(api.contains("去除脚本文本首尾空白"))
         assertTrue(api.contains("X-Legado-Token"))
         assertTrue(api.contains("其他设置"))
-        assertTrue(api.contains("Web 书源访问令牌"))
+        assertTrue(api.contains("Web 与 MCP 访问令牌"))
         assertTrue(api.contains("Sec-WebSocket-Protocol"))
         assertTrue(api.contains("读取任何 WebSocket 帧前"))
         assertTrue(api.contains("不会进入应用备份"))
@@ -295,6 +344,7 @@ class JsSourceWebApiContractTest {
         assertTrue(api.contains("旧 JSON 书源写入接口"))
         assertTrue(api.contains("当前浏览器标签页会话"))
         assertTrue(api.contains("可信局域网"))
+        assertTrue(api.contains("关闭访问令牌保护"))
         assertTrue(api.contains("/getHttpLogs?limit=50"))
         assertTrue(api.contains("/getHttpLog?id=1"))
         assertTrue(api.contains("8 KiB"))
@@ -319,11 +369,12 @@ class JsSourceWebApiContractTest {
         assertTrue(sourceToken.contains("sourceApiEndpoint !== endpoint"))
         assertTrue(webApi.contains("bindSourceApiTokenEndpoint(nextHttpEntryPoint)"))
         assertTrue(sourceToken.contains("sourceApiTokenWebSocketProtocol"))
+        assertTrue(sourceToken.contains("getJsSourceApiTokenRequired"))
+        assertTrue(sourceToken.contains("cache: 'no-store'"))
         assertFalse(webApi.contains("apiToken_localStorage_key"))
-        assertTrue(webApi.contains("token: string"))
-        assertTrue(webApi.contains("sourceApiTokenWebSocketProtocol(token)"))
-        assertTrue(webApi.contains("['legado', sourceApiTokenWebSocketProtocol(token)]"))
-        assertTrue(sourceToken.contains("Web 书源访问令牌"))
+        assertTrue(webApi.contains("token: string | undefined"))
+        assertTrue(webApi.contains("sourceApiTokenWebSocketProtocols(token)"))
+        assertTrue(sourceToken.contains("Web 与 MCP 访问令牌"))
         assertTrue(webShelf.contains("requestSourceApiToken({ remember: false })"))
         assertTrue(sourceEditor.contains("v-if=\"authorized\""))
         assertTrue(sourceEditor.contains("await requestSourceApiToken()"))
@@ -333,6 +384,8 @@ class JsSourceWebApiContractTest {
         assertTrue(server.contains("application/json; charset=utf-8"))
         assertTrue(server.contains("X-Content-Type-Options"))
         assertTrue(server.contains("Content-Security-Policy"))
+        assertTrue(server.contains("/getJsSourceApiTokenRequired"))
+        assertTrue(server.contains("uri == \"/getJsSourceApiTokenRequired\""))
     }
 
     @Test

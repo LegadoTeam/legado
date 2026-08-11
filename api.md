@@ -4,9 +4,9 @@
 
 您需要先在设置中启用"Web 服务"。
 
-> Web 服务默认监听手机网络接口，多数接口不提供身份认证，请仅在可信局域网中启用，使用后及时关闭。书源写入、搜索和调试接口使用“Web 书源访问令牌”；纯 JavaScript 书源接口同样必须提供令牌。
+> Web 服务默认监听手机网络接口，多数接口不提供身份认证，请仅在可信局域网中启用，使用后及时关闭。“访问令牌保护”默认开启，保护书源写入、搜索、调试、HTTP 日志和 MCP 接口；关闭后这些接口均可不带令牌访问，仅应在可信网络中使用。
 
-旧 JSON 书源写入接口也必须通过 `X-Legado-Token` 提供令牌。搜索和调试 WebSocket 在 Upgrade 握手时使用 `Sec-WebSocket-Protocol: legado, legado.token.<令牌 UTF-8 字节的 base64url，无填充>`；固定协议必须位于第一项，服务端会在读取任何 WebSocket 帧前完成验证。浏览器同源状态不作为身份凭据；Web 页面中的令牌只保存在当前浏览器标签页会话中，关闭标签页或切换服务地址后需要重新输入。
+保护开启时，旧 JSON 书源写入接口也必须通过 `X-Legado-Token` 提供令牌。搜索和调试 WebSocket 在 Upgrade 握手时使用 `Sec-WebSocket-Protocol: legado, legado.token.<令牌 UTF-8 字节的 base64url，无填充>`；固定协议必须位于第一项，服务端会在读取任何 WebSocket 帧前完成验证。浏览器同源状态不作为身份凭据；Web 页面中的令牌只保存在当前浏览器标签页会话中，关闭标签页或切换服务地址后需要重新输入。关闭访问令牌保护时，WebSocket 只需使用固定协议 `legado`。
 
 ## 使用
 
@@ -29,7 +29,7 @@ Method = POST
 
 请求 BODY 为纯 JavaScript 书源脚本文本，`Content-Type` 使用 `text/plain; charset=utf-8`，最大 1 MiB，并且必须提供正确的 `Content-Length`。HTTP 层会去除脚本文本首尾空白，应用随后复用编辑器的提取、校验和保存逻辑；等待其他保存和解析脚本各自最多 30 秒。
 
-请先在“设置 > 其他设置 > Web 书源访问令牌”中配置令牌，并通过 `X-Legado-Token` 请求头提供完全相同的值。令牌验证会在读取请求体之前完成。令牌不会进入应用备份，恢复或更换设备后需要重新配置。该接口无论是否同源都必须发送令牌；使用明文 HTTP 时仍只能在可信网络中使用。
+访问令牌保护开启时，请先在“设置 > 其他设置 > Web 与 MCP 访问令牌”中配置令牌，并通过 `X-Legado-Token` 请求头提供完全相同的值。令牌验证会在读取请求体之前完成。令牌不会进入应用备份，恢复或更换设备后需要重新配置。关闭保护后可省略令牌；使用明文 HTTP 时仍只能在可信网络中使用。
 
 覆盖已有书源时会保留启用状态、发现开关、排序、权重、响应时间，以及脚本未声明时的原分组。书源有实质变化时会更新时间并回写脚本中的 `lastUpdateTime`；内容未变化时保留原时间。
 
@@ -39,7 +39,7 @@ Method = POST
 URL = http://127.0.0.1:1234/saveJsSource?openedSourceUrl=原书源URL（可选）
 Method = POST
 Content-Type = text/plain; charset=utf-8
-X-Legado-Token = 设置中配置的令牌
+X-Legado-Token = 设置中配置的令牌（访问令牌保护开启时）
 ```
 
 #### 插入多个书源or订阅源
@@ -93,14 +93,14 @@ Message = { key: [String], tag: [String] }
 #### HTTP 请求日志
 
 HTTP 日志仅在设置中启用“记录 HTTP 日志”后写入内存，最多保留最近 50 条；请求和响应正文单次最多记录 8 KiB，
-记录会在写入时脱敏认证信息、Cookie 和常见密钥字段。完整日志仍可能包含敏感业务数据，因此两个接口都要求通过
-`X-Legado-Token` 提供“Web 书源访问令牌”，并且只应在可信局域网中使用。
+记录会在写入时脱敏认证信息、Cookie 和常见密钥字段。完整日志仍可能包含敏感业务数据，因此访问令牌保护开启时，
+两个接口都要求通过 `X-Legado-Token` 提供访问令牌；关闭保护后也只应在可信局域网中使用。
 
 ```text
 URL = http://127.0.0.1:1234/getHttpLogs?limit=50
 URL = http://127.0.0.1:1234/getHttpLog?id=1
 Method = GET
-X-Legado-Token = 设置中配置的令牌
+X-Legado-Token = 设置中配置的令牌（访问令牌保护开启时）
 ```
 
 `getHttpLogs` 返回 `{ recording, logs }`，其中 `logs` 为摘要列表；`getHttpLog` 按 id 返回完整的已脱敏记录。
@@ -108,8 +108,8 @@ X-Legado-Token = 设置中配置的令牌
 #### MCP 服务
 
 应用可直接提供 Streamable HTTP MCP 服务，默认端口为 `1236`，端点为 `/mcp`。服务与 Web 服务相互独立，
-但复用“Web 书源访问令牌”；启动前必须先配置令牌，所有 MCP 请求都必须携带 `X-Legado-Token`。
-服务保留 SDK 的 Host 和 Origin 校验，只允许本机地址与设备当前局域网地址。令牌通过 HTTP 发送，因此只应在可信局域网中使用。
+并复用“Web 与 MCP 访问令牌”。访问令牌保护开启时，启动前必须先配置令牌，所有 MCP 请求都必须携带 `X-Legado-Token`；关闭保护后 MCP 可在未配置令牌时启动，请求也可省略该请求头。
+无论是否开启令牌保护，服务都保留 SDK 的 Host 和 Origin 校验，只允许本机地址与设备当前局域网地址。服务只应在可信局域网中使用。
 端点面向可设置自定义请求头的本地或桌面客户端，不提供浏览器跨域 CORS 预检。
 
 通用 HTTP MCP 客户端可按以下字段配置：
@@ -118,7 +118,7 @@ X-Legado-Token = 设置中配置的令牌
 {
   "url": "http://<设备IP>:1236/mcp",
   "headers": {
-    "X-Legado-Token": "设置中配置的令牌"
+    "X-Legado-Token": "设置中配置的令牌（关闭访问令牌保护时可省略）"
   }
 }
 ```
@@ -129,7 +129,7 @@ X-Legado-Token = 设置中配置的令牌
 脚本求值及批量校验均可能修改应用状态；`check_source` 会按当前应用配置更新书源分组、错误备注和响应时间。
 校验期间若书源被删除或重新保存，该项会标记为未完成，旧校验结果不会覆盖新记录。
 客户端取消 MCP 请求不会中止已经启动的应用内校验，可在应用的校验通知中手动停止。
-书源全文、未脱敏 Cookie 与已脱敏 HTTP 日志仍可能包含敏感业务数据，请只向可信客户端开放令牌。
+书源全文、未脱敏 Cookie 与已脱敏 HTTP 日志仍可能包含敏感业务数据，请只向可信客户端开放服务。
 `debug_source` 返回的调试输出不会脱敏，也可能包含请求参数、书源正文或其他敏感内容。
 调试期间会发送 `notifications/message` 日志；请求 `_meta.progressToken` 时还会同步发送
 `notifications/progress`。通知超时或客户端不支持通知不会影响最终的完整有界日志结果。

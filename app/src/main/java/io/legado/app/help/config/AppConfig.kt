@@ -496,6 +496,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefInt(PreferKey.mcpPort, value)
         }
 
+    val jsSourceApiTokenRequired: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.jsSourceApiTokenRequired, true)
+
     var jsSourceApiToken: String?
         get() = appCtx.getSharedPreferences(JS_SOURCE_API_PREFS, MODE_PRIVATE)
             .getString(JS_SOURCE_API_TOKEN, null)

@@ -207,6 +207,13 @@
             android:title="@string/mcp_port_title"
             app:iconSpaceReserved="false" />
 
+        <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="true"
+            android:key="jsSourceApiTokenRequired"
+            android:summary="@string/js_source_api_token_required_summary"
+            android:title="@string/js_source_api_token_required_title"
+            app:iconSpaceReserved="false" />
+
         <io.legado.app.lib.prefs.EditTextPreference
             android:key="jsSourceApiToken"
             android:summary="@string/js_source_api_token_summary"

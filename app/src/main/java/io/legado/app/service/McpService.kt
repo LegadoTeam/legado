@@ -109,7 +109,7 @@ class McpService : BaseService() {
     private fun upMcpServer() {
         if (destroyed) return
         val token = AppConfig.jsSourceApiToken
-        if (token.isNullOrBlank()) {
+        if (AppConfig.jsSourceApiTokenRequired && token.isNullOrBlank()) {
             stopWithError(getString(R.string.mcp_service_token_required))
             return
         }
@@ -122,6 +122,7 @@ class McpService : BaseService() {
         try {
             val nextEngine = embeddedServer(CIO, port = port, host = "0.0.0.0") {
                 configureMcp(
+                    tokenRequiredProvider = { AppConfig.jsSourceApiTokenRequired },
                     tokenProvider = { AppConfig.jsSourceApiToken },
                     unauthorizedMessage = {
                         this@McpService.getString(R.string.mcp_service_token_invalid)

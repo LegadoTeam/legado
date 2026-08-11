@@ -7,7 +7,7 @@ import {
   bindSourceApiTokenEndpoint,
   getSourceApiToken,
   requestSourceApiToken,
-  sourceApiTokenWebSocketProtocol,
+  sourceApiTokenWebSocketProtocols,
 } from './sourceToken'
 import type {
   BaseBook,
@@ -169,7 +169,7 @@ const getLegacyReviewPageUrl = (session: LegacyReviewSession) => {
 // webSocket
 const search = (
   searchKey: string,
-  token: string,
+  token: string | undefined,
   onReceive: (data: SeachBook[]) => void,
   onFinish: () => void,
   onAuthFailure?: () => void,
@@ -182,7 +182,7 @@ const search = (
   }
   const socket = new WebSocket(
     new URL('searchBook', legado_webSocket_entry_point),
-    ['legado', sourceApiTokenWebSocketProtocol(token)],
+    sourceApiTokenWebSocketProtocols(token),
   )
   socket.onerror = event => {
     reportHandshakeFailure()
@@ -257,10 +257,7 @@ const debug = async (
     legado_webSocket_entry_point,
   )
 
-  const socket = new WebSocket(url, [
-    'legado',
-    sourceApiTokenWebSocketProtocol(token),
-  ])
+  const socket = new WebSocket(url, sourceApiTokenWebSocketProtocols(token))
   socket.onerror = event => {
     wsOnError?.call(socket, event)
   }

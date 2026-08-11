@@ -34,9 +34,14 @@ class McpServiceContractTest {
         assertTrue(application.contains("allowedOrigins = allowedOrigins"))
         assertFalse(application.contains("enableDnsRebindingProtection = false"))
         assertFalse(application.contains("request.path()"))
+        assertTrue(application.contains("tokenRequiredProvider()"))
 
         val service = projectFile("app/src/main/java/io/legado/app/service/McpService.kt")
-        assertTrue(service.indexOf("token.isNullOrBlank()") < service.indexOf("embeddedServer("))
+        assertTrue(
+            service.indexOf("AppConfig.jsSourceApiTokenRequired && token.isNullOrBlank()") <
+                service.indexOf("embeddedServer(")
+        )
+        assertTrue(service.contains("tokenRequiredProvider = { AppConfig.jsSourceApiTokenRequired }"))
 
         val manifest = projectFile("app/src/main/AndroidManifest.xml")
         assertTrue(manifest.contains("FOREGROUND_SERVICE_SPECIAL_USE"))

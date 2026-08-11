@@ -133,6 +133,8 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
                         returnData = when (uri) {
                             "/getBookSource" -> BookSourceController.getSource(parameters)
                             "/getBookSources" -> BookSourceController.sources
+                            "/getJsSourceApiTokenRequired" ->
+                                BookSourceController.isJsSourceApiTokenRequired
                             "/getHttpLogs" -> HttpLogController.getLogs(parameters)
                             "/getHttpLog" -> HttpLogController.getLog(parameters)
                             "/getBookshelf" -> BookController.bookshelf
@@ -263,7 +265,10 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
     private fun Response.addWebHeaders(origin: String?, uri: String) {
         addHeader("X-Content-Type-Options", "nosniff")
         origin?.let { addHeader("Access-Control-Allow-Origin", it) }
-        if (uri in PROTECTED_HTTP_LOG_READ_ROUTES) {
+        if (
+            uri in PROTECTED_HTTP_LOG_READ_ROUTES ||
+            uri == "/getJsSourceApiTokenRequired"
+        ) {
             addHeader("Cache-Control", "no-store")
         }
         if (uri.startsWith("/vue/") && uri.endsWith(".html")) {

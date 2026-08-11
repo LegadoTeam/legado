@@ -69,6 +69,29 @@ class McpApplicationTest {
     }
 
     @Test
+    fun disabledTokenProtectionAllowsMissingTokenButStillChecksHost() = testApplication {
+        application { testMcpApplication(tokenRequired = false) }
+
+        val localResponse = client.request(McpAccess.PATH) {
+            method = HttpMethod.Post
+            header(HttpHeaders.Host, "localhost")
+            header(HttpHeaders.Accept, "application/json, text/event-stream")
+            contentType(ContentType.Application.Json)
+            setBody("not-json")
+        }
+        assertEquals(HttpStatusCode.BadRequest, localResponse.status)
+
+        val hostileResponse = client.request(McpAccess.PATH) {
+            method = HttpMethod.Post
+            header(HttpHeaders.Host, "example.test")
+            header(HttpHeaders.Accept, "application/json, text/event-stream")
+            contentType(ContentType.Application.Json)
+            setBody("not-json")
+        }
+        assertEquals(HttpStatusCode.Forbidden, hostileResponse.status)
+    }
+
+    @Test
     fun validTokenStillRequiresAllowedHostAndOrigin() = testApplication {
         application { testMcpApplication() }
 
@@ -94,8 +117,11 @@ class McpApplicationTest {
         assertEquals(HttpStatusCode.Forbidden, hostileOrigin.status)
     }
 
-    private fun io.ktor.server.application.Application.testMcpApplication() {
+    private fun io.ktor.server.application.Application.testMcpApplication(
+        tokenRequired: Boolean = true,
+    ) {
         configureMcp(
+            tokenRequiredProvider = { tokenRequired },
             tokenProvider = { "secret" },
             unauthorizedMessage = { "unauthorized" },
             allowedHosts = listOf("localhost"),

@@ -76,3 +76,22 @@ test('keeps a validated source token after debug transport errors', () => {
     /errorMsg\.includes\('访问令牌'\)[\s\S]*clearSourceApiToken\(\)/,
   )
 })
+
+test('skips source tokens only when the server disables protection', () => {
+  const token = readSource('api/sourceToken.ts')
+  const api = readSource('api/api.ts')
+  const axios = readSource('api/axios.ts')
+
+  assert.match(token, /getJsSourceApiTokenRequired/)
+  assert.match(token, /cache: 'no-store'/)
+  assert.match(token, /if \(!response\.ok\) return true/)
+  assert.match(token, /catch \{\s*return true\s*\}/)
+  assert.match(token, /if \(!\(await isSourceApiTokenRequired\(\)\)\) return undefined/)
+  assert.match(
+    token,
+    /token \? \['legado', sourceApiTokenWebSocketProtocol\(token\)\] : \['legado'\]/,
+  )
+  assert.match(axios, /if \(token\) config\.headers\.set\('X-Legado-Token', token\)/)
+  assert.match(api, /token: string \| undefined/)
+  assert.match(api, /sourceApiTokenWebSocketProtocols\(token\)/)
+})
