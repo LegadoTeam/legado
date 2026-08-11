@@ -27,6 +27,16 @@ class TestReleaseWorkflowTest {
         workflowFile.readText().replace("\r\n", "\n")
     }
 
+    private val lanzouUploaderText by lazy {
+        val userDir = requireNotNull(System.getProperty("user.dir"))
+        val scriptFile = generateSequence(File(userDir)) {
+            it.parentFile
+        }.map {
+            File(it, ".github/scripts/lzy_web.py")
+        }.first { it.isFile }
+        scriptFile.readText().replace("\r\n", "\n")
+    }
+
     @Test
     fun `test release runs for every master push`() {
         assertTrue(workflowText.contains("push:"))
@@ -70,5 +80,14 @@ class TestReleaseWorkflowTest {
         assertFalse(syncWorkflowText.contains("git merge --no-edit upstream/master || true"))
         assertTrue(syncWorkflowText.contains("gh workflow run TestRelease.yml --ref master"))
         assertTrue(syncWorkflowText.contains("-f commit_sha=\"${'$'}(git rev-parse HEAD)\""))
+    }
+
+    @Test
+    fun `lanzou uploader propagates login and upload failures`() {
+        assertTrue(lanzouUploaderText.contains("with open(file_dir, \"rb\") as upload_stream:"))
+        assertTrue(lanzouUploaderText.contains("return 0 if upload(argv[0], argv[1]) else 1"))
+        assertTrue(lanzouUploaderText.contains("sys.exit(main(sys.argv[1:]))"))
+        assertFalse(lanzouUploaderText.contains("\"name\": '{file_name}'"))
+        assertFalse(lanzouUploaderText.contains("retry_tim+"))
     }
 }
