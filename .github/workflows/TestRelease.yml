@@ -1,12 +1,14 @@
 name: Test Release
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches:
+      - master
 
 concurrency:
-  group: test-release-pr-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: test-release
+  cancel-in-progress: false
+  queue: max
 
 permissions:
   contents: read
@@ -14,26 +16,20 @@ permissions:
 jobs:
 
   prepare:
-    if: >-
-      ${{ !github.event.pull_request.draft &&
-          github.event.pull_request.user.login == 'mgz0227' &&
-          github.actor == 'mgz0227' &&
-          github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ !github.event.deleted }}
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.set-ver.outputs.version }}
+      label: ${{ steps.set-ver.outputs.label }}
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: refs/pull/${{ github.event.pull_request.number }}/merge
-
-      - name: Test Lanzou Upload Helper
-        run: python3 .github/scripts/test_lzy_web.py
 
       - id: set-ver
         run: |
           version="3.$(TZ=Asia/Shanghai date +%y%m%d%H)"
+          branch="${GITHUB_REF_NAME//[^[:alnum:]._-]/_}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "label=${branch}_${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
 
       - name: Verify Release Credentials
         env:
@@ -69,7 +65,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          ref: refs/pull/${{ github.event.pull_request.number }}/merge
           fetch-depth: 0
 
       - name: Setup JDK 17
@@ -189,16 +184,13 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    concurrency:
-      group: test-release-publish
-      cancel-in-progress: false
-      queue: max
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
-      PR_NUMBER: ${{ github.event.pull_request.number }}
-      PR_TITLE: ${{ github.event.pull_request.title }}
-      PR_URL: ${{ github.event.pull_request.html_url }}
-      PR_SHA: ${{ github.sha }}
+      RELEASE_LABEL: ${{ needs.prepare.outputs.label }}
+      BRANCH: ${{ github.ref_name }}
+      COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+      COMMIT_URL: ${{ github.event.head_commit.url }}
+      COMMIT_SHA: ${{ github.sha }}
       ylogin: ${{ secrets.LANZOU_ID }}
       phpdisk_info: ${{ secrets.LANZOU_PSD }}
       LANZOU_FOLDER_ID: ${{ secrets.LANZOU_FOLDER_ID }}
@@ -206,7 +198,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: refs/pull/${{ github.event.pull_request.number }}/merge
           fetch-depth: 0
 
       - uses: actions/download-artifact@v8
@@ -228,9 +219,11 @@ jobs:
 
       - name: Prepare Release Notes
         run: |
-          printf '此版本为 PR 测试版，可能存在不稳定情况，升级前请备份数据。\n\nPR #%s: %s\n\n%s\n\nCommit: %s\n' \
-            "$PR_NUMBER" "$PR_TITLE" "$PR_URL" "$PR_SHA" \
-            > "$GITHUB_WORKSPACE/release-notes.md"
+          {
+            printf '此版本为提交测试版，可能存在不稳定情况，升级前请备份数据。\n\n'
+            printf 'Branch: %s\n\nCommit: %s\n\n%s\n\n%s\n' \
+              "$BRANCH" "$COMMIT_SHA" "$COMMIT_URL" "$COMMIT_MESSAGE"
+          } > "$GITHUB_WORKSPACE/release-notes.md"
 
       - name: Update Beta Tag
         run: |
@@ -240,7 +233,7 @@ jobs:
       - name: Publish Beta Release
         uses: ncipollo/release-action@v1
         with:
-          name: legado_test_PR${{ github.event.pull_request.number }}_${{ env.VERSION }}
+          name: legado_test_${{ env.RELEASE_LABEL }}_${{ env.VERSION }}
           tag: beta
           bodyFile: ${{ github.workspace }}/release-notes.md
           prerelease: true
@@ -258,7 +251,7 @@ jobs:
           for file in *.apk; do
             renamed="${file/新包名/release}"
             renamed="${renamed/新共存/releaseA}"
-            mv -- "$file" "${renamed%.apk}_测试版_PR${PR_NUMBER}.apk"
+            mv -- "$file" "${renamed%.apk}_测试版_${RELEASE_LABEL}.apk"
           done
 
       - name: Upload To Lanzou

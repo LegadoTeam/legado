@@ -18,16 +18,15 @@ class TestReleaseWorkflowTest {
     }
 
     @Test
-    fun `test release only accepts trusted repository pull requests`() {
-        assertTrue(workflowText.contains("pull_request:"))
-        assertTrue(workflowText.contains("github.event.pull_request.user.login == 'mgz0227'"))
-        assertTrue(workflowText.contains("github.actor == 'mgz0227'"))
-        assertTrue(
-            workflowText.contains(
-                "github.event.pull_request.head.repo.full_name == github.repository"
-            )
-        )
-        assertFalse(workflowText.contains("pull_request_target:"))
+    fun `test release runs for every master push`() {
+        assertTrue(workflowText.contains("push:"))
+        assertTrue(workflowText.contains("- master"))
+        assertTrue(workflowText.contains("if: ${'$'}{{ !github.event.deleted }}"))
+        assertTrue(workflowText.contains("group: test-release"))
+        assertTrue(workflowText.contains("cancel-in-progress: false"))
+        assertTrue(workflowText.contains("queue: max"))
+        assertFalse(workflowText.contains("pull_request:"))
+        assertFalse(workflowText.contains("github.event.pull_request"))
     }
 
     @Test
@@ -35,9 +34,9 @@ class TestReleaseWorkflowTest {
         assertTrue(workflowText.contains("tag: beta"))
         assertTrue(workflowText.contains("prerelease: true"))
         assertTrue(workflowText.contains("removeArtifacts: true"))
-        assertTrue(workflowText.contains("queue: max"))
-        assertTrue(workflowText.contains("_测试版_PR"))
+        assertTrue(workflowText.contains("_测试版_${'$'}{RELEASE_LABEL}"))
         assertTrue(workflowText.contains("lzy_web.py"))
+        assertFalse(workflowText.contains("test_lzy_web.py"))
         assertFalse(workflowText.contains("Deploy apk to server"))
         assertFalse(workflowText.contains("Post to Telegram Channel"))
         assertFalse(workflowText.contains("Push To \"test\" Branch"))
