@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "pnpm test && run-p type-check \"build-only {@}\" -- && node ./scripts/sync.js",
+    "build": "pnpm test && pnpm build-only && pnpm type-check && node ./scripts/sync.js",
     "preview": "vite preview",
     "build-only": "vite build",
     "test": "node --test",
