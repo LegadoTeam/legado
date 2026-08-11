@@ -6,6 +6,10 @@ on:
     - cron: '0 */12 * * *'
   workflow_dispatch: {}  # 支持手动触发
 
+permissions:
+  actions: write
+  contents: write
+
 jobs:
   sync:
     runs-on: ubuntu-latest
@@ -34,9 +38,7 @@ jobs:
         id: check
         run: |
           git fetch upstream master
-          LOCAL=$(git rev-parse master)
-          REMOTE=$(git rev-parse upstream/master)
-          if [ "$LOCAL" = "$REMOTE" ]; then
+          if git merge-base --is-ancestor upstream/master master; then
             echo "up_to_date=true" >> $GITHUB_OUTPUT
             echo "✅ Already up to date."
           else
@@ -48,9 +50,17 @@ jobs:
         if: steps.check.outputs.up_to_date == 'false'
         run: |
           git checkout master
-          git merge --no-edit upstream/master || true
+          git merge --no-edit upstream/master
 
       - name: Push to origin
         if: steps.check.outputs.up_to_date == 'false'
         run: |
           git push "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" master
+
+      - name: Dispatch Test Release
+        if: steps.check.outputs.up_to_date == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run TestRelease.yml --ref master \
+            -f commit_sha="$(git rev-parse HEAD)"

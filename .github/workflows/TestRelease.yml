@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - master
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Commit on master to build
+        required: false
+        type: string
 
 concurrency:
   group: test-release
@@ -21,15 +27,27 @@ jobs:
     outputs:
       version: ${{ steps.set-ver.outputs.version }}
       label: ${{ steps.set-ver.outputs.label }}
+      commit: ${{ steps.set-ver.outputs.commit }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.commit_sha || github.sha }}
 
       - id: set-ver
+        env:
+          COMMIT_SHA: ${{ inputs.commit_sha || github.sha }}
         run: |
+          if [[ ! "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]] || \
+            ! git merge-base --is-ancestor "$COMMIT_SHA" origin/master; then
+            echo "Commit must belong to master: $COMMIT_SHA"
+            exit 1
+          fi
           version="3.$(TZ=Asia/Shanghai date +%y%m%d%H)"
           branch="${GITHUB_REF_NAME//[^[:alnum:]._-]/_}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "label=${branch}_${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          echo "label=${branch}_${COMMIT_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          echo "commit=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Verify Release Credentials
         env:
@@ -66,6 +84,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          ref: ${{ needs.prepare.outputs.commit }}
 
       - name: Setup JDK 17
         uses: actions/setup-java@v5
@@ -188,9 +207,8 @@ jobs:
       VERSION: ${{ needs.prepare.outputs.version }}
       RELEASE_LABEL: ${{ needs.prepare.outputs.label }}
       BRANCH: ${{ github.ref_name }}
-      COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-      COMMIT_URL: ${{ github.event.head_commit.url }}
-      COMMIT_SHA: ${{ github.sha }}
+      COMMIT_URL: ${{ format('{0}/{1}/commit/{2}', github.server_url, github.repository, needs.prepare.outputs.commit) }}
+      COMMIT_SHA: ${{ needs.prepare.outputs.commit }}
       ylogin: ${{ secrets.LANZOU_ID }}
       phpdisk_info: ${{ secrets.LANZOU_PSD }}
       LANZOU_FOLDER_ID: ${{ secrets.LANZOU_FOLDER_ID }}
@@ -199,6 +217,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          ref: ${{ needs.prepare.outputs.commit }}
 
       - uses: actions/download-artifact@v8
         with:
@@ -219,10 +238,11 @@ jobs:
 
       - name: Prepare Release Notes
         run: |
+          commit_message="$(git log -1 --format=%B "$COMMIT_SHA")"
           {
             printf '此版本为提交测试版，可能存在不稳定情况，升级前请备份数据。\n\n'
             printf 'Branch: %s\n\nCommit: %s\n\n%s\n\n%s\n' \
-              "$BRANCH" "$COMMIT_SHA" "$COMMIT_URL" "$COMMIT_MESSAGE"
+              "$BRANCH" "$COMMIT_SHA" "$COMMIT_URL" "$commit_message"
           } > "$GITHUB_WORKSPACE/release-notes.md"
 
       - name: Update Beta Tag

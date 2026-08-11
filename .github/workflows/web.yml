@@ -17,10 +17,14 @@ on:
 
 concurrency:
   group: build-web-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   UPSTREAM_REPOSITORY: LegadoTeam/legado
+
+permissions:
+  actions: write
+  contents: write
 
 jobs:
   build:
@@ -66,4 +70,12 @@ jobs:
       - name: Push web assets
         if: ${{ steps.web-commit.outputs.changes_detected == 'true' }}
         run: bash .github/scripts/push-web-assets.sh
+
+      - name: Dispatch Test Release
+        if: ${{ steps.web-commit.outputs.changes_detected == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run TestRelease.yml --ref master \
+            -f commit_sha="$(git rev-parse HEAD)"
 
