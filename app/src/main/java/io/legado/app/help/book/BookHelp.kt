@@ -87,10 +87,18 @@ internal class ContentSaveFence {
     }
 
     fun replace(key: ContentSaveKey, fileName: String, write: () -> Unit) {
+        var failure: Throwable? = null
         states.compute(key) { _, current ->
-            write()
-            ContentSaveState((current?.version ?: 0L) + 1L, fileName)
+            val nextVersion = (current?.version ?: 0L) + 1L
+            try {
+                write()
+                ContentSaveState(nextVersion, fileName)
+            } catch (error: Throwable) {
+                failure = error
+                ContentSaveState(nextVersion, current?.fileName)
+            }
         }
+        failure?.let { throw it }
     }
 }
 
