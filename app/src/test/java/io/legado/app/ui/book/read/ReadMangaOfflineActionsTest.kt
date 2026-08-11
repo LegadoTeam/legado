@@ -15,6 +15,8 @@ class ReadMangaOfflineActionsTest {
             "src/main/java/io/legado/app/ui/book/manga/ReadMangaViewModel.kt"
         ).readText()
         val menu = projectFile("src/main/res/menu/book_manga.xml").readText()
+        val preferKey = projectFile("src/main/java/io/legado/app/constant/PreferKey.kt").readText()
+        val appConfig = projectFile("src/main/java/io/legado/app/help/config/AppConfig.kt").readText()
         val downloadDialog = projectFile(
             "src/main/java/io/legado/app/ui/book/read/BaseReadBookActivity.kt"
         ).readText()
@@ -25,8 +27,10 @@ class ReadMangaOfflineActionsTest {
         val bookCover = projectFile("src/main/java/io/legado/app/model/BookCover.kt").readText()
 
         assertTrue(menu.contains("android:id=\"@+id/menu_download\""))
+        assertTrue(menu.contains("@+id/menu_manga_long_click_save_image"))
         assertTrue(activity.contains("R.id.menu_download ->"))
         assertTrue(activity.contains("longTapListener ="))
+        assertTrue(activity.contains("AppConfig.mangaLongClickSaveImage"))
         assertTrue(activity.contains("as? MangaPage"))
         assertTrue(downloadDialog.contains("fun Context.showBookDownloadDialog(book: Book)"))
         assertTrue(viewModel.contains("BookHelp.saveImage(ReadManga.bookSource, book, src)"))
@@ -40,6 +44,8 @@ class ReadMangaOfflineActionsTest {
         assertTrue(mangaViewHolder.contains("mangaImagePath(imageUrl)"))
         assertTrue(mangaViewHolder.contains("takeIf { it.isFile }?.absolutePath ?: imageUrl"))
         assertTrue(bookCover.contains("ImageLoader.loadFile(context, path).apply(options)"))
+        assertTrue(preferKey.contains("mangaLongClickSaveImage = \"mangaLongClickSaveImage\""))
+        assertTrue(appConfig.contains("getPrefBoolean(PreferKey.mangaLongClickSaveImage, true)"))
     }
 
     private fun projectFile(pathInApp: String): File {

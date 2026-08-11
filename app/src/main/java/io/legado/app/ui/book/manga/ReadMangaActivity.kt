@@ -237,13 +237,17 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                 }
             }
             longTapListener = { event ->
-                val position = findChildViewUnder(event.x, event.y)
-                    ?.let { getChildAdapterPosition(it) }
-                    ?: RecyclerView.NO_POSITION
-                (mAdapter.getItem(position) as? MangaPage)?.let {
-                    saveImage(it.mImageUrl)
-                    true
-                } ?: false
+                if (!AppConfig.mangaLongClickSaveImage) {
+                    false
+                } else {
+                    val position = findChildViewUnder(event.x, event.y)
+                        ?.let { getChildAdapterPosition(it) }
+                        ?: RecyclerView.NO_POSITION
+                    (mAdapter.getItem(position) as? MangaPage)?.let {
+                        saveImage(it.mImageUrl)
+                        true
+                    } ?: false
+                }
             }
         }
         binding.webtoonFrame.run {
@@ -546,6 +550,11 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                 setDisableMangaScale(item.isChecked)
             }
 
+            R.id.menu_manga_long_click_save_image -> {
+                item.isChecked = !item.isChecked
+                AppConfig.mangaLongClickSaveImage = item.isChecked
+            }
+
             R.id.menu_disable_click_scroll -> {
                 item.isChecked = !item.isChecked
                 AppConfig.disableClickScroll = item.isChecked
@@ -733,6 +742,8 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         menu.findItem(R.id.menu_pre_manga_number).title =
             getString(R.string.pre_download_m, AppConfig.mangaPreDownloadNum)
         menu.findItem(R.id.menu_disable_manga_scale).isChecked = AppConfig.disableMangaScale
+        menu.findItem(R.id.menu_manga_long_click_save_image).isChecked =
+            AppConfig.mangaLongClickSaveImage
         menu.findItem(R.id.menu_disable_click_scroll).isChecked = AppConfig.disableClickScroll
         menu.findItem(R.id.menu_manga_auto_page_speed).title =
             getString(R.string.manga_auto_page_speed, AppConfig.mangaAutoPageSpeed)

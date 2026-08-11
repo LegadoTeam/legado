@@ -830,6 +830,12 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefBoolean(PreferKey.disableMangaScale, value)
         }
 
+    var mangaLongClickSaveImage: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.mangaLongClickSaveImage, true)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.mangaLongClickSaveImage, value)
+        }
+
     var disableMangaPageAnim: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.disableMangaPageAnim, false)
         set(value) {
