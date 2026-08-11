@@ -206,9 +206,6 @@ jobs:
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
       RELEASE_LABEL: ${{ needs.prepare.outputs.label }}
-      BRANCH: ${{ github.ref_name }}
-      COMMIT_URL: ${{ format('{0}/{1}/commit/{2}', github.server_url, github.repository, needs.prepare.outputs.commit) }}
-      COMMIT_SHA: ${{ needs.prepare.outputs.commit }}
       ylogin: ${{ secrets.LANZOU_ID }}
       phpdisk_info: ${{ secrets.LANZOU_PSD }}
       LANZOU_FOLDER_ID: ${{ secrets.LANZOU_FOLDER_ID }}
@@ -238,11 +235,10 @@ jobs:
 
       - name: Prepare Release Notes
         run: |
-          commit_message="$(git log -1 --format=%B "$COMMIT_SHA")"
           {
             printf '此版本为提交测试版，可能存在不稳定情况，升级前请备份数据。\n\n'
-            printf 'Branch: %s\n\nCommit: %s\n\n%s\n\n%s\n' \
-              "$BRANCH" "$COMMIT_SHA" "$COMMIT_URL" "$commit_message"
+            bash .github/scripts/extract-latest-update.sh \
+              app/src/main/assets/updateLog.md
           } > "$GITHUB_WORKSPACE/release-notes.md"
 
       - name: Update Beta Tag
@@ -253,7 +249,7 @@ jobs:
       - name: Publish Beta Release
         uses: ncipollo/release-action@v1
         with:
-          name: legado_test_${{ env.RELEASE_LABEL }}_${{ env.VERSION }}
+          name: legado_app_${{ env.VERSION }}
           tag: beta
           bodyFile: ${{ github.workspace }}/release-notes.md
           prerelease: true
