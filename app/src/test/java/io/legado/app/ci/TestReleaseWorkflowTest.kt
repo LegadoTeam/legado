@@ -21,6 +21,7 @@ class TestReleaseWorkflowTest {
     fun `test release only accepts trusted repository pull requests`() {
         assertTrue(workflowText.contains("pull_request:"))
         assertTrue(workflowText.contains("github.event.pull_request.user.login == 'mgz0227'"))
+        assertTrue(workflowText.contains("github.actor == 'mgz0227'"))
         assertTrue(
             workflowText.contains(
                 "github.event.pull_request.head.repo.full_name == github.repository"

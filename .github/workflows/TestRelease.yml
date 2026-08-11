@@ -17,6 +17,7 @@ jobs:
     if: >-
       ${{ !github.event.pull_request.draft &&
           github.event.pull_request.user.login == 'mgz0227' &&
+          github.actor == 'mgz0227' &&
           github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     outputs:
@@ -84,12 +85,16 @@ jobs:
         run: echo "" > "$GITHUB_WORKSPACE/app/src/main/assets/18PlusList.txt"
 
       - name: Release APK Sign
+        env:
+          RELEASE_KEY_STORE: ${{ secrets.RELEASE_KEY_STORE }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
         run: |
-          echo "${{ secrets.RELEASE_KEY_STORE }}" | base64 --decode \
+          printf '%s' "$RELEASE_KEY_STORE" | base64 --decode \
             > "$GITHUB_WORKSPACE/app/legado.jks"
           {
-            echo "RELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}"
-            echo "RELEASE_STORE_PASSWORD=${{ secrets.RELEASE_STORE_PASSWORD }}"
+            printf '%s\n' "RELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD"
+            printf '%s\n' "RELEASE_STORE_PASSWORD=$RELEASE_STORE_PASSWORD"
             echo "RELEASE_STORE_FILE=./legado.jks"
             echo "RELEASE_KEY_ALIAS=legado"
           } >> "$GITHUB_WORKSPACE/gradle.properties"
