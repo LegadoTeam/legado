@@ -34,6 +34,7 @@ class TestReleaseWorkflowTest {
         assertTrue(workflowText.contains("tag: beta"))
         assertTrue(workflowText.contains("prerelease: true"))
         assertTrue(workflowText.contains("removeArtifacts: true"))
+        assertTrue(workflowText.contains("queue: max"))
         assertTrue(workflowText.contains("_测试版_PR"))
         assertTrue(workflowText.contains("lzy_web.py"))
         assertFalse(workflowText.contains("Deploy apk to server"))

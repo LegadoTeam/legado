@@ -187,6 +187,7 @@ jobs:
     concurrency:
       group: test-release-publish
       cancel-in-progress: false
+      queue: max
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
