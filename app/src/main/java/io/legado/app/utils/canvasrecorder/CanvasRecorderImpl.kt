@@ -37,6 +37,7 @@ class CanvasRecorderImpl : BaseCanvasRecorder() {
     }
 
     override fun beginRecording(width: Int, height: Int): Canvas {
+        markRecordingStarted()
         init(width, height)
         bitmap?.eraseColor(Color.TRANSPARENT)
         canvas = canvasPool.obtain().apply { setBitmap(bitmap) }
