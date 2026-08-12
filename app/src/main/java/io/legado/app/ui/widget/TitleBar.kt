@@ -67,9 +67,7 @@ class TitleBar @JvmOverloads constructor(
     private val opaque: Boolean
     private val automaticForeground: Boolean
     private val titleTextColorFromAttrs: Boolean
-    private val titleTextAppearanceFromAttrs: Boolean
     private val subtitleTextColorFromAttrs: Boolean
-    private val subtitleTextAppearanceFromAttrs: Boolean
 
     init {
         val a = context.obtainStyledAttributes(
@@ -92,9 +90,7 @@ class TitleBar @JvmOverloads constructor(
         val titleText = a.getString(R.styleable.TitleBar_title)
         val subtitleText = a.getString(R.styleable.TitleBar_subtitle)
         titleTextColorFromAttrs = a.hasValue(R.styleable.TitleBar_titleTextColor)
-        titleTextAppearanceFromAttrs = a.hasValue(R.styleable.TitleBar_titleTextAppearance)
         subtitleTextColorFromAttrs = a.hasValue(R.styleable.TitleBar_subtitleTextColor)
-        subtitleTextAppearanceFromAttrs = a.hasValue(R.styleable.TitleBar_subtitleTextAppearance)
 
         when (themeMode) {
             1 -> inflate(context, R.layout.view_title_bar_dark, this)
@@ -225,10 +221,10 @@ class TitleBar @JvmOverloads constructor(
     fun applyForegroundColor() {
         if (!usesTransparentForeground) return
         val color = context.getToolbarTextColor(true)
-        if (!titleTextColorFromAttrs && !titleTextAppearanceFromAttrs) {
+        if (!titleTextColorFromAttrs) {
             setTitleTextColor(color)
         }
-        if (!subtitleTextColorFromAttrs && !subtitleTextAppearanceFromAttrs) {
+        if (!subtitleTextColorFromAttrs) {
             setSubTitleTextColor(color)
         }
         val colorFilter = PorterDuffColorFilter(color, PorterDuff.Mode.SRC_ATOP)
