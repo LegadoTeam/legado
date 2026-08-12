@@ -140,6 +140,11 @@ class McpServiceContractTest {
         assertTrue(notification.contains("catch (error: CancellationException)"))
         assertTrue(notification.contains("throw error"))
 
+        val checkProgress = tools
+            .substringAfter("private suspend fun ClientConnection.sendCheckProgress(")
+            .substringBefore("private fun registerTools")
+        assertTrue(checkProgress.contains("total = total"))
+
         val api = projectFile("api.md")
         assertTrue(api.contains("notifications/message"))
         assertTrue(api.contains("progressToken"))
@@ -160,6 +165,7 @@ class McpServiceContractTest {
         assertTrue(checkTool.contains("Debug.getCheckSnapshot(checkSessionId, urls)"))
         assertTrue(checkTool.contains("Debug.takeCheckSnapshot(checkSessionId, urls)"))
         assertTrue(checkTool.contains("sendCheckProgress("))
+        assertTrue(tools.contains("total = total?.toDouble()"))
         assertTrue(tools.contains("logger = \"legado.check_source\""))
         assertFalse(checkTool.contains("getBookSources(urls)"))
 

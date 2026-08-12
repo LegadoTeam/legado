@@ -164,6 +164,7 @@ object McpToolServer {
         line: String,
         progress: Int,
         progressToken: RequestId?,
+        total: Int? = null,
         logger: String = "legado.debug_source",
     ) {
         sendBestEffort {
@@ -184,6 +185,7 @@ object McpToolServer {
                         ProgressNotificationParams(
                             progressToken = progressToken,
                             progress = progress.toDouble(),
+                            total = total?.toDouble(),
                             message = line,
                         )
                     )
@@ -208,6 +210,7 @@ object McpToolServer {
                     line,
                     reportedUrls.size,
                     progressToken,
+                    total = total,
                     logger = "legado.check_source",
                 )
             }
