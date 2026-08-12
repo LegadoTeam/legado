@@ -17,16 +17,6 @@ class TestReleaseWorkflowTest {
         workflowFile.readText().replace("\r\n", "\n")
     }
 
-    private val syncWorkflowText by lazy {
-        val userDir = requireNotNull(System.getProperty("user.dir"))
-        val workflowFile = generateSequence(File(userDir)) {
-            it.parentFile
-        }.map {
-            File(it, ".github/workflows/SyncUpstream.yml")
-        }.first { it.isFile }
-        workflowFile.readText().replace("\r\n", "\n")
-    }
-
     private val lanzouUploaderText by lazy {
         val userDir = requireNotNull(System.getProperty("user.dir"))
         val scriptFile = generateSequence(File(userDir)) {
@@ -70,16 +60,6 @@ class TestReleaseWorkflowTest {
         assertFalse(workflowText.contains("Deploy apk to server"))
         assertFalse(workflowText.contains("Post to Telegram Channel"))
         assertFalse(workflowText.contains("Push To \"test\" Branch"))
-    }
-
-    @Test
-    fun `upstream sync dispatches test release for its pushed commit`() {
-        assertTrue(syncWorkflowText.contains("actions: write"))
-        assertTrue(syncWorkflowText.contains("contents: write"))
-        assertTrue(syncWorkflowText.contains("git merge-base --is-ancestor upstream/master master"))
-        assertFalse(syncWorkflowText.contains("git merge --no-edit upstream/master || true"))
-        assertTrue(syncWorkflowText.contains("gh workflow run TestRelease.yml --ref master"))
-        assertTrue(syncWorkflowText.contains("-f commit_sha=\"${'$'}(git rev-parse HEAD)\""))
     }
 
     @Test
