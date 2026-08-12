@@ -1,11 +1,16 @@
 <template>
-  <el-tabs id="source-edit">
+  <el-tabs id="source-edit" v-model="activeTab">
     <el-tab-pane
       v-for="{ name, children } in Object.values(config)"
       :label="name"
+      :name="name"
       :key="name"
     >
-      <el-form label-position="right" label-width="220px">
+      <el-form
+        v-if="activeTab === name"
+        label-position="right"
+        label-width="220px"
+      >
         <el-form-item
           v-for="{
             type,
@@ -64,7 +69,8 @@
 import type { SourceConfig } from '@/config/sourceConfig'
 
 const store = useSourceStore()
-defineProps<{ config: SourceConfig }>()
+const props = defineProps<{ config: SourceConfig }>()
+const activeTab = ref(Object.values(props.config)[0]?.name ?? '')
 
 const currentSource = computed(() => store.currentSource)
 
