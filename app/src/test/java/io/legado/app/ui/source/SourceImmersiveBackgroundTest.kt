@@ -43,6 +43,35 @@ class SourceImmersiveBackgroundTest {
     }
 
     @Test
+    fun transparentTitleBarsUseVisibleBackgroundForContrast() {
+        val theme = projectFile("src/main/java/io/legado/app/lib/theme/MaterialValueHelper.kt")
+            .readText()
+        assertTrue(
+            theme.contains("toolbarBackgroundColor(transparentBar, primaryColor, backgroundColor)")
+        )
+
+        val titleBar = projectFile("src/main/java/io/legado/app/ui/widget/TitleBar.kt")
+            .readText()
+        assertTrue(titleBar.contains("automaticForeground = themeMode == 0 && !opaque"))
+        assertTrue(titleBar.contains("!AppConfig.isEInkMode && background?.alpha == 0"))
+        assertTrue(titleBar.contains("context.getToolbarTextColor(true)"))
+        assertTrue(titleBar.contains("toolbar.navigationIcon?.colorFilter = colorFilter"))
+        assertTrue(titleBar.contains("toolbar.overflowIcon?.colorFilter = colorFilter"))
+        assertTrue(titleBar.contains("findViewById<SearchView>(R.id.search_view)?.applyTint(color)"))
+        assertTrue(titleBar.contains("toolbar.menu.forEach { item ->"))
+
+        val menu = projectFile("src/main/java/io/legado/app/utils/MenuExtensions.kt").readText()
+        assertTrue(menu.contains("(impl.actionView as? SearchView)?.applyTint(tintColor)"))
+
+        val activity = projectFile("src/main/java/io/legado/app/base/BaseActivity.kt").readText()
+        val fragment = projectFile("src/main/java/io/legado/app/base/BaseFragment.kt").readText()
+        assertTrue(
+            activity.contains("transparentBar = titleBar?.usesTransparentForeground == true")
+        )
+        assertTrue(fragment.contains("titleBar?.post { titleBar.applyForegroundColor() }"))
+    }
+
+    @Test
     fun navigationBarsDisablePlatformContrastScrimOnAndroidQ() {
         val source = projectFile("src/main/java/io/legado/app/utils/ActivityExtensions.kt")
             .readText()

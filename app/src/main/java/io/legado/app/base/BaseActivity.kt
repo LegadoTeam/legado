@@ -114,9 +114,14 @@ abstract class BaseActivity<VB : ViewBinding>(
 
     final override fun onCreateOptionsMenu(menu: Menu): Boolean {
         val bool = onCompatCreateOptionsMenu(menu)
-        menu.applyTint(this, toolBarTheme)
         val titleBar: TitleBar? = findViewById<TitleBar>(R.id.title_bar)
             ?: findViewById(R.id.titleBar)
+        menu.applyTint(
+            this,
+            toolBarTheme,
+            transparentBar = titleBar?.usesTransparentForeground == true
+        )
+        titleBar?.applyForegroundColor()
         titleBar?.toolbar?.installActivityOverflowMenu()
         return bool
     }

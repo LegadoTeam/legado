@@ -11,26 +11,37 @@ import android.widget.ImageButton
 import androidx.appcompat.view.menu.MenuBuilder
 import androidx.appcompat.view.menu.MenuItemImpl
 import androidx.appcompat.view.menu.SubMenuBuilder
+import androidx.appcompat.widget.SearchView
 import androidx.core.view.forEach
 import io.legado.app.R
 import io.legado.app.constant.Theme
+import io.legado.app.lib.theme.getToolbarTextColor
 import io.legado.app.lib.theme.primaryTextColor
 import java.lang.reflect.Method
 
 @SuppressLint("RestrictedApi")
 @Suppress("UsePropertyAccessSyntax")
-fun Menu.applyTint(context: Context, theme: Theme = Theme.Auto): Menu = this.let { menu ->
+fun Menu.applyTint(
+    context: Context,
+    theme: Theme = Theme.Auto,
+    transparentBar: Boolean = false
+): Menu = this.let { menu ->
     if (menu is MenuBuilder) {
         menu.setOptionalIconsVisible(true)
     }
     val defaultTextColor = context.getCompatColor(R.color.primaryText)
-    val tintColor = MenuExtensions.getMenuColor(context, theme)
+    val tintColor = MenuExtensions.getMenuColor(
+        context,
+        theme,
+        transparentBar = transparentBar
+    )
     menu.forEach { item ->
         (item as MenuItemImpl).let { impl ->
             //overflow：展开的item
             impl.icon?.setTintMutate(
                 if (impl.requiresOverflow()) defaultTextColor else tintColor
             )
+            (impl.actionView as? SearchView)?.applyTint(tintColor)
         }
     }
     return menu
@@ -99,7 +110,8 @@ object MenuExtensions {
     fun getMenuColor(
         context: Context,
         theme: Theme = Theme.Auto,
-        requiresOverflow: Boolean = false
+        requiresOverflow: Boolean = false,
+        transparentBar: Boolean = false
     ): Int {
         val defaultTextColor = context.getCompatColor(R.color.primaryText)
         if (requiresOverflow)
@@ -108,7 +120,7 @@ object MenuExtensions {
         return when (theme) {
             Theme.Dark -> context.getCompatColor(R.color.md_white_1000)
             Theme.Light -> context.getCompatColor(R.color.md_black_1000)
-            else -> primaryTextColor
+            else -> if (transparentBar) context.getToolbarTextColor(true) else primaryTextColor
         }
     }
 
