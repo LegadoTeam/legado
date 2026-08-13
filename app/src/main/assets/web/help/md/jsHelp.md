@@ -752,6 +752,7 @@ function loginUi(state) {
         { name: "验证码已发送至 " + state.phone, type: "label" },
         { key: "code", name: "验证码", type: "text" },
         { key: "line", name: "线路", type: "select", options: ["主线路", "备用线路"] },
+        { key: "remember", name: "记住登录", type: "toggle", value: "true" },
         { name: "登录", type: "button", action: "verify" }
     ] };
 }
@@ -780,6 +781,7 @@ function loginAction(action, state, form) {
 |`text`、`password`|`key`、`name`|文本或密码输入，可加 `hint`、`value`|
 |`label`|`name`|只读提示文字|
 |`select`|`key`、`name`、`options`|单选，值为选项字符串|
+|`toggle`|`key`、`name`|开关，值为字符串 `"true"`/`"false"`；可加 `value`、`action`|
 |`button`|`name`、`action`|派发动作，可加 `countdown` 秒数|
 
 `loginAction` 可以返回以下命令；未知键会被忽略并写入日志，非法命令对象会提示错误：

@@ -24,14 +24,16 @@ class LoginUiV2Test {
                 {"key":"phone","name":"手机号","type":"text","hint":"11位","value":"138"},
                 {"name":"说明","type":"label"},
                 {"key":"line","name":"线路","type":"select","options":["电信","联通"]},
+                {"key":"remember","name":"记住登录","type":"toggle","value":"true"},
                 {"name":"发码","type":"button","action":"sendCode","countdown":60}
             ]}"""
         )
 
-        assertEquals(4, rows!!.size)
+        assertEquals(5, rows!!.size)
         assertEquals("11位", rows[0].hint)
         assertEquals(listOf("电信", "联通"), rows[2].options)
-        assertEquals(60, rows[3].countdown)
+        assertEquals("true", rows[3].value)
+        assertEquals(60, rows[4].countdown)
     }
 
     @Test
@@ -44,9 +46,14 @@ class LoginUiV2Test {
             """{"rows":[]}""",
             """{"rows":[{"name":"缺少键","type":"text"}]}""",
             """{"rows":[{"key":"x","name":"空选项","type":"select","options":[]}]}""",
+            """{"rows":[{"name":"缺少键","type":"toggle"}]}""",
+            """{"rows":[{"key":"x","name":"非法值","type":"toggle","value":"yes"}]}""",
+            """{"rows":[{"key":"x","name":"空动作","type":"toggle","action":""}]}""",
             """{"rows":[{"name":"缺少动作","type":"button"}]}""",
             """{"rows":[{"key":"x","name":"甲","type":"text"},{"key":"x","name":"乙","type":"text"}]}""",
+            """{"rows":[{"key":"x","name":"甲","type":"text"},{"key":"x","name":"乙","type":"toggle"}]}""",
             """{"rows":[{"name":"甲","type":"button","action":"same"},{"name":"乙","type":"button","action":"same"}]}""",
+            """{"rows":[{"key":"x","name":"甲","type":"toggle","action":"same"},{"name":"乙","type":"button","action":"same"}]}""",
         ).forEach { assertNull(LoginUiV2.parseRender(it)) }
     }
 

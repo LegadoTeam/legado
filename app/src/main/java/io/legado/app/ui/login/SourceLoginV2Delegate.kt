@@ -15,8 +15,10 @@ import io.legado.app.data.entities.rule.RowUi
 import io.legado.app.databinding.DialogLoginBinding
 import io.legado.app.databinding.ItemFilletTextBinding
 import io.legado.app.databinding.ItemLoginLabelBinding
+import io.legado.app.databinding.ItemLoginToggleBinding
 import io.legado.app.databinding.ItemSourceEditBinding
 import io.legado.app.lib.dialogs.selector
+import io.legado.app.lib.theme.view.ThemeSwitch
 import io.legado.app.model.login.LoginUiV2
 import io.legado.app.utils.GSON
 import io.legado.app.utils.dpToPx
@@ -40,7 +42,9 @@ class SourceLoginV2Delegate(
     private var actionJob: Job? = null
     private val sessionValues = linkedMapOf<String, String>()
     private val fieldViews = linkedMapOf<String, ItemSourceEditBinding>()
+    private val toggleViews = linkedMapOf<String, ThemeSwitch>()
     private val buttonViews = hashMapOf<String, TextView>()
+    private val toggleActionViews = hashMapOf<String, ThemeSwitch>()
     private val buttonLabels = hashMapOf<String, String>()
     private val countdownLeft = hashMapOf<String, Int>()
     private val countdownTimers = hashMapOf<String, CountDownTimer>()
@@ -58,13 +62,16 @@ class SourceLoginV2Delegate(
         countdownTimers.values.forEach(CountDownTimer::cancel)
         countdownTimers.clear()
         fieldViews.clear()
+        toggleViews.clear()
         buttonViews.clear()
+        toggleActionViews.clear()
         binding.rotateLoading.gone()
     }
 
     private fun render(
         candidateState: String = stateJson,
         errors: Map<String, String>? = null,
+        restoreActionOnFailure: String? = null,
     ) {
         renderJob?.cancel()
         collectForm()
@@ -82,6 +89,7 @@ class SourceLoginV2Delegate(
             binding.rotateLoading.gone()
             val rows = result.getOrNull()?.first
             if (rows == null) {
+                restoreActionOnFailure?.let { setActionEnabled(it, true) }
                 val error = result.exceptionOrNull()
                 if (error == null) {
                     AppLog.put("登录UI v2 渲染结果格式错误")
@@ -106,7 +114,9 @@ class SourceLoginV2Delegate(
     private fun showRenderError() {
         binding.flexbox.removeAllViews()
         fieldViews.clear()
+        toggleViews.clear()
         buttonViews.clear()
+        toggleActionViews.clear()
         ItemLoginLabelBinding.inflate(inflater, binding.root, false).let {
             binding.flexbox.addView(it.root)
             it.root.setText(R.string.login_ui_v2_render_error)
@@ -116,7 +126,9 @@ class SourceLoginV2Delegate(
     private fun buildViews(rows: List<RowUi>, stored: Map<String, String>) {
         binding.flexbox.removeAllViews()
         fieldViews.clear()
+        toggleViews.clear()
         buttonViews.clear()
+        toggleActionViews.clear()
         buttonLabels.clear()
         rows.forEach { row ->
             when (row.type) {
@@ -124,6 +136,7 @@ class SourceLoginV2Delegate(
                 RowUi.Type.password -> addField(row, stored, password = true)
                 RowUi.Type.label -> addLabel(row)
                 RowUi.Type.select -> addSelect(row, stored)
+                RowUi.Type.toggle -> addToggle(row, stored)
                 RowUi.Type.button -> addButton(row)
             }
         }
@@ -201,10 +214,32 @@ class SourceLoginV2Delegate(
         }
     }
 
+    private fun addToggle(row: RowUi, stored: Map<String, String>) {
+        val key = requireNotNull(row.key)
+        ItemLoginToggleBinding.inflate(inflater, binding.root, false).let {
+            binding.flexbox.addView(it.root)
+            row.style().apply(it.root)
+            it.toggle.text = row.name
+            it.toggle.isChecked = LoginUiV2.resolveFieldValue(
+                row.value,
+                sessionValues[key],
+                stored[key],
+            ) == "true"
+            toggleViews[key] = it.toggle
+            row.action?.let { action ->
+                toggleActionViews[action] = it.toggle
+                it.toggle.setOnCheckedChangeListener { _, _ -> dispatch(action, null) }
+            }
+        }
+    }
+
     private fun collectForm(): Map<String, String> {
         val form = linkedMapOf<String, String>()
         fieldViews.forEach { (key, field) ->
             form[key] = field.editText.text?.toString().orEmpty()
+        }
+        toggleViews.forEach { (key, toggle) ->
+            form[key] = toggle.isChecked.toString()
         }
         sessionValues.putAll(form)
         return form
@@ -234,7 +269,7 @@ class SourceLoginV2Delegate(
         }
         clearErrors()
         val formJson = GSON.toJson(collectForm())
-        setButtonEnabled(action, false)
+        setActionEnabled(action, false)
         actionJob = scope.launch {
             val result = withContext(IO) {
                 runCatching {
@@ -244,9 +279,9 @@ class SourceLoginV2Delegate(
                 }.onFailure { ensureActive() }
             }
             ensureActive()
-            setButtonEnabled(action, true)
             val error = result.exceptionOrNull()
             if (error != null) {
+                setActionEnabled(action, true)
                 AppLog.put("登录UI v2 动作 $action 出错", error)
                 fragment.context?.toastOnUi(
                     fragment.getString(
@@ -258,6 +293,7 @@ class SourceLoginV2Delegate(
             }
             val command = LoginUiV2.parseActionResult(result.getOrNull())
             if (command.malformed) {
+                setActionEnabled(action, true)
                 AppLog.put("登录UI v2 动作 $action 返回了无效命令")
                 fragment.context?.toastOnUi(R.string.login_ui_v2_invalid_action)
                 return@launch
@@ -268,6 +304,7 @@ class SourceLoginV2Delegate(
             command.loginJson?.let { loginJson ->
                 val saved = withContext(IO) { source.putLoginInfo(loginJson) }
                 if (!saved) {
+                    setActionEnabled(action, true)
                     fragment.context?.toastOnUi(R.string.login_ui_v2_save_error)
                     return@launch
                 }
@@ -277,22 +314,30 @@ class SourceLoginV2Delegate(
                 fragment.dismissAllowingStateLoss()
                 return@launch
             }
+            val nextState = command.stateJson
+            if (nextState == null) {
+                setActionEnabled(action, true)
+            }
             if (errors.isEmpty() && countdownSeconds != null && countdownSeconds > 0) {
                 startCountdown(action, countdownSeconds)
             }
-            val nextState = command.stateJson
             if (nextState == null) {
                 applyErrors(errors)
             } else {
-                render(nextState, errors)
+                render(nextState, errors, action)
             }
         }
     }
 
-    private fun setButtonEnabled(action: String, enabled: Boolean) {
-        buttonViews[action]?.let {
+    private fun setActionEnabled(action: String, enabled: Boolean) {
+        toggleActionViews.values.forEach {
             it.isEnabled = enabled
             it.alpha = if (enabled) 1f else 0.5f
+        }
+        buttonViews[action]?.let {
+            val buttonEnabled = enabled && countdownLeft.getOrDefault(action, 0) <= 0
+            it.isEnabled = buttonEnabled
+            it.alpha = if (buttonEnabled) 1f else 0.5f
         }
     }
 

@@ -228,6 +228,21 @@ class LoginUiScriptEvaluatorTest {
         assertTrue(viewBuild > stateCommit)
         assertTrue(delegate.contains("if (!saved)"))
         assertTrue(delegate.indexOf("if (!saved)") < delegate.indexOf("if (command.close)"))
+        val dispatchStart = delegate.indexOf("private fun dispatch")
+        val actionResult = delegate.substring(
+            dispatchStart,
+            delegate.indexOf("private fun setActionEnabled", dispatchStart),
+        )
+        val resultReady = actionResult.indexOf("ensureActive()")
+        val resultError = actionResult.indexOf("val error = result.exceptionOrNull()")
+        val firstRestore = actionResult.indexOf("setActionEnabled(action, true)")
+        assertTrue(resultReady >= 0)
+        assertTrue(resultError > resultReady)
+        assertTrue(firstRestore > resultError)
+        assertTrue(actionResult.contains("render(nextState, errors, action)"))
+        assertTrue(delegate.contains("restoreActionOnFailure?.let { setActionEnabled(it, true) }"))
+        assertTrue(delegate.contains("setOnCheckedChangeListener { _, _ -> dispatch(action, null) }"))
+        assertFalse(delegate.contains("setOnUserCheckedChangeListener"))
 
         val destroyDelegate = dialog.indexOf("v2Delegate?.destroy()")
         val destroyView = dialog.indexOf("super.onDestroyView()", destroyDelegate)
