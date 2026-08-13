@@ -215,6 +215,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
             pageOwner.cancel()?.cancel()
             searchPool?.close()
             searchPool = null
+            rawSearchHits.clear()
             mSearchId = 0L
         }
     }

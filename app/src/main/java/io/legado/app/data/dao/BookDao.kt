@@ -122,7 +122,7 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE name = :name and author = :author")
     fun getBook(name: String, author: String): Book?
 
-    @Query("SELECT * FROM books WHERE trim(name) = trim(:name)")
+    @Query("SELECT * FROM books WHERE name = :name")
     fun getBooksByName(name: String): List<Book>
 
     @Query("""select distinct bs.* from books, book_sources bs 

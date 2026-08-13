@@ -1,14 +1,19 @@
 package io.legado.app.help.book
 
-import io.legado.app.constant.AppLog
 import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.SearchBook
-import io.legado.app.model.AudioPlay
-import io.legado.app.model.ReadBook
-import io.legado.app.model.ReadManga
 
+/**
+ * Shelf add + 「在架」badge. Does not delete or rewrite existing bookshelf rows.
+ *
+ * Future adds: a new empty/佚名 hit is skipped when that title already has exactly
+ * one web real author on the shelf. A new real author is always inserted; existing
+ * 佚名 rows stay put (avoids irreversible guess if a second author appears later).
+ * Local rows are never reused or REPLACE-deleted. If a local book already owns the
+ * unique (name, author) key, the web copy is not inserted.
+ */
 object SearchBookShelfHelp {
 
     data class AddResult(
@@ -33,87 +38,40 @@ object SearchBookShelfHelp {
 
         fun update(book: Book)
 
-        fun delete(book: Book)
-
         fun insertIgnore(book: Book): Boolean
-
-        /** Satellite retarget before delete (highlights/bookmarks). Default no-op for tests. */
-        fun onRetire(retired: Book, canonical: Book) {}
-
-        /** Remap (name, author) keys when author string changes in place. */
-        fun onAuthorKeyChange(name: String, oldAuthor: String, book: Book) {}
     }
 
     /**
-     * Resolve an on-shelf row for name/author[/url] (RFC-003 §4.8).
-     * Used by BookInfo and other getBook(name, author) call sites.
+     * Existing row to reuse when adding [name]/[author].
+     * Never returns a weak row for an incoming real author.
      */
-    fun findExistingOnShelf(name: String, author: String, bookUrl: String = ""): Book? {
+    fun findExistingToReuseOnAdd(name: String, author: String, bookUrl: String = ""): Book? {
         return resolveExisting(
             AppStore,
             SearchBook(bookUrl = bookUrl, name = name, author = author),
         )
     }
 
-    /** Same-name cleanup for title T (RFC-003 §4.10). */
-    fun cleanupSameName(name: String) {
-        appDb.runInTransaction {
-            coalesceSameName(AppStore, name)
-        }
-    }
-
-    /**
-     * Retire [incoming] into [canonical] with satellite retarget (RFC-003 §4.9).
-     * Does not insert chapters for the retired URL.
-     */
-    fun retireIncomingIntoCanonical(incoming: Book, canonical: Book) {
-        if (incoming.bookUrl == canonical.bookUrl) {
-            AppStore.update(canonical)
-            return
-        }
-        if (!BookAuthorIdentity.mayRetireShelfBook(incoming, canonical)) {
-            AppStore.update(canonical)
-            return
-        }
-        appDb.runInTransaction {
-            if (BookAuthorIdentity.preferProgress(incoming, canonical)) {
-                BookAuthorIdentity.copyProgress(incoming, canonical)
-            }
-            BookAuthorIdentity.fillBlanksFrom(canonical, incoming)
-            retargetActiveReading(incoming.bookUrl, canonical)
-            AppStore.onRetire(incoming, canonical)
-            if (AppStore.getBook(incoming.bookUrl) != null) {
-                AppStore.delete(incoming)
-            }
-            AppStore.update(canonical)
-            coalesceSameName(AppStore, canonical.name)
-        }
-    }
-
-    /**
-     * Keys for search/explore 「在架」徽章 (RFC-003 §4.8 / §4.11).
-     * Includes sole-real aliases so weak↔sole matches without treating multi-author titles as one.
-     */
     fun shelfBadgeKeys(books: Iterable<Book>): Set<String> {
         val visible = books.filter { !it.isNotShelf }
         val keys = linkedSetOf<String>()
         val byName = visible.groupBy { it.name.trim() }
-        for ((name, peers) in byName) {
-            if (name.isEmpty()) continue
+        for ((n, peers) in byName) {
+            if (n.isEmpty()) continue
             val sole = BookAuthorIdentity.soleRealAuthor(peers.map { it.author })
             for (book in peers) {
                 keys.add(book.bookUrl)
-                keys.add("$name-${book.author}")
+                keys.add("$n-${book.author}")
                 val eff = BookAuthorIdentity.effectiveAuthor(book.author)
                 if (eff.isNotEmpty()) {
-                    keys.add("$name-$eff")
+                    keys.add("$n-$eff")
                 } else {
-                    keys.add(name)
+                    keys.add(n)
                 }
             }
             if (sole != null) {
-                keys.add("$name-$sole")
-                keys.add("weak:$name")
+                keys.add("$n-$sole")
+                keys.add("weak:$n")
             }
         }
         return keys
@@ -152,10 +110,8 @@ object SearchBookShelfHelp {
         val addedBooks = arrayListOf<Book>()
         val booksToOrder = arrayListOf<Book>()
         books.forEach { searchBook ->
-            coalesceSameName(store, searchBook.name)
             val existingBook = resolveExisting(store, searchBook)
             if (existingBook != null) {
-                applyIncomingToExisting(existingBook, searchBook, store)
                 if (existingBook.isNotShelf) {
                     existingBook.removeType(BookType.notShelf)
                     if (existingBook.order == 0) {
@@ -170,34 +126,11 @@ object SearchBookShelfHelp {
 
             val newBook = searchBook.toBook().apply {
                 removeType(BookType.notShelf)
-                author = if (BookAuthorIdentity.isWeakAuthor(author)) "" else author.trim()
             }
-            // If sole real exists after normalizing, resolve again (should not insert).
-            coalesceSameName(store, newBook.name)
-            val again = resolveExisting(store, searchBook)
-            if (again != null) {
-                applyIncomingToExisting(again, searchBook, store)
-                if (again.isNotShelf) {
-                    again.removeType(BookType.notShelf)
-                    if (again.order == 0) booksToOrder.add(again) else store.update(again)
-                    addedBooks.add(again)
-                }
-                return@forEach
-            }
-            if (store.insertIgnore(newBook)) {
+            val persisted = persistNewBook(store, newBook) ?: return@forEach
+            if (persisted.bookUrl == newBook.bookUrl) {
                 addedBooks.add(newBook)
                 if (newBook.order == 0) booksToOrder.add(newBook)
-            } else {
-                val conflict = resolveExisting(store, searchBook)
-                    ?: store.getBook(newBook.bookUrl)
-                if (conflict != null) {
-                    applyIncomingToExisting(conflict, searchBook, store)
-                    if (conflict.isNotShelf) {
-                        conflict.removeType(BookType.notShelf)
-                        if (conflict.order == 0) booksToOrder.add(conflict) else store.update(conflict)
-                        addedBooks.add(conflict)
-                    }
-                }
             }
         }
         var nextOrder = minOrder - booksToOrder.size
@@ -213,126 +146,51 @@ object SearchBookShelfHelp {
     }
 
     /**
-     * Resolve shelf book for [searchBook] (RFC-003 §4.8).
+     * URL match, or same effective author, or incoming weak + sole web real already on shelf.
+     * Incoming real never reuses an existing weak row. Local rows are never reused
+     * for a different URL (web add must still insert).
      */
     internal fun resolveExisting(store: Store, searchBook: SearchBook): Book? {
         store.getBook(searchBook.bookUrl)?.let { return it }
-        val sameName = store.getBooksByName(searchBook.name)
-        if (sameName.isEmpty()) return null
-        val peerAuthors = sameName.map { it.author } + searchBook.author
-        // Exact effective match
         val want = BookAuthorIdentity.effectiveAuthor(searchBook.author)
-        sameName.firstOrNull {
-            BookAuthorIdentity.effectiveAuthor(it.author) == want
-        }?.let { return it }
-        // Sole-real weak↔real
-        val sole = BookAuthorIdentity.soleRealAuthor(peerAuthors) ?: return null
-        if (want.isEmpty() || want == sole) {
+        val sameName = store.getBooksByName(searchBook.name).filter { !it.isLocal }
+        if (want.isNotEmpty()) {
+            reusable(store.getBook(searchBook.name, searchBook.author))?.let { return it }
+            reusable(store.getBook(searchBook.name, want))?.let { return it }
             return sameName.firstOrNull {
-                BookAuthorIdentity.effectiveAuthor(it.author) == sole
-            } ?: sameName.firstOrNull { BookAuthorIdentity.isWeakAuthor(it.author) }
-        }
-        return null
-    }
-
-    private fun applyIncomingToExisting(
-        existing: Book,
-        searchBook: SearchBook,
-        store: Store,
-    ) {
-        val incomingReal = BookAuthorIdentity.effectiveAuthor(searchBook.author)
-        val existingReal = BookAuthorIdentity.effectiveAuthor(existing.author)
-        val oldAuthor = existing.author
-        if (existingReal.isEmpty() && incomingReal.isNotEmpty()) {
-            // §4.9.1: never write a colliding author key; never collide-fill local.
-            val conflict = store.getBook(existing.name, incomingReal)
-            val canFill = (conflict == null || conflict.bookUrl == existing.bookUrl) &&
-                !existing.isLocal
-            if (canFill) {
-                existing.author = incomingReal
+                BookAuthorIdentity.effectiveAuthor(it.author) == want
             }
         }
-        BookAuthorIdentity.fillBlanksFrom(
-            existing,
-            searchBook.toBook(),
-        )
-        store.update(existing)
-        if (oldAuthor != existing.author) {
-            store.onAuthorKeyChange(existing.name, oldAuthor, existing)
+        if (sameName.isEmpty()) return null
+        val sole = BookAuthorIdentity.soleRealAuthor(sameName.map { it.author })
+        if (sole != null) {
+            return sameName.firstOrNull {
+                BookAuthorIdentity.effectiveAuthor(it.author) == sole
+            }
         }
-        coalesceSameName(store, existing.name)
+        return sameName.firstOrNull { BookAuthorIdentity.isWeakAuthor(it.author) }
     }
 
     /**
-     * Collapse same-name weak+sole-real duplicates (RFC-003 §4.9–4.10).
-     * Never retires local books.
+     * Insert [book] without REPLACE-deleting another row.
+     * Placeholder authors are stored as empty so they do not collide with a local 「佚名」.
+     * @return the inserted book, an existing same-key web row, or null when a local unique key blocks insert.
      */
-    internal fun coalesceSameName(store: Store, name: String) {
-        val rows = store.getBooksByName(name)
-        if (rows.size < 2) return
-        val sole = BookAuthorIdentity.soleRealAuthor(rows.map { it.author })
-        if (sole == null) {
-            // |S|≥2: leave weaks alone (RFC-003 §4.4.4 / §4.8). |S|==0: collapse weaks.
-            if (BookAuthorIdentity.distinctRealAuthors(rows.map { it.author }).isNotEmpty()) {
-                return
-            }
-            val weaks = rows.filter { BookAuthorIdentity.isWeakAuthor(it.author) }
-            if (weaks.size < 2) return
-            val canonical = BookAuthorIdentity.pickCanonicalShelfBook(weaks) ?: return
-            retireOthers(store, weaks, canonical)
-            return
+    internal fun persistNewBook(store: Store, book: Book): Book? {
+        store.getBook(book.bookUrl)?.let {
+            store.update(book)
+            return book
         }
-        val canonical = BookAuthorIdentity.pickCanonicalShelfBook(rows) ?: return
-        // Ensure canonical holds sole author when safe
-        if (BookAuthorIdentity.effectiveAuthor(canonical.author) != sole) {
-            val holder = rows.firstOrNull {
-                BookAuthorIdentity.effectiveAuthor(it.author) == sole
-            }
-            if (holder != null && holder.bookUrl != canonical.bookUrl) {
-                // Prefer real-author row as canonical
-                retireOthers(store, rows, holder)
-                return
-            }
-            val conflict = store.getBook(canonical.name, sole)
-            if (conflict == null || conflict.bookUrl == canonical.bookUrl) {
-                if (!canonical.isLocal) {
-                    canonical.author = sole
-                    store.update(canonical)
-                }
-            }
+        if (BookAuthorIdentity.isWeakAuthor(book.author)) {
+            book.author = ""
         }
-        retireOthers(store, rows, BookAuthorIdentity.pickCanonicalShelfBook(store.getBooksByName(name)) ?: return)
+        if (store.insertIgnore(book)) return book
+        return reusable(store.getBook(book.name, book.author))
     }
 
-    private fun retireOthers(store: Store, rows: List<Book>, canonical: Book) {
-        var canon = canonical
-        for (other in rows) {
-            if (!BookAuthorIdentity.mayRetireShelfBook(other, canon)) continue
-            if (BookAuthorIdentity.preferProgress(other, canon)) {
-                BookAuthorIdentity.copyProgress(other, canon)
-            }
-            BookAuthorIdentity.fillBlanksFrom(canon, other)
-            retargetActiveReading(other.bookUrl, canon)
-            store.onRetire(other, canon)
-            store.delete(other)
-        }
-        if (canon.isNotShelf) {
-            canon.removeType(BookType.notShelf)
-        }
-        store.update(canon)
-    }
+    fun persistIncomingBook(book: Book): Book? = persistNewBook(AppStore, book)
 
-    private fun retargetActiveReading(fromUrl: String, to: Book) {
-        if (ReadBook.book?.bookUrl == fromUrl) {
-            ReadBook.book = to
-        }
-        if (AudioPlay.book?.bookUrl == fromUrl) {
-            AudioPlay.book = to
-        }
-        if (ReadManga.book?.bookUrl == fromUrl) {
-            ReadManga.book = to
-        }
-    }
+    private fun reusable(book: Book?): Book? = book?.takeUnless { it.isLocal }
 
     private object AppStore : Store {
         override val minOrder: Int
@@ -354,64 +212,14 @@ object SearchBookShelfHelp {
             book.update()
         }
 
-        override fun delete(book: Book) {
-            appDb.bookDao.delete(book)
-        }
-
         override fun insertIgnore(book: Book): Boolean {
             return appDb.bookDao.insertIgnore(book) != -1L
-        }
-
-        override fun onRetire(retired: Book, canonical: Book) {
-            try {
-                appDb.bookHighlightDao.retargetBook(
-                    fromUrl = retired.bookUrl,
-                    toUrl = canonical.bookUrl,
-                    bookName = canonical.name,
-                    bookAuthor = canonical.author,
-                )
-                if (retired.name != canonical.name || retired.author != canonical.author) {
-                    appDb.bookmarkDao.remapBook(
-                        oldName = retired.name,
-                        oldAuthor = retired.author,
-                        newName = canonical.name,
-                        newAuthor = canonical.author,
-                    )
-                }
-            } catch (e: Exception) {
-                AppLog.put("RFC-003 retire retarget failed\n${e.localizedMessage}", e)
-                throw e
-            }
-        }
-
-        override fun onAuthorKeyChange(name: String, oldAuthor: String, book: Book) {
-            if (oldAuthor == book.author) return
-            try {
-                appDb.bookmarkDao.remapBook(
-                    oldName = name,
-                    oldAuthor = oldAuthor,
-                    newName = book.name,
-                    newAuthor = book.author,
-                )
-                appDb.bookHighlightDao.updateBookMetadata(
-                    bookUrl = book.bookUrl,
-                    bookName = book.name,
-                    bookAuthor = book.author,
-                )
-            } catch (e: Exception) {
-                AppLog.put("RFC-003 author key remap failed\n${e.localizedMessage}", e)
-                throw e
-            }
         }
     }
 }
 
 internal fun Book.isSameShelfIdentity(other: Book): Boolean {
-    if (bookUrl.isNotBlank() && bookUrl == other.bookUrl) return true
-    if (!BookAuthorIdentity.equalName(name, other.name)) return false
-    // Without full same-name peers, only effective-author equality is safe.
-    return BookAuthorIdentity.effectiveAuthor(author) ==
-        BookAuthorIdentity.effectiveAuthor(other.author)
+    return (bookUrl.isNotBlank() && bookUrl == other.bookUrl) || isSameNameAuthor(other)
 }
 
 internal fun mergeActiveShelfBook(activeBook: Book?, shelfBook: Book): Book? {

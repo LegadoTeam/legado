@@ -57,13 +57,6 @@ interface BookmarkDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insert(vararg bookmark: Bookmark)
 
-    /** RFC-003: remap (bookName, bookAuthor) keys when canonical author changes. */
-    @Query(
-        """update bookmarks set bookName = :newName, bookAuthor = :newAuthor
-        where bookName = :oldName and bookAuthor = :oldAuthor"""
-    )
-    fun remapBook(oldName: String, oldAuthor: String, newName: String, newAuthor: String)
-
     @Update
     fun update(bookmark: Bookmark)
 

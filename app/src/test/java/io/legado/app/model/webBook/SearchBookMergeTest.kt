@@ -111,12 +111,14 @@ class SearchBookMergeTest {
     }
 
     @Test
-    fun rebuildMergesYimingIntoSoleRealAndKeepsOrigins() {
+    fun rebuildPrefersRealAuthorUrlWhenWeakArrivesFirst() {
         val yiming = book("高考后", "佚名", "https://popofree.com")
         val real = book("高考后", "七月观天", "https://good.com")
         val merged = SearchBookMerge.rebuildFromRawHits(listOf(yiming, real))
         assertEquals(1, merged.size)
         assertEquals("七月观天", merged.single().author)
+        assertEquals("https://good.com/高考后", merged.single().bookUrl)
+        assertEquals("https://good.com", merged.single().origin)
         assertTrue(merged.single().origins.contains("https://popofree.com"))
         assertTrue(merged.single().origins.contains("https://good.com"))
     }

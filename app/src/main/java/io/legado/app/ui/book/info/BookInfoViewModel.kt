@@ -20,13 +20,13 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.exception.NoBooksDirException
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppWebDav
-import io.legado.app.help.book.BookAuthorIdentity
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.SearchBookShelfHelp
 import io.legado.app.help.book.getExportFileName
 import io.legado.app.help.book.getRemoteUrl
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isNotShelf
+import io.legado.app.help.book.isSameNameAuthor
 import io.legado.app.help.book.isWebFile
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.savePreservingCustomCoverUrl
@@ -117,19 +117,17 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             val name = intent.getStringExtra("name") ?: ""
             val author = intent.getStringExtra("author") ?: ""
             val bookUrl = intent.getStringExtra("bookUrl") ?: ""
+            appDb.bookDao.getBook(name, author)?.let {
+                inBookshelf = !it.isNotShelf
+                upBook(it)
+                return@execute
+            }
             if (bookUrl.isNotBlank()) {
                 appDb.bookDao.getBook(bookUrl)?.let {
                     inBookshelf = !it.isNotShelf
                     upBook(it)
                     return@execute
                 }
-            }
-            SearchBookShelfHelp.findExistingOnShelf(name, author, bookUrl)?.let {
-                inBookshelf = !it.isNotShelf
-                upBook(it)
-                return@execute
-            }
-            if (bookUrl.isNotBlank()) {
                 appDb.searchBookDao.getSearchBook(bookUrl)?.toBook()?.let {
                     upBook(it)
                     return@execute
@@ -150,7 +148,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         execute {
             val name = intent.getStringExtra("name") ?: ""
             val author = intent.getStringExtra("author") ?: ""
-            SearchBookShelfHelp.findExistingOnShelf(name, author)?.let { book ->
+            appDb.bookDao.getBook(name, author)?.let { book ->
                 upBook(book)
             }
         }
@@ -508,25 +506,19 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             if (book.order == 0) {
                 book.order = appDb.bookDao.minOrder - 1
             }
-            SearchBookShelfHelp.findExistingOnShelf(book.name, book.author, book.bookUrl)?.let {
-                if (BookAuthorIdentity.preferProgress(it, book)) {
-                    BookAuthorIdentity.copyProgress(it, book)
-                } else if (!BookAuthorIdentity.hasProgress(book) && BookAuthorIdentity.hasProgress(it)) {
-                    BookAuthorIdentity.copyProgress(it, book)
-                }
+            appDb.bookDao.getBook(book.name, book.author)?.let {
+                book.durChapterIndex = it.durChapterIndex
+                book.durChapterPos = it.durChapterPos
+                book.durChapterTitle = it.durChapterTitle
             }
             if (preserveCustomCoverUrl) {
                 book.savePreservingCustomCoverUrl()
             } else {
                 book.save()
             }
-            if (ReadBook.book?.let {
-                    it.bookUrl == book.bookUrl || BookAuthorIdentity.sameEffectiveIdentity(it, book)
-                } == true) {
+            if (ReadBook.book?.isSameNameAuthor(book) == true) {
                 ReadBook.book = book
-            } else if (AudioPlay.book?.let {
-                    it.bookUrl == book.bookUrl || BookAuthorIdentity.sameEffectiveIdentity(it, book)
-                } == true) {
+            } else if (AudioPlay.book?.isSameNameAuthor(book) == true) {
                 AudioPlay.book = book
             }
         }.onSuccess {
@@ -546,104 +538,67 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
 
     fun addToBookshelf(success: (() -> Unit)?) { //点击书架按钮或在加分组时触发
         execute {
-            var chapterTargetUrl: String? = null
+            var skipIncomingChapters = false
+            var onShelf = false
             bookData.value?.let { book ->
                 book.removeType(BookType.notShelf)
                 if (book.order == 0) {
                     book.order = appDb.bookDao.minOrder - 1
                 }
-                if (BookAuthorIdentity.isWeakAuthor(book.author)) {
-                    book.author = ""
-                }
-                val existing = SearchBookShelfHelp.findExistingOnShelf(
+                val reuse = SearchBookShelfHelp.findExistingToReuseOnAdd(
                     book.name,
                     book.author,
                     book.bookUrl,
                 )
-                val target = if (existing != null && existing.bookUrl != book.bookUrl) {
-                    existing.removeType(BookType.notShelf)
-                    if (existing.order == 0) {
-                        existing.order = book.order
+                val target = if (reuse != null && reuse.bookUrl != book.bookUrl) {
+                    skipIncomingChapters = true
+                    reuse.removeType(BookType.notShelf)
+                    if (reuse.order == 0) {
+                        reuse.order = book.order
                     }
-                    val incomingReal = BookAuthorIdentity.effectiveAuthor(book.author)
-                    val oldAuthor = existing.author
-                    if (BookAuthorIdentity.isWeakAuthor(existing.author) &&
-                        incomingReal.isNotEmpty() &&
-                        !existing.isLocal
-                    ) {
-                        val conflict = appDb.bookDao.getBook(existing.name, incomingReal)
-                        if (conflict == null || conflict.bookUrl == existing.bookUrl) {
-                            existing.author = incomingReal
-                        }
-                    }
-                    BookAuthorIdentity.fillBlanksFrom(existing, book)
-                    if (BookAuthorIdentity.preferProgress(book, existing)) {
-                        BookAuthorIdentity.copyProgress(book, existing)
-                    }
-                    existing.savePreservingCustomCoverUrl()
-                    if (oldAuthor != existing.author) {
-                        runCatching {
-                            appDb.bookmarkDao.remapBook(
-                                oldName = existing.name,
-                                oldAuthor = oldAuthor,
-                                newName = existing.name,
-                                newAuthor = existing.author,
-                            )
-                            appDb.bookHighlightDao.updateBookMetadata(
-                                bookUrl = existing.bookUrl,
-                                bookName = existing.name,
-                                bookAuthor = existing.author,
-                            )
-                        }.onFailure {
-                            AppLog.put("书架合并后书签/高亮 remap 失败\n${it.localizedMessage}", it)
-                        }
-                    }
-                    appDb.bookDao.getBook(book.bookUrl)?.let { incomingRow ->
-                        SearchBookShelfHelp.retireIncomingIntoCanonical(incomingRow, existing)
-                    }
-                    bookData.postValue(existing)
-                    existing
+                    reuse.savePreservingCustomCoverUrl()
+                    bookData.postValue(reuse)
+                    onShelf = true
+                    reuse
                 } else {
-                    SearchBookShelfHelp.findExistingOnShelf(
-                        book.name,
-                        book.author,
-                        book.bookUrl,
-                    )?.let {
-                        if (BookAuthorIdentity.preferProgress(it, book)) {
-                            BookAuthorIdentity.copyProgress(it, book)
-                        } else if (!BookAuthorIdentity.hasProgress(book) &&
-                            BookAuthorIdentity.hasProgress(it)
-                        ) {
-                            BookAuthorIdentity.copyProgress(it, book)
+                    appDb.bookDao.getBook(book.name, book.author)?.let { existing ->
+                        if (existing.bookUrl == book.bookUrl) {
+                            book.durChapterIndex = existing.durChapterIndex
+                            book.durChapterPos = existing.durChapterPos
+                            book.durChapterTitle = existing.durChapterTitle
                         }
                     }
-                    book.savePreservingCustomCoverUrl()
-                    book
+                    val persisted = SearchBookShelfHelp.persistIncomingBook(book)
+                    if (persisted == null || persisted.bookUrl != book.bookUrl) {
+                        skipIncomingChapters = true
+                    }
+                    if (persisted != null && persisted.bookUrl != book.bookUrl) {
+                        persisted.removeType(BookType.notShelf)
+                        persisted.savePreservingCustomCoverUrl()
+                        bookData.postValue(persisted)
+                    }
+                    onShelf = persisted != null
+                    persisted ?: book
                 }
-                chapterTargetUrl = target.bookUrl
-                if (ReadBook.book?.let {
-                        it.bookUrl == book.bookUrl ||
-                            it.bookUrl == target.bookUrl ||
-                            BookAuthorIdentity.sameEffectiveIdentity(it, target)
-                    } == true) {
-                    ReadBook.book = target
-                } else if (AudioPlay.book?.let {
-                        it.bookUrl == book.bookUrl ||
-                            it.bookUrl == target.bookUrl ||
-                            BookAuthorIdentity.sameEffectiveIdentity(it, target)
-                    } == true) {
-                    AudioPlay.book = target
+                if (onShelf) {
+                    if (ReadBook.book?.bookUrl == target.bookUrl ||
+                        ReadBook.book?.isSameNameAuthor(target) == true
+                    ) {
+                        ReadBook.book = target
+                    } else if (AudioPlay.book?.bookUrl == target.bookUrl ||
+                        AudioPlay.book?.isSameNameAuthor(target) == true
+                    ) {
+                        AudioPlay.book = target
+                    }
+                    SourceCallBack.callBackBook(SourceCallBack.ADD_BOOK_SHELF, bookSource, target)
                 }
-                SearchBookShelfHelp.cleanupSameName(target.name)
-                SourceCallBack.callBackBook(SourceCallBack.ADD_BOOK_SHELF, bookSource, target)
             }
-            chapterListData.value?.let { chapters ->
-                val url = chapterTargetUrl ?: return@let
-                if (chapters.isNotEmpty() && chapters.all { it.bookUrl == url }) {
-                    appDb.bookChapterDao.insert(*chapters.toTypedArray())
+            if (!skipIncomingChapters) {
+                chapterListData.value?.let {
+                    appDb.bookChapterDao.insert(*it.toTypedArray())
                 }
             }
-            inBookshelf = true
+            inBookshelf = onShelf
         }.onSuccess {
             success?.invoke()
         }

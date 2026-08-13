@@ -12,7 +12,6 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
-import io.legado.app.help.book.SearchBookShelfHelp
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.getBookSource
 import io.legado.app.help.book.isNotShelf
@@ -61,11 +60,6 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
                 }
                 if (appDb.bookDao.insertIgnore(temporaryBook) == -1L) {
                     val concurrentBook = appDb.bookDao.getBook(requestedBookUrl)
-                        ?: SearchBookShelfHelp.findExistingOnShelf(
-                            targetBook.name,
-                            targetBook.author,
-                            requestedBookUrl,
-                        )
                         ?: return@execute null
                     databaseBook = concurrentBook
                     targetBook = concurrentBook
