@@ -48,6 +48,7 @@ class WebViewRequestConfigTest {
         val headers = linkedMapOf(
             "User-Agent" to "source-agent",
             "cookiejar" to "enabled",
+            "PrOxY" to "socks5://127.0.0.1:1080",
             "Cookie" to "session=one",
             "Authorization" to "Bearer token",
             "X-Requested-With" to "source-client",

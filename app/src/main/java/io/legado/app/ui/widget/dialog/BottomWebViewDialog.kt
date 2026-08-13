@@ -706,6 +706,16 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                         }
                     }
                 }
+                appDb.bookSourceDao.getBookSource(sourceKey).let {
+                    if (it == null) {
+                        withContext(Dispatchers.Main) {
+                            activity?.toastOnUi("no find bookSource")
+                            dismiss()
+                        }
+                        return@launch
+                    }
+                    source = it
+                }
                 val analyzeUrl =
                     AnalyzeUrl(url, source = source, coroutineContext = coroutineContext)
                 val html = args.getString("html") ?: analyzeUrl.getStrResponseAwait().body
@@ -728,16 +738,6 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                     } else {
                         JS_URL + html
                     }
-                }
-                appDb.bookSourceDao.getBookSource(sourceKey).let {
-                    if (it == null) {
-                        withContext(Dispatchers.Main) {
-                            activity?.toastOnUi("no find bookSource")
-                            dismiss()
-                        }
-                        return@launch
-                    }
-                    source = it
                 }
                 val bookType = args.getInt("bookType", 0)
                 withContext(Dispatchers.Main) {

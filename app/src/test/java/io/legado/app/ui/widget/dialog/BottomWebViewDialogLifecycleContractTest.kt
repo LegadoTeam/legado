@@ -74,6 +74,18 @@ class BottomWebViewDialogLifecycleContractTest {
     }
 
     @Test
+    fun `source is loaded before the initial request`() {
+        val onViewCreated = section("override fun onViewCreated", "private fun initWebView")
+
+        val loadSource = onViewCreated.indexOf("appDb.bookSourceDao.getBookSource(sourceKey)")
+        val analyzeUrl = onViewCreated.indexOf("AnalyzeUrl(url, source = source")
+        val request = onViewCreated.indexOf("analyzeUrl.getStrResponseAwait()")
+        assertTrue(loadSource >= 0)
+        assertTrue(analyzeUrl > loadSource)
+        assertTrue(request > analyzeUrl)
+    }
+
+    @Test
     fun `bottom sheet references follow the current dialog`() {
         val fields = section("private val binding", "private val displayMetrics")
 

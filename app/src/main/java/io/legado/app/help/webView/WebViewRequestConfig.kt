@@ -10,7 +10,7 @@ internal data class WebViewRequestConfig(
 
 /**
  * User-Agent belongs to WebSettings so redirects and subresources use it consistently.
- * CookieJar is an internal OkHttp switch and must never be sent to a website.
+ * CookieJar and proxy are internal network options and must never be sent to a website.
  */
 internal fun Map<String, String>?.toWebViewRequestConfig(
     defaultUserAgent: String
@@ -26,6 +26,7 @@ internal fun Map<String, String>?.toWebViewRequestConfig(
     this?.forEach { (name, value) ->
         if (!name.equals(AppConst.UA_NAME, ignoreCase = true)
             && !name.equals(cookieJarHeader, ignoreCase = true)
+            && !name.equals("proxy", ignoreCase = true)
         ) {
             additionalHeaders[name] = value
         }
