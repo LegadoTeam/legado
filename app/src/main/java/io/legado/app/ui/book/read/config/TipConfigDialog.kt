@@ -80,6 +80,11 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
             ReadTipConfig.getHeaderModes(requireContext())[ReadTipConfig.headerMode]
         binding.tvFooterShow.text =
             ReadTipConfig.getFooterModes(requireContext())[ReadTipConfig.footerMode]
+        binding.dsbTipTextSize.valueFormat = {
+            tipTextSizeFromProgress(it).toString()
+        }
+        binding.dsbTipTextSize.progress =
+            tipTextSizeToProgress(ReadTipConfig.tipTextSize)
 
         initTipValues()
         upTvTipColor()
@@ -273,6 +278,10 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
                 ) { tipFooterRightTemplate = it }
             }
         }
+        dsbTipTextSize.onChanged = {
+            ReadTipConfig.tipTextSize = tipTextSizeFromProgress(it)
+            postEvent(EventBus.UP_CONFIG, arrayListOf(2))
+        }
         llTipColor.setOnClickListener {
             context?.selector(items = ReadTipConfig.tipColorNames) { _, i ->
                 when (i) {
@@ -359,4 +368,14 @@ internal fun titleNumberSpacingToProgress(spacing: Int): Int {
 internal fun titleNumberSpacingFromProgress(progress: Int): Int {
     return (progress + TITLE_NUMBER_SPACING_MIN)
         .coerceIn(TITLE_NUMBER_SPACING_MIN, TITLE_NUMBER_SPACING_MAX)
+}
+
+internal fun tipTextSizeToProgress(textSize: Int): Int {
+    return textSize.coerceIn(ReadTipConfig.minTextSize, ReadTipConfig.maxTextSize) -
+        ReadTipConfig.minTextSize
+}
+
+internal fun tipTextSizeFromProgress(progress: Int): Int {
+    return (progress + ReadTipConfig.minTextSize)
+        .coerceIn(ReadTipConfig.minTextSize, ReadTipConfig.maxTextSize)
 }

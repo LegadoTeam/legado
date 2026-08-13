@@ -200,7 +200,7 @@ class PageView(context: Context) : FrameLayout(context) {
             readerInfoView.view.apply {
                 isBattery = false
                 typeface = ChapterProvider.typeface
-                textSize = 12f
+                textSize = ReadTipConfig.tipTextSize.toFloat()
             }
         }
     }

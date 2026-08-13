@@ -7,6 +7,8 @@ import splitties.init.appCtx
 @Suppress("ConstPropertyName")
 object ReadTipConfig {
 
+    const val minTextSize = 5
+    const val maxTextSize = 50
     const val none = 0
     const val chapterTitle = 1
     const val time = 2
@@ -115,6 +117,12 @@ object ReadTipConfig {
         get() = ReadBookConfig.config.footerMode
         set(value) {
             ReadBookConfig.config.footerMode = value
+        }
+
+    var tipTextSize: Int
+        get() = ReadBookConfig.config.tipTextSize.coerceIn(minTextSize, maxTextSize)
+        set(value) {
+            ReadBookConfig.config.tipTextSize = value.coerceIn(minTextSize, maxTextSize)
         }
 
     var tipColor: Int

@@ -542,6 +542,7 @@ object ReadBookConfig {
             exportConfig.tipFooterLeftTemplate = shareConfig.tipFooterLeftTemplate
             exportConfig.tipFooterMiddleTemplate = shareConfig.tipFooterMiddleTemplate
             exportConfig.tipFooterRightTemplate = shareConfig.tipFooterRightTemplate
+            exportConfig.tipTextSize = shareConfig.tipTextSize
             exportConfig.tipColor = shareConfig.tipColor
             exportConfig.headerMode = shareConfig.headerMode
             exportConfig.footerMode = shareConfig.footerMode
@@ -690,6 +691,7 @@ object ReadBookConfig {
         var tipFooterLeftTemplate: String? = null,
         var tipFooterMiddleTemplate: String? = null,
         var tipFooterRightTemplate: String? = null,
+        var tipTextSize: Int = 12,
         var tipColor: Int = 0,
         var tipDividerColor: Int = -1,
         var headerMode: Int = 0,
@@ -987,6 +989,7 @@ object ReadBookConfig {
             "tipFooterLeft" to tipFooterLeft,
             "tipFooterMiddle" to tipFooterMiddle,
             "tipFooterRight" to tipFooterRight,
+            "tipTextSize" to tipTextSize,
             "tipColor" to tipColor,
             "tipDividerColor" to tipDividerColor,
             "headerMode" to headerMode,

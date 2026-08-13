@@ -413,6 +413,14 @@
             android:text="@string/header_footer"
             android:textSize="18sp" />
 
+        <io.legado.app.ui.widget.DetailSeekBar
+            android:id="@+id/dsb_tip_text_size"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="3dp"
+            app:max="45"
+            app:title="@string/text_size" />
+
         <LinearLayout
             android:id="@+id/ll_tip_color"
             android:layout_width="match_parent"
