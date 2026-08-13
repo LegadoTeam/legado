@@ -44,6 +44,7 @@ zxingLite = "3.5.0"
 #不要更新版本
 #noinspection NewerVersionAvailable
 hutool = "5.8.22"
+bouncycastle = "1.75"
 
 #noinspection NewerVersionAvailable
 protobufJavalite = "3.25.9"
@@ -111,6 +112,7 @@ fragment-testing = { module = "androidx.fragment:fragment-testing", version.ref 
 androidx-junit = { module = "androidx.test.ext:junit", version = "1.3.0" }
 
 hutool-crypto = { module = "cn.hutool:hutool-crypto", version.ref = "hutool" }
+bouncycastle-provider = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
 
 libarchive = { module = "me.zhanghai.android.libarchive:library", version.ref = "libarchive" }
 lifecycle-common-java8 = { module = "androidx.lifecycle:lifecycle-common-java8", version.ref = "lifecycle" }
