@@ -69,6 +69,13 @@ interface BookHighlightDao {
     )
     fun updateBookMetadata(bookUrl: String, bookName: String, bookAuthor: String)
 
+    /** RFC-003: move highlights off a retired bookUrl onto the canonical row. */
+    @Query(
+        """update highlights set bookUrl = :toUrl, bookName = :bookName, bookAuthor = :bookAuthor
+        where bookUrl = :fromUrl"""
+    )
+    fun retargetBook(fromUrl: String, toUrl: String, bookName: String, bookAuthor: String)
+
     @Update
     fun update(highlight: BookHighlight)
 

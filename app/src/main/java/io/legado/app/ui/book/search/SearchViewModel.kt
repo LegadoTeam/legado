@@ -11,6 +11,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.data.entities.SearchKeyword
 import io.legado.app.help.book.ReadRecordIndex
+import io.legado.app.help.book.SearchBookShelfHelp
 import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.config.AppConfig
 import io.legado.app.model.webBook.SearchModel
@@ -89,14 +90,7 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
         }
         execute {
             appDb.bookDao.flowAll().mapLatest { books ->
-                val keys = arrayListOf<String>()
-                books.filterNot { it.isNotShelf }
-                    .forEach {
-                        keys.add("${it.name}-${it.author}")
-                        keys.add(it.name)
-                        keys.add(it.bookUrl)
-                    }
-                keys
+                SearchBookShelfHelp.shelfBadgeKeys(books).toList()
             }.catch {
                 AppLog.put("搜索界面获取书籍列表失败\n${it.localizedMessage}", it)
             }.collect {
@@ -110,11 +104,7 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
     }
 
     fun isInBookShelf(book: SearchBook): Boolean {
-        val name = book.name
-        val author = book.author
-        val bookUrl = book.bookUrl
-        val key = if (author.isNotBlank()) "$name-$author" else name
-        return bookshelf.contains(key) || bookshelf.contains(bookUrl)
+        return SearchBookShelfHelp.isInShelfBadgeIndex(book, bookshelf)
     }
 
     fun hasReadRecord(book: SearchBook): Boolean {

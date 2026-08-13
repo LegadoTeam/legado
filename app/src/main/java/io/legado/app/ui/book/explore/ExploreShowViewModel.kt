@@ -56,14 +56,7 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
     init {
         execute {
             appDb.bookDao.flowAll().mapLatest { books ->
-                val keys = arrayListOf<String>()
-                books.filterNot { it.isNotShelf }
-                    .forEach {
-                        keys.add("${it.name}-${it.author}")
-                        keys.add(it.name)
-                        keys.add(it.bookUrl)
-                    }
-                keys
+                SearchBookShelfHelp.shelfBadgeKeys(books).toList()
             }.catch {
                 AppLog.put("发现列表界面获取书籍数据失败\n${it.localizedMessage}", it)
             }.collect {
@@ -256,11 +249,7 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
     }
 
     fun isInBookShelf(book: SearchBook): Boolean {
-        val name = book.name
-        val author = book.author
-        val bookUrl = book.bookUrl
-        val key = if (author.isNotBlank()) "$name-$author" else name
-        return bookshelf.contains(key) || bookshelf.contains(bookUrl)
+        return SearchBookShelfHelp.isInShelfBadgeIndex(book, bookshelf)
     }
 
     private data class ShelfState(
