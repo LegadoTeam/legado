@@ -995,10 +995,11 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
 
             binding.tvTime.text = item.time.orEmpty()
             binding.tvTime.visibility = if (item.time.isNullOrBlank()) View.GONE else View.VISIBLE
-            if (!item.isReply) {
+            val likeCount = item.likeCount
+            val showLikeArea = !item.isReply || (likeCount != null && likeCount > 0)
+            if (showLikeArea) {
                 binding.ivLike.visible()
                 binding.llLikeArea.visible()
-                val likeCount = item.likeCount
                 if (likeCount != null && likeCount > 0) {
                     binding.tvLikeCount.text = likeCount.toString()
                     binding.tvLikeCount.visible()

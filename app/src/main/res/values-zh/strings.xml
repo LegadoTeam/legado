@@ -1237,7 +1237,7 @@
     <string name="rule_review_reply_avatar">子评论头像（replyAvatarRule）</string>
     <string name="rule_review_reply_name">子评论昵称（replyNameRule）</string>
     <string name="rule_review_reply_badge">子评论徽章（replyBadgeRule）</string>
-    <string name="rule_review_reply_content">子评论内容协议（replyContentRule：text/img/audio/time）</string>
+    <string name="rule_review_reply_content">子评论内容协议（replyContentRule：text/img/audio/time/likeCount）</string>
     <string name="rule_review_url">段评URL（reviewUrl）</string>
     <string name="rule_avatar">段评发布者头像（avatarRule）</string>
     <string name="rule_review_content">段评内容（contentRule）</string>

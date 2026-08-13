@@ -87,7 +87,7 @@ class ReviewRuleParserTest {
                           "avatar": "/reply.png",
                           "name": "Bob",
                           "badges": "reader|top",
-                          "content": "Reply"
+                          "content": "{\"text\":\"Reply\",\"likeCount\":3}"
                         }
                       ]
                     },
@@ -143,7 +143,7 @@ class ReviewRuleParserTest {
                 assertEquals("Bob", name)
                 assertEquals(listOf("reader", "top"), badges)
                 assertEquals("Reply", content)
-                assertEquals(null, likeCount)
+                assertEquals(3, likeCount)
                 assertEquals(null, replyCount)
             }
         }
@@ -162,7 +162,7 @@ class ReviewRuleParserTest {
                         "avatar": "/reply.png",
                         "name": "Bob",
                         "badges": ["reader", "top"],
-                        "content": "{\"text\":\"Reply\",\"img\":\"/reply.jpg\",\"time\":\"now\"}"
+                        "content": "{\"text\":\"Reply\",\"img\":\"/reply.jpg\",\"time\":\"now\",\"likeCount\":4}"
                       }
                     ]
                   }
@@ -194,6 +194,7 @@ class ReviewRuleParserTest {
             assertEquals("Reply", content)
             assertEquals("https://example.com/reply.jpg", imageUrl)
             assertEquals("now", time)
+            assertEquals(4, likeCount)
             assertTrue(this.replies.isEmpty())
         }
     }

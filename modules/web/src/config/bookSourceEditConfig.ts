@@ -615,7 +615,7 @@ export default {
         namespace: 'ruleReview',
         id: 'replyContentRule',
         type: 'String',
-        hint: 'text/img/audio/time',
+        hint: 'text/img/audio/time/likeCount',
       },
     ],
   },

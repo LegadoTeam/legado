@@ -1242,7 +1242,7 @@
     <string name="rule_review_reply_avatar">Reply avatar (replyAvatarRule)</string>
     <string name="rule_review_reply_name">Reply name (replyNameRule)</string>
     <string name="rule_review_reply_badge">Reply badge (replyBadgeRule)</string>
-    <string name="rule_review_reply_content">Reply content protocol (replyContentRule: text/img/audio/time)</string>
+    <string name="rule_review_reply_content">Reply content protocol (replyContentRule: text/img/audio/time/likeCount)</string>
     <string name="rule_avatar">段评发布者头像（avatarRule）</string>
     <string name="rule_review_url">段评URL（reviewUrl）</string>
     <string name="rule_review_content">Paragraph review content（contentRule）</string>

@@ -65,6 +65,22 @@ class ReviewDetailMediaSourceTest {
     }
 
     @Test
+    fun `reply likes are shown only for positive counts`() {
+        val binding = dialogSource()
+            .substringAfter("binding.tvTime.text = item.time.orEmpty()")
+            .substringBefore("private fun bindReviewImage")
+
+        assertTrue(
+            binding.contains(
+                "val showLikeArea = !item.isReply || (likeCount != null && likeCount > 0)"
+            )
+        )
+        assertTrue(binding.contains("if (showLikeArea)"))
+        assertTrue(binding.contains("binding.llLikeArea.visible()"))
+        assertTrue(binding.contains("binding.llLikeArea.gone()"))
+    }
+
+    @Test
     fun `review image restores its cached aspect ratio before reloading`() {
         val binding = dialogSource()
             .substringAfter("private fun bindReviewImage(")

@@ -272,7 +272,7 @@ internal object ReviewRuleParser {
             imageUrl = protocol?.imageUrl,
             audioUrl = protocol?.audioUrl,
             time = protocol?.time,
-            likeCount = if (isReply) null else protocol?.likeCount,
+            likeCount = protocol?.likeCount,
             replyCount = if (isReply) null else protocol?.replyCount,
             replies = replies,
         )
