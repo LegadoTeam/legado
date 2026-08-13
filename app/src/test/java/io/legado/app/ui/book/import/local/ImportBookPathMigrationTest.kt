@@ -143,21 +143,52 @@ class ImportBookPathMigrationTest {
         ).substringAfter("override fun onClickSelectBarMainAction()")
             .substringBefore("private fun initView()")
 
+        assertTrue(localBook.contains("val importedUris = linkedSetOf<Uri>()"))
+        assertTrue(localBook.contains("onBookImported = importedBooks::add"))
         assertTrue(localBook.contains("importedUris.add(uri)"))
         assertTrue(localBook.contains("var firstError: Throwable? = null"))
         assertTrue(localBook.contains("if (firstError == null) firstError = it"))
         assertTrue(localBook.contains("throw firstError"))
-        assertTrue(localBook.contains("if (importedUris.isEmpty())"))
-        assertTrue(localBook.contains("return importedUris"))
+        assertTrue(localBook.contains("if (importedBooks.isEmpty())"))
+        assertTrue(localBook.contains("return importedUris to importedBooks"))
         assertTrue(
             localBook.indexOf("kotlin.runCatching") <
                     localBook.indexOf("FileDoc.fromUri(uri, false)")
         )
-        assertTrue(viewModel.contains(".onSuccess { importedUris ->"))
+        assertTrue(viewModel.contains(".onSuccess { (importedUris, importedBookCount, groupError) ->"))
         assertFalse(viewModel.contains(".onFinally"))
         assertTrue(viewModel.contains("it.localizedMessage"))
         assertTrue(viewModel.contains("importedUris.size == fileUris.size"))
         assertTrue(activity.contains("it.file.uri in importedUris"))
+    }
+
+    @Test
+    fun `batch import groups only successful book products`() {
+        val localBook = readProjectFile(
+            "src/main/java/io/legado/app/model/localBook/LocalBook.kt"
+        )
+        val viewModel = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/import/local/ImportBookViewModel.kt"
+        )
+        val activity = readProjectFile(
+            "src/main/java/io/legado/app/ui/book/import/local/ImportBookActivity.kt"
+        )
+
+        assertTrue(localBook.contains("onBookImported: (Book) -> Unit = {}"))
+        assertTrue(localBook.contains("}.also(onBookImported)"))
+        assertTrue(viewModel.contains("appDb.runInTransaction"))
+        assertTrue(viewModel.contains("if (!groupDao.canAddGroup)"))
+        assertTrue(viewModel.contains("groupDao.getUnusedId()"))
+        assertTrue(viewModel.contains("groupName = name"))
+        assertTrue(viewModel.contains("val (importedUris, importedBooks)"))
+        assertTrue(viewModel.contains("*importedBooks.map"))
+        assertTrue(viewModel.contains("it.copy(group = it.group or groupId)"))
+        assertTrue(viewModel.contains("}.exceptionOrNull()"))
+        assertTrue(viewModel.contains("Triple(importedUris, importedBooks.size, groupError)"))
+        assertTrue(activity.contains("selected.size < 2 || isRecursiveScan"))
+        assertTrue(activity.contains("isRecursiveScan = true"))
+        assertTrue(activity.contains("isRecursiveScan = false"))
+        assertTrue(activity.contains("dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false"))
     }
 
     @Test

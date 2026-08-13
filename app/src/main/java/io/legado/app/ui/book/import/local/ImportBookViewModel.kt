@@ -9,6 +9,8 @@ import io.legado.app.constant.AppPattern.archiveFileRegex
 import io.legado.app.constant.AppPattern.bookFileRegex
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
+import io.legado.app.data.entities.BookGroup
+import io.legado.app.exception.NoStackTraceException
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.utils.AlphanumComparator
 import io.legado.app.utils.FileDoc
@@ -99,22 +101,62 @@ class ImportBookViewModel(application: Application) : BaseViewModel(application)
         }.sortedWith(comparator).toList()
     }.flowOn(IO)
 
-    fun addToBookshelf(bookList: HashSet<ImportBook>, onSuccess: (Set<Uri>) -> Unit) {
+    fun addToBookshelf(
+        bookList: HashSet<ImportBook>,
+        groupName: String? = null,
+        onSuccess: (Set<Uri>) -> Unit,
+    ) {
         val fileUris = bookList.map { it.file.uri }
         execute {
-            LocalBook.importFiles(fileUris)
+            if (groupName != null && !appDb.bookGroupDao.canAddGroup) {
+                throw NoStackTraceException(context.getString(R.string.book_group_limit))
+            }
+            val (importedUris, importedBooks) = LocalBook.importFiles(fileUris)
+            val groupError = groupName?.let { name ->
+                kotlin.runCatching {
+                    appDb.runInTransaction {
+                        val groupDao = appDb.bookGroupDao
+                        if (!groupDao.canAddGroup) {
+                            throw NoStackTraceException(context.getString(R.string.book_group_limit))
+                        }
+                        val groupId = groupDao.getUnusedId()
+                        groupDao.getByID(groupId) ?: appDb.bookDao.removeGroup(groupId)
+                        groupDao.insert(
+                            BookGroup(
+                                groupId = groupId,
+                                groupName = name,
+                                order = groupDao.maxOrder + 1,
+                            )
+                        )
+                        appDb.bookDao.update(
+                            *importedBooks.map {
+                                it.copy(group = it.group or groupId)
+                            }.toTypedArray()
+                        )
+                    }
+                }.exceptionOrNull()
+            }
+            Triple(importedUris, importedBooks.size, groupError)
         }.onError {
             context.toastOnUi(
                 it.localizedMessage
                     ?: context.getString(R.string.add_loaded_books_to_bookshelf_failed)
             )
             AppLog.put("添加书架失败\n${it.localizedMessage}", it)
-        }.onSuccess { importedUris ->
-            if (importedUris.size == fileUris.size) {
+        }.onSuccess { (importedUris, importedBookCount, groupError) ->
+            if (groupError != null) {
+                AppLog.put("创建本地书籍目录分组失败\n${groupError.localizedMessage}", groupError)
+                context.toastOnUi(
+                    context.getString(
+                        R.string.import_directory_group_failed,
+                        groupError.localizedMessage,
+                    )
+                )
+            } else if (importedUris.size == fileUris.size) {
                 context.toastOnUi("添加书架成功")
             } else {
                 context.toastOnUi(
-                    "成功添加 ${importedUris.size} 个文件，失败 ${fileUris.size - importedUris.size} 个"
+                    "成功添加 $importedBookCount 本书，${fileUris.size - importedUris.size} 个文件未完整导入"
                 )
             }
             onSuccess(importedUris)

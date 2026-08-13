@@ -380,6 +380,7 @@ object LocalBook {
     fun importArchiveFile(
         archiveFileUri: Uri,
         saveFileName: String? = null,
+        onBookImported: (Book) -> Unit = {},
         filter: ((String) -> Boolean)? = null
     ): List<Book> {
         val archiveFileDoc = FileDoc.fromUri(archiveFileUri, false)
@@ -394,7 +395,7 @@ object LocalBook {
                     origin = "${BookType.localTag}::${archiveFileDoc.name}"
                     addType(BookType.archive)
                     save()
-                }
+                }.also(onBookImported)
             }
         }
     }
@@ -415,18 +416,19 @@ object LocalBook {
         return books
     }
 
-    fun importFiles(uris: List<Uri>): Set<Uri> {
+    fun importFiles(uris: List<Uri>): Pair<Set<Uri>, List<Book>> {
         val importedUris = linkedSetOf<Uri>()
+        val importedBooks = mutableListOf<Book>()
         var firstError: Throwable? = null
         uris.forEach { uri ->
             kotlin.runCatching {
                 val fileDoc = FileDoc.fromUri(uri, false)
                 if (ArchiveUtils.isArchive(fileDoc.name)) {
-                    importArchiveFile(uri) {
+                    importArchiveFile(uri, onBookImported = importedBooks::add) {
                         it.matches(AppPattern.bookFileRegex)
                     }
                 } else {
-                    importFile(uri)
+                    importedBooks.add(importFile(uri))
                 }
             }.onSuccess {
                 importedUris.add(uri)
@@ -435,11 +437,11 @@ object LocalBook {
                 AppLog.put("ImportFile Error:\nUri $uri\n${it.localizedMessage}", it)
             }
         }
-        if (importedUris.isEmpty()) {
+        if (importedBooks.isEmpty()) {
             throw firstError
                 ?: NoStackTraceException("ImportFiles Error:\nAll input files occur error")
         }
-        return importedUris
+        return importedUris to importedBooks
     }
 
     /**

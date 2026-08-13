@@ -475,6 +475,10 @@
     <string name="imm_navigation_bar">immersion navigation bar</string>
     <string name="imm_navigation_bar_s">The navigation bar becomes transparent</string>
     <string name="add_to_bookshelf">Add to Bookshelf</string>
+    <string name="import_directory_group_title">Import folder group</string>
+    <string name="import_directory_group">Create a bookshelf group for this folder</string>
+    <string name="book_group_limit">The limit of 63 custom groups has been reached. Delete a group before importing by folder.</string>
+    <string name="import_directory_group_failed">Books were imported, but the folder group could not be created: %s</string>
     <string name="add_loaded_books_to_bookshelf">Add Loaded Books to Bookshelf</string>
     <string name="add_loaded_books_to_bookshelf_message">Add the %1$d currently loaded results to the bookshelf? Existing books and duplicates will be skipped.</string>
     <string name="add_loaded_books_to_bookshelf_result">Added %1$d book(s); skipped %2$d</string>
