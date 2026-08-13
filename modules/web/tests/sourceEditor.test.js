@@ -21,7 +21,7 @@ test('uses bounded labels and stable source list rows', () => {
   const form = readSource('components/SourceTabForm.vue')
   const list = readSource('components/SourceList.vue')
 
-  assert.match(form, /label-width="220px"/)
+  assert.match(form, /label-width="140px"/)
   assert.match(list, /:data-key="getSourceUniqueKey"/)
   assert.match(list, /class="source-list-panel"/)
   assert.doesNotMatch(list, /calc\(100% - 75px\)/)
@@ -34,7 +34,8 @@ test('measures source textareas only while their tab is visible', () => {
   assert.match(form, /<el-tabs id="source-edit" v-model="activeTab">/)
   assert.match(form, /:name="name"/)
   assert.match(form, /v-if="activeTab === name"/)
-  assert.match(editor, /flex: 0 0 360px/)
+  assert.match(editor, /\.right \{\s*flex: 1/)
+  assert.doesNotMatch(editor, /flex: 0 0 360px/)
 })
 
 test('keeps the JavaScript source toolbar balanced on narrow screens', () => {

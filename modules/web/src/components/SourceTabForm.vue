@@ -9,7 +9,7 @@
       <el-form
         v-if="activeTab === name"
         label-position="right"
-        label-width="220px"
+        label-width="140px"
       >
         <el-form-item
           v-for="{

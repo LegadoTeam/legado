@@ -113,7 +113,7 @@ onMounted(authorize)
     margin-left: 20px;
   }
   .right {
-    flex: 0 0 360px;
+    flex: 1;
     min-width: 0;
     min-height: 0;
     width: 360px;
