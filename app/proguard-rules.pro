@@ -75,6 +75,10 @@ cn.hutool.core.codec.**,
 cn.hutool.core.util.**{*;}
 -keep class cn.hutool.crypto.**{*;}
 -dontwarn cn.hutool.**
+# Bouncy Castle registers provider implementations by class name.
+-keep class org.bouncycastle.jce.provider.** { *; }
+-keep class org.bouncycastle.jcajce.provider.** { *; }
+-keep class org.bouncycastle.pqc.jcajce.provider.** { *; }
 # 缓存 Cookie
 -keep class **.help.http.CookieStore{*;}
 -keep class **.help.CacheManager{*;}
