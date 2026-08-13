@@ -135,8 +135,15 @@ class LoginUiScriptEvaluatorTest {
         assertTrue(loadingView.contains("android:id=\"@+id/rotate_loading\""))
         assertTrue(loadingView.contains("android:visibility=\"gone\""))
         assertTrue(source.contains("viewLifecycleOwner.lifecycleScope.launch"))
-        assertTrue(source.contains("binding.rotateLoading.visible()"))
-        assertTrue(source.contains("binding.rotateLoading.gone()"))
+        val delegate = readProjectFile(
+            "src/main/java/io/legado/app/ui/login/SourceLoginV2Delegate.kt"
+        )
+        assertTrue(delegate.contains("private var firstRender = true"))
+        assertTrue(delegate.contains("val showLoading = firstRender"))
+        assertTrue(delegate.contains("if (showLoading) binding.rotateLoading.visible()"))
+        assertTrue(delegate.contains("if (showLoading) {"))
+        assertTrue(delegate.contains("firstRender = false"))
+        assertTrue(delegate.contains("binding.rotateLoading.gone()"))
         val decision = source.indexOf(
             "val renderDecision = resolveLoginUiRender(rowUis, renderedRowsResult)"
         )

@@ -40,6 +40,7 @@ class SourceLoginV2Delegate(
     private var stateJson = "{}"
     private var renderJob: Job? = null
     private var actionJob: Job? = null
+    private var firstRender = true
     private val sessionValues = linkedMapOf<String, String>()
     private val fieldViews = linkedMapOf<String, ItemSourceEditBinding>()
     private val toggleViews = linkedMapOf<String, ThemeSwitch>()
@@ -76,7 +77,8 @@ class SourceLoginV2Delegate(
         renderJob?.cancel()
         collectForm()
         renderJob = scope.launch {
-            binding.rotateLoading.visible()
+            val showLoading = firstRender
+            if (showLoading) binding.rotateLoading.visible()
             val result = withContext(IO) {
                 runCatching {
                     runScriptWithContext {
@@ -86,7 +88,10 @@ class SourceLoginV2Delegate(
                 }.onFailure { ensureActive() }
             }
             ensureActive()
-            binding.rotateLoading.gone()
+            if (showLoading) {
+                firstRender = false
+                binding.rotateLoading.gone()
+            }
             val rows = result.getOrNull()?.first
             if (rows == null) {
                 restoreActionOnFailure?.let { setActionEnabled(it, true) }
