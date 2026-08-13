@@ -128,11 +128,7 @@ class ImportBookViewModel(application: Application) : BaseViewModel(application)
                                 order = groupDao.maxOrder + 1,
                             )
                         )
-                        appDb.bookDao.update(
-                            *importedBooks.map {
-                                it.copy(group = it.group or groupId)
-                            }.toTypedArray()
-                        )
+                        appDb.bookDao.addGroup(importedBooks.map { it.bookUrl }, groupId)
                     }
                 }.exceptionOrNull()
             }

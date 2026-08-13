@@ -170,6 +170,9 @@ class ImportBookPathMigrationTest {
         val viewModel = readProjectFile(
             "src/main/java/io/legado/app/ui/book/import/local/ImportBookViewModel.kt"
         )
+        val bookDao = readProjectFile(
+            "src/main/java/io/legado/app/data/dao/BookDao.kt"
+        )
         val activity = readProjectFile(
             "src/main/java/io/legado/app/ui/book/import/local/ImportBookActivity.kt"
         )
@@ -181,8 +184,10 @@ class ImportBookPathMigrationTest {
         assertTrue(viewModel.contains("groupDao.getUnusedId()"))
         assertTrue(viewModel.contains("groupName = name"))
         assertTrue(viewModel.contains("val (importedUris, importedBooks)"))
-        assertTrue(viewModel.contains("*importedBooks.map"))
-        assertTrue(viewModel.contains("it.copy(group = it.group or groupId)"))
+        assertTrue(viewModel.contains("bookDao.addGroup(importedBooks.map { it.bookUrl }, groupId)"))
+        assertFalse(viewModel.contains("bookDao.update("))
+        assertTrue(bookDao.contains("set `group` = `group` | :groupId"))
+        assertTrue(bookDao.contains("where bookUrl in (:bookUrls)"))
         assertTrue(viewModel.contains("}.exceptionOrNull()"))
         assertTrue(viewModel.contains("Triple(importedUris, importedBooks.size, groupError)"))
         assertTrue(activity.contains("selected.size < 2 || isRecursiveScan"))
