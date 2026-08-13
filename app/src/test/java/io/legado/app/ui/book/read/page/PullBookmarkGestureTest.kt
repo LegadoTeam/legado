@@ -29,6 +29,20 @@ class PullBookmarkGestureTest {
     }
 
     @Test
+    fun `release position decides whether bookmark is toggled`() {
+        val actionUp = source("app/src/main/java/io/legado/app/ui/book/read/page/ReadView.kt")
+            .substringAfter("MotionEvent.ACTION_UP ->")
+            .substringBefore("MotionEvent.ACTION_CANCEL ->")
+
+        assertTrue(actionUp.contains("classifyPullBookmarkGesture("))
+        assertTrue(actionUp.contains("event.x - startX"))
+        assertTrue(actionUp.contains("event.y - startY"))
+        assertTrue(actionUp.contains("pullBookmarkDistance"))
+        assertTrue(actionUp.contains(") == PullBookmarkGestureState.READY"))
+        assertFalse(actionUp.contains("pullBookmarkState == PullBookmarkGestureState.READY"))
+    }
+
+    @Test
     fun `bookmark actions use the metadata-bearing current page`() {
         val source = source("app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
         val toggleBookmark = source.substringAfter("override fun toggleBookmark()")

@@ -286,7 +286,12 @@ class ReadView(context: Context, attrs: AttributeSet) :
                 if (!pressDown) return true
                 pressDown = false
                 if (pullBookmarkState != PullBookmarkGestureState.NONE) {
-                    val toggleBookmark = pullBookmarkState == PullBookmarkGestureState.READY
+                    val toggleBookmark = classifyPullBookmarkGesture(
+                        event.x - startX,
+                        event.y - startY,
+                        slopSquare,
+                        pullBookmarkDistance,
+                    ) == PullBookmarkGestureState.READY
                     resetPullBookmarkGesture()
                     pressOnTextSelected = false
                     if (toggleBookmark) {
