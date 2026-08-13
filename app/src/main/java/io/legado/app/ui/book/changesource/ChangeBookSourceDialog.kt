@@ -180,7 +180,7 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
         binding.toolBar.navigationIcon =
             getCompatDrawable(androidx.appcompat.R.drawable.abc_ic_ab_back_material)
         binding.toolBar.setNavigationContentDescription(
-            androidx.appcompat.R.string.abc_action_bar_up_description
+            R.string.back
         )
         binding.toolBar.setNavigationOnClickListener {
             dismissAllowingStateLoss()

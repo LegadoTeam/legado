@@ -244,6 +244,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
             binding.toolBar.addView(countView, lp)
         }
         binding.toolBar.setNavigationIcon(R.drawable.ic_baseline_close)
+        binding.toolBar.setNavigationContentDescription(R.string.close)
         binding.toolBar.navigationIcon?.setTint(getCompatColor(R.color.secondaryText))
         binding.toolBar.setNavigationOnClickListener { dismiss() }
         setupHeightDrag()

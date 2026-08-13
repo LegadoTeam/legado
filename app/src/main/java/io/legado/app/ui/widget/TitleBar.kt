@@ -59,6 +59,7 @@ class TitleBar @JvmOverloads constructor(
         }
 
     private val displayHomeAsUp: Boolean
+    private val navigationDescription: CharSequence
     private val navigationIconTint: ColorStateList?
     private val navigationIconTintMode: Int
     private val fitStatusBar: Boolean
@@ -85,8 +86,9 @@ class TitleBar @JvmOverloads constructor(
         automaticForeground = themeMode == 0 && !opaque
 
         val navigationIcon = a.getDrawable(R.styleable.TitleBar_navigationIcon)
-        val navigationContentDescription =
+        navigationDescription =
             a.getText(R.styleable.TitleBar_navigationContentDescription)
+                ?: context.getText(R.string.back)
         val titleText = a.getString(R.styleable.TitleBar_title)
         val subtitleText = a.getString(R.styleable.TitleBar_subtitle)
         titleTextColorFromAttrs = a.hasValue(R.styleable.TitleBar_titleTextColor)
@@ -101,7 +103,7 @@ class TitleBar @JvmOverloads constructor(
         toolbar.apply {
             navigationIcon?.let {
                 this.navigationIcon = it
-                this.navigationContentDescription = navigationContentDescription
+                this.navigationContentDescription = navigationDescription
             }
 
             if (a.hasValue(R.styleable.TitleBar_titleTextAppearance)) {
@@ -308,7 +310,12 @@ class TitleBar @JvmOverloads constructor(
         if (attachToActivity) {
             activity?.let {
                 it.setSupportActionBar(toolbar)
-                it.supportActionBar?.setDisplayHomeAsUpEnabled(displayHomeAsUp)
+                it.supportActionBar?.apply {
+                    setDisplayHomeAsUpEnabled(displayHomeAsUp)
+                    if (displayHomeAsUp) {
+                        setHomeActionContentDescription(navigationDescription)
+                    }
+                }
             }
         }
     }
