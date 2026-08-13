@@ -10,7 +10,8 @@ class ImportSelectionCountResetTest {
     @Test
     fun `successful imports reset selection through adapter callback`() {
         val localAction = mainAction(
-            projectFile("src/main/java/io/legado/app/ui/book/import/local/ImportBookActivity.kt")
+            projectFile("src/main/java/io/legado/app/ui/book/import/local/ImportBookActivity.kt"),
+            "\n    private fun alertDirectoryGroup",
         )
         val remoteAction = mainAction(
             projectFile("src/main/java/io/legado/app/ui/book/import/remote/RemoteBookActivity.kt")
@@ -23,10 +24,10 @@ class ImportSelectionCountResetTest {
         }
     }
 
-    private fun mainAction(file: File): String {
+    private fun mainAction(file: File, endMarker: String = "\n    private fun"): String {
         val source = file.readText()
         val start = source.indexOf("override fun onClickSelectBarMainAction()")
-        val end = source.indexOf("\n    private fun", start)
+        val end = source.indexOf(endMarker, start)
         assertTrue(start >= 0)
         assertTrue(end > start)
         return source.substring(start, end)
