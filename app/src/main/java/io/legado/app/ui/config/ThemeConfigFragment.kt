@@ -236,7 +236,7 @@ class ThemeConfigFragment : PreferenceFragment(),
                 .setTitle(getString(R.string.font_scale))
                 .setMaxValue(16)
                 .setMinValue(8)
-                .setValue(10)
+                .setValue(requireContext().getPrefInt(PreferKey.fontScale).takeIf { it in 8..16 } ?: 10)
                 .setCustomButton((R.string.btn_default_s)) {
                     putPrefInt(PreferKey.fontScale, 0)
                     recreateActivities()
