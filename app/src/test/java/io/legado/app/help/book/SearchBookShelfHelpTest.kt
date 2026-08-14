@@ -420,6 +420,37 @@ class SearchBookShelfHelpTest {
         assertEquals(0, result.added)
         assertEquals(1, store.books.size)
         assertEquals("A", store.books.single().bookUrl)
+        val presence = SearchBookShelfHelp.presence(incoming, store)
+        assertTrue(presence.identityOnShelf)
+        assertFalse(presence.urlOnShelf)
+        assertEquals("A", presence.existing?.bookUrl)
+    }
+
+    @Test
+    fun localSameAuthorIsIdentityOnlyNotUrlOnShelf() {
+        val local = Book(
+            bookUrl = "local://A",
+            name = "T",
+            author = "作者甲",
+            type = BookType.local or BookType.text,
+        )
+        val incoming = searchBook("https://B", "T", "作者甲")
+        val presence = SearchBookShelfHelp.presence(incoming, FakeStore(local))
+        assertTrue(presence.identityOnShelf)
+        assertFalse(presence.urlOnShelf)
+        assertEquals("local://A", presence.existing?.bookUrl)
+    }
+
+    @Test
+    fun sameUrlIsBothIdentityAndUrlOnShelf() {
+        val web = Book(bookUrl = "https://A", name = "T", author = "作者甲")
+        val presence = SearchBookShelfHelp.presence(
+            searchBook("https://A", "T", "作者甲"),
+            FakeStore(web),
+        )
+        assertTrue(presence.identityOnShelf)
+        assertTrue(presence.urlOnShelf)
+        assertEquals("https://A", presence.existing?.bookUrl)
     }
 
     @Test

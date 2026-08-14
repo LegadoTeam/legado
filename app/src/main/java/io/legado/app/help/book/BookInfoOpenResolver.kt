@@ -1,7 +1,6 @@
 package io.legado.app.help.book
 
 import io.legado.app.data.entities.Book
-import io.legado.app.data.entities.SearchBook
 
 /**
  * Search/explore pass a URL that must keep the detail page. Do not open a
@@ -11,7 +10,8 @@ internal object BookInfoOpenResolver {
 
     data class Result(
         val book: Book,
-        val inBookshelf: Boolean,
+        val identityOnShelf: Boolean,
+        val urlOnShelf: Boolean,
     )
 
     fun resolve(
@@ -22,15 +22,33 @@ internal object BookInfoOpenResolver {
         searchByUrl: Book?,
         shelfByNameAuthor: Book?,
         searchByNameAuthor: Book?,
-        incomingOnShelf: Boolean,
+        presence: SearchBookShelfHelp.ShelfPresence,
     ): Result? {
         if (bookUrl.isNotBlank()) {
-            shelfByUrl?.let { return Result(it, !it.isNotShelf) }
-            searchByUrl?.let { return Result(it, incomingOnShelf) }
+            shelfByUrl?.let {
+                val on = !it.isNotShelf
+                return Result(it, identityOnShelf = on, urlOnShelf = on)
+            }
+            searchByUrl?.let {
+                return Result(
+                    it,
+                    identityOnShelf = presence.identityOnShelf,
+                    urlOnShelf = false,
+                )
+            }
             return null
         }
-        shelfByNameAuthor?.let { return Result(it, !it.isNotShelf) }
-        searchByNameAuthor?.let { return Result(it, incomingOnShelf) }
+        shelfByNameAuthor?.let {
+            val on = !it.isNotShelf
+            return Result(it, identityOnShelf = on, urlOnShelf = on)
+        }
+        searchByNameAuthor?.let {
+            return Result(
+                it,
+                identityOnShelf = presence.identityOnShelf,
+                urlOnShelf = false,
+            )
+        }
         return null
     }
 }

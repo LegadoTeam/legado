@@ -143,9 +143,14 @@ class BookInfoLoadingIndicatorTest {
 
         assertTrue(loadBookInfo.contains("val oldBook = book.copy()"))
         assertTrue(loadBookInfo.contains("bookData.postValue(oldBook)"))
+        assertTrue(loadBookInfo.contains("refreshShelfFlags(it)"))
+        assertFalse(loadBookInfo.contains("dbBook.updateTo"))
+        assertFalse(loadBookInfo.contains("urlOnShelf = true"))
         assertFalse(normalBookRefresh.contains("it.save()"))
-        assertTrue(normalBookRefresh.contains("oldBook = persistedBook"))
+        assertTrue(normalBookRefresh.contains("oldBook = oldBook"))
         assertTrue(loadChapter.contains("appDb.bookDao.replace(oldBook, book)"))
+        assertTrue(loadChapter.contains("if (urlOnShelf)"))
+        assertFalse(loadChapter.contains("if (inBookshelf)"))
         assertTrue(loadChapter.contains("bookData.postValue(oldBook)"))
         assertTrue(
             mainViewModel.contains(
@@ -163,6 +168,12 @@ class BookInfoLoadingIndicatorTest {
         assertTrue(addToBookshelf.contains("SearchBookShelfHelp.resolveOnShelf("))
         assertFalse(addToBookshelf.contains("adoptExistingShelfBook"))
         assertFalse(addToBookshelf.contains("bookData.postValue"))
+        val saveBook = projectFile(VIEW_MODEL_PATH).readText()
+            .substringAfter("fun saveBook(")
+            .substringBefore("fun saveChapterList(")
+        assertTrue(saveBook.contains("appDb.bookDao.getBook(book.bookUrl)"))
+        assertTrue(saveBook.contains("SearchBookShelfHelp.persistIncomingBook(book)"))
+        assertFalse(saveBook.contains("getBook(book.name, book.author)"))
     }
 
     private fun Element.androidAttribute(name: String): String = getAttributeNS(ANDROID_NS, name)

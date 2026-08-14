@@ -32,7 +32,6 @@ import io.legado.app.help.book.isWebFile
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.savePreservingCustomCoverUrl
 import io.legado.app.help.book.update
-import io.legado.app.help.book.updateTo
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.lib.webdav.ObjectNotFoundException
 import io.legado.app.model.AudioPlay
@@ -100,6 +99,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     val chapterListData = MutableLiveData<List<BookChapter>>()
     val webFiles = mutableListOf<WebFile>()
     var inBookshelf = false
+    var urlOnShelf = false
     var hasCustomBtn = false
     var bookSource: BookSource? = null
     private var changeSourceCoroutine: Coroutine<*>? = null
@@ -118,6 +118,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             val name = intent.getStringExtra("name") ?: ""
             val author = intent.getStringExtra("author") ?: ""
             val bookUrl = intent.getStringExtra("bookUrl") ?: ""
+            val presence = SearchBookShelfHelp.presence(name, author, bookUrl)
             val opened = BookInfoOpenResolver.resolve(
                 name = name,
                 author = author,
@@ -128,13 +129,9 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 shelfByNameAuthor = appDb.bookDao.getBook(name, author),
                 searchByNameAuthor = appDb.searchBookDao.getFirstByNameAuthor(name, author)
                     ?.toBook(),
-                incomingOnShelf = SearchBookShelfHelp.isIncomingOnVisibleShelf(
-                    name,
-                    author,
-                    bookUrl,
-                ),
+                presence = presence,
             ) ?: throw NoStackTraceException("未找到书籍")
-            inBookshelf = opened.inBookshelf
+            applyShelfPresence(opened.identityOnShelf, opened.urlOnShelf)
             upBook(opened.book)
         }.onError {
             AppLog.put(it.localizedMessage, it)
@@ -157,6 +154,16 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
+    private fun refreshShelfFlags(book: Book) {
+        val presence = SearchBookShelfHelp.presence(book.name, book.author, book.bookUrl)
+        applyShelfPresence(presence.identityOnShelf, presence.urlOnShelf)
+    }
+
+    private fun applyShelfPresence(identityOnShelf: Boolean, persistedUrl: Boolean) {
+        inBookshelf = identityOnShelf
+        urlOnShelf = persistedUrl
+    }
+
     private fun upBook(book: Book) {
         execute {
             bookSource = if (book.isLocal) null else
@@ -166,7 +173,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             bookData.postValue(book)
             upCoverByRule(book)
             if (book.tocUrl.isEmpty() && !book.isLocal) {
-                loadBookInfo(book, runPreUpdateJs = inBookshelf)
+                loadBookInfo(book, runPreUpdateJs = urlOnShelf)
             } else {
                 val chapterList = appDb.bookChapterDao.getChapterList(book.bookUrl)
                 if (chapterList.isNotEmpty()) {
@@ -187,7 +194,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 }
                 book.customCoverUrl = coverUrl
                 bookData.postValue(book)
-                if (inBookshelf) {
+                if (urlOnShelf) {
                     saveBook(book, preserveCustomCoverUrl = false)
                 }
             }
@@ -250,21 +257,10 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             val oldBook = book.copy()
             WebBook.getBookInfo(scope, bookSource, book, canReName = canReName)
                 .onSuccess(IO) {
-                    var persistedBook = oldBook
-                    val dbBook = appDb.bookDao.getBook(book.name, book.author)
-                    if (!inBookshelf && dbBook != null && !dbBook.isNotShelf && dbBook.origin == book.origin) {
-                        /**
-                         * book 来自搜索时(inBookshelf == false)，搜索的书名不存在于书架，但是加载详情后，书名更新，存在同名书籍
-                         * 此时 book 的数据会与数据库中的不同，需要更新 #3652 #4619
-                         * book 加载详情后虽然书名作者相同，但是又可能不是数据库中(书源不同)的那本书 #3149
-                         */
-                        dbBook.updateTo(it)
-                        persistedBook = dbBook
-                        inBookshelf = true
-                    }
+                    refreshShelfFlags(it)
                     if (it.isWebFile) {
                         bookData.postValue(it)
-                        if (inBookshelf) {
+                        if (urlOnShelf) {
                             it.savePreservingCustomCoverUrl()
                         }
                         loadWebFile(it)
@@ -273,7 +269,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                             it,
                             runPreUpdateJs,
                             isFromBookInfo = true,
-                            oldBook = persistedBook,
+                            oldBook = oldBook,
                         )
                     }
                 }.onError {
@@ -321,7 +317,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 isFromBookInfo = isFromBookInfo,
             )
                 .onSuccess(IO) {
-                    if (inBookshelf) {
+                    if (urlOnShelf) {
                         book.removeType(BookType.updateError)
                         appDb.bookDao.replace(oldBook, book)
                         /**
@@ -473,7 +469,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             if (book.isWebFile) {
                 loadWebFile(book)
             }
-            if (inBookshelf) {
+            if (urlOnShelf) {
                 book.removeType(BookType.updateError)
                 bookData.value?.delete()
                 appDb.bookDao.insert(book)
@@ -509,19 +505,30 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             if (book.order == 0) {
                 book.order = appDb.bookDao.minOrder - 1
             }
-            appDb.bookDao.getBook(book.name, book.author)?.let {
-                book.durChapterIndex = it.durChapterIndex
-                book.durChapterPos = it.durChapterPos
-                book.durChapterTitle = it.durChapterTitle
-            }
-            if (preserveCustomCoverUrl) {
-                book.savePreservingCustomCoverUrl()
+            val byUrl = appDb.bookDao.getBook(book.bookUrl)
+            if (byUrl != null) {
+                book.durChapterIndex = byUrl.durChapterIndex
+                book.durChapterPos = byUrl.durChapterPos
+                book.durChapterTitle = byUrl.durChapterTitle
+                if (preserveCustomCoverUrl) {
+                    book.savePreservingCustomCoverUrl()
+                } else {
+                    book.save()
+                }
             } else {
-                book.save()
+                val persisted = SearchBookShelfHelp.persistIncomingBook(book)
+                if (persisted == null || persisted.bookUrl != book.bookUrl) {
+                    refreshShelfFlags(book)
+                    return@execute
+                }
+                urlOnShelf = true
+                if (!book.isNotShelf) {
+                    inBookshelf = true
+                }
             }
-            if (ReadBook.book?.isSameNameAuthor(book) == true) {
+            if (ReadBook.book?.bookUrl == book.bookUrl) {
                 ReadBook.book = book
-            } else if (AudioPlay.book?.isSameNameAuthor(book) == true) {
+            } else if (AudioPlay.book?.bookUrl == book.bookUrl) {
                 AudioPlay.book = book
             }
         }.onSuccess {
@@ -563,12 +570,12 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     val persisted = SearchBookShelfHelp.persistIncomingBook(incoming)
                     persisted != null && persisted.bookUrl == incoming.bookUrl
                 }
-                val onShelf = savedThisBook ||
-                    SearchBookShelfHelp.isIncomingOnVisibleShelf(
-                        incoming.name,
-                        incoming.author,
-                        incoming.bookUrl,
-                    )
+                val presence = SearchBookShelfHelp.presence(
+                    incoming.name,
+                    incoming.author,
+                    incoming.bookUrl,
+                )
+                val onShelf = savedThisBook || presence.identityOnShelf
                 if (savedThisBook) {
                     book.removeType(BookType.notShelf)
                     book.order = incoming.order
@@ -587,7 +594,11 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     }
                 }
                 inBookshelf = onShelf
-            } ?: run { inBookshelf = false }
+                urlOnShelf = savedThisBook || presence.urlOnShelf
+            } ?: run {
+                inBookshelf = false
+                urlOnShelf = false
+            }
         }.onSuccess {
             success?.invoke()
         }
@@ -603,9 +614,14 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
 
     fun delBook(deleteOriginal: Boolean = false, success: (() -> Unit)? = null) {
         execute {
+            if (!urlOnShelf) {
+                inBookshelf = false
+                return@execute
+            }
             bookData.value?.let {
                 it.delete()
                 inBookshelf = false
+                urlOnShelf = false
                 if (it.isLocal) {
                     LocalBook.deleteBook(it, deleteOriginal)
                 }
@@ -644,6 +660,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             bookData.postValue(it)
             loadChapter(it)
             inBookshelf = true
+            urlOnShelf = true
             it
         }
     }

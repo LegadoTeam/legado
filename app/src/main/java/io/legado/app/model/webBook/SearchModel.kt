@@ -130,7 +130,8 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                 appDb.searchBookDao.insert(*items.toTypedArray())
                 val published = mergeItems(searchId, items, precision, key) ?: return@onEach
                 currentCoroutineContext().ensureActive()
-                callBack.onSearchSuccess(published)
+                if (!SearchResultGate.accept(searchId, mSearchId)) return@onEach
+                callBack.onSearchSuccess(searchId, published)
             }.onCompletion { error ->
                 val context = currentCoroutineContext()
                 pageOwner.complete(context[Job]) {
@@ -244,7 +245,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
         fun getSearchScope(): SearchScope
         fun onSearchStart()
         fun onSearchProgress(searched: Int, total: Int)
-        fun onSearchSuccess(searchBooks: List<SearchBook>)
+        fun onSearchSuccess(searchId: Long, searchBooks: List<SearchBook>)
         fun onSearchFinish(isEmpty: Boolean, hasMore: Boolean)
         fun onSearchCancel(exception: Throwable? = null)
     }

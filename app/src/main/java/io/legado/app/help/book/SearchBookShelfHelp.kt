@@ -28,6 +28,17 @@ object SearchBookShelfHelp {
             get() = total - added
     }
 
+    /**
+     * One shelf-identity answer for badge, skip-insert, and BookInfo.
+     * [identityOnShelf] is list/UI/skip-insert. [urlOnShelf] is the only
+     * flag that may persist this page's URL (replace/save/chapters).
+     */
+    data class ShelfPresence(
+        val existing: Book?,
+        val identityOnShelf: Boolean,
+        val urlOnShelf: Boolean,
+    )
+
     internal interface Store {
         val minOrder: Int
 
@@ -200,26 +211,32 @@ object SearchBookShelfHelp {
         return resolveExisting(AppStore, searchBook)
     }
 
-    /**
-     * True when list badge / bulk add / detail add would skip inserting [searchBook]
-     * because a visible shelf row already owns that identity.
-     */
-    fun isIncomingOnVisibleShelf(name: String, author: String, bookUrl: String): Boolean {
-        return isIncomingOnVisibleShelf(
-            SearchBook(bookUrl = bookUrl, name = name, author = author),
-            AppStore,
-        )
+    fun presence(name: String, author: String, bookUrl: String): ShelfPresence {
+        return presence(SearchBook(bookUrl = bookUrl, name = name, author = author), AppStore)
     }
 
-    internal fun isIncomingOnVisibleShelf(searchBook: SearchBook, store: Store): Boolean {
-        store.getBook(searchBook.bookUrl)?.let { return !it.isNotShelf }
-        val existing = resolveExisting(store, searchBook)
-        if (existing != null && !existing.isNotShelf) return true
+    fun isIncomingOnVisibleShelf(name: String, author: String, bookUrl: String): Boolean {
+        return presence(name, author, bookUrl).identityOnShelf
+    }
+
+    internal fun presence(searchBook: SearchBook, store: Store): ShelfPresence {
+        val byUrl = store.getBook(searchBook.bookUrl)
+        if (byUrl != null && !byUrl.isNotShelf) {
+            return ShelfPresence(byUrl, identityOnShelf = true, urlOnShelf = true)
+        }
+        val existing = resolveExisting(store, searchBook)?.takeUnless { it.isNotShelf }
+        if (existing != null) {
+            return ShelfPresence(existing, identityOnShelf = true, urlOnShelf = false)
+        }
         val owner = store.getBook(
             searchBook.name,
             BookAuthorIdentity.persistAuthor(searchBook.author),
-        )
-        return owner != null && !owner.isNotShelf
+        )?.takeUnless { it.isNotShelf }
+        return ShelfPresence(owner, identityOnShelf = owner != null, urlOnShelf = false)
+    }
+
+    internal fun isIncomingOnVisibleShelf(searchBook: SearchBook, store: Store): Boolean {
+        return presence(searchBook, store).identityOnShelf
     }
 
     private fun reusable(book: Book?): Book? = book?.takeUnless { it.isLocal }

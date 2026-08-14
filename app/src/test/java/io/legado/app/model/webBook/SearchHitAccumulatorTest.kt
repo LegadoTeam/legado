@@ -89,6 +89,78 @@ class SearchHitAccumulatorTest {
         assertFalse(src.contains("rawSearchHits"))
         assertTrue(src.contains("rawHits.publish("))
         assertFalse(src.contains("searchBooks ="))
+        assertTrue(src.contains("SearchResultGate.accept(searchId, mSearchId)"))
+        assertTrue(src.contains("onSearchSuccess(searchId, published)"))
+    }
+
+    @Test
+    fun staleCallbackAfterBeginDoesNotWin() {
+        var currentId = 1L
+        val posted = mutableListOf<List<String>>()
+        fun onSuccess(searchId: Long, books: List<SearchBook>) {
+            if (!SearchResultGate.accept(searchId, currentId)) return
+            posted.add(books.map { it.bookUrl })
+        }
+        val acc = SearchHitAccumulator()
+        acc.begin(1L)
+        val old = acc.publish(1L, listOf(hit("old")))!!
+        acc.begin(2L)
+        currentId = 2L
+        val new = acc.publish(2L, listOf(hit("new")))!!
+        onSuccess(1L, old)
+        onSuccess(2L, new)
+        assertEquals(listOf(listOf("new")), posted)
+        val viewModel = sequenceOf(
+            File("app/src/main/java/io/legado/app/ui/book/search/SearchViewModel.kt"),
+            File("src/main/java/io/legado/app/ui/book/search/SearchViewModel.kt"),
+        ).first { it.isFile }.readText()
+        assertTrue(viewModel.contains("searchGeneration.postIfCurrent(searchId)"))
+        assertTrue(viewModel.contains("searchGeneration.beginNew"))
+        assertFalse(SearchResultGate.accept(0L, 0L))
+        assertFalse(SearchResultGate.accept(1L, 2L))
+        assertTrue(SearchResultGate.accept(2L, 2L))
+    }
+
+    @Test
+    fun staleUiPostAfterBeginNewDoesNotWin() {
+        val posted = mutableListOf<String>()
+        val gen = SearchUiGeneration()
+        val oldId = gen.beginNew { posted.add("clear-1") }
+        assertTrue(gen.postIfCurrent(oldId) { posted.add("old") })
+        val newId = gen.beginNew { posted.add("clear-2") }
+        assertFalse(gen.postIfCurrent(oldId) { posted.add("stale") })
+        assertTrue(gen.postIfCurrent(newId) { posted.add("new") })
+        assertEquals(listOf("clear-1", "old", "clear-2", "new"), posted)
+    }
+
+    @Test
+    fun concurrentBeginNewDropsStalePost() {
+        val gen = SearchUiGeneration()
+        val oldId = gen.beginNew()
+        val posted = Collections.synchronizedList(mutableListOf<String>())
+        val start = CyclicBarrier(2)
+        val done = CountDownLatch(2)
+        Thread {
+            try {
+                start.await(5, TimeUnit.SECONDS)
+                gen.postIfCurrent(oldId) { posted.add("old") }
+            } finally {
+                done.countDown()
+            }
+        }.start()
+        Thread {
+            try {
+                start.await(5, TimeUnit.SECONDS)
+                val newId = gen.beginNew()
+                gen.postIfCurrent(newId) { posted.add("new") }
+            } finally {
+                done.countDown()
+            }
+        }.start()
+        assertTrue(done.await(10, TimeUnit.SECONDS))
+        assertTrue(posted.contains("new"))
+        assertTrue(posted.last() == "new")
+        assertFalse(posted == listOf("new", "old"))
     }
 
     @Test

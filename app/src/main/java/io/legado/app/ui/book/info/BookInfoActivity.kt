@@ -413,7 +413,7 @@ class BookInfoActivity :
             R.id.menu_can_update -> {
                 viewModel.getBook()?.let {
                     it.canUpdate = !it.canUpdate
-                    if (viewModel.inBookshelf) {
+                    if (viewModel.urlOnShelf) {
                         if (!it.canUpdate) {
                             it.removeType(BookType.updateError)
                         }
@@ -1056,7 +1056,17 @@ class BookInfoActivity :
         tvShelf.setOnClickListener {
             viewModel.getBook()?.let { book ->
                 if (viewModel.inBookshelf) {
-                    deleteBook()
+                    if (!viewModel.urlOnShelf) {
+                        toastOnUi(
+                            getString(
+                                R.string.local_book_identity_conflict,
+                                book.name,
+                                book.author,
+                            )
+                        )
+                    } else {
+                        deleteBook()
+                    }
                 } else {
                     if (book.isWebFile) {
                         showWebFileDownloadAlert()
@@ -1097,7 +1107,11 @@ class BookInfoActivity :
             }
             if (!viewModel.inBookshelf) {
                 viewModel.saveBook(book) { //点击目录会保存book
-                    viewModel.saveChapterList {
+                    if (viewModel.urlOnShelf) {
+                        viewModel.saveChapterList {
+                            openChapterList()
+                        }
+                    } else {
                         openChapterList()
                     }
                 }
@@ -1225,7 +1239,7 @@ class BookInfoActivity :
             viewModel.bookSource?.getKey() -> viewModel.bookSource?.setVariable(variable)
             viewModel.bookData.value?.bookUrl -> viewModel.bookData.value?.let {
                 it.putCustomVariable(variable)
-                if (viewModel.inBookshelf) {
+                if (viewModel.urlOnShelf) {
                     viewModel.saveBook(it)
                 }
             }
@@ -1344,11 +1358,18 @@ class BookInfoActivity :
             chapterChanged = changed
             if (!viewModel.inBookshelf) {
                 book.addType(BookType.notShelf)
-                lifecycleScope.launch {
-                    withContext(IO) {
-                        book.save()
-                    }
-                    viewModel.saveChapterList {
+                viewModel.saveBook(book) {
+                    if (viewModel.urlOnShelf) {
+                        viewModel.saveChapterList {
+                            startReadActivity(
+                                book,
+                                index.takeIf { deferHighlightPosition },
+                                pos.takeIf { deferHighlightPosition },
+                                highlightLayoutTitleLength.takeIf { deferHighlightPosition },
+                                highlightAnchorText.takeIf { deferHighlightPosition }
+                            )
+                        }
+                    } else {
                         startReadActivity(
                             book,
                             index.takeIf { deferHighlightPosition },
@@ -1360,8 +1381,10 @@ class BookInfoActivity :
                 }
             } else {
                 lifecycleScope.launch {
-                    withContext(IO) {
-                        book.update()
+                    if (viewModel.urlOnShelf) {
+                        withContext(IO) {
+                            book.update()
+                        }
                     }
                     startReadActivity(
                         book,
@@ -1473,14 +1496,20 @@ class BookInfoActivity :
         if (!viewModel.inBookshelf) {
             book.addType(BookType.notShelf)
             viewModel.saveBook(book) {
-                viewModel.saveChapterList {
+                if (viewModel.urlOnShelf) {
+                    viewModel.saveChapterList {
+                        startReadActivity(book)
+                    }
+                } else {
                     startReadActivity(book)
                 }
             }
-        } else {
+        } else if (viewModel.urlOnShelf) {
             viewModel.saveBook(book) {
                 startReadActivity(book)
             }
+        } else {
+            startReadActivity(book)
         }
     }
 
@@ -1495,12 +1524,12 @@ class BookInfoActivity :
             book.isAudio -> readBookResult.launch(
                 Intent(this, AudioPlayActivity::class.java)
                     .putExtra("bookUrl", book.bookUrl)
-                    .putExtra("inBookshelf", viewModel.inBookshelf)
+                    .putExtra("inBookshelf", viewModel.urlOnShelf)
             )
             book.isVideo -> readBookResult.launch(
                 Intent(this, VideoPlayerActivity::class.java)
                     .putExtra("bookUrl", book.bookUrl)
-                    .putExtra("inBookshelf", viewModel.inBookshelf)
+                    .putExtra("inBookshelf", viewModel.urlOnShelf)
             )
 
             else -> readBookResult.launch(
@@ -1510,7 +1539,7 @@ class BookInfoActivity :
                     else ReadBookActivity::class.java
                 ).apply {
                     putExtra("bookUrl", book.bookUrl)
-                    putExtra("inBookshelf", viewModel.inBookshelf)
+                    putExtra("inBookshelf", viewModel.urlOnShelf)
                     putExtra("chapterChanged", chapterChanged)
                     if (highlightIndex != null &&
                         highlightChapterPos != null &&
@@ -1548,7 +1577,7 @@ class BookInfoActivity :
             book.customCoverUrl = coverUrl
             book.persistedCoverUrl = null
             showCover(book)
-            if (viewModel.inBookshelf) {
+            if (viewModel.urlOnShelf) {
                 viewModel.saveBook(book, preserveCustomCoverUrl = false)
             }
         }
@@ -1558,7 +1587,7 @@ class BookInfoActivity :
         upGroup(groupId)
         viewModel.getBook()?.let { book ->
             book.group = groupId
-            if (viewModel.inBookshelf) {
+            if (viewModel.urlOnShelf) {
                 viewModel.saveBook(book)
             } else if (groupId > 0) {
                 viewModel.addToBookshelf {

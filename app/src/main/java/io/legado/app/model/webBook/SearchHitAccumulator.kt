@@ -60,3 +60,50 @@ internal class SearchHitAccumulator {
         }
     }
 }
+
+/** Drop a search callback whose id is no longer the UI's current search. */
+internal object SearchResultGate {
+    fun accept(submittedId: Long, currentId: Long): Boolean {
+        return submittedId != 0L && submittedId == currentId
+    }
+}
+
+/** UI search id + LiveData post share one lock so a stale callback cannot win. */
+internal class SearchUiGeneration {
+    private val lock = Any()
+
+    @Volatile
+    var current = 0L
+        private set
+
+    fun beginNew(onBegin: () -> Unit = {}): Long {
+        synchronized(lock) {
+            current += 1L
+            if (current == 0L) current = 1L
+            onBegin()
+            return current
+        }
+    }
+
+    fun begin(id: Long, onBegin: () -> Unit = {}): Long {
+        synchronized(lock) {
+            current = id
+            onBegin()
+            return current
+        }
+    }
+
+    fun invalidate() {
+        synchronized(lock) {
+            current = 0L
+        }
+    }
+
+    fun postIfCurrent(submittedId: Long, post: () -> Unit): Boolean {
+        synchronized(lock) {
+            if (!SearchResultGate.accept(submittedId, current)) return false
+            post()
+            return true
+        }
+    }
+}
