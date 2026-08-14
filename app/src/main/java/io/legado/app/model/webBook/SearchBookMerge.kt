@@ -30,7 +30,10 @@ object SearchBookMerge {
         if (target.intro.isNullOrBlank() && !incoming.intro.isNullOrBlank()) {
             target.intro = incoming.intro
         }
-        if (target.coverUrl.isNullOrBlank() && !incoming.coverUrl.isNullOrBlank()) {
+        if (target.coverUrl.isNullOrBlank() &&
+            !incoming.coverUrl.isNullOrBlank() &&
+            incoming.origin == target.origin
+        ) {
             target.coverUrl = incoming.coverUrl
         }
     }

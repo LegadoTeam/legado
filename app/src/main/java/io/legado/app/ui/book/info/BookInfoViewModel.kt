@@ -102,6 +102,10 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     var hasCustomBtn = false
     var bookSource: BookSource? = null
     private var changeSourceCoroutine: Coroutine<*>? = null
+    private var bookInfoJob: Coroutine<*>? = null
+    private var chapterListJob: Coroutine<*>? = null
+    private var detailLoadGeneration = 0L
+    private var currentDetailUrl: String? = null
     val waitDialogData = MutableLiveData<Boolean>()
     val loadingData = MutableLiveData<Boolean>()
     private val networkLoadingCounter = BookInfoNetworkLoadingCounter(loadingData::postValue)
@@ -156,6 +160,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
 
     private fun upBook(book: Book) {
         execute {
+            currentDetailUrl = book.bookUrl
             bookSource = if (book.isLocal) null else
                 appDb.bookSourceDao.getBookSource(book.origin)?.also {
                     hasCustomBtn = it.customButton
@@ -239,14 +244,18 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             bookData.postValue(book)
             loadChapter(book)
         } else {
+            val generation = detailLoadGeneration
+            val requestedUrl = book.bookUrl
             val bookSource = bookSource ?: let {
-                chapterListData.postValue(chapterListData.value.orEmpty())
+                postChaptersForCurrentBook()
                 context.toastOnUi(R.string.error_no_source)
                 return
             }
             val oldBook = book.copy()
-            WebBook.getBookInfo(scope, bookSource, book, canReName = canReName)
+            bookInfoJob?.cancel()
+            bookInfoJob = WebBook.getBookInfo(scope, bookSource, book, canReName = canReName)
                 .onSuccess(IO) {
+                    if (!isCurrentDetailLoad(generation, requestedUrl)) return@onSuccess
                     var persistedBook = oldBook
                     val dbBook = appDb.bookDao.getBook(book.name, book.author)
                     if (!inBookshelf && dbBook != null && !dbBook.isNotShelf && dbBook.origin == book.origin) {
@@ -255,11 +264,14 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                          * 此时 book 的数据会与数据库中的不同，需要更新 #3652 #4619
                          * book 加载详情后虽然书名作者相同，但是又可能不是数据库中(书源不同)的那本书 #3149
                          */
+                        if (!isCurrentDetailLoad(generation, requestedUrl)) return@onSuccess
                         dbBook.updateTo(it)
                         persistedBook = dbBook
                         inBookshelf = true
                     }
+                    if (!isCurrentDetailLoad(generation, requestedUrl)) return@onSuccess
                     if (it.isWebFile) {
+                        currentDetailUrl = it.bookUrl
                         bookData.postValue(it)
                         if (inBookshelf) {
                             it.savePreservingCustomCoverUrl()
@@ -274,8 +286,9 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                         )
                     }
                 }.onError {
+                    if (!isCurrentDetailLoad(generation, requestedUrl)) return@onError
                     bookData.postValue(oldBook)
-                    chapterListData.postValue(chapterListData.value.orEmpty())
+                    postChaptersForCurrentBook()
                     AppLog.put("获取书籍信息失败\n${it.localizedMessage}", it)
                     context.toastOnUi(R.string.error_get_book_info)
                 }
@@ -291,8 +304,12 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         oldBook: Book = book.copy(),
     ) {
         if (book.isLocal) {
+            val generation = detailLoadGeneration
+            val requestedUrl = book.bookUrl
             execute(scope) {
+                if (!isCurrentDetailLoad(generation, requestedUrl)) return@execute
                 LocalBook.getChapterList(book).let {
+                    if (!isCurrentDetailLoad(generation, requestedUrl)) return@execute
                     book.update()
                     appDb.bookChapterDao.delByBook(book.bookUrl)
                     appDb.bookChapterDao.insert(*it.toTypedArray())
@@ -301,16 +318,20 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     chapterListData.postValue(it)
                 }
             }.onError {
-                chapterListData.postValue(chapterListData.value.orEmpty())
+                if (!isCurrentDetailLoad(generation, requestedUrl)) return@onError
+                postChaptersForCurrentBook()
                 context.toastOnUi("LoadTocError:${it.localizedMessage}")
             }
         } else {
+            val generation = detailLoadGeneration
+            val requestedUrl = book.bookUrl
             val bookSource = bookSource ?: let {
-                chapterListData.postValue(chapterListData.value.orEmpty())
+                postChaptersForCurrentBook()
                 context.toastOnUi(R.string.error_no_source)
                 return
             }
-            WebBook.getChapterList(
+            chapterListJob?.cancel()
+            chapterListJob = WebBook.getChapterList(
                 scope,
                 bookSource,
                 book,
@@ -318,7 +339,9 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 isFromBookInfo = isFromBookInfo,
             )
                 .onSuccess(IO) {
+                    if (!isCurrentDetailLoad(generation, requestedUrl)) return@onSuccess
                     if (inBookshelf) {
+                        if (!isCurrentDetailLoad(generation, requestedUrl)) return@onSuccess
                         book.removeType(BookType.updateError)
                         appDb.bookDao.replace(oldBook, book)
                         /**
@@ -331,11 +354,14 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                         appDb.bookChapterDao.insert(*it.toTypedArray())
                         ReadBook.onChapterListUpdated(book)
                     }
+                    if (!isCurrentDetailLoad(generation, requestedUrl)) return@onSuccess
+                    currentDetailUrl = book.bookUrl
                     bookData.postValue(book)
                     chapterListData.postValue(it)
                 }.onError {
+                    if (!isCurrentDetailLoad(generation, requestedUrl)) return@onError
                     bookData.postValue(oldBook)
-                    chapterListData.postValue(chapterListData.value.orEmpty())
+                    postChaptersForCurrentBook()
                     AppLog.put("获取目录失败\n${it.localizedMessage}", it)
                     context.toastOnUi(R.string.error_get_chapter_list)
                 }
@@ -353,7 +379,12 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     }
 
     private fun loadWebFile(book: Book) {
+        val generation = detailLoadGeneration
+        val requestedUrl = book.bookUrl
         execute {
+            if (!isCurrentDetailLoad(generation, requestedUrl)) {
+                return@execute emptyList<WebFile>()
+            }
             webFiles.clear()
             val fileNameNoExtension = if (book.author.isBlank()) book.name
             else "${book.name} 作者：${book.author}"
@@ -377,6 +408,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             chapterListData.postValue(emptyList())
             context.toastOnUi("LoadWebFileError\n${it.localizedMessage}")
         }.onSuccess {
+            if (!isCurrentDetailLoad(generation, requestedUrl)) return@onSuccess
             webFiles.addAll(it)
             book.latestChapterTitle = "已下载"
             bookData.postValue(book)
@@ -604,9 +636,38 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
      * Switch the detail page onto an existing shelf row (same as [upBook]):
      * book, origin source, and chapters. Never keep the incoming book's source/toc.
      */
+    private fun invalidateIncomingDetailLoads() {
+        detailLoadGeneration += 1
+        bookInfoJob?.cancel()
+        chapterListJob?.cancel()
+        bookInfoJob = null
+        chapterListJob = null
+        chapterListData.postValue(emptyList())
+    }
+
+    private fun isCurrentDetailLoad(generation: Long, requestedUrl: String): Boolean {
+        return BookInfoLoadGuard.shouldApply(
+            detailLoadGeneration,
+            generation,
+            currentDetailUrl ?: bookData.value?.bookUrl,
+            requestedUrl,
+        )
+    }
+
+    private fun postChaptersForCurrentBook() {
+        val current = bookData.value
+        if (current == null) {
+            chapterListData.postValue(emptyList())
+            return
+        }
+        chapterListData.postValue(appDb.bookChapterDao.getChapterList(current.bookUrl))
+    }
+
     private fun adoptExistingShelfBook(existing: Book) {
+        invalidateIncomingDetailLoads()
         existing.removeType(BookType.notShelf)
         existing.savePreservingCustomCoverUrl()
+        currentDetailUrl = existing.bookUrl
         bookSource = if (existing.isLocal) {
             hasCustomBtn = false
             null

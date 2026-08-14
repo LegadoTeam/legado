@@ -62,8 +62,15 @@ object SearchBookShelfHelp {
             val sole = BookAuthorIdentity.soleRealAuthor(webPeers.map { it.author })
             for (book in peers) {
                 keys.add(book.bookUrl)
-                keys.add("$n-${book.author}")
                 val eff = BookAuthorIdentity.effectiveAuthor(book.author)
+                if (book.isLocal) {
+                    if (eff.isNotEmpty()) {
+                        keys.add("$n-${book.author}")
+                        keys.add("$n-$eff")
+                    }
+                    continue
+                }
+                keys.add("$n-${book.author}")
                 if (eff.isNotEmpty()) {
                     keys.add("$n-$eff")
                 } else {

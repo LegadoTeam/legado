@@ -88,9 +88,30 @@ class SearchBookMergeTest {
         SearchBookMerge.absorb(empty, rich)
         assertEquals("凤嘲凰", empty.author)
         assertEquals("简介……", empty.intro)
-        assertEquals("https://rich.com/cover.jpg", empty.coverUrl)
+        assertEquals(null, empty.coverUrl)
         assertTrue(empty.origins.contains("https://rich.com"))
         assertTrue(empty.origins.contains("https://empty.com"))
+    }
+
+    @Test
+    fun absorbDoesNotCopyCoverFromDifferentOrigin() {
+        val target = book("高考后", "七月观天", "https://good.com")
+        target.coverUrl = null
+        val weak = book("高考后", "佚名", "https://popofree.com")
+        weak.coverUrl = "https://popofree.com/cover.jpg"
+        SearchBookMerge.absorb(target, weak)
+        assertEquals(null, target.coverUrl)
+        assertEquals("七月观天", target.author)
+    }
+
+    @Test
+    fun absorbCopiesCoverWhenOriginMatches() {
+        val target = book("高考后", "七月观天", "https://good.com")
+        target.coverUrl = null
+        val other = book("高考后", "七月观天", "https://good.com")
+        other.coverUrl = "https://good.com/cover.jpg"
+        SearchBookMerge.absorb(target, other)
+        assertEquals("https://good.com/cover.jpg", target.coverUrl)
     }
 
     @Test

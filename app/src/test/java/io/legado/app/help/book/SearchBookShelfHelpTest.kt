@@ -270,6 +270,32 @@ class SearchBookShelfHelpTest {
     }
 
     @Test
+    fun localYimingDoesNotMarkWebYimingInShelfAndStillInserts() {
+        val local = Book(
+            bookUrl = "local://x",
+            name = "同名书",
+            author = "佚名",
+            type = BookType.local or BookType.text,
+        )
+        val incoming = searchBook("weak", "同名书", "佚名")
+        val keys = SearchBookShelfHelp.shelfBadgeKeys(listOf(local))
+        assertFalse(SearchBookShelfHelp.isInShelfBadgeIndex(incoming, keys))
+        assertTrue(
+            SearchBookShelfHelp.isInShelfBadgeIndex(
+                searchBook("local://x", "同名书", "佚名"),
+                keys,
+            )
+        )
+        val store = FakeStore(local)
+        val result = SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
+        assertEquals(1, result.added)
+        assertEquals(2, store.books.size)
+        assertTrue(store.books.any { it.bookUrl == "local://x" })
+        assertTrue(store.books.any { it.bookUrl == "weak" })
+        assertEquals(0, store.deleteCount)
+    }
+
+    @Test
     fun persistNewBookSkipsWhenLocalOwnsExactRealKey() {
         val local = Book(
             bookUrl = "local://x",
