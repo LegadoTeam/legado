@@ -365,6 +365,7 @@
     <string name="highlight_action_trigger">高亮操作唤起方式</string>
     <string name="highlight_action_trigger_click">点击</string>
     <string name="highlight_action_trigger_long_press">长按</string>
+    <string name="highlight_action_trigger_off">关闭</string>
     <string name="action_del">删除</string>
     <string name="load_over_time">加载超时</string>
     <string name="join_group">关注：%s</string>

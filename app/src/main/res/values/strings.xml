@@ -368,6 +368,7 @@
     <string name="highlight_action_trigger">Highlight action trigger</string>
     <string name="highlight_action_trigger_click">Tap</string>
     <string name="highlight_action_trigger_long_press">Long press</string>
+    <string name="highlight_action_trigger_off">Off</string>
     <string name="action_del">Delete</string>
     <string name="load_over_time">Loading timeout</string>
     <string name="join_group">Follow:%s</string>

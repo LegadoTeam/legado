@@ -626,8 +626,8 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val clickImgWay: String?
         get() = appCtx.getPrefString(PreferKey.clickImgWay)
 
-    val highlightActionByLongPress: Boolean
-        get() = appCtx.getPrefString(PreferKey.highlightActionTrigger, "click") == "longPress"
+    val highlightActionTrigger: String?
+        get() = appCtx.getPrefString(PreferKey.highlightActionTrigger, "click")
 
     var preDownloadNum
         get() = appCtx.getPrefInt(PreferKey.preDownloadNum, 2)

@@ -108,24 +108,31 @@ class ManualHighlightRenderTest {
     }
 
     @Test
-    fun `highlight actions move to long press only when explicitly configured`() {
+    fun `highlight actions support click long press and off modes`() {
         val content = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/ContentTextView.kt")
         val appConfig = readProjectFile("src/main/java/io/legado/app/help/config/AppConfig.kt")
         val preferences = readProjectFile("src/main/res/xml/pref_config_read.xml")
         val values = readProjectFile("src/main/res/values/array_values.xml")
         val longPress = content.substringAfter("fun longPress(").substringBefore("fun click(")
         val click = content.substringAfter("fun click(").substringBefore("fun selectText(")
+        val notify = content.substringAfter("private fun notifyHighlightClick(")
+            .substringBefore("private fun highlightAt(")
         val clickValue = values.indexOf("<item>click</item>")
         val longPressValue = values.indexOf("<item>longPress</item>")
+        val offValue = values.indexOf("<item>off</item>")
 
         assertTrue(appConfig.contains("getPrefString(PreferKey.highlightActionTrigger, \"click\")"))
-        assertTrue(appConfig.contains("== \"longPress\""))
         assertTrue(preferences.contains("android:defaultValue=\"click\""))
         assertTrue(preferences.contains("android:key=\"highlightActionTrigger\""))
         assertTrue(clickValue in 0 until longPressValue)
-        assertTrue(longPress.contains("highlightActionByLongPress && column.highlightStyle != null &&"))
-        assertTrue(longPress.contains("highlightActionByLongPress || column.linkUrl != null"))
-        assertTrue(click.contains("!highlightActionByLongPress && column.highlightStyle != null"))
+        assertTrue(longPressValue in 0 until offValue)
+        assertTrue(longPress.contains("highlightActionTrigger == \"longPress\""))
+        assertTrue(click.contains("highlightActionTrigger != \"longPress\""))
+        val offGate = notify.indexOf("if (AppConfig.highlightActionTrigger == \"off\") return false")
+        val manual = notify.indexOf("highlightAt(column, textPos, page)?.let")
+        val automatic = notify.indexOf("highlightRuleIdAt(column, textPos, page)?.let")
+        assertTrue(offGate in 0 until manual)
+        assertTrue(manual in 0 until automatic)
     }
 
     @Test

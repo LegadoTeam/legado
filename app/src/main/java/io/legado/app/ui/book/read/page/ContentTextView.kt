@@ -240,12 +240,12 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         y: Float,
         select: (textPos: TextPos) -> Unit,
     ) {
-        val highlightActionByLongPress = AppConfig.highlightActionByLongPress
+        val highlightActionTrigger = AppConfig.highlightActionTrigger
         touch(x, y) { relativeOffset, textPos, textPage, textLine, column ->
             when (column) {
                 is ImageColumn -> callBack.onImageLongPress(x, y, column.src)
                 is TextColumn -> {
-                    if (highlightActionByLongPress && column.highlightStyle != null &&
+                    if (highlightActionTrigger == "longPress" && column.highlightStyle != null &&
                         notifyHighlightClick(column, textPos, textPage, textLine, relativeOffset)
                     ) return@touch
                     if (!selectAble) return@touch
@@ -255,7 +255,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                 is TextHtmlColumn -> {
                     if (
                         column.highlightStyle != null &&
-                        (highlightActionByLongPress || column.linkUrl != null) &&
+                        (highlightActionTrigger == "longPress" || column.linkUrl != null) &&
                         notifyHighlightClick(column, textPos, textPage, textLine, relativeOffset)
                     ) return@touch
                     if (!selectAble) return@touch
@@ -280,7 +280,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         } else {
             false
         }
-        val highlightActionByLongPress = AppConfig.highlightActionByLongPress
+        val highlightActionTrigger = AppConfig.highlightActionTrigger
         var handled = false
         touch(x, y) { relativeOffset, textPos, textPage, textLine, column ->
             when (column) {
@@ -348,7 +348,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                             putExtra("uri", linkUrl)
                         }
                         handled = true
-                    } else if (!highlightActionByLongPress && column.highlightStyle != null) {
+                    } else if (highlightActionTrigger != "longPress" && column.highlightStyle != null) {
                         handled = notifyHighlightClick(
                             column,
                             textPos,
@@ -359,7 +359,9 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                     }
                 }
 
-                is TextColumn -> if (!highlightActionByLongPress && column.highlightStyle != null) {
+                is TextColumn -> if (highlightActionTrigger != "longPress" &&
+                    column.highlightStyle != null
+                ) {
                     handled = notifyHighlightClick(
                         column,
                         textPos,
@@ -905,6 +907,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         line: TextLine,
         relativeOffset: Float
     ): Boolean {
+        if (AppConfig.highlightActionTrigger == "off") return false
         val x = column.start + callBack.imgBgPaddingStart
         val y = line.lineTop + relativeOffset + callBack.headerHeight
         highlightAt(column, textPos, page)?.let {

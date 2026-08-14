@@ -104,6 +104,7 @@
     <string-array name="highlight_action_trigger_title">
         <item>@string/highlight_action_trigger_click</item>
         <item>@string/highlight_action_trigger_long_press</item>
+        <item>@string/highlight_action_trigger_off</item>
     </string-array>
 
 	<string-array name="double_page_title">
