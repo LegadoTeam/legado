@@ -37,6 +37,8 @@ object SearchBookShelfHelp {
 
         fun getBooksByName(name: String): List<Book>
 
+        fun allBooks(): List<Book>
+
         fun update(book: Book)
 
         fun insertIgnore(book: Book): Boolean
@@ -52,15 +54,12 @@ object SearchBookShelfHelp {
             val sole = BookAuthorIdentity.soleRealAuthor(webPeers.map { it.author })
             for (book in peers) {
                 keys.add(book.bookUrl)
-                val eff = BookAuthorIdentity.effectiveAuthor(book.author)
-                if (book.isLocal) {
-                    if (eff.isNotEmpty()) {
-                        keys.add("$n-${book.author}")
-                        keys.add("$n-$eff")
-                    }
-                    continue
-                }
+                // Exact Room (name, author) identity. Do not trim: padded local
+                // names do not block a trimmed web insert.
+                keys.add(roomIdentityKey(book.name, book.author))
+                if (book.isLocal) continue
                 keys.add("$n-${book.author}")
+                val eff = BookAuthorIdentity.effectiveAuthor(book.author)
                 if (eff.isNotEmpty()) {
                     keys.add("$n-$eff")
                 } else {
@@ -77,6 +76,8 @@ object SearchBookShelfHelp {
 
     fun isInShelfBadgeIndex(book: SearchBook, index: Set<String>): Boolean {
         if (index.contains(book.bookUrl)) return true
+        val persistKey = roomIdentityKey(book.name, BookAuthorIdentity.persistAuthor(book.author))
+        if (index.contains(persistKey)) return true
         val name = BookAuthorIdentity.canonicalName(book.name)
         val eff = BookAuthorIdentity.effectiveAuthor(book.author)
         if (eff.isNotEmpty()) {
@@ -103,7 +104,13 @@ object SearchBookShelfHelp {
         store: Store,
     ): AddResult {
         if (books.isEmpty()) return AddResult(0, emptyList())
+        return addLoadedBooksToIndexedStore(books, NameIndexStore(store))
+    }
 
+    private fun addLoadedBooksToIndexedStore(
+        books: List<SearchBook>,
+        store: Store,
+    ): AddResult {
         val minOrder = store.minOrder
         val addedBooks = arrayListOf<Book>()
         val booksToOrder = arrayListOf<Book>()
@@ -180,7 +187,7 @@ object SearchBookShelfHelp {
             return book
         }
         if (BookAuthorIdentity.isWeakAuthor(book.author)) {
-            book.author = ""
+            book.author = BookAuthorIdentity.persistAuthor(book.author)
         }
         if (store.insertIgnore(book)) return book
         return reusable(store.getBook(book.name, book.author))
@@ -206,8 +213,10 @@ object SearchBookShelfHelp {
             val key = BookAuthorIdentity.canonicalName(name)
             if (key.isEmpty()) return emptyList()
             // Trim-equivalent in memory so SQL can keep the name index (no trim(name)).
-            return appDb.bookDao.all.filter { BookAuthorIdentity.canonicalName(it.name) == key }
+            return allBooks().filter { BookAuthorIdentity.canonicalName(it.name) == key }
         }
+
+        override fun allBooks(): List<Book> = appDb.bookDao.all
 
         override fun update(book: Book) {
             book.update()
@@ -216,6 +225,43 @@ object SearchBookShelfHelp {
         override fun insertIgnore(book: Book): Boolean {
             return appDb.bookDao.insertIgnore(book) != -1L
         }
+    }
+}
+
+/** Exact Room (name, author) badge key. NUL separators cannot collide with canonical `$name-$author`. */
+private fun roomIdentityKey(name: String, author: String): String = "rk\u0000$name\u0000$author"
+
+/**
+ * One shelf snapshot per batch add so N results do not reload bookDao.all N times.
+ * Inserts during the batch are visible to later items.
+ */
+private class NameIndexStore(
+    private val inner: SearchBookShelfHelp.Store,
+) : SearchBookShelfHelp.Store {
+    private val snapshot = inner.allBooks()
+    private val inserted = arrayListOf<Book>()
+
+    override val minOrder: Int
+        get() = inner.minOrder
+
+    override fun getBook(name: String, author: String): Book? = inner.getBook(name, author)
+
+    override fun getBook(bookUrl: String): Book? = inner.getBook(bookUrl)
+
+    override fun getBooksByName(name: String): List<Book> {
+        val key = BookAuthorIdentity.canonicalName(name)
+        if (key.isEmpty()) return emptyList()
+        return (snapshot + inserted).filter { BookAuthorIdentity.canonicalName(it.name) == key }
+    }
+
+    override fun allBooks(): List<Book> = snapshot + inserted
+
+    override fun update(book: Book) = inner.update(book)
+
+    override fun insertIgnore(book: Book): Boolean {
+        val ok = inner.insertIgnore(book)
+        if (ok) inserted.add(book)
+        return ok
     }
 }
 

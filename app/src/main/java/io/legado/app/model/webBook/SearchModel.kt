@@ -42,8 +42,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
     private var searchKey: String = ""
     private var bookSourceParts = emptyList<BookSourcePart>()
     private var searchBooks = arrayListOf<SearchBook>()
-    /** Raw per-source hits; display list is rebuilt from this (empty/佚名 author merge). */
-    private var rawSearchHits = arrayListOf<SearchBook>()
+    private val rawHits = SearchHitAccumulator()
     private val pageOwner = SearchPageOwner()
     private var workingState = MutableStateFlow(true)
     private val activeProgress = AtomicReference<SearchProgressReporter?>()
@@ -66,10 +65,11 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                 if (mSearchId != 0L) {
                     close()
                 }
-                searchBooks.clear()
-                rawSearchHits.clear()
+                searchBooks = arrayListOf()
+                rawHits.begin(searchId)
                 bookSourceParts = callBack.getSearchScope().getBookSourceParts()
                 if (bookSourceParts.isEmpty()) {
+                    rawHits.reset()
                     callBack.onSearchCancel(NoStackTraceException("启用书源为空"))
                     return
                 }
@@ -130,7 +130,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                 }
                 hasMore = hasMore || items.isNotEmpty()
                 appDb.searchBookDao.insert(*items.toTypedArray())
-                mergeItems(items, precision, key)
+                mergeItems(searchId, items, precision, key)
                 currentCoroutineContext().ensureActive()
                 if (searchId != mSearchId) return@onEach
                 callBack.onSearchSuccess(searchBooks)
@@ -156,22 +156,42 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
         job.start()
     }
 
-    private suspend fun mergeItems(newDataS: List<SearchBook>, precision: Boolean, key: String) {
-        if (newDataS.isNotEmpty()) {
+    private suspend fun mergeItems(
+        searchId: Long,
+        newDataS: List<SearchBook>,
+        precision: Boolean,
+        key: String,
+    ) {
+        val copies = if (newDataS.isEmpty()) {
+            emptyList()
+        } else {
+            val out = ArrayList<SearchBook>(newDataS.size)
             for (book in newDataS) {
                 currentCoroutineContext().ensureActive()
-                rawSearchHits.add(book.copy())
+                out.add(book.copy())
             }
+            out
         }
-        rebuildDisplay(precision, key)
+        val snapshot = rawHits.append(searchId, copies) ?: return
+        applyDisplay(searchId, snapshot, precision, key)
     }
 
     /**
      * Rebuild the visible list from raw hits.
      * Same title + empty/佚名 author merges only when there is exactly one real author.
      */
-    private suspend fun rebuildDisplay(precision: Boolean, key: String) {
-        val merged = SearchBookMerge.rebuildFromRawHits(rawSearchHits)
+    private suspend fun rebuildDisplay(searchId: Long, precision: Boolean, key: String) {
+        val snapshot = rawHits.snapshot(searchId) ?: return
+        applyDisplay(searchId, snapshot, precision, key)
+    }
+
+    private suspend fun applyDisplay(
+        searchId: Long,
+        snapshot: List<SearchBook>,
+        precision: Boolean,
+        key: String,
+    ) {
+        val merged = SearchBookMerge.rebuildFromRawHits(snapshot)
         val equalData = arrayListOf<SearchBook>()
         val containsData = arrayListOf<SearchBook>()
         val tagsData = arrayListOf<SearchBook>()
@@ -193,6 +213,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
             equalData.addAll(otherData)
         }
         currentCoroutineContext().ensureActive()
+        if (!rawHits.isCurrent(searchId)) return
         searchBooks = equalData
     }
 
@@ -215,7 +236,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
             pageOwner.cancel()?.cancel()
             searchPool?.close()
             searchPool = null
-            rawSearchHits.clear()
+            rawHits.reset()
             mSearchId = 0L
         }
     }

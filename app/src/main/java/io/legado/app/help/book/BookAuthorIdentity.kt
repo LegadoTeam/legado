@@ -24,6 +24,12 @@ object BookAuthorIdentity {
 
     fun isWeakAuthor(raw: String?): Boolean = effectiveAuthor(raw).isEmpty()
 
+    /**
+     * Author stored on insert. Weak placeholders become empty so they do not
+     * collide with a local row whose author is the literal 「佚名」.
+     */
+    fun persistAuthor(raw: String?): String = if (isWeakAuthor(raw)) "" else raw.orEmpty()
+
     fun canonicalName(raw: String?): String = raw.orEmpty().trim()
 
     fun equalName(a: String?, b: String?): Boolean =
