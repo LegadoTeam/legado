@@ -24,8 +24,10 @@ object BookAuthorIdentity {
 
     fun isWeakAuthor(raw: String?): Boolean = effectiveAuthor(raw).isEmpty()
 
+    fun canonicalName(raw: String?): String = raw.orEmpty().trim()
+
     fun equalName(a: String?, b: String?): Boolean =
-        a.orEmpty().trim() == b.orEmpty().trim()
+        canonicalName(a) == canonicalName(b)
 
     fun distinctRealAuthors(rawAuthors: Iterable<String?>): Set<String> {
         val out = linkedSetOf<String>()

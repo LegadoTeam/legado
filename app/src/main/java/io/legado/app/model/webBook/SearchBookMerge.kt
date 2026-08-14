@@ -42,7 +42,7 @@ object SearchBookMerge {
     fun rebuildFromRawHits(rawHits: List<SearchBook>): List<SearchBook> {
         if (rawHits.isEmpty()) return emptyList()
         val out = arrayListOf<SearchBook>()
-        for (hits in rawHits.groupBy { it.name.trim() }.values) {
+        for (hits in rawHits.groupBy { BookAuthorIdentity.canonicalName(it.name) }.values) {
             out.addAll(mergeNameGroup(hits))
         }
         return out

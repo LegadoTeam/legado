@@ -552,12 +552,10 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 )
                 val target = if (reuse != null && reuse.bookUrl != book.bookUrl) {
                     skipIncomingChapters = true
-                    reuse.removeType(BookType.notShelf)
                     if (reuse.order == 0) {
                         reuse.order = book.order
                     }
-                    reuse.savePreservingCustomCoverUrl()
-                    bookData.postValue(reuse)
+                    adoptExistingShelfBook(reuse)
                     onShelf = true
                     reuse
                 } else {
@@ -573,9 +571,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                         skipIncomingChapters = true
                     }
                     if (persisted != null && persisted.bookUrl != book.bookUrl) {
-                        persisted.removeType(BookType.notShelf)
-                        persisted.savePreservingCustomCoverUrl()
-                        bookData.postValue(persisted)
+                        adoptExistingShelfBook(persisted)
                     }
                     onShelf = persisted != null
                     persisted ?: book
@@ -601,6 +597,34 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             inBookshelf = onShelf
         }.onSuccess {
             success?.invoke()
+        }
+    }
+
+    /**
+     * Switch the detail page onto an existing shelf row (same as [upBook]):
+     * book, origin source, and chapters. Never keep the incoming book's source/toc.
+     */
+    private fun adoptExistingShelfBook(existing: Book) {
+        existing.removeType(BookType.notShelf)
+        existing.savePreservingCustomCoverUrl()
+        bookSource = if (existing.isLocal) {
+            hasCustomBtn = false
+            null
+        } else {
+            appDb.bookSourceDao.getBookSource(existing.origin)?.also {
+                hasCustomBtn = it.customButton
+            }
+        }
+        bookData.postValue(existing)
+        if (existing.tocUrl.isEmpty() && !existing.isLocal) {
+            loadBookInfo(existing, runPreUpdateJs = true)
+        } else {
+            val chapters = appDb.bookChapterDao.getChapterList(existing.bookUrl)
+            if (chapters.isNotEmpty()) {
+                chapterListData.postValue(chapters)
+            } else {
+                loadChapter(existing, isFromBookInfo = true)
+            }
         }
     }
 

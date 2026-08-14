@@ -55,10 +55,11 @@ object SearchBookShelfHelp {
     fun shelfBadgeKeys(books: Iterable<Book>): Set<String> {
         val visible = books.filter { !it.isNotShelf }
         val keys = linkedSetOf<String>()
-        val byName = visible.groupBy { it.name.trim() }
+        val byName = visible.groupBy { BookAuthorIdentity.canonicalName(it.name) }
         for ((n, peers) in byName) {
             if (n.isEmpty()) continue
-            val sole = BookAuthorIdentity.soleRealAuthor(peers.map { it.author })
+            val webPeers = peers.filter { !it.isLocal }
+            val sole = BookAuthorIdentity.soleRealAuthor(webPeers.map { it.author })
             for (book in peers) {
                 keys.add(book.bookUrl)
                 keys.add("$n-${book.author}")
@@ -79,7 +80,7 @@ object SearchBookShelfHelp {
 
     fun isInShelfBadgeIndex(book: SearchBook, index: Set<String>): Boolean {
         if (index.contains(book.bookUrl)) return true
-        val name = book.name.trim()
+        val name = BookAuthorIdentity.canonicalName(book.name)
         val eff = BookAuthorIdentity.effectiveAuthor(book.author)
         if (eff.isNotEmpty()) {
             if (index.contains("$name-$eff")) return true
@@ -205,7 +206,10 @@ object SearchBookShelfHelp {
         }
 
         override fun getBooksByName(name: String): List<Book> {
-            return appDb.bookDao.getBooksByName(name)
+            val key = BookAuthorIdentity.canonicalName(name)
+            if (key.isEmpty()) return emptyList()
+            // Trim-equivalent in memory so SQL can keep the name index (no trim(name)).
+            return appDb.bookDao.all.filter { BookAuthorIdentity.canonicalName(it.name) == key }
         }
 
         override fun update(book: Book) {

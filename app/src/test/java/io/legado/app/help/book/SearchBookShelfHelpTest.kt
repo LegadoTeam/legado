@@ -287,6 +287,50 @@ class SearchBookShelfHelpTest {
     }
 
     @Test
+    fun paddedShelfNameAndTrimmedSearchShareBadgeAndSkipInsert() {
+        val existing = Book(
+            bookUrl = "real",
+            name = "同名书 ",
+            author = "作者甲",
+        )
+        val incoming = searchBook("weak", "同名书", "佚名")
+        val keys = SearchBookShelfHelp.shelfBadgeKeys(listOf(existing))
+        assertTrue(SearchBookShelfHelp.isInShelfBadgeIndex(incoming, keys))
+        val store = FakeStore(existing)
+        val result = SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
+        assertEquals(0, result.added)
+        assertEquals(1, store.books.size)
+        assertEquals("real", store.books.single().bookUrl)
+        assertEquals("同名书 ", store.books.single().name)
+        assertEquals(0, store.deleteCount)
+    }
+
+    @Test
+    fun localRealDoesNotGiveWeakBadgeAndIncomingYimingStillInserts() {
+        val local = Book(
+            bookUrl = "local://x",
+            name = "同名书",
+            author = "作者甲",
+            type = BookType.local or BookType.text,
+        )
+        val incoming = searchBook("weak", "同名书", "佚名")
+        val keys = SearchBookShelfHelp.shelfBadgeKeys(listOf(local))
+        assertFalse(SearchBookShelfHelp.isInShelfBadgeIndex(incoming, keys))
+        assertTrue(
+            SearchBookShelfHelp.isInShelfBadgeIndex(
+                searchBook("local://x", "同名书", "作者甲"),
+                keys,
+            )
+        )
+        val store = FakeStore(local)
+        SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
+        assertEquals(2, store.books.size)
+        assertTrue(store.books.any { it.bookUrl == "local://x" })
+        assertTrue(store.books.any { it.bookUrl == "weak" })
+        assertEquals(0, store.deleteCount)
+    }
+
+    @Test
     fun addingRealAuthorDoesNotRewriteExistingYiming() {
         val existing = Book(
             bookUrl = "weak-url",
@@ -515,7 +559,7 @@ class SearchBookShelfHelpTest {
         }
 
         override fun getBooksByName(name: String): List<Book> {
-            return books.filter { it.name == name }
+            return books.filter { BookAuthorIdentity.equalName(it.name, name) }
         }
 
         override fun update(book: Book) {

@@ -124,6 +124,16 @@ class SearchBookMergeTest {
     }
 
     @Test
+    fun rebuildMergesPaddedAndTrimmedTitles() {
+        val padded = book("高考后 ", "佚名", "https://popofree.com")
+        val real = book("高考后", "七月观天", "https://good.com")
+        val merged = SearchBookMerge.rebuildFromRawHits(listOf(padded, real))
+        assertEquals(1, merged.size)
+        assertEquals("七月观天", merged.single().author)
+        assertEquals("https://good.com/高考后", merged.single().bookUrl)
+    }
+
+    @Test
     fun rebuildKeepsEmptySeparateWhenTwoRealsPresent() {
         val empty = book("同名书", "", "https://empty.com")
         val a = book("同名书", "作者甲", "https://a.com")
