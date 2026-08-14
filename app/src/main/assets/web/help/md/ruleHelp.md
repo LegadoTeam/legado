@@ -171,7 +171,7 @@ function loginAction(action, state, form) {
 }
 ```
 
-`loginUi` 返回 `{rows:[...]}`；行类型支持 `text`、`password`、`label`、`select` 和 `button`。`loginAction` 可返回 `state` 重新渲染、`error` 显示字段错误、`login` 保存登录信息、`close` 关闭界面。
+`loginUi` 返回 `{rows:[...]}`；行类型支持 `text`、`password`、`label`、`select`、`button` 和 `toggle`。`loginAction` 可返回 `state` 重新渲染、`error` 显示字段错误、`login` 保存登录信息、`close` 关闭界面。
 
 ## 发现
 
