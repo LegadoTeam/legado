@@ -21,6 +21,7 @@ import io.legado.app.exception.NoBooksDirException
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.book.BookHelp
+import io.legado.app.help.book.BookInfoOpenResolver
 import io.legado.app.help.book.SearchBookShelfHelp
 import io.legado.app.help.book.getExportFileName
 import io.legado.app.help.book.getRemoteUrl
@@ -117,27 +118,24 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             val name = intent.getStringExtra("name") ?: ""
             val author = intent.getStringExtra("author") ?: ""
             val bookUrl = intent.getStringExtra("bookUrl") ?: ""
-            appDb.bookDao.getBook(name, author)?.let {
-                inBookshelf = !it.isNotShelf
-                upBook(it)
-                return@execute
-            }
-            if (bookUrl.isNotBlank()) {
-                appDb.bookDao.getBook(bookUrl)?.let {
-                    inBookshelf = !it.isNotShelf
-                    upBook(it)
-                    return@execute
-                }
-                appDb.searchBookDao.getSearchBook(bookUrl)?.toBook()?.let {
-                    upBook(it)
-                    return@execute
-                }
-            }
-            appDb.searchBookDao.getFirstByNameAuthor(name, author)?.toBook()?.let {
-                upBook(it)
-                return@execute
-            }
-            throw NoStackTraceException("未找到书籍")
+            val opened = BookInfoOpenResolver.resolve(
+                name = name,
+                author = author,
+                bookUrl = bookUrl,
+                shelfByUrl = bookUrl.takeIf { it.isNotBlank() }?.let { appDb.bookDao.getBook(it) },
+                searchByUrl = bookUrl.takeIf { it.isNotBlank() }
+                    ?.let { appDb.searchBookDao.getSearchBook(it)?.toBook() },
+                shelfByNameAuthor = appDb.bookDao.getBook(name, author),
+                searchByNameAuthor = appDb.searchBookDao.getFirstByNameAuthor(name, author)
+                    ?.toBook(),
+                incomingOnShelf = SearchBookShelfHelp.isIncomingOnVisibleShelf(
+                    name,
+                    author,
+                    bookUrl,
+                ),
+            ) ?: throw NoStackTraceException("未找到书籍")
+            inBookshelf = opened.inBookshelf
+            upBook(opened.book)
         }.onError {
             AppLog.put(it.localizedMessage, it)
             context.toastOnUi(it.localizedMessage)
@@ -148,6 +146,11 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         execute {
             val name = intent.getStringExtra("name") ?: ""
             val author = intent.getStringExtra("author") ?: ""
+            val bookUrl = intent.getStringExtra("bookUrl") ?: bookData.value?.bookUrl.orEmpty()
+            if (bookUrl.isNotBlank()) {
+                appDb.bookDao.getBook(bookUrl)?.let { upBook(it) }
+                return@execute
+            }
             appDb.bookDao.getBook(name, author)?.let { book ->
                 upBook(book)
             }
@@ -538,7 +541,6 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
 
     fun addToBookshelf(success: (() -> Unit)?) { //点击书架按钮或在加分组时触发
         execute {
-            var savedThisBook = false
             bookData.value?.let { book ->
                 val incoming = book.copy()
                 incoming.removeType(BookType.notShelf)
@@ -552,9 +554,21 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                         incoming.durChapterTitle = existing.durChapterTitle
                     }
                 }
-                // Persist this book's URL only. Do not switch the page onto another shelf row.
-                val persisted = SearchBookShelfHelp.persistIncomingBook(incoming)
-                savedThisBook = persisted != null && persisted.bookUrl == incoming.bookUrl
+                // Same identity as search list / bulk add. Never switch the page onto another URL.
+                val existing = SearchBookShelfHelp.resolveOnShelf(incoming.toSearchBook())
+                val savedThisBook = if (existing != null && existing.bookUrl != incoming.bookUrl) {
+                    SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming.toSearchBook()))
+                    false
+                } else {
+                    val persisted = SearchBookShelfHelp.persistIncomingBook(incoming)
+                    persisted != null && persisted.bookUrl == incoming.bookUrl
+                }
+                val onShelf = savedThisBook ||
+                    SearchBookShelfHelp.isIncomingOnVisibleShelf(
+                        incoming.name,
+                        incoming.author,
+                        incoming.bookUrl,
+                    )
                 if (savedThisBook) {
                     book.removeType(BookType.notShelf)
                     book.order = incoming.order
@@ -568,14 +582,12 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                         AudioPlay.book = book
                     }
                     SourceCallBack.callBackBook(SourceCallBack.ADD_BOOK_SHELF, bookSource, book)
+                    chapterListData.value?.let {
+                        appDb.bookChapterDao.insert(*it.toTypedArray())
+                    }
                 }
-            }
-            if (savedThisBook) {
-                chapterListData.value?.let {
-                    appDb.bookChapterDao.insert(*it.toTypedArray())
-                }
-            }
-            inBookshelf = savedThisBook
+                inBookshelf = onShelf
+            } ?: run { inBookshelf = false }
         }.onSuccess {
             success?.invoke()
         }

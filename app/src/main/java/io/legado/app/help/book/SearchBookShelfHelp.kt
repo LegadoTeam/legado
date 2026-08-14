@@ -158,7 +158,8 @@ object SearchBookShelfHelp {
     internal fun resolveExisting(store: Store, searchBook: SearchBook): Book? {
         store.getBook(searchBook.bookUrl)?.let { return it }
         val want = BookAuthorIdentity.effectiveAuthor(searchBook.author)
-        val sameName = store.getBooksByName(searchBook.name).filter { !it.isLocal }
+        val sameName = store.getBooksByName(searchBook.name)
+            .filter { !it.isLocal && !it.isNotShelf }
         if (want.isNotEmpty()) {
             reusable(store.getBook(searchBook.name, searchBook.author))?.let { return it }
             reusable(store.getBook(searchBook.name, want))?.let { return it }
@@ -195,6 +196,32 @@ object SearchBookShelfHelp {
 
     fun persistIncomingBook(book: Book): Book? = persistNewBook(AppStore, book)
 
+    internal fun resolveOnShelf(searchBook: SearchBook): Book? {
+        return resolveExisting(AppStore, searchBook)
+    }
+
+    /**
+     * True when list badge / bulk add / detail add would skip inserting [searchBook]
+     * because a visible shelf row already owns that identity.
+     */
+    fun isIncomingOnVisibleShelf(name: String, author: String, bookUrl: String): Boolean {
+        return isIncomingOnVisibleShelf(
+            SearchBook(bookUrl = bookUrl, name = name, author = author),
+            AppStore,
+        )
+    }
+
+    internal fun isIncomingOnVisibleShelf(searchBook: SearchBook, store: Store): Boolean {
+        store.getBook(searchBook.bookUrl)?.let { return !it.isNotShelf }
+        val existing = resolveExisting(store, searchBook)
+        if (existing != null && !existing.isNotShelf) return true
+        val owner = store.getBook(
+            searchBook.name,
+            BookAuthorIdentity.persistAuthor(searchBook.author),
+        )
+        return owner != null && !owner.isNotShelf
+    }
+
     private fun reusable(book: Book?): Book? = book?.takeUnless { it.isLocal }
 
     private object AppStore : Store {
@@ -230,40 +257,6 @@ object SearchBookShelfHelp {
 
 /** Exact Room (name, author) badge key. NUL separators cannot collide with canonical `$name-$author`. */
 private fun roomIdentityKey(name: String, author: String): String = "rk\u0000$name\u0000$author"
-
-/**
- * One shelf snapshot per batch add so N results do not reload bookDao.all N times.
- * Inserts during the batch are visible to later items.
- */
-private class NameIndexStore(
-    private val inner: SearchBookShelfHelp.Store,
-) : SearchBookShelfHelp.Store {
-    private val snapshot = inner.allBooks()
-    private val inserted = arrayListOf<Book>()
-
-    override val minOrder: Int
-        get() = inner.minOrder
-
-    override fun getBook(name: String, author: String): Book? = inner.getBook(name, author)
-
-    override fun getBook(bookUrl: String): Book? = inner.getBook(bookUrl)
-
-    override fun getBooksByName(name: String): List<Book> {
-        val key = BookAuthorIdentity.canonicalName(name)
-        if (key.isEmpty()) return emptyList()
-        return (snapshot + inserted).filter { BookAuthorIdentity.canonicalName(it.name) == key }
-    }
-
-    override fun allBooks(): List<Book> = snapshot + inserted
-
-    override fun update(book: Book) = inner.update(book)
-
-    override fun insertIgnore(book: Book): Boolean {
-        val ok = inner.insertIgnore(book)
-        if (ok) inserted.add(book)
-        return ok
-    }
-}
 
 internal fun Book.isSameShelfIdentity(other: Book): Boolean {
     return (bookUrl.isNotBlank() && bookUrl == other.bookUrl) || isSameNameAuthor(other)

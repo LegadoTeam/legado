@@ -160,7 +160,7 @@ class BookInfoLoadingIndicatorTest {
             .substringAfter("fun addToBookshelf(")
             .substringBefore("fun getBook(")
         assertTrue(addToBookshelf.contains("SearchBookShelfHelp.persistIncomingBook(incoming)"))
-        assertFalse(addToBookshelf.contains("findExistingToReuseOnAdd"))
+        assertTrue(addToBookshelf.contains("SearchBookShelfHelp.resolveOnShelf("))
         assertFalse(addToBookshelf.contains("adoptExistingShelfBook"))
         assertFalse(addToBookshelf.contains("bookData.postValue"))
     }

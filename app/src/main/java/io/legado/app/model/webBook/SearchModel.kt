@@ -41,7 +41,6 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
     private var searchPage = 1
     private var searchKey: String = ""
     private var bookSourceParts = emptyList<BookSourcePart>()
-    private var searchBooks = arrayListOf<SearchBook>()
     private val rawHits = SearchHitAccumulator()
     private val pageOwner = SearchPageOwner()
     private var workingState = MutableStateFlow(true)
@@ -65,7 +64,6 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                 if (mSearchId != 0L) {
                     close()
                 }
-                searchBooks = arrayListOf()
                 rawHits.begin(searchId)
                 bookSourceParts = callBack.getSearchScope().getBookSourceParts()
                 if (bookSourceParts.isEmpty()) {
@@ -130,16 +128,18 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                 }
                 hasMore = hasMore || items.isNotEmpty()
                 appDb.searchBookDao.insert(*items.toTypedArray())
-                mergeItems(searchId, items, precision, key)
+                val published = mergeItems(searchId, items, precision, key) ?: return@onEach
                 currentCoroutineContext().ensureActive()
-                if (searchId != mSearchId) return@onEach
-                callBack.onSearchSuccess(searchBooks)
+                callBack.onSearchSuccess(published)
             }.onCompletion { error ->
                 val context = currentCoroutineContext()
                 pageOwner.complete(context[Job]) {
+                    val published = runCatching {
+                        rebuildDisplay(searchId, precision, key)
+                    }.getOrNull()
                     when {
                         error == null -> progress.finish {
-                            callBack.onSearchFinish(searchBooks.isEmpty(), hasMore)
+                            callBack.onSearchFinish(published.isNullOrEmpty(), hasMore)
                         }
                         context.isActive -> progress.finish {
                             callBack.onSearchCancel()
@@ -161,7 +161,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
         newDataS: List<SearchBook>,
         precision: Boolean,
         key: String,
-    ) {
+    ): List<SearchBook>? {
         val copies = if (newDataS.isEmpty()) {
             emptyList()
         } else {
@@ -172,17 +172,17 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
             }
             out
         }
-        val snapshot = rawHits.append(searchId, copies) ?: return
-        applyDisplay(searchId, snapshot, precision, key)
+        val snapshot = rawHits.append(searchId, copies) ?: return null
+        return applyDisplay(searchId, snapshot, precision, key)
     }
 
     /**
      * Rebuild the visible list from raw hits.
      * Same title + empty/佚名 author merges only when there is exactly one real author.
      */
-    private suspend fun rebuildDisplay(searchId: Long, precision: Boolean, key: String) {
-        val snapshot = rawHits.snapshot(searchId) ?: return
-        applyDisplay(searchId, snapshot, precision, key)
+    private suspend fun rebuildDisplay(searchId: Long, precision: Boolean, key: String): List<SearchBook>? {
+        val snapshot = rawHits.snapshot(searchId) ?: return null
+        return applyDisplay(searchId, snapshot, precision, key)
     }
 
     private suspend fun applyDisplay(
@@ -190,7 +190,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
         snapshot: List<SearchBook>,
         precision: Boolean,
         key: String,
-    ) {
+    ): List<SearchBook>? {
         val merged = SearchBookMerge.rebuildFromRawHits(snapshot)
         val equalData = arrayListOf<SearchBook>()
         val containsData = arrayListOf<SearchBook>()
@@ -213,8 +213,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
             equalData.addAll(otherData)
         }
         currentCoroutineContext().ensureActive()
-        if (!rawHits.isCurrent(searchId)) return
-        searchBooks = equalData
+        return rawHits.publish(searchId, equalData)
     }
 
     fun pause() {

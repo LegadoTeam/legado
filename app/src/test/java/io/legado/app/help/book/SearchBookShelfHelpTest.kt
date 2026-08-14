@@ -388,6 +388,59 @@ class SearchBookShelfHelpTest {
     }
 
     @Test
+    fun notShelfRealDoesNotAbsorbIncomingWeak() {
+        val temp = Book(
+            bookUrl = "A",
+            name = "T",
+            author = "作者甲",
+            type = BookType.text or BookType.notShelf,
+        )
+        val incoming = searchBook("B", "T", "佚名")
+        val keys = SearchBookShelfHelp.shelfBadgeKeys(listOf(temp))
+        assertFalse(SearchBookShelfHelp.isInShelfBadgeIndex(incoming, keys))
+        assertFalse(SearchBookShelfHelp.isIncomingOnVisibleShelf(incoming, FakeStore(temp)))
+        val store = FakeStore(temp)
+        val result = SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
+        assertEquals(1, result.added)
+        assertEquals(2, store.books.size)
+        assertTrue(store.books.first { it.bookUrl == "A" }.isNotShelf)
+        assertEquals("B", result.addedBooks.single().bookUrl)
+        assertEquals(0, store.deleteCount)
+    }
+
+    @Test
+    fun soleWebRealMarksWeakIncomingOnShelfForListAndDetail() {
+        val real = Book(bookUrl = "A", name = "T", author = "作者甲")
+        val incoming = searchBook("B", "T", "佚名")
+        val store = FakeStore(real)
+        val keys = SearchBookShelfHelp.shelfBadgeKeys(listOf(real))
+        assertTrue(SearchBookShelfHelp.isInShelfBadgeIndex(incoming, keys))
+        assertTrue(SearchBookShelfHelp.isIncomingOnVisibleShelf(incoming, store))
+        val result = SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
+        assertEquals(0, result.added)
+        assertEquals(1, store.books.size)
+        assertEquals("A", store.books.single().bookUrl)
+    }
+
+    @Test
+    fun notShelfEmptyAuthorDoesNotMarkWebYimingOnShelf() {
+        val temp = Book(
+            bookUrl = "A",
+            name = "T",
+            author = "",
+            type = BookType.text or BookType.notShelf,
+        )
+        val incoming = searchBook("B", "T", "佚名")
+        assertFalse(SearchBookShelfHelp.isIncomingOnVisibleShelf(incoming, FakeStore(temp)))
+        assertFalse(
+            SearchBookShelfHelp.isInShelfBadgeIndex(
+                incoming,
+                SearchBookShelfHelp.shelfBadgeKeys(listOf(temp)),
+            )
+        )
+    }
+
+    @Test
     fun persistNewBookSkipsWhenLocalOwnsExactRealKey() {
         val local = Book(
             bookUrl = "local://x",

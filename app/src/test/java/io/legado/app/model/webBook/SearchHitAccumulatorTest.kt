@@ -33,9 +33,10 @@ class SearchHitAccumulatorTest {
         acc.begin(9L)
         acc.append(9L, listOf(hit("keep")))
         acc.reset()
-        assertFalse(acc.isCurrent(9L))
-        assertNull(acc.append(9L, listOf(hit("after-reset"))))
         assertNull(acc.snapshot(9L))
+        assertNull(acc.published(9L))
+        assertNull(acc.append(9L, listOf(hit("after-reset"))))
+        assertNull(acc.publish(9L, listOf(hit("stale-display"))))
     }
 
     @Test
@@ -86,6 +87,54 @@ class SearchHitAccumulatorTest {
         ).first { it.isFile }.readText()
         assertTrue(src.contains("SearchHitAccumulator"))
         assertFalse(src.contains("rawSearchHits"))
+        assertTrue(src.contains("rawHits.publish("))
+        assertFalse(src.contains("searchBooks ="))
+    }
+
+    @Test
+    fun stalePublishDoesNotReplaceNewerDisplay() {
+        val acc = SearchHitAccumulator()
+        acc.begin(1L)
+        acc.publish(1L, listOf(hit("old")))
+        acc.begin(2L)
+        acc.publish(2L, listOf(hit("new")))
+        assertNull(acc.publish(1L, listOf(hit("stale"))))
+        assertEquals(listOf("new"), acc.published(2L)!!.map { it.bookUrl })
+        assertNull(acc.published(1L))
+    }
+
+    @Test
+    fun concurrentStalePublishDoesNotReplaceNewDisplay() {
+        val acc = SearchHitAccumulator()
+        acc.begin(1L)
+        val errors = Collections.synchronizedList(mutableListOf<Throwable>())
+        val start = CyclicBarrier(2)
+        val done = CountDownLatch(2)
+        Thread {
+            try {
+                start.await(5, TimeUnit.SECONDS)
+                acc.publish(1L, listOf(hit("old")))
+            } catch (t: Throwable) {
+                errors.add(t)
+            } finally {
+                done.countDown()
+            }
+        }.start()
+        Thread {
+            try {
+                start.await(5, TimeUnit.SECONDS)
+                acc.begin(2L)
+                acc.publish(2L, listOf(hit("new")))
+            } catch (t: Throwable) {
+                errors.add(t)
+            } finally {
+                done.countDown()
+            }
+        }.start()
+        assertTrue(done.await(10, TimeUnit.SECONDS))
+        assertTrue(errors.toString(), errors.isEmpty())
+        assertEquals(listOf("new"), acc.published(2L)!!.map { it.bookUrl })
+        assertNull(acc.published(1L))
     }
 
     private fun hit(bookUrl: String) = SearchBook(
