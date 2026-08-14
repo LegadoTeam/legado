@@ -57,6 +57,7 @@ import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.launch
 import splitties.init.appCtx
 import java.io.FileOutputStream
+import kotlin.math.roundToInt
 
 
 @Suppress("SameParameterValue")
@@ -236,7 +237,11 @@ class ThemeConfigFragment : PreferenceFragment(),
                 .setTitle(getString(R.string.font_scale))
                 .setMaxValue(16)
                 .setMinValue(8)
-                .setValue(requireContext().getPrefInt(PreferKey.fontScale).takeIf { it in 8..16 } ?: 10)
+                .setValue(
+                    (AppContextWrapper.getFontScale(requireContext()) * 10)
+                        .roundToInt()
+                        .coerceIn(8, 16)
+                )
                 .setCustomButton((R.string.btn_default_s)) {
                     putPrefInt(PreferKey.fontScale, 0)
                     recreateActivities()
