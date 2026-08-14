@@ -154,6 +154,17 @@ class BookInfoLoadingIndicatorTest {
         )
     }
 
+    @Test
+    fun `add to bookshelf persists the current book url only`() {
+        val addToBookshelf = projectFile(VIEW_MODEL_PATH).readText()
+            .substringAfter("fun addToBookshelf(")
+            .substringBefore("fun getBook(")
+        assertTrue(addToBookshelf.contains("SearchBookShelfHelp.persistIncomingBook(incoming)"))
+        assertFalse(addToBookshelf.contains("findExistingToReuseOnAdd"))
+        assertFalse(addToBookshelf.contains("adoptExistingShelfBook"))
+        assertFalse(addToBookshelf.contains("bookData.postValue"))
+    }
+
     private fun Element.androidAttribute(name: String): String = getAttributeNS(ANDROID_NS, name)
 
     private fun Element.elementChildren(): List<Element> {

@@ -8,11 +8,12 @@ import io.legado.app.data.entities.SearchBook
 /**
  * Shelf add + 「在架」badge. Does not delete or rewrite existing bookshelf rows.
  *
- * Future adds: a new empty/佚名 hit is skipped when that title already has exactly
- * one web real author on the shelf. A new real author is always inserted; existing
- * 佚名 rows stay put (avoids irreversible guess if a second author appears later).
- * Local rows are never reused or REPLACE-deleted. If a local book already owns the
- * unique (name, author) key, the web copy is not inserted.
+ * Search/explore bulk add: a new empty/佚名 hit is skipped when that title
+ * already has exactly one web real author on the shelf. A new real author is
+ * always inserted; existing 佚名 rows stay put. BookInfo add persists the
+ * current book's URL only and does not retarget another shelf row.
+ * Local rows are never reused or REPLACE-deleted. If a local book already owns
+ * the unique (name, author) key, the web copy is not inserted.
  */
 object SearchBookShelfHelp {
 
@@ -39,17 +40,6 @@ object SearchBookShelfHelp {
         fun update(book: Book)
 
         fun insertIgnore(book: Book): Boolean
-    }
-
-    /**
-     * Existing row to reuse when adding [name]/[author].
-     * Never returns a weak row for an incoming real author.
-     */
-    fun findExistingToReuseOnAdd(name: String, author: String, bookUrl: String = ""): Book? {
-        return resolveExisting(
-            AppStore,
-            SearchBook(bookUrl = bookUrl, name = name, author = author),
-        )
     }
 
     fun shelfBadgeKeys(books: Iterable<Book>): Set<String> {
