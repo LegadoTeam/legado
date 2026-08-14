@@ -8,7 +8,8 @@ object HighlightRuleMatcher {
         val isRegex: Boolean,
         val style: HighlightStyle,
         val timeoutMs: Long = 3000L,
-        val applyToTitle: Boolean = false
+        val applyToTitle: Boolean = false,
+        val applyToBody: Boolean = true
     )
 
     data class RuleMatch(
@@ -16,7 +17,8 @@ object HighlightRuleMatcher {
         val end: Int,
         val ruleId: Long,
         val style: HighlightStyle,
-        val applyToTitle: Boolean
+        val applyToTitle: Boolean,
+        val applyToBody: Boolean = true
     )
 
     data class MatchResult(
@@ -28,29 +30,33 @@ object HighlightRuleMatcher {
         text: String,
         rules: List<Rule>,
         shouldContinue: () -> Boolean = { true },
-        maxMatches: Int = DEFAULT_MAX_MATCHES
-    ): List<RuleMatch> = matchDetailed(text, rules, shouldContinue, maxMatches).matches
+        maxMatches: Int = DEFAULT_MAX_MATCHES,
+        titleLength: Int = 0
+    ): List<RuleMatch> =
+        matchDetailed(text, rules, shouldContinue, maxMatches, titleLength).matches
 
     internal fun matchDetailed(
         text: String,
         rules: List<Rule>,
         shouldContinue: () -> Boolean = { true },
-        maxMatches: Int = DEFAULT_MAX_MATCHES
+        maxMatches: Int = DEFAULT_MAX_MATCHES,
+        titleLength: Int = 0
     ): MatchResult {
         val limit = maxMatches.coerceAtLeast(0)
         if (text.isEmpty() || rules.isEmpty() || limit == 0) {
             return MatchResult(emptyList(), completed = true)
         }
+        val titleEnd = titleLength.coerceIn(0, text.length)
         val matches = ArrayList<RuleMatch>()
         for (rule in rules) {
             if (!shouldContinue()) {
                 return MatchResult(matches, completed = false)
             }
-            if (rule.pattern.isEmpty()) continue
+            if (rule.pattern.isEmpty() || !rule.applyToTitle && !rule.applyToBody) continue
             val completed = if (rule.isRegex) {
-                matchRegex(text, rule, matches, shouldContinue, limit)
+                matchRegex(text, titleEnd, rule, matches, shouldContinue, limit)
             } else {
-                matchLiteral(text, rule, matches, shouldContinue, limit)
+                matchLiteral(text, titleEnd, rule, matches, shouldContinue, limit)
             }
             if (!completed) {
                 return MatchResult(matches, completed = false)
@@ -61,25 +67,36 @@ object HighlightRuleMatcher {
 
     private fun matchLiteral(
         text: String,
+        titleEnd: Int,
         rule: Rule,
         out: MutableList<RuleMatch>,
         shouldContinue: () -> Boolean,
         maxMatches: Int
     ): Boolean {
-        var from = 0
-        while (shouldContinue()) {
-            val start = text.indexOf(rule.pattern, from)
-            if (start < 0) return true
-            if (out.size >= maxMatches) return false
-            val end = start + rule.pattern.length
-            out.add(rule.match(start, end))
-            from = end
+        fun matchSegment(segmentStart: Int, segmentEnd: Int): Boolean {
+            if (segmentStart >= segmentEnd) return true
+            val isSlice = segmentEnd < text.length
+            val input = if (isSlice) text.substring(segmentStart, segmentEnd) else text
+            val offset = if (isSlice) segmentStart else 0
+            var from = if (isSlice) 0 else segmentStart
+            while (shouldContinue()) {
+                val start = input.indexOf(rule.pattern, from)
+                if (start < 0) return true
+                val end = start + rule.pattern.length
+                if (out.size >= maxMatches) return false
+                out.add(rule.match(offset + start, offset + end))
+                from = end
+            }
+            return false
         }
-        return false
+        if (rule.applyToTitle && rule.applyToBody) return matchSegment(0, text.length)
+        if (rule.applyToTitle && !matchSegment(0, titleEnd)) return false
+        return !rule.applyToBody || matchSegment(titleEnd, text.length)
     }
 
     private fun matchRegex(
         text: String,
+        titleEnd: Int,
         rule: Rule,
         out: MutableList<RuleMatch>,
         shouldContinue: () -> Boolean,
@@ -92,31 +109,39 @@ object HighlightRuleMatcher {
         } catch (_: StackOverflowError) {
             return false
         }
+        val timeoutNanos = rule.timeoutMs
+            .coerceAtLeast(1L)
+            .coerceAtMost(Long.MAX_VALUE / 1_000_000L) * 1_000_000L
+        val startedAt = System.nanoTime()
         try {
-            val timeoutNanos = rule.timeoutMs
-                .coerceAtLeast(1L)
-                .coerceAtMost(Long.MAX_VALUE / 1_000_000L) * 1_000_000L
-            val startedAt = System.nanoTime()
-            val input = DeadlineCharSequence(
-                text,
-                startedAt,
-                timeoutNanos,
-                shouldContinue
-            )
-            var result = regex.find(input)
-            while (result != null) {
-                if (!shouldContinue() || System.nanoTime() - startedAt > timeoutNanos) {
-                    return false
+            fun matchSegment(segmentStart: Int, segmentEnd: Int): Boolean {
+                if (segmentStart >= segmentEnd) return true
+                val input = DeadlineCharSequence(
+                    text,
+                    startedAt,
+                    timeoutNanos,
+                    shouldContinue,
+                    segmentStart,
+                    segmentEnd
+                )
+                var result = regex.find(input)
+                while (result != null) {
+                    if (!shouldContinue() || System.nanoTime() - startedAt > timeoutNanos) {
+                        return false
+                    }
+                    if (out.size >= maxMatches) return false
+                    val start = result.range.first
+                    val end = result.range.last + 1
+                    if (end > start) {
+                        out.add(rule.match(segmentStart + start, segmentStart + end))
+                    }
+                    result = result.next()
                 }
-                if (out.size >= maxMatches) return false
-                val start = result.range.first
-                val end = result.range.last + 1
-                if (end > start) {
-                    out.add(rule.match(start, end))
-                }
-                result = result.next()
+                return true
             }
-            return true
+            if (rule.applyToTitle && rule.applyToBody) return matchSegment(0, text.length)
+            if (rule.applyToTitle && !matchSegment(0, titleEnd)) return false
+            return !rule.applyToBody || matchSegment(titleEnd, text.length)
         } catch (_: MatchCancelledException) {
             return false
         } catch (_: RegexTimeoutException) {
@@ -129,36 +154,40 @@ object HighlightRuleMatcher {
     }
 
     private fun Rule.match(start: Int, end: Int) =
-        RuleMatch(start, end, id, style, applyToTitle)
+        RuleMatch(start, end, id, style, applyToTitle, applyToBody)
 
     private class DeadlineCharSequence(
         private val source: CharSequence,
         private val startedAt: Long,
         private val timeoutNanos: Long,
-        private val shouldContinue: () -> Boolean
+        private val shouldContinue: () -> Boolean,
+        private val start: Int = 0,
+        private val end: Int = source.length
     ) : CharSequence {
 
         override val length: Int
-            get() = source.length
+            get() = end - start
 
         override fun get(index: Int): Char {
             checkDeadline()
-            return source[index]
+            return source[start + index]
         }
 
         override fun subSequence(startIndex: Int, endIndex: Int): CharSequence {
             checkDeadline()
             return DeadlineCharSequence(
-                source.subSequence(startIndex, endIndex),
+                source,
                 startedAt,
                 timeoutNanos,
-                shouldContinue
+                shouldContinue,
+                start + startIndex,
+                start + endIndex
             )
         }
 
         override fun toString(): String {
             checkDeadline()
-            return source.toString()
+            return source.subSequence(start, end).toString()
         }
 
         private fun checkDeadline() {

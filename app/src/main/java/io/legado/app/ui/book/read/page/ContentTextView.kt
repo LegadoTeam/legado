@@ -763,7 +763,8 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                         it.start,
                         it.end,
                         it.style,
-                        it.applyToTitle
+                        it.applyToTitle,
+                        it.applyToBody
                     )
                 }
                 .toList()
@@ -1054,7 +1055,7 @@ internal fun highlightRuleIdAtColumn(
     columnEnd: Int,
     isTitle: Boolean
 ): Long? = matches.lastOrNull {
-    (!isTitle || it.applyToTitle) &&
+    (if (isTitle) it.applyToTitle else it.applyToBody) &&
             highlightRangeIntersects(columnStart, columnEnd, it.start, it.end)
 }?.ruleId
 

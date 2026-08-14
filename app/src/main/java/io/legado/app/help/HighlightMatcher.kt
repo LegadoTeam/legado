@@ -6,7 +6,8 @@ object HighlightMatcher {
         val start: Int,
         val end: Int,
         val style: HighlightStyle,
-        val applyToTitle: Boolean = false
+        val applyToTitle: Boolean = false,
+        val applyToBody: Boolean = true
     )
 
     data class LineSpec(
@@ -31,7 +32,9 @@ object HighlightMatcher {
                 val columnEnd = columnPosition + length
                 var style: HighlightStyle? = null
                 for (range in ranges) {
-                    if (line.isTitle && !range.applyToTitle) continue
+                    if (line.isTitle && !range.applyToTitle ||
+                        !line.isTitle && !range.applyToBody
+                    ) continue
                     if (length > 0 && columnStart < range.end && columnEnd > range.start) {
                         style = HighlightStyle.merge(style, range.style)
                     }

@@ -215,4 +215,32 @@ class MigrationTest {
                 close()
             }
     }
+
+    @Test
+    @Throws(IOException::class)
+    fun migrate99To100DefaultsHighlightRulesToBody() {
+        val databaseName = "migration-highlight-rule-body"
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        context.deleteDatabase(databaseName)
+        helper.createDatabase(databaseName, 99).apply {
+            execSQL(
+                """insert into highlightRules
+                    (name, pattern, isRegex, scope, isEnabled, style, sortOrder,
+                    timeoutMillisecond, applyToTitle)
+                    values ('rule', 'text', 0, null, 1, '', 0, 3000, 0)"""
+            )
+            close()
+        }
+
+        Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
+            .build().apply {
+                openHelper.writableDatabase.query(
+                    "select applyToBody from highlightRules where name = 'rule'"
+                ).use { cursor ->
+                    assertTrue(cursor.moveToFirst())
+                    assertEquals(1, cursor.getInt(0))
+                }
+                close()
+            }
+    }
 }

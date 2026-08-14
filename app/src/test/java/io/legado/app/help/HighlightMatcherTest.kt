@@ -96,6 +96,27 @@ class HighlightMatcherTest {
     }
 
     @Test
+    fun `body line accepts only ranges opted into body`() {
+        val result = HighlightMatcher.resolve(
+            0,
+            listOf(LineSpec(6, listOf(3, 3), true)),
+            listOf(
+                Range(
+                    0,
+                    3,
+                    HighlightStyle(fill = 0x11),
+                    applyToTitle = true,
+                    applyToBody = false
+                ),
+                Range(3, 6, HighlightStyle(fill = 0x22))
+            )
+        )
+
+        assertNull(result[0][0])
+        assertNotNull(result[0][1])
+    }
+
+    @Test
     fun `title and body share one chapter coordinate space`() {
         val result = HighlightMatcher.resolve(
             pageBase = 10,

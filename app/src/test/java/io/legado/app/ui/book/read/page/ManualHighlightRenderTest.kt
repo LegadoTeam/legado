@@ -183,13 +183,14 @@ class ManualHighlightRenderTest {
     fun `automatic click match respects title gate and last rule priority`() {
         val style = HighlightStyle(fill = 1)
         val matches = listOf(
-            RuleMatch(1, 2, 1, style, applyToTitle = false),
-            RuleMatch(1, 2, 2, style, applyToTitle = true)
+            RuleMatch(1, 2, 1, style, applyToTitle = false, applyToBody = true),
+            RuleMatch(1, 2, 2, style, applyToTitle = true, applyToBody = false)
         )
 
-        assertEquals(2L, highlightRuleIdAtColumn(matches, 0, 2, isTitle = false))
+        assertEquals(1L, highlightRuleIdAtColumn(matches, 0, 2, isTitle = false))
         assertEquals(2L, highlightRuleIdAtColumn(matches, 0, 2, isTitle = true))
         assertNull(highlightRuleIdAtColumn(matches.take(1), 0, 2, isTitle = true))
+        assertNull(highlightRuleIdAtColumn(matches.drop(1), 0, 2, isTitle = false))
         assertNull(highlightRuleIdAtColumn(matches, 2, 3, isTitle = false))
     }
 

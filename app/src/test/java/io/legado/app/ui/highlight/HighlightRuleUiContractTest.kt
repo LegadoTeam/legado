@@ -44,6 +44,7 @@ class HighlightRuleUiContractTest {
 
         assertTrue(editor.contains("HighlightStyleDialog.StyleHost"))
         assertTrue(editor.contains("setColorPickerDialogListener(this)"))
+        assertEquals(1, layout.elementsWithAndroidId("@+id/cb_apply_to_body"))
         assertEquals(1, layout.elementsWithAndroidId("@+id/cb_apply_to_title"))
     }
 

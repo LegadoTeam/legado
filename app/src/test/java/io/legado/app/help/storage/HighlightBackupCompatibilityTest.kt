@@ -36,8 +36,19 @@ class HighlightBackupCompatibilityTest {
         ).getOrThrow().single().normalizeForRestore()
 
         assertFalse(rule.applyToTitle)
+        assertTrue(rule.applyToBody)
         assertEquals(HighlightRule.DEFAULT_TIMEOUT_MILLISECONDS, rule.timeoutMillisecond)
         assertEquals(HighlightStyle(), rule.styleObj())
+    }
+
+    @Test
+    fun `rule json preserves title only scope`() {
+        val rule = GSON.fromJsonArray<HighlightRule>(
+            """[{"pattern":"text","applyToTitle":true,"applyToBody":false}]"""
+        ).getOrThrow().single().normalizeForRestore()
+
+        assertTrue(rule.applyToTitle)
+        assertFalse(rule.applyToBody)
     }
 
     @Test

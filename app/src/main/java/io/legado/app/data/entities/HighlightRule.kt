@@ -28,7 +28,9 @@ data class HighlightRule(
     var order: Int = Int.MIN_VALUE,
     var timeoutMillisecond: Long = DEFAULT_TIMEOUT_MILLISECONDS,
     @ColumnInfo(defaultValue = "0")
-    var applyToTitle: Boolean = false
+    var applyToTitle: Boolean = false,
+    @ColumnInfo(defaultValue = "1")
+    var applyToBody: Boolean = true
 ) : Parcelable {
 
     override fun equals(other: Any?): Boolean {
