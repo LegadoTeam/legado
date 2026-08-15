@@ -97,6 +97,7 @@ class HttpTtsEditDialog() : BaseDialogFragment(R.layout.dialog_http_tts_edit, tr
         binding.tvLoginCheckJs.setText(httpTTS.loginCheckJs)
         binding.tvHeaders.setText(httpTTS.header)
         binding.tvJsLib.setText(httpTTS.jsLib)
+        binding.cbIsEnableCookie.isChecked = httpTTS.enabledCookieJar == true
     }
 
 
@@ -185,7 +186,8 @@ class HttpTtsEditDialog() : BaseDialogFragment(R.layout.dialog_http_tts_edit, tr
             loginUi = binding.tvLoginUi.text?.toString(),
             loginCheckJs = binding.tvLoginCheckJs.text?.toString(),
             header = binding.tvHeaders.text?.toString(),
-            jsLib = binding.tvJsLib.text?.toString()
+            jsLib = binding.tvJsLib.text?.toString(),
+            enabledCookieJar = binding.cbIsEnableCookie.isChecked
         )
     }
 
