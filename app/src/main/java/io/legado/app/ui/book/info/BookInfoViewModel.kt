@@ -27,12 +27,9 @@ import io.legado.app.help.book.SearchBookShelfHelp
 import io.legado.app.help.book.getExportFileName
 import io.legado.app.help.book.getRemoteUrl
 import io.legado.app.help.book.addType
-import io.legado.app.help.book.isAudio
-import io.legado.app.help.book.isImage
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.book.isSameNameAuthor
-import io.legado.app.help.book.isVideo
 import io.legado.app.help.book.isWebFile
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.savePreservingCustomCoverUrl
@@ -43,7 +40,6 @@ import io.legado.app.model.AudioPlay
 import io.legado.app.model.BookCover
 import io.legado.app.model.ReadBook
 import io.legado.app.model.ReadManga
-import io.legado.app.model.VideoPlay
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.webBook.WebBook
@@ -125,11 +121,8 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
 
     fun upBook(intent: Intent, success: (() -> Unit)? = null) {
         execute {
-            val page = bookData.value
-            val sessionUrl = sessionBookUrl(page)
-            val pageUrl = page?.bookUrl
-            val book = sessionUrl?.takeIf { it.isNotBlank() }?.let { appDb.bookDao.getBook(it) }
-                ?: pageUrl?.takeIf { it.isNotBlank() }?.let { appDb.bookDao.getBook(it) }
+            val pageUrl = bookData.value?.bookUrl
+            val book = pageUrl?.takeIf { it.isNotBlank() }?.let { appDb.bookDao.getBook(it) }
             if (book != null) {
                 refreshShelfFlags(book)
                 upBook(book)
@@ -139,16 +132,6 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         }.onSuccess {
             success?.invoke()
         }
-    }
-
-    private fun sessionBookUrl(page: Book?): String? {
-        val preferred = when {
-            page?.isAudio == true -> AudioPlay.book?.bookUrl
-            page?.isVideo == true -> VideoPlay.book?.bookUrl
-            page?.isImage == true -> ReadManga.book?.bookUrl ?: ReadBook.book?.bookUrl
-            else -> ReadBook.book?.bookUrl
-        }
-        return preferred?.takeIf { it.isNotBlank() }
     }
 
     private fun refreshShelfFlags(book: Book) {
