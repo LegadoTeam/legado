@@ -93,6 +93,22 @@ class ReviewDetailMediaSourceTest {
     }
 
     @Test
+    fun `embedded replies are expanded without loading paged replies`() {
+        val source = dialogSource()
+        val flatten = source.substringAfter("private fun flattenItems(")
+            .substringBefore("private fun renderUiItems()")
+
+        assertTrue(flatten.contains("val isExpanded = loadedReplyCount > 0 ||"))
+        assertTrue(flatten.contains("expandedReplyParentKeys.contains(parentKey)"))
+        assertTrue(flatten.contains("val canLoadMore = hasReplyUrl"))
+
+        val listener = source.substringAfter("override fun registerListener(")
+            .substringBefore("private fun bindAudioState")
+        assertTrue(listener.contains("loadReplies(parentKey)"))
+        assertFalse(listener.contains("detail.replies.isNotEmpty()"))
+    }
+
+    @Test
     fun `review image restores its cached aspect ratio before reloading`() {
         val binding = dialogSource()
             .substringAfter("private fun bindReviewImage(")

@@ -793,7 +793,8 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
 
             val loadedReplyCount = item.replies.size
             val totalReplyCount = max(item.replyCount ?: 0, loadedReplyCount)
-            val isExpanded = expandedReplyParentKeys.contains(parentKey)
+            val isExpanded = loadedReplyCount > 0 ||
+                    expandedReplyParentKeys.contains(parentKey)
             val canLoadMore = hasReplyUrl &&
                     !item.id.isNullOrBlank() &&
                     !replyExhaustedParentKeys.contains(parentKey) &&
@@ -1073,17 +1074,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
                 if (item.itemType == TYPE_MORE) {
                     if (item.isLoading) return@setOnClickListener
                     val parentKey = item.parentKey ?: return@setOnClickListener
-                    val detail = mainItemIndexByKey[parentKey]
-                        ?.let { detailItems.getOrNull(it) }
-                        ?: return@setOnClickListener
-                    if (detail.replies.isNotEmpty() &&
-                        !expandedReplyParentKeys.contains(parentKey)
-                    ) {
-                        expandedReplyParentKeys.add(parentKey)
-                        renderUiItems()
-                    } else {
-                        loadReplies(parentKey)
-                    }
+                    loadReplies(parentKey)
                 }
             }
             binding.ivMedia.setOnClickListener {

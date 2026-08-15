@@ -90,6 +90,7 @@
           <details
             v-if="hasReplies(item)"
             class="reply-details"
+            :open="item.replyItems.length > 0"
             @toggle="onReplyToggle($event, item)"
             @click.stop
           >
