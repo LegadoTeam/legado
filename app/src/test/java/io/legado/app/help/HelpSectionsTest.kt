@@ -6,6 +6,24 @@ import org.junit.Test
 class HelpSectionsTest {
 
     @Test
+    fun includesNestedH3SectionsWhenH2SectionsExist() {
+        val sections = parseHelpSections(
+            "## One\nIntro\n### First\n1\n### Second\n2\n## Two\n### Only\n3",
+        )
+
+        assertEquals(
+            listOf(
+                0 to "One",
+                1 to "First",
+                1 to "Second",
+                0 to "Two",
+            ),
+            sections.map { it.depth to it.title },
+        )
+        assertEquals("### First\n1", sections[1].markdown)
+    }
+
+    @Test
     fun parsesSupportedHeadingLayouts() {
         data class Case(
             val name: String,

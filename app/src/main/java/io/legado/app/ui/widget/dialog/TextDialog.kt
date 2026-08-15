@@ -188,7 +188,9 @@ class TextDialog() : BaseDialogFragment(R.layout.dialog_text_view) {
             return
         }
         selectedSection = selectedSection.coerceIn(0, sections.size)
-        val labels = listOf(getString(R.string.all)) + sections.map { it.title }
+        val labels = listOf(getString(R.string.all)) + sections.map {
+            if (it.depth == 0) it.title else "    ${it.title}"
+        }
         binding.tocList.adapter = ArrayAdapter<String>(
             requireContext(),
             android.R.layout.simple_list_item_activated_1,

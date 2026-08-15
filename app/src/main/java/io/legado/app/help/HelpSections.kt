@@ -3,13 +3,18 @@ package io.legado.app.help
 internal data class HelpSection(
     val title: String,
     val markdown: String,
+    val depth: Int = 0,
 )
 
 internal fun parseHelpSections(markdown: String): List<HelpSection> {
     val lines = markdown.lines()
-    return splitHelpSections(lines, 2)
-        ?: splitHelpSections(lines, 3)
-        ?: emptyList()
+    val parentSections = splitHelpSections(lines, 2)
+        ?: return splitHelpSections(lines, 3).orEmpty()
+    return parentSections.flatMap { parent ->
+        listOf(parent) + splitHelpSections(parent.markdown.lines(), 3)
+            .orEmpty()
+            .map { it.copy(depth = 1) }
+    }
 }
 
 private fun splitHelpSections(lines: List<String>, level: Int): List<HelpSection>? {
