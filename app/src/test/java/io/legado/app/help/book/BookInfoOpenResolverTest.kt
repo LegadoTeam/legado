@@ -116,7 +116,14 @@ class BookInfoOpenResolverTest {
         assertTrue(tocResult.contains("if (!viewModel.inBookshelf)"))
         assertTrue(tocResult.contains("viewModel.delBook(onlyNotShelf = true)"))
         assertTrue(activity.contains("putExtra(\"inBookshelf\", viewModel.inBookshelf)"))
-        assertTrue(info.contains("BookInfoShelfFlags.canDeleteTempBookUrl"))
+        assertTrue(info.contains("deleteNotShelfByUrl"))
+        assertFalse(info.contains("canDeleteTempBookUrl"))
+        val dao = read("src/main/java/io/legado/app/data/dao/BookDao.kt")
+        assertTrue(
+            dao.contains(
+                "delete from books where bookUrl = :bookUrl and type & \${BookType.notShelf} > 0",
+            ),
+        )
         val readFinish = read("src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
         assertTrue(readFinish.contains("BookInfoShelfFlags.promoteOrSkipTempBook"))
     }

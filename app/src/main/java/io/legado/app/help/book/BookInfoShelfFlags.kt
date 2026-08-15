@@ -30,14 +30,6 @@ internal object BookInfoShelfFlags {
         return pageUrl.isNotBlank() && persistedUrl == pageUrl
     }
 
-    fun canDeleteTempBookUrl(
-        pageUrl: String,
-        persistedUrl: String?,
-        persistedIsNotShelf: Boolean,
-    ): Boolean {
-        return canDeleteBookUrl(pageUrl, persistedUrl) && persistedIsNotShelf
-    }
-
     fun readerInBookshelfExtra(officialUrlOnShelf: Boolean): Boolean = officialUrlOnShelf
 
     fun promoteOrSkipTempBook(book: Book): Boolean {

@@ -135,9 +135,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
             }.onCompletion { error ->
                 val context = currentCoroutineContext()
                 pageOwner.complete(context[Job]) {
-                    val published = runCatching {
-                        rebuildDisplay(searchId, precision, key)
-                    }.getOrNull()
+                    val published = rawHits.published(searchId)
                     when {
                         error == null -> progress.finish {
                             callBack.onSearchFinish(published.isNullOrEmpty(), hasMore)
@@ -178,15 +176,6 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
             return rawHits.published(searchId)
         }
         return applyDisplay(searchId, appended.hits, precision, key)
-    }
-
-    /**
-     * Rebuild the visible list from raw hits.
-     * Same title + empty/佚名 author merges only when there is exactly one real author.
-     */
-    private suspend fun rebuildDisplay(searchId: Long, precision: Boolean, key: String): List<SearchBook>? {
-        val snapshot = rawHits.snapshot(searchId) ?: return null
-        return applyDisplay(searchId, snapshot, precision, key)
     }
 
     private suspend fun applyDisplay(

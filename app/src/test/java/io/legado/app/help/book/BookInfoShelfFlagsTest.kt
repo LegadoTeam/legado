@@ -12,9 +12,6 @@ class BookInfoShelfFlagsTest {
     @Test
     fun tocCancelDeletesOnlyTheCurrentNotShelfUrl() {
         assertTrue(BookInfoShelfFlags.canDeleteBookUrl("B", "B"))
-        assertTrue(BookInfoShelfFlags.canDeleteTempBookUrl("B", "B", persistedIsNotShelf = true))
-        assertFalse(BookInfoShelfFlags.canDeleteTempBookUrl("B", "B", persistedIsNotShelf = false))
-        assertFalse(BookInfoShelfFlags.canDeleteTempBookUrl("B", "A", persistedIsNotShelf = true))
         assertFalse(BookInfoShelfFlags.canDeleteBookUrl("B", "A"))
     }
 

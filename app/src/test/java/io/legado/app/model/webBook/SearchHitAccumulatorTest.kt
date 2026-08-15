@@ -237,6 +237,12 @@ class SearchHitAccumulatorTest {
         assertTrue(src.contains("if (!appended.changed)"))
         assertTrue(src.contains("rawHits.published(searchId)"))
         assertTrue(src.contains("applyDisplay(searchId, appended.hits"))
+        val startSearch = src.substringAfter("private fun startSearch()").substringBefore("private suspend fun mergeItems")
+        val completion = startSearch.substringAfter("onCompletion").substringBefore("activeProgress")
+        assertTrue(completion.contains("rawHits.published(searchId)"))
+        assertFalse(completion.contains("rebuildDisplay"))
+        assertFalse(completion.contains("onSearchSuccess"))
+        assertFalse(src.contains("fun rebuildDisplay"))
     }
 
     private fun hit(bookUrl: String) = SearchBook(

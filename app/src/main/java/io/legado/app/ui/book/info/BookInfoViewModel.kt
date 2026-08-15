@@ -615,17 +615,19 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     ) {
         execute {
             val book = bookData.value ?: return@execute
-            val persisted = appDb.bookDao.getBook(book.bookUrl)
-            val allowed = if (onlyNotShelf) {
-                BookInfoShelfFlags.canDeleteTempBookUrl(
+            if (onlyNotShelf) {
+                val deleted = appDb.bookDao.deleteNotShelfByUrl(book.bookUrl)
+                if (deleted > 0 && ReadBook.book?.bookUrl == book.bookUrl) {
+                    ReadBook.book = null
+                }
+                if (deleted > 0 && book.isLocal) {
+                    LocalBook.deleteBook(book, deleteOriginal)
+                }
+            } else if (BookInfoShelfFlags.canDeleteBookUrl(
                     book.bookUrl,
-                    persisted?.bookUrl,
-                    persisted?.isNotShelf == true,
+                    appDb.bookDao.getBook(book.bookUrl)?.bookUrl,
                 )
-            } else {
-                BookInfoShelfFlags.canDeleteBookUrl(book.bookUrl, persisted?.bookUrl)
-            }
-            if (allowed) {
+            ) {
                 book.delete()
                 if (book.isLocal) {
                     LocalBook.deleteBook(book, deleteOriginal)
