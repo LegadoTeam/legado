@@ -6,9 +6,10 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.SearchBook
 
 /**
- * Shelf add + 「在架」badge. Does not delete or rewrite official bookshelf rows.
- * Weak incoming skips when a sole web real author is already visible.
- * BookInfo keeps the current URL. Local unique keys are never REPLACE-deleted.
+ * Search/explore bulk add. Does not delete or rewrite official bookshelf rows.
+ * A new empty/佚名 hit is skipped when that title already has exactly one
+ * visible web real author. Badge is for the displayed row only (URL / this
+ * book's name-author), not a cross-page identity.
  */
 object SearchBookShelfHelp {
 
@@ -22,13 +23,6 @@ object SearchBookShelfHelp {
         val skipped: Int
             get() = total - added
     }
-
-    /** [identityOnShelf] = badge/skip-insert/UI. [urlOnShelf] = visible row for this URL. */
-    data class ShelfPresence(
-        val existing: Book?,
-        val identityOnShelf: Boolean,
-        val urlOnShelf: Boolean,
-    )
 
     internal interface Store {
         val minOrder: Int
@@ -44,35 +38,22 @@ object SearchBookShelfHelp {
         fun update(book: Book)
 
         fun insertIgnore(book: Book): Boolean
-
-        fun delete(book: Book)
     }
 
     fun shelfBadgeKeys(books: Iterable<Book>): Set<String> {
-        val visible = books.filter { !it.isNotShelf }
         val keys = linkedSetOf<String>()
-        val byName = visible.groupBy { BookAuthorIdentity.canonicalName(it.name) }
-        for ((n, peers) in byName) {
-            if (n.isEmpty()) continue
-            val webPeers = peers.filter { !it.isLocal }
-            val sole = BookAuthorIdentity.soleRealAuthor(webPeers.map { it.author })
-            for (book in peers) {
-                keys.add(book.bookUrl)
-                // Exact Room (name, author) identity. Do not trim: padded local
-                // names do not block a trimmed web insert.
-                keys.add(roomIdentityKey(book.name, book.author))
-                if (book.isLocal) continue
-                keys.add("$n-${book.author}")
-                val eff = BookAuthorIdentity.effectiveAuthor(book.author)
-                if (eff.isNotEmpty()) {
-                    keys.add("$n-$eff")
-                } else {
-                    keys.add(n)
-                }
-            }
-            if (sole != null) {
-                keys.add("$n-$sole")
-                keys.add("weak:$n")
+        for (book in books) {
+            if (book.isNotShelf) continue
+            keys.add(book.bookUrl)
+            keys.add(roomIdentityKey(book.name, book.author))
+            val n = BookAuthorIdentity.canonicalName(book.name)
+            if (n.isEmpty() || book.isLocal) continue
+            keys.add("$n-${book.author}")
+            val eff = BookAuthorIdentity.effectiveAuthor(book.author)
+            if (eff.isNotEmpty()) {
+                keys.add("$n-$eff")
+            } else {
+                keys.add(n)
             }
         }
         return keys
@@ -85,14 +66,26 @@ object SearchBookShelfHelp {
         val name = BookAuthorIdentity.canonicalName(book.name)
         val eff = BookAuthorIdentity.effectiveAuthor(book.author)
         if (eff.isNotEmpty()) {
-            if (index.contains("$name-$eff")) return true
-            if (index.contains("$name-${book.author}")) return true
-        } else {
-            if (index.contains(name)) return true
-            if (index.contains("weak:$name")) return true
-            if (index.contains("$name-${book.author}")) return true
+            return index.contains("$name-$eff") || index.contains("$name-${book.author}")
         }
-        return false
+        return index.contains(name) || index.contains("$name-${book.author}")
+    }
+
+    fun shouldSkipWeakInsert(name: String, author: String, bookUrl: String): Boolean {
+        return shouldSkipWeakInsert(SearchBook(bookUrl = bookUrl, name = name, author = author), AppStore)
+    }
+
+    internal fun shouldSkipWeakInsert(searchBook: SearchBook, store: Store): Boolean {
+        if (!BookAuthorIdentity.isWeakAuthor(searchBook.author)) return false
+        store.getBook(searchBook.bookUrl)?.takeUnless { it.isNotShelf }?.let { return false }
+        val sameName = store.getBooksByName(searchBook.name)
+            .filter { !it.isLocal && !it.isNotShelf }
+        return BookAuthorIdentity.soleRealAuthor(sameName.map { it.author }) != null
+    }
+
+    fun isOfficialUrlOnShelf(bookUrl: String): Boolean {
+        if (bookUrl.isBlank()) return false
+        return appDb.bookDao.getBook(bookUrl)?.isNotShelf == false
     }
 
     fun addLoadedBooksToShelf(books: List<SearchBook>): AddResult {
@@ -119,19 +112,17 @@ object SearchBookShelfHelp {
         val addedBooks = arrayListOf<Book>()
         val booksToOrder = arrayListOf<Book>()
         books.forEach { searchBook ->
-            val existingBook = resolveExisting(store, searchBook)
-            if (existingBook != null) {
-                if (existingBook.isNotShelf) {
-                    existingBook.removeType(BookType.notShelf)
-                    store.update(existingBook)
-                    if (existingBook.order == 0) {
-                        booksToOrder.add(existingBook)
-                    }
-                    addedBooks.add(existingBook)
+            if (shouldSkipWeakInsert(searchBook, store)) return@forEach
+            val byUrl = store.getBook(searchBook.bookUrl)
+            if (byUrl != null) {
+                if (byUrl.isNotShelf) {
+                    byUrl.removeType(BookType.notShelf)
+                    store.update(byUrl)
+                    addedBooks.add(byUrl)
+                    if (byUrl.order == 0) booksToOrder.add(byUrl)
                 }
                 return@forEach
             }
-
             val newBook = searchBook.toBook().apply {
                 removeType(BookType.notShelf)
             }
@@ -153,35 +144,7 @@ object SearchBookShelfHelp {
         return AddResult(books.size, addedBooks)
     }
 
-    /** URL, same effective author, or incoming weak + sole visible web real. Local rows are never reused. */
-    internal fun resolveExisting(store: Store, searchBook: SearchBook): Book? {
-        val byUrl = store.getBook(searchBook.bookUrl)
-        if (byUrl != null && !byUrl.isNotShelf) return byUrl
-        val want = BookAuthorIdentity.effectiveAuthor(searchBook.author)
-        val sameName = store.getBooksByName(searchBook.name)
-            .filter { !it.isLocal && !it.isNotShelf }
-        val visible = if (want.isNotEmpty()) {
-            reusable(store.getBook(searchBook.name, searchBook.author))
-                ?: reusable(store.getBook(searchBook.name, want))
-                ?: sameName.firstOrNull {
-                    BookAuthorIdentity.effectiveAuthor(it.author) == want
-                }
-        } else if (sameName.isEmpty()) {
-            null
-        } else {
-            val sole = BookAuthorIdentity.soleRealAuthor(sameName.map { it.author })
-            if (sole != null) {
-                sameName.firstOrNull {
-                    BookAuthorIdentity.effectiveAuthor(it.author) == sole
-                }
-            } else {
-                sameName.firstOrNull { BookAuthorIdentity.isWeakAuthor(it.author) }
-            }
-        }
-        return visible ?: byUrl
-    }
-
-    /** Insert without REPLACE. Weak authors persist as empty. NotShelf unique-key leftovers are dropped. */
+    /** Insert without REPLACE. Weak authors persist as empty. Unique-key conflicts are not deleted. */
     internal fun persistNewBook(store: Store, book: Book): Book? {
         store.getBook(book.bookUrl)?.let {
             store.update(book)
@@ -192,11 +155,7 @@ object SearchBookShelfHelp {
         }
         if (store.insertIgnore(book)) return book
         val owner = store.getBook(book.name, book.author) ?: return null
-        if (owner.isNotShelf && !owner.isLocal && owner.bookUrl != book.bookUrl) {
-            store.delete(owner)
-            if (store.insertIgnore(book)) return book
-        }
-        return reusable(owner.takeUnless { it.isNotShelf })
+        return owner.takeUnless { it.isLocal || it.isNotShelf }
     }
 
     fun persistIncomingBook(book: Book): Book? {
@@ -206,40 +165,6 @@ object SearchBookShelfHelp {
         }
         return persisted
     }
-
-    internal fun resolveOnShelf(searchBook: SearchBook): Book? {
-        return resolveExisting(AppStore, searchBook)
-    }
-
-    fun presence(name: String, author: String, bookUrl: String): ShelfPresence {
-        return presence(SearchBook(bookUrl = bookUrl, name = name, author = author), AppStore)
-    }
-
-    fun isIncomingOnVisibleShelf(name: String, author: String, bookUrl: String): Boolean {
-        return presence(name, author, bookUrl).identityOnShelf
-    }
-
-    internal fun presence(searchBook: SearchBook, store: Store): ShelfPresence {
-        val byUrl = store.getBook(searchBook.bookUrl)
-        if (byUrl != null && !byUrl.isNotShelf) {
-            return ShelfPresence(byUrl, identityOnShelf = true, urlOnShelf = true)
-        }
-        val existing = resolveExisting(store, searchBook)?.takeUnless { it.isNotShelf }
-        if (existing != null) {
-            return ShelfPresence(existing, identityOnShelf = true, urlOnShelf = false)
-        }
-        val owner = store.getBook(
-            searchBook.name,
-            BookAuthorIdentity.persistAuthor(searchBook.author),
-        )?.takeUnless { it.isNotShelf }
-        return ShelfPresence(owner, identityOnShelf = owner != null, urlOnShelf = false)
-    }
-
-    internal fun isIncomingOnVisibleShelf(searchBook: SearchBook, store: Store): Boolean {
-        return presence(searchBook, store).identityOnShelf
-    }
-
-    private fun reusable(book: Book?): Book? = book?.takeUnless { it.isLocal }
 
     private object AppStore : Store {
         override val minOrder: Int
@@ -256,7 +181,6 @@ object SearchBookShelfHelp {
         override fun getBooksByName(name: String): List<Book> {
             val key = BookAuthorIdentity.canonicalName(name)
             if (key.isEmpty()) return emptyList()
-            // Trim-equivalent in memory so SQL can keep the name index (no trim(name)).
             return allBooks().filter { BookAuthorIdentity.canonicalName(it.name) == key }
         }
 
@@ -269,14 +193,9 @@ object SearchBookShelfHelp {
         override fun insertIgnore(book: Book): Boolean {
             return appDb.bookDao.insertIgnore(book) != -1L
         }
-
-        override fun delete(book: Book) {
-            book.delete()
-        }
     }
 }
 
-/** Exact Room (name, author) badge key. NUL separators cannot collide with canonical `$name-$author`. */
 private fun roomIdentityKey(name: String, author: String): String = "rk\u0000$name\u0000$author"
 
 internal fun Book.isSameShelfIdentity(other: Book): Boolean {

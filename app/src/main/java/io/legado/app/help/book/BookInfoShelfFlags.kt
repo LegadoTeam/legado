@@ -5,56 +5,31 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 
 /**
- * BookInfo shelf flags.
- *
- * [State.inBookshelf] is identity-on-shelf (badge / skip-insert / UI).
- * [State.urlOnShelf] is a visible (non-notShelf) `books` row for this URL.
- *
- * Temp persist for TOC/Read only proves `getBook(url)` can succeed. It must
- * not promote either flag. Official add and DB presence own the flags.
+ * BookInfo official-shelf flag is this URL only. Temp TOC/Read persist must
+ * not mark official. Weak add/promote is skipped when a sole web real exists.
  */
 internal object BookInfoShelfFlags {
 
-    data class State(
-        val inBookshelf: Boolean,
-        val urlOnShelf: Boolean,
-    )
-
-    fun fromPresence(identityOnShelf: Boolean, urlOnShelf: Boolean): State {
-        return State(inBookshelf = identityOnShelf, urlOnShelf = urlOnShelf)
+    fun isOfficialUrl(bookUrl: String): Boolean {
+        return SearchBookShelfHelp.isOfficialUrlOnShelf(bookUrl)
     }
 
-    /** URL is now in DB so TOC/Read can load it. Do not mark official shelf. */
-    fun afterUrlPersisted(previous: State): State = previous
-
-    fun afterReaderReturned(identityOnShelf: Boolean, urlOnShelf: Boolean): State {
-        return fromPresence(identityOnShelf, urlOnShelf)
+    fun resolveReturnBook(
+        currentPageUrl: String?,
+        intentUrl: String?,
+        byCurrentUrl: Book?,
+        byIntentUrl: Book?,
+        byNameAuthor: Book?,
+    ): Book? {
+        if (!currentPageUrl.isNullOrBlank() && byCurrentUrl != null) return byCurrentUrl
+        if (!intentUrl.isNullOrBlank() && byIntentUrl != null) return byIntentUrl
+        return byNameAuthor
     }
 
-    fun afterBookRestored(identityOnShelf: Boolean, urlOnShelf: Boolean): State {
-        return fromPresence(identityOnShelf, urlOnShelf)
-    }
-
-    /**
-     * Reader/TOC return: follow the page's current URL (changeTo may have
-     * replaced the book). The launch Intent extra can still be the old URL.
-     */
-    fun resolveReturnBookUrl(currentPageUrl: String?, intentUrl: String?): String {
-        return currentPageUrl?.takeIf { it.isNotBlank() } ?: intentUrl.orEmpty()
-    }
-
-    /**
-     * User remove-from-shelf: delete only the current page URL.
-     * Identity-only must not delete the other shelf row.
-     */
     fun canDeleteBookUrl(pageUrl: String, persistedUrl: String?): Boolean {
         return pageUrl.isNotBlank() && persistedUrl == pageUrl
     }
 
-    /**
-     * TOC/reader leftover cleanup. Official rows must survive a stale
-     * [urlOnShelf] after changeTo.
-     */
     fun canDeleteTempBookUrl(
         pageUrl: String,
         persistedUrl: String?,
@@ -63,21 +38,10 @@ internal object BookInfoShelfFlags {
         return canDeleteBookUrl(pageUrl, persistedUrl) && persistedIsNotShelf
     }
 
-    fun readerInBookshelfExtra(urlOnShelf: Boolean): Boolean = urlOnShelf
-
-    /**
-     * Promote a temp URL only when this URL is already official, or no
-     * visible shelf identity owns the name. Weak leftover rows must not
-     * become a second official book beside the sole real author.
-     */
-    fun canPromoteToOfficial(identityOnShelf: Boolean, urlOnShelf: Boolean): Boolean {
-        return urlOnShelf || !identityOnShelf
-    }
+    fun readerInBookshelfExtra(officialUrlOnShelf: Boolean): Boolean = officialUrlOnShelf
 
     fun promoteOrSkipTempBook(book: Book): Boolean {
-        val presence = SearchBookShelfHelp.presence(book.name, book.author, book.bookUrl)
-        if (!canPromoteToOfficial(presence.identityOnShelf, presence.urlOnShelf)) {
-            appDb.bookDao.getBook(book.bookUrl)?.takeIf { it.isNotShelf }?.delete()
+        if (SearchBookShelfHelp.shouldSkipWeakInsert(book.name, book.author, book.bookUrl)) {
             return false
         }
         book.removeType(BookType.notShelf)

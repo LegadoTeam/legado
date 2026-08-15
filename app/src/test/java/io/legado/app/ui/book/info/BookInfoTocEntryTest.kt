@@ -26,9 +26,9 @@ class BookInfoTocEntryTest {
         assertTrue(tocEntry.contains("return@setOnClickListener"))
         assertTrue(tocEntry.contains("viewModel.saveBook(book)"))
         assertTrue(tocEntry.contains("viewModel.saveChapterList"))
-        assertTrue(tocEntry.contains("if (viewModel.urlOnShelf)"))
+        assertTrue(tocEntry.contains("if (viewModel.inBookshelf)"))
         assertTrue(tocEntry.contains("book.addType(BookType.notShelf)"))
-        assertTrue(tocEntry.contains("if (!viewModel.inBookshelf)"))
+        assertFalse(tocEntry.contains("urlOnShelf"))
         assertTrue(savedOpen >= 0)
         assertTrue(directOpen >= 0)
     }
@@ -65,7 +65,7 @@ class BookInfoTocEntryTest {
             .substringAfter("if (!deferHighlightPosition) {")
             .substringBefore("}")
         val notShelfFlow = readFlow
-            .substringAfter("if (!viewModel.urlOnShelf) {")
+            .substringAfter("if (!viewModel.inBookshelf) {")
             .substringBefore("} else {")
         val shelfFlow = readFlow.substringAfter("} else {")
         assertTrue(callback.contains("index = it[0] as Int"))

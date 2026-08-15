@@ -154,7 +154,7 @@ class BookInfoActivity :
                         .takeIf(String::isNotEmpty),
             )
         } ?: let {
-            if (!viewModel.urlOnShelf) {
+            if (!viewModel.inBookshelf) {
                 viewModel.delBook(onlyNotShelf = true) //临时落库才删；正式在架不删
             }
         }
@@ -307,7 +307,7 @@ class BookInfoActivity :
             viewModel.bookData.value?.isLocal ?: false
         menu.findItem(R.id.menu_create_book_update_task)?.isVisible =
             viewModel.bookData.value?.let {
-                viewModel.urlOnShelf &&
+                viewModel.inBookshelf &&
                     viewModel.bookSource != null &&
                     !it.isLocal &&
                     it.canUpdate
@@ -334,7 +334,7 @@ class BookInfoActivity :
             }
 
             R.id.menu_edit -> {
-                if (!viewModel.urlOnShelf) return true
+                if (!viewModel.inBookshelf) return true
                 viewModel.getBook()?.let {
                     infoEditResult.launch {
                         putExtra("bookUrl", it.bookUrl)
@@ -411,7 +411,7 @@ class BookInfoActivity :
             R.id.menu_can_update -> {
                 viewModel.getBook()?.let {
                     it.canUpdate = !it.canUpdate
-                    if (viewModel.urlOnShelf) {
+                    if (viewModel.inBookshelf) {
                         if (!it.canUpdate) {
                             it.removeType(BookType.updateError)
                         }
@@ -1003,7 +1003,7 @@ class BookInfoActivity :
         } else {
             binding.tvShelf.text = getString(R.string.add_to_bookshelf)
         }
-        editMenuItem?.isVisible = viewModel.urlOnShelf
+        editMenuItem?.isVisible = viewModel.inBookshelf
     }
 
     private fun upGroup(groupId: Long) {
@@ -1054,22 +1054,7 @@ class BookInfoActivity :
         tvShelf.setOnClickListener {
             viewModel.getBook()?.let { book ->
                 if (viewModel.inBookshelf) {
-                    if (!viewModel.urlOnShelf) {
-                        viewModel.delBook(onlyNotShelf = true) {
-                            if (viewModel.inBookshelf && !viewModel.urlOnShelf) {
-                                toastOnUi(
-                                    getString(
-                                        R.string.local_book_identity_conflict,
-                                        book.name,
-                                        book.author,
-                                    )
-                                )
-                            }
-                            upTvBookshelf()
-                        }
-                    } else {
-                        deleteBook()
-                    }
+                    deleteBook()
                 } else {
                     if (book.isWebFile) {
                         showWebFileDownloadAlert()
@@ -1108,12 +1093,10 @@ class BookInfoActivity :
                 toastOnUi(R.string.book_not_exist)
                 return@setOnClickListener
             }
-            if (viewModel.urlOnShelf) {
+            if (viewModel.inBookshelf) {
                 openChapterList()
             } else {
-                if (!viewModel.inBookshelf) {
-                    book.addType(BookType.notShelf)
-                }
+                book.addType(BookType.notShelf)
                 viewModel.saveBook(book) { //点击目录会保存book
                     viewModel.saveChapterList {
                         openChapterList()
@@ -1241,7 +1224,7 @@ class BookInfoActivity :
             viewModel.bookSource?.getKey() -> viewModel.bookSource?.setVariable(variable)
             viewModel.bookData.value?.bookUrl -> viewModel.bookData.value?.let {
                 it.putCustomVariable(variable)
-                if (viewModel.urlOnShelf) {
+                if (viewModel.inBookshelf) {
                     viewModel.saveBook(it)
                 }
             }
@@ -1358,10 +1341,8 @@ class BookInfoActivity :
                 book.chapterInVolumeIndex = chapterInVolumeIndex
             }
             chapterChanged = changed
-            if (!viewModel.urlOnShelf) {
-                if (!viewModel.inBookshelf) {
-                    book.addType(BookType.notShelf)
-                }
+            if (!viewModel.inBookshelf) {
+                book.addType(BookType.notShelf)
                 viewModel.saveBook(book) {
                     viewModel.saveChapterList {
                         startReadActivity(
@@ -1375,10 +1356,8 @@ class BookInfoActivity :
                 }
             } else {
                 lifecycleScope.launch {
-                    if (viewModel.urlOnShelf) {
-                        withContext(IO) {
-                            book.update()
-                        }
+                    withContext(IO) {
+                        book.update()
                     }
                     startReadActivity(
                         book,
@@ -1487,15 +1466,13 @@ class BookInfoActivity :
     }
 
     private fun readBook(book: Book) {
-        if (viewModel.urlOnShelf) {
-            viewModel.saveBook(book) {
-                startReadActivity(book)
-            }
-        } else {
-            if (!viewModel.inBookshelf) {
+            if (viewModel.inBookshelf) {
+                viewModel.saveBook(book) {
+                    startReadActivity(book)
+                }
+            } else {
                 book.addType(BookType.notShelf)
-            }
-            viewModel.saveBook(book) {
+                viewModel.saveBook(book) {
                 viewModel.saveChapterList {
                     startReadActivity(book)
                 }
@@ -1514,12 +1491,12 @@ class BookInfoActivity :
             book.isAudio -> readBookResult.launch(
                 Intent(this, AudioPlayActivity::class.java)
                     .putExtra("bookUrl", book.bookUrl)
-                    .putExtra("inBookshelf", viewModel.urlOnShelf)
+                    .putExtra("inBookshelf", viewModel.inBookshelf)
             )
             book.isVideo -> readBookResult.launch(
                 Intent(this, VideoPlayerActivity::class.java)
                     .putExtra("bookUrl", book.bookUrl)
-                    .putExtra("inBookshelf", viewModel.urlOnShelf)
+                    .putExtra("inBookshelf", viewModel.inBookshelf)
             )
 
             else -> readBookResult.launch(
@@ -1529,7 +1506,7 @@ class BookInfoActivity :
                     else ReadBookActivity::class.java
                 ).apply {
                     putExtra("bookUrl", book.bookUrl)
-                    putExtra("inBookshelf", viewModel.urlOnShelf)
+                    putExtra("inBookshelf", viewModel.inBookshelf)
                     putExtra("chapterChanged", chapterChanged)
                     if (highlightIndex != null &&
                         highlightChapterPos != null &&
@@ -1567,7 +1544,7 @@ class BookInfoActivity :
             book.customCoverUrl = coverUrl
             book.persistedCoverUrl = null
             showCover(book)
-            if (viewModel.urlOnShelf) {
+            if (viewModel.inBookshelf) {
                 viewModel.saveBook(book, preserveCustomCoverUrl = false)
             }
         }
@@ -1577,7 +1554,7 @@ class BookInfoActivity :
         upGroup(groupId)
         viewModel.getBook()?.let { book ->
             book.group = groupId
-            if (viewModel.urlOnShelf) {
+            if (viewModel.inBookshelf) {
                 viewModel.saveBook(book)
             } else if (groupId > 0) {
                 viewModel.addToBookshelf {

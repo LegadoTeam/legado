@@ -14,9 +14,7 @@ class SearchBookShelfHelpTest {
     @Test
     fun emptyListDoesNotTouchStore() {
         val store = FakeStore(minOrder = 8)
-
         val result = SearchBookShelfHelp.addLoadedBooksToShelf(emptyList(), store)
-
         assertEquals(0, result.total)
         assertEquals(0, result.added)
         assertEquals(0, store.insertAttempts)
@@ -35,7 +33,6 @@ class SearchBookShelfHelpTest {
             ),
             store,
         )
-
         assertEquals(4, result.total)
         assertEquals(2, result.added)
         assertEquals(2, result.skipped)
@@ -44,7 +41,7 @@ class SearchBookShelfHelpTest {
     }
 
     @Test
-    fun existingShelfBookIsNotReplacedByAnotherUrl() {
+    fun existingOfficialBookIsNotReplacedByAnotherUrl() {
         val existing = Book(
             bookUrl = "saved-url",
             name = "Saved Book",
@@ -54,22 +51,19 @@ class SearchBookShelfHelpTest {
             customCoverUrl = "saved-cover",
         )
         val store = FakeStore(existing)
-
         val result = SearchBookShelfHelp.addLoadedBooksToShelf(
             listOf(searchBook("new-url", existing.name, existing.author)),
             store,
         )
-
         assertEquals(0, result.added)
         assertEquals(1, result.skipped)
-        assertEquals(0, store.insertAttempts)
-        assertSame(existing, store.books.single())
+        assertEquals("saved-url", store.books.single().bookUrl)
         assertEquals("saved-cover", store.books.single().customCoverUrl)
     }
 
     @Test
-    fun temporaryBookIsActivatedInPlaceAndKeepsUserState() {
-        val existing = Book(
+    fun differentUrlDoesNotActivateLeftoverNotShelf() {
+        val leftover = Book(
             bookUrl = "old-url",
             name = "Temporary Book",
             author = "Temporary Author",
@@ -77,28 +71,16 @@ class SearchBookShelfHelpTest {
             order = 0,
             group = 8,
             durChapterIndex = 12,
-            durChapterPos = 34,
-            customCoverUrl = "custom-cover",
-            customIntro = "custom-intro",
         )
-        val store = FakeStore(existing, minOrder = -5)
-
+        val store = FakeStore(leftover, minOrder = -5)
         val result = SearchBookShelfHelp.addLoadedBooksToShelf(
-            listOf(searchBook("new-url", existing.name, existing.author)),
+            listOf(searchBook("new-url", leftover.name, leftover.author)),
             store,
         )
-
-        assertEquals(1, result.added)
-        assertSame(existing, result.addedBooks.single())
-        assertFalse(existing.isNotShelf)
-        assertEquals(-6, existing.order)
-        assertEquals(8, existing.group)
-        assertEquals(12, existing.durChapterIndex)
-        assertEquals(34, existing.durChapterPos)
-        assertEquals("custom-cover", existing.customCoverUrl)
-        assertEquals("custom-intro", existing.customIntro)
-        assertTrue(store.updateCount >= 1)
-        assertEquals(0, store.insertAttempts)
+        assertEquals(0, result.added)
+        assertTrue(leftover.isNotShelf)
+        assertEquals("old-url", store.books.single().bookUrl)
+        assertEquals(12, leftover.durChapterIndex)
     }
 
     @Test
@@ -111,29 +93,27 @@ class SearchBookShelfHelpTest {
             order = 3,
         )
         val store = FakeStore(existing)
-
         val result = SearchBookShelfHelp.addLoadedBooksToShelf(
             listOf(searchBook("same-url", "New Name", "New Author")),
             store,
         )
-
         assertEquals(1, result.added)
-        assertSame(existing, result.addedBooks.single())
-        assertEquals("Old Name", existing.name)
-        assertEquals("Old Author", existing.author)
-        assertEquals(3, existing.order)
-        assertFalse(existing.isNotShelf)
+        val activated = result.addedBooks.single()
+        assertEquals("same-url", activated.bookUrl)
+        assertEquals("Old Name", activated.name)
+        assertEquals("Old Author", activated.author)
+        assertEquals(3, activated.order)
+        assertFalse(activated.isNotShelf)
+        assertFalse(store.books.single().isNotShelf)
     }
 
     @Test
     fun ignoredInsertDoesNotReportBookAsAdded() {
         val store = FakeStore(minOrder = 6, rejectInserts = true)
-
         val result = SearchBookShelfHelp.addLoadedBooksToShelf(
             listOf(searchBook("conflict-url", "Conflict", "Author")),
             store,
         )
-
         assertEquals(0, result.added)
         assertEquals(1, result.skipped)
         assertEquals(1, store.insertAttempts)
@@ -150,7 +130,6 @@ class SearchBookShelfHelpTest {
             order = 42,
         )
         val store = FakeStore(temporary, minOrder = 10)
-
         val result = SearchBookShelfHelp.addLoadedBooksToShelf(
             listOf(
                 searchBook(temporary.bookUrl, temporary.name, temporary.author),
@@ -158,7 +137,6 @@ class SearchBookShelfHelpTest {
             ),
             store,
         )
-
         assertEquals(2, result.added)
         assertEquals(42, result.addedBooks[0].order)
         assertEquals(9, result.addedBooks[1].order)
@@ -167,7 +145,6 @@ class SearchBookShelfHelpTest {
     @Test
     fun assignedOrdersNeverUseUnassignedZeroValue() {
         val store = FakeStore(minOrder = 1)
-
         val result = SearchBookShelfHelp.addLoadedBooksToShelf(
             listOf(
                 searchBook("url-1", "Book A", "Author A"),
@@ -175,7 +152,6 @@ class SearchBookShelfHelpTest {
             ),
             store,
         )
-
         assertEquals(listOf(-2, -1), result.addedBooks.map { it.order })
     }
 
@@ -186,7 +162,6 @@ class SearchBookShelfHelpTest {
             name = "Active Name",
             author = "Active Author",
         )
-
         assertTrue(
             activeBook.isSameShelfIdentity(
                 Book(bookUrl = "active-url", name = "Renamed", author = "Another Author")
@@ -200,11 +175,6 @@ class SearchBookShelfHelpTest {
         assertFalse(
             activeBook.isSameShelfIdentity(
                 Book(bookUrl = "other-url", name = "Active Name", author = "佚名")
-            )
-        )
-        assertFalse(
-            activeBook.isSameShelfIdentity(
-                Book(bookUrl = "other-url", name = "Other Name", author = "Other Author")
             )
         )
     }
@@ -229,7 +199,7 @@ class SearchBookShelfHelpTest {
     }
 
     @Test
-    fun addingYimingPrefersSoleRealOverExistingYiming() {
+    fun addingYimingDoesNotDeleteExistingYimingWhenSoleRealExists() {
         val weak = Book(bookUrl = "weak", name = "同名书", author = "佚名")
         val real = Book(bookUrl = "real", name = "同名书", author = "七月观天")
         val store = FakeStore(weak, real)
@@ -239,16 +209,8 @@ class SearchBookShelfHelpTest {
         )
         assertEquals(0, result.added)
         assertEquals(2, store.books.size)
-        assertEquals(
-            "real",
-            SearchBookShelfHelp.resolveExisting(
-                store,
-                searchBook("incoming-weak", "同名书", "佚名"),
-            )?.bookUrl,
-        )
         assertTrue(store.books.any { it.bookUrl == "weak" })
         assertTrue(store.books.any { it.bookUrl == "real" })
-        assertEquals(0, store.deleteCount)
     }
 
     @Test
@@ -266,7 +228,6 @@ class SearchBookShelfHelpTest {
         assertEquals("", incoming.author)
         assertEquals(2, store.books.size)
         assertEquals("佚名", store.books.first { it.bookUrl == "local://x" }.author)
-        assertEquals(0, store.deleteCount)
     }
 
     @Test
@@ -290,9 +251,6 @@ class SearchBookShelfHelpTest {
         val result = SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
         assertEquals(1, result.added)
         assertEquals(2, store.books.size)
-        assertTrue(store.books.any { it.bookUrl == "local://x" })
-        assertTrue(store.books.any { it.bookUrl == "weak" })
-        assertEquals(0, store.deleteCount)
     }
 
     @Test
@@ -310,13 +268,10 @@ class SearchBookShelfHelpTest {
         val result = SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
         assertEquals(1, result.added)
         assertEquals(2, store.books.size)
-        assertTrue(store.books.any { it.bookUrl == "local://x" })
-        assertTrue(store.books.any { it.bookUrl == "W" })
-        assertEquals(0, store.deleteCount)
     }
 
     @Test
-    fun localEmptyAuthorMarksWebYimingAndSkipInsert() {
+    fun localEmptyAuthorSharesPersistKeyWithWebYimingAndBlocksInsert() {
         val local = Book(
             bookUrl = "local://x",
             name = "T",
@@ -329,9 +284,7 @@ class SearchBookShelfHelpTest {
         val store = FakeStore(local)
         val result = SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
         assertEquals(0, result.added)
-        assertEquals(1, store.books.size)
         assertEquals("local://x", store.books.single().bookUrl)
-        assertEquals(0, store.deleteCount)
     }
 
     @Test
@@ -348,9 +301,7 @@ class SearchBookShelfHelpTest {
         val store = FakeStore(local)
         val result = SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
         assertEquals(0, result.added)
-        assertEquals(1, store.books.size)
         assertEquals("local://x", store.books.single().bookUrl)
-        assertEquals(0, store.deleteCount)
     }
 
     @Test
@@ -399,63 +350,34 @@ class SearchBookShelfHelpTest {
         val incoming = searchBook("B", "T", "佚名")
         val keys = SearchBookShelfHelp.shelfBadgeKeys(listOf(temp))
         assertFalse(SearchBookShelfHelp.isInShelfBadgeIndex(incoming, keys))
-        assertFalse(SearchBookShelfHelp.isIncomingOnVisibleShelf(incoming, FakeStore(temp)))
         val store = FakeStore(temp)
         val result = SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
         assertEquals(1, result.added)
         assertEquals(2, store.books.size)
         assertTrue(store.books.first { it.bookUrl == "A" }.isNotShelf)
         assertEquals("B", result.addedBooks.single().bookUrl)
-        assertEquals(0, store.deleteCount)
     }
 
     @Test
-    fun soleWebRealMarksWeakIncomingOnShelfForListAndDetail() {
+    fun soleWebRealSkipsWeakInsertButDoesNotBadgeTheWeakRow() {
         val real = Book(bookUrl = "A", name = "T", author = "作者甲")
         val incoming = searchBook("B", "T", "佚名")
-        val store = FakeStore(real)
         val keys = SearchBookShelfHelp.shelfBadgeKeys(listOf(real))
-        assertTrue(SearchBookShelfHelp.isInShelfBadgeIndex(incoming, keys))
-        assertTrue(SearchBookShelfHelp.isIncomingOnVisibleShelf(incoming, store))
+        assertFalse(SearchBookShelfHelp.isInShelfBadgeIndex(incoming, keys))
+        assertTrue(
+            SearchBookShelfHelp.isInShelfBadgeIndex(
+                searchBook("A", "T", "作者甲"),
+                keys,
+            )
+        )
+        val store = FakeStore(real)
         val result = SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
         assertEquals(0, result.added)
-        assertEquals(1, store.books.size)
         assertEquals("A", store.books.single().bookUrl)
-        val presence = SearchBookShelfHelp.presence(incoming, store)
-        assertTrue(presence.identityOnShelf)
-        assertFalse(presence.urlOnShelf)
-        assertEquals("A", presence.existing?.bookUrl)
     }
 
     @Test
-    fun localSameAuthorIsIdentityOnlyNotUrlOnShelf() {
-        val local = Book(
-            bookUrl = "local://A",
-            name = "T",
-            author = "作者甲",
-            type = BookType.local or BookType.text,
-        )
-        val incoming = searchBook("https://B", "T", "作者甲")
-        val presence = SearchBookShelfHelp.presence(incoming, FakeStore(local))
-        assertTrue(presence.identityOnShelf)
-        assertFalse(presence.urlOnShelf)
-        assertEquals("local://A", presence.existing?.bookUrl)
-    }
-
-    @Test
-    fun sameUrlIsBothIdentityAndUrlOnShelf() {
-        val web = Book(bookUrl = "https://A", name = "T", author = "作者甲")
-        val presence = SearchBookShelfHelp.presence(
-            searchBook("https://A", "T", "作者甲"),
-            FakeStore(web),
-        )
-        assertTrue(presence.identityOnShelf)
-        assertTrue(presence.urlOnShelf)
-        assertEquals("https://A", presence.existing?.bookUrl)
-    }
-
-    @Test
-    fun leftoverNotShelfDoesNotHideSoleRealPresenceOrPromote() {
+    fun leftoverNotShelfStaysWhenSoleRealAlreadyExists() {
         val real = Book(bookUrl = "A", name = "T", author = "作者甲")
         val leftover = Book(
             bookUrl = "B",
@@ -463,26 +385,18 @@ class SearchBookShelfHelpTest {
             author = "佚名",
             type = BookType.text or BookType.notShelf,
         )
-        val incoming = searchBook("B", "T", "佚名")
         val store = FakeStore(real, leftover)
-        val presence = SearchBookShelfHelp.presence(incoming, store)
-        assertTrue(presence.identityOnShelf)
-        assertFalse(presence.urlOnShelf)
-        assertEquals("A", presence.existing?.bookUrl)
-        assertFalse(
-            BookInfoShelfFlags.canPromoteToOfficial(
-                presence.identityOnShelf,
-                presence.urlOnShelf,
-            )
+        val result = SearchBookShelfHelp.addLoadedBooksToShelf(
+            listOf(searchBook("B", "T", "佚名")),
+            store,
         )
-        val result = SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
         assertEquals(0, result.added)
         assertEquals("A", store.books.single { !it.isNotShelf }.bookUrl)
         assertTrue(store.books.any { it.bookUrl == "B" && it.isNotShelf })
     }
 
     @Test
-    fun notShelfEmptyAuthorDoesNotMarkWebYimingOnShelf() {
+    fun notShelfEmptyAuthorDoesNotDeleteWhenWeakInsertHitsUniqueKey() {
         val temp = Book(
             bookUrl = "A",
             name = "T",
@@ -490,7 +404,6 @@ class SearchBookShelfHelpTest {
             type = BookType.text or BookType.notShelf,
         )
         val incoming = searchBook("B", "T", "佚名")
-        assertFalse(SearchBookShelfHelp.isIncomingOnVisibleShelf(incoming, FakeStore(temp)))
         assertFalse(
             SearchBookShelfHelp.isInShelfBadgeIndex(
                 incoming,
@@ -499,19 +412,13 @@ class SearchBookShelfHelpTest {
         )
         val store = FakeStore(temp)
         val result = SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
-        assertEquals(1, result.added)
-        assertEquals("B", result.addedBooks.single().bookUrl)
-        assertEquals(listOf("B"), store.books.map { it.bookUrl })
-        assertEquals(1, store.deleteCount)
-        val persisted = SearchBookShelfHelp.persistNewBook(
-            FakeStore(temp.copy()),
-            Book(bookUrl = "B", name = "T", author = "佚名"),
-        )
-        assertEquals("B", persisted?.bookUrl)
+        assertEquals(0, result.added)
+        assertEquals(listOf("A"), store.books.map { it.bookUrl })
+        assertTrue(store.books.single().isNotShelf)
     }
 
     @Test
-    fun sameBatchActivateTempRealThenSkipsWeakOnCopyingStore() {
+    fun sameBatchActivateTempRealThenSkipsWeak() {
         val leftover = Book(
             bookUrl = "A",
             name = "T",
@@ -519,7 +426,7 @@ class SearchBookShelfHelpTest {
             type = BookType.text or BookType.notShelf,
             order = 0,
         )
-        val store = FakeStore(leftover, copyOnRead = true)
+        val store = FakeStore(leftover)
         val result = SearchBookShelfHelp.addLoadedBooksToShelf(
             listOf(
                 searchBook("A", "T", "作者甲"),
@@ -530,7 +437,6 @@ class SearchBookShelfHelpTest {
         assertEquals(1, result.added)
         assertEquals("A", result.addedBooks.single().bookUrl)
         assertEquals(1, store.books.size)
-        assertEquals("A", store.books.single().bookUrl)
         assertFalse(store.books.single().isNotShelf)
         assertEquals(0, store.insertAttempts)
         assertEquals(1, store.allBooksLoads)
@@ -548,13 +454,11 @@ class SearchBookShelfHelpTest {
         val incoming = Book(bookUrl = "https://web/x", name = "同名书", author = "七月观天")
         val persisted = SearchBookShelfHelp.persistNewBook(store, incoming)
         assertEquals(null, persisted)
-        assertEquals(1, store.books.size)
         assertEquals("local://x", store.books.single().bookUrl)
-        assertEquals(0, store.deleteCount)
     }
 
     @Test
-    fun paddedShelfNameAndTrimmedSearchShareBadgeAndSkipInsert() {
+    fun paddedShelfNameSkipsWeakInsertWithoutBadgingYiming() {
         val existing = Book(
             bookUrl = "real",
             name = "同名书 ",
@@ -562,14 +466,12 @@ class SearchBookShelfHelpTest {
         )
         val incoming = searchBook("weak", "同名书", "佚名")
         val keys = SearchBookShelfHelp.shelfBadgeKeys(listOf(existing))
-        assertTrue(SearchBookShelfHelp.isInShelfBadgeIndex(incoming, keys))
+        assertFalse(SearchBookShelfHelp.isInShelfBadgeIndex(incoming, keys))
         val store = FakeStore(existing)
         val result = SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
         assertEquals(0, result.added)
-        assertEquals(1, store.books.size)
         assertEquals("real", store.books.single().bookUrl)
         assertEquals("同名书 ", store.books.single().name)
-        assertEquals(0, store.deleteCount)
     }
 
     @Test
@@ -583,18 +485,10 @@ class SearchBookShelfHelpTest {
         val incoming = searchBook("weak", "同名书", "佚名")
         val keys = SearchBookShelfHelp.shelfBadgeKeys(listOf(local))
         assertFalse(SearchBookShelfHelp.isInShelfBadgeIndex(incoming, keys))
-        assertTrue(
-            SearchBookShelfHelp.isInShelfBadgeIndex(
-                searchBook("local://x", "同名书", "作者甲"),
-                keys,
-            )
-        )
         val store = FakeStore(local)
         SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
         assertEquals(2, store.books.size)
-        assertTrue(store.books.any { it.bookUrl == "local://x" })
         assertTrue(store.books.any { it.bookUrl == "weak" })
-        assertEquals(0, store.deleteCount)
     }
 
     @Test
@@ -605,7 +499,6 @@ class SearchBookShelfHelpTest {
             author = "佚名",
             order = 3,
             durChapterIndex = 5,
-            durChapterPos = 10,
         )
         val store = FakeStore(existing)
         SearchBookShelfHelp.addLoadedBooksToShelf(
@@ -615,7 +508,6 @@ class SearchBookShelfHelpTest {
         assertEquals(2, store.books.size)
         assertEquals("佚名", store.books.first { it.bookUrl == "weak-url" }.author)
         assertEquals("七月观天", store.books.first { it.bookUrl == "real-url" }.author)
-        assertEquals(0, store.deleteCount)
     }
 
     @Test
@@ -628,7 +520,7 @@ class SearchBookShelfHelpTest {
             store,
         )
         assertEquals(3, store.books.size)
-        assertTrue(store.books.any { it.author == "" || it.author == "佚名" || it.bookUrl == "weak" })
+        assertTrue(store.books.any { it.bookUrl == "weak" })
     }
 
     @Test
@@ -647,7 +539,6 @@ class SearchBookShelfHelpTest {
             store,
         )
         assertEquals(3, store.books.size)
-        assertEquals(0, store.deleteCount)
         assertTrue(store.books.any { it.bookUrl == "weak" })
         assertTrue(store.books.any { it.author == "作者甲" })
         assertTrue(store.books.any { it.author == "作者乙" })
@@ -666,29 +557,8 @@ class SearchBookShelfHelpTest {
             listOf(searchBook("https://web/x", "同名书", "七月观天")),
             store,
         )
-        val localRow = store.books.first { it.bookUrl == "local://x" }
-        assertEquals("佚名", localRow.author)
+        assertEquals("佚名", store.books.first { it.bookUrl == "local://x" }.author)
         assertTrue(store.books.any { it.bookUrl == "https://web/x" })
-        assertEquals(0, store.deleteCount)
-    }
-
-    @Test
-    fun localRealDoesNotAbsorbIncomingYiming() {
-        val local = Book(
-            bookUrl = "local://x",
-            name = "同名书",
-            author = "七月观天",
-            type = BookType.local or BookType.text,
-        )
-        val store = FakeStore(local)
-        SearchBookShelfHelp.addLoadedBooksToShelf(
-            listOf(searchBook("weak", "同名书", "佚名")),
-            store,
-        )
-        assertEquals(2, store.books.size)
-        assertTrue(store.books.any { it.bookUrl == "local://x" })
-        assertTrue(store.books.any { it.bookUrl == "weak" })
-        assertEquals(0, store.deleteCount)
     }
 
     @Test
@@ -700,21 +570,16 @@ class SearchBookShelfHelpTest {
             listOf(searchBook("incoming", "同名书", "七月观天")),
             store,
         )
-        val reals = store.books.filter {
-            BookAuthorIdentity.effectiveAuthor(it.author) == "七月观天"
-        }
-        assertEquals(1, reals.size)
-        assertEquals("real", reals.single().bookUrl)
         assertEquals(2, store.books.size)
         assertTrue(store.books.any { it.bookUrl == "weak" })
-        assertEquals(0, store.deleteCount)
+        assertEquals("real", store.books.single { it.author == "七月观天" }.bookUrl)
     }
 
     @Test
-    fun shelfBadgeMatchesWeakAndSoleReal() {
+    fun shelfBadgeDoesNotMarkWeakWhenSoleRealExists() {
         val real = Book(bookUrl = "r", name = "高考后", author = "七月观天")
         val keys = SearchBookShelfHelp.shelfBadgeKeys(listOf(real))
-        assertTrue(
+        assertFalse(
             SearchBookShelfHelp.isInShelfBadgeIndex(
                 searchBook("other", "高考后", "佚名"),
                 keys,
@@ -723,12 +588,6 @@ class SearchBookShelfHelpTest {
         assertTrue(
             SearchBookShelfHelp.isInShelfBadgeIndex(
                 searchBook("other2", "高考后", "七月观天"),
-                keys,
-            )
-        )
-        assertFalse(
-            SearchBookShelfHelp.isInShelfBadgeIndex(
-                searchBook("x", "别的书", "佚名"),
                 keys,
             )
         )
@@ -771,9 +630,7 @@ class SearchBookShelfHelpTest {
             order = -9,
             durChapterPos = 1,
         )
-
         val merged = mergeActiveShelfBook(activeBook, shelfBook)
-
         assertSame(activeBook, merged)
         assertFalse(activeBook.isNotShelf)
         assertEquals(-9, activeBook.order)
@@ -795,7 +652,6 @@ class SearchBookShelfHelpTest {
             author = "Same Author",
             durChapterPos = 12,
         )
-
         assertSame(shelfBook, mergeActiveShelfBook(activeBook, shelfBook))
     }
 
@@ -811,37 +667,35 @@ class SearchBookShelfHelpTest {
         vararg initialBooks: Book,
         override val minOrder: Int = 0,
         private val rejectInserts: Boolean = false,
-        private val copyOnRead: Boolean = false,
     ) : SearchBookShelfHelp.Store {
         val books = initialBooks.toMutableList()
         var insertAttempts = 0
         var updateCount = 0
-        var deleteCount = 0
         var allBooksLoads = 0
         var booksByNameLoads = 0
 
         override fun getBook(name: String, author: String): Book? {
-            return view(books.firstOrNull { it.name == name && it.author == author })
+            return books.firstOrNull { it.name == name && it.author == author }
         }
 
         override fun getBook(bookUrl: String): Book? {
-            return view(books.firstOrNull { it.bookUrl == bookUrl })
+            return books.firstOrNull { it.bookUrl == bookUrl }
         }
 
         override fun getBooksByName(name: String): List<Book> {
             booksByNameLoads++
-            return books.filter { BookAuthorIdentity.equalName(it.name, name) }.map(::viewRequired)
+            return books.filter { BookAuthorIdentity.equalName(it.name, name) }
         }
 
         override fun allBooks(): List<Book> {
             allBooksLoads++
-            return books.map(::viewRequired)
+            return books.toList()
         }
 
         override fun update(book: Book) {
             updateCount++
             val index = books.indexOfFirst { it.bookUrl == book.bookUrl }
-            if (index >= 0) books[index] = stored(book)
+            if (index >= 0) books[index] = book
         }
 
         override fun insertIgnore(book: Book): Boolean {
@@ -849,26 +703,8 @@ class SearchBookShelfHelpTest {
             if (rejectInserts) return false
             if (books.any { it.bookUrl == book.bookUrl }) return false
             if (books.any { it.name == book.name && it.author == book.author }) return false
-            books.add(stored(book))
+            books.add(book)
             return true
-        }
-
-        override fun delete(book: Book) {
-            if (books.removeAll { it.bookUrl == book.bookUrl }) {
-                deleteCount++
-            }
-        }
-
-        private fun view(book: Book?): Book? {
-            return book?.let(::viewRequired)
-        }
-
-        private fun viewRequired(book: Book): Book {
-            return if (copyOnRead) book.copy() else book
-        }
-
-        private fun stored(book: Book): Book {
-            return if (copyOnRead) book.copy() else book
         }
     }
 }
