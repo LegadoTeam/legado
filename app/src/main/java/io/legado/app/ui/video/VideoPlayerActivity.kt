@@ -41,7 +41,7 @@ import io.legado.app.databinding.ActivityVideoPlayerBinding
 import io.legado.app.help.GlideImageGetter
 import io.legado.app.help.TextViewTagHandler
 import io.legado.app.help.WebCacheManager
-import io.legado.app.help.book.removeType
+import io.legado.app.help.book.BookInfoShelfFlags
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.gsyVideo.VideoPlayer
 import io.legado.app.help.webView.PooledWebView
@@ -766,10 +766,21 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             alert(title = getString(R.string.add_to_bookshelf)) {
                 setMessage(getString(R.string.check_add_bookshelf, book.name))
                 okButton {
-                    VideoPlay.book?.removeType(BookType.notShelf)
-                    VideoPlay.book?.save()
-                    VideoPlay.inBookshelf = true
-                    setResult(RESULT_OK)
+                    val current = VideoPlay.book ?: return@okButton
+                    if (BookInfoShelfFlags.promoteOrSkipTempBook(current)) {
+                        VideoPlay.inBookshelf = true
+                        setResult(RESULT_OK)
+                    } else {
+                        toastOnUi(
+                            getString(
+                                R.string.local_book_identity_conflict,
+                                current.name,
+                                current.author,
+                            )
+                        )
+                        callBackBookEnd()
+                        viewModel.removeFromBookshelf { super.finish() }
+                    }
                 }
                 noButton {
                     callBackBookEnd()

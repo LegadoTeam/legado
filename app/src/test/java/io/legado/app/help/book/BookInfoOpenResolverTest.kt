@@ -178,9 +178,11 @@ class BookInfoOpenResolverTest {
         val readFinish = read("src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
         val mangaFinish = read("src/main/java/io/legado/app/ui/book/manga/ReadMangaActivity.kt")
         val audioFinish = read("src/main/java/io/legado/app/ui/book/audio/AudioPlayActivity.kt")
+        val videoFinish = read("src/main/java/io/legado/app/ui/video/VideoPlayerActivity.kt")
         assertTrue(readFinish.contains("BookInfoShelfFlags.promoteOrSkipTempBook"))
         assertTrue(mangaFinish.contains("BookInfoShelfFlags.promoteOrSkipTempBook"))
         assertTrue(audioFinish.contains("BookInfoShelfFlags.promoteOrSkipTempBook"))
+        assertTrue(videoFinish.contains("BookInfoShelfFlags.promoteOrSkipTempBook"))
     }
 
     private fun offShelf() = SearchBookShelfHelp.ShelfPresence(
