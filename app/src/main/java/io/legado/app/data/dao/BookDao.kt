@@ -14,6 +14,7 @@ import io.legado.app.data.entities.BookCacheCleanupSnapshot
 import io.legado.app.data.entities.BookCacheInfo
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.BookshelfBook
 import io.legado.app.help.book.isNotShelf
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
@@ -51,6 +52,17 @@ interface BookDao {
 
     @Query("SELECT * FROM books order by durChapterTime desc")
     fun flowAll(): Flow<List<Book>>
+
+    @Query(
+        """
+        SELECT bookUrl, origin, name, author, coverUrl, customCoverUrl, type, `group`,
+        ((SELECT coalesce(sum(groupId), 0) FROM book_groups WHERE groupId > 0) & `group`) != 0
+            AS hasUserGroup,
+        latestChapterTime, durChapterTime, `order`
+        FROM books WHERE type & ${BookType.notShelf} = 0
+        """
+    )
+    fun flowBookshelfBooks(): Flow<List<BookshelfBook>>
 
     @Query("SELECT * FROM books WHERE type & ${BookType.audio} > 0")
     fun flowAudio(): Flow<List<Book>>

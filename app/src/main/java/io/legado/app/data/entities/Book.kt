@@ -172,12 +172,7 @@ data class Book(
     fun getDisplayCover() = if (customCoverUrl.isNullOrEmpty()) coverUrl else customCoverUrl
 
     /** Source credentials are only reused for custom covers on the same network origin. */
-    fun getCoverSourceOrigin(): String? {
-        val customUrl = customCoverUrl?.takeIf { it.isNotEmpty() } ?: return origin
-        val sourceOrigin = NetworkUtils.getBaseUrl(origin) ?: return null
-        val coverOrigin = NetworkUtils.getBaseUrl(customUrl) ?: return null
-        return origin.takeIf { sourceOrigin.equals(coverOrigin, ignoreCase = true) }
-    }
+    fun getCoverSourceOrigin() = coverSourceOrigin(origin, customCoverUrl)
 
     fun getDisplayIntro() = if (customIntro.isNullOrEmpty()) intro else customIntro
 
@@ -506,4 +501,11 @@ data class Book(
         @TypeConverter
         fun stringToReadConfig(json: String?) = GSON.fromJsonObject<ReadConfig>(json).getOrNull()
     }
+}
+
+internal fun coverSourceOrigin(origin: String, customCoverUrl: String?): String? {
+    val customUrl = customCoverUrl?.takeIf { it.isNotEmpty() } ?: return origin
+    val sourceOrigin = NetworkUtils.getBaseUrl(origin) ?: return null
+    val coverOrigin = NetworkUtils.getBaseUrl(customUrl) ?: return null
+    return origin.takeIf { sourceOrigin.equals(coverOrigin, ignoreCase = true) }
 }

@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.data.entities.Book
-import io.legado.app.data.entities.BookGroup
 import io.legado.app.databinding.ItemBookshelfList2Binding
 import io.legado.app.databinding.ItemBookshelfListBinding
 import io.legado.app.databinding.ItemBookshelfListGroupBinding
@@ -48,7 +47,7 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                 holder.onBind(it, position, payloads)
             }
 
-            is GroupViewHolder -> (getItem(position) as? BookGroup)?.let {
+            is GroupViewHolder -> (getItem(position) as? BookshelfGroupItem)?.let {
                 holder.registerListener(it)
                 holder.onBind(it, position, payloads)
             }
@@ -194,9 +193,9 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
     inner class GroupViewHolder(val binding: ItemBookshelfListGroupBinding) :
         RecyclerView.ViewHolder(binding.root) {
 
-        fun onBind(item: BookGroup, position: Int) = binding.run {
-            tvName.text = item.groupName
-            ivCover.load(item.cover)
+        fun onBind(item: BookshelfGroupItem, position: Int) = binding.run {
+            tvName.text = item.group.groupName
+            ivCover.load(item.group.cover, item.previewBooks)
             flHasNew.gone()
             ivAuthor.gone()
             ivLast.gone()
@@ -206,7 +205,7 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
             tvRead.gone()
         }
 
-        fun onBind(item: BookGroup, position: Int, payloads: MutableList<Any>) = binding.run {
+        fun onBind(item: BookshelfGroupItem, position: Int, payloads: MutableList<Any>) = binding.run {
             if (payloads.isEmpty()) {
                 onBind(item, position)
             } else {
@@ -214,20 +213,20 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                     val bundle = payloads[i] as Bundle
                     bundle.keySet().forEach {
                         when (it) {
-                            "groupName" -> tvName.text = item.groupName
-                            "cover" -> ivCover.load(item.cover)
+                            "groupName" -> tvName.text = item.group.groupName
+                            "cover" -> ivCover.load(item.group.cover, item.previewBooks)
                         }
                     }
                 }
             }
         }
 
-        fun registerListener(item: Any) {
+        fun registerListener(item: BookshelfGroupItem) {
             binding.root.setOnClickListener {
-                callBack.onItemClick(item)
+                callBack.onItemClick(item.group)
             }
             binding.root.onLongClick {
-                callBack.onItemLongClick(item)
+                callBack.onItemLongClick(item.group)
             }
         }
 

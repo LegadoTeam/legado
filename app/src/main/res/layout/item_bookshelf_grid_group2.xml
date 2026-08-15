@@ -28,17 +28,15 @@
             android:layout_height="wrap_content"
             android:scrollbars="none">
 
-            <io.legado.app.ui.widget.image.CoverImageView
+            <io.legado.app.ui.widget.image.GroupCoverView
                 android:id="@+id/iv_cover"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_margin="4dp"
-                android:scaleType="centerCrop"
                 android:scrollbars="none"
-                android:src="@drawable/image_cover_default"
                 android:transitionName="img_cover"
                 app:layout_constraintTop_toTopOf="parent"
-                tools:ignore="UnusedAttribute,ImageContrastCheck"
+                tools:ignore="UnusedAttribute"
                 tools:layout_editor_absoluteX="4dp" />
 
             <TextView
