@@ -18,3 +18,8 @@ test('shows reply likes only when the count is positive', () => {
   )
   assert.doesNotMatch(dialog, /v-if="reply\.likeCount != null"/)
 })
+
+test('shows the reply target before reply content', () => {
+  assert.match(dialog, /v-if="reply\.replyToName" class="reply-target"/)
+  assert.match(dialog, /回复 \{\{ reply\.replyToName \}\}：<\/span>\{\{ reply\.content \}\}/)
+})

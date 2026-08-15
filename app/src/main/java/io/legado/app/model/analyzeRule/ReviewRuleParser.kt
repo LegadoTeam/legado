@@ -36,6 +36,7 @@ internal object ReviewRuleParser {
         val id: String?,
         val avatar: String?,
         val name: String?,
+        val replyToName: String?,
         val badges: List<String>,
         val content: String?,
         val imageUrl: String?,
@@ -267,6 +268,7 @@ internal object ReviewRuleParser {
             id = id,
             avatar = avatar,
             name = name,
+            replyToName = protocol?.replyToName,
             badges = badges,
             content = content,
             imageUrl = protocol?.imageUrl,
@@ -313,6 +315,7 @@ internal object ReviewRuleParser {
 
     internal data class ContentProtocol(
         val text: String?,
+        val replyToName: String?,
         val imageUrl: String?,
         val audioUrl: String?,
         val time: String?,
@@ -325,18 +328,20 @@ internal object ReviewRuleParser {
         if (!value.startsWith("{") || !value.endsWith("}")) return null
         val content = GSON.fromJsonObject<Map<String, Any?>>(value).getOrNull() ?: return null
         val text = content.stringValue("text")
+        val replyToName = content.stringValue("replyToName")
         val image = content.stringValue("img")
         val audio = content.stringValue("audio")
         val time = content.stringValue("time")
         val likeCount = parseInt(content["likeCount"])
         val replyCount = parseInt(content["replyCount"])
-        if (text == null && image == null && audio == null && time == null &&
+        if (text == null && replyToName == null && image == null && audio == null && time == null &&
             likeCount == null && replyCount == null
         ) {
             return null
         }
         return ContentProtocol(
             text = text,
+            replyToName = replyToName,
             imageUrl = image?.let { NetworkUtils.getAbsoluteURL(baseUrl, it) },
             audioUrl = audio?.let { NetworkUtils.getAbsoluteURL(baseUrl, it) },
             time = time,

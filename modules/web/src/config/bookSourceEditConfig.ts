@@ -572,7 +572,7 @@ export default {
         namespace: 'ruleReview',
         id: 'detailContentRule',
         type: 'String',
-        hint: 'text/img/audio/time/likeCount/replyCount',
+        hint: 'text/replyToName/img/audio/time/likeCount/replyCount',
       },
       {
         title: '段评回复 URL（reviewQuoteUrl）',
@@ -615,7 +615,7 @@ export default {
         namespace: 'ruleReview',
         id: 'replyContentRule',
         type: 'String',
-        hint: 'text/img/audio/time/likeCount',
+        hint: 'text/replyToName/img/audio/time/likeCount',
       },
     ],
   },

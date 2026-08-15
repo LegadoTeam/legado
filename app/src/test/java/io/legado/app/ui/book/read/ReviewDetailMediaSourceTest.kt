@@ -65,6 +65,18 @@ class ReviewDetailMediaSourceTest {
     }
 
     @Test
+    fun `reply target keeps the commenter header and prefixes the body`() {
+        val binding = dialogSource()
+            .substringAfter("binding.llBadges.visibility")
+            .substringBefore("val hasText")
+
+        assertTrue(binding.contains("binding.tvName.text = item.name.orEmpty()"))
+        assertTrue(binding.contains("val replyToName = item.replyToName.orEmpty().trim()"))
+        assertTrue(binding.contains("val prefix = \"\u56de\u590d \$replyToName\uff1a\""))
+        assertFalse(binding.contains("binding.tvName.gone()"))
+    }
+
+    @Test
     fun `reply likes are shown only for positive counts`() {
         val binding = dialogSource()
             .substringAfter("binding.tvTime.text = item.time.orEmpty()")

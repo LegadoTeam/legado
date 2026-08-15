@@ -68,6 +68,10 @@ test('keeps source editor state and mobile controls reachable', () => {
   assert.match(tools, /set: val => store\.changeTabName\(val\)/)
   assert.doesNotMatch(json, /margin-bottom: 4px/)
   assert.match(config, /返回 -1 表示章评，1 开始表示正文段落/)
+  assert.match(
+    config,
+    /id: 'replyContentRule',[\s\S]*hint: 'text\/replyToName\/img\/audio\/time\/likeCount'/,
+  )
 })
 
 test('keeps a validated source token after debug transport errors', () => {

@@ -169,6 +169,7 @@ internal object JsSourceReview {
             id = item.optString("id"),
             avatar = item.optString("avatar")?.let { NetworkUtils.getAbsoluteURL(baseUrl, it) },
             name = item.optString("name"),
+            replyToName = protocol?.replyToName,
             badges = item.optStrings("badge")
                 .flatMap { ReviewRuleParser.splitBadgeValue(it) }
                 .distinct(),

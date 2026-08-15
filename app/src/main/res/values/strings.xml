@@ -1239,13 +1239,13 @@
     <string name="rule_review_detail_avatar">Avatar (detailAvatarRule)</string>
     <string name="rule_review_detail_name">Name (detailNameRule)</string>
     <string name="rule_review_detail_badge">Badge (detailBadgeRule)</string>
-    <string name="rule_review_detail_content">Comment content protocol (detailContentRule: text/img/audio/time/likeCount/replyCount)</string>
+    <string name="rule_review_detail_content">Comment content protocol (detailContentRule: text/replyToName/img/audio/time/likeCount/replyCount)</string>
     <string name="rule_review_reply_list">Reply list (replyListRule)</string>
     <string name="rule_review_reply_id">Reply ID (replyIdRule)</string>
     <string name="rule_review_reply_avatar">Reply avatar (replyAvatarRule)</string>
     <string name="rule_review_reply_name">Reply name (replyNameRule)</string>
     <string name="rule_review_reply_badge">Reply badge (replyBadgeRule)</string>
-    <string name="rule_review_reply_content">Reply content protocol (replyContentRule: text/img/audio/time/likeCount)</string>
+    <string name="rule_review_reply_content">Reply content protocol (replyContentRule: text/replyToName/img/audio/time/likeCount)</string>
     <string name="rule_avatar">段评发布者头像（avatarRule）</string>
     <string name="rule_review_url">段评URL（reviewUrl）</string>
     <string name="rule_review_content">Paragraph review content（contentRule）</string>

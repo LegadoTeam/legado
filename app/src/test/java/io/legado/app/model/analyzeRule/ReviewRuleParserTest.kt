@@ -87,7 +87,7 @@ class ReviewRuleParserTest {
                           "avatar": "/reply.png",
                           "name": "Bob",
                           "badges": "reader|top",
-                          "content": "{\"text\":\"Reply\",\"likeCount\":3}"
+                          "content": "{\"text\":\"Reply\",\"replyToName\":\"Alice\",\"likeCount\":3}"
                         }
                       ]
                     },
@@ -141,6 +141,7 @@ class ReviewRuleParserTest {
                 assertEquals("r1", id)
                 assertEquals("https://example.com/reply.png", avatar)
                 assertEquals("Bob", name)
+                assertEquals("Alice", replyToName)
                 assertEquals(listOf("reader", "top"), badges)
                 assertEquals("Reply", content)
                 assertEquals(3, likeCount)
@@ -162,7 +163,7 @@ class ReviewRuleParserTest {
                         "avatar": "/reply.png",
                         "name": "Bob",
                         "badges": ["reader", "top"],
-                        "content": "{\"text\":\"Reply\",\"img\":\"/reply.jpg\",\"time\":\"now\",\"likeCount\":4}"
+                        "content": "{\"text\":\"Reply\",\"replyToName\":\"Alice\",\"img\":\"/reply.jpg\",\"time\":\"now\",\"likeCount\":4}"
                       }
                     ]
                   }
@@ -190,6 +191,7 @@ class ReviewRuleParserTest {
             assertEquals("r1", id)
             assertEquals("https://example.com/reply.png", avatar)
             assertEquals("Bob", name)
+            assertEquals("Alice", replyToName)
             assertEquals(listOf("reader", "top"), badges)
             assertEquals("Reply", content)
             assertEquals("https://example.com/reply.jpg", imageUrl)

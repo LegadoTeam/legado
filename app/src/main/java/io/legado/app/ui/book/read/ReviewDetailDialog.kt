@@ -166,6 +166,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
             return oldItem.isReply == newItem.isReply &&
                     oldItem.parentKey == newItem.parentKey &&
                     oldItem.name == newItem.name &&
+                    oldItem.replyToName == newItem.replyToName &&
                     oldItem.content == newItem.content &&
                     oldItem.time == newItem.time &&
                     oldItem.avatar == newItem.avatar &&
@@ -682,6 +683,8 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
             append('|')
             append(item.name.orEmpty())
             append('|')
+            append(item.replyToName.orEmpty())
+            append('|')
             append(item.content.orEmpty())
             append('|')
             append(item.time.orEmpty())
@@ -768,6 +771,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
         val id: String?,
         val avatar: String?,
         val name: String?,
+        val replyToName: String?,
         val badges: List<String>,
         val content: String?,
         val imageUrl: String?,
@@ -814,6 +818,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
                     id = null,
                     avatar = null,
                     name = null,
+                    replyToName = null,
                     badges = emptyList(),
                     content = null,
                     imageUrl = null,
@@ -840,6 +845,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
         id = id,
         avatar = avatar,
         name = name,
+        replyToName = replyToName,
         badges = badges,
         content = content,
         imageUrl = imageUrl,
@@ -956,29 +962,27 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
             val contentColor = context.getCompatColor(R.color.reviewContentText)
             binding.llBadges.visibility = if (item.badges.isEmpty()) View.GONE else View.VISIBLE
             bindBadges(binding.llBadges, item.badges)
+            binding.tvName.text = item.name.orEmpty()
+            binding.tvName.visibility = if (item.name.isNullOrBlank()) View.GONE else View.VISIBLE
+            binding.tvName.setTextColor(primaryColor)
             if (item.isReply) {
-                binding.tvName.gone()
-                val name = item.name.orEmpty().trim()
                 val content = item.content.orEmpty().trim()
+                val replyToName = item.replyToName.orEmpty().trim()
                 binding.tvContent.text = when {
-                    name.isEmpty() -> content
-                    content.isEmpty() -> name
+                    content.isEmpty() || replyToName.isEmpty() -> content
                     else -> SpannableStringBuilder().apply {
-                        append(name)
+                        val prefix = "回复 $replyToName："
+                        append(prefix)
                         setSpan(
                             ForegroundColorSpan(secondaryColor),
                             0,
-                            name.length,
+                            prefix.length,
                             Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
                         )
-                        append("  ")
                         append(content)
                     }
                 }
             } else {
-                binding.tvName.text = item.name.orEmpty()
-                binding.tvName.visibility = if (item.name.isNullOrBlank()) View.GONE else View.VISIBLE
-                binding.tvName.setTextColor(primaryColor)
                 binding.tvContent.text = item.content.orEmpty()
             }
             val hasText = binding.tvContent.text?.isNotBlank() == true

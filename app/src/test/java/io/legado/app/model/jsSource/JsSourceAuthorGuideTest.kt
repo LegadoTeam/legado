@@ -72,7 +72,7 @@ class JsSourceAuthorGuideTest {
             "replyCount",
             "页面从 `1` 开始",
             "nextPageUrl",
-            "{text, img, audio, time, likeCount, replyCount}",
+            "{text, replyToName, img, audio, time, likeCount, replyCount}",
             "`badge` 可返回字符串或字符串数组",
         )
 

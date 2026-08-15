@@ -113,7 +113,9 @@
                     <span v-else>{{ badge }}</span>
                   </template>
                 </header>
-                <p v-if="reply.content" class="review-content">{{ reply.content }}</p>
+                <p v-if="reply.content" class="review-content">
+                  <span v-if="reply.replyToName" class="reply-target">回复 {{ reply.replyToName }}：</span>{{ reply.content }}
+                </p>
                 <img
                   v-if="reply.imageUrl"
                   class="review-image"
@@ -243,6 +245,7 @@ const reviewIdentity = (item: ReviewItem) =>
   [
     item.avatar,
     item.name,
+    item.replyToName,
     item.content,
     item.imageUrl,
     item.audioUrl,
@@ -507,6 +510,10 @@ watch(visible, open => {
   line-height: 1.7;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.reply-target {
+  color: var(--el-text-color-secondary);
 }
 
 .review-image {

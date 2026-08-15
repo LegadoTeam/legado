@@ -117,6 +117,7 @@ export type ReviewItem = {
   id?: string | null
   avatar?: string | null
   name?: string | null
+  replyToName?: string | null
   badges?: string[]
   content?: string | null
   imageUrl?: string | null
