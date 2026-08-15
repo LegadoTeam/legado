@@ -181,6 +181,62 @@ class McpServiceContractTest {
     }
 
     @Test
+    fun `tools publish conservative behavior annotations`() {
+        val tools = projectFile("app/src/main/java/io/legado/app/web/mcp/McpToolServer.kt")
+        val registrations = tools.substringAfter("private fun registerTools")
+        val profiles = mapOf(
+            "localReadToolAnnotations" to listOf(
+                "list_sources", "get_source", "get_http_logs", "get_http_log", "get_cookies"
+            ),
+            "localWriteToolAnnotations" to listOf(
+                "delete_sources", "set_http_log_recording", "set_cookie", "clear_cookies"
+            ),
+            "openWorldWriteToolAnnotations" to listOf(
+                "save_source", "debug_source", "eval_js", "check_source"
+            ),
+        )
+        val registeredNames = Regex("name = \\\"([a-z_]+)\\\"")
+            .findAll(registrations)
+            .map { it.groupValues[1] }
+            .toSet()
+        assertEquals(profiles.values.flatten().toSet(), registeredNames)
+        profiles.forEach { (profile, names) ->
+            names.forEach { name ->
+                val tool = registrations.substringAfter("name = \"$name\"")
+                    .substringBefore("\n        server.addTool(")
+                assertTrue("$name must use $profile", tool.contains("toolAnnotations = $profile"))
+            }
+        }
+
+        fun hints(profile: String): Set<String> {
+            val definition = tools.substringAfter("private val $profile = ToolAnnotations(")
+                .substringBefore(')')
+            return Regex("""[a-zA-Z]+Hint = (?:true|false)""")
+                .findAll(definition)
+                .map { it.value }
+                .toSet()
+        }
+        assertEquals(
+            setOf("readOnlyHint = true", "openWorldHint = false"),
+            hints("localReadToolAnnotations"),
+        )
+        assertEquals(
+            setOf(
+                "readOnlyHint = false", "destructiveHint = true",
+                "idempotentHint = true", "openWorldHint = false",
+            ),
+            hints("localWriteToolAnnotations"),
+        )
+        assertEquals(
+            setOf(
+                "readOnlyHint = false", "destructiveHint = true",
+                "idempotentHint = false", "openWorldHint = true",
+            ),
+            hints("openWorldWriteToolAnnotations"),
+        )
+    }
+
+    @Test
     fun `request context evaluates and normalizes source javascript`() = runBlocking {
         val source = BookSource(
             bookSourceUrl = "https://example.com",

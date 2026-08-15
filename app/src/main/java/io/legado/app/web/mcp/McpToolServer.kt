@@ -36,6 +36,7 @@ import io.modelcontextprotocol.kotlin.sdk.types.RequestId
 import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import io.modelcontextprotocol.kotlin.sdk.types.TextResourceContents
+import io.modelcontextprotocol.kotlin.sdk.types.ToolAnnotations
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -68,6 +69,22 @@ object McpToolServer {
     private const val NOTIFICATION_TIMEOUT_MS = 500L
     private val debugScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val debugMutex = Mutex()
+    private val localReadToolAnnotations = ToolAnnotations(
+        readOnlyHint = true,
+        openWorldHint = false,
+    )
+    private val localWriteToolAnnotations = ToolAnnotations(
+        readOnlyHint = false,
+        destructiveHint = true,
+        idempotentHint = true,
+        openWorldHint = false,
+    )
+    private val openWorldWriteToolAnnotations = ToolAnnotations(
+        readOnlyHint = false,
+        destructiveHint = true,
+        idempotentHint = false,
+        openWorldHint = true,
+    )
 
     fun create(): Server {
         return Server(
@@ -229,6 +246,7 @@ object McpToolServer {
                 },
                 required = listOf("source"),
             ),
+            toolAnnotations = openWorldWriteToolAnnotations,
         ) { request ->
             try {
                 val source = request.arguments.str("source")
@@ -268,6 +286,7 @@ object McpToolServer {
                 },
                 required = listOf("url", "key"),
             ),
+            toolAnnotations = openWorldWriteToolAnnotations,
         ) { request ->
             try {
                 val url = request.arguments.str("url")
@@ -333,6 +352,7 @@ object McpToolServer {
                 },
                 required = emptyList(),
             ),
+            toolAnnotations = localReadToolAnnotations,
         ) { request ->
             try {
                 val summaries = McpFormat.summarizeSources(
@@ -356,6 +376,7 @@ object McpToolServer {
                 },
                 required = listOf("url"),
             ),
+            toolAnnotations = localReadToolAnnotations,
         ) { request ->
             try {
                 val url = request.arguments.str("url")
@@ -383,6 +404,7 @@ object McpToolServer {
                 },
                 required = listOf("urls"),
             ),
+            toolAnnotations = localWriteToolAnnotations,
         ) { request ->
             try {
                 val urls = (request.arguments?.get("urls") as? JsonArray)
@@ -420,6 +442,7 @@ object McpToolServer {
                 },
                 required = emptyList(),
             ),
+            toolAnnotations = localReadToolAnnotations,
         ) { request ->
             try {
                 val limit = request.arguments.int("limit") ?: 50
@@ -459,6 +482,7 @@ object McpToolServer {
                 },
                 required = listOf("id"),
             ),
+            toolAnnotations = localReadToolAnnotations,
         ) { request ->
             try {
                 val id = request.arguments.int("id")
@@ -485,6 +509,7 @@ object McpToolServer {
                 },
                 required = listOf("enabled"),
             ),
+            toolAnnotations = localWriteToolAnnotations,
         ) { request ->
             try {
                 val enabled = request.arguments.bool("enabled")
@@ -507,6 +532,7 @@ object McpToolServer {
                 },
                 required = listOf("url"),
             ),
+            toolAnnotations = localReadToolAnnotations,
         ) { request ->
             try {
                 val url = request.arguments.str("url")
@@ -537,6 +563,7 @@ object McpToolServer {
                 },
                 required = listOf("url", "cookie"),
             ),
+            toolAnnotations = localWriteToolAnnotations,
         ) { request ->
             try {
                 val url = request.arguments.str("url")
@@ -569,6 +596,7 @@ object McpToolServer {
                 },
                 required = listOf("url"),
             ),
+            toolAnnotations = localWriteToolAnnotations,
         ) { request ->
             try {
                 val url = request.arguments.str("url")
@@ -600,6 +628,7 @@ object McpToolServer {
                 },
                 required = listOf("js"),
             ),
+            toolAnnotations = openWorldWriteToolAnnotations,
         ) { request ->
             try {
                 val js = request.arguments.str("js")
@@ -702,6 +731,7 @@ object McpToolServer {
                 },
                 required = listOf("urls"),
             ),
+            toolAnnotations = openWorldWriteToolAnnotations,
         ) { request ->
             val urls = (request.arguments?.get("urls") as? JsonArray)
                 ?.mapNotNull { runCatching { it.jsonPrimitive.contentOrNull }.getOrNull() }
