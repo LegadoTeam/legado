@@ -58,6 +58,30 @@ class RuntimeMediaStabilityTest {
     }
 
     @Test
+    fun emptyCoverSkipsDelayedNetworkFallback() {
+        val source = listOf(File("src/main/java"), File("app/src/main/java"))
+            .first { it.isDirectory }
+            .resolve("io/legado/app/ui/widget/image/CoverImageView.kt")
+            .readText()
+        val load = source.substringAfter("path: String? = null,")
+            .substringBefore("override fun onDetachedFromWindow")
+        val emptyPath = load.substringAfter("if (currentPath == null) {")
+            .substringBefore("if (drawBookName")
+
+        assertTrue(load.contains("currentJob?.cancel()"))
+        assertTrue(load.contains("triggerChannel.tryReceive()"))
+        assertTrue(load.contains("path?.takeIf { it.isNotBlank() }"))
+        assertTrue(load.contains("this.name = currentName"))
+        assertTrue(load.contains("this.author = currentAuthor"))
+        assertTrue(emptyPath.contains("needNameBitmap.put(currentPath.toString(), true)"))
+        assertTrue(emptyPath.contains("ImageLoader.load(context, BookCover.defaultDrawable)"))
+        assertTrue(emptyPath.contains("invalidate()"))
+        assertTrue(emptyPath.contains("onLoadFinish?.invoke()"))
+        assertTrue(emptyPath.contains("return"))
+        assertFalse(emptyPath.contains("glideListener"))
+    }
+
+    @Test
     fun audioCoverUsesTheBookScopedSourceOrigin() {
         val source = listOf(File("src/main/java"), File("app/src/main/java"))
             .first { it.isDirectory }

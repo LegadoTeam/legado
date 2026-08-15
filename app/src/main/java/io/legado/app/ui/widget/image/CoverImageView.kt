@@ -300,18 +300,29 @@ class CoverImageView @JvmOverloads constructor(
         lifecycle: Lifecycle? = null,
         onLoadFinish: (() -> Unit)? = null
     ) {
-        val currentAuthor = author?.replace(AppPattern.bdRegex, "")?.trim()?.also {
-            this.author = it
-        }
-        val currentName = name?.replace(AppPattern.bdRegex, "")?.trim()?.also {
-            this.name = it
-        }
-        this.bitmapPath = path
+        currentJob?.cancel()
+        currentJob = null
+        triggerChannel.tryReceive()
+        val currentAuthor = author?.replace(AppPattern.bdRegex, "")?.trim()
+        val currentName = name?.replace(AppPattern.bdRegex, "")?.trim()
+        val currentPath = path?.takeIf { it.isNotBlank() }
+        this.author = currentAuthor
+        this.name = currentName
+        this.bitmapPath = currentPath
         if (AppConfig.useDefaultCover) {
             ImageLoader.load(context, BookCover.defaultDrawable)
                 .centerCrop()
                 .into(this)
         } else {
+            if (currentPath == null) {
+                needNameBitmap.put(currentPath.toString(), true)
+                ImageLoader.load(context, BookCover.defaultDrawable)
+                    .centerCrop()
+                    .into(this)
+                invalidate()
+                onLoadFinish?.invoke()
+                return
+            }
             if (drawBookName && currentName != null) {
                 val pathName = if (drawBookAuthor){
                     currentName + currentAuthor
@@ -325,9 +336,9 @@ class CoverImageView @JvmOverloads constructor(
                 options = options.set(OkHttpModelLoader.sourceOriginOption, sourceOrigin)
             }
             var builder = if (fragment != null && lifecycle != null) {
-                ImageLoader.load(fragment, lifecycle, path)
+                ImageLoader.load(fragment, lifecycle, currentPath)
             } else {
-                ImageLoader.load(context, path)//Glide自动识别http://,content://和file://
+                ImageLoader.load(context, currentPath)//Glide自动识别http://,content://和file://
             }
             builder = builder.apply(options)
                 .placeholder(BookCover.defaultDrawable)
