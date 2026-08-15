@@ -155,7 +155,7 @@ class BookInfoActivity :
             )
         } ?: let {
             if (!viewModel.urlOnShelf) {
-                viewModel.delBook() //进目录会临时落库，退出目录再删；正式在架不删
+                viewModel.delBook(onlyNotShelf = true) //临时落库才删；正式在架不删
             }
         }
     }
@@ -1055,7 +1055,7 @@ class BookInfoActivity :
             viewModel.getBook()?.let { book ->
                 if (viewModel.inBookshelf) {
                     if (!viewModel.urlOnShelf) {
-                        viewModel.delBook {
+                        viewModel.delBook(onlyNotShelf = true) {
                             if (viewModel.inBookshelf && !viewModel.urlOnShelf) {
                                 toastOnUi(
                                     getString(

@@ -128,7 +128,10 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         execute {
             val name = intent.getStringExtra("name") ?: ""
             val author = intent.getStringExtra("author") ?: ""
-            val bookUrl = intent.getStringExtra("bookUrl") ?: bookData.value?.bookUrl.orEmpty()
+            val bookUrl = BookInfoShelfFlags.resolveReturnBookUrl(
+                bookData.value?.bookUrl,
+                intent.getStringExtra("bookUrl"),
+            )
             val book = if (bookUrl.isNotBlank()) {
                 appDb.bookDao.getBook(bookUrl)
             } else {
@@ -672,11 +675,24 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         return book
     }
 
-    fun delBook(deleteOriginal: Boolean = false, success: (() -> Unit)? = null) {
+    fun delBook(
+        deleteOriginal: Boolean = false,
+        onlyNotShelf: Boolean = false,
+        success: (() -> Unit)? = null,
+    ) {
         execute {
             val book = bookData.value ?: return@execute
-            val persistedUrl = appDb.bookDao.getBook(book.bookUrl)?.bookUrl
-            if (BookInfoShelfFlags.canDeleteBookUrl(book.bookUrl, persistedUrl)) {
+            val persisted = appDb.bookDao.getBook(book.bookUrl)
+            val allowed = if (onlyNotShelf) {
+                BookInfoShelfFlags.canDeleteTempBookUrl(
+                    book.bookUrl,
+                    persisted?.bookUrl,
+                    persisted?.isNotShelf == true,
+                )
+            } else {
+                BookInfoShelfFlags.canDeleteBookUrl(book.bookUrl, persisted?.bookUrl)
+            }
+            if (allowed) {
                 book.delete()
                 if (book.isLocal) {
                     LocalBook.deleteBook(book, deleteOriginal)

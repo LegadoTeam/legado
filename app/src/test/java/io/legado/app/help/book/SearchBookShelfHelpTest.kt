@@ -368,6 +368,7 @@ class SearchBookShelfHelpTest {
             store,
         )
         assertEquals(1, store.allBooksLoads)
+        assertEquals(0, store.booksByNameLoads)
         assertEquals(3, store.insertAttempts)
     }
 
@@ -496,6 +497,43 @@ class SearchBookShelfHelpTest {
                 SearchBookShelfHelp.shelfBadgeKeys(listOf(temp)),
             )
         )
+        val store = FakeStore(temp)
+        val result = SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
+        assertEquals(1, result.added)
+        assertEquals("B", result.addedBooks.single().bookUrl)
+        assertEquals(listOf("B"), store.books.map { it.bookUrl })
+        assertEquals(1, store.deleteCount)
+        val persisted = SearchBookShelfHelp.persistNewBook(
+            FakeStore(temp.copy()),
+            Book(bookUrl = "B", name = "T", author = "佚名"),
+        )
+        assertEquals("B", persisted?.bookUrl)
+    }
+
+    @Test
+    fun sameBatchActivateTempRealThenSkipsWeakOnCopyingStore() {
+        val leftover = Book(
+            bookUrl = "A",
+            name = "T",
+            author = "作者甲",
+            type = BookType.text or BookType.notShelf,
+            order = 0,
+        )
+        val store = FakeStore(leftover, copyOnRead = true)
+        val result = SearchBookShelfHelp.addLoadedBooksToShelf(
+            listOf(
+                searchBook("A", "T", "作者甲"),
+                searchBook("B", "T", "佚名"),
+            ),
+            store,
+        )
+        assertEquals(1, result.added)
+        assertEquals("A", result.addedBooks.single().bookUrl)
+        assertEquals(1, store.books.size)
+        assertEquals("A", store.books.single().bookUrl)
+        assertFalse(store.books.single().isNotShelf)
+        assertEquals(0, store.insertAttempts)
+        assertEquals(1, store.allBooksLoads)
     }
 
     @Test
@@ -773,32 +811,37 @@ class SearchBookShelfHelpTest {
         vararg initialBooks: Book,
         override val minOrder: Int = 0,
         private val rejectInserts: Boolean = false,
+        private val copyOnRead: Boolean = false,
     ) : SearchBookShelfHelp.Store {
         val books = initialBooks.toMutableList()
         var insertAttempts = 0
         var updateCount = 0
         var deleteCount = 0
         var allBooksLoads = 0
+        var booksByNameLoads = 0
 
         override fun getBook(name: String, author: String): Book? {
-            return books.firstOrNull { it.name == name && it.author == author }
+            return view(books.firstOrNull { it.name == name && it.author == author })
         }
 
         override fun getBook(bookUrl: String): Book? {
-            return books.firstOrNull { it.bookUrl == bookUrl }
+            return view(books.firstOrNull { it.bookUrl == bookUrl })
         }
 
         override fun getBooksByName(name: String): List<Book> {
-            return books.filter { BookAuthorIdentity.equalName(it.name, name) }
+            booksByNameLoads++
+            return books.filter { BookAuthorIdentity.equalName(it.name, name) }.map(::viewRequired)
         }
 
         override fun allBooks(): List<Book> {
             allBooksLoads++
-            return books.toList()
+            return books.map(::viewRequired)
         }
 
         override fun update(book: Book) {
             updateCount++
+            val index = books.indexOfFirst { it.bookUrl == book.bookUrl }
+            if (index >= 0) books[index] = stored(book)
         }
 
         override fun insertIgnore(book: Book): Boolean {
@@ -806,8 +849,26 @@ class SearchBookShelfHelpTest {
             if (rejectInserts) return false
             if (books.any { it.bookUrl == book.bookUrl }) return false
             if (books.any { it.name == book.name && it.author == book.author }) return false
-            books.add(book)
+            books.add(stored(book))
             return true
+        }
+
+        override fun delete(book: Book) {
+            if (books.removeAll { it.bookUrl == book.bookUrl }) {
+                deleteCount++
+            }
+        }
+
+        private fun view(book: Book?): Book? {
+            return book?.let(::viewRequired)
+        }
+
+        private fun viewRequired(book: Book): Book {
+            return if (copyOnRead) book.copy() else book
+        }
+
+        private fun stored(book: Book): Book {
+            return if (copyOnRead) book.copy() else book
         }
     }
 }

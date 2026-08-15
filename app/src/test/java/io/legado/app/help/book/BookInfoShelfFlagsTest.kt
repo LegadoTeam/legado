@@ -24,11 +24,25 @@ class BookInfoShelfFlagsTest {
     }
 
     @Test
-    fun tocCancelDeletesOnlyTheCurrentUrl() {
+    fun tocCancelDeletesOnlyTheCurrentNotShelfUrl() {
         assertTrue(BookInfoShelfFlags.canDeleteBookUrl("B", "B"))
+        assertTrue(BookInfoShelfFlags.canDeleteTempBookUrl("B", "B", persistedIsNotShelf = true))
+        assertFalse(BookInfoShelfFlags.canDeleteTempBookUrl("B", "B", persistedIsNotShelf = false))
+        assertFalse(BookInfoShelfFlags.canDeleteTempBookUrl("B", "A", persistedIsNotShelf = true))
+        assertFalse(BookInfoShelfFlags.canDeleteTempBookUrl("B", null, persistedIsNotShelf = true))
+        assertFalse(BookInfoShelfFlags.canDeleteTempBookUrl("", "B", persistedIsNotShelf = true))
         assertFalse(BookInfoShelfFlags.canDeleteBookUrl("B", "A"))
         assertFalse(BookInfoShelfFlags.canDeleteBookUrl("B", null))
         assertFalse(BookInfoShelfFlags.canDeleteBookUrl("", "B"))
+    }
+
+    @Test
+    fun readerReturnPrefersCurrentPageUrlAfterChangeTo() {
+        assertEquals("B", BookInfoShelfFlags.resolveReturnBookUrl("B", "A"))
+        assertEquals("A", BookInfoShelfFlags.resolveReturnBookUrl("", "A"))
+        assertEquals("A", BookInfoShelfFlags.resolveReturnBookUrl(null, "A"))
+        assertEquals("", BookInfoShelfFlags.resolveReturnBookUrl(null, null))
+        assertFalse(BookInfoShelfFlags.canDeleteTempBookUrl("B", "B", persistedIsNotShelf = false))
     }
 
     @Test
@@ -63,7 +77,7 @@ class BookInfoShelfFlagsTest {
 
         state = BookInfoShelfFlags.afterUrlPersisted(state)
         assertEquals(BookInfoShelfFlags.State(false, false), state)
-        assertTrue(BookInfoShelfFlags.canDeleteBookUrl("B", "B"))
+        assertTrue(BookInfoShelfFlags.canDeleteTempBookUrl("B", "B", persistedIsNotShelf = true))
         assertFalse(state.urlOnShelf)
 
         state = BookInfoShelfFlags.afterUrlPersisted(state)
@@ -76,5 +90,6 @@ class BookInfoShelfFlagsTest {
         assertEquals(BookInfoShelfFlags.State(true, true), state)
         assertTrue(BookInfoShelfFlags.readerInBookshelfExtra(state.urlOnShelf))
         assertFalse(BookInfoShelfFlags.canDeleteBookUrl("B", "A"))
+        assertFalse(BookInfoShelfFlags.canDeleteTempBookUrl("B", "B", persistedIsNotShelf = false))
     }
 }

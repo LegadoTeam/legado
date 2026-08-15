@@ -36,11 +36,31 @@ internal object BookInfoShelfFlags {
     }
 
     /**
-     * Delete only the current page URL. Identity-only must not delete the
-     * other shelf row.
+     * Reader/TOC return: follow the page's current URL (changeTo may have
+     * replaced the book). The launch Intent extra can still be the old URL.
+     */
+    fun resolveReturnBookUrl(currentPageUrl: String?, intentUrl: String?): String {
+        return currentPageUrl?.takeIf { it.isNotBlank() } ?: intentUrl.orEmpty()
+    }
+
+    /**
+     * User remove-from-shelf: delete only the current page URL.
+     * Identity-only must not delete the other shelf row.
      */
     fun canDeleteBookUrl(pageUrl: String, persistedUrl: String?): Boolean {
         return pageUrl.isNotBlank() && persistedUrl == pageUrl
+    }
+
+    /**
+     * TOC/reader leftover cleanup. Official rows must survive a stale
+     * [urlOnShelf] after changeTo.
+     */
+    fun canDeleteTempBookUrl(
+        pageUrl: String,
+        persistedUrl: String?,
+        persistedIsNotShelf: Boolean,
+    ): Boolean {
+        return canDeleteBookUrl(pageUrl, persistedUrl) && persistedIsNotShelf
     }
 
     fun readerInBookshelfExtra(urlOnShelf: Boolean): Boolean = urlOnShelf

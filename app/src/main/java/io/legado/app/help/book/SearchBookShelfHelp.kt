@@ -6,14 +6,9 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.SearchBook
 
 /**
- * Shelf add + 「在架」badge. Does not delete or rewrite existing bookshelf rows.
- *
- * Search/explore bulk add: a new empty/佚名 hit is skipped when that title
- * already has exactly one web real author on the shelf. A new real author is
- * always inserted; existing 佚名 rows stay put. BookInfo add persists the
- * current book's URL only and does not retarget another shelf row.
- * Local rows are never reused or REPLACE-deleted. If a local book already owns
- * the unique (name, author) key, the web copy is not inserted.
+ * Shelf add + 「在架」badge. Does not delete or rewrite official bookshelf rows.
+ * Weak incoming skips when a sole web real author is already visible.
+ * BookInfo keeps the current URL. Local unique keys are never REPLACE-deleted.
  */
 object SearchBookShelfHelp {
 
@@ -28,11 +23,7 @@ object SearchBookShelfHelp {
             get() = total - added
     }
 
-    /**
-     * One shelf-identity answer for badge, skip-insert, and BookInfo.
-     * [identityOnShelf] is list/UI/skip-insert. [urlOnShelf] is the only
-     * flag that may persist this page's URL (replace/save/chapters).
-     */
+    /** [identityOnShelf] = badge/skip-insert/UI. [urlOnShelf] = visible row for this URL. */
     data class ShelfPresence(
         val existing: Book?,
         val identityOnShelf: Boolean,
@@ -53,6 +44,8 @@ object SearchBookShelfHelp {
         fun update(book: Book)
 
         fun insertIgnore(book: Book): Boolean
+
+        fun delete(book: Book)
     }
 
     fun shelfBadgeKeys(books: Iterable<Book>): Set<String> {
@@ -130,10 +123,9 @@ object SearchBookShelfHelp {
             if (existingBook != null) {
                 if (existingBook.isNotShelf) {
                     existingBook.removeType(BookType.notShelf)
+                    store.update(existingBook)
                     if (existingBook.order == 0) {
                         booksToOrder.add(existingBook)
-                    } else {
-                        store.update(existingBook)
                     }
                     addedBooks.add(existingBook)
                 }
@@ -161,11 +153,7 @@ object SearchBookShelfHelp {
         return AddResult(books.size, addedBooks)
     }
 
-    /**
-     * URL match, or same effective author, or incoming weak + sole web real already on shelf.
-     * Incoming real never reuses an existing weak row. Local rows are never reused
-     * for a different URL (web add must still insert).
-     */
+    /** URL, same effective author, or incoming weak + sole visible web real. Local rows are never reused. */
     internal fun resolveExisting(store: Store, searchBook: SearchBook): Book? {
         val byUrl = store.getBook(searchBook.bookUrl)
         if (byUrl != null && !byUrl.isNotShelf) return byUrl
@@ -193,11 +181,7 @@ object SearchBookShelfHelp {
         return visible ?: byUrl
     }
 
-    /**
-     * Insert [book] without REPLACE-deleting another row.
-     * Placeholder authors are stored as empty so they do not collide with a local 「佚名」.
-     * @return the inserted book, an existing same-key web row, or null when a local unique key blocks insert.
-     */
+    /** Insert without REPLACE. Weak authors persist as empty. NotShelf unique-key leftovers are dropped. */
     internal fun persistNewBook(store: Store, book: Book): Book? {
         store.getBook(book.bookUrl)?.let {
             store.update(book)
@@ -207,10 +191,21 @@ object SearchBookShelfHelp {
             book.author = BookAuthorIdentity.persistAuthor(book.author)
         }
         if (store.insertIgnore(book)) return book
-        return reusable(store.getBook(book.name, book.author))
+        val owner = store.getBook(book.name, book.author) ?: return null
+        if (owner.isNotShelf && !owner.isLocal && owner.bookUrl != book.bookUrl) {
+            store.delete(owner)
+            if (store.insertIgnore(book)) return book
+        }
+        return reusable(owner.takeUnless { it.isNotShelf })
     }
 
-    fun persistIncomingBook(book: Book): Book? = persistNewBook(AppStore, book)
+    fun persistIncomingBook(book: Book): Book? {
+        var persisted: Book? = null
+        appDb.runInTransaction {
+            persisted = persistNewBook(AppStore, book)
+        }
+        return persisted
+    }
 
     internal fun resolveOnShelf(searchBook: SearchBook): Book? {
         return resolveExisting(AppStore, searchBook)
@@ -273,6 +268,10 @@ object SearchBookShelfHelp {
 
         override fun insertIgnore(book: Book): Boolean {
             return appDb.bookDao.insertIgnore(book) != -1L
+        }
+
+        override fun delete(book: Book) {
+            book.delete()
         }
     }
 }
