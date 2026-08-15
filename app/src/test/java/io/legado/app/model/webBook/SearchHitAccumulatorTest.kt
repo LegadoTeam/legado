@@ -88,7 +88,10 @@ class SearchHitAccumulatorTest {
         ).first { it.isFile }.readText()
         assertTrue(src.contains("SearchHitAccumulator"))
         assertFalse(src.contains("rawSearchHits"))
-        assertTrue(src.contains("rawHits.appendAndPublish("))
+        assertFalse(src.contains("appendAndPublish"))
+        assertTrue(src.contains("rawHits.append("))
+        assertTrue(src.contains("rawHits.publish("))
+        assertTrue(src.contains("SearchBookMerge.rebuildFromRawHits"))
         assertFalse(src.contains("searchBooks ="))
         assertTrue(src.contains("SearchResultGate.accept(searchId, mSearchId)"))
         assertTrue(src.contains("onSearchSuccess(searchId, published.hits)"))
@@ -111,57 +114,9 @@ class SearchHitAccumulatorTest {
         onSuccess(1L, old)
         onSuccess(2L, new)
         assertEquals(listOf(listOf("new")), posted)
-        val viewModel = sequenceOf(
-            File("app/src/main/java/io/legado/app/ui/book/search/SearchViewModel.kt"),
-            File("src/main/java/io/legado/app/ui/book/search/SearchViewModel.kt"),
-        ).first { it.isFile }.readText()
-        assertTrue(viewModel.contains("searchGeneration.postIfCurrent(searchId)"))
-        assertTrue(viewModel.contains("searchGeneration.beginNew"))
         assertFalse(SearchResultGate.accept(0L, 0L))
         assertFalse(SearchResultGate.accept(1L, 2L))
         assertTrue(SearchResultGate.accept(2L, 2L))
-    }
-
-    @Test
-    fun staleUiPostAfterBeginNewDoesNotWin() {
-        val posted = mutableListOf<String>()
-        val gen = SearchUiGeneration()
-        val oldId = gen.beginNew { posted.add("clear-1") }
-        assertTrue(gen.postIfCurrent(oldId) { posted.add("old") })
-        val newId = gen.beginNew { posted.add("clear-2") }
-        assertFalse(gen.postIfCurrent(oldId) { posted.add("stale") })
-        assertTrue(gen.postIfCurrent(newId) { posted.add("new") })
-        assertEquals(listOf("clear-1", "old", "clear-2", "new"), posted)
-    }
-
-    @Test
-    fun concurrentBeginNewDropsStalePost() {
-        val gen = SearchUiGeneration()
-        val oldId = gen.beginNew()
-        val posted = Collections.synchronizedList(mutableListOf<String>())
-        val start = CyclicBarrier(2)
-        val done = CountDownLatch(2)
-        Thread {
-            try {
-                start.await(5, TimeUnit.SECONDS)
-                gen.postIfCurrent(oldId) { posted.add("old") }
-            } finally {
-                done.countDown()
-            }
-        }.start()
-        Thread {
-            try {
-                start.await(5, TimeUnit.SECONDS)
-                val newId = gen.beginNew()
-                gen.postIfCurrent(newId) { posted.add("new") }
-            } finally {
-                done.countDown()
-            }
-        }.start()
-        assertTrue(done.await(10, TimeUnit.SECONDS))
-        assertTrue(posted.contains("new"))
-        assertTrue(posted.last() == "new")
-        assertFalse(posted == listOf("new", "old"))
     }
 
     @Test
@@ -211,20 +166,17 @@ class SearchHitAccumulatorTest {
     }
 
     @Test
-    fun appendAndPublishKeepsNewerDisplayWhenOlderBuildFinishesLast() {
+    fun appendThenPublishRebuildsDisplayOutsideTheAppendLock() {
         val acc = SearchHitAccumulator()
         acc.begin(1L)
-        val first = acc.appendAndPublish(1L, listOf(hit("A"))) { it }
+        val first = acc.append(1L, listOf(hit("A")))
         assertTrue(first!!.changed)
-        assertEquals(listOf("A"), first.hits.map { it.bookUrl })
-        val dup = acc.appendAndPublish(1L, listOf(hit("A"))) { error("should not rebuild") }
+        assertEquals(listOf("A"), acc.publish(1L, first.hits)!!.map { it.bookUrl })
+        val dup = acc.append(1L, listOf(hit("A")))
         assertFalse(dup!!.changed)
-        assertEquals(listOf("A"), dup.hits.map { it.bookUrl })
-        val extra = acc.appendAndPublish(1L, listOf(hit("B"))) { books ->
-            books.filter { it.bookUrl == "B" }
-        }
+        val extra = acc.append(1L, listOf(hit("B")))
         assertTrue(extra!!.changed)
-        assertEquals(listOf("B"), extra.hits.map { it.bookUrl })
+        assertEquals(listOf("B"), acc.publish(1L, extra.hits.filter { it.bookUrl == "B" })!!.map { it.bookUrl })
         assertEquals(listOf("B"), acc.published(1L)!!.map { it.bookUrl })
     }
 
@@ -252,35 +204,28 @@ class SearchHitAccumulatorTest {
             File("app/src/main/java/io/legado/app/model/webBook/SearchModel.kt"),
             File("src/main/java/io/legado/app/model/webBook/SearchModel.kt"),
         ).first { it.isFile }.readText()
-        assertTrue(src.contains("appendAndPublish"))
+        assertFalse(src.contains("appendAndPublish"))
         assertTrue(src.contains("hasMore = hasMore || published.changed"))
         assertTrue(src.contains("rawHits.published(searchId)"))
         val startSearch = src.substringAfter("private fun startSearch()").substringBefore("private suspend fun mergeItems")
         val completion = startSearch.substringAfter("onCompletion").substringBefore("activeProgress")
         assertTrue(completion.contains("rawHits.published(searchId)"))
-        assertFalse(completion.contains("rebuildDisplay"))
         assertFalse(completion.contains("onSearchSuccess"))
-        assertFalse(src.contains("fun rebuildDisplay"))
-        assertTrue(startSearch.contains("searchJob?.cancel()"))
+        assertFalse(startSearch.contains("searchJob?.cancel()"))
         assertFalse(startSearch.contains("acceptFinish"))
         assertFalse(startSearch.contains("CoroutineStart.LAZY"))
         val viewModel = sequenceOf(
             File("app/src/main/java/io/legado/app/ui/book/search/SearchViewModel.kt"),
             File("src/main/java/io/legado/app/ui/book/search/SearchViewModel.kt"),
         ).first { it.isFile }.readText()
-        assertTrue(viewModel.contains("searchStartLock"))
-        assertTrue(viewModel.contains("synchronized(searchStartLock)"))
+        assertFalse(viewModel.contains("searchStartLock"))
+        assertFalse(viewModel.contains("SearchUiGeneration"))
         val searchFn = viewModel.substringAfter("fun search(key: String)").substringBefore("fun stop()")
         assertTrue(searchFn.contains("searchModel.cancelSearch()"))
-        assertTrue(searchFn.contains("searchGeneration.beginNew"))
-        assertTrue(searchFn.contains("searchModel.search("))
-        assertTrue(searchFn.contains("synchronized(searchStartLock)"))
-        assertTrue(searchFn.contains("start.first != searchGeneration.current"))
+        assertTrue(searchFn.contains("searchID = System.currentTimeMillis()"))
+        assertTrue(searchFn.contains("searchModel.search(searchID, searchKey)"))
         assertTrue(searchFn.contains("execute {"))
-        val bump = searchFn.substringAfter("synchronized(searchStartLock)").substringBefore("execute {")
-        assertTrue(bump.contains("searchModel.cancelSearch()"))
-        assertTrue(bump.contains("searchGeneration.beginNew"))
-        assertFalse(bump.contains("searchModel.search("))
+        assertTrue(viewModel.contains("private var searchID = 0L"))
     }
 
     private fun hit(bookUrl: String) = SearchBook(

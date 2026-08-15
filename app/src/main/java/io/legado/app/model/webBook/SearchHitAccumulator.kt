@@ -69,25 +69,6 @@ internal class SearchHitAccumulator {
         }
     }
 
-    /**
-     * Append and, when the raw set grew, rebuild display under the same lock
-     * so an older page cannot publish after a newer one.
-     */
-    fun appendAndPublish(
-        generation: Long,
-        items: List<SearchBook>,
-        buildDisplay: (List<SearchBook>) -> List<SearchBook>,
-    ): SearchHitAppend? {
-        synchronized(lock) {
-            val appended = appendLocked(generation, items) ?: return null
-            if (!appended.changed) {
-                return SearchHitAppend(display, changed = false)
-            }
-            display = buildDisplay(appended.hits)
-            return SearchHitAppend(display, changed = true)
-        }
-    }
-
     fun published(generation: Long): List<SearchBook>? {
         synchronized(lock) {
             if (generation == 0L || generation != this.generation) return null
@@ -146,4 +127,4 @@ internal class SearchUiGeneration {
             return true
         }
     }
-}
+    }

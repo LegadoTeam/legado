@@ -171,9 +171,13 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
             out
         }
         currentCoroutineContext().ensureActive()
-        return rawHits.appendAndPublish(searchId, copies) { snapshot ->
-            buildDisplay(snapshot, precision, key)
+        val appended = rawHits.append(searchId, copies) ?: return null
+        if (!appended.changed) {
+            return SearchHitAppend(rawHits.published(searchId) ?: emptyList(), changed = false)
         }
+        val display = buildDisplay(appended.hits, precision, key)
+        val published = rawHits.publish(searchId, display) ?: return null
+        return SearchHitAppend(published, changed = true)
     }
 
     private fun buildDisplay(

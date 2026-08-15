@@ -231,7 +231,7 @@ class SearchBookShelfHelpTest {
     }
 
     @Test
-    fun localYimingDoesNotMarkWebYimingInShelfAndStillInserts() {
+    fun localYimingMarksExactYimingBadgeAndWebStillInserts() {
         val local = Book(
             bookUrl = "local://x",
             name = "同名书",
@@ -240,7 +240,7 @@ class SearchBookShelfHelpTest {
         )
         val incoming = searchBook("weak", "同名书", "佚名")
         val keys = SearchBookShelfHelp.shelfBadgeKeys(listOf(local))
-        assertFalse(SearchBookShelfHelp.isInShelfBadgeIndex(incoming, keys))
+        assertTrue(SearchBookShelfHelp.isInShelfBadgeIndex(incoming, keys))
         assertTrue(
             SearchBookShelfHelp.isInShelfBadgeIndex(
                 searchBook("local://x", "同名书", "佚名"),
@@ -271,7 +271,7 @@ class SearchBookShelfHelpTest {
     }
 
     @Test
-    fun localEmptyAuthorSharesPersistKeyWithWebYimingAndBlocksInsert() {
+    fun localEmptyAuthorDoesNotBadgeYimingAndStillBlocksInsert() {
         val local = Book(
             bookUrl = "local://x",
             name = "T",
@@ -280,7 +280,7 @@ class SearchBookShelfHelpTest {
         )
         val incoming = searchBook("W", "T", "佚名")
         val keys = SearchBookShelfHelp.shelfBadgeKeys(listOf(local))
-        assertTrue(SearchBookShelfHelp.isInShelfBadgeIndex(incoming, keys))
+        assertFalse(SearchBookShelfHelp.isInShelfBadgeIndex(incoming, keys))
         val store = FakeStore(local)
         val result = SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
         assertEquals(0, result.added)
@@ -319,6 +319,20 @@ class SearchBookShelfHelpTest {
             store,
         )
         assertEquals(3, store.insertAttempts)
+        assertEquals(1, store.allBooksLoads)
+        assertEquals(0, store.booksByNameLoads)
+    }
+
+    @Test
+    fun shelfBadgeUsesExactNameAuthorNotTrim() {
+        val shelf = Book(bookUrl = "A", name = "T ", author = "A")
+        val keys = SearchBookShelfHelp.shelfBadgeKeys(listOf(shelf))
+        assertFalse(
+            SearchBookShelfHelp.isInShelfBadgeIndex(searchBook("B", "T", "A"), keys)
+        )
+        assertTrue(
+            SearchBookShelfHelp.isInShelfBadgeIndex(searchBook("A", "T ", "A"), keys)
+        )
     }
 
     @Test
