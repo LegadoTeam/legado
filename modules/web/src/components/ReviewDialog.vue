@@ -126,9 +126,17 @@
                   @keydown.enter.stop="openImage(reply.imageUrl)"
                   @keydown.space.stop.prevent="openImage(reply.imageUrl)"
                 />
-                <div v-if="reply.time || reply.likeCount != null" class="meta">
+                <div
+                  v-if="
+                    reply.time ||
+                    (reply.likeCount != null && reply.likeCount > 0)
+                  "
+                  class="meta"
+                >
                   <span v-if="reply.time">{{ reply.time }}</span>
-                  <span v-if="reply.likeCount != null">{{ reply.likeCount }} 赞</span>
+                  <span v-if="reply.likeCount != null && reply.likeCount > 0">
+                    {{ reply.likeCount }} 赞
+                  </span>
                 </div>
               </article>
 
