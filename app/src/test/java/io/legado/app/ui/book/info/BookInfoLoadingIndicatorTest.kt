@@ -174,6 +174,8 @@ class BookInfoLoadingIndicatorTest {
         assertTrue(saveBook.contains("appDb.bookDao.getBook(book.bookUrl)"))
         assertTrue(saveBook.contains("SearchBookShelfHelp.persistIncomingBook(book)"))
         assertFalse(saveBook.contains("getBook(book.name, book.author)"))
+        assertTrue(saveBook.contains("if (saved == true)"))
+        assertTrue(saveBook.contains("presence.identityOnShelf"))
     }
 
     private fun Element.androidAttribute(name: String): String = getAttributeNS(ANDROID_NS, name)

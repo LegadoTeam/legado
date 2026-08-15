@@ -121,11 +121,18 @@ class BookInfoOpenResolverTest {
         assertTrue(explore.contains("putExtra(\"bookUrl\", book.bookUrl)"))
         val activity = read("src/main/java/io/legado/app/ui/book/info/BookInfoActivity.kt")
         val readBook = activity.substringAfter("private fun readBook(").substringBefore("private fun startReadActivity(")
-        assertTrue(readBook.contains("else if (viewModel.urlOnShelf)"))
+        val tocEntry = activity.substringAfter("tvTocView.setOnClickListener {").substringBefore("tvChangeGroup.setOnClickListener")
+        assertTrue(readBook.contains("if (viewModel.urlOnShelf)"))
+        assertTrue(readBook.contains("viewModel.saveBook(book)"))
+        assertFalse(readBook.contains("} else {\n            startReadActivity(book)"))
+        assertTrue(tocEntry.contains("if (viewModel.urlOnShelf)"))
+        assertFalse(tocEntry.contains("} else {\n                openChapterList()"))
+        assertTrue(saveBook.contains("if (saved == true)"))
+        assertTrue(saveBook.contains("presence.identityOnShelf"))
         assertTrue(activity.contains("putExtra(\"inBookshelf\", viewModel.urlOnShelf)"))
         assertFalse(activity.contains("putExtra(\"inBookshelf\", viewModel.inBookshelf)"))
         assertTrue(activity.contains("R.string.local_book_identity_conflict"))
-        assertTrue(activity.contains("if (!viewModel.urlOnShelf)"))
+        assertTrue(activity.contains("editMenuItem?.isVisible = viewModel.urlOnShelf"))
     }
 
     private fun offShelf() = SearchBookShelfHelp.ShelfPresence(

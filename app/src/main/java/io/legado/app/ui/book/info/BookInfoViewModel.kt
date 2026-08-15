@@ -516,10 +516,33 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     book.save()
                 }
             } else {
+                val presence = SearchBookShelfHelp.presence(
+                    book.name,
+                    book.author,
+                    book.bookUrl,
+                )
+                if (presence.identityOnShelf) {
+                    applyShelfPresence(identityOnShelf = true, persistedUrl = false)
+                    context.toastOnUi(
+                        context.getString(
+                            R.string.local_book_identity_conflict,
+                            book.name,
+                            book.author,
+                        )
+                    )
+                    return@execute false
+                }
                 val persisted = SearchBookShelfHelp.persistIncomingBook(book)
                 if (persisted == null || persisted.bookUrl != book.bookUrl) {
                     refreshShelfFlags(book)
-                    return@execute
+                    context.toastOnUi(
+                        context.getString(
+                            R.string.local_book_identity_conflict,
+                            book.name,
+                            book.author,
+                        )
+                    )
+                    return@execute false
                 }
                 urlOnShelf = true
                 if (!book.isNotShelf) {
@@ -531,8 +554,11 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             } else if (AudioPlay.book?.bookUrl == book.bookUrl) {
                 AudioPlay.book = book
             }
-        }.onSuccess {
-            success?.invoke()
+            true
+        }.onSuccess { saved ->
+            if (saved == true) {
+                success?.invoke()
+            }
         }
     }
 

@@ -310,7 +310,7 @@ class BookInfoActivity :
             viewModel.bookData.value?.isLocal ?: false
         menu.findItem(R.id.menu_create_book_update_task)?.isVisible =
             viewModel.bookData.value?.let {
-                viewModel.inBookshelf &&
+                viewModel.urlOnShelf &&
                     viewModel.bookSource != null &&
                     !it.isLocal &&
                     it.canUpdate
@@ -337,6 +337,7 @@ class BookInfoActivity :
             }
 
             R.id.menu_edit -> {
+                if (!viewModel.urlOnShelf) return true
                 viewModel.getBook()?.let {
                     infoEditResult.launch {
                         putExtra("bookUrl", it.bookUrl)
@@ -1005,7 +1006,7 @@ class BookInfoActivity :
         } else {
             binding.tvShelf.text = getString(R.string.add_to_bookshelf)
         }
-        editMenuItem?.isVisible = viewModel.inBookshelf
+        editMenuItem?.isVisible = viewModel.urlOnShelf
     }
 
     private fun upGroup(groupId: Long) {
@@ -1105,18 +1106,14 @@ class BookInfoActivity :
                 toastOnUi(R.string.book_not_exist)
                 return@setOnClickListener
             }
-            if (!viewModel.inBookshelf) {
+            if (viewModel.urlOnShelf) {
+                openChapterList()
+            } else {
                 viewModel.saveBook(book) { //点击目录会保存book
-                    if (viewModel.urlOnShelf) {
-                        viewModel.saveChapterList {
-                            openChapterList()
-                        }
-                    } else {
+                    viewModel.saveChapterList {
                         openChapterList()
                     }
                 }
-            } else {
-                openChapterList()
             }
         }
         tvChangeGroup.setOnClickListener {
@@ -1356,20 +1353,12 @@ class BookInfoActivity :
                 book.chapterInVolumeIndex = chapterInVolumeIndex
             }
             chapterChanged = changed
-            if (!viewModel.inBookshelf) {
-                book.addType(BookType.notShelf)
+            if (!viewModel.urlOnShelf) {
+                if (!viewModel.inBookshelf) {
+                    book.addType(BookType.notShelf)
+                }
                 viewModel.saveBook(book) {
-                    if (viewModel.urlOnShelf) {
-                        viewModel.saveChapterList {
-                            startReadActivity(
-                                book,
-                                index.takeIf { deferHighlightPosition },
-                                pos.takeIf { deferHighlightPosition },
-                                highlightLayoutTitleLength.takeIf { deferHighlightPosition },
-                                highlightAnchorText.takeIf { deferHighlightPosition }
-                            )
-                        }
-                    } else {
+                    viewModel.saveChapterList {
                         startReadActivity(
                             book,
                             index.takeIf { deferHighlightPosition },
@@ -1493,23 +1482,19 @@ class BookInfoActivity :
     }
 
     private fun readBook(book: Book) {
-        if (!viewModel.inBookshelf) {
-            book.addType(BookType.notShelf)
-            viewModel.saveBook(book) {
-                if (viewModel.urlOnShelf) {
-                    viewModel.saveChapterList {
-                        startReadActivity(book)
-                    }
-                } else {
-                    startReadActivity(book)
-                }
-            }
-        } else if (viewModel.urlOnShelf) {
+        if (viewModel.urlOnShelf) {
             viewModel.saveBook(book) {
                 startReadActivity(book)
             }
         } else {
-            startReadActivity(book)
+            if (!viewModel.inBookshelf) {
+                book.addType(BookType.notShelf)
+            }
+            viewModel.saveBook(book) {
+                viewModel.saveChapterList {
+                    startReadActivity(book)
+                }
+            }
         }
     }
 
