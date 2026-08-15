@@ -116,9 +116,11 @@ class BookInfoLoadingIndicatorTest {
         val clearChapters = "chapterListData.postValue(emptyList())"
 
         assertEquals(
-            5,
+            4,
             refreshSection.lineSequence().count { it.trim() == preserveCurrent },
         )
+        assertTrue(refreshSection.contains("restoreBookAfterLoadFailure(oldBook)"))
+        assertTrue(refreshSection.contains("refreshShelfFlags(oldBook)"))
         assertFalse(refreshSection.contains(clearChapters))
         assertEquals(
             2,
@@ -142,7 +144,7 @@ class BookInfoLoadingIndicatorTest {
             .substringBefore("}.onError")
 
         assertTrue(loadBookInfo.contains("val oldBook = book.copy()"))
-        assertTrue(loadBookInfo.contains("bookData.postValue(oldBook)"))
+        assertTrue(loadBookInfo.contains("restoreBookAfterLoadFailure(oldBook)"))
         assertTrue(loadBookInfo.contains("refreshShelfFlags(it)"))
         assertFalse(loadBookInfo.contains("dbBook.updateTo"))
         assertFalse(loadBookInfo.contains("urlOnShelf = true"))
@@ -151,7 +153,7 @@ class BookInfoLoadingIndicatorTest {
         assertTrue(loadChapter.contains("appDb.bookDao.replace(oldBook, book)"))
         assertTrue(loadChapter.contains("if (urlOnShelf)"))
         assertFalse(loadChapter.contains("if (inBookshelf)"))
-        assertTrue(loadChapter.contains("bookData.postValue(oldBook)"))
+        assertTrue(loadChapter.contains("restoreBookAfterLoadFailure(oldBook)"))
         assertTrue(
             mainViewModel.contains(
                 "WebBook.runPreUpdateJs(source, book).getOrThrow()",
@@ -176,6 +178,9 @@ class BookInfoLoadingIndicatorTest {
         assertFalse(saveBook.contains("getBook(book.name, book.author)"))
         assertTrue(saveBook.contains("if (saved == true)"))
         assertTrue(saveBook.contains("presence.identityOnShelf"))
+        assertTrue(saveBook.contains("BookInfoShelfFlags.afterUrlPersisted"))
+        assertFalse(saveBook.contains("inBookshelf = true"))
+        assertFalse(saveBook.contains("urlOnShelf = true"))
     }
 
     private fun Element.androidAttribute(name: String): String = getAttributeNS(ANDROID_NS, name)

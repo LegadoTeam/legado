@@ -24,13 +24,25 @@ internal class SearchHitAccumulator {
         begin(0L)
     }
 
-    fun append(generation: Long, items: List<SearchBook>): List<SearchBook>? {
+    fun append(generation: Long, items: List<SearchBook>): SearchHitAppend? {
         synchronized(lock) {
             if (generation == 0L || generation != this.generation) return null
-            if (items.isNotEmpty()) {
-                hits = hits + items
+            if (items.isEmpty()) {
+                return SearchHitAppend(hits, changed = false)
             }
-            return hits
+            val seen = HashSet<String>(hits.size + items.size)
+            hits.forEach { seen.add(it.primaryStr()) }
+            val added = ArrayList<SearchBook>(items.size)
+            for (item in items) {
+                if (seen.add(item.primaryStr())) {
+                    added.add(item)
+                }
+            }
+            if (added.isEmpty()) {
+                return SearchHitAppend(hits, changed = false)
+            }
+            hits = hits + added
+            return SearchHitAppend(hits, changed = true)
         }
     }
 
@@ -60,6 +72,11 @@ internal class SearchHitAccumulator {
         }
     }
 }
+
+internal data class SearchHitAppend(
+    val hits: List<SearchBook>,
+    val changed: Boolean,
+)
 
 /** Drop a search callback whose id is no longer the UI's current search. */
 internal object SearchResultGate {

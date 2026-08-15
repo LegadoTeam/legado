@@ -22,7 +22,8 @@ class SearchHitAccumulatorTest {
         acc.begin(2L)
         assertNull(acc.append(1L, listOf(hit("stale"))))
         val snap = acc.append(2L, listOf(hit("new")))
-        assertEquals(listOf("new"), snap!!.map { it.bookUrl })
+        assertEquals(listOf("new"), snap!!.hits.map { it.bookUrl })
+        assertTrue(snap.changed)
         assertEquals(listOf("new"), acc.snapshot(2L)!!.map { it.bookUrl })
         assertNull(acc.snapshot(1L))
     }
@@ -207,6 +208,35 @@ class SearchHitAccumulatorTest {
         assertTrue(errors.toString(), errors.isEmpty())
         assertEquals(listOf("new"), acc.published(2L)!!.map { it.bookUrl })
         assertNull(acc.published(1L))
+    }
+
+    @Test
+    fun duplicatePagesDoNotGrowRawHits() {
+        val acc = SearchHitAccumulator()
+        acc.begin(1L)
+        val first = acc.append(1L, listOf(hit("A"), hit("B")))
+        assertTrue(first!!.changed)
+        assertEquals(listOf("A", "B"), first.hits.map { it.bookUrl })
+        val dup = acc.append(1L, listOf(hit("A"), hit("B")))
+        assertFalse(dup!!.changed)
+        assertEquals(listOf("A", "B"), dup.hits.map { it.bookUrl })
+        val empty = acc.append(1L, emptyList())
+        assertFalse(empty!!.changed)
+        assertEquals(listOf("A", "B"), empty.hits.map { it.bookUrl })
+        val extra = acc.append(1L, listOf(hit("B"), hit("C")))
+        assertTrue(extra!!.changed)
+        assertEquals(listOf("A", "B", "C"), extra.hits.map { it.bookUrl })
+    }
+
+    @Test
+    fun searchModelSkipsRebuildWhenHitsUnchanged() {
+        val src = sequenceOf(
+            File("app/src/main/java/io/legado/app/model/webBook/SearchModel.kt"),
+            File("src/main/java/io/legado/app/model/webBook/SearchModel.kt"),
+        ).first { it.isFile }.readText()
+        assertTrue(src.contains("if (!appended.changed)"))
+        assertTrue(src.contains("rawHits.published(searchId)"))
+        assertTrue(src.contains("applyDisplay(searchId, appended.hits"))
     }
 
     private fun hit(bookUrl: String) = SearchBook(

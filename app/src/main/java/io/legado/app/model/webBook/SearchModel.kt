@@ -173,8 +173,11 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
             }
             out
         }
-        val snapshot = rawHits.append(searchId, copies) ?: return null
-        return applyDisplay(searchId, snapshot, precision, key)
+        val appended = rawHits.append(searchId, copies) ?: return null
+        if (!appended.changed) {
+            return rawHits.published(searchId)
+        }
+        return applyDisplay(searchId, appended.hits, precision, key)
     }
 
     /**

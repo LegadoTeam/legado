@@ -22,6 +22,7 @@ import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.BookInfoOpenResolver
+import io.legado.app.help.book.BookInfoShelfFlags
 import io.legado.app.help.book.SearchBookShelfHelp
 import io.legado.app.help.book.getExportFileName
 import io.legado.app.help.book.getRemoteUrl
@@ -77,23 +78,6 @@ internal fun normalizeWebFileName(
     }
 }
 
-internal class BookInfoNetworkLoadingCounter(
-    private val onLoadingChanged: (Boolean) -> Unit,
-) {
-    private var activeLoads = 0
-
-    @Synchronized
-    fun begin() {
-        if (activeLoads++ == 0) onLoadingChanged(true)
-    }
-
-    @Synchronized
-    fun end() {
-        check(activeLoads > 0) { "No active network load" }
-        if (--activeLoads == 0) onLoadingChanged(false)
-    }
-}
-
 class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     val bookData = MutableLiveData<Book>()
     val chapterListData = MutableLiveData<List<BookChapter>>()
@@ -139,18 +123,22 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
-    fun upBook(intent: Intent) {
+    fun upBook(intent: Intent, success: (() -> Unit)? = null) {
         execute {
             val name = intent.getStringExtra("name") ?: ""
             val author = intent.getStringExtra("author") ?: ""
             val bookUrl = intent.getStringExtra("bookUrl") ?: bookData.value?.bookUrl.orEmpty()
-            if (bookUrl.isNotBlank()) {
-                appDb.bookDao.getBook(bookUrl)?.let { upBook(it) }
-                return@execute
+            val book = if (bookUrl.isNotBlank()) {
+                appDb.bookDao.getBook(bookUrl)
+            } else {
+                appDb.bookDao.getBook(name, author)
             }
-            appDb.bookDao.getBook(name, author)?.let { book ->
-                upBook(book)
+            book?.let {
+                refreshShelfFlags(it)
+                upBook(it)
             }
+        }.onSuccess {
+            success?.invoke()
         }
     }
 
@@ -160,8 +148,9 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     }
 
     private fun applyShelfPresence(identityOnShelf: Boolean, persistedUrl: Boolean) {
-        inBookshelf = identityOnShelf
-        urlOnShelf = persistedUrl
+        val state = BookInfoShelfFlags.fromPresence(identityOnShelf, persistedUrl)
+        inBookshelf = state.inBookshelf
+        urlOnShelf = state.urlOnShelf
     }
 
     private fun upBook(book: Book) {
@@ -273,8 +262,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                         )
                     }
                 }.onError {
-                    bookData.postValue(oldBook)
-                    chapterListData.postValue(chapterListData.value.orEmpty())
+                    restoreBookAfterLoadFailure(oldBook)
                     AppLog.put("获取书籍信息失败\n${it.localizedMessage}", it)
                     context.toastOnUi(R.string.error_get_book_info)
                 }
@@ -333,8 +321,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     bookData.postValue(book)
                     chapterListData.postValue(it)
                 }.onError {
-                    bookData.postValue(oldBook)
-                    chapterListData.postValue(chapterListData.value.orEmpty())
+                    restoreBookAfterLoadFailure(oldBook)
                     AppLog.put("获取目录失败\n${it.localizedMessage}", it)
                     context.toastOnUi(R.string.error_get_chapter_list)
                 }
@@ -342,6 +329,11 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
+    private fun restoreBookAfterLoadFailure(oldBook: Book) {
+        refreshShelfFlags(oldBook)
+        bookData.postValue(oldBook)
+        chapterListData.postValue(chapterListData.value.orEmpty())
+    }
 
     fun loadGroup(groupId: Long, success: ((groupNames: String?) -> Unit)) {
         execute {
@@ -544,10 +536,11 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     )
                     return@execute false
                 }
-                urlOnShelf = true
-                if (!book.isNotShelf) {
-                    inBookshelf = true
-                }
+                val kept = BookInfoShelfFlags.afterUrlPersisted(
+                    BookInfoShelfFlags.State(inBookshelf, urlOnShelf),
+                )
+                inBookshelf = kept.inBookshelf
+                urlOnShelf = kept.urlOnShelf
             }
             if (ReadBook.book?.bookUrl == book.bookUrl) {
                 ReadBook.book = book
@@ -640,17 +633,19 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
 
     fun delBook(deleteOriginal: Boolean = false, success: (() -> Unit)? = null) {
         execute {
-            if (!urlOnShelf) {
-                inBookshelf = false
+            val book = bookData.value ?: return@execute
+            val persistedUrl = appDb.bookDao.getBook(book.bookUrl)?.bookUrl
+            if (!BookInfoShelfFlags.canDeleteBookUrl(book.bookUrl, persistedUrl)) {
+                if (!urlOnShelf) {
+                    inBookshelf = false
+                }
                 return@execute
             }
-            bookData.value?.let {
-                it.delete()
-                inBookshelf = false
-                urlOnShelf = false
-                if (it.isLocal) {
-                    LocalBook.deleteBook(it, deleteOriginal)
-                }
+            book.delete()
+            inBookshelf = false
+            urlOnShelf = false
+            if (book.isLocal) {
+                LocalBook.deleteBook(book, deleteOriginal)
             }
         }.onSuccess {
             success?.invoke()

@@ -154,8 +154,8 @@ class BookInfoActivity :
                         .takeIf(String::isNotEmpty),
             )
         } ?: let {
-            if (!viewModel.inBookshelf) {
-                viewModel.delBook() //进目录会保存book，此时退出目录触发的book删除，不通知书源回调
+            if (!viewModel.urlOnShelf) {
+                viewModel.delBook() //进目录会临时落库，退出目录再删；正式在架不删
             }
         }
     }
@@ -167,13 +167,10 @@ class BookInfoActivity :
     private val readBookResult = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
-        viewModel.upBook(intent)
+        viewModel.upBook(intent) {
+            upTvBookshelf()
+        }
         when (it.resultCode) {
-            RESULT_OK -> {
-                viewModel.inBookshelf = true
-                upTvBookshelf()
-            }
-
             RESULT_DELETED -> {
                 setResult(RESULT_OK)
                 finish()
@@ -1109,6 +1106,9 @@ class BookInfoActivity :
             if (viewModel.urlOnShelf) {
                 openChapterList()
             } else {
+                if (!viewModel.inBookshelf) {
+                    book.addType(BookType.notShelf)
+                }
                 viewModel.saveBook(book) { //点击目录会保存book
                     viewModel.saveChapterList {
                         openChapterList()
