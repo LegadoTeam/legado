@@ -26,24 +26,28 @@ internal class SearchHitAccumulator {
 
     fun append(generation: Long, items: List<SearchBook>): SearchHitAppend? {
         synchronized(lock) {
-            if (generation == 0L || generation != this.generation) return null
-            if (items.isEmpty()) {
-                return SearchHitAppend(hits, changed = false)
-            }
-            val seen = HashSet<String>(hits.size + items.size)
-            hits.forEach { seen.add(it.primaryStr()) }
-            val added = ArrayList<SearchBook>(items.size)
-            for (item in items) {
-                if (seen.add(item.primaryStr())) {
-                    added.add(item)
-                }
-            }
-            if (added.isEmpty()) {
-                return SearchHitAppend(hits, changed = false)
-            }
-            hits = hits + added
-            return SearchHitAppend(hits, changed = true)
+            return appendLocked(generation, items)
         }
+    }
+
+    private fun appendLocked(generation: Long, items: List<SearchBook>): SearchHitAppend? {
+        if (generation == 0L || generation != this.generation) return null
+        if (items.isEmpty()) {
+            return SearchHitAppend(hits, changed = false)
+        }
+        val seen = HashSet<String>(hits.size + items.size)
+        hits.forEach { seen.add(it.primaryStr()) }
+        val added = ArrayList<SearchBook>(items.size)
+        for (item in items) {
+            if (seen.add(item.primaryStr())) {
+                added.add(item)
+            }
+        }
+        if (added.isEmpty()) {
+            return SearchHitAppend(hits, changed = false)
+        }
+        hits = hits + added
+        return SearchHitAppend(hits, changed = true)
     }
 
     fun snapshot(generation: Long): List<SearchBook>? {
@@ -62,6 +66,25 @@ internal class SearchHitAccumulator {
             if (generation == 0L || generation != this.generation) return null
             display = books
             return display
+        }
+    }
+
+    /**
+     * Append and, when the raw set grew, rebuild display under the same lock
+     * so an older page cannot publish after a newer one.
+     */
+    fun appendAndPublish(
+        generation: Long,
+        items: List<SearchBook>,
+        buildDisplay: (List<SearchBook>) -> List<SearchBook>,
+    ): SearchHitAppend? {
+        synchronized(lock) {
+            val appended = appendLocked(generation, items) ?: return null
+            if (!appended.changed) {
+                return SearchHitAppend(display, changed = false)
+            }
+            display = buildDisplay(appended.hits)
+            return SearchHitAppend(display, changed = true)
         }
     }
 

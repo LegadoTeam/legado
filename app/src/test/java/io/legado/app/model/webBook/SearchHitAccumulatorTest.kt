@@ -88,10 +88,10 @@ class SearchHitAccumulatorTest {
         ).first { it.isFile }.readText()
         assertTrue(src.contains("SearchHitAccumulator"))
         assertFalse(src.contains("rawSearchHits"))
-        assertTrue(src.contains("rawHits.publish("))
+        assertTrue(src.contains("rawHits.appendAndPublish("))
         assertFalse(src.contains("searchBooks ="))
         assertTrue(src.contains("SearchResultGate.accept(searchId, mSearchId)"))
-        assertTrue(src.contains("onSearchSuccess(searchId, published)"))
+        assertTrue(src.contains("onSearchSuccess(searchId, published.hits)"))
     }
 
     @Test
@@ -211,6 +211,24 @@ class SearchHitAccumulatorTest {
     }
 
     @Test
+    fun appendAndPublishKeepsNewerDisplayWhenOlderBuildFinishesLast() {
+        val acc = SearchHitAccumulator()
+        acc.begin(1L)
+        val first = acc.appendAndPublish(1L, listOf(hit("A"))) { it }
+        assertTrue(first!!.changed)
+        assertEquals(listOf("A"), first.hits.map { it.bookUrl })
+        val dup = acc.appendAndPublish(1L, listOf(hit("A"))) { error("should not rebuild") }
+        assertFalse(dup!!.changed)
+        assertEquals(listOf("A"), dup.hits.map { it.bookUrl })
+        val extra = acc.appendAndPublish(1L, listOf(hit("B"))) { books ->
+            books.filter { it.bookUrl == "B" }
+        }
+        assertTrue(extra!!.changed)
+        assertEquals(listOf("B"), extra.hits.map { it.bookUrl })
+        assertEquals(listOf("B"), acc.published(1L)!!.map { it.bookUrl })
+    }
+
+    @Test
     fun duplicatePagesDoNotGrowRawHits() {
         val acc = SearchHitAccumulator()
         acc.begin(1L)
@@ -234,15 +252,32 @@ class SearchHitAccumulatorTest {
             File("app/src/main/java/io/legado/app/model/webBook/SearchModel.kt"),
             File("src/main/java/io/legado/app/model/webBook/SearchModel.kt"),
         ).first { it.isFile }.readText()
-        assertTrue(src.contains("if (!appended.changed)"))
+        assertTrue(src.contains("appendAndPublish"))
+        assertTrue(src.contains("hasMore = hasMore || published.changed"))
         assertTrue(src.contains("rawHits.published(searchId)"))
-        assertTrue(src.contains("applyDisplay(searchId, appended.hits"))
         val startSearch = src.substringAfter("private fun startSearch()").substringBefore("private suspend fun mergeItems")
         val completion = startSearch.substringAfter("onCompletion").substringBefore("activeProgress")
         assertTrue(completion.contains("rawHits.published(searchId)"))
         assertFalse(completion.contains("rebuildDisplay"))
         assertFalse(completion.contains("onSearchSuccess"))
         assertFalse(src.contains("fun rebuildDisplay"))
+        val viewModel = sequenceOf(
+            File("app/src/main/java/io/legado/app/ui/book/search/SearchViewModel.kt"),
+            File("src/main/java/io/legado/app/ui/book/search/SearchViewModel.kt"),
+        ).first { it.isFile }.readText()
+        assertTrue(viewModel.contains("searchStartLock"))
+        assertTrue(viewModel.contains("synchronized(searchStartLock)"))
+        val searchFn = viewModel.substringAfter("fun search(key: String)").substringBefore("fun stop()")
+        assertTrue(searchFn.contains("searchModel.cancelSearch()"))
+        assertTrue(searchFn.contains("searchGeneration.beginNew"))
+        assertTrue(searchFn.contains("searchModel.search("))
+        assertTrue(searchFn.contains("synchronized(searchStartLock)"))
+        assertTrue(searchFn.contains("start.first != searchGeneration.current"))
+        assertTrue(searchFn.contains("execute {"))
+        val bump = searchFn.substringAfter("synchronized(searchStartLock)").substringBefore("execute {")
+        assertTrue(bump.contains("searchModel.cancelSearch()"))
+        assertTrue(bump.contains("searchGeneration.beginNew"))
+        assertFalse(bump.contains("searchModel.search("))
     }
 
     private fun hit(bookUrl: String) = SearchBook(

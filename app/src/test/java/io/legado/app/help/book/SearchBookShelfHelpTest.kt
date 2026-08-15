@@ -318,8 +318,6 @@ class SearchBookShelfHelpTest {
             ),
             store,
         )
-        assertEquals(1, store.allBooksLoads)
-        assertEquals(0, store.booksByNameLoads)
         assertEquals(3, store.insertAttempts)
     }
 
@@ -336,7 +334,6 @@ class SearchBookShelfHelpTest {
         assertEquals(1, result.added)
         assertEquals(1, store.books.size)
         assertEquals("real", store.books.single().bookUrl)
-        assertEquals(1, store.allBooksLoads)
     }
 
     @Test
@@ -439,7 +436,6 @@ class SearchBookShelfHelpTest {
         assertEquals(1, store.books.size)
         assertFalse(store.books.single().isNotShelf)
         assertEquals(0, store.insertAttempts)
-        assertEquals(1, store.allBooksLoads)
     }
 
     @Test

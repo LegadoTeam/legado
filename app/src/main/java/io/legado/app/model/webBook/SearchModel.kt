@@ -126,12 +126,12 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                 for (book in items) {
                     book.releaseHtmlData()
                 }
-                hasMore = hasMore || items.isNotEmpty()
                 appDb.searchBookDao.insert(*items.toTypedArray())
                 val published = mergeItems(searchId, items, precision, key) ?: return@onEach
+                hasMore = hasMore || published.changed
                 currentCoroutineContext().ensureActive()
                 if (!SearchResultGate.accept(searchId, mSearchId)) return@onEach
-                callBack.onSearchSuccess(searchId, published)
+                callBack.onSearchSuccess(searchId, published.hits)
             }.onCompletion { error ->
                 val context = currentCoroutineContext()
                 pageOwner.complete(context[Job]) {
@@ -160,7 +160,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
         newDataS: List<SearchBook>,
         precision: Boolean,
         key: String,
-    ): List<SearchBook>? {
+    ): SearchHitAppend? {
         val copies = if (newDataS.isEmpty()) {
             emptyList()
         } else {
@@ -171,26 +171,23 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
             }
             out
         }
-        val appended = rawHits.append(searchId, copies) ?: return null
-        if (!appended.changed) {
-            return rawHits.published(searchId)
+        currentCoroutineContext().ensureActive()
+        return rawHits.appendAndPublish(searchId, copies) { snapshot ->
+            buildDisplay(snapshot, precision, key)
         }
-        return applyDisplay(searchId, appended.hits, precision, key)
     }
 
-    private suspend fun applyDisplay(
-        searchId: Long,
+    private fun buildDisplay(
         snapshot: List<SearchBook>,
         precision: Boolean,
         key: String,
-    ): List<SearchBook>? {
+    ): List<SearchBook> {
         val merged = SearchBookMerge.rebuildFromRawHits(snapshot)
         val equalData = arrayListOf<SearchBook>()
         val containsData = arrayListOf<SearchBook>()
         val tagsData = arrayListOf<SearchBook>()
         val otherData = arrayListOf<SearchBook>()
         for (book in merged) {
-            currentCoroutineContext().ensureActive()
             when {
                 book.name == key || book.author == key -> equalData.add(book)
                 book.kind?.contains(key) == true -> tagsData.add(book)
@@ -198,15 +195,13 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                 !precision -> otherData.add(book)
             }
         }
-        currentCoroutineContext().ensureActive()
         equalData.sortByDescending { it.origins.size }
         equalData.addAll(tagsData.sortedByDescending { it.origins.size })
         equalData.addAll(containsData.sortedByDescending { it.origins.size })
         if (!precision) {
             equalData.addAll(otherData)
         }
-        currentCoroutineContext().ensureActive()
-        return rawHits.publish(searchId, equalData)
+        return equalData
     }
 
     fun pause() {

@@ -101,13 +101,6 @@ object SearchBookShelfHelp {
         store: Store,
     ): AddResult {
         if (books.isEmpty()) return AddResult(0, emptyList())
-        return addLoadedBooksToIndexedStore(books, NameIndexStore(store))
-    }
-
-    private fun addLoadedBooksToIndexedStore(
-        books: List<SearchBook>,
-        store: Store,
-    ): AddResult {
         val minOrder = store.minOrder
         val addedBooks = arrayListOf<Book>()
         val booksToOrder = arrayListOf<Book>()

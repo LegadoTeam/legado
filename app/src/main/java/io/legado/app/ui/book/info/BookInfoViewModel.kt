@@ -27,9 +27,12 @@ import io.legado.app.help.book.SearchBookShelfHelp
 import io.legado.app.help.book.getExportFileName
 import io.legado.app.help.book.getRemoteUrl
 import io.legado.app.help.book.addType
+import io.legado.app.help.book.isAudio
+import io.legado.app.help.book.isImage
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.book.isSameNameAuthor
+import io.legado.app.help.book.isVideo
 import io.legado.app.help.book.isWebFile
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.savePreservingCustomCoverUrl
@@ -40,6 +43,7 @@ import io.legado.app.model.AudioPlay
 import io.legado.app.model.BookCover
 import io.legado.app.model.ReadBook
 import io.legado.app.model.ReadManga
+import io.legado.app.model.VideoPlay
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.webBook.WebBook
@@ -121,17 +125,11 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
 
     fun upBook(intent: Intent, success: (() -> Unit)? = null) {
         execute {
-            val name = intent.getStringExtra("name") ?: ""
-            val author = intent.getStringExtra("author") ?: ""
-            val currentUrl = bookData.value?.bookUrl
-            val extraUrl = intent.getStringExtra("bookUrl")
-            val book = BookInfoShelfFlags.resolveReturnBook(
-                currentUrl,
-                extraUrl,
-                currentUrl?.takeIf { it.isNotBlank() }?.let { appDb.bookDao.getBook(it) },
-                extraUrl?.takeIf { it.isNotBlank() }?.let { appDb.bookDao.getBook(it) },
-                appDb.bookDao.getBook(name, author),
-            )
+            val page = bookData.value
+            val sessionUrl = sessionBookUrl(page)
+            val pageUrl = page?.bookUrl
+            val book = sessionUrl?.takeIf { it.isNotBlank() }?.let { appDb.bookDao.getBook(it) }
+                ?: pageUrl?.takeIf { it.isNotBlank() }?.let { appDb.bookDao.getBook(it) }
             if (book != null) {
                 refreshShelfFlags(book)
                 upBook(book)
@@ -141,6 +139,16 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         }.onSuccess {
             success?.invoke()
         }
+    }
+
+    private fun sessionBookUrl(page: Book?): String? {
+        val preferred = when {
+            page?.isAudio == true -> AudioPlay.book?.bookUrl
+            page?.isVideo == true -> VideoPlay.book?.bookUrl
+            page?.isImage == true -> ReadManga.book?.bookUrl ?: ReadBook.book?.bookUrl
+            else -> ReadBook.book?.bookUrl
+        }
+        return preferred?.takeIf { it.isNotBlank() }
     }
 
     private fun refreshShelfFlags(book: Book) {
@@ -570,33 +578,46 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                             incoming.author,
                         )
                     )
-                    return@execute
+                    return@execute false
                 }
                 val persisted = SearchBookShelfHelp.persistIncomingBook(incoming)
                 val savedThisBook = persisted != null && persisted.bookUrl == incoming.bookUrl
-                if (savedThisBook) {
-                    book.removeType(BookType.notShelf)
-                    book.order = incoming.order
-                    book.author = incoming.author
-                    book.durChapterIndex = incoming.durChapterIndex
-                    book.durChapterPos = incoming.durChapterPos
-                    book.durChapterTitle = incoming.durChapterTitle
-                    if (ReadBook.book?.isSameNameAuthor(book) == true) {
-                        ReadBook.book = book
-                    } else if (AudioPlay.book?.isSameNameAuthor(book) == true) {
-                        AudioPlay.book = book
-                    }
-                    SourceCallBack.callBackBook(SourceCallBack.ADD_BOOK_SHELF, bookSource, book)
-                    chapterListData.value?.let {
-                        appDb.bookChapterDao.insert(*it.toTypedArray())
-                    }
+                if (!savedThisBook) {
+                    refreshShelfFlags(incoming)
+                    context.toastOnUi(
+                        context.getString(
+                            R.string.local_book_identity_conflict,
+                            incoming.name,
+                            incoming.author,
+                        )
+                    )
+                    return@execute false
                 }
-                inBookshelf = savedThisBook
+                book.removeType(BookType.notShelf)
+                book.order = incoming.order
+                book.author = incoming.author
+                book.durChapterIndex = incoming.durChapterIndex
+                book.durChapterPos = incoming.durChapterPos
+                book.durChapterTitle = incoming.durChapterTitle
+                if (ReadBook.book?.isSameNameAuthor(book) == true) {
+                    ReadBook.book = book
+                } else if (AudioPlay.book?.isSameNameAuthor(book) == true) {
+                    AudioPlay.book = book
+                }
+                SourceCallBack.callBackBook(SourceCallBack.ADD_BOOK_SHELF, bookSource, book)
+                chapterListData.value?.let {
+                    appDb.bookChapterDao.insert(*it.toTypedArray())
+                }
+                inBookshelf = true
+                true
             } ?: run {
                 inBookshelf = false
+                false
             }
-        }.onSuccess {
-            success?.invoke()
+        }.onSuccess { saved ->
+            if (saved == true) {
+                success?.invoke()
+            }
         }
     }
 
