@@ -1599,6 +1599,17 @@
     <string name="review_icon_svg_title">SVG icon</string>
     <string name="review_icon_svg_hint">&lt;svg ...&gt; use {{count}} as the count placeholder</string>
     <string name="review_icon_svg_invalid">Invalid SVG. Check its syntax and dimensions.</string>
+    <string name="review_icon_templates_title">SVG templates</string>
+    <string name="review_icon_svg_edit">Edit current SVG</string>
+    <string name="review_icon_template_save">Save current SVG</string>
+    <string name="review_icon_template_name">Template name</string>
+    <string name="review_icon_template_name_empty">Template name cannot be empty</string>
+    <string name="review_icon_template_default_name">Template %1$d</string>
+    <string name="review_icon_template_no_svg">Set a valid SVG before saving it as a template</string>
+    <string name="review_icon_template_saved">Template saved</string>
+    <string name="review_icon_template_renamed">Template renamed</string>
+    <string name="review_icon_template_deleted">Template deleted</string>
+    <string name="review_icon_template_unnamed">Unnamed template</string>
     <string name="review_icon_size_title">Icon size</string>
     <string name="review_icon_size_hint">Enter 50-200; 100 is the default size</string>
     <string name="review_icon_size_invalid">Enter an integer from 50 to 200</string>

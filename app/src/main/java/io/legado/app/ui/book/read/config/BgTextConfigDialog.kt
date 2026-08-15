@@ -13,9 +13,12 @@ import android.view.WindowManager
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.SeekBar
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.TooltipCompat
 import androidx.core.graphics.toColorInt
 import androidx.core.view.isGone
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.jaredrummler.android.colorpicker.ColorPickerDialog
 import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
@@ -51,6 +54,7 @@ import io.legado.app.utils.createFileIfNotExist
 import io.legado.app.utils.createFileReplace
 import io.legado.app.utils.createFolderReplace
 import io.legado.app.utils.delete
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.externalCache
 import io.legado.app.utils.externalFiles
 import io.legado.app.utils.find
@@ -265,30 +269,7 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
                 .show(requireActivity())
         }
         binding.tvReviewIconSvg.setOnClickListener {
-            val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
-                editView.hint = getString(R.string.review_icon_svg_hint)
-                editView.setSingleLine(false)
-                editView.maxLines = 8
-                editView.setText(ReadBookConfig.reviewIconSvg)
-                editView.setSelection(editView.text?.length ?: 0)
-            }
-            val dialog = alert(R.string.review_icon_svg_title) {
-                customView { alertBinding.root }
-                okButton()
-                cancelButton()
-            }
-            dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
-                val newSvg = alertBinding.editView.text?.toString().orEmpty().trim()
-                if (newSvg.isNotBlank() && !isValidReviewIconSvg(newSvg)) {
-                    toastOnUi(R.string.review_icon_svg_invalid)
-                    return@setOnClickListener
-                }
-                if (newSvg != ReadBookConfig.reviewIconSvg) {
-                    ReadBookConfig.reviewIconSvg = newSvg
-                    notifyReviewIconStyleChanged()
-                }
-                dialog.dismiss()
-            }
+            showReviewIconTemplates()
         }
         binding.tvReviewIconSize.setOnClickListener {
             val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
@@ -380,6 +361,151 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
                 postEvent(EventBus.UP_CONFIG, arrayListOf(3))
             }
         })
+    }
+
+    private fun showReviewIconTemplates() {
+        val templates = ReadBookConfig.durConfig.reviewIconSvgTemplates
+        val templateAdapter = ReviewIconSvgTemplateAdapter(
+            requireContext(),
+            secondaryTextColor
+        ).apply {
+            setItems(templates)
+        }
+        val visibleRows = ((templates.size.coerceAtLeast(1) + 2) / 3).coerceAtMost(2)
+        val recyclerView = RecyclerView(requireContext()).apply {
+            layoutManager = GridLayoutManager(requireContext(), 3)
+            adapter = templateAdapter
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                (visibleRows * 88).dpToPx()
+            )
+            setHasFixedSize(true)
+        }
+        lateinit var dialog: AlertDialog
+        templateAdapter.setOnItemClickListener { _, template ->
+            if (applyReviewIconTemplate(template)) dialog.dismiss()
+        }
+        templateAdapter.setOnItemLongClickListener { _, template ->
+            dialog.dismiss()
+            confirmDeleteReviewIconTemplate(template)
+            true
+        }
+        dialog = alert(R.string.review_icon_templates_title) {
+            customView { recyclerView }
+            positiveButton(R.string.review_icon_template_save)
+            neutralButton(R.string.review_icon_svg_edit)
+            cancelButton()
+        }
+        dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+            dialog.dismiss()
+            showReviewIconTemplateNameEditor()
+        }
+        dialog.getButton(DialogInterface.BUTTON_NEUTRAL).setOnClickListener {
+            dialog.dismiss()
+            showReviewIconSvgEditor()
+        }
+    }
+
+    private fun showReviewIconSvgEditor() {
+        val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
+            editView.hint = getString(R.string.review_icon_svg_hint)
+            editView.setSingleLine(false)
+            editView.maxLines = 8
+            editView.setText(ReadBookConfig.reviewIconSvg)
+            editView.setSelection(editView.text?.length ?: 0)
+        }
+        val dialog = alert(R.string.review_icon_svg_title) {
+            customView { alertBinding.root }
+            okButton()
+            cancelButton()
+        }
+        dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+            val newSvg = alertBinding.editView.text?.toString().orEmpty().trim()
+            if (newSvg.isNotBlank() && !isValidReviewIconSvg(newSvg)) {
+                toastOnUi(R.string.review_icon_svg_invalid)
+                return@setOnClickListener
+            }
+            if (newSvg != ReadBookConfig.reviewIconSvg) {
+                ReadBookConfig.reviewIconSvg = newSvg
+                notifyReviewIconStyleChanged()
+            }
+            dialog.dismiss()
+        }
+    }
+
+    private fun showReviewIconTemplateNameEditor(
+        template: ReadBookConfig.ReviewIconSvgTemplate? = null
+    ) {
+        val svg = template?.svg?.trim() ?: ReadBookConfig.reviewIconSvg.trim()
+        if (svg.isBlank() || (template == null && !isValidReviewIconSvg(svg))) {
+            toastOnUi(R.string.review_icon_template_no_svg)
+            return
+        }
+        val existing = template ?: ReadBookConfig.durConfig.reviewIconSvgTemplates
+            .firstOrNull { it.svg.trim() == svg }
+        val defaultName = existing?.name ?: getString(
+            R.string.review_icon_template_default_name,
+            ReadBookConfig.durConfig.reviewIconSvgTemplates.size + 1
+        )
+        val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
+            editView.setHint(R.string.review_icon_template_name)
+            editView.setSingleLine(true)
+            editView.setText(defaultName)
+            editView.setSelection(editView.text?.length ?: 0)
+        }
+        val dialog = alert(R.string.review_icon_template_name) {
+            customView { alertBinding.root }
+            okButton()
+            cancelButton()
+        }
+        dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+            val name = alertBinding.editView.text?.toString().orEmpty().trim()
+            if (name.isEmpty()) {
+                toastOnUi(R.string.review_icon_template_name_empty)
+                return@setOnClickListener
+            }
+            ReadBookConfig.durConfig.putReviewIconSvgTemplate(name, svg)
+            toastOnUi(
+                if (template == null) R.string.review_icon_template_saved
+                else R.string.review_icon_template_renamed
+            )
+            dialog.dismiss()
+            showReviewIconTemplates()
+        }
+    }
+
+    private fun applyReviewIconTemplate(
+        template: ReadBookConfig.ReviewIconSvgTemplate
+    ): Boolean {
+        val svg = template.svg.trim()
+        if (!isValidReviewIconSvg(svg)) {
+            toastOnUi(R.string.review_icon_svg_invalid)
+            return false
+        }
+        if (svg != ReadBookConfig.reviewIconSvg) {
+            ReadBookConfig.reviewIconSvg = svg
+            notifyReviewIconStyleChanged()
+        }
+        return true
+    }
+
+    private fun confirmDeleteReviewIconTemplate(
+        template: ReadBookConfig.ReviewIconSvgTemplate
+    ) {
+        val name = template.name.ifBlank { getString(R.string.review_icon_template_unnamed) }
+        alert(name, getString(R.string.sure_del)) {
+            yesButton { dialog ->
+                dialog.dismiss()
+                ReadBookConfig.durConfig.removeReviewIconSvgTemplate(template.svg)
+                toastOnUi(R.string.review_icon_template_deleted)
+                showReviewIconTemplates()
+            }
+            neutralButton(R.string.edit) { dialog ->
+                dialog.dismiss()
+                showReviewIconTemplateNameEditor(template)
+            }
+            noButton()
+        }
     }
 
     private fun notifyReviewIconStyleChanged() {

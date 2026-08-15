@@ -161,7 +161,7 @@
             android:gravity="center"
             android:padding="6dp"
             android:singleLine="true"
-            android:text="@string/review_icon_svg_title"
+            android:text="@string/review_icon_templates_title"
             android:textSize="14sp"
             app:isBottomBackground="true" />
 

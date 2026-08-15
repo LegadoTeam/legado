@@ -1,5 +1,6 @@
 package io.legado.app.ui.book.read.page.provider
 
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -13,11 +14,22 @@ class ReviewIconSvgSourceTest {
         ).readText().normalizeLines()
 
         assertTrue(source.contains("var reviewIconSvg: String = \"\""))
+        assertTrue(
+            source.contains(
+                "var reviewIconSvgTemplates: List<ReviewIconSvgTemplate> = emptyList()"
+            )
+        )
         assertTrue(source.contains("var reviewIconScale: Int = 100"))
         assertTrue(source.contains("config.reviewIconScale = value.coerceIn(50, 200)"))
         assertTrue(source.contains("exportConfig.reviewIconSvg = shareConfig.reviewIconSvg"))
         assertTrue(source.contains("exportConfig.reviewIconScale = shareConfig.reviewIconScale"))
+        assertFalse(
+            source.contains(
+                "exportConfig.reviewIconSvgTemplates = shareConfig.reviewIconSvgTemplates"
+            )
+        )
         assertTrue(source.contains("\"reviewIconSvg\" to reviewIconSvg"))
+        assertTrue(source.contains("\"reviewIconSvgTemplates\" to reviewIconSvgTemplates"))
         assertTrue(source.contains("\"reviewIconScale\" to reviewIconScale"))
     }
 
@@ -55,11 +67,25 @@ class ReviewIconSvgSourceTest {
         val dialog = projectFile(
             "src/main/java/io/legado/app/ui/book/read/config/BgTextConfigDialog.kt"
         ).readText().normalizeLines()
+        val adapter = projectFile(
+            "src/main/java/io/legado/app/ui/book/read/config/ReviewIconSvgTemplateAdapter.kt"
+        ).readText().normalizeLines()
         val layout = projectFile(
             "src/main/res/layout/dialog_read_bg_text.xml"
         ).readText().normalizeLines()
 
         assertTrue(dialog.contains("isValidReviewIconSvg(newSvg)"))
+        assertTrue(dialog.contains("ReadBookConfig.durConfig.reviewIconSvgTemplates"))
+        assertTrue(dialog.contains("ReviewIconSvgTemplateAdapter("))
+        assertTrue(dialog.contains("GridLayoutManager(requireContext(), 3)"))
+        assertTrue(dialog.contains("templateAdapter.setOnItemClickListener"))
+        assertTrue(dialog.contains("templateAdapter.setOnItemLongClickListener"))
+        assertTrue(adapter.contains("ItemBgImageBinding"))
+        assertTrue(adapter.contains("item.svg.replace(\"{{count}}\", \"88\")"))
+        assertTrue(adapter.contains("SvgUtils.createBitmapFromSvgText"))
+        assertTrue(adapter.contains("ivBg.contentDescription = displayName"))
+        assertTrue(adapter.contains("tvName.text = displayName"))
+        assertTrue(dialog.contains("ReadBookConfig.reviewIconSvg = svg"))
         assertTrue(dialog.contains("scale !in 50..200"))
         assertTrue(dialog.contains("ChapterProvider.clearReviewIconCache()"))
         assertTrue(dialog.contains("ChapterProvider.refreshReviewColumnsForStyleChange()"))

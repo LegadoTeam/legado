@@ -625,6 +625,12 @@ object ReadBookConfig {
     }
 
     @Keep
+    data class ReviewIconSvgTemplate(
+        val name: String = "",
+        val svg: String = "",
+    )
+
+    @Keep
     data class Config(
         var name: String = "",
         var bgStr: String = "#EEEEEE",//白天背景
@@ -664,6 +670,7 @@ object ReadBookConfig {
         var underlineMode: Int = 0, //下划线
         var reviewIconColor: Int = 0, //段评内置图标颜色(0=跟随主题)
         var reviewIconSvg: String = "",
+        var reviewIconSvgTemplates: List<ReviewIconSvgTemplate> = emptyList(),
         var reviewIconScale: Int = 100,
         var paddingBottom: Int = 6,
         var paddingLeft: Int = 16,
@@ -923,6 +930,24 @@ object ReadBookConfig {
             return path
         }
 
+        fun putReviewIconSvgTemplate(name: String, svg: String) {
+            val normalizedName = name.trim()
+            val normalizedSvg = svg.trim()
+            if (normalizedName.isEmpty() || normalizedSvg.isEmpty()) return
+            val templates = reviewIconSvgTemplates.associateByTo(
+                linkedMapOf<String, ReviewIconSvgTemplate>()
+            ) { it.svg.trim() }
+            templates[normalizedSvg] = ReviewIconSvgTemplate(normalizedName, normalizedSvg)
+            reviewIconSvgTemplates = templates.values.toList()
+        }
+
+        fun removeReviewIconSvgTemplate(svg: String) {
+            val normalizedSvg = svg.trim()
+            reviewIconSvgTemplates = reviewIconSvgTemplates.filterNot {
+                it.svg.trim() == normalizedSvg
+            }
+        }
+
         fun toMap() = mapOf(
             "name" to name,
             "bgStr" to bgStr,
@@ -968,6 +993,7 @@ object ReadBookConfig {
             "underlineMode" to underlineMode,
             "reviewIconColor" to reviewIconColor,
             "reviewIconSvg" to reviewIconSvg,
+            "reviewIconSvgTemplates" to reviewIconSvgTemplates,
             "reviewIconScale" to reviewIconScale,
             "paddingBottom" to paddingBottom,
             "paddingLeft" to paddingLeft,

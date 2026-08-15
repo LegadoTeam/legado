@@ -1488,6 +1488,17 @@
     <string name="review_icon_svg_title">SVG 图标</string>
     <string name="review_icon_svg_hint">&lt;svg ...&gt; 使用 {{count}} 作为数量占位符</string>
     <string name="review_icon_svg_invalid">SVG 无效，请检查语法和尺寸定义</string>
+    <string name="review_icon_templates_title">SVG 模板</string>
+    <string name="review_icon_svg_edit">编辑当前 SVG</string>
+    <string name="review_icon_template_save">保存当前 SVG</string>
+    <string name="review_icon_template_name">模板名称</string>
+    <string name="review_icon_template_name_empty">模板名称不能为空</string>
+    <string name="review_icon_template_default_name">模板 %1$d</string>
+    <string name="review_icon_template_no_svg">请先设置有效的 SVG 再保存为模板</string>
+    <string name="review_icon_template_saved">模板已保存</string>
+    <string name="review_icon_template_renamed">模板已重命名</string>
+    <string name="review_icon_template_deleted">模板已删除</string>
+    <string name="review_icon_template_unnamed">未命名模板</string>
     <string name="review_icon_size_title">图标大小</string>
     <string name="review_icon_size_hint">输入 50-200，100 为默认大小</string>
     <string name="review_icon_size_invalid">请输入 50-200 之间的整数</string>
