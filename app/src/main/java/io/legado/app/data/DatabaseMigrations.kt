@@ -7,6 +7,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.BookSourceType
 import io.legado.app.constant.BookType
+import java.util.UUID
 
 object DatabaseMigrations {
 
@@ -20,6 +21,7 @@ object DatabaseMigrations {
             migration_31_32, migration_32_33, migration_33_34, migration_34_35,
             migration_35_36, migration_36_37, migration_37_38, migration_38_39,
             migration_39_40, migration_40_41, migration_41_42, migration_42_43,
+            migration_100_101,
         )
     }
 
@@ -37,6 +39,30 @@ object DatabaseMigrations {
     private val migration_11_12 = object : Migration(11, 12) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE rssSources ADD style TEXT ")
+        }
+    }
+
+    private val migration_100_101 = object : Migration(100, 101) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE highlightRules ADD COLUMN uuid TEXT NOT NULL DEFAULT ''"
+            )
+            val statement = db.compileStatement(
+                "UPDATE highlightRules SET uuid = ? WHERE id = ?"
+            )
+            db.query("SELECT id FROM highlightRules").use { cursor ->
+                while (cursor.moveToNext()) {
+                    statement.clearBindings()
+                    statement.bindString(1, UUID.randomUUID().toString())
+                    statement.bindLong(2, cursor.getLong(0))
+                    statement.executeUpdateDelete()
+                }
+            }
+            statement.close()
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS index_highlightRules_uuid " +
+                    "ON highlightRules(uuid)"
+            )
         }
     }
 

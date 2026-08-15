@@ -27,6 +27,17 @@ class HighlightRuleDaoContractTest {
         assertTrue(source.contains("deleteAll()"))
     }
 
+    @Test
+    fun `reader uses stable order when positions match`() {
+        val source = projectFile(
+            "src/main/java/io/legado/app/data/dao/HighlightRuleDao.kt"
+        ).readText()
+        val query = source.substringBefore("fun findEnabledByBook")
+            .substringAfterLast("@Query(")
+
+        assertTrue(query.contains("ORDER BY sortOrder ASC, id ASC"))
+    }
+
     private fun projectFile(pathInApp: String): File =
         sequenceOf(File(pathInApp), File("app/$pathInApp"))
             .first(File::isFile)

@@ -8,4 +8,15 @@
         android:title="@string/highlight_rule_add"
         app:showAsAction="always" />
 
+    <item
+        android:id="@+id/menu_import_local"
+        android:icon="@drawable/ic_import"
+        android:title="@string/import_local"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_export_all"
+        android:title="@string/export_all"
+        app:showAsAction="never" />
+
 </menu>

@@ -1,27 +1,28 @@
 package io.legado.app
 
 import androidx.room.Room
-import androidx.room.migration.Migration
 import androidx.room.testing.MigrationTestHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.data.AppDatabase
+import io.legado.app.data.DatabaseMigrations
+import io.legado.app.data.entities.HighlightRule
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.IOException
+import java.util.UUID
 
 @RunWith(AndroidJUnit4::class)
 class MigrationTest {
 
     private val TEST_DB = "migration-test"
 
-    private val ALL_MIGRATIONS = arrayOf<Migration>(
-
-    )
+    private val ALL_MIGRATIONS = DatabaseMigrations.migrations
 
     @get:Rule
     val helper: MigrationTestHelper = MigrationTestHelper(
@@ -60,6 +61,7 @@ class MigrationTest {
         helper.createDatabase(databaseName, 93).close()
 
         Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
+            .addMigrations(*ALL_MIGRATIONS)
             .build().apply {
                 openHelper.writableDatabase.query("PRAGMA table_info(auto_task_rules)").use { cursor ->
                     val nameIndex = cursor.getColumnIndexOrThrow("name")
@@ -83,6 +85,7 @@ class MigrationTest {
         helper.createDatabase(databaseName, 95).close()
 
         Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
+            .addMigrations(*ALL_MIGRATIONS)
             .build().apply {
                 openHelper.writableDatabase.query("PRAGMA table_info(highlights)").use { cursor ->
                     val nameIndex = cursor.getColumnIndexOrThrow("name")
@@ -165,6 +168,7 @@ class MigrationTest {
         }
 
         Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
+            .addMigrations(*ALL_MIGRATIONS)
             .build().apply {
                 openHelper.writableDatabase.query(
                     "select bookUrl, chapterUrl from highlights where time = 1"
@@ -186,6 +190,7 @@ class MigrationTest {
         helper.createDatabase(databaseName, 97).close()
 
         Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
+            .addMigrations(*ALL_MIGRATIONS)
             .build().apply {
                 openHelper.writableDatabase.query("PRAGMA table_info(highlightRules)")
                     .use { cursor ->
@@ -233,6 +238,7 @@ class MigrationTest {
         }
 
         Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
+            .addMigrations(*ALL_MIGRATIONS)
             .build().apply {
                 openHelper.writableDatabase.query(
                     "select applyToBody from highlightRules where name = 'rule'"
@@ -242,5 +248,131 @@ class MigrationTest {
                 }
                 close()
             }
+    }
+
+    @Test
+    @Throws(IOException::class)
+    fun migrate100To101BackfillsUniqueHighlightRuleUuids() {
+        val databaseName = "migration-highlight-rule-uuid"
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        context.deleteDatabase(databaseName)
+        helper.createDatabase(databaseName, 100).apply {
+            execSQL(
+                """insert into highlightRules
+                    (name, pattern, isRegex, scope, isEnabled, style, sortOrder,
+                    timeoutMillisecond, applyToTitle, applyToBody)
+                    values ('first', 'one', 0, null, 1, '', 3, 3000, 0, 1),
+                    ('second', 'two', 0, null, 0, '', 7, 3000, 1, 0)"""
+            )
+            close()
+        }
+
+        Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
+            .addMigrations(*ALL_MIGRATIONS)
+            .build().apply {
+                openHelper.writableDatabase.query(
+                    "select name, pattern, isEnabled, sortOrder, uuid " +
+                        "from highlightRules order by id"
+                ).use { cursor ->
+                    val rows = buildList {
+                        while (cursor.moveToNext()) {
+                            add(
+                                listOf(
+                                    cursor.getString(0),
+                                    cursor.getString(1),
+                                    cursor.getInt(2).toString(),
+                                    cursor.getInt(3).toString(),
+                                    cursor.getString(4)
+                                )
+                            )
+                        }
+                    }
+                    assertEquals(listOf("first", "one", "1", "3"), rows[0].take(4))
+                    assertEquals(listOf("second", "two", "0", "7"), rows[1].take(4))
+                    val uuids = rows.map { UUID.fromString(it[4]).toString() }
+                    assertEquals(2, uuids.distinct().size)
+                }
+                openHelper.writableDatabase.query("PRAGMA index_list(highlightRules)")
+                    .use { cursor ->
+                        val nameIndex = cursor.getColumnIndexOrThrow("name")
+                        val uniqueIndex = cursor.getColumnIndexOrThrow("unique")
+                        var foundUniqueUuidIndex = false
+                        while (cursor.moveToNext()) {
+                            if (cursor.getString(nameIndex) == "index_highlightRules_uuid") {
+                                foundUniqueUuidIndex = cursor.getInt(uniqueIndex) == 1
+                            }
+                        }
+                        assertTrue(foundUniqueUuidIndex)
+                    }
+                close()
+            }
+    }
+
+    @Test
+    fun highlightRuleDaoKeepsUuidIdentityAndRollsBackInvalidImports() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val dao = database.highlightRuleDao
+            val uuidA = "11111111-1111-4111-8111-111111111111"
+            val uuidB = "22222222-2222-4222-8222-222222222222"
+            val uuidC = "33333333-3333-4333-8333-333333333333"
+            dao.insert(
+                HighlightRule(uuid = uuidA, pattern = "old", order = 3),
+                HighlightRule(uuid = uuidB, pattern = "stay", order = 8)
+            )
+
+            dao.importRules(
+                listOf(
+                    HighlightRule(id = 99, uuid = uuidA, pattern = "updated"),
+                    HighlightRule(id = 99, uuid = uuidC, pattern = "added")
+                )
+            )
+            assertEquals(
+                listOf(
+                    Triple(uuidA, "updated", 0),
+                    Triple(uuidB, "stay", 1),
+                    Triple(uuidC, "added", 2)
+                ),
+                dao.all.map { Triple(it.uuid, it.pattern, it.order) }
+            )
+
+            dao.move(setOf(uuidB, uuidC), toTop = true)
+            assertEquals(listOf(uuidB, uuidC, uuidA), dao.all.map { it.uuid })
+            assertEquals(listOf(0, 1, 2), dao.all.map { it.order })
+
+            dao.replaceAll(
+                listOf(
+                    HighlightRule(id = 1, uuid = uuidB, pattern = "restored-first"),
+                    HighlightRule(id = 1, uuid = uuidC, pattern = "restored-second")
+                )
+            )
+            assertEquals(
+                listOf(
+                    Triple(uuidB, "restored-first", 0),
+                    Triple(uuidC, "restored-second", 1)
+                ),
+                dao.all.map { Triple(it.uuid, it.pattern, it.order) }
+            )
+            assertEquals(2, dao.all.map { it.id }.distinct().size)
+
+            val beforeInvalidRestore = dao.all.map { Triple(it.uuid, it.pattern, it.order) }
+            assertThrows(IllegalArgumentException::class.java) {
+                dao.replaceAll(
+                    listOf(
+                        HighlightRule(id = 1, uuid = uuidA, pattern = "first"),
+                        HighlightRule(id = 2, uuid = uuidA, pattern = "duplicate")
+                    )
+                )
+            }
+            assertEquals(
+                beforeInvalidRestore,
+                dao.all.map { Triple(it.uuid, it.pattern, it.order) }
+            )
+        } finally {
+            database.close()
+        }
     }
 }

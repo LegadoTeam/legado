@@ -32,6 +32,7 @@ class OnLineImportActivity :
                 "replaceRule" -> showDialogFragment(
                     ImportReplaceRuleDialog(it.second, true)
                 )
+                "highlightRule" -> showImportHighlightRuleDialog(it.second, true)
                 "httpTts" -> showDialogFragment(
                     ImportHttpTtsDialog(it.second, true)
                 )

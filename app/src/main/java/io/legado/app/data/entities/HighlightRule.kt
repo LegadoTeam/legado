@@ -4,20 +4,27 @@ import android.os.Parcelable
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import io.legado.app.help.HighlightStyle
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
+import java.util.UUID
 import java.util.regex.Pattern
 import java.util.regex.PatternSyntaxException
 
 @Parcelize
-@Entity(tableName = "highlightRules")
+@Entity(
+    tableName = "highlightRules",
+    indices = [Index(value = ["uuid"], unique = true)]
+)
 data class HighlightRule(
     @PrimaryKey(autoGenerate = true)
     var id: Long = 0,
+    @ColumnInfo(defaultValue = "''")
+    var uuid: String = UUID.randomUUID().toString(),
     var name: String = "",
     var pattern: String = "",
     var isRegex: Boolean = false,
@@ -72,6 +79,11 @@ data class HighlightRule(
 
     @Suppress("USELESS_CAST")
     fun normalizeForRestore(): HighlightRule {
+        uuid = runCatching {
+            UUID.fromString((uuid as String?).orEmpty()).toString()
+        }.getOrElse {
+            UUID.randomUUID().toString()
+        }
         name = (name as String?).orEmpty()
         pattern = (pattern as String?).orEmpty()
         style = (style as String?).orEmpty()
@@ -84,5 +96,14 @@ data class HighlightRule(
 
     companion object {
         const val DEFAULT_TIMEOUT_MILLISECONDS = 3000L
+    }
+}
+
+data class HighlightRuleFile(
+    val type: String? = null,
+    val rules: List<HighlightRule?>? = null
+) {
+    companion object {
+        const val TYPE = "highlightRule"
     }
 }
