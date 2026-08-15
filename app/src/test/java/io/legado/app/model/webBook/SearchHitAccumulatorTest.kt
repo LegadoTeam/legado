@@ -90,7 +90,7 @@ class SearchHitAccumulatorTest {
         assertFalse(src.contains("rawSearchHits"))
         assertTrue(src.contains("rawHits.appendAndPublish("))
         assertFalse(src.contains("searchBooks ="))
-        assertTrue(src.contains("SearchResultGate.accept(searchId, mSearchId)"))
+        assertTrue(src.contains("SearchResultGate.acceptFinish("))
         assertTrue(src.contains("onSearchSuccess(searchId, published.hits)"))
     }
 
@@ -256,8 +256,9 @@ class SearchHitAccumulatorTest {
         assertTrue(src.contains("hasMore = hasMore || published.changed"))
         assertTrue(src.contains("rawHits.published(searchId)"))
         val startSearch = src.substringAfter("private fun startSearch()").substringBefore("private suspend fun mergeItems")
-        val completion = startSearch.substringAfter("onCompletion").substringBefore("activeProgress")
+        val completion = startSearch.substringAfter("onCompletion").substringBefore(".catch")
         assertTrue(completion.contains("rawHits.published(searchId)"))
+        assertTrue(completion.contains("SearchResultGate.acceptFinish("))
         assertFalse(completion.contains("rebuildDisplay"))
         assertFalse(completion.contains("onSearchSuccess"))
         assertFalse(src.contains("fun rebuildDisplay"))
@@ -278,6 +279,25 @@ class SearchHitAccumulatorTest {
         assertTrue(bump.contains("searchModel.cancelSearch()"))
         assertTrue(bump.contains("searchGeneration.beginNew"))
         assertFalse(bump.contains("searchModel.search("))
+        assertTrue(startSearch.contains("searchJob?.cancel()"))
+        assertTrue(startSearch.contains("SearchResultGate.acceptFinish("))
+        assertTrue(startSearch.contains("CoroutineStart.LAZY"))
+    }
+
+    @Test
+    fun supersededPageJobCannotFinish() {
+        val page1 = Any()
+        val page2 = Any()
+        assertTrue(SearchResultGate.acceptFinish(page1, page1, 1L, 1L))
+        assertFalse(SearchResultGate.acceptFinish(page2, page1, 1L, 1L))
+        assertFalse(SearchResultGate.acceptFinish(page1, page1, 1L, 2L))
+        assertFalse(SearchResultGate.acceptFinish(null, page1, 1L, 1L))
+        val onEach = File("src/main/java/io/legado/app/model/webBook/SearchModel.kt")
+            .takeIf { it.isFile }?.readText()
+            ?: File("app/src/main/java/io/legado/app/model/webBook/SearchModel.kt").readText()
+        val each = onEach.substringAfter(".onEach { items ->").substringBefore(".onCompletion")
+        assertTrue(each.contains("SearchResultGate.acceptFinish("))
+        assertTrue(each.contains("onSearchSuccess(searchId, published.hits)"))
     }
 
     private fun hit(bookUrl: String) = SearchBook(

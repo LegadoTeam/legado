@@ -106,6 +106,15 @@ internal object SearchResultGate {
     fun accept(submittedId: Long, currentId: Long): Boolean {
         return submittedId != 0L && submittedId == currentId
     }
+
+    fun acceptFinish(
+        activeJob: Any?,
+        completingJob: Any?,
+        submittedId: Long,
+        currentId: Long,
+    ): Boolean {
+        return activeJob === completingJob && accept(submittedId, currentId)
+    }
 }
 
 /** UI search id + LiveData post share one lock so a stale callback cannot win. */
