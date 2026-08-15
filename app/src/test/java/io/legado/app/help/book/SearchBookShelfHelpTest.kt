@@ -454,6 +454,33 @@ class SearchBookShelfHelpTest {
     }
 
     @Test
+    fun leftoverNotShelfDoesNotHideSoleRealPresenceOrPromote() {
+        val real = Book(bookUrl = "A", name = "T", author = "作者甲")
+        val leftover = Book(
+            bookUrl = "B",
+            name = "T",
+            author = "佚名",
+            type = BookType.text or BookType.notShelf,
+        )
+        val incoming = searchBook("B", "T", "佚名")
+        val store = FakeStore(real, leftover)
+        val presence = SearchBookShelfHelp.presence(incoming, store)
+        assertTrue(presence.identityOnShelf)
+        assertFalse(presence.urlOnShelf)
+        assertEquals("A", presence.existing?.bookUrl)
+        assertFalse(
+            BookInfoShelfFlags.canPromoteToOfficial(
+                presence.identityOnShelf,
+                presence.urlOnShelf,
+            )
+        )
+        val result = SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
+        assertEquals(0, result.added)
+        assertEquals("A", store.books.single { !it.isNotShelf }.bookUrl)
+        assertTrue(store.books.any { it.bookUrl == "B" && it.isNotShelf })
+    }
+
+    @Test
     fun notShelfEmptyAuthorDoesNotMarkWebYimingOnShelf() {
         val temp = Book(
             bookUrl = "A",

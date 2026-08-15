@@ -167,7 +167,7 @@ class BookInfoLoadingIndicatorTest {
             .substringAfter("fun addToBookshelf(")
             .substringBefore("fun getBook(")
         assertTrue(addToBookshelf.contains("SearchBookShelfHelp.persistIncomingBook(incoming)"))
-        assertTrue(addToBookshelf.contains("SearchBookShelfHelp.resolveOnShelf("))
+        assertTrue(addToBookshelf.contains("BookInfoShelfFlags.canPromoteToOfficial"))
         assertFalse(addToBookshelf.contains("adoptExistingShelfBook"))
         assertFalse(addToBookshelf.contains("bookData.postValue"))
         val saveBook = projectFile(VIEW_MODEL_PATH).readText()
@@ -179,6 +179,8 @@ class BookInfoLoadingIndicatorTest {
         assertTrue(saveBook.contains("if (saved == true)"))
         assertTrue(saveBook.contains("presence.identityOnShelf"))
         assertTrue(saveBook.contains("BookInfoShelfFlags.afterUrlPersisted"))
+        assertTrue(saveBook.contains("BookInfoShelfFlags.canPromoteToOfficial"))
+        assertTrue(saveBook.contains("book.addType(BookType.notShelf)"))
         assertFalse(saveBook.contains("inBookshelf = true"))
         assertFalse(saveBook.contains("urlOnShelf = true"))
     }

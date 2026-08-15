@@ -1,5 +1,9 @@
 package io.legado.app.help.book
 
+import io.legado.app.constant.BookType
+import io.legado.app.data.appDb
+import io.legado.app.data.entities.Book
+
 /**
  * BookInfo shelf flags.
  *
@@ -40,4 +44,24 @@ internal object BookInfoShelfFlags {
     }
 
     fun readerInBookshelfExtra(urlOnShelf: Boolean): Boolean = urlOnShelf
+
+    /**
+     * Promote a temp URL only when this URL is already official, or no
+     * visible shelf identity owns the name. Weak leftover rows must not
+     * become a second official book beside the sole real author.
+     */
+    fun canPromoteToOfficial(identityOnShelf: Boolean, urlOnShelf: Boolean): Boolean {
+        return urlOnShelf || !identityOnShelf
+    }
+
+    fun promoteOrSkipTempBook(book: Book): Boolean {
+        val presence = SearchBookShelfHelp.presence(book.name, book.author, book.bookUrl)
+        if (!canPromoteToOfficial(presence.identityOnShelf, presence.urlOnShelf)) {
+            appDb.bookDao.getBook(book.bookUrl)?.takeIf { it.isNotShelf }?.delete()
+            return false
+        }
+        book.removeType(BookType.notShelf)
+        book.save()
+        return true
+    }
 }

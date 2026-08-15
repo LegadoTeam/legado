@@ -26,8 +26,14 @@ internal object BookInfoOpenResolver {
     ): Result? {
         if (bookUrl.isNotBlank()) {
             shelfByUrl?.let {
-                val on = !it.isNotShelf
-                return Result(it, identityOnShelf = on, urlOnShelf = on)
+                if (!it.isNotShelf) {
+                    return Result(it, identityOnShelf = true, urlOnShelf = true)
+                }
+                return Result(
+                    it,
+                    identityOnShelf = presence.identityOnShelf,
+                    urlOnShelf = false,
+                )
             }
             searchByUrl?.let {
                 return Result(

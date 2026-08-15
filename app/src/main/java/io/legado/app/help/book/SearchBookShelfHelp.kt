@@ -167,25 +167,30 @@ object SearchBookShelfHelp {
      * for a different URL (web add must still insert).
      */
     internal fun resolveExisting(store: Store, searchBook: SearchBook): Book? {
-        store.getBook(searchBook.bookUrl)?.let { return it }
+        val byUrl = store.getBook(searchBook.bookUrl)
+        if (byUrl != null && !byUrl.isNotShelf) return byUrl
         val want = BookAuthorIdentity.effectiveAuthor(searchBook.author)
         val sameName = store.getBooksByName(searchBook.name)
             .filter { !it.isLocal && !it.isNotShelf }
-        if (want.isNotEmpty()) {
-            reusable(store.getBook(searchBook.name, searchBook.author))?.let { return it }
-            reusable(store.getBook(searchBook.name, want))?.let { return it }
-            return sameName.firstOrNull {
-                BookAuthorIdentity.effectiveAuthor(it.author) == want
+        val visible = if (want.isNotEmpty()) {
+            reusable(store.getBook(searchBook.name, searchBook.author))
+                ?: reusable(store.getBook(searchBook.name, want))
+                ?: sameName.firstOrNull {
+                    BookAuthorIdentity.effectiveAuthor(it.author) == want
+                }
+        } else if (sameName.isEmpty()) {
+            null
+        } else {
+            val sole = BookAuthorIdentity.soleRealAuthor(sameName.map { it.author })
+            if (sole != null) {
+                sameName.firstOrNull {
+                    BookAuthorIdentity.effectiveAuthor(it.author) == sole
+                }
+            } else {
+                sameName.firstOrNull { BookAuthorIdentity.isWeakAuthor(it.author) }
             }
         }
-        if (sameName.isEmpty()) return null
-        val sole = BookAuthorIdentity.soleRealAuthor(sameName.map { it.author })
-        if (sole != null) {
-            return sameName.firstOrNull {
-                BookAuthorIdentity.effectiveAuthor(it.author) == sole
-            }
-        }
-        return sameName.firstOrNull { BookAuthorIdentity.isWeakAuthor(it.author) }
+        return visible ?: byUrl
     }
 
     /**

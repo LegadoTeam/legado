@@ -77,6 +77,29 @@ class BookInfoOpenResolverTest {
     }
 
     @Test
+    fun notShelfUrlKeepsPresenceIdentityWithoutMarkingOfficial() {
+        val leftover = Book(
+            bookUrl = "B",
+            name = "T",
+            author = "佚名",
+            type = BookType.notShelf,
+        )
+        val opened = BookInfoOpenResolver.resolve(
+            name = "T",
+            author = "佚名",
+            bookUrl = "B",
+            shelfByUrl = leftover,
+            searchByUrl = leftover,
+            shelfByNameAuthor = Book(bookUrl = "A", name = "T", author = "作者甲"),
+            searchByNameAuthor = leftover,
+            presence = identityOnly(),
+        )!!
+        assertEquals("B", opened.book.bookUrl)
+        assertTrue(opened.identityOnShelf)
+        assertFalse(opened.urlOnShelf)
+    }
+
+    @Test
     fun presentUrlDoesNotFallBackToNameAuthor() {
         assertNull(
             BookInfoOpenResolver.resolve(
@@ -112,9 +135,10 @@ class BookInfoOpenResolverTest {
         assertFalse(saveBook.contains("getBook(book.name, book.author)"))
         assertTrue(upBookIntent.contains("getStringExtra(\"bookUrl\")"))
         assertTrue(upBookIntent.contains("if (bookUrl.isNotBlank())"))
-        assertTrue(upBookIntent.contains("refreshShelfFlags(it)"))
-        assertTrue(addToBookshelf.contains("SearchBookShelfHelp.resolveOnShelf("))
+        assertTrue(upBookIntent.contains("refreshShelfFlags(book)"))
+        assertTrue(addToBookshelf.contains("BookInfoShelfFlags.canPromoteToOfficial"))
         assertTrue(addToBookshelf.contains("SearchBookShelfHelp.presence("))
+        assertFalse(addToBookshelf.contains("SearchBookShelfHelp.resolveOnShelf("))
         assertFalse(addToBookshelf.contains("bookData.postValue"))
         assertTrue(loadChapter.contains("if (urlOnShelf)"))
         assertFalse(loadChapter.contains("if (inBookshelf)"))
@@ -131,6 +155,8 @@ class BookInfoOpenResolverTest {
         assertTrue(saveBook.contains("if (saved == true)"))
         assertTrue(saveBook.contains("presence.identityOnShelf"))
         assertTrue(saveBook.contains("BookInfoShelfFlags.afterUrlPersisted"))
+        assertTrue(saveBook.contains("BookInfoShelfFlags.canPromoteToOfficial"))
+        assertTrue(saveBook.contains("book.addType(BookType.notShelf)"))
         assertFalse(saveBook.contains("inBookshelf = true"))
         assertFalse(saveBook.contains("urlOnShelf = true"))
         val tocResult = activity.substringAfter("private val tocActivityResult").substringBefore("private val localBookTreeSelect")
@@ -147,7 +173,14 @@ class BookInfoOpenResolverTest {
         assertTrue(activity.contains("putExtra(\"inBookshelf\", viewModel.urlOnShelf)"))
         assertFalse(activity.contains("putExtra(\"inBookshelf\", viewModel.inBookshelf)"))
         assertTrue(activity.contains("R.string.local_book_identity_conflict"))
+        assertTrue(activity.contains("viewModel.delBook {"))
         assertTrue(activity.contains("editMenuItem?.isVisible = viewModel.urlOnShelf"))
+        val readFinish = read("src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
+        val mangaFinish = read("src/main/java/io/legado/app/ui/book/manga/ReadMangaActivity.kt")
+        val audioFinish = read("src/main/java/io/legado/app/ui/book/audio/AudioPlayActivity.kt")
+        assertTrue(readFinish.contains("BookInfoShelfFlags.promoteOrSkipTempBook"))
+        assertTrue(mangaFinish.contains("BookInfoShelfFlags.promoteOrSkipTempBook"))
+        assertTrue(audioFinish.contains("BookInfoShelfFlags.promoteOrSkipTempBook"))
     }
 
     private fun offShelf() = SearchBookShelfHelp.ShelfPresence(

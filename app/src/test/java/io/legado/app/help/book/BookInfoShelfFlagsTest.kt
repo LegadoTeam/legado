@@ -8,6 +8,13 @@ import org.junit.Test
 class BookInfoShelfFlagsTest {
 
     @Test
+    fun leftoverWeakUrlCannotPromoteBesideSoleReal() {
+        assertFalse(BookInfoShelfFlags.canPromoteToOfficial(identityOnShelf = true, urlOnShelf = false))
+        assertTrue(BookInfoShelfFlags.canPromoteToOfficial(identityOnShelf = false, urlOnShelf = false))
+        assertTrue(BookInfoShelfFlags.canPromoteToOfficial(identityOnShelf = true, urlOnShelf = true))
+    }
+
+    @Test
     fun tempPersistDoesNotPromoteOfficialShelfFlags() {
         val off = BookInfoShelfFlags.State(inBookshelf = false, urlOnShelf = false)
         assertEquals(off, BookInfoShelfFlags.afterUrlPersisted(off))

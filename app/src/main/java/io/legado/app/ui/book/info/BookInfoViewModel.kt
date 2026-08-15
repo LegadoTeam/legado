@@ -26,6 +26,7 @@ import io.legado.app.help.book.BookInfoShelfFlags
 import io.legado.app.help.book.SearchBookShelfHelp
 import io.legado.app.help.book.getExportFileName
 import io.legado.app.help.book.getRemoteUrl
+import io.legado.app.help.book.addType
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.book.isSameNameAuthor
@@ -133,9 +134,11 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             } else {
                 appDb.bookDao.getBook(name, author)
             }
-            book?.let {
-                refreshShelfFlags(it)
-                upBook(it)
+            if (book != null) {
+                refreshShelfFlags(book)
+                upBook(book)
+            } else {
+                refreshShelfFlags(Book(name = name, author = author, bookUrl = bookUrl))
             }
         }.onSuccess {
             success?.invoke()
@@ -502,6 +505,29 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 book.durChapterIndex = byUrl.durChapterIndex
                 book.durChapterPos = byUrl.durChapterPos
                 book.durChapterTitle = byUrl.durChapterTitle
+                if (byUrl.isNotShelf) {
+                    val presence = SearchBookShelfHelp.presence(
+                        book.name,
+                        book.author,
+                        book.bookUrl,
+                    )
+                    if (!BookInfoShelfFlags.canPromoteToOfficial(
+                            presence.identityOnShelf,
+                            presence.urlOnShelf,
+                        )
+                    ) {
+                        applyShelfPresence(identityOnShelf = true, persistedUrl = false)
+                        context.toastOnUi(
+                            context.getString(
+                                R.string.local_book_identity_conflict,
+                                book.name,
+                                book.author,
+                            )
+                        )
+                        return@execute false
+                    }
+                    book.addType(BookType.notShelf)
+                }
                 if (preserveCustomCoverUrl) {
                     book.savePreservingCustomCoverUrl()
                 } else {
@@ -581,14 +607,29 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     }
                 }
                 // Same identity as search list / bulk add. Never switch the page onto another URL.
-                val existing = SearchBookShelfHelp.resolveOnShelf(incoming.toSearchBook())
-                val savedThisBook = if (existing != null && existing.bookUrl != incoming.bookUrl) {
-                    SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming.toSearchBook()))
-                    false
-                } else {
-                    val persisted = SearchBookShelfHelp.persistIncomingBook(incoming)
-                    persisted != null && persisted.bookUrl == incoming.bookUrl
+                val presenceBefore = SearchBookShelfHelp.presence(
+                    incoming.name,
+                    incoming.author,
+                    incoming.bookUrl,
+                )
+                if (!BookInfoShelfFlags.canPromoteToOfficial(
+                        presenceBefore.identityOnShelf,
+                        presenceBefore.urlOnShelf,
+                    )
+                ) {
+                    appDb.bookDao.getBook(incoming.bookUrl)?.takeIf { it.isNotShelf }?.delete()
+                    applyShelfPresence(identityOnShelf = true, persistedUrl = false)
+                    context.toastOnUi(
+                        context.getString(
+                            R.string.local_book_identity_conflict,
+                            incoming.name,
+                            incoming.author,
+                        )
+                    )
+                    return@execute
                 }
+                val persisted = SearchBookShelfHelp.persistIncomingBook(incoming)
+                val savedThisBook = persisted != null && persisted.bookUrl == incoming.bookUrl
                 val presence = SearchBookShelfHelp.presence(
                     incoming.name,
                     incoming.author,
@@ -635,18 +676,13 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         execute {
             val book = bookData.value ?: return@execute
             val persistedUrl = appDb.bookDao.getBook(book.bookUrl)?.bookUrl
-            if (!BookInfoShelfFlags.canDeleteBookUrl(book.bookUrl, persistedUrl)) {
-                if (!urlOnShelf) {
-                    inBookshelf = false
+            if (BookInfoShelfFlags.canDeleteBookUrl(book.bookUrl, persistedUrl)) {
+                book.delete()
+                if (book.isLocal) {
+                    LocalBook.deleteBook(book, deleteOriginal)
                 }
-                return@execute
             }
-            book.delete()
-            inBookshelf = false
-            urlOnShelf = false
-            if (book.isLocal) {
-                LocalBook.deleteBook(book, deleteOriginal)
-            }
+            refreshShelfFlags(book)
         }.onSuccess {
             success?.invoke()
         }

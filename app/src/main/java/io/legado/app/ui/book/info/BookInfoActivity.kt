@@ -1055,13 +1055,18 @@ class BookInfoActivity :
             viewModel.getBook()?.let { book ->
                 if (viewModel.inBookshelf) {
                     if (!viewModel.urlOnShelf) {
-                        toastOnUi(
-                            getString(
-                                R.string.local_book_identity_conflict,
-                                book.name,
-                                book.author,
-                            )
-                        )
+                        viewModel.delBook {
+                            if (viewModel.inBookshelf && !viewModel.urlOnShelf) {
+                                toastOnUi(
+                                    getString(
+                                        R.string.local_book_identity_conflict,
+                                        book.name,
+                                        book.author,
+                                    )
+                                )
+                            }
+                            upTvBookshelf()
+                        }
                     } else {
                         deleteBook()
                     }
