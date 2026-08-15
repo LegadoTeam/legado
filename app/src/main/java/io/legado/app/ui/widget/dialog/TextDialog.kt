@@ -2,12 +2,19 @@ package io.legado.app.ui.widget.dialog
 
 import android.os.Build
 import android.os.Bundle
+import android.text.Spannable
+import android.text.SpannableStringBuilder
+import android.text.Spanned
 import android.text.method.LinkMovementMethod
+import android.text.style.BackgroundColorSpan
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
 import android.view.textclassifier.TextClassifier
 import android.widget.ArrayAdapter
 import androidx.core.view.GravityCompat
+import androidx.core.view.isVisible
+import androidx.core.widget.doAfterTextChanged
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -18,14 +25,18 @@ import io.legado.app.databinding.DialogTextViewBinding
 import io.legado.app.help.CacheManager
 import io.legado.app.help.HelpSection
 import io.legado.app.help.IntentData
+import io.legado.app.help.findTextRanges
 import io.legado.app.help.parseHelpSections
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.code.CodeEditActivity
+import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.applyTint
+import io.legado.app.utils.hideSoftInput
 import io.legado.app.utils.setHtml
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.setMarkdown
 import io.legado.app.utils.showDialogFragment
+import io.legado.app.utils.showSoftInput
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.noties.markwon.Markwon
@@ -74,6 +85,10 @@ class TextDialog() : BaseDialogFragment(R.layout.dialog_text_view) {
     private var sections: List<HelpSection> = emptyList()
     private var selectedSection = 0
     private var restoredScrollY = 0
+    private var searchQuery = ""
+    private var searchRanges: List<IntRange> = emptyList()
+    private var searchIndex = -1
+    private val searchSpans = mutableListOf<BackgroundColorSpan>()
 
     override fun onStart() {
         super.onStart()
@@ -107,6 +122,7 @@ class TextDialog() : BaseDialogFragment(R.layout.dialog_text_view) {
                     if (showToc) {
                         binding.textView.setLineSpacing(0f, 1.3f)
                         setupToc()
+                        setupSearch(savedInstanceState)
                     }
                     viewLifecycleOwner.lifecycleScope.launch {
                         markwon = withContext(IO) {
@@ -140,6 +156,7 @@ class TextDialog() : BaseDialogFragment(R.layout.dialog_text_view) {
             }
             binding.toolBar.setOnMenuItemClickListener { menu ->
                 when (menu.itemId) {
+                    R.id.menu_search -> toggleSearch()
                     R.id.menu_help_toc -> binding.drawerLayout.openDrawer(GravityCompat.END)
                     R.id.menu_close -> dismissAllowingStateLoss()
                     R.id.menu_fullscreen_edit -> {
@@ -200,6 +217,9 @@ class TextDialog() : BaseDialogFragment(R.layout.dialog_text_view) {
         binding.tocList.setSelection(selectedSection)
         binding.tocList.setOnItemClickListener { _, _, position, _ ->
             if (selectedSection != position) {
+                if (position != 0 && searchQuery.isNotBlank()) {
+                    binding.searchInput.text?.clear()
+                }
                 selectedSection = position
                 restoredScrollY = 0
                 binding.textView.scrollTo(0, 0)
@@ -219,8 +239,128 @@ class TextDialog() : BaseDialogFragment(R.layout.dialog_text_view) {
         }
     }
 
+    private fun setupSearch(savedInstanceState: Bundle?) {
+        searchQuery = savedInstanceState?.getString(STATE_SEARCH_QUERY).orEmpty()
+        searchIndex = savedInstanceState?.getInt(STATE_SEARCH_INDEX, -1) ?: -1
+        if (searchQuery.isNotBlank() && selectedSection != 0) {
+            selectedSection = 0
+            restoredScrollY = 0
+            binding.tocList.setItemChecked(0, true)
+            binding.tocList.setSelection(0)
+        }
+        binding.searchInput.setText(searchQuery)
+        binding.searchBar.isVisible = savedInstanceState?.getBoolean(STATE_SEARCH_VISIBLE) == true
+        binding.searchInput.doAfterTextChanged {
+            onSearchQueryChanged(it?.toString().orEmpty())
+        }
+        binding.searchInput.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                moveToMatch(searchIndex + 1)
+                true
+            } else {
+                false
+            }
+        }
+        binding.btnSearchPrev.setOnClickListener { moveToMatch(searchIndex - 1) }
+        binding.btnSearchNext.setOnClickListener { moveToMatch(searchIndex + 1) }
+        binding.toolBar.menu.findItem(R.id.menu_search)?.isVisible = true
+    }
+
+    private fun toggleSearch() {
+        val searchInput = binding.searchInput
+        binding.searchBar.isVisible = !binding.searchBar.isVisible
+        if (binding.searchBar.isVisible) {
+            searchInput.setSelection(searchInput.text?.length ?: 0)
+            searchInput.post {
+                if (searchInput.isAttachedToWindow) searchInput.showSoftInput()
+            }
+        } else {
+            searchInput.hideSoftInput()
+        }
+    }
+
+    private fun onSearchQueryChanged(query: String) {
+        searchQuery = query
+        searchIndex = -1
+        binding.searchCount.text = ""
+        setSearchNavigationEnabled(false)
+        if (query.isBlank()) {
+            searchRanges = emptyList()
+            clearSearchSpans()
+            return
+        }
+        if (selectedSection != 0) {
+            selectedSection = 0
+            restoredScrollY = 0
+            binding.tocList.setItemChecked(0, true)
+            binding.tocList.setSelection(0)
+            renderMarkdown(currentMarkdown())
+        } else if (renderJob?.isActive != true) {
+            applySearchHighlight()
+        }
+    }
+
+    private fun applySearchHighlight(keepIndex: Boolean = false) {
+        clearSearchSpans()
+        val text = binding.textView.text
+        searchRanges = findTextRanges(text.toString(), searchQuery)
+        if (searchRanges.isEmpty()) {
+            searchIndex = -1
+            setSearchNavigationEnabled(false)
+            binding.searchCount.text = "0/0"
+            return
+        }
+        if (!keepIndex || searchIndex !in searchRanges.indices) searchIndex = 0
+        val spannable = text as? Spannable ?: run {
+            binding.textView.text = SpannableStringBuilder(text)
+            binding.textView.text as? Spannable ?: return
+        }
+        val normalColor = ColorUtils.adjustAlpha(primaryColor, 0.25f)
+        val currentColor = ColorUtils.adjustAlpha(primaryColor, 0.5f)
+        searchRanges.forEachIndexed { index, range ->
+            val span = BackgroundColorSpan(if (index == searchIndex) currentColor else normalColor)
+            spannable.setSpan(span, range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            searchSpans.add(span)
+        }
+        setSearchNavigationEnabled(true)
+        binding.searchCount.text = "${searchIndex + 1}/${searchRanges.size}"
+        scrollToCurrentMatch()
+    }
+
+    private fun setSearchNavigationEnabled(enabled: Boolean) {
+        binding.btnSearchPrev.isEnabled = enabled
+        binding.btnSearchNext.isEnabled = enabled
+    }
+
+    private fun moveToMatch(index: Int) {
+        if (searchRanges.isEmpty()) return
+        searchIndex = ((index % searchRanges.size) + searchRanges.size) % searchRanges.size
+        applySearchHighlight(keepIndex = true)
+    }
+
+    private fun clearSearchSpans() {
+        val text = binding.textView.text as? Spannable
+        searchSpans.forEach { text?.removeSpan(it) }
+        searchSpans.clear()
+    }
+
+    private fun scrollToCurrentMatch() {
+        val offset = searchRanges.getOrNull(searchIndex)?.first ?: return
+        val textView = binding.textView
+        textView.post {
+            if (!textView.isAttachedToWindow ||
+                searchRanges.getOrNull(searchIndex)?.first != offset
+            ) return@post
+            val layout = textView.layout ?: return@post
+            val y = (layout.getLineTop(layout.getLineForOffset(offset)) - textView.totalPaddingTop)
+                .coerceAtLeast(0)
+            textView.scrollTo(0, y)
+        }
+    }
+
     private fun renderMarkdown(markdown: String, scrollY: Int = 0) {
         val currentMarkwon = markwon ?: return
+        if (searchQuery.isNotBlank()) setSearchNavigationEnabled(false)
         renderJob?.cancel()
         renderJob = viewLifecycleOwner.lifecycleScope.launch {
             val parsed = withContext(IO) { currentMarkwon.toMarkdown(markdown) }
@@ -233,8 +373,12 @@ class TextDialog() : BaseDialogFragment(R.layout.dialog_text_view) {
                     showDialogFragment(PhotoDialog(source))
                 },
             )
-            textView.post {
-                if (textView.isAttachedToWindow) textView.scrollTo(0, scrollY)
+            if (searchQuery.isNotBlank()) {
+                applySearchHighlight(keepIndex = true)
+            } else {
+                textView.post {
+                    if (textView.isAttachedToWindow) textView.scrollTo(0, scrollY)
+                }
             }
         }
     }
@@ -243,6 +387,9 @@ class TextDialog() : BaseDialogFragment(R.layout.dialog_text_view) {
         if (arguments?.getBoolean("showToc") == true) {
             outState.putInt(STATE_SELECTED_SECTION, selectedSection)
             outState.putInt(STATE_SCROLL_Y, binding.textView.scrollY)
+            outState.putBoolean(STATE_SEARCH_VISIBLE, binding.searchBar.isVisible)
+            outState.putString(STATE_SEARCH_QUERY, searchQuery)
+            outState.putInt(STATE_SEARCH_INDEX, searchIndex)
         }
         super.onSaveInstanceState(outState)
     }
@@ -250,6 +397,7 @@ class TextDialog() : BaseDialogFragment(R.layout.dialog_text_view) {
     override fun onDestroyView() {
         renderJob?.cancel()
         renderJob = null
+        searchSpans.clear()
         markwon = null
         super.onDestroyView()
     }
@@ -257,6 +405,9 @@ class TextDialog() : BaseDialogFragment(R.layout.dialog_text_view) {
     companion object {
         private const val STATE_SELECTED_SECTION = "selectedSection"
         private const val STATE_SCROLL_Y = "textScrollY"
+        private const val STATE_SEARCH_VISIBLE = "searchVisible"
+        private const val STATE_SEARCH_QUERY = "searchQuery"
+        private const val STATE_SEARCH_INDEX = "searchIndex"
     }
 
 }

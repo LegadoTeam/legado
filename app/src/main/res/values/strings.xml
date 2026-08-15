@@ -84,6 +84,8 @@
     <string name="version">Version</string>
     <string name="local">Local</string>
     <string name="search">Search</string>
+    <string name="help_search_prev">Previous match</string>
+    <string name="help_search_next">Next match</string>
     <string name="origin_format">Origin: %s</string>
     <string name="read_dur_progress">Origin: %s</string>
     <string name="book_name">Title</string>

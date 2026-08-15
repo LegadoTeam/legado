@@ -164,6 +164,31 @@ class DialogViewLifecycleContractTest {
         assertFalse(countdown.contains("view.post"))
     }
 
+    @Test
+    fun `text dialog search is help only and rejects stale posted scrolls`() {
+        val source = source("widget/dialog/TextDialog.kt")
+        val layout = projectFile("src/main/res/layout/dialog_text_view.xml").readText()
+        val markdownSetup = source.section(
+            "Mode.MD.name -> {",
+            "viewLifecycleOwner.lifecycleScope.launch",
+        )
+        val scroll = source.section(
+            "private fun scrollToCurrentMatch()",
+            "private fun renderMarkdown",
+        )
+
+        assertTrue(markdownSetup.contains("if (showToc)"))
+        assertTrue(markdownSetup.contains("setupSearch(savedInstanceState)"))
+        assertTrue(scroll.indexOf("val offset =") < scroll.indexOf("textView.post"))
+        assertTrue(scroll.contains("searchRanges.getOrNull(searchIndex)?.first != offset"))
+        assertTrue(scroll.contains("!textView.isAttachedToWindow"))
+        assertTrue(source.contains("outState.putString(STATE_SEARCH_QUERY, searchQuery)"))
+        assertTrue(source.contains("if (position != 0 && searchQuery.isNotBlank())"))
+        assertTrue(source.contains("if (searchQuery.isNotBlank() && selectedSection != 0)"))
+        assertTrue(source.contains("else if (renderJob?.isActive != true)"))
+        assertTrue(layout.contains("android:saveEnabled=\"false\""))
+    }
+
     private fun source(relativePath: String): String {
         return projectFile("src/main/java/io/legado/app/ui/$relativePath")
             .readText()
