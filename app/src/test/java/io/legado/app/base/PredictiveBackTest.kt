@@ -21,4 +21,14 @@ class PredictiveBackTest {
         val manifest = File("src/main/AndroidManifest.xml").readText()
         assertTrue(manifest.contains("""android:enableOnBackInvokedCallback="true"""))
     }
+
+    @Test
+    fun `regular activities do not consume finish without closing`() {
+        listOf(
+            "src/main/java/io/legado/app/ui/book/search/SearchActivity.kt",
+            "src/main/java/io/legado/app/ui/book/source/manage/BookSourceActivity.kt"
+        ).forEach { path ->
+            assertFalse(File(path).readText().contains("override fun finish()"))
+        }
+    }
 }

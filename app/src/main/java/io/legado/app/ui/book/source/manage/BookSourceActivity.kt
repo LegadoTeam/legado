@@ -818,14 +818,6 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
         }
     }
 
-    override fun finish() {
-        if (searchView.query.isNullOrEmpty()) {
-            super.finish()
-        } else {
-            searchView.setQuery("", true)
-        }
-    }
-
     override fun onDestroy() {
         super.onDestroy()
         if (!Debug.isChecking) {
