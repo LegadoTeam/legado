@@ -139,14 +139,11 @@ object SearchBookShelfHelp {
         return AddResult(books.size, addedBooks)
     }
 
-    /** Insert without REPLACE. Weak authors persist as empty. Unique-key conflicts are not deleted. */
+    /** Insert without REPLACE. Unique-key conflicts are not deleted. */
     internal fun persistNewBook(store: Store, book: Book): Book? {
         store.getBook(book.bookUrl)?.let {
             store.update(book)
             return book
-        }
-        if (BookAuthorIdentity.isWeakAuthor(book.author)) {
-            book.author = BookAuthorIdentity.persistAuthor(book.author)
         }
         if (store.insertIgnore(book)) return book
         val owner = store.getBook(book.name, book.author) ?: return null

@@ -121,13 +121,10 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
 
     fun upBook(intent: Intent, success: (() -> Unit)? = null) {
         execute {
-            val pageUrl = bookData.value?.bookUrl
-            val book = pageUrl?.takeIf { it.isNotBlank() }?.let { appDb.bookDao.getBook(it) }
-            if (book != null) {
-                refreshShelfFlags(book)
+            val name = intent.getStringExtra("name") ?: ""
+            val author = intent.getStringExtra("author") ?: ""
+            appDb.bookDao.getBook(name, author)?.let { book ->
                 upBook(book)
-            } else {
-                inBookshelf = false
             }
         }.onSuccess {
             success?.invoke()

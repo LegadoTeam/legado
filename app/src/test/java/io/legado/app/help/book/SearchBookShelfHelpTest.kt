@@ -224,14 +224,15 @@ class SearchBookShelfHelpTest {
         val store = FakeStore(local)
         val incoming = Book(bookUrl = "https://web/x", name = "同名书", author = "佚名")
         val persisted = SearchBookShelfHelp.persistNewBook(store, incoming)
-        assertEquals("https://web/x", persisted?.bookUrl)
-        assertEquals("", incoming.author)
-        assertEquals(2, store.books.size)
-        assertEquals("佚名", store.books.first { it.bookUrl == "local://x" }.author)
+        assertEquals(null, persisted)
+        assertEquals("佚名", incoming.author)
+        assertEquals(1, store.books.size)
+        assertEquals("佚名", store.books.single().author)
+        assertEquals("local://x", store.books.single().bookUrl)
     }
 
     @Test
-    fun localYimingMarksExactYimingBadgeAndWebStillInserts() {
+    fun localYimingMarksExactYimingBadgeAndDoesNotInsertDuplicate() {
         val local = Book(
             bookUrl = "local://x",
             name = "同名书",
@@ -249,8 +250,9 @@ class SearchBookShelfHelpTest {
         )
         val store = FakeStore(local)
         val result = SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
-        assertEquals(1, result.added)
-        assertEquals(2, store.books.size)
+        assertEquals(0, result.added)
+        assertEquals(1, store.books.size)
+        assertEquals("local://x", store.books.single().bookUrl)
     }
 
     @Test
@@ -271,7 +273,7 @@ class SearchBookShelfHelpTest {
     }
 
     @Test
-    fun localEmptyAuthorDoesNotBadgeYimingAndStillBlocksInsert() {
+    fun localEmptyAuthorDoesNotBadgeYimingAndWebYimingStillInserts() {
         val local = Book(
             bookUrl = "local://x",
             name = "T",
@@ -283,8 +285,9 @@ class SearchBookShelfHelpTest {
         assertFalse(SearchBookShelfHelp.isInShelfBadgeIndex(incoming, keys))
         val store = FakeStore(local)
         val result = SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
-        assertEquals(0, result.added)
-        assertEquals("local://x", store.books.single().bookUrl)
+        assertEquals(1, result.added)
+        assertEquals(2, store.books.size)
+        assertEquals("佚名", store.books.first { it.bookUrl == "W" }.author)
     }
 
     @Test
@@ -423,9 +426,10 @@ class SearchBookShelfHelpTest {
         )
         val store = FakeStore(temp)
         val result = SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
-        assertEquals(0, result.added)
-        assertEquals(listOf("A"), store.books.map { it.bookUrl })
-        assertTrue(store.books.single().isNotShelf)
+        assertEquals(1, result.added)
+        assertEquals("B", result.addedBooks.single().bookUrl)
+        assertEquals("佚名", result.addedBooks.single().author)
+        assertTrue(store.books.first { it.bookUrl == "A" }.isNotShelf)
     }
 
     @Test
