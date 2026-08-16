@@ -34,6 +34,7 @@ class DialogViewLifecycleContractTest {
         val created = source.section("override fun onFragmentCreated", "override fun onViewStateRestored")
         val restored = source.section("override fun onViewStateRestored", "override fun onSaveInstanceState")
         val savedState = source.section("override fun onSaveInstanceState", "override fun onDestroyView")
+        val cancel = source.section("override fun onCancel", "private fun save")
         val viewModel = source.section("class ContentEditViewModel", "\n    }\n\n}")
         val resetMenu = source.section("R.id.menu_reset", "R.id.menu_copy_all")
         val editTitle = source.section("private fun editTitle", "override fun onCancel")
@@ -56,10 +57,13 @@ class DialogViewLifecycleContractTest {
         assertFalse(created.contains("withStateAtLeast"))
         assertTrue(restored.contains("super.onViewStateRestored(savedInstanceState)"))
         assertTrue(restored.contains("viewModel.restoreDraft"))
+        assertTrue(restored.contains("savedInstanceState.getBoolean(STATE_HAS_CHANGES)"))
         assertTrue(restored.contains("viewModel.draftText?.let"))
         assertTrue(restored.contains("contentView.doAfterTextChanged"))
         assertTrue(restored.contains("viewModel.initContent(editTarget)"))
         assertTrue(savedState.contains("outState.putBoolean(STATE_HAS_DRAFT, viewModel.hasDraft)"))
+        assertTrue(savedState.contains("outState.putBoolean(STATE_HAS_CHANGES, viewModel.hasChanges)"))
+        assertTrue(cancel.contains("if (viewModel.hasChanges) save()"))
         assertTrue(viewModel.contains("private var contentTask"))
         assertTrue(viewModel.contains("private var pendingReset"))
         assertTrue(viewModel.contains("if (!reset && (draftState.hasDraft || contentTask?.isActive == true))"))
@@ -139,6 +143,39 @@ class DialogViewLifecycleContractTest {
 
         assertEquals("reset content", state.applyLoaded(request, "reset content"))
         assertEquals("reset content", state.text)
+        assertFalse(state.hasChanges)
+    }
+
+    @Test
+    fun `content draft only changes after a real edit`() {
+        val state = ContentDraftState()
+        state.restore("loaded content")
+
+        assertFalse(state.hasChanges)
+
+        state.update("edited content")
+        assertTrue(state.hasChanges)
+
+        state.update("loaded content")
+        assertFalse(state.hasChanges)
+    }
+
+    @Test
+    fun `editing before content loads is still a change`() {
+        val state = ContentDraftState()
+
+        state.update("early edit")
+
+        assertTrue(state.hasChanges)
+    }
+
+    @Test
+    fun `restored dirty draft remains changed`() {
+        val state = ContentDraftState()
+
+        state.restore("restored edit", hasChanges = true)
+
+        assertTrue(state.hasChanges)
     }
 
     @Test

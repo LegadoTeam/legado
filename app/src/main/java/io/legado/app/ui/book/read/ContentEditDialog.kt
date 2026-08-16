@@ -50,15 +50,22 @@ internal data class ContentEditTarget(
 internal class ContentDraftState {
     var text: String? = null
         private set
+    private var baseline: String? = null
+    private var restoredChanges = false
     private var revision = 0L
     private var requestGeneration = 0L
 
     val hasDraft: Boolean
         get() = text != null
 
-    fun restore(text: String): Boolean {
+    val hasChanges: Boolean
+        get() = restoredChanges || (text != null && text != baseline)
+
+    fun restore(text: String, hasChanges: Boolean = false): Boolean {
         if (this.text != null) return false
         this.text = text
+        baseline = text
+        restoredChanges = hasChanges
         return true
     }
 
@@ -77,6 +84,8 @@ internal class ContentDraftState {
         if (request.generation != requestGeneration || request.revision != revision) return null
         if (this.text != text) revision++
         this.text = text
+        baseline = text
+        restoredChanges = false
         return text
     }
 }
@@ -92,6 +101,7 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
         private const val ARG_CHAPTER_POS = "chapterPos"
         private const val ARG_TITLE = "title"
         private const val STATE_HAS_DRAFT = "hasDraft"
+        private const val STATE_HAS_CHANGES = "hasChanges"
 
         fun newInstance(): ContentEditDialog? {
             val book = ReadBook.book ?: return null
@@ -178,7 +188,10 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
         super.onViewStateRestored(savedInstanceState)
         val contentView = binding.contentView
         if (savedInstanceState?.getBoolean(STATE_HAS_DRAFT) == true) {
-            viewModel.restoreDraft(contentView.text?.toString().orEmpty())
+            viewModel.restoreDraft(
+                contentView.text?.toString().orEmpty(),
+                savedInstanceState.getBoolean(STATE_HAS_CHANGES),
+            )
         }
         viewModel.draftText?.let { draft ->
             if (contentView.text?.toString() != draft) contentView.setText(draft)
@@ -192,6 +205,7 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putBoolean(STATE_HAS_DRAFT, viewModel.hasDraft)
+        outState.putBoolean(STATE_HAS_CHANGES, viewModel.hasChanges)
     }
 
     override fun onDestroyView() {
@@ -255,7 +269,7 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
 
     override fun onCancel(dialog: DialogInterface) {
         super.onCancel(dialog)
-        save()
+        if (viewModel.hasChanges) save()
     }
 
     private fun save() {
@@ -289,6 +303,8 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
             get() = draftState.text
         internal val hasDraft: Boolean
             get() = draftState.hasDraft
+        internal val hasChanges: Boolean
+            get() = draftState.hasChanges
         private var contentTask: Coroutine<String?>? = null
         private var pendingReset: ContentLoadRequest? = null
 
@@ -298,8 +314,8 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
             val target: ContentEditTarget,
         )
 
-        fun restoreDraft(text: String) {
-            if (draftState.restore(text)) contentLiveData.value = text
+        fun restoreDraft(text: String, hasChanges: Boolean) {
+            if (draftState.restore(text, hasChanges)) contentLiveData.value = text
         }
 
         fun updateDraft(text: String) {
