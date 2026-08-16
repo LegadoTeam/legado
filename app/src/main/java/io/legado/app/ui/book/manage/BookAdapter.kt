@@ -174,15 +174,14 @@ class BookAdapter(context: Context, val callBack: CallBack) :
     }
 
     private var isMoved = false
+    private var needsOrderReset = false
 
     override fun swap(srcPosition: Int, targetPosition: Int): Boolean {
         val srcItem = getItem(srcPosition)
         val targetItem = getItem(targetPosition)
         if (srcItem != null && targetItem != null) {
             if (srcItem.order == targetItem.order) {
-                for ((index, item) in getItems().withIndex()) {
-                    item.order = index + 1
-                }
+                needsOrderReset = true
             } else {
                 val pos = srcItem.order
                 srcItem.order = targetItem.order
@@ -196,9 +195,10 @@ class BookAdapter(context: Context, val callBack: CallBack) :
 
     override fun onClearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
         if (isMoved) {
-            callBack.updateBook(*getItems().toTypedArray())
+            callBack.updateBookOrder(getItems(), needsOrderReset)
         }
         isMoved = false
+        needsOrderReset = false
     }
 
     val dragSelectCallback: DragSelectTouchHelper.Callback =
@@ -233,7 +233,7 @@ class BookAdapter(context: Context, val callBack: CallBack) :
 
         fun upSelectCount()
 
-        fun updateBook(vararg book: Book)
+        fun updateBookOrder(books: List<Book>, resetAll: Boolean)
 
         fun deleteBook(book: Book)
 

@@ -479,8 +479,8 @@ class BookshelfManageActivity :
         binding.selectActionBar.upCountView(adapter.selection.size, adapter.getItems().size)
     }
 
-    override fun updateBook(vararg book: Book) {
-        viewModel.updateBook(*book)
+    override fun updateBookOrder(books: List<Book>, resetAll: Boolean) {
+        viewModel.updateBookOrder(books, resetAll)
     }
 
     override fun deleteBook(book: Book) {

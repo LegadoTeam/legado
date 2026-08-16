@@ -27,6 +27,7 @@ import io.legado.app.model.SourceCallBack
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.externalFiles
+import io.legado.app.utils.mergeFilteredOrder
 import io.legado.app.utils.stackTraceStr
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.writeToOutputStream
@@ -71,6 +72,23 @@ class BookshelfManageViewModel(application: Application) : BaseViewModel(applica
     fun updateBook(vararg book: Book) {
         execute {
             appDb.bookDao.updatePreservingCustomCoverUrl(*book)
+        }
+    }
+
+    fun updateBookOrder(books: List<Book>, resetAll: Boolean) {
+        execute {
+            if (resetAll) {
+                appDb.runInTransaction {
+                    val reordered = mergeFilteredOrder(
+                        appDb.bookDao.allShelfByOrder,
+                        books,
+                    ) { it.bookUrl }
+                    reordered.forEachIndexed { index, book -> book.order = index + 1 }
+                    appDb.bookDao.updateOrder(reordered)
+                }
+            } else {
+                appDb.bookDao.updateOrder(books)
+            }
         }
     }
 

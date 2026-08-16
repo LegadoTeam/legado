@@ -142,6 +142,11 @@ interface BookDao {
     @get:Query("SELECT * FROM books")
     val all: List<Book>
 
+    @get:Query(
+        "SELECT * FROM books WHERE type & ${BookType.notShelf} = 0 ORDER BY `order`"
+    )
+    val allShelfByOrder: List<Book>
+
     @Query("SELECT bookUrl, name, origin, originName, type FROM books")
     fun getCacheCleanupBooks(): List<BookCacheInfo>
 
@@ -214,6 +219,14 @@ interface BookDao {
 
     @Update
     fun update(vararg book: Book)
+
+    @Query("UPDATE books SET `order` = :order WHERE bookUrl = :bookUrl")
+    fun updateOrder(bookUrl: String, order: Int)
+
+    @Transaction
+    fun updateOrder(books: List<Book>) {
+        books.forEach { updateOrder(it.bookUrl, it.order) }
+    }
 
     @Query("select customCoverUrl from books where bookUrl = :bookUrl")
     fun getCustomCoverUrl(bookUrl: String): String?
