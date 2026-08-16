@@ -77,6 +77,7 @@ function getContent(chapter, book, nextChapterUrl) {
  * getReviewSummary 返回 [{ paraIndex: 1, count: 5, paraData: "token" }]，paraIndex 为 -1 时表示章节标题；
  * getReviewDetail 返回 { items: [{ id: "comment-1", content: { text: "评论内容", replyCount: 3 } }], nextPageUrl: null }。
  * 可选的 getReviewReplies 返回 { items: [{ id: "reply-1", content: "回复内容" }] }，用于按评论 ID 和 page 加载更多回复。
+ * id/reviewId 是不透明字符串；超过 JavaScript 安全整数范围的 ID 必须在 JSON.parse 前保留为字符串。
  * content 也可返回 { text, replyToName, img, audio, time, likeCount, replyCount }。
  * nextPageUrl 只是“是否还有下一页”的信号，翻页时应用会递增 page 参数再次调用。
  *

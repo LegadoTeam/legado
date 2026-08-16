@@ -152,6 +152,29 @@ class ReviewRuleParserTest {
     }
 
     @Test
+    fun `declarative detail preserves 64-bit numeric ids`() {
+        val result = ReviewRuleParser.parseDetailPage(
+            body = """{"items":[{"id":1051979893439332353,"content":"评论"}]}""",
+            rule = ReviewRule(
+                detailListRule = "$.items",
+                detailIdRule = "$.id",
+                detailContentRule = "$.content",
+            ),
+            nextPageRule = null,
+            baseUrl = chapter.url,
+            source = source,
+            book = book,
+            chapter = chapter,
+            context = EmptyCoroutineContext,
+            paraIndex = "1",
+            paraData = "",
+            page = "1",
+        )
+
+        assertEquals("1051979893439332353", result.items.single().id)
+    }
+
+    @Test
     fun `parses a standalone reply page with reply rules`() {
         val replies = ReviewRuleParser.parseReplyPage(
             body = """

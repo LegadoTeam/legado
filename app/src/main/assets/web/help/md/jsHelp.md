@@ -922,6 +922,8 @@ function getReviewReplies(chapter, book, paraIndex, paraData, reviewId, page) {
   `reviewId` 是主评论的非空 `id`，且详情项需要提供正数 `replyCount` 才会显示加载入口。页面从 `1` 开始，
   返回首批回复，空数组表示没有更多回复。声明该函数时详情项不要内嵌 `replies`；未声明时仍可使用内嵌回复。
   它必须与上述两个段评函数一起声明。
+- `id` 和 `reviewId` 是不透明字符串。超过 JavaScript 安全整数范围的数字 ID 必须在 `JSON.parse` 前保留为字符串；
+  一旦被 `JSON.parse` 舍入，应用无法恢复原值。
 - 段评函数异常会记录到日志，详情加载错误同时显示在弹窗中；返回空数组表示没有内容。
 
 ### 运行环境与并发
