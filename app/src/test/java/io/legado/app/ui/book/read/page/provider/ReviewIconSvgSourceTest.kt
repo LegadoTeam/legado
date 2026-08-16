@@ -63,6 +63,19 @@ class ReviewIconSvgSourceTest {
     }
 
     @Test
+    fun `legacy image reviews reuse the native renderer and keep image fallback`() {
+        val column = projectFile(
+            "src/main/java/io/legado/app/ui/book/read/page/entities/column/ImageColumn.kt"
+        ).readText().normalizeLines()
+
+        assertTrue(column.contains("parseImageReviewOption(src, click)"))
+        assertTrue(column.contains("takeUnless { textLine.isImage }"))
+        assertTrue(column.contains("ChapterProvider.getReviewWidth(textLine.isTitle)"))
+        assertTrue(column.contains("it.drawToCanvas("))
+        assertTrue(column.contains("ImageProvider.getImage("))
+    }
+
+    @Test
     fun `settings validate svg and refresh current review columns`() {
         val dialog = projectFile(
             "src/main/java/io/legado/app/ui/book/read/config/BgTextConfigDialog.kt"

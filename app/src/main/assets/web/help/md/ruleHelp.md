@@ -432,10 +432,15 @@ result = `<img src = "${url}">`;
 > 目前支持"text"、"full"、"single"、"left"、"right"  
 > 在书源正文样式为大写"TEXT"时，占1.5个字符位(text样式宽度与汉字保持一致，不受width控制)  
 
+> "reviewCount"键用于兼容旧书源的图片段评
+> 仅"style"为"text"或"TEXT"、数量为正整数且同时存在非空"click"时，在原行内图片位置按当前阅读样式的原生段评SVG绘制
+> 原始图片地址和点击脚本保持不变，字段缺失或非法时仍显示原图
+
 ```
 <img src = "https://du.com/result.png,{'style': 'center','width':'50%'}">
 <img src = "https://du.com/result.png,{'style': 'right','width':'300'}">
 <img src = "data:image/svg+xml;base64,QQ,{'style': 'left','width':'100%'}">
+<img src = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxIDEiLz4=,{'style':'TEXT','reviewCount':'37','click':'getDP(1,37)'}">
 ```
 
 * 详情页html
