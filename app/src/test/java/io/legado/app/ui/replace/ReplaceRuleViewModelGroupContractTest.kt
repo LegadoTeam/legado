@@ -21,6 +21,17 @@ class ReplaceRuleViewModelGroupContractTest {
         assertFalse(source.contains("source.group?.splitNotBlank"))
     }
 
+    @Test
+    fun `batch moves allocate orders outside existing bounds`() {
+        val top = source.substringAfter("fun topSelect").substringBefore("fun toBottom")
+        val bottom = source.substringAfter("fun bottomSelect").substringBefore("fun upOrder")
+
+        assertTrue(top.contains("it.order = minOrder++"))
+        assertFalse(top.contains("it.order = ++minOrder"))
+        assertTrue(bottom.contains("var maxOrder = appDb.replaceRuleDao.maxOrder + 1"))
+        assertTrue(bottom.contains("it.order = maxOrder++"))
+    }
+
     private fun projectFile(pathInApp: String): File {
         return listOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull { it.isFile }

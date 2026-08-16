@@ -35,7 +35,7 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
         execute {
             var minOrder = appDb.replaceRuleDao.minOrder - rules.size
             rules.forEach {
-                it.order = ++minOrder
+                it.order = minOrder++
             }
             appDb.replaceRuleDao.update(*rules.toTypedArray())
         }
@@ -50,7 +50,7 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
 
     fun bottomSelect(rules: List<ReplaceRule>) {
         execute {
-            var maxOrder = appDb.replaceRuleDao.maxOrder
+            var maxOrder = appDb.replaceRuleDao.maxOrder + 1
             rules.forEach {
                 it.order = maxOrder++
             }
