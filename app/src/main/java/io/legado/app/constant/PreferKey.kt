@@ -59,6 +59,7 @@ object PreferKey {
     const val saveTabPosition = "saveTabPosition"
     const val fontFolder = "fontFolder"
     const val backupPath = "backupUri"
+    const val backupContent = "backupContent"
     const val restoreIgnore = "restoreIgnore"
     const val threadCount = "threadCount"
     const val webPort = "webPort"

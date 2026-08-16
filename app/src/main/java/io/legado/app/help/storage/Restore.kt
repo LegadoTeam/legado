@@ -163,8 +163,13 @@ object Restore {
                 AppLog.put("恢复高亮规则出错\n${it.localizedMessage}", it)
             }
         }
-        fileToListT<BookGroup>(path, "bookGroup.json")?.let {
-            appDb.bookGroupDao.insert(*it.toTypedArray())
+        fileToListT<BookGroup>(path, "bookGroup.json")?.let { groups ->
+            groups.forEach { group ->
+                group.cover = group.cover?.let { coverPath ->
+                    remapRestoredCoverPath(coverPath, backupRoot, appCtx.externalFiles)
+                }
+            }
+            appDb.bookGroupDao.insert(*groups.toTypedArray())
         }
         fileToListT<BookSource>(path, "bookSource.json")?.let {
             appDb.bookSourceDao.insert(*it.toTypedArray())
@@ -334,16 +339,21 @@ object Restore {
             hideNavigationBar = appCtx.getPrefBoolean(PreferKey.hideNavigationBar)
             autoReadSpeed = appCtx.getPrefInt(PreferKey.autoReadSpeed, 46)
         }
-        restoreBackupMediaDirectory(File(path), appCtx.externalFiles, "covers")
+        val coverRestoreResult =
+            restoreBackupMediaDirectory(File(path), appCtx.externalFiles, "covers")
             .onFailure {
                 AppLog.put("恢复封面图片出错\n${it.localizedMessage}", it)
             }
-        if (!BackupConfig.ignoreReadConfig) {
+        val backgroundRestoreResult = if (!BackupConfig.ignoreReadConfig) {
             restoreBackupMediaDirectory(File(path), appCtx.externalFiles, "bg")
                 .onFailure {
                     AppLog.put("恢复阅读背景图片出错\n${it.localizedMessage}", it)
                 }
+        } else {
+            null
         }
+        coverRestoreResult.getOrThrow()
+        backgroundRestoreResult?.getOrThrow()
         if (!restoredAutoTasks.isNullOrEmpty()) {
             appDb.autoTaskRuleDao.upsert(*restoredAutoTasks.toTypedArray())
         }

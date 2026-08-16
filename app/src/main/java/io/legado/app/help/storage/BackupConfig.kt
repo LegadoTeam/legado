@@ -25,6 +25,40 @@ object BackupConfig {
     private const val coverConfigKey = "coverConfig"
     private const val localBookKey = "localBook"
 
+    internal const val bookshelfContentKey = "backupBookshelf"
+    internal const val annotationContentKey = "backupAnnotations"
+    internal const val sourceContentKey = "backupSources"
+    internal const val ruleContentKey = "backupRules"
+    internal const val historyContentKey = "backupHistory"
+    internal const val settingContentKey = "backupSettings"
+    internal const val persistedCoverContentKey = "backupPersistedCovers"
+    internal const val otherCoverContentKey = "backupOtherCovers"
+    internal const val backgroundContentKey = "backupBackgrounds"
+
+    val contentKeys = arrayOf(
+        bookshelfContentKey,
+        annotationContentKey,
+        sourceContentKey,
+        ruleContentKey,
+        historyContentKey,
+        settingContentKey,
+        persistedCoverContentKey,
+        otherCoverContentKey,
+        backgroundContentKey,
+    )
+
+    val contentTitles = arrayOf(
+        appCtx.getString(R.string.backup_content_bookshelf),
+        appCtx.getString(R.string.backup_content_annotations),
+        appCtx.getString(R.string.backup_content_sources),
+        appCtx.getString(R.string.backup_content_rules),
+        appCtx.getString(R.string.backup_content_history),
+        appCtx.getString(R.string.backup_content_settings),
+        appCtx.getString(R.string.backup_content_persisted_covers),
+        appCtx.getString(R.string.backup_content_other_covers),
+        appCtx.getString(R.string.backup_content_backgrounds),
+    )
+
     //配置忽略key
     val ignoreKeys = arrayOf(
         readConfigKey,
@@ -141,6 +175,10 @@ object BackupConfig {
         get() = ignoreConfig[PreferKey.threadCount] == true
     val ignoreLocalBook: Boolean
         get() = ignoreConfig[localBookKey] == true
+
+    internal fun contentIsEnabled(key: String): Boolean {
+        return ignoreConfig[key] != true
+    }
 
     fun saveIgnoreConfig() {
         val json = GSON.toJson(ignoreConfig)

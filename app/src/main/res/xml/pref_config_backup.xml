@@ -84,6 +84,12 @@
             app:iconSpaceReserved="false" />
 
         <io.legado.app.lib.prefs.Preference
+            android:key="backupContent"
+            android:summary="@string/backup_content_summary"
+            android:title="@string/backup_content"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
             android:key="web_dav_backup"
             android:summary="@string/backup_summary"
             android:title="@string/backup"

@@ -915,6 +915,17 @@
     <string name="default_cover">Default cover</string>
     <string name="restore_ignore">Bypass list</string>
     <string name="restore_ignore_summary">Ignore some contents while restoring</string>
+    <string name="backup_content">Backup content</string>
+    <string name="backup_content_summary">Select the data and media included in local and WebDAV backups</string>
+    <string name="backup_content_bookshelf">Bookshelf and groups</string>
+    <string name="backup_content_annotations">Bookmarks and annotations</string>
+    <string name="backup_content_sources">Sources and subscriptions</string>
+    <string name="backup_content_rules">Rules and tools</string>
+    <string name="backup_content_history">Reading and search history</string>
+    <string name="backup_content_settings">Reading, theme and app settings</string>
+    <string name="backup_content_persisted_covers">Persisted book covers</string>
+    <string name="backup_content_other_covers">Other cover files</string>
+    <string name="backup_content_backgrounds">Reading backgrounds</string>
     <string name="read_config">Reading interface settings</string>
     <string name="confirm_read_config_import">Import reading layout?</string>
     <string name="read_config_import_success">Reading layout imported</string>

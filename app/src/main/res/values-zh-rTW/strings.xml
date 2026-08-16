@@ -797,6 +797,17 @@
     <string name="default_cover">預設封面</string>
     <string name="restore_ignore">復原忽略列表</string>
     <string name="restore_ignore_summary">復原時忽略一些內容不復原，方便不同手機配置不同</string>
+    <string name="backup_content">備份內容</string>
+    <string name="backup_content_summary">選擇本機與 WebDAV 備份中包含的資料和媒體</string>
+    <string name="backup_content_bookshelf">書架與分組</string>
+    <string name="backup_content_annotations">書籤與標註</string>
+    <string name="backup_content_sources">書源與訂閱</string>
+    <string name="backup_content_rules">規則與工具</string>
+    <string name="backup_content_history">閱讀記錄與搜尋歷史</string>
+    <string name="backup_content_settings">閱讀、主題與應用設定</string>
+    <string name="backup_content_persisted_covers">書籍固化封面</string>
+    <string name="backup_content_other_covers">其他封面檔案</string>
+    <string name="backup_content_backgrounds">閱讀背景</string>
     <string name="read_config">閱讀介面設定</string>
     <string name="group_name">分組名稱</string>
     <string name="note_content">備註內容</string>

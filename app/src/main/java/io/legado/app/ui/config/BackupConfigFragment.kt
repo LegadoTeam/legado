@@ -237,6 +237,7 @@ class BackupConfigFragment : PreferenceFragment(),
     override fun onPreferenceTreeClick(preference: Preference): Boolean {
         when (preference.key) {
             PreferKey.backupPath -> selectBackupPath.launch()
+            PreferKey.backupContent -> backupContent()
             PreferKey.restoreIgnore -> backupIgnore()
             "web_dav_backup" -> backup()
             "web_dav_restore" -> restore()
@@ -254,6 +255,20 @@ class BackupConfigFragment : PreferenceFragment(),
         alert(R.string.restore_ignore) {
             multiChoiceItems(BackupConfig.ignoreTitle, checkedItems) { _, which, isChecked ->
                 BackupConfig.ignoreConfig[BackupConfig.ignoreKeys[which]] = isChecked
+            }
+            onDismiss {
+                BackupConfig.saveIgnoreConfig()
+            }
+        }
+    }
+
+    private fun backupContent() {
+        val checkedItems = BooleanArray(BackupConfig.contentKeys.size) {
+            BackupConfig.contentIsEnabled(BackupConfig.contentKeys[it])
+        }
+        alert(R.string.backup_content) {
+            multiChoiceItems(BackupConfig.contentTitles, checkedItems) { _, which, isChecked ->
+                BackupConfig.ignoreConfig[BackupConfig.contentKeys[which]] = !isChecked
             }
             onDismiss {
                 BackupConfig.saveIgnoreConfig()
