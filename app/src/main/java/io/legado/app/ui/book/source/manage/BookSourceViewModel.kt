@@ -11,6 +11,7 @@ import io.legado.app.help.source.SourceHelp
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.cnCompare
+import io.legado.app.utils.mergeFilteredOrder
 import io.legado.app.utils.normalizeFileName
 import io.legado.app.utils.outputStream
 import io.legado.app.utils.renameGroupExact
@@ -60,10 +61,22 @@ class BookSourceViewModel(application: Application) : BaseViewModel(application)
         execute { appDb.bookSourceDao.update(*bookSource) }
     }
 
-    fun upOrder(items: List<BookSourcePart>) {
+    fun upOrder(items: List<BookSourcePart>, resetAll: Boolean, sortAscending: Boolean) {
         if (items.isEmpty()) return
         execute {
-            appDb.bookSourceDao.upOrder(items)
+            if (resetAll) {
+                appDb.runInTransaction {
+                    val orderedItems = if (sortAscending) items else items.asReversed()
+                    val reordered = mergeFilteredOrder(
+                        appDb.bookSourceDao.allPart,
+                        orderedItems,
+                    ) { it.bookSourceUrl }
+                    reordered.forEachIndexed { index, source -> source.customOrder = index }
+                    appDb.bookSourceDao.upOrder(reordered)
+                }
+            } else {
+                appDb.bookSourceDao.upOrder(items)
+            }
         }
     }
 

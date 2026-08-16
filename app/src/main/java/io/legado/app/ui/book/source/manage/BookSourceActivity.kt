@@ -112,8 +112,7 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
     private var groupMenu: SubMenu? = null
     override var sort = BookSourceSort.Default
         private set
-    override var sortAscending = true
-        private set
+    private var sortAscending = true
     private var snackBar: Snackbar? = null
     private var checkSourceUiSessionId: Long? = null
     private var groupSourcesByDomain = false
@@ -780,8 +779,8 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
         }
     }
 
-    override fun upOrder(items: List<BookSourcePart>) {
-        viewModel.upOrder(items)
+    override fun upOrder(items: List<BookSourcePart>, resetAll: Boolean) {
+        viewModel.upOrder(items, resetAll, sortAscending)
     }
 
     override fun enable(enable: Boolean, bookSource: BookSourcePart) {

@@ -335,14 +335,8 @@ class BookSourceAdapter(
             movedItems.forEach {
                 sortNumberSet.add(it.customOrder)
             }
-            if (movedItems.size > sortNumberSet.size) {
-                callBack.upOrder(getItems().mapIndexed { index, bookSourcePart ->
-                    bookSourcePart.customOrder = if (callBack.sortAscending) index else -index
-                    bookSourcePart
-                })
-            } else {
-                callBack.upOrder(movedItems.toList())
-            }
+            val resetAll = movedItems.size > sortNumberSet.size
+            callBack.upOrder(if (resetAll) getItems() else movedItems.toList(), resetAll)
             movedItems.clear()
         }
     }
@@ -376,14 +370,13 @@ class BookSourceAdapter(
 
     interface CallBack {
         val sort: BookSourceSort
-        val sortAscending: Boolean
         fun del(bookSource: BookSourcePart)
         fun edit(bookSource: BookSourcePart)
         fun toTop(bookSource: BookSourcePart)
         fun toBottom(bookSource: BookSourcePart)
         fun searchBook(bookSource: BookSourcePart)
         fun debug(bookSource: BookSourcePart)
-        fun upOrder(items: List<BookSourcePart>)
+        fun upOrder(items: List<BookSourcePart>, resetAll: Boolean)
         fun enable(enable: Boolean, bookSource: BookSourcePart)
         fun enableExplore(enable: Boolean, bookSource: BookSourcePart)
         fun upCountView()
