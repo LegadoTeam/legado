@@ -104,6 +104,7 @@ class BookInfoOpenResolverTest {
         assertTrue(initData.contains("BookInfoOpenResolver.resolve("))
         assertTrue(initData.contains("inBookshelf = opened.inBookshelf"))
         assertTrue(saveBook.contains("SearchBookShelfHelp.persistIncomingBook(book)"))
+        assertTrue(saveBook.contains("BookInfoShelfFlags.keepExistingNotShelf(book, byUrl)"))
         assertFalse(saveBook.contains("shouldSkipWeakInsert"))
         assertTrue(upBookIntent.contains("intent.getStringExtra(\"name\")"))
         assertTrue(upBookIntent.contains("appDb.bookDao.getBook(name, author)"))

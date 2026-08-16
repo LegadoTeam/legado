@@ -484,9 +484,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 book.durChapterIndex = byUrl.durChapterIndex
                 book.durChapterPos = byUrl.durChapterPos
                 book.durChapterTitle = byUrl.durChapterTitle
-                if (byUrl.isNotShelf) {
-                    book.addType(BookType.notShelf)
-                }
+                BookInfoShelfFlags.keepExistingNotShelf(book, byUrl)
                 if (preserveCustomCoverUrl) {
                     book.savePreservingCustomCoverUrl()
                 } else {
