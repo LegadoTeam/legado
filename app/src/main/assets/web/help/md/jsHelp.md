@@ -355,18 +355,18 @@ java.htmlFormat(str: String, redirectUrl: String): String
 >  所有对于文件的读写删操作都是相对路径,只能操作阅读缓存/android/data/{package}/cache/内的文件
 ```js
 //文件下载 url用于生成文件名，返回文件路径
-downloadFile(url: String): String
+java.downloadFile(url: String): String
 //文件解压,zipPath为压缩文件路径，返回解压路径
-unArchiveFile(zipPath: String): String
-unzipFile(zipPath: String): String
-unrarFile(zipPath: String): String
-un7zFile(zipPath: String): String
+java.unArchiveFile(zipPath: String): String
+java.unzipFile(zipPath: String): String
+java.unrarFile(zipPath: String): String
+java.un7zFile(zipPath: String): String
 //文件夹内所有文件读取
-getTxtInFolder(unzipPath: String): String
+java.getTxtInFolder(path: String): String
 //读取文本文件
-readTxtFile(path: String): String
+java.readTxtFile(path: String): String
 //删除文件
-deleteFile(path: String) 
+java.deleteFile(path: String): Boolean
 ```
 
 ### [js加解密类](https://github.com/LegadoTeam/legado/blob/master/app/src/main/java/io/legado/app/help/JsEncodeUtils.kt) 部分函数
