@@ -29,6 +29,9 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      - name: Prepare instrumentation build
+        run: sed -i 's/minSdk 23/minSdk 26/' app/build.gradle
+
       - name: Run migration tests
         uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
         with:
