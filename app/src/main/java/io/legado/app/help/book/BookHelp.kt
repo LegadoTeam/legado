@@ -649,10 +649,6 @@ object BookHelp {
             .trim { it <= ' ' }
     }
 
-    private val jaccardSimilarity by lazy {
-        JaccardSimilarity()
-    }
-
     /**
      * 根据目录名获取当前章节
      */
@@ -666,26 +662,18 @@ object BookHelp {
         if (oldDurChapterIndex <= 0) return 0
         if (newChapterList.isEmpty()) return oldDurChapterIndex
         val oldChapterNum = getChapterNum(oldDurChapterName)
-        val oldName = getPureChapterName(oldDurChapterName)
         val newChapterSize = newChapterList.size
         val durIndex =
             if (oldChapterListSize == 0) oldDurChapterIndex
             else (oldDurChapterIndex.toLong() * newChapterSize / oldChapterListSize).toInt()
         val min = max(0, min(oldDurChapterIndex, durIndex) - 10)
         val max = min(newChapterSize - 1, max(oldDurChapterIndex, durIndex) + 10)
-        var nameSim = 0.0
-        var newIndex = 0
-        if (oldName.isNotEmpty()) {
-            for (i in min..max) {
-                val newName = getPureChapterName(newChapterList[i].title)
-                val temp = jaccardSimilarity.apply(oldName, newName)
-                if (temp > nameSim) {
-                    nameSim = temp
-                    newIndex = i
-                }
-            }
-        }
-        if (nameSim > 0.96) return newIndex
+        findNearestChapterTitleIndex(
+            oldDurChapterName,
+            newChapterList,
+            min..max,
+            durIndex,
+        )?.let { return it }
         if (searchAllChapterNumbers && oldChapterNum > 0) {
             findNearestChapterNumberIndex(
                 newChapterList.map { getChapterNum(it.title) },
@@ -794,6 +782,35 @@ private fun getPureChapterName(chapterName: String?): String {
         .replace(regexB, "")
         .replace(regexC, "")
         .replace(regexOther, "")
+}
+
+private val jaccardSimilarity by lazy {
+    JaccardSimilarity()
+}
+
+internal fun findNearestChapterTitleIndex(
+    oldChapterName: String?,
+    newChapterList: List<BookChapter>,
+    range: IntRange,
+    expectedIndex: Int,
+): Int? {
+    val oldName = getPureChapterName(oldChapterName)
+    if (oldName.isEmpty()) return null
+    var bestSimilarity = 0.0
+    var bestIndex = 0
+    for (i in range) {
+        val similarity = jaccardSimilarity.apply(
+            oldName,
+            getPureChapterName(newChapterList[i].title),
+        )
+        if (similarity > bestSimilarity ||
+            similarity == bestSimilarity && abs(i - expectedIndex) < abs(bestIndex - expectedIndex)
+        ) {
+            bestSimilarity = similarity
+            bestIndex = i
+        }
+    }
+    return bestIndex.takeIf { bestSimilarity > 0.96 }
 }
 
 internal fun findNearestChapterNumberIndex(

@@ -1,5 +1,6 @@
 package io.legado.app.help.book
 
+import io.legado.app.data.entities.BookChapter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -8,6 +9,28 @@ import org.junit.Test
 import java.io.File
 
 class BookHelpChapterIndexContractTest {
+
+    @Test
+    fun `equal normalized titles keep the nearest reading position`() {
+        val suffixes = listOf("（一）", "（二）", "（三）", "（四）", "（五）", "（六）", "（七）")
+        val chapters = MutableList(45) { index ->
+            BookChapter(index = index, title = "第${index + 1}章 其他$index")
+        }.apply {
+            suffixes.forEachIndexed { offset, suffix ->
+                val index = offset + 1
+                this[index] = BookChapter(index = index, title = "第${index + 1}章 凶鹿$suffix")
+            }
+        }
+
+        assertEquals(
+            3,
+            findNearestChapterTitleIndex("第4章 凶鹿（三）", chapters, chapters.indices, 3),
+        )
+        assertEquals(
+            7,
+            findNearestChapterTitleIndex("第8章 凶鹿（七）", chapters, chapters.indices, 7),
+        )
+    }
 
     @Test
     fun `chapter ratio maps old progress into the new list`() {
@@ -44,10 +67,11 @@ class BookHelpChapterIndexContractTest {
             .replace("\r\n", "\n")
 
         assertTrue(dialogSource.contains("searchAllChapterNumbers = true"))
-        assertTrue(
-            bookHelpSource.indexOf("if (nameSim > 0.96) return newIndex") <
-                    bookHelpSource.indexOf("if (searchAllChapterNumbers && oldChapterNum > 0)")
-        )
+        val titleLookup = bookHelpSource.indexOf("findNearestChapterTitleIndex(")
+        val chapterNumberLookup =
+            bookHelpSource.indexOf("if (searchAllChapterNumbers && oldChapterNum > 0)")
+        assertTrue(titleLookup >= 0)
+        assertTrue(titleLookup < chapterNumberLookup)
         assertEquals(
             174,
             findNearestChapterNumberIndex(chapterNumbers(144 to 114, 174 to 144), 144, 144)
