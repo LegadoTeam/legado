@@ -5,16 +5,21 @@ import io.legado.app.data.entities.SearchBook
 /**
  * Per-search raw hits. Replaces a shared mutable ArrayList so cancel/restart
  * cannot mix generations or throw ConcurrentModificationException.
+ *
+ * Same-generation publishes carry the hits [revision] from append. A slower
+ * rebuild from an older revision cannot overwrite a newer display.
  */
 internal class SearchHitAccumulator {
     private val lock = Any()
     private var generation = 0L
+    private var hitsRevision = 0L
     private var hits: List<SearchBook> = emptyList()
     private var display: List<SearchBook> = emptyList()
 
     fun begin(generation: Long) {
         synchronized(lock) {
             this.generation = generation
+            hitsRevision = 0L
             hits = emptyList()
             display = emptyList()
         }
@@ -33,7 +38,7 @@ internal class SearchHitAccumulator {
     private fun appendLocked(generation: Long, items: List<SearchBook>): SearchHitAppend? {
         if (generation == 0L || generation != this.generation) return null
         if (items.isEmpty()) {
-            return SearchHitAppend(hits, changed = false)
+            return SearchHitAppend(hits, changed = false, revision = hitsRevision)
         }
         val seen = HashSet<String>(hits.size + items.size)
         hits.forEach { seen.add(it.primaryStr()) }
@@ -44,10 +49,11 @@ internal class SearchHitAccumulator {
             }
         }
         if (added.isEmpty()) {
-            return SearchHitAppend(hits, changed = false)
+            return SearchHitAppend(hits, changed = false, revision = hitsRevision)
         }
         hits = hits + added
-        return SearchHitAppend(hits, changed = true)
+        hitsRevision += 1
+        return SearchHitAppend(hits, changed = true, revision = hitsRevision)
     }
 
     fun snapshot(generation: Long): List<SearchBook>? {
@@ -58,12 +64,17 @@ internal class SearchHitAccumulator {
     }
 
     /**
-     * Atomically accept [books] as the visible list for [generation].
-     * Returns the submitted list, or null if this search is no longer current.
+     * Atomically accept [books] as the visible list for [generation] when
+     * [revision] still matches the current hits revision.
      */
-    fun publish(generation: Long, books: List<SearchBook>): List<SearchBook>? {
+    fun publish(
+        generation: Long,
+        revision: Long,
+        books: List<SearchBook>,
+    ): List<SearchBook>? {
         synchronized(lock) {
             if (generation == 0L || generation != this.generation) return null
+            if (revision != hitsRevision) return null
             display = books
             return display
         }
@@ -80,6 +91,7 @@ internal class SearchHitAccumulator {
 internal data class SearchHitAppend(
     val hits: List<SearchBook>,
     val changed: Boolean,
+    val revision: Long = 0L,
 )
 
 /** Drop a search callback whose id is no longer the UI's current search. */

@@ -8,8 +8,8 @@ import io.legado.app.data.entities.SearchBook
 /**
  * Search/explore bulk add. Does not delete or rewrite official bookshelf rows.
  * A new empty/佚名 hit is skipped when that title already has exactly one
- * visible web real author. Badge is for the displayed row only (URL / this
- * book's exact name-author), not trimmed or weak-author identity.
+ * visible web real author. Badge keys are URL and exact name-author; bare
+ * title is added only when the shelf row itself has a weak author.
  */
 object SearchBookShelfHelp {
 
@@ -46,7 +46,11 @@ object SearchBookShelfHelp {
             if (book.isNotShelf) continue
             keys.add(book.bookUrl)
             keys.add("${book.name}-${book.author}")
-            keys.add(book.name)
+            // Bare title only for weak authors. Real-author rows must not make
+            // empty-author search hits look already-on-shelf.
+            if (BookAuthorIdentity.isWeakAuthor(book.author)) {
+                keys.add(book.name)
+            }
         }
         return keys
     }

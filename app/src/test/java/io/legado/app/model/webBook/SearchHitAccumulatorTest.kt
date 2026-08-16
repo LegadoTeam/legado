@@ -37,7 +37,7 @@ class SearchHitAccumulatorTest {
         assertNull(acc.snapshot(9L))
         assertNull(acc.published(9L))
         assertNull(acc.append(9L, listOf(hit("after-reset"))))
-        assertNull(acc.publish(9L, listOf(hit("stale-display"))))
+        assertNull(acc.publish(9L, 1L, listOf(hit("stale-display"))))
     }
 
     @Test
@@ -90,7 +90,7 @@ class SearchHitAccumulatorTest {
         assertFalse(src.contains("rawSearchHits"))
         assertFalse(src.contains("appendAndPublish"))
         assertTrue(src.contains("rawHits.append("))
-        assertTrue(src.contains("rawHits.publish("))
+        assertTrue(src.contains("rawHits.publish(searchId, appended.revision, display)"))
         assertTrue(src.contains("SearchBookMerge.rebuildFromRawHits"))
         assertFalse(src.contains("searchBooks ="))
         assertTrue(src.contains("SearchResultGate.accept(searchId, mSearchId)"))
@@ -107,10 +107,12 @@ class SearchHitAccumulatorTest {
         }
         val acc = SearchHitAccumulator()
         acc.begin(1L)
-        val old = acc.publish(1L, listOf(hit("old")))!!
+        val oldAppend = acc.append(1L, listOf(hit("old")))!!
+        val old = acc.publish(1L, oldAppend.revision, oldAppend.hits)!!
         acc.begin(2L)
         currentId = 2L
-        val new = acc.publish(2L, listOf(hit("new")))!!
+        val newAppend = acc.append(2L, listOf(hit("new")))!!
+        val new = acc.publish(2L, newAppend.revision, newAppend.hits)!!
         onSuccess(1L, old)
         onSuccess(2L, new)
         assertEquals(listOf(listOf("new")), posted)
@@ -123,10 +125,12 @@ class SearchHitAccumulatorTest {
     fun stalePublishDoesNotReplaceNewerDisplay() {
         val acc = SearchHitAccumulator()
         acc.begin(1L)
-        acc.publish(1L, listOf(hit("old")))
+        val oldAppend = acc.append(1L, listOf(hit("old")))!!
+        acc.publish(1L, oldAppend.revision, oldAppend.hits)
         acc.begin(2L)
-        acc.publish(2L, listOf(hit("new")))
-        assertNull(acc.publish(1L, listOf(hit("stale"))))
+        val newAppend = acc.append(2L, listOf(hit("new")))!!
+        acc.publish(2L, newAppend.revision, newAppend.hits)
+        assertNull(acc.publish(1L, oldAppend.revision, listOf(hit("stale"))))
         assertEquals(listOf("new"), acc.published(2L)!!.map { it.bookUrl })
         assertNull(acc.published(1L))
     }
@@ -135,13 +139,14 @@ class SearchHitAccumulatorTest {
     fun concurrentStalePublishDoesNotReplaceNewDisplay() {
         val acc = SearchHitAccumulator()
         acc.begin(1L)
+        val oldAppend = acc.append(1L, listOf(hit("old")))!!
         val errors = Collections.synchronizedList(mutableListOf<Throwable>())
         val start = CyclicBarrier(2)
         val done = CountDownLatch(2)
         Thread {
             try {
                 start.await(5, TimeUnit.SECONDS)
-                acc.publish(1L, listOf(hit("old")))
+                acc.publish(1L, oldAppend.revision, listOf(hit("old")))
             } catch (t: Throwable) {
                 errors.add(t)
             } finally {
@@ -152,7 +157,8 @@ class SearchHitAccumulatorTest {
             try {
                 start.await(5, TimeUnit.SECONDS)
                 acc.begin(2L)
-                acc.publish(2L, listOf(hit("new")))
+                val newAppend = acc.append(2L, listOf(hit("new")))!!
+                acc.publish(2L, newAppend.revision, newAppend.hits)
             } catch (t: Throwable) {
                 errors.add(t)
             } finally {
@@ -166,18 +172,39 @@ class SearchHitAccumulatorTest {
     }
 
     @Test
-    fun appendThenPublishRebuildsDisplayOutsideTheAppendLock() {
+    fun sameGenerationOlderRevisionCannotOverwriteNewerDisplay() {
         val acc = SearchHitAccumulator()
         acc.begin(1L)
-        val first = acc.append(1L, listOf(hit("A")))
-        assertTrue(first!!.changed)
-        assertEquals(listOf("A"), acc.publish(1L, first.hits)!!.map { it.bookUrl })
-        val dup = acc.append(1L, listOf(hit("A")))
-        assertFalse(dup!!.changed)
-        val extra = acc.append(1L, listOf(hit("B")))
-        assertTrue(extra!!.changed)
-        assertEquals(listOf("B"), acc.publish(1L, extra.hits.filter { it.bookUrl == "B" })!!.map { it.bookUrl })
-        assertEquals(listOf("B"), acc.published(1L)!!.map { it.bookUrl })
+        val first = acc.append(1L, listOf(hit("A")))!!
+        assertTrue(first.changed)
+        val second = acc.append(1L, listOf(hit("B")))!!
+        assertTrue(second.changed)
+        assertEquals(listOf("A", "B"), second.hits.map { it.bookUrl })
+        assertEquals(
+            listOf("A", "B"),
+            acc.publish(1L, second.revision, second.hits)!!.map { it.bookUrl },
+        )
+        assertNull(acc.publish(1L, first.revision, first.hits))
+        assertEquals(listOf("A", "B"), acc.published(1L)!!.map { it.bookUrl })
+    }
+
+    @Test
+    fun appendThenPublishUsesMatchingRevision() {
+        val acc = SearchHitAccumulator()
+        acc.begin(1L)
+        val first = acc.append(1L, listOf(hit("A")))!!
+        assertTrue(first.changed)
+        assertEquals(listOf("A"), acc.publish(1L, first.revision, first.hits)!!.map { it.bookUrl })
+        val dup = acc.append(1L, listOf(hit("A")))!!
+        assertFalse(dup.changed)
+        assertEquals(first.revision, dup.revision)
+        val extra = acc.append(1L, listOf(hit("B")))!!
+        assertTrue(extra.changed)
+        assertEquals(
+            listOf("A", "B"),
+            acc.publish(1L, extra.revision, extra.hits)!!.map { it.bookUrl },
+        )
+        assertEquals(listOf("A", "B"), acc.published(1L)!!.map { it.bookUrl })
     }
 
     @Test

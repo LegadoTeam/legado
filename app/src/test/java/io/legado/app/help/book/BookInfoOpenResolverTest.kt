@@ -105,6 +105,7 @@ class BookInfoOpenResolverTest {
         assertTrue(initData.contains("inBookshelf = opened.inBookshelf"))
         assertTrue(saveBook.contains("SearchBookShelfHelp.persistIncomingBook(book)"))
         assertTrue(saveBook.contains("BookInfoShelfFlags.keepExistingNotShelf(book, byUrl)"))
+        assertTrue(saveBook.contains("refreshShelfFlags(book)"))
         assertFalse(saveBook.contains("shouldSkipWeakInsert"))
         assertTrue(upBookIntent.contains("intent.getStringExtra(\"name\")"))
         assertTrue(upBookIntent.contains("appDb.bookDao.getBook(name, author)"))
@@ -126,6 +127,8 @@ class BookInfoOpenResolverTest {
         assertTrue(activity.contains("putExtra(\"inBookshelf\", viewModel.inBookshelf)"))
         assertTrue(info.contains("deleteNotShelfByUrl"))
         assertFalse(info.contains("canDeleteTempBookUrl"))
+        val changeTo = info.substringAfter("fun changeTo(").substringBefore("fun topBook(")
+        assertTrue(changeTo.contains("refreshShelfFlags(book)"))
         val dao = read("src/main/java/io/legado/app/data/dao/BookDao.kt")
         assertTrue(
             dao.contains(

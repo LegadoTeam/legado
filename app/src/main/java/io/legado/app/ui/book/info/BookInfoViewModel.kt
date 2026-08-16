@@ -451,6 +451,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             }
             bookData.postValue(book)
             chapterListData.postValue(toc)
+            refreshShelfFlags(book)
         }.onSuccess {
             onSuccess()
         }.onFinally {
@@ -504,6 +505,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     return@execute false
                 }
             }
+            refreshShelfFlags(book)
             if (ReadBook.book?.bookUrl == book.bookUrl) {
                 ReadBook.book = book
             } else if (AudioPlay.book?.bookUrl == book.bookUrl) {

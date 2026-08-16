@@ -599,6 +599,12 @@ class SearchBookShelfHelpTest {
                 keys,
             )
         )
+        assertFalse(
+            SearchBookShelfHelp.isInShelfBadgeIndex(
+                searchBook("empty", "高考后", ""),
+                keys,
+            )
+        )
         assertTrue(
             SearchBookShelfHelp.isInShelfBadgeIndex(
                 searchBook("other2", "高考后", "七月观天"),
@@ -618,9 +624,56 @@ class SearchBookShelfHelpTest {
                 keys,
             )
         )
+        assertFalse(
+            SearchBookShelfHelp.isInShelfBadgeIndex(
+                searchBook("empty", "同名书", ""),
+                keys,
+            )
+        )
         assertTrue(
             SearchBookShelfHelp.isInShelfBadgeIndex(
                 searchBook("a2", "同名书", "作者甲"),
+                keys,
+            )
+        )
+    }
+
+    @Test
+    fun localRealDoesNotBadgeEmptyAuthorWebHit() {
+        val local = Book(
+            bookUrl = "local://x",
+            name = "T",
+            author = "作者甲",
+            type = BookType.local or BookType.text,
+        )
+        val keys = SearchBookShelfHelp.shelfBadgeKeys(listOf(local))
+        assertFalse(
+            SearchBookShelfHelp.isInShelfBadgeIndex(
+                searchBook("W", "T", ""),
+                keys,
+            )
+        )
+        assertFalse(
+            SearchBookShelfHelp.isInShelfBadgeIndex(
+                searchBook("W2", "T", "佚名"),
+                keys,
+            )
+        )
+    }
+
+    @Test
+    fun weakShelfAuthorStillBadgesEmptyAuthorByBareName() {
+        val weak = Book(bookUrl = "w", name = "T", author = "佚名")
+        val keys = SearchBookShelfHelp.shelfBadgeKeys(listOf(weak))
+        assertTrue(
+            SearchBookShelfHelp.isInShelfBadgeIndex(
+                searchBook("other", "T", ""),
+                keys,
+            )
+        )
+        assertTrue(
+            SearchBookShelfHelp.isInShelfBadgeIndex(
+                searchBook("w2", "T", "佚名"),
                 keys,
             )
         )
