@@ -7,6 +7,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.data.AppDatabase
 import io.legado.app.data.DatabaseMigrations
+import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.HighlightRule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -349,6 +350,84 @@ class MigrationTest {
                 }
                 close()
             }
+    }
+
+    @Test
+    fun bookCoverUpdatesRejectStaleStateAndSupportBothRestoreLevels() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val dao = database.bookDao
+            val book = Book(
+                bookUrl = "https://books.example/book",
+                origin = "https://sources.example/a",
+                name = "book",
+                author = "author",
+                coverUrl = "https://images.example/source.jpg",
+                customCoverUrl = "https://images.example/custom.jpg",
+                persistedCoverUrl = "/covers/old.cover",
+            )
+            dao.insert(book)
+
+            assertEquals(
+                1,
+                dao.updatePersistedCoverUrlIfUnchanged(
+                    book.bookUrl,
+                    book.origin,
+                    book.coverUrl,
+                    book.customCoverUrl,
+                    book.persistedCoverUrl,
+                    "/covers/new.cover",
+                )
+            )
+            assertEquals("/covers/new.cover", dao.getBook(book.bookUrl)?.persistedCoverUrl)
+
+            val current = book.copy(persistedCoverUrl = "/covers/new.cover")
+            listOf(
+                current.copy(origin = "https://sources.example/stale"),
+                current.copy(coverUrl = "https://images.example/stale-source.jpg"),
+                current.copy(customCoverUrl = "https://images.example/stale-custom.jpg"),
+                current.copy(persistedCoverUrl = "/covers/stale.cover"),
+            ).forEach { stale ->
+                assertEquals(
+                    0,
+                    dao.updatePersistedCoverUrlIfUnchanged(
+                        stale.bookUrl,
+                        stale.origin,
+                        stale.coverUrl,
+                        stale.customCoverUrl,
+                        stale.persistedCoverUrl,
+                        "/covers/rejected.cover",
+                    )
+                )
+            }
+            assertEquals("/covers/new.cover", dao.getBook(book.bookUrl)?.persistedCoverUrl)
+
+            assertEquals(
+                1,
+                dao.clearPersistedCoverUrlIfUnchanged(book.bookUrl, "/covers/new.cover")
+            )
+            assertEquals(
+                0,
+                dao.clearCoverOverridesIfUnchanged(
+                    book.bookUrl,
+                    book.customCoverUrl,
+                    "/covers/new.cover",
+                )
+            )
+            assertEquals(
+                1,
+                dao.clearCoverOverridesIfUnchanged(book.bookUrl, book.customCoverUrl, null)
+            )
+            dao.getBook(book.bookUrl)?.let { restored ->
+                assertEquals(null, restored.customCoverUrl)
+                assertEquals(null, restored.persistedCoverUrl)
+            }
+        } finally {
+            database.close()
+        }
     }
 
     @Test
