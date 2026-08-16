@@ -37,6 +37,10 @@ import splitties.init.appCtx
 import androidx.core.net.toUri
 
 internal object ReviewColumnGeometry {
+    fun centeredTop(containerHeight: Float, contentHeight: Float): Float {
+        return (containerHeight - contentHeight) / 2f
+    }
+
     fun trailingInset(width: Float, trailingPadding: Float, edgeInset: Float): Float {
         return (width + edgeInset - trailingPadding).coerceAtLeast(0f)
     }

@@ -9,6 +9,7 @@ import io.legado.app.ui.book.read.page.ContentTextView
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.book.read.page.entities.TextLine.Companion.emptyTextLine
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
+import io.legado.app.ui.book.read.page.provider.ReviewColumnGeometry
 import kotlin.math.roundToInt
 
 /**
@@ -50,7 +51,12 @@ data class ReviewColumn(
             configuredHeight
         }
         if (height > 0f) {
-            drawToCanvas(canvas, textLine.lineBase - textLine.lineTop, height)
+            drawToCanvas(
+                canvas,
+                textLine.lineBase - textLine.lineTop,
+                height,
+                containerHeight = if (textLine.isImage) null else textLine.height,
+            )
         }
     }
 
@@ -60,7 +66,12 @@ data class ReviewColumn(
     val path by lazy { Path() }
     private val iconRect by lazy { RectF() }
 
-    fun drawToCanvas(canvas: Canvas, baseLine: Float, height: Float) {
+    fun drawToCanvas(
+        canvas: Canvas,
+        baseLine: Float,
+        height: Float,
+        containerHeight: Float? = null,
+    ) {
         if (count == 0) return
         val iconHeight = height * 0.9f
         ChapterProvider.getReviewIconBitmap(
@@ -69,7 +80,9 @@ data class ReviewColumn(
             iconHeight.roundToInt().coerceAtLeast(1),
         )?.let { bitmap ->
             val drawHeight = minOf(iconHeight, (end - start) * bitmap.height / bitmap.width)
-            val iconTop = baseLine - drawHeight
+            val iconTop = containerHeight?.let {
+                ReviewColumnGeometry.centeredTop(it, drawHeight)
+            } ?: baseLine - drawHeight
             iconRect.set(start, iconTop, end, iconTop + drawHeight)
             canvas.drawBitmap(bitmap, null, iconRect, null)
             return

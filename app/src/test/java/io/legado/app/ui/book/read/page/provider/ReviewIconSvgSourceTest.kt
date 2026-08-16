@@ -53,7 +53,13 @@ class ReviewIconSvgSourceTest {
         assertTrue(column.contains("ChapterProvider.getReviewIconBitmap("))
         assertTrue(column.contains("canvas.drawBitmap(bitmap, null, iconRect, null)"))
         assertTrue(column.contains("val drawHeight = minOf(iconHeight"))
-        assertTrue(column.contains("val iconTop = baseLine - drawHeight"))
+        assertTrue(column.contains("ReviewColumnGeometry.centeredTop(it, drawHeight)"))
+        assertTrue(column.contains("?: baseLine - drawHeight"))
+        assertTrue(
+            column.contains(
+                "containerHeight = if (textLine.isImage) null else textLine.height"
+            )
+        )
         assertTrue(
             column.contains(
                 "minOf(ChapterProvider.getReviewHeight(false), textLine.height) * 0.9f"
@@ -72,6 +78,7 @@ class ReviewIconSvgSourceTest {
         assertTrue(column.contains("takeUnless { textLine.isImage }"))
         assertTrue(column.contains("ChapterProvider.getReviewWidth(textLine.isTitle)"))
         assertTrue(column.contains("it.drawToCanvas("))
+        assertTrue(column.contains("containerHeight = textLine.height"))
         assertTrue(column.contains("ImageProvider.getImage("))
     }
 

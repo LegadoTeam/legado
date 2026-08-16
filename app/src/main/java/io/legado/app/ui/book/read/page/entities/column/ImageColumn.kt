@@ -47,6 +47,7 @@ data class ImageColumn(
                 canvas,
                 textLine.lineBase - textLine.lineTop,
                 height * scale,
+                containerHeight = textLine.height,
             )
             return
         }
