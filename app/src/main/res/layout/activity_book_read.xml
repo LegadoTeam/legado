@@ -18,7 +18,7 @@
         android:alpha="0.88"
         android:contentDescription="@string/bookmark"
         android:padding="4dp"
-        android:src="@drawable/ic_bookmark"
+        android:src="@drawable/ic_bookmark_filled"
         android:visibility="gone" />
 
     <View

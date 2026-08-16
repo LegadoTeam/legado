@@ -15,6 +15,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
+import android.widget.FrameLayout
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -2545,6 +2546,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         bookmarkJob = null
         bookmarkBookKey = null
         bookmarks = emptyList()
+        binding.readView.curPage.showBookmarkIndicator(false)
         binding.bookmarkIndicator.isGone = true
     }
 
@@ -2553,11 +2555,18 @@ class ReadBookActivity : BaseReadBookActivity(),
         val hasBookmark = page.lines.isNotEmpty() && bookmarks.any {
             it.chapterIndex == page.chapterIndex && page.containPos(it.chapterPos)
         }
-        binding.bookmarkIndicator.isVisible = AppConfig.pullToToggleBookmark &&
+        val showIndicator = AppConfig.pullToToggleBookmark &&
                 !binding.readView.isScroll && hasBookmark
+        val shownInHeader = binding.readView.curPage.showBookmarkIndicator(showIndicator)
+        binding.bookmarkIndicator.isVisible = showIndicator && !shownInHeader
         if (binding.bookmarkIndicator.isVisible) {
             binding.bookmarkIndicator.post {
                 if (binding.bookmarkIndicator.isVisible) {
+                    binding.bookmarkIndicator.layoutParams =
+                        (binding.bookmarkIndicator.layoutParams as FrameLayout.LayoutParams).apply {
+                            marginEnd = 12.dpToPx() +
+                                    binding.readView.curPage.displayCutoutPaddingEnd
+                        }
                     binding.bookmarkIndicator.translationY =
                         (binding.readView.curPage.headerHeight + 8.dpToPx()).toFloat()
                 }
@@ -2665,7 +2674,10 @@ class ReadBookActivity : BaseReadBookActivity(),
                 when (value) {
                     0 -> upSystemUiVisibility()
                     1 -> readView.upBg()
-                    2 -> readView.upStyle()
+                    2 -> {
+                        readView.upStyle()
+                        upBookmarkIndicator()
+                    }
                     3 -> readView.upBgAlpha()
                     4 -> readView.upPageSlopSquare()
                     5 -> if (isInitFinish) {

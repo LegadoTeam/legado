@@ -20,6 +20,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ReadTipConfig
 import io.legado.app.help.config.ReaderInfoValues
+import io.legado.app.lib.theme.accentColor
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.ReadBookActivity
 import io.legado.app.ui.book.read.page.entities.TextLine
@@ -48,6 +49,12 @@ class PageView(context: Context) : FrameLayout(context) {
     private var readerInfoValues = ReaderInfoValues(battery = 100)
     private var readerInfoViews = emptyArray<ReaderInfoView>()
     private var isMainView = false
+    private var bookmarkIndicatorVisible = false
+    private val bookmarkDrawable by lazy {
+        requireNotNull(ContextCompat.getDrawable(context, R.drawable.ic_bookmark_filled))
+            .mutate()
+            .apply { setTint(context.accentColor) }
+    }
     var isScroll = false
 
     val headerHeight: Int
@@ -60,6 +67,8 @@ class PageView(context: Context) : FrameLayout(context) {
         get() {
             return binding.vwRoot.paddingStart
         }
+    val displayCutoutPaddingEnd: Int
+        get() = binding.vwRoot.paddingEnd
 
     init {
         if (!isInEditMode) {
@@ -147,6 +156,9 @@ class PageView(context: Context) : FrameLayout(context) {
                     insets.right,
                     insets.bottom
                 )
+                if (isMainView) {
+                    readBookActivity?.upBookmarkIndicator()
+                }
                 windowInsets
             }
         } else {
@@ -209,6 +221,19 @@ class PageView(context: Context) : FrameLayout(context) {
         readerInfoViews.forEach { readerInfoView ->
             val view = readerInfoView.view
             val template = readerInfoView.template
+            if (view === binding.tvHeaderRight) {
+                if (bookmarkIndicatorVisible) {
+                    val size = view.lineHeight
+                    bookmarkDrawable.setBounds(0, 0, size, size)
+                    view.setCompoundDrawablesRelative(null, null, bookmarkDrawable, null)
+                    view.setTextIfNotEqual("")
+                    view.contentDescription = context.getString(R.string.bookmark)
+                    view.isGone = false
+                    return@forEach
+                }
+                view.setCompoundDrawablesRelative(null, null, null, null)
+                view.contentDescription = null
+            }
             if (view === binding.tvFooterLeft) {
                 view.isInvisible = template.isEmpty()
             } else {
@@ -220,6 +245,14 @@ class PageView(context: Context) : FrameLayout(context) {
                 )
             }
         }
+    }
+
+    fun showBookmarkIndicator(show: Boolean): Boolean {
+        if (bookmarkIndicatorVisible != show) {
+            bookmarkIndicatorVisible = show
+            renderReaderInfo()
+        }
+        return show && !binding.llHeader.isGone
     }
 
     private data class ReaderInfoView(
