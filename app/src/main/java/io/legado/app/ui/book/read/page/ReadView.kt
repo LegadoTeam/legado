@@ -10,6 +10,8 @@ import android.view.MotionEvent
 import android.view.ViewConfiguration
 import android.view.WindowInsets
 import android.widget.FrameLayout
+import android.widget.Magnifier
+import androidx.annotation.RequiresApi
 import io.legado.app.R
 import io.legado.app.constant.PageAnim
 import io.legado.app.data.entities.BookProgress
@@ -114,6 +116,8 @@ class ReadView(context: Context, attrs: AttributeSet) :
     var isTextSelected = false
     private var pressOnTextSelected = false
     private val initialTextPos = TextPos(0, 0, 0)
+    private var textMagnifier: SelectionMagnifierApi28? = null
+    private val locationOnScreen = IntArray(2)
 
     private val slopSquare by lazy { ViewConfiguration.get(context).scaledTouchSlop }
     private val pullBookmarkDistance by lazy { slopSquare * 6 }
@@ -217,6 +221,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
         }
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
+                dismissTextMagnifier()
                 callBack.screenOffTimerStart()
                 if (isTextSelected) {
                     curPage.cancelSelect()
@@ -274,6 +279,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
                     removeCallbacks(longPressRunnable)
                     if (isTextSelected) {
                         selectText(event.x, event.y)
+                        showTextMagnifier(event.x, event.y)
                     } else {
                         pageDelegate?.onTouch(event)
                     }
@@ -281,6 +287,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
             }
 
             MotionEvent.ACTION_UP -> {
+                dismissTextMagnifier()
                 callBack.screenOffTimerStart()
                 removeCallbacks(longPressRunnable)
                 if (!pressDown) return true
@@ -317,6 +324,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
             }
 
             MotionEvent.ACTION_CANCEL -> {
+                dismissTextMagnifier()
                 removeCallbacks(longPressRunnable)
                 if (!pressDown) return true
                 pressDown = false
@@ -346,6 +354,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
     }
 
     fun cancelSelect(clearSearchResult: Boolean = false) {
+        dismissTextMagnifier()
         if (isTextSelected) {
             curPage.cancelSelect(clearSearchResult)
             isTextSelected = false
@@ -570,13 +579,56 @@ class ReadView(context: Context, attrs: AttributeSet) :
         }
     }
 
+    private fun showTextMagnifier(x: Float, y: Float) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
+        val magnifier = textMagnifier
+            ?: SelectionMagnifierApi28(this).also { textMagnifier = it }
+        magnifier.show(x, y)
+    }
+
+    private fun selectMoveAtRaw(x: Float, y: Float, moveStart: Boolean) {
+        getLocationOnScreen(locationOnScreen)
+        val localX = x - locationOnScreen[0]
+        val localY = y - locationOnScreen[1]
+        if (moveStart) {
+            curPage.selectStartMove(localX, localY)
+        } else {
+            curPage.selectEndMove(localX, localY)
+        }
+        showTextMagnifier(localX, localY)
+    }
+
+    fun selectStartMoveAtRaw(x: Float, y: Float) {
+        selectMoveAtRaw(x, y, true)
+    }
+
+    fun selectEndMoveAtRaw(x: Float, y: Float) {
+        selectMoveAtRaw(x, y, false)
+    }
+
+    fun dismissTextMagnifier() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            textMagnifier?.dismiss()
+        }
+    }
+
     /**
      * 销毁事件
      */
     fun onDestroy() {
+        dismissTextMagnifier()
         pageDelegate?.onDestroy()
         curPage.cancelSelect()
         invalidateTextPage()
+    }
+
+    @RequiresApi(Build.VERSION_CODES.P)
+    private class SelectionMagnifierApi28(view: ReadView) {
+        private val magnifier = Magnifier(view)
+
+        fun show(x: Float, y: Float) = magnifier.show(x, y)
+
+        fun dismiss() = magnifier.dismiss()
     }
 
     /**

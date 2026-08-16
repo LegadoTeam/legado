@@ -123,6 +123,57 @@ class PullBookmarkGestureTest {
         assertTrue(selection.contains("resetPullBookmarkGesture()"))
     }
 
+    @Test
+    fun `text selection magnifier follows drags and always dismisses`() {
+        val readView = source("app/src/main/java/io/legado/app/ui/book/read/page/ReadView.kt")
+        val magnifier = readView.substringAfter("fun showTextMagnifier(x: Float, y: Float)")
+            .substringBefore("private fun selectMoveAtRaw")
+        assertTrue(magnifier.contains("Build.VERSION.SDK_INT < Build.VERSION_CODES.P"))
+        assertTrue(magnifier.contains("SelectionMagnifierApi28(this)"))
+        assertTrue(readView.contains("@RequiresApi(Build.VERSION_CODES.P)\n" +
+                "    private class SelectionMagnifierApi28"))
+
+        val handleMove = readView.substringAfter("private fun selectMoveAtRaw")
+            .substringBefore("fun selectStartMoveAtRaw")
+        assertTrue(handleMove.contains("val localX = x - locationOnScreen[0]"))
+        assertTrue(handleMove.contains("val localY = y - locationOnScreen[1]"))
+        assertTrue(handleMove.contains("curPage.selectStartMove(localX, localY)"))
+        assertTrue(handleMove.contains("curPage.selectEndMove(localX, localY)"))
+        assertTrue(handleMove.contains("showTextMagnifier(localX, localY)"))
+        val dismiss = readView.substringAfter("fun dismissTextMagnifier()")
+            .substringBefore("fun onDestroy()")
+        assertTrue(dismiss.contains("Build.VERSION.SDK_INT >= Build.VERSION_CODES.P"))
+
+        val touch = readView.substringAfter("override fun onTouchEvent")
+            .substringBefore("private fun resetPullBookmarkGesture")
+        assertTrue(touch.substringAfter("MotionEvent.ACTION_MOVE ->")
+            .substringBefore("MotionEvent.ACTION_UP ->")
+            .contains("showTextMagnifier(event.x, event.y)"))
+        assertTrue(touch.substringAfter("MotionEvent.ACTION_UP ->")
+            .substringBefore("MotionEvent.ACTION_CANCEL ->")
+            .contains("dismissTextMagnifier()"))
+        assertTrue(touch.substringAfter("MotionEvent.ACTION_CANCEL ->")
+            .contains("dismissTextMagnifier()"))
+        assertTrue(readView.substringAfter("fun cancelSelect")
+            .substringBefore("fun upStatusBar")
+            .contains("dismissTextMagnifier()"))
+        assertTrue(readView.substringAfter("fun onDestroy()")
+            .substringBefore("fun fillPage")
+            .contains("dismissTextMagnifier()"))
+
+        val activity = source("app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
+        val handleTouch = activity.substringAfter("override fun onTouch(v: View, event: MotionEvent)")
+            .substringBefore("override fun upSelectedStart")
+        assertTrue(handleTouch.contains("readView.selectStartMoveAtRaw("))
+        assertTrue(handleTouch.contains("readView.selectEndMoveAtRaw("))
+        val finishHandleDrag = handleTouch.substringAfter(
+            "MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL ->"
+        )
+        assertTrue(finishHandleDrag.contains("readView.dismissTextMagnifier()"))
+        assertTrue(finishHandleDrag.contains("readView.curPage.resetReverseCursor()"))
+        assertTrue(finishHandleDrag.contains("showTextActionMenu()"))
+    }
+
     private fun source(relativePath: String): String {
         val userDir = requireNotNull(System.getProperty("user.dir"))
         val root = generateSequence(File(userDir)) { it.parentFile }

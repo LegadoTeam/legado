@@ -893,24 +893,24 @@ class ReadBookActivity : BaseReadBookActivity(),
             MotionEvent.ACTION_MOVE -> {
                 when (v.id) {
                     R.id.cursor_left -> if (!readView.curPage.getReverseStartCursor()) {
-                        readView.curPage.selectStartMove(
+                        readView.selectStartMoveAtRaw(
                             event.rawX + cursorLeft.width,
                             event.rawY - cursorLeft.height
                         )
                     } else {
-                        readView.curPage.selectEndMove(
+                        readView.selectEndMoveAtRaw(
                             event.rawX - cursorRight.width,
                             event.rawY - cursorRight.height
                         )
                     }
 
                     R.id.cursor_right -> if (readView.curPage.getReverseEndCursor()) {
-                        readView.curPage.selectStartMove(
+                        readView.selectStartMoveAtRaw(
                             event.rawX + cursorLeft.width,
                             event.rawY - cursorLeft.height
                         )
                     } else {
-                        readView.curPage.selectEndMove(
+                        readView.selectEndMoveAtRaw(
                             event.rawX - cursorRight.width,
                             event.rawY - cursorRight.height
                         )
@@ -918,7 +918,8 @@ class ReadBookActivity : BaseReadBookActivity(),
                 }
             }
 
-            MotionEvent.ACTION_UP -> {
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                readView.dismissTextMagnifier()
                 readView.curPage.resetReverseCursor()
                 showTextActionMenu()
             }
