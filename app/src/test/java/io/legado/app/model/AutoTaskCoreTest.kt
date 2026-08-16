@@ -33,6 +33,22 @@ class AutoTaskCoreTest {
     }
 
     @Test
+    fun movesUsingTheAdjacentVisibleTask() {
+        val rules = listOf(
+            AutoTaskRule(id = "a", customOrder = 0),
+            AutoTaskRule(id = "hidden", customOrder = 1),
+            AutoTaskRule(id = "c", customOrder = 2)
+        )
+        val expectedVisibleOrder = listOf("c", "a")
+
+        val reordered = mergeAutoTaskOrder(rules, expectedVisibleOrder)
+        val repeated = mergeAutoTaskOrder(reordered, expectedVisibleOrder)
+
+        assertEquals(listOf("c", "hidden", "a"), reordered.map { it.id })
+        assertEquals(reordered, repeated)
+    }
+
+    @Test
     fun buildsEscapedBookUpdateTask() {
         val bookUrl = "https://example.com/book?value=\");throw new Error('bad');//"
         val book = Book(bookUrl = bookUrl, name = "Test", author = "Author")

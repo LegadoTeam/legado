@@ -32,16 +32,17 @@ class AutoTaskPersistenceContractTest {
         assertTrue(dao.contains("ORDER BY customOrder"))
         assertTrue(dao.contains("@Upsert"))
         assertFalse(dao.contains("deleteAll"))
+        assertTrue(autoTask.contains("fun reorder("))
         assertMutationChecksLegacyFirst(
             autoTask.substringAfter("fun upsert(").substringBefore("fun delete("),
             "appDb.autoTaskRuleDao.upsert"
         )
         assertMutationChecksLegacyFirst(
-            autoTask.substringAfter("fun delete(").substringBefore("fun move("),
+            autoTask.substringAfter("fun delete(").substringBefore("fun reorder("),
             "appDb.autoTaskRuleDao.deleteByIds"
         )
         assertMutationChecksLegacyFirst(
-            autoTask.substringAfter("fun move(").substringBefore("fun updateRunState("),
+            autoTask.substringAfter("fun reorder(").substringBefore("fun updateEnabled("),
             "appDb.autoTaskRuleDao.update"
         )
         assertMutationChecksLegacyFirst(

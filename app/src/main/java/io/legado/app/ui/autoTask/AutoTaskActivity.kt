@@ -43,6 +43,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Collections.swap
 
 class AutoTaskActivity : BaseActivity<ActivityAutoTaskBinding>(), AutoTaskAdapter.Callback,
     SelectActionBar.CallBack, PopupMenu.OnMenuItemClickListener, SearchView.OnQueryTextListener {
@@ -259,8 +260,15 @@ class AutoTaskActivity : BaseActivity<ActivityAutoTaskBinding>(), AutoTaskAdapte
     }
 
     override fun move(task: AutoTaskRule, offset: Int) {
+        val tasks = adapter.getItems().toMutableList()
+        val position = tasks.indexOfFirst { it.id == task.id }
+        if (position < 0) return
+        val targetPosition = position + offset
+        if (targetPosition !in tasks.indices) return
+        swap(tasks, position, targetPosition)
+        val orderedIds = tasks.map { it.id }
         lifecycleScope.launch(Dispatchers.IO) {
-            AutoTask.move(task.id, offset, this@AutoTaskActivity)
+            AutoTask.reorder(orderedIds, this@AutoTaskActivity)
         }
     }
 
