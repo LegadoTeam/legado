@@ -154,6 +154,7 @@ class ImportRssSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_view
                 ?.isChecked = AppConfig.importKeepEnable
             findItem(R.id.menu_show_comment)
                 ?.isChecked = AppConfig.importShowComment
+            findItem(R.id.menu_replace_source)?.isVisible = false
             findItem(R.id.menu_select_new_source)?.isVisible = false // 暂不支持
             findItem(R.id.menu_select_update_source)?.isVisible = false // 暂不支持
         }

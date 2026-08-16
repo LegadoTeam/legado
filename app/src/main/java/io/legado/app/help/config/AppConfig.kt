@@ -622,6 +622,11 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         set(value) {
             appCtx.putPrefBoolean(PreferKey.importShowComment, value)
         }
+    var importReplaceSource: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.importReplaceSource, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.importReplaceSource, value)
+        }
 
     val clickImgWay: String?
         get() = appCtx.getPrefString(PreferKey.clickImgWay)

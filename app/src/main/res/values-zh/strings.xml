@@ -15,7 +15,7 @@
     <string name="select_backup_path">请选择备份路径</string>
     <string name="menu_import_old_version">导入旧版数据</string>
     <string name="menu_import_github">导入 Github 数据</string>
-    <string name="menu_replace_rule">净化替换</string>
+    <string name="menu_replace_rule">替换管理</string>
     <string name="menu_send">发送</string>
 
     <string name="dialog_title">提示</string>
@@ -37,12 +37,12 @@
     <string name="delete_select_group">删除当前分组</string>
     <string name="delete_all">删除所有</string>
     <string name="replace">替换</string>
-    <string name="replace_purify">替换净化</string>
+    <string name="replace_purify">替换管理</string>
     <string name="custom_export_section">自定义Epub导出章节</string>
-    <string name="replace_purify_desc">配置替换净化规则</string>
+    <string name="replace_purify_desc">管理替换规则</string>
     <string name="not_available">暂无</string>
     <string name="enable">启用</string>
-    <string name="replace_purify_search">替换净化-搜索</string>
+    <string name="replace_purify_search">替换管理-搜索</string>
     <string name="bookshelf">书架</string>
     <string name="favorites">收藏夹</string>
     <string name="favorite">收藏</string>
@@ -240,7 +240,7 @@
     <string name="import_book_source">导入书源</string>
     <string name="import_local">本地导入</string>
     <string name="import_on_line">网络导入</string>
-    <string name="replace_rule_title">替换净化</string>
+    <string name="replace_rule_title">替换管理</string>
     <string name="replace_rule_edit">替换规则编辑</string>
     <string name="replace_rule">替换规则</string>
     <string name="replace_to">替换为</string>
@@ -1132,6 +1132,7 @@
     <string name="general">全局</string>
     <string name="use_replace">使用替换</string>
     <string name="scope_title">作用于标题</string>
+    <string name="scope_source">作用于书源</string>
     <string name="scope_content">作用于正文</string>
     <string name="join_qq_channel">加入 QQ 频道</string>
     <string name="qq_channel_summary">点击加入阅读 QQ 频道</string>
@@ -1580,4 +1581,8 @@
     <string name="curl_converter_failed">转换失败</string>
     <string name="curl_converter_no_output">请先转换内容</string>
     <string name="curl_converter_insert_failed">编辑器尚未就绪</string>
+    <string name="replace_source_on_import">导入时自动替换书源</string>
+    <string name="show_source_replacement">显示替换后的书源</string>
+    <string name="source_replacement_error">替换失败：%1$s</string>
+    <string name="import_status_error">替换错误</string>
 </resources>

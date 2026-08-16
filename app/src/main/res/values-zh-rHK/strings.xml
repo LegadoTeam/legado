@@ -14,7 +14,7 @@
     <string name="backup_path">備份路徑</string>
     <string name="menu_import_old_version">導入舊版數據</string>
     <string name="menu_import_github">導入 Github 數據</string>
-    <string name="menu_replace_rule">淨化替換</string>
+    <string name="menu_replace_rule">替換管理</string>
     <string name="menu_send">Send</string>
 
     <string name="dialog_title">提示</string>
@@ -208,7 +208,7 @@
     <string name="import_book_source">導入書源</string>
     <string name="import_local">本地導入</string>
     <string name="import_on_line">網絡導入</string>
-    <string name="replace_rule_title">替換淨化</string>
+    <string name="replace_rule_title">替換管理</string>
     <string name="replace_rule_edit">替換規則編輯</string>
     <string name="replace_rule">替換規則</string>
     <string name="replace_to">替換為</string>

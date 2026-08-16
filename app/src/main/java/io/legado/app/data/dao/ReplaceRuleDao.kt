@@ -106,6 +106,12 @@ interface ReplaceRuleDao {
     )
     fun findEnabledByTitleScope(name: String, origin: String): List<ReplaceRule>
 
+    @Query(
+        """SELECT * FROM replace_rules WHERE isEnabled = 1 and scopeSource = 1
+        ORDER BY sortOrder ASC"""
+    )
+    fun findEnabledBySourceScope(): List<ReplaceRule>
+
     @Query("select * from replace_rules where `group` like '%' || :group || '%'")
     fun getByGroup(group: String): List<ReplaceRule>
 

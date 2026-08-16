@@ -31,7 +31,8 @@ fun CharSequence.replace(
     replacement: String,
     timeout: Long,
     chapter: BookChapter? = null,
-    book: ReplaceBook? = null
+    book: ReplaceBook? = null,
+    includeContentInTimeoutMessage: Boolean = true,
 ): String {
     val charSequence = this@replace
     val isJs = replacement.startsWith("@js:")
@@ -70,8 +71,13 @@ fun CharSequence.replace(
                 select {
                     job.onJoin {}
                     onTimeout(timeout) {
+                        val content = if (includeContentInTimeoutMessage) {
+                            "\n替换内容:$charSequence"
+                        } else {
+                            ""
+                        }
                         val timeoutMsg =
-                            "替换超时,3秒后还未结束将重启应用\n规则名称:$name\n替换规则:$regex\n替换内容:$charSequence"
+                            "替换超时,3秒后还未结束将重启应用\n规则名称:$name\n替换规则:$regex$content"
                         val exception = RegexTimeoutException(timeoutMsg)
                         block.cancel(exception)
                         appCtx.longToastOnUi(timeoutMsg)

@@ -15,7 +15,7 @@
     <string name="select_backup_path">請選擇備份路徑</string>
     <string name="menu_import_old_version">匯入舊版資料</string>
     <string name="menu_import_github">匯入Github資料</string>
-    <string name="menu_replace_rule">淨化取代</string>
+    <string name="menu_replace_rule">取代管理</string>
     <string name="menu_send">傳送</string>
 
     <string name="dialog_title">提示</string>
@@ -210,7 +210,7 @@
     <string name="import_book_source">匯入書源</string>
     <string name="import_local">本機匯入</string>
     <string name="import_on_line">網路匯入</string>
-    <string name="replace_rule_title">取代淨化</string>
+    <string name="replace_rule_title">取代管理</string>
     <string name="replace_rule_edit">取代規則編輯</string>
     <string name="replace_rule">取代規則</string>
     <string name="replace_to">取代為</string>

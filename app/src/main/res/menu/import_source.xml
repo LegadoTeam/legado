@@ -43,4 +43,10 @@
         android:checkable="true"
         app:showAsAction="never" />
 
+    <item
+        android:id="@+id/menu_replace_source"
+        android:title="@string/replace_source_on_import"
+        android:checkable="true"
+        app:showAsAction="never" />
+
 </menu>

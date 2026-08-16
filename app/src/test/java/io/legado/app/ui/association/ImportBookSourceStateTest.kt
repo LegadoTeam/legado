@@ -97,7 +97,7 @@ class ImportBookSourceStateTest {
             "src/main/java/io/legado/app/ui/association/ImportTxtTocRuleDialog.kt",
         ).forEach { path ->
             val source = readProjectFile(path)
-            val textIndex = source.indexOf("showComment.text = it")
+            val textIndex = source.indexOf("showComment.text =")
             val resetIndex = source.indexOf("showComment.maxLines = 3", textIndex)
             val visibleIndex = source.indexOf("showComment.visible()", textIndex)
             assertTrue(textIndex >= 0 && resetIndex > textIndex && visibleIndex > resetIndex)
@@ -138,6 +138,47 @@ class ImportBookSourceStateTest {
                 )
                 assertTrue(source.contains("R.string.import_status_update"))
             }
+    }
+
+    @Test
+    fun `book source replacement preview is isolated from other import dialogs`() {
+        val dialog = readProjectFile(
+            "src/main/java/io/legado/app/ui/association/ImportBookSourceDialog.kt"
+        )
+        assertTrue(dialog.contains("viewModel.setUseSourceReplacement(item.isChecked)"))
+        assertTrue(dialog.contains("viewModel.originalSourceJson(position)"))
+        assertTrue(dialog.contains("alternateCode = viewModel.replacedSourceJson(position)"))
+        val interactionState = dialog.substringAfter("private fun updateInteractionState()")
+            .substringBefore("override fun onCodeSave")
+        assertTrue(interactionState.contains("menu_select_new_source)?.isEnabled = importEnabled"))
+        assertTrue(interactionState.contains("menu_select_update_source)?.isEnabled = importEnabled"))
+
+        val viewModel = readProjectFile(
+            "src/main/java/io/legado/app/ui/association/ImportBookSourceViewModel.kt"
+        )
+        val setReplacement = viewModel.substringAfter("fun setUseSourceReplacement")
+            .substringBefore("private suspend fun importSourceUrl")
+        assertTrue(setReplacement.contains("useSourceReplacement = previousMode"))
+        assertTrue(setReplacement.contains("AppConfig.importReplaceSource = previousMode"))
+        assertTrue(setReplacement.contains("applyCandidateSources()"))
+        val setSelection = viewModel.substringAfter("fun setSelection")
+            .substringBefore("fun updateSource")
+        assertTrue(
+            setSelection.contains(
+                "if (sourceUpdatePending.value == true || !canImportSource(index)) return"
+            )
+        )
+
+        val codeDialog = readProjectFile(
+            "src/main/java/io/legado/app/ui/widget/dialog/CodeDialog.kt"
+        )
+        assertTrue(codeDialog.contains("binding.codeView.keyListener = null"))
+        assertTrue(codeDialog.contains("menu_save)?.isVisible = !show"))
+
+        val rssDialog = readProjectFile(
+            "src/main/java/io/legado/app/ui/association/ImportRssSourceDialog.kt"
+        )
+        assertTrue(rssDialog.contains("menu_replace_source)?.isVisible = false"))
     }
 
     private fun readProjectFile(pathInApp: String): String {

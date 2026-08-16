@@ -188,6 +188,7 @@ object PreferKey {
     const val showBookshelfFastScroller = "showBookshelfFastScroller"
     const val importKeepEnable = "importKeepEnable"
     const val importShowComment = "importShowComment"
+    const val importReplaceSource = "importReplaceSource"
     const val clickImgWay = "clickImgWay"
     const val highlightActionTrigger = "highlightActionTrigger"
     const val keyPageOnLongPress = "keyPageOnLongPress"

@@ -40,6 +40,9 @@ data class ReplaceRule(
     //作用于标题
     @ColumnInfo(defaultValue = "0")
     var scopeTitle: Boolean = false,
+    //作用于书源
+    @ColumnInfo(defaultValue = "0")
+    var scopeSource: Boolean = false,
     //作用于正文
     @ColumnInfo(defaultValue = "1")
     var scopeContent: Boolean = true,

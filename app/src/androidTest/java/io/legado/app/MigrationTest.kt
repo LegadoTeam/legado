@@ -353,6 +353,37 @@ class MigrationTest {
     }
 
     @Test
+    @Throws(IOException::class)
+    fun migrate102To103AddsDisabledSourceReplacementScope() {
+        val databaseName = "migration-replace-rule-source-scope"
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        context.deleteDatabase(databaseName)
+        helper.createDatabase(databaseName, 102).apply {
+            execSQL(
+                """insert into replace_rules
+                    (id, name, pattern, replacement, scopeTitle, scopeContent,
+                     isEnabled, isRegex, timeoutMillisecond, sortOrder)
+                    values (1, 'legacy', 'x', 'y', 1, 1, 1, 0, 3000, 0)"""
+            )
+            close()
+        }
+
+        Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
+            .addMigrations(*ALL_MIGRATIONS)
+            .build().apply {
+                openHelper.writableDatabase.query(
+                    "select scopeTitle, scopeSource, scopeContent from replace_rules where id = 1"
+                ).use { cursor ->
+                    assertTrue(cursor.moveToFirst())
+                    assertEquals(1, cursor.getInt(0))
+                    assertEquals(0, cursor.getInt(1))
+                    assertEquals(1, cursor.getInt(2))
+                }
+                close()
+            }
+    }
+
+    @Test
     fun bookCoverUpdatesRejectStaleStateAndSupportBothRestoreLevels() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
