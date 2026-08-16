@@ -18,8 +18,6 @@ import android.view.View
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.get
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
@@ -964,10 +962,9 @@ class ReadBookActivity : BaseReadBookActivity(),
      * 显示文本操作菜单
      */
     override fun showTextActionMenu() {
-        val navigationBarHeight = navigationBarInsetBottom()
         textActionMenu.show(
             binding.textMenuPosition,
-            binding.root.height + navigationBarHeight,
+            binding.root.rootView.height,
             binding.textMenuPosition.x.toInt(),
             binding.textMenuPosition.y.toInt(),
             binding.cursorLeft.y.toInt() + binding.cursorLeft.height,
@@ -975,11 +972,6 @@ class ReadBookActivity : BaseReadBookActivity(),
             binding.cursorRight.y.toInt() + binding.cursorRight.height
         )
     }
-
-    private fun navigationBarInsetBottom() =
-        ViewCompat.getRootWindowInsets(binding.root)
-            ?.getInsets(WindowInsetsCompat.Type.navigationBars())
-            ?.bottom ?: 0
 
     private var editingHighlightTime: Long? = null
     private var editingHighlightSnapshot: BookHighlight? = null
@@ -2199,10 +2191,9 @@ class ReadBookActivity : BaseReadBookActivity(),
             }
             popupAction.dismiss()
         }
-        val navigationBarHeight = navigationBarInsetBottom()
         popupAction.showAtLocation(
             binding.readView, Gravity.BOTTOM or Gravity.LEFT, x.toInt(),
-            binding.root.height + navigationBarHeight - y.toInt()
+            binding.root.rootView.height - y.toInt()
         )
     }
 

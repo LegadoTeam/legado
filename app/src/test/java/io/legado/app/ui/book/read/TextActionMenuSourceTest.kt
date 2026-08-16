@@ -24,21 +24,18 @@ class TextActionMenuSourceTest {
     }
 
     @Test
-    fun `reader popups use the live navigation bar inset`() {
+    fun `reader popups use the popup window coordinate height`() {
         val source = projectFile(
             "src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt"
         ).readText()
-        val insetHelper = source.substringAfter("private fun navigationBarInsetBottom()")
-            .substringBefore("private var editingHighlightTime")
 
-        assertTrue(insetHelper.contains("ViewCompat.getRootWindowInsets(binding.root)"))
-        assertTrue(insetHelper.contains("WindowInsetsCompat.Type.navigationBars()"))
         assertEquals(
             2,
-            Regex("val navigationBarHeight = navigationBarInsetBottom\\(\\)")
+            Regex("binding\\.root\\.rootView\\.height")
                 .findAll(source).count()
         )
         assertFalse(source.contains("binding.navigationBar.height"))
+        assertFalse(source.contains("binding.root.height +"))
     }
 
     private fun projectFile(pathInApp: String): File {
