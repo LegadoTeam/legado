@@ -59,6 +59,8 @@ class CoverImageView @JvmOverloads constructor(
     private var viewWidth: Float = 0f
     private var viewHeight: Float = 0f
     private var currentJob: Job? = null
+    @Volatile
+    private var currentNameBitmap: Pair<String, Bitmap>? = null
     private val triggerChannel = Channel<Unit>(Channel.CONFLATED)
     var bitmapPath: String? = null
         private set
@@ -111,12 +113,20 @@ class CoverImageView @JvmOverloads constructor(
             } else {
                 currentName
             }
-            val cacheBitmap =  nameBitmapCache[pathName + width]
+            val cacheBitmap = getNameBitmap(pathName + width)
             if (cacheBitmap != null) {
                 canvas.drawBitmap(cacheBitmap, 0f, 0f, null)
                 return
             }
             drawNameAuthor(pathName, currentName, currentAuthor, false)
+        }
+    }
+
+    private fun getNameBitmap(cacheKey: String): Bitmap? {
+        val currentBitmap = currentNameBitmap
+        if (currentBitmap?.first == cacheKey) return currentBitmap.second
+        return nameBitmapCache[cacheKey]?.also {
+            currentNameBitmap = cacheKey to it
         }
     }
 
@@ -141,11 +151,17 @@ class CoverImageView @JvmOverloads constructor(
                     } while (width == 0 && attempts < 2000)
                 }
                 ensureActive()
+                val cacheKey = pathName + width
+                if (getNameBitmap(cacheKey) != null) {
+                    postInvalidate()
+                    return@launch
+                }
                 val bitmap = generateCoverBitmap(name, author)
                 ensureActive()
                 needNameBitmap.put(bitmapPath.toString(), true)
-                nameBitmapCache.put(pathName + width, bitmap)
-                invalidate()
+                nameBitmapCache.put(cacheKey, bitmap)
+                currentNameBitmap = cacheKey to bitmap
+                postInvalidate()
             } catch (_: CancellationException) {
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -306,6 +322,9 @@ class CoverImageView @JvmOverloads constructor(
         val currentAuthor = author?.replace(AppPattern.bdRegex, "")?.trim()
         val currentName = name?.replace(AppPattern.bdRegex, "")?.trim()
         val currentPath = path?.takeIf { it.isNotBlank() }
+        if (this.name != currentName || this.author != currentAuthor) {
+            currentNameBitmap = null
+        }
         this.author = currentAuthor
         this.name = currentName
         this.bitmapPath = currentPath

@@ -82,6 +82,29 @@ class RuntimeMediaStabilityTest {
     }
 
     @Test
+    fun visibleTextCoverSurvivesSharedCacheEviction() {
+        val source = listOf(File("src/main/java"), File("app/src/main/java"))
+            .first { it.isDirectory }
+            .resolve("io/legado/app/ui/widget/image/CoverImageView.kt")
+            .readText()
+        val cache = source.substringAfter("companion object {")
+            .substringBefore("private val needNameBitmap")
+        val generation = source.substringAfter("private fun generateCoverAsync")
+            .substringBefore("private fun generateCoverBitmap")
+        val localCache = source.substringAfter("private fun getNameBitmap")
+            .substringBefore("private fun drawNameAuthor")
+
+        assertTrue(cache.contains("LruCache<String, Bitmap>(33)"))
+        assertTrue(source.contains("private var currentNameBitmap: Pair<String, Bitmap>? = null"))
+        assertTrue(localCache.contains("currentBitmap?.first == cacheKey"))
+        assertTrue(localCache.contains("currentNameBitmap = cacheKey to it"))
+        assertTrue(generation.contains("if (getNameBitmap(cacheKey) != null)"))
+        assertTrue(generation.contains("nameBitmapCache.put(cacheKey, bitmap)"))
+        assertTrue(generation.contains("currentNameBitmap = cacheKey to bitmap"))
+        assertTrue(generation.contains("postInvalidate()"))
+    }
+
+    @Test
     fun audioCoverUsesTheBookScopedSourceOrigin() {
         val source = listOf(File("src/main/java"), File("app/src/main/java"))
             .first { it.isDirectory }
