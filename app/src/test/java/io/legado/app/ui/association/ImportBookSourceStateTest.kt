@@ -173,7 +173,47 @@ class ImportBookSourceStateTest {
             "src/main/java/io/legado/app/ui/widget/dialog/CodeDialog.kt"
         )
         assertTrue(codeDialog.contains("binding.codeView.keyListener = null"))
-        assertTrue(codeDialog.contains("menu_save)?.isVisible = !show"))
+        assertTrue(codeDialog.contains("initMenu(!disableEdit)"))
+        assertTrue(codeDialog.contains("saveEnabled && !show && searchView.isIconified"))
+        assertTrue(codeDialog.contains("findTextRanges("))
+        assertTrue(codeDialog.contains("right - left - navigationWidth"))
+        assertTrue(
+            codeDialog.contains(
+                "binding.toolBar.contentInsetStart - binding.toolBar.contentInsetEnd"
+            )
+        )
+        assertTrue(
+            codeDialog.contains("binding.toolBar.paddingStart - binding.toolBar.paddingEnd")
+        )
+        assertTrue(
+            codeDialog.contains("updateSearch(keepIndex = true, selectMatch = false)")
+        )
+        assertTrue(codeDialog.contains("if (selectMatch) showCurrentMatch()"))
+        val alternatePreview = codeDialog.substringAfter("private fun showAlternate")
+            .substringBefore("private fun initMenu")
+        assertTrue(
+            alternatePreview.contains("if (!searchView.isIconified) showCurrentMatch()")
+        )
+        assertTrue(
+            codeDialog.contains("R.id.menu_search_previous -> moveToMatch(searchIndex - 1)")
+        )
+        assertTrue(
+            codeDialog.contains("R.id.menu_search_next -> moveToMatch(searchIndex + 1)")
+        )
+        assertTrue(codeDialog.contains("codeView.setSelection(range.first, range.last + 1)"))
+        assertTrue(codeDialog.contains("codeView.bringPointIntoView(range.first)"))
+        assertTrue(codeDialog.contains("searchRanges.getOrNull(searchIndex) != range"))
+        assertTrue(codeDialog.contains("override fun onViewStateRestored"))
+        assertTrue(
+            codeDialog.contains(
+                "if (!searchView.isIconified) updateSearch(keepIndex = true)"
+            )
+        )
+
+        val codeMenu = readProjectFile("src/main/res/menu/code_edit.xml")
+        assertTrue(codeMenu.contains("@+id/menu_search"))
+        assertTrue(codeMenu.contains("@+id/menu_search_previous"))
+        assertTrue(codeMenu.contains("@+id/menu_search_next"))
 
         val rssDialog = readProjectFile(
             "src/main/java/io/legado/app/ui/association/ImportRssSourceDialog.kt"

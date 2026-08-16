@@ -5,6 +5,26 @@
     tools:ignore="AlwaysShowAction">
 
     <item
+        android:id="@+id/menu_search"
+        android:title="@string/search"
+        app:actionViewClass="androidx.appcompat.widget.SearchView"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/menu_search_previous"
+        android:icon="@drawable/ic_skip_previous"
+        android:title="@string/help_search_prev"
+        android:visible="false"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/menu_search_next"
+        android:icon="@drawable/ic_skip_next"
+        android:title="@string/help_search_next"
+        android:visible="false"
+        app:showAsAction="always" />
+
+    <item
         android:id="@+id/menu_save"
         android:icon="@drawable/ic_save"
         android:title="@string/action_save"
