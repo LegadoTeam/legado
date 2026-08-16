@@ -180,10 +180,13 @@
     <string name="clear_cache">清理快取</string>
     <string name="clear_cache_success">成功清理快取</string>
     <string name="persist_network_covers">將網路封面儲存到本機</string>
+    <string name="restore_network_covers">還原網路封面</string>
+    <string name="restore_network_covers_confirm">清除所選書籍儲存在本機的封面並重新顯示網路封面？</string>
     <string name="restore_source_covers">還原書源封面</string>
-    <string name="restore_source_covers_confirm">清除所選書籍的自訂封面並重新顯示書源封面？</string>
+    <string name="restore_source_covers_confirm">清除所選書籍儲存在本機的封面和自訂封面並重新顯示書源封面？</string>
     <string name="persist_cover_progress">正在儲存封面 %1$d/%2$d</string>
     <string name="persist_cover_result">已儲存 %1$d，本機略過 %2$d，失敗 %3$d</string>
+    <string name="restore_network_cover_result">已還原 %1$d 本書的網路封面</string>
     <string name="restore_source_cover_result">已還原 %1$d 本書的書源封面</string>
     <string name="action_save">儲存</string>
     <string name="edit_source">編輯源</string>

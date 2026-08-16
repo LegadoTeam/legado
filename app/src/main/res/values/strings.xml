@@ -212,10 +212,13 @@
     <string name="clear_cache">Clear cache</string>
     <string name="clear_cache_success">Cache cleared</string>
     <string name="persist_network_covers">Save network covers locally</string>
+    <string name="restore_network_covers">Restore network covers</string>
+    <string name="restore_network_covers_confirm">Clear locally saved covers for the selected books and show their network covers again?</string>
     <string name="restore_source_covers">Restore source covers</string>
-    <string name="restore_source_covers_confirm">Clear custom covers for the selected books and show source covers again?</string>
+    <string name="restore_source_covers_confirm">Clear locally saved and custom covers for the selected books and show source covers again?</string>
     <string name="persist_cover_progress">Saving cover %1$d/%2$d</string>
     <string name="persist_cover_result">Saved %1$d, skipped %2$d, failed %3$d</string>
+    <string name="restore_network_cover_result">Restored %1$d network covers</string>
     <string name="restore_source_cover_result">Restored %1$d source covers</string>
     <string name="action_save">Save</string>
     <string name="edit_source">Edit source</string>

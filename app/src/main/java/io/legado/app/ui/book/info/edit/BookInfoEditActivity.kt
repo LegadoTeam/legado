@@ -13,6 +13,7 @@ import io.legado.app.data.entities.Book
 import io.legado.app.databinding.ActivityBookInfoEditBinding
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
+import io.legado.app.help.book.hasEditedNetworkCover
 import io.legado.app.help.book.isAudio
 import io.legado.app.help.book.isImage
 import io.legado.app.help.book.isLocal
@@ -93,6 +94,7 @@ class BookInfoEditActivity :
         }
         tvRefreshCover.setOnClickListener {
             viewModel.book?.customCoverUrl = tieCoverUrl.text?.toString()
+            viewModel.book?.persistedCoverUrl = null
             upCover()
         }
     }
@@ -108,7 +110,7 @@ class BookInfoEditActivity :
                 else -> 0
             }
         )
-        tieCoverUrl.setText(book.getDisplayCover())
+        tieCoverUrl.setText(book.customCoverUrl?.takeIf { it.isNotEmpty() } ?: book.coverUrl)
         tieBookIntro.setText(book.getDisplayIntro())
         upCover()
     }
@@ -133,7 +135,10 @@ class BookInfoEditActivity :
         }
         book.removeType(BookType.video, BookType.local, BookType.image, BookType.audio, BookType.text)
         book.addType(bookType)
-        val customCoverUrl = tieCoverUrl.text?.toString()
+        val customCoverUrl = tieCoverUrl.text?.toString()?.takeIf { it.isNotEmpty() }
+        if (hasEditedNetworkCover(customCoverUrl, book.customCoverUrl, book.coverUrl)) {
+            book.persistedCoverUrl = null
+        }
         book.customCoverUrl = if (customCoverUrl == book.coverUrl) null else customCoverUrl
         val customIntro = tieBookIntro.text?.toString()
         book.customIntro = if (customIntro == book.intro) null else customIntro
@@ -146,6 +151,7 @@ class BookInfoEditActivity :
 
     override fun coverChangeTo(coverUrl: String) {
         viewModel.book?.customCoverUrl = coverUrl
+        viewModel.book?.persistedCoverUrl = null
         binding.tieCoverUrl.setText(coverUrl)
         upCover()
     }

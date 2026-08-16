@@ -32,6 +32,7 @@ import io.legado.app.help.DirectLinkUpload
 import io.legado.app.help.HighlightStyle
 import io.legado.app.help.LauncherIconHelp
 import io.legado.app.help.book.isLocal
+import io.legado.app.help.book.normalizeLegacyPersistedCover
 import io.legado.app.help.book.upType
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
@@ -113,7 +114,11 @@ object Restore {
         fileToListT<Book>(path, "bookshelf.json")?.let {
             it.forEach { book ->
                 book.upType()
+                book.normalizeLegacyPersistedCover()
                 book.customCoverUrl = book.customCoverUrl?.let { coverPath ->
+                    remapRestoredCoverPath(coverPath, backupRoot, appCtx.externalFiles)
+                }
+                book.persistedCoverUrl = book.persistedCoverUrl?.let { coverPath ->
                     remapRestoredCoverPath(coverPath, backupRoot, appCtx.externalFiles)
                 }
             }

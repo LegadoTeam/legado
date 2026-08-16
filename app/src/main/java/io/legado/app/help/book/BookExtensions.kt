@@ -277,6 +277,7 @@ fun Book.updateTo(newBook: Book): Book {
     newBook.group = group
     newBook.order = order
     newBook.customCoverUrl = customCoverUrl
+    newBook.persistedCoverUrl = persistedCoverUrl
     newBook.customIntro = customIntro
     newBook.customTag = customTag
     newBook.canUpdate = canUpdate

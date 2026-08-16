@@ -34,6 +34,10 @@
         android:title="@string/persist_network_covers" />
 
     <item
+        android:id="@+id/menu_restore_network_covers"
+        android:title="@string/restore_network_covers" />
+
+    <item
         android:id="@+id/menu_restore_source_covers"
         android:title="@string/restore_source_covers" />
 

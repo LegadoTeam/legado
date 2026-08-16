@@ -58,7 +58,7 @@ interface BookDao {
         SELECT bookUrl, origin, name, author, coverUrl, customCoverUrl, type, `group`,
         ((SELECT coalesce(sum(groupId), 0) FROM book_groups WHERE groupId > 0) & `group`) != 0
             AS hasUserGroup,
-        latestChapterTime, durChapterTime, `order`
+        latestChapterTime, durChapterTime, `order`, persistedCoverUrl
         FROM books WHERE type & ${BookType.notShelf} = 0
         """
     )
@@ -218,21 +218,57 @@ interface BookDao {
     @Query("select customCoverUrl from books where bookUrl = :bookUrl")
     fun getCustomCoverUrl(bookUrl: String): String?
 
+    @Query("select persistedCoverUrl from books where bookUrl = :bookUrl")
+    fun getPersistedCoverUrl(bookUrl: String): String?
+
     @Transaction
     fun updatePreservingCustomCoverUrl(vararg books: Book) {
         books.forEach { book ->
-            update(book.copy(customCoverUrl = getCustomCoverUrl(book.bookUrl)))
+            update(
+                book.copy(
+                    customCoverUrl = getCustomCoverUrl(book.bookUrl),
+                    persistedCoverUrl = getPersistedCoverUrl(book.bookUrl),
+                )
+            )
         }
     }
 
     @Query(
-        """update books set customCoverUrl = :customCoverUrl
-        where bookUrl = :bookUrl and customCoverUrl is :expectedCustomCoverUrl"""
+        """update books set persistedCoverUrl = :persistedCoverUrl
+        where bookUrl = :bookUrl
+        and origin = :expectedOrigin
+        and coverUrl is :expectedCoverUrl
+        and customCoverUrl is :expectedCustomCoverUrl
+        and persistedCoverUrl is :expectedPersistedCoverUrl"""
     )
-    fun updateCustomCoverUrlIfUnchanged(
+    fun updatePersistedCoverUrlIfUnchanged(
+        bookUrl: String,
+        expectedOrigin: String,
+        expectedCoverUrl: String?,
+        expectedCustomCoverUrl: String?,
+        expectedPersistedCoverUrl: String?,
+        persistedCoverUrl: String?,
+    ): Int
+
+    @Query(
+        """update books set persistedCoverUrl = null
+        where bookUrl = :bookUrl and persistedCoverUrl is :expectedPersistedCoverUrl"""
+    )
+    fun clearPersistedCoverUrlIfUnchanged(
+        bookUrl: String,
+        expectedPersistedCoverUrl: String?,
+    ): Int
+
+    @Query(
+        """update books set customCoverUrl = null, persistedCoverUrl = null
+        where bookUrl = :bookUrl
+        and customCoverUrl is :expectedCustomCoverUrl
+        and persistedCoverUrl is :expectedPersistedCoverUrl"""
+    )
+    fun clearCoverOverridesIfUnchanged(
         bookUrl: String,
         expectedCustomCoverUrl: String?,
-        customCoverUrl: String?,
+        expectedPersistedCoverUrl: String?,
     ): Int
 
     @Query("select readConfig from books where bookUrl = :bookUrl")
@@ -263,13 +299,16 @@ interface BookDao {
 
     @Transaction
     fun replace(oldBook: Book, newBook: Book) {
-        val customCoverUrl = if (has(newBook.bookUrl)) {
-            getCustomCoverUrl(newBook.bookUrl)
-        } else {
-            getCustomCoverUrl(oldBook.bookUrl)
-        }
+        val storedBookUrl = if (has(newBook.bookUrl)) newBook.bookUrl else oldBook.bookUrl
+        val customCoverUrl = getCustomCoverUrl(storedBookUrl)
+        val persistedCoverUrl = getPersistedCoverUrl(storedBookUrl)
         delete(oldBook)
-        insert(newBook.copy(customCoverUrl = customCoverUrl))
+        insert(
+            newBook.copy(
+                customCoverUrl = customCoverUrl,
+                persistedCoverUrl = persistedCoverUrl,
+            )
+        )
     }
 
     @Query("update books set durChapterPos = :pos where bookUrl = :bookUrl")

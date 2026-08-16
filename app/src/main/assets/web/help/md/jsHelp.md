@@ -458,6 +458,7 @@ kind // 分类信息(书源获取)
 customTag // 分类信息(用户修改)
 coverUrl // 封面Url(书源获取)
 customCoverUrl // 封面Url(用户修改)
+persistedCoverUrl // 保存到本地的网络封面
 intro // 简介内容(书源获取)
 customIntro // 简介内容(用户修改)
 charset // 自定义字符集名称(仅适用于本地书籍)

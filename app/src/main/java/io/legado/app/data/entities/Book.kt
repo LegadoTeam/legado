@@ -124,7 +124,9 @@ data class Book(
     var readConfig: ReadConfig? = null,
     //同步时间
     @ColumnInfo(defaultValue = "0")
-    var syncTime: Long = 0L
+    var syncTime: Long = 0L,
+    // 保存到本地的网络封面
+    var persistedCoverUrl: String? = null
 ) : Parcelable, BaseBook {
 
     override fun equals(other: Any?): Boolean {
@@ -169,10 +171,16 @@ data class Book(
 
     fun getUnreadChapterNum() = max(simulatedTotalChapterNum() - durChapterIndex - 1, 0)
 
-    fun getDisplayCover() = if (customCoverUrl.isNullOrEmpty()) coverUrl else customCoverUrl
+    fun getDisplayCover() = persistedCoverUrl?.takeIf { it.isNotEmpty() }
+        ?: customCoverUrl?.takeIf { it.isNotEmpty() }
+        ?: coverUrl
 
     /** Source credentials are only reused for custom covers on the same network origin. */
-    fun getCoverSourceOrigin() = coverSourceOrigin(origin, customCoverUrl)
+    fun getCoverSourceOrigin() = if (persistedCoverUrl.isNullOrEmpty()) {
+        coverSourceOrigin(origin, customCoverUrl)
+    } else {
+        null
+    }
 
     fun getDisplayIntro() = if (customIntro.isNullOrEmpty()) intro else customIntro
 
@@ -433,6 +441,7 @@ data class Book(
         newBook.group = group
         newBook.order = order
         newBook.customCoverUrl = customCoverUrl
+        newBook.persistedCoverUrl = persistedCoverUrl
         newBook.customIntro = customIntro
         newBook.customTag = customTag
         newBook.canUpdate = canUpdate

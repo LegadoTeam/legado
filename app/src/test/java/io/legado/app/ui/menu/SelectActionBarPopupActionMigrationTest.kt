@@ -116,6 +116,7 @@ class SelectActionBarPopupActionMigrationTest {
                 "@+id/menu_change_source",
                 "@+id/menu_clear_cache",
                 "@+id/menu_persist_covers",
+                "@+id/menu_restore_network_covers",
                 "@+id/menu_restore_source_covers",
                 "@+id/menu_check_selected_interval",
                 "@+id/menu_update_toc",

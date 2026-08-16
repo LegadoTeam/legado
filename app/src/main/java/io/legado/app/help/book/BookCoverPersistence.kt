@@ -1,13 +1,44 @@
 package io.legado.app.help.book
 
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.coverSourceOrigin
 import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.isAbsUrl
 import java.io.File
 import java.io.IOException
 
 internal fun Book.networkCoverForPersistence(): String? {
-    return getDisplayCover()?.takeIf { it.isAbsUrl() }
+    return (customCoverUrl?.takeIf { it.isNotEmpty() } ?: coverUrl)
+        ?.takeIf { it.isAbsUrl() }
+}
+
+internal fun Book.networkCoverSourceOrigin() = coverSourceOrigin(origin, customCoverUrl)
+
+internal fun hasEditedNetworkCover(
+    editedCoverUrl: String?,
+    customCoverUrl: String?,
+    sourceCoverUrl: String?,
+): Boolean {
+    val edited = editedCoverUrl?.takeIf { it.isNotEmpty() }
+    val current = customCoverUrl?.takeIf { it.isNotEmpty() }
+        ?: sourceCoverUrl?.takeIf { it.isNotEmpty() }
+    return edited != current
+}
+
+private val persistedCoverFileName = Regex("^[0-9a-fA-F]{32}\\.cover$")
+
+internal fun isLegacyPersistedCoverPath(path: String?): Boolean {
+    val file = path?.let(::File) ?: return false
+    return file.isAbsolute &&
+        file.parentFile?.name == "covers" &&
+        persistedCoverFileName.matches(file.name)
+}
+
+internal fun Book.normalizeLegacyPersistedCover() {
+    if (persistedCoverUrl.isNullOrEmpty() && isLegacyPersistedCoverPath(customCoverUrl)) {
+        persistedCoverUrl = customCoverUrl
+        customCoverUrl = null
+    }
 }
 
 internal fun installPersistentCover(source: File, coversDir: File): File {

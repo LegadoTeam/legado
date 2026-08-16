@@ -309,6 +309,49 @@ class MigrationTest {
     }
 
     @Test
+    @Throws(IOException::class)
+    fun migrate101To102SeparatesLegacyPersistedCovers() {
+        val databaseName = "migration-persisted-book-covers"
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        context.deleteDatabase(databaseName)
+        val legacyName = "0123456789abcdef0123456789abcdef.cover"
+        val legacyPath = "/data/user/0/io.legado.app/files/covers/$legacyName"
+        val manualPath = "/data/user/0/io.legado.app/files/covers/manual.png"
+        val networkPath = "https://images.example/covers/$legacyName"
+        helper.createDatabase(databaseName, 101).apply {
+            listOf(
+                Triple("legacy", legacyPath, "author"),
+                Triple("manual", manualPath, "author"),
+                Triple("network", networkPath, "author"),
+            ).forEach { (name, cover, author) ->
+                execSQL(
+                    "insert into books (bookUrl, name, author, customCoverUrl) values (?, ?, ?, ?)",
+                    arrayOf(name, name, author, cover)
+                )
+            }
+            close()
+        }
+
+        Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
+            .addMigrations(*ALL_MIGRATIONS)
+            .build().apply {
+                openHelper.writableDatabase.query(
+                    "select bookUrl, customCoverUrl, persistedCoverUrl from books order by bookUrl"
+                ).use { cursor ->
+                    val rows = buildMap {
+                        while (cursor.moveToNext()) {
+                            put(cursor.getString(0), cursor.getString(1) to cursor.getString(2))
+                        }
+                    }
+                    assertEquals(manualPath to null, rows["manual"])
+                    assertEquals(networkPath to null, rows["network"])
+                    assertEquals(null to legacyPath, rows["legacy"])
+                }
+                close()
+            }
+    }
+
+    @Test
     fun highlightRuleDaoKeepsUuidIdentityAndRollsBackInvalidImports() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)

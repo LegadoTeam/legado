@@ -24,6 +24,8 @@ export type Book = BaseBook & {
   coverUrl?: string
   // 封面Url(用户修改)
   customCoverUrl?: string
+  // 保存到本地的网络封面
+  persistedCoverUrl?: string
   // 简介内容(书源获取)
   intro?: string
   // 简介内容(用户修改)

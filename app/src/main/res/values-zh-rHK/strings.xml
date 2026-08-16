@@ -178,10 +178,13 @@
     <string name="clear_cache">清理緩存</string>
     <string name="clear_cache_success">成功清理緩存</string>
     <string name="persist_network_covers">保存網絡封面到本地</string>
+    <string name="restore_network_covers">恢復網絡封面</string>
+    <string name="restore_network_covers_confirm">清除所選書籍保存在本地的封面並重新顯示網絡封面？</string>
     <string name="restore_source_covers">恢復書源封面</string>
-    <string name="restore_source_covers_confirm">清除所選書籍的自訂封面並重新顯示書源封面？</string>
+    <string name="restore_source_covers_confirm">清除所選書籍保存在本地的封面和自訂封面並重新顯示書源封面？</string>
     <string name="persist_cover_progress">正在保存封面 %1$d/%2$d</string>
     <string name="persist_cover_result">已保存 %1$d，本地跳過 %2$d，失敗 %3$d</string>
+    <string name="restore_network_cover_result">已恢復 %1$d 本書的網絡封面</string>
     <string name="restore_source_cover_result">已恢復 %1$d 本書的書源封面</string>
     <string name="action_save">保存</string>
     <string name="edit_source">編輯源</string>

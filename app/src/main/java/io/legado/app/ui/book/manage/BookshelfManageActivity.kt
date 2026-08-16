@@ -330,12 +330,25 @@ class BookshelfManageActivity :
             R.id.menu_change_source -> showDialogFragment<SourcePickerDialog>()
             R.id.menu_clear_cache -> viewModel.clearCache(adapter.selection)
             R.id.menu_persist_covers -> viewModel.persistNetworkCovers(adapter.selection)
+            R.id.menu_restore_network_covers -> alertRestoreNetworkCovers()
             R.id.menu_restore_source_covers -> alertRestoreSourceCovers()
             R.id.menu_check_selected_interval -> adapter.checkSelectedInterval()
             R.id.menu_update_toc -> updateBooksToc()
             R.id.menu_create_book_update_tasks -> showCreateBookUpdateTasksDialog()
         }
         return false
+    }
+
+    private fun alertRestoreNetworkCovers() {
+        alert(
+            titleResource = R.string.restore_network_covers,
+            messageResource = R.string.restore_network_covers_confirm
+        ) {
+            okButton {
+                viewModel.restoreNetworkCovers(adapter.selection)
+            }
+            noButton()
+        }
     }
 
     private fun alertRestoreSourceCovers() {

@@ -96,6 +96,10 @@ class BookshelfGroupItemTest {
         assertEquals(sameOrigin.customCoverUrl, sameOrigin.displayCover)
         assertEquals(sameOrigin.origin, sameOrigin.coverSourceOrigin)
         assertNull(otherOrigin.coverSourceOrigin)
+
+        val persisted = sameOrigin.copy(persistedCoverUrl = "/covers/local.cover")
+        assertEquals(persisted.persistedCoverUrl, persisted.displayCover)
+        assertNull(persisted.coverSourceOrigin)
     }
 
     private fun urls(item: BookshelfGroupItem) = item.previewBooks.map { it.bookUrl }
@@ -109,6 +113,7 @@ class BookshelfGroupItemTest {
         latest: Long = 0,
         read: Long = 0,
         customCover: String? = null,
+        persistedCover: String? = null,
         hasUserGroup: Boolean = group > 0,
         origin: String = "https://books.example.com",
     ) = BookshelfBook(
@@ -123,6 +128,7 @@ class BookshelfGroupItemTest {
         hasUserGroup = hasUserGroup,
         latestChapterTime = latest,
         durChapterTime = read,
+        persistedCoverUrl = persistedCover,
         order = order,
     )
 }

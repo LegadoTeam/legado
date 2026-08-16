@@ -7,6 +7,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.BookSourceType
 import io.legado.app.constant.BookType
+import io.legado.app.help.book.isLegacyPersistedCoverPath
 import java.util.UUID
 
 object DatabaseMigrations {
@@ -488,6 +489,31 @@ object DatabaseMigrations {
                 ) = 1
                 """.trimIndent()
             )
+        }
+    }
+
+    @Suppress("ClassName")
+    class Migration_101_102 : AutoMigrationSpec {
+        override fun onPostMigrate(db: SupportSQLiteDatabase) {
+            val update = db.compileStatement(
+                """update books set persistedCoverUrl = ?, customCoverUrl = null
+                where bookUrl = ? and customCoverUrl is ? and persistedCoverUrl is null"""
+            )
+            db.query(
+                "select bookUrl, customCoverUrl from books where customCoverUrl is not null"
+            ).use { cursor ->
+                while (cursor.moveToNext()) {
+                    val bookUrl = cursor.getString(0)
+                    val customCoverUrl = cursor.getString(1)
+                    if (!isLegacyPersistedCoverPath(customCoverUrl)) continue
+                    update.clearBindings()
+                    update.bindString(1, customCoverUrl)
+                    update.bindString(2, bookUrl)
+                    update.bindString(3, customCoverUrl)
+                    update.executeUpdateDelete()
+                }
+            }
+            update.close()
         }
     }
 

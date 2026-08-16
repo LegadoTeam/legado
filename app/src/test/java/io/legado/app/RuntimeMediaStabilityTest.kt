@@ -55,6 +55,13 @@ class RuntimeMediaStabilityTest {
 
         book.customCoverUrl = "https://images.example.net/cover.jpg"
         assertNull(book.getCoverSourceOrigin())
+
+        book.persistedCoverUrl = "/data/user/0/io.legado.app/files/covers/local.cover"
+        assertEquals(book.persistedCoverUrl, book.getDisplayCover())
+        assertNull(book.getCoverSourceOrigin())
+
+        book.persistedCoverUrl = null
+        assertEquals(book.customCoverUrl, book.getDisplayCover())
     }
 
     @Test
