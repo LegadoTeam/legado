@@ -1,5 +1,6 @@
 package io.legado.app.ui.book.read
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -20,6 +21,24 @@ class TextActionMenuSourceTest {
         assertFalse(show.contains("moreMenuItems.isEmpty()"))
         assertFalse(show.contains("contentView.measure("))
         assertFalse(show.contains("contentView.measuredHeight"))
+    }
+
+    @Test
+    fun `reader popups use the live navigation bar inset`() {
+        val source = projectFile(
+            "src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt"
+        ).readText()
+        val insetHelper = source.substringAfter("private fun navigationBarInsetBottom()")
+            .substringBefore("private var editingHighlightTime")
+
+        assertTrue(insetHelper.contains("ViewCompat.getRootWindowInsets(binding.root)"))
+        assertTrue(insetHelper.contains("WindowInsetsCompat.Type.navigationBars()"))
+        assertEquals(
+            2,
+            Regex("val navigationBarHeight = navigationBarInsetBottom\\(\\)")
+                .findAll(source).count()
+        )
+        assertFalse(source.contains("binding.navigationBar.height"))
     }
 
     private fun projectFile(pathInApp: String): File {

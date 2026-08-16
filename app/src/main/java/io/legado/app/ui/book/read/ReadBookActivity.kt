@@ -18,6 +18,8 @@ import android.view.View
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.get
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
@@ -145,7 +147,6 @@ import io.legado.app.utils.invisible
 import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.isTrue
 import io.legado.app.utils.launch
-import io.legado.app.utils.navigationBarGravity
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.observeEventSticky
 import io.legado.app.utils.postEvent
@@ -963,9 +964,7 @@ class ReadBookActivity : BaseReadBookActivity(),
      * 显示文本操作菜单
      */
     override fun showTextActionMenu() {
-        val navigationBarHeight =
-            if (!ReadBookConfig.hideNavigationBar && navigationBarGravity == Gravity.BOTTOM)
-                binding.navigationBar.height else 0
+        val navigationBarHeight = navigationBarInsetBottom()
         textActionMenu.show(
             binding.textMenuPosition,
             binding.root.height + navigationBarHeight,
@@ -976,6 +975,11 @@ class ReadBookActivity : BaseReadBookActivity(),
             binding.cursorRight.y.toInt() + binding.cursorRight.height
         )
     }
+
+    private fun navigationBarInsetBottom() =
+        ViewCompat.getRootWindowInsets(binding.root)
+            ?.getInsets(WindowInsetsCompat.Type.navigationBars())
+            ?.bottom ?: 0
 
     private var editingHighlightTime: Long? = null
     private var editingHighlightSnapshot: BookHighlight? = null
@@ -2195,9 +2199,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             }
             popupAction.dismiss()
         }
-        val navigationBarHeight =
-            if (!ReadBookConfig.hideNavigationBar && navigationBarGravity == Gravity.BOTTOM)
-                binding.navigationBar.height else 0
+        val navigationBarHeight = navigationBarInsetBottom()
         popupAction.showAtLocation(
             binding.readView, Gravity.BOTTOM or Gravity.LEFT, x.toInt(),
             binding.root.height + navigationBarHeight - y.toInt()
