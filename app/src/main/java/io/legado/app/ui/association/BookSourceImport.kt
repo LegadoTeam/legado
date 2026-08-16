@@ -75,6 +75,21 @@ internal fun prepareBookSourceImportCandidate(
     }
 }
 
+internal fun refreshBookSourceImportCandidates(
+    candidates: List<BookSourceImportCandidate>,
+    editedIndex: Int,
+    editedSource: BookSource?,
+    rules: List<ReplaceRule>,
+): List<BookSourceImportCandidate> {
+    require(editedIndex in candidates.indices)
+    return candidates.mapIndexed { index, candidate ->
+        prepareBookSourceImportCandidate(
+            if (index == editedIndex) editedSource ?: candidate.original else candidate.original,
+            rules,
+        )
+    }
+}
+
 private fun ReplaceRule.matchesSource(name: String, url: String): Boolean {
     if (!isEnabled || !scopeSource) return false
     fun String.matchesSourceValue(): Boolean =

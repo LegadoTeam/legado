@@ -25,6 +25,12 @@
         app:showAsAction="always" />
 
     <item
+        android:id="@+id/menu_replace_rule"
+        android:title="@string/menu_replace_rule"
+        android:visible="false"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_save"
         android:icon="@drawable/ic_save"
         android:title="@string/action_save"

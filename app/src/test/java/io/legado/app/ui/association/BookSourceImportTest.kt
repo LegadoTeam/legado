@@ -155,6 +155,54 @@ class BookSourceImportTest {
     }
 
     @Test
+    fun `rule manager refreshes every candidate and keeps the edited draft`() {
+        val candidates = listOf(
+            prepareBookSourceImportCandidate(
+                BookSource("https://example.com/one", "First Name"),
+                emptyList(),
+            ),
+            prepareBookSourceImportCandidate(
+                BookSource("https://example.com/two", "Second Name"),
+                emptyList(),
+            ),
+        )
+        val rules = listOf(
+            ReplaceRule(
+                pattern = " Name",
+                replacement = " Updated",
+                scopeSource = true,
+                isRegex = false,
+            )
+        )
+        val refreshed = refreshBookSourceImportCandidates(
+            candidates,
+            editedIndex = 0,
+            editedSource = BookSource("https://example.com/one", "Draft Name"),
+            rules = rules,
+        )
+
+        assertEquals(listOf("Draft Name", "Second Name"), refreshed.map {
+            it.original.bookSourceName
+        })
+        assertEquals(listOf("Draft Updated", "Second Updated"), refreshed.map {
+            it.replaced?.bookSourceName
+        })
+        val refreshedWithoutDraft = refreshBookSourceImportCandidates(
+            candidates,
+            editedIndex = 0,
+            editedSource = null,
+            rules = rules,
+        )
+
+        assertEquals(listOf("First Name", "Second Name"), refreshedWithoutDraft.map {
+            it.original.bookSourceName
+        })
+        assertEquals(listOf("First Updated", "Second Updated"), refreshedWithoutDraft.map {
+            it.replaced?.bookSourceName
+        })
+    }
+
+    @Test
     fun `source replacement honors include and exclude scope`() {
         val source = BookSource(
             bookSourceUrl = "https://example.com/source",

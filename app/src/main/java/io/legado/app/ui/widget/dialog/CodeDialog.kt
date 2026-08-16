@@ -23,6 +23,12 @@ import io.legado.app.utils.setLayout
 import io.legado.app.utils.visible
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 
+internal fun resolveCodeDialogOriginal(
+    showingAlternate: Boolean,
+    originalCode: String,
+    displayedCode: String,
+): String = if (showingAlternate) originalCode else displayedCode
+
 class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
 
     constructor(
@@ -31,6 +37,7 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
         requestId: String? = null,
         alternateCode: String? = null,
         showAlternate: Boolean = false,
+        showReplaceRules: Boolean = false,
     ) : this() {
         arguments = Bundle().apply {
             putBoolean("disableEdit", disableEdit)
@@ -38,6 +45,7 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
             putString("requestId", requestId)
             alternateCode?.let { putString("alternateCode", IntentData.put(it)) }
             putBoolean("showAlternate", showAlternate)
+            putBoolean("showReplaceRules", showReplaceRules)
         }
     }
 
@@ -50,9 +58,16 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
     private lateinit var searchView: SearchView
     private var searchRanges: List<IntRange> = emptyList()
     private var searchIndex = -1
+    private var replaceRuleRefreshPending = false
+    private var originalCodeStateKey: String? = null
+    private var alternateCodeStateKey: String? = null
+    val requestId: String?
+        get() = arguments?.getString("requestId")
 
     override fun onStart() {
         super.onStart()
+        originalCodeStateKey?.let { IntentData.get<Any>(it) }
+        alternateCodeStateKey?.let { IntentData.get<Any>(it) }
         setLayout(1f, ViewGroup.LayoutParams.MATCH_PARENT)
     }
 
@@ -67,23 +82,35 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
         binding.codeView.addLegadoPattern()
         binding.codeView.addJsonPattern()
         binding.codeView.addJsPattern()
-        originalCode = arguments?.getString("code")
+        originalCodeStateKey = savedInstanceState?.getString("originalCode")
+            ?: arguments?.getString("code")
+        originalCode = originalCodeStateKey
             ?.let { IntentData.get<String>(it) }
             .orEmpty()
-        alternateCode = arguments?.getString("alternateCode")
+        alternateCodeStateKey = savedInstanceState?.getString("alternateCode")
+            ?: arguments?.getString("alternateCode")
+        alternateCode = alternateCodeStateKey
             ?.let { IntentData.get<String>(it) }
+        if (arguments?.getBoolean("showReplaceRules") == true) {
+            callback()?.let { alternateCode = it.getCodeAlternate(requestId) }
+        }
         editKeyListener = binding.codeView.keyListener
         binding.codeView.setText(originalCode)
-        if (arguments?.getBoolean("disableEdit") != true && alternateCode != null) {
-            binding.cbSourceReplacementPreview.apply {
+        val canPreviewReplacement = !disableEdit && alternateCode != null
+        binding.cbSourceReplacementPreview.apply {
+            isChecked = savedInstanceState?.getBoolean("showingAlternate")
+                ?: (arguments?.getBoolean("showAlternate") == true)
+            if (canPreviewReplacement) {
                 visible()
-                isChecked = arguments?.getBoolean("showAlternate") == true
-                setOnCheckedChangeListener { _, checked -> showAlternate(checked) }
+            } else {
+                gone()
             }
-            showAlternate(binding.cbSourceReplacementPreview.isChecked)
-        } else {
-            binding.cbSourceReplacementPreview.gone()
+            setOnCheckedChangeListener { _, checked -> showAlternate(checked) }
         }
+        if (canPreviewReplacement) {
+            showAlternate(binding.cbSourceReplacementPreview.isChecked)
+        }
+        setReplaceRuleRefreshPending(callback()?.isReplaceRuleRefreshPending() == true)
         binding.codeView.doAfterTextChanged {
             if (!searchView.isIconified) {
                 updateSearch(keepIndex = true, selectMatch = false)
@@ -92,8 +119,8 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
     }
 
     private fun showAlternate(show: Boolean) {
-        val alternate = alternateCode ?: return
         if (show) {
+            val alternate = alternateCode ?: return
             if (!showingAlternate) {
                 originalCode = binding.codeView.text?.toString().orEmpty()
             }
@@ -113,6 +140,8 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
         saveEnabled = canSave
         binding.toolBar.inflateMenu(R.menu.code_edit)
         binding.toolBar.menu.applyTint(requireContext())
+        binding.toolBar.menu.findItem(R.id.menu_replace_rule).isVisible =
+            arguments?.getBoolean("showReplaceRules") == true
         searchView = binding.toolBar.menu.findItem(R.id.menu_search).actionView as SearchView
         val navigationWidth = 96.dpToPx()
         val minimumWidth = 48.dpToPx()
@@ -154,11 +183,12 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
             when (it.itemId) {
                 R.id.menu_search_previous -> moveToMatch(searchIndex - 1)
                 R.id.menu_search_next -> moveToMatch(searchIndex + 1)
-                R.id.menu_save -> {
+                R.id.menu_replace_rule -> if (!replaceRuleRefreshPending) {
+                    callback()?.onOpenReplaceRules()
+                }
+                R.id.menu_save -> if (!replaceRuleRefreshPending) {
                     binding.codeView.text?.toString()?.let { code ->
-                        val requestId = arguments?.getString("requestId")
-                        (parentFragment as? Callback)?.onCodeSave(code, requestId)
-                            ?: (activity as? Callback)?.onCodeSave(code, requestId)
+                        callback()?.onCodeSave(code, requestId)
                     }
                     dismiss()
                 }
@@ -220,6 +250,54 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
         binding.toolBar.menu.findItem(R.id.menu_search_next).isEnabled = enabled
     }
 
+    fun refreshAlternateCode() {
+        alternateCode = callback()?.getCodeAlternate(requestId)
+        updateAlternatePreview()
+    }
+
+    fun clearAlternateCode() {
+        alternateCode = null
+        updateAlternatePreview()
+    }
+
+    private fun updateAlternatePreview() {
+        if (view == null) return
+        binding.toolBar.menu.findItem(R.id.menu_replace_rule).isEnabled =
+            !replaceRuleRefreshPending
+        binding.cbSourceReplacementPreview.apply {
+            if (alternateCode == null) {
+                if (showingAlternate) showAlternate(false)
+                gone()
+            } else {
+                visible()
+                if (isChecked) showAlternate(true)
+            }
+        }
+    }
+
+    fun setReplaceRuleRefreshPending(pending: Boolean) {
+        replaceRuleRefreshPending = pending
+        if (view == null) return
+        binding.toolBar.menu.findItem(R.id.menu_replace_rule).isEnabled = !pending
+        binding.toolBar.menu.findItem(R.id.menu_save).isEnabled = !pending
+        binding.cbSourceReplacementPreview.isEnabled = !pending
+        binding.codeView.keyListener = if (pending || showingAlternate) null else editKeyListener
+        isCancelable = !pending
+    }
+
+    fun currentOriginalCode(): String = if (view == null) {
+        originalCode
+    } else {
+        resolveCodeDialogOriginal(
+            showingAlternate,
+            originalCode,
+            binding.codeView.text?.toString().orEmpty(),
+        )
+    }
+
+    private fun callback(): Callback? =
+        (parentFragment as? Callback) ?: (activity as? Callback)
+
     override fun onViewStateRestored(savedInstanceState: Bundle?) {
         super.onViewStateRestored(savedInstanceState)
         setSearchOpen(!searchView.isIconified)
@@ -229,13 +307,29 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putInt("searchIndex", searchIndex)
+        originalCodeStateKey = saveStateData(originalCodeStateKey, currentOriginalCode())
+            .also { outState.putString("originalCode", it) }
+        alternateCode?.let { code ->
+            alternateCodeStateKey = saveStateData(alternateCodeStateKey, code)
+                .also { outState.putString("alternateCode", it) }
+        }
+        outState.putBoolean("showingAlternate", showingAlternate)
         super.onSaveInstanceState(outState)
     }
+
+    private fun saveStateData(key: String?, data: String): String =
+        key?.also { IntentData.put(it, data) } ?: IntentData.put(data)
 
 
     interface Callback {
 
         fun onCodeSave(code: String, requestId: String?)
+
+        fun onOpenReplaceRules() = Unit
+
+        fun getCodeAlternate(requestId: String?): String? = null
+
+        fun isReplaceRuleRefreshPending(): Boolean = false
 
     }
 

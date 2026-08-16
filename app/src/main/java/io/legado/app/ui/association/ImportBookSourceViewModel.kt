@@ -355,6 +355,39 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
         }.start()
     }
 
+    fun refreshSourceReplacements(index: Int, source: BookSource?): Boolean {
+        if (sourceUpdatePending.value == true || index !in sourceCandidates.indices) return false
+        val previousCandidates = sourceCandidates.toList()
+        sourceUpdatePending.value = true
+        executeLazy {
+            refreshBookSourceImportCandidates(
+                previousCandidates,
+                index,
+                source,
+                appDb.replaceRuleDao.findEnabledBySourceScope(),
+            )
+        }.onSuccess { candidates ->
+            sourceCandidates.clear()
+            sourceCandidates.addAll(candidates)
+            applyCandidateSources()
+            comparisonSource(
+                preserveManualSelections = true,
+                onError = {
+                    sourceCandidates.clear()
+                    sourceCandidates.addAll(previousCandidates)
+                    applyCandidateSources()
+                },
+            ) {
+                sourceUpdatePending.value = false
+            }
+        }.onError {
+            errorLiveData.value = "ImportError:${it.localizedMessage}"
+            AppLog.put("ImportError:${it.localizedMessage}", it)
+            sourceUpdatePending.value = false
+        }.start()
+        return true
+    }
+
     fun canImportSource(index: Int): Boolean =
         sourceCandidates.getOrNull(index)?.canImport(useSourceReplacement) != false
 

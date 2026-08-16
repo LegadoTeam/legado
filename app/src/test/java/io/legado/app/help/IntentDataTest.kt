@@ -24,7 +24,9 @@ class IntentDataTest {
 
     @Test
     fun `explicit keys remain caller controlled`() {
+        IntentData.put("fixed", "old")
         assertEquals("fixed", IntentData.put("fixed", "value"))
         assertEquals("value", IntentData.get<String>("fixed"))
+        assertNull(IntentData.get<String>("fixed"))
     }
 }
