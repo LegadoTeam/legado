@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import androidx.recyclerview.widget.RecyclerView.RecycledViewPool
+import io.legado.app.R
 import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
@@ -21,12 +22,14 @@ import io.legado.app.help.book.removeType
 import io.legado.app.help.book.sync
 import io.legado.app.help.book.update
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.LocalConfig
 import io.legado.app.model.CacheBook
 import io.legado.app.model.ReadBook
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.CacheBookService
 import io.legado.app.utils.onEachParallel
 import io.legado.app.utils.postEvent
+import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -346,10 +349,15 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
-    fun restoreWebDav(name: String) {
-        execute {
+    fun restoreWebDav(name: String, restoredLastBackup: Long) {
+        executeLazy {
             AppWebDav.restoreWebDav(name)
-        }
+        }.onSuccess {
+            LocalConfig.lastBackup = maxOf(LocalConfig.lastBackup, restoredLastBackup)
+        }.onError {
+            AppLog.put("WebDav恢复出错\n${it.localizedMessage}", it)
+            context.toastOnUi("${context.getString(R.string.restore_fail)}\n${it.localizedMessage}")
+        }.start()
     }
 
     private fun deleteNotShelfBook() {

@@ -35,6 +35,7 @@ class BackupMediaTest {
                 "rssSources.json",
                 "rssStar.json",
                 "sourceSub.json",
+                "cookies.json",
                 "replaceRule.json",
                 "txtTocRule.json",
                 "httpTTS.json",
@@ -53,6 +54,14 @@ class BackupMediaTest {
                 "videoConfig.xml",
             ),
             allFiles,
+        )
+    }
+
+    @Test
+    fun cookiesAreOptInBackupContent() {
+        assertEquals(
+            listOf("cookies.json"),
+            selectedBackupFileNames { it == "backupCookies" },
         )
     }
 
