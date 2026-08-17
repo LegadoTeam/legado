@@ -250,32 +250,67 @@ class SearchHitAccumulatorTest {
         val searchFn = viewModel.substringAfter("fun search(key: String)").substringBefore("fun stop()")
         assertTrue(searchFn.contains("searchModel.cancelSearch()"))
         assertTrue(searchFn.contains("searchID = System.currentTimeMillis()"))
+        assertTrue(searchFn.contains("searchPublishGate.begin(searchID)"))
         assertTrue(searchFn.contains("searchModel.search(searchID, searchKey)"))
         assertTrue(searchFn.contains("execute {"))
         assertTrue(viewModel.contains("private var searchID = 0L"))
-        assertTrue(viewModel.contains("acceptedSearchRevision = 0L"))
-        assertTrue(
-            viewModel.contains(
-                "SearchResultGate.accept(searchId, searchID, revision, acceptedSearchRevision)",
-            ),
-        )
+        assertTrue(viewModel.contains("SearchUiPublishGate"))
+        assertTrue(viewModel.contains("searchPublishGate.publish("))
+        val stopFn = viewModel.substringAfter("fun stop()").substringBefore("fun pause()")
+        assertTrue(stopFn.contains("searchPublishGate.resetAcceptedRevision()"))
+        assertFalse(viewModel.contains("searchStartLock"))
+        assertFalse(viewModel.contains("SearchUiGeneration"))
     }
 
     @Test
     fun sameGenerationOlderRevisionIsRejectedAtUiGate() {
-        var currentId = 1L
-        var acceptedRev = 0L
+        val gate = SearchUiPublishGate()
+        gate.begin(1L)
         val posted = mutableListOf<List<String>>()
-        fun onSuccess(searchId: Long, revision: Long, books: List<SearchBook>) {
-            if (!SearchResultGate.accept(searchId, currentId, revision, acceptedRev)) return
-            acceptedRev = revision
-            posted.add(books.map { it.bookUrl })
-        }
-        onSuccess(1L, 2L, listOf(hit("A"), hit("B")))
-        onSuccess(1L, 1L, listOf(hit("A")))
+        assertTrue(gate.publish(1L, 2L, listOf(hit("A"), hit("B"))) { posted.add(it.map { b -> b.bookUrl }) })
+        assertFalse(gate.publish(1L, 1L, listOf(hit("A"))) { posted.add(it.map { b -> b.bookUrl }) })
         assertEquals(listOf(listOf("A", "B")), posted)
-        assertFalse(SearchResultGate.accept(1L, 1L, 1L, 2L))
-        assertTrue(SearchResultGate.accept(1L, 1L, 2L, 2L))
+    }
+
+    @Test
+    fun stopResetsAcceptedRevisionSoSameSearchIdCanRestart() {
+        val gate = SearchUiPublishGate()
+        gate.begin(9L)
+        val posted = mutableListOf<Long>()
+        assertTrue(gate.publish(9L, 5L, listOf(hit("old"))) { posted.add(5L) })
+        gate.resetAcceptedRevision()
+        assertTrue(gate.publish(9L, 1L, listOf(hit("new"))) { posted.add(1L) })
+        assertEquals(listOf(5L, 1L), posted)
+    }
+
+    @Test
+    fun concurrentPublishKeepsMonotonicRevision() {
+        val gate = SearchUiPublishGate()
+        gate.begin(1L)
+        val posted = Collections.synchronizedList(mutableListOf<Long>())
+        val start = CyclicBarrier(2)
+        val done = CountDownLatch(2)
+        Thread {
+            try {
+                start.await(5, TimeUnit.SECONDS)
+                gate.publish(1L, 1L, listOf(hit("A"))) { posted.add(1L) }
+            } finally {
+                done.countDown()
+            }
+        }.start()
+        Thread {
+            try {
+                start.await(5, TimeUnit.SECONDS)
+                gate.publish(1L, 2L, listOf(hit("A"), hit("B"))) { posted.add(2L) }
+            } finally {
+                done.countDown()
+            }
+        }.start()
+        assertTrue(done.await(10, TimeUnit.SECONDS))
+        assertTrue(posted.isNotEmpty())
+        if (posted.contains(2L)) {
+            assertEquals(2L, posted.last())
+        }
     }
 
     private fun hit(bookUrl: String) = SearchBook(

@@ -14,7 +14,7 @@ import io.legado.app.help.book.ReadRecordIndex
 import io.legado.app.help.book.SearchBookShelfHelp
 import io.legado.app.help.config.AppConfig
 import io.legado.app.model.webBook.SearchModel
-import io.legado.app.model.webBook.SearchResultGate
+import io.legado.app.model.webBook.SearchUiPublishGate
 import io.legado.app.utils.ConflateLiveData
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -43,7 +43,7 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
     var hasMore = true
     private val searchCommands = SearchCommandGate()
     private var searchID = 0L
-    private var acceptedSearchRevision = 0L
+    private val searchPublishGate = SearchUiPublishGate()
     private val searchModel = SearchModel(viewModelScope, object : SearchModel.CallBack {
 
         override fun getSearchScope(): SearchScope {
@@ -59,11 +59,9 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
         }
 
         override fun onSearchSuccess(searchId: Long, revision: Long, searchBooks: List<SearchBook>) {
-            if (!SearchResultGate.accept(searchId, searchID, revision, acceptedSearchRevision)) {
-                return
+            searchPublishGate.publish(searchId, revision, searchBooks) {
+                searchBookLiveData.postValue(it)
             }
-            acceptedSearchRevision = revision
-            searchBookLiveData.postValue(searchBooks)
         }
 
         override fun onSearchFinish(isEmpty: Boolean, hasMore: Boolean) {
@@ -129,7 +127,7 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
                 if ((searchKey == key) || key.isNotEmpty()) {
                     searchModel.cancelSearch()
                     searchID = command
-                    acceptedSearchRevision = 0L
+                    searchPublishGate.begin(searchID)
                     searchBookLiveData.postValue(emptyList())
                     searchKey = key
                     hasMore = true
@@ -148,7 +146,7 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
     fun stop() {
         searchCommands.invalidate {
             searchID = 0L
-            acceptedSearchRevision = 0L
+            searchPublishGate.resetAcceptedRevision()
             searchModel.cancelSearch()
         }
     }
@@ -193,7 +191,7 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
         super.onCleared()
         searchCommands.invalidate {
             searchID = 0L
-            acceptedSearchRevision = 0L
+            searchPublishGate.resetAcceptedRevision()
             searchModel.close()
         }
     }

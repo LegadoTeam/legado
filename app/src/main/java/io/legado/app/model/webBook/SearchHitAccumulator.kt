@@ -111,42 +111,42 @@ internal object SearchResultGate {
     }
 }
 
-/** UI search id + LiveData post share one lock so a stale callback cannot win. */
-internal class SearchUiGeneration {
+/**
+ * Single synchronized publish point for search UI: generation + revision + post.
+ * Reset revision on stop/close so the same searchId can restart from rev 1.
+ */
+internal class SearchUiPublishGate {
     private val lock = Any()
+    private var currentId = 0L
+    private var acceptedRevision = 0L
 
-    @Volatile
-    var current = 0L
-        private set
-
-    fun beginNew(onBegin: () -> Unit = {}): Long {
+    fun begin(searchId: Long) {
         synchronized(lock) {
-            current += 1L
-            if (current == 0L) current = 1L
-            onBegin()
-            return current
+            currentId = searchId
+            acceptedRevision = 0L
         }
     }
 
-    fun begin(id: Long, onBegin: () -> Unit = {}): Long {
+    /** After SearchModel.close() resets accumulator; keep the same searchId. */
+    fun resetAcceptedRevision() {
         synchronized(lock) {
-            current = id
-            onBegin()
-            return current
+            acceptedRevision = 0L
         }
     }
 
-    fun invalidate() {
+    fun publish(
+        searchId: Long,
+        revision: Long,
+        books: List<SearchBook>,
+        post: (List<SearchBook>) -> Unit,
+    ): Boolean {
         synchronized(lock) {
-            current = 0L
-        }
-    }
-
-    fun postIfCurrent(submittedId: Long, post: () -> Unit): Boolean {
-        synchronized(lock) {
-            if (!SearchResultGate.accept(submittedId, current)) return false
-            post()
+            if (!SearchResultGate.accept(searchId, currentId, revision, acceptedRevision)) {
+                return false
+            }
+            acceptedRevision = revision
+            post(books)
             return true
         }
     }
-    }
+}
