@@ -116,6 +116,22 @@ class PullBookmarkGestureTest {
     }
 
     @Test
+    fun `bookmark indicator keeps the existing header line metrics`() {
+        assertEquals(16, BookmarkIndicatorGeometry.size(-12, 4))
+        assertEquals(18, BookmarkIndicatorGeometry.top(30, -12))
+
+        val pageView = source("app/src/main/java/io/legado/app/ui/book/read/page/PageView.kt")
+        val indicator = pageView.substringAfter("if (bookmarkIndicatorVisible)")
+            .substringBefore("return@forEach")
+        assertTrue(indicator.contains("bookmarkIndicatorText"))
+        assertFalse(indicator.contains("setCompoundDrawablesRelative"))
+        val span = pageView.substringAfter("private class BookmarkIndicatorSpan")
+            .substringBefore("class PageView")
+        assertTrue(span.contains("top = metrics.top"))
+        assertTrue(span.contains("bottom = metrics.bottom"))
+    }
+
+    @Test
     fun `long press clears pull candidate before selecting text`() {
         val source = source("app/src/main/java/io/legado/app/ui/book/read/page/ReadView.kt")
         val selection = source.substringAfter("curPage.longPress(startX, startY)")
