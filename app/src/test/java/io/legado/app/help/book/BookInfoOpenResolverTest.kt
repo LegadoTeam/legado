@@ -109,8 +109,15 @@ class BookInfoOpenResolverTest {
         assertFalse(saveBook.contains("shouldSkipWeakInsert"))
         assertTrue(upBookIntent.contains("intent.getStringExtra(\"name\")"))
         assertTrue(upBookIntent.contains("appDb.bookDao.getBook(name, author)"))
+        assertTrue(upBookIntent.contains("refreshShelfFlags(book)"))
         assertTrue(upBookIntent.contains("refreshShelfFlags(it)"))
         assertFalse(upBookIntent.contains("bookData.value?.bookUrl"))
+        // After a name/author hit, do not re-read stale LiveData to overwrite flags.
+        val afterHit = upBookIntent.substringAfter("appDb.bookDao.getBook(name, author)")
+        assertFalse(
+            afterHit.substringAfter("loadChapter(book, isFromBookInfo = true)")
+                .contains("refreshShelfFlags(it)"),
+        )
         assertFalse(upBookIntent.contains("sessionBookUrl"))
         assertFalse(upBookIntent.contains("ReadManga.book"))
         assertFalse(upBookIntent.contains("resolveReturnBook"))
@@ -130,7 +137,10 @@ class BookInfoOpenResolverTest {
         assertTrue(info.contains("deleteNotShelfByUrl"))
         assertFalse(info.contains("canDeleteTempBookUrl"))
         val changeTo = info.substringAfter("fun changeTo(").substringBefore("fun topBook(")
+        val flagsSrc = read("src/main/java/io/legado/app/help/book/BookInfoShelfFlags.kt")
         assertTrue(changeTo.contains("restoreOfficialUserFields"))
+        assertTrue(flagsSrc.contains("existing.updateTo(incoming)"))
+        assertTrue(flagsSrc.contains("incoming.durChapterPos = durChapterPos"))
         assertTrue(
             changeTo.indexOf("refreshShelfFlags(book)") < changeTo.indexOf("bookData.postValue(book)"),
         )

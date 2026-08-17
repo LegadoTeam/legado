@@ -33,6 +33,7 @@ class BookInfoShelfFlagsTest {
             order = -3,
             customIntro = "keep-intro",
             customTag = "tag-a",
+            syncTime = 99L,
         )
         val incoming = Book(
             bookUrl = "A",
@@ -43,13 +44,17 @@ class BookInfoShelfFlagsTest {
             customIntro = "from-B",
             customTag = "tag-b",
             durChapterPos = 42,
+            durChapterIndex = 5,
+            syncTime = 1L,
         )
         BookInfoShelfFlags.restoreOfficialUserFields(incoming, existing)
         assertEquals(9L, incoming.group)
         assertEquals(-3, incoming.order)
         assertEquals("keep-intro", incoming.customIntro)
         assertEquals("tag-a", incoming.customTag)
+        assertEquals(99L, incoming.syncTime)
         assertEquals(42, incoming.durChapterPos)
+        assertEquals(5, incoming.durChapterIndex)
     }
 
     @Test

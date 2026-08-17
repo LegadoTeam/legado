@@ -94,7 +94,7 @@ class SearchHitAccumulatorTest {
         assertTrue(src.contains("SearchBookMerge.rebuildFromRawHits"))
         assertFalse(src.contains("searchBooks ="))
         assertTrue(src.contains("SearchResultGate.accept(searchId, mSearchId)"))
-        assertTrue(src.contains("onSearchSuccess(searchId, published.hits)"))
+        assertTrue(src.contains("onSearchSuccess(searchId, published.revision, published.hits)"))
     }
 
     @Test
@@ -253,7 +253,29 @@ class SearchHitAccumulatorTest {
         assertTrue(searchFn.contains("searchModel.search(searchID, searchKey)"))
         assertTrue(searchFn.contains("execute {"))
         assertTrue(viewModel.contains("private var searchID = 0L"))
-        assertTrue(viewModel.contains("SearchResultGate.accept(searchId, searchID)"))
+        assertTrue(viewModel.contains("acceptedSearchRevision = 0L"))
+        assertTrue(
+            viewModel.contains(
+                "SearchResultGate.accept(searchId, searchID, revision, acceptedSearchRevision)",
+            ),
+        )
+    }
+
+    @Test
+    fun sameGenerationOlderRevisionIsRejectedAtUiGate() {
+        var currentId = 1L
+        var acceptedRev = 0L
+        val posted = mutableListOf<List<String>>()
+        fun onSuccess(searchId: Long, revision: Long, books: List<SearchBook>) {
+            if (!SearchResultGate.accept(searchId, currentId, revision, acceptedRev)) return
+            acceptedRev = revision
+            posted.add(books.map { it.bookUrl })
+        }
+        onSuccess(1L, 2L, listOf(hit("A"), hit("B")))
+        onSuccess(1L, 1L, listOf(hit("A")))
+        assertEquals(listOf(listOf("A", "B")), posted)
+        assertFalse(SearchResultGate.accept(1L, 1L, 1L, 2L))
+        assertTrue(SearchResultGate.accept(1L, 1L, 2L, 2L))
     }
 
     private fun hit(bookUrl: String) = SearchBook(

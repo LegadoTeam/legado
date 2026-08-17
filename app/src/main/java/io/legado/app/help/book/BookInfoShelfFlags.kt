@@ -27,20 +27,25 @@ internal object BookInfoShelfFlags {
     }
 
     /**
-     * After migrateTo onto an existing official URL, keep that row's user
-     * fields (group / custom* / readConfig). Chapter progress may stay from
-     * migrateTo.
+     * After migrateTo onto an existing official URL, reuse [Book.updateTo] for
+     * shelf user fields, then put back the migrate reading progress.
      */
     fun restoreOfficialUserFields(incoming: Book, existing: Book?) {
         existing ?: return
         if (existing.isNotShelf) return
-        incoming.group = existing.group
-        incoming.order = existing.order
-        incoming.customCoverUrl = existing.customCoverUrl
-        incoming.customIntro = existing.customIntro
-        incoming.customTag = existing.customTag
-        incoming.canUpdate = existing.canUpdate
-        incoming.readConfig = existing.readConfig
+        val durChapterIndex = incoming.durChapterIndex
+        val durChapterTitle = incoming.durChapterTitle
+        val durVolumeIndex = incoming.durVolumeIndex
+        val chapterInVolumeIndex = incoming.chapterInVolumeIndex
+        val durChapterPos = incoming.durChapterPos
+        val durChapterTime = incoming.durChapterTime
+        existing.updateTo(incoming)
+        incoming.durChapterIndex = durChapterIndex
+        incoming.durChapterTitle = durChapterTitle
+        incoming.durVolumeIndex = durVolumeIndex
+        incoming.chapterInVolumeIndex = chapterInVolumeIndex
+        incoming.durChapterPos = durChapterPos
+        incoming.durChapterTime = durChapterTime
     }
 
     /** Before save: official rows keep DB user fields; temp rows keep progress. */

@@ -94,10 +94,20 @@ internal data class SearchHitAppend(
     val revision: Long = 0L,
 )
 
-/** Drop a search callback whose id is no longer the UI's current search. */
+/** Drop a search callback whose id/revision is no longer the UI's current search. */
 internal object SearchResultGate {
     fun accept(submittedId: Long, currentId: Long): Boolean {
         return submittedId != 0L && submittedId == currentId
+    }
+
+    fun accept(
+        submittedId: Long,
+        currentId: Long,
+        submittedRevision: Long,
+        lastAcceptedRevision: Long,
+    ): Boolean {
+        if (!accept(submittedId, currentId)) return false
+        return submittedRevision >= lastAcceptedRevision
     }
 }
 

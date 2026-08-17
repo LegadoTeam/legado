@@ -144,8 +144,6 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     }
                 }
             }
-            // After any name/author hit, recompute from the page URL we now hold.
-            bookData.value?.let { refreshShelfFlags(it) }
         }.onSuccess {
             success?.invoke()
         }

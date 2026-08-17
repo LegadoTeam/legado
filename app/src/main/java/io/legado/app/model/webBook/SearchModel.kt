@@ -130,7 +130,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                 hasMore = hasMore || published.changed
                 currentCoroutineContext().ensureActive()
                 if (!SearchResultGate.accept(searchId, mSearchId)) return@onEach
-                callBack.onSearchSuccess(searchId, published.hits)
+                callBack.onSearchSuccess(searchId, published.revision, published.hits)
             }.onCompletion { error ->
                 val context = currentCoroutineContext()
                 pageOwner.complete(context[Job]) {
@@ -239,7 +239,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
         fun getSearchScope(): SearchScope
         fun onSearchStart()
         fun onSearchProgress(searched: Int, total: Int)
-        fun onSearchSuccess(searchId: Long, searchBooks: List<SearchBook>)
+        fun onSearchSuccess(searchId: Long, revision: Long, searchBooks: List<SearchBook>)
         fun onSearchFinish(isEmpty: Boolean, hasMore: Boolean)
         fun onSearchCancel(exception: Throwable? = null)
     }
