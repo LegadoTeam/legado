@@ -66,19 +66,19 @@ class RuleSubAdapter(context: Context, val callBack: Callback) :
                 val srcOrder = srcItem.customOrder
                 srcItem.customOrder = targetItem.customOrder
                 targetItem.customOrder = srcOrder
-                movedItems.add(srcItem)
-                movedItems.add(targetItem)
+                movedItems[srcItem.id] = srcItem
+                movedItems[targetItem.id] = targetItem
             }
         }
         swapItem(srcPosition, targetPosition)
         return true
     }
 
-    private val movedItems = hashSetOf<RuleSub>()
+    private val movedItems = linkedMapOf<Long, RuleSub>()
 
     override fun onClearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
         if (movedItems.isNotEmpty()) {
-            callBack.updateSourceSub(*movedItems.toTypedArray())
+            callBack.updateSourceSub(*movedItems.values.toTypedArray())
             movedItems.clear()
         }
     }

@@ -320,23 +320,23 @@ class BookSourceAdapter(
             val srcOrder = srcItem.customOrder
             srcItem.customOrder = targetItem.customOrder
             targetItem.customOrder = srcOrder
-            movedItems.add(srcItem)
-            movedItems.add(targetItem)
+            movedItems[srcItem.bookSourceUrl] = srcItem
+            movedItems[targetItem.bookSourceUrl] = targetItem
         }
         swapItem(srcPosition, targetPosition)
         return true
     }
 
-    private val movedItems = hashSetOf<BookSourcePart>()
+    private val movedItems = linkedMapOf<String, BookSourcePart>()
 
     override fun onClearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
         if (movedItems.isNotEmpty()) {
             val sortNumberSet = hashSetOf<Int>()
-            movedItems.forEach {
+            movedItems.values.forEach {
                 sortNumberSet.add(it.customOrder)
             }
             val resetAll = movedItems.size > sortNumberSet.size
-            callBack.upOrder(if (resetAll) getItems() else movedItems.toList(), resetAll)
+            callBack.upOrder(if (resetAll) getItems() else movedItems.values.toList(), resetAll)
             movedItems.clear()
         }
     }

@@ -200,19 +200,19 @@ class RssSourceAdapter(context: Context, val callBack: CallBack) :
                 val srcOrder = srcItem.customOrder
                 srcItem.customOrder = targetItem.customOrder
                 targetItem.customOrder = srcOrder
-                movedItems.add(srcItem)
-                movedItems.add(targetItem)
+                movedItems[srcItem.sourceUrl] = srcItem
+                movedItems[targetItem.sourceUrl] = targetItem
             }
         }
         swapItem(srcPosition, targetPosition)
         return true
     }
 
-    private val movedItems = hashSetOf<RssSource>()
+    private val movedItems = linkedMapOf<String, RssSource>()
 
     override fun onClearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
         if (movedItems.isNotEmpty()) {
-            callBack.update(*movedItems.toTypedArray())
+            callBack.update(*movedItems.values.toTypedArray())
             movedItems.clear()
         }
     }
