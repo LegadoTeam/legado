@@ -44,7 +44,7 @@ zxingLite = "3.5.0"
 #不要更新版本
 #noinspection NewerVersionAvailable
 hutool = "5.8.22"
-bouncycastle = "1.75"
+bouncycastle = "1.85.2"
 
 #noinspection NewerVersionAvailable
 protobufJavalite = "3.25.9"
