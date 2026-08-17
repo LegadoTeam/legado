@@ -24,6 +24,7 @@ object BackupConfig {
     private const val themeConfigKey = "themeConfig"
     private const val coverConfigKey = "coverConfig"
     private const val localBookKey = "localBook"
+    private const val cookieIgnoreKey = "ignoreCookies"
 
     internal const val bookshelfContentKey = "backupBookshelf"
     internal const val annotationContentKey = "backupAnnotations"
@@ -34,6 +35,8 @@ object BackupConfig {
     internal const val persistedCoverContentKey = "backupPersistedCovers"
     internal const val otherCoverContentKey = "backupOtherCovers"
     internal const val backgroundContentKey = "backupBackgrounds"
+    internal const val cookieContentKey = "backupCookies"
+    internal const val cookieFileName = "cookies.json"
 
     val contentKeys = arrayOf(
         bookshelfContentKey,
@@ -45,6 +48,7 @@ object BackupConfig {
         persistedCoverContentKey,
         otherCoverContentKey,
         backgroundContentKey,
+        cookieContentKey,
     )
 
     val contentTitles = arrayOf(
@@ -57,6 +61,7 @@ object BackupConfig {
         appCtx.getString(R.string.backup_content_persisted_covers),
         appCtx.getString(R.string.backup_content_other_covers),
         appCtx.getString(R.string.backup_content_backgrounds),
+        appCtx.getString(R.string.backup_content_cookies),
     )
 
     //配置忽略key
@@ -68,7 +73,8 @@ object BackupConfig {
         PreferKey.bookshelfLayout,
         PreferKey.showRss,
         PreferKey.threadCount,
-        localBookKey
+        localBookKey,
+        cookieIgnoreKey,
     )
 
     //配置忽略标题
@@ -80,7 +86,8 @@ object BackupConfig {
         appCtx.getString(R.string.bookshelf_layout),
         appCtx.getString(R.string.show_rss),
         appCtx.getString(R.string.thread_count),
-        appCtx.getString(R.string.local_book)
+        appCtx.getString(R.string.local_book),
+        appCtx.getString(R.string.backup_content_cookies),
     )
 
     //自动忽略keys
@@ -175,9 +182,15 @@ object BackupConfig {
         get() = ignoreConfig[PreferKey.threadCount] == true
     val ignoreLocalBook: Boolean
         get() = ignoreConfig[localBookKey] == true
+    val ignoreCookies: Boolean
+        get() = ignoreConfig[cookieIgnoreKey] == true
 
     internal fun contentIsEnabled(key: String): Boolean {
-        return ignoreConfig[key] != true
+        return if (key == cookieContentKey) {
+            ignoreConfig[key] == false
+        } else {
+            ignoreConfig[key] != true
+        }
     }
 
     fun saveIgnoreConfig() {

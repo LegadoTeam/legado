@@ -928,6 +928,7 @@
     <string name="backup_content_persisted_covers">Persisted book covers</string>
     <string name="backup_content_other_covers">Other cover files</string>
     <string name="backup_content_backgrounds">Reading backgrounds</string>
+    <string name="backup_content_cookies">Persistent cookies</string>
     <string name="read_config">Reading interface settings</string>
     <string name="confirm_read_config_import">Import reading layout?</string>
     <string name="read_config_import_success">Reading layout imported</string>
@@ -1356,6 +1357,7 @@
     <string name="select_update_source">Select update source</string>
     <string name="set_local_password">Setting the local password</string>
     <string name="set_local_password_summary">The local password is used to encrypt and decrypt the sensitive information of the backup, if you need to synchronize between different devices, the local password should be the same.</string>
+    <string name="cookie_backup_password_required">Set a non-empty local password before backing up or restoring persistent cookies.</string>
     <string name="only_latest_backup_t">Keep only the latest backup</string>
     <string name="only_latest_backup_s">Local backup keeps only the latest backup file</string>
     <string name="webdav_application_authorization_error">Fail to authorize WebDav application</string>
