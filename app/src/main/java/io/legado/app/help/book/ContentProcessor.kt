@@ -213,7 +213,7 @@ class ContentProcessor private constructor(
             mContent = mContent.replace('\u00A0', ' ')
         }
         val contents = arrayListOf<String>()
-        mContent.split("\n").forEach { str ->
+        mContent.lineSequence().forEach { str ->
             val paragraph = str.trim {
                 it.code <= 0x20 || it == '　'
             }
