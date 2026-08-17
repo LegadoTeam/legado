@@ -20,6 +20,21 @@ class BookSourceManageOrderTest {
     }
 
     @Test
+    fun `duplicate order shared with hidden source is normalized`() {
+        val allItems = listOf(Item("a", 0), Item("hidden", 1), Item("b", 1))
+        val movedItems = listOf(Item("a", 1), Item("b", 0))
+
+        val result = mergeFilteredOrder(
+            allItems,
+            movedItems.sortedBy(Item::order),
+            Item::key,
+        ).onEachIndexed { index, item -> item.order = index }
+
+        assertEquals(listOf("b", "hidden", "a"), result.map(Item::key))
+        assertEquals(listOf(0, 1, 2), result.map(Item::order))
+    }
+
+    @Test
     fun `duplicate source order resets from the full current list`() {
         val adapter = projectFile(
             "src/main/java/io/legado/app/ui/book/source/manage/BookSourceAdapter.kt"
@@ -32,13 +47,15 @@ class BookSourceManageOrderTest {
         assertTrue(adapter.contains("callBack.upOrder(if (resetAll) getItems()"))
         assertFalse(adapter.contains("getItems().mapIndexed"))
         assertTrue(viewModel.contains("appDb.runInTransaction"))
+        assertTrue(viewModel.contains("resetAll || appDb.bookSourceDao.hasDuplicateOrder"))
+        assertTrue(viewModel.contains("else -> items.sortedBy { it.customOrder }"))
         assertTrue(viewModel.contains("appDb.bookSourceDao.allPart"))
-        assertTrue(viewModel.contains("if (sortAscending) items else items.asReversed()"))
+        assertTrue(viewModel.contains("resetAll && !sortAscending -> items.asReversed()"))
         assertTrue(viewModel.contains("source.customOrder = index"))
         assertTrue(viewModel.contains("appDb.bookSourceDao.upOrder(reordered)"))
     }
 
-    private data class Item(val key: String)
+    private data class Item(val key: String, var order: Int = 0)
 
     private fun projectFile(pathInApp: String): File =
         listOf(File(pathInApp), File("app/$pathInApp")).first { it.isFile }

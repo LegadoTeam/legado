@@ -64,18 +64,22 @@ class BookSourceViewModel(application: Application) : BaseViewModel(application)
     fun upOrder(items: List<BookSourcePart>, resetAll: Boolean, sortAscending: Boolean) {
         if (items.isEmpty()) return
         execute {
-            if (resetAll) {
-                appDb.runInTransaction {
-                    val orderedItems = if (sortAscending) items else items.asReversed()
+            appDb.runInTransaction {
+                if (resetAll || appDb.bookSourceDao.hasDuplicateOrder) {
+                    val orderedItems = when {
+                        resetAll && !sortAscending -> items.asReversed()
+                        resetAll -> items
+                        else -> items.sortedBy { it.customOrder }
+                    }
                     val reordered = mergeFilteredOrder(
                         appDb.bookSourceDao.allPart,
                         orderedItems,
                     ) { it.bookSourceUrl }
                     reordered.forEachIndexed { index, source -> source.customOrder = index }
                     appDb.bookSourceDao.upOrder(reordered)
+                } else {
+                    appDb.bookSourceDao.upOrder(items)
                 }
-            } else {
-                appDb.bookSourceDao.upOrder(items)
             }
         }
     }
