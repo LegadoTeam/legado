@@ -91,11 +91,14 @@ class CookieBackupCompatibilityTest {
             .substringBefore("override fun onSaveInstanceState")
         val autoRestore = mainViewModel.substringAfter("fun restoreWebDav(")
             .substringBefore("private fun deleteNotShelfBook")
+        val contentIsEnabled = config.substringAfter("internal fun contentIsEnabled(")
+            .substringBefore("fun saveIgnoreConfig")
 
         assertTrue(backupFunction.contains("aes.encryptBase64(GSON.toJson(appDb.cookieDao.all))"))
         assertTrue(backupFunction.contains("BackupConfig.cookieContentKey in enabledContentKeys"))
         assertTrue(backupFunction.contains("val password = LocalConfig.password"))
         assertTrue(backupFunction.contains("password.isNullOrBlank()"))
+        assertTrue(backupFunction.contains("val aes = BackupAES(password)"))
         assertTrue(
             backupFunction.indexOf("password.isNullOrBlank()") <
                 backupFunction.indexOf("LocalConfig.lastBackup = System.currentTimeMillis()")
@@ -103,6 +106,7 @@ class CookieBackupCompatibilityTest {
         assertTrue(restoreFunction.contains("!BackupConfig.ignoreCookies"))
         assertTrue(restoreFunction.contains("val password = LocalConfig.password"))
         assertTrue(restoreFunction.contains("password.isNullOrBlank()"))
+        assertTrue(restoreFunction.contains("val aes = BackupAES(password)"))
         assertTrue(restoreFunction.contains("aes.decryptStr(file.readText())"))
         assertTrue(
             restoreFunction.indexOf("val restoredCookies") <
@@ -137,7 +141,8 @@ class CookieBackupCompatibilityTest {
         assertTrue(autoRestore.contains("executeLazy {"))
         assertTrue(autoRestore.contains("}.onError {"))
         assertTrue(autoRestore.contains("}.start()"))
-        assertTrue(config.contains("ignoreConfig[key] == false"))
+        assertTrue(contentIsEnabled.contains("if (key == cookieContentKey)"))
+        assertTrue(contentIsEnabled.contains("ignoreConfig[key] == false"))
     }
 
     private fun projectFile(pathInApp: String): File =
