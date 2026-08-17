@@ -101,6 +101,20 @@ class BottomWebViewDialogLifecycleContractTest {
         assertFalse(fields.contains("private val behavior by lazy"))
     }
 
+    @Test
+    fun `sheet state follows size layout request`() {
+        val setConfig = section("private fun setConfig", "private fun reapplyConfiguredHeight")
+        val widthChange = setConfig.indexOf("params.width = width")
+        val heightChange = setConfig.indexOf("params.height = height")
+        val requestLayout = setConfig.indexOf("sheet.layoutParams = params")
+        val applyState = setConfig.indexOf("behaviorSpec.state?.let { behavior?.state = it }")
+
+        assertTrue(widthChange >= 0)
+        assertTrue(heightChange >= 0)
+        assertTrue(requestLayout > heightChange)
+        assertTrue(applyState > requestLayout)
+    }
+
     private fun section(startMarker: String, endMarker: String): String {
         val start = source.indexOf(startMarker)
         val end = source.indexOf(endMarker, start)

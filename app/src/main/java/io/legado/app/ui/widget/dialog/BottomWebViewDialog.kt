@@ -379,7 +379,6 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             expandedHeight = heightSpec.expandedHeight,
         )
         behavior?.let { behavior ->
-            behaviorSpec.state?.let { behavior.state = it }
             behaviorSpec.peekHeight?.let { behavior.peekHeight = it }
             config.isHideable?.let { behavior.isHideable = it }
             behaviorSpec.skipCollapsed?.let { behavior.skipCollapsed = it }
@@ -541,6 +540,8 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                 }
             }
         }
+
+        behaviorSpec.state?.let { behavior?.state = it }
 
         val scrollNoDraggable = config.scrollNoDraggable ?: if (first) true else null
         scrollNoDraggable?.let {
