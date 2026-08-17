@@ -94,13 +94,15 @@ class CookieBackupCompatibilityTest {
 
         assertTrue(backupFunction.contains("aes.encryptBase64(GSON.toJson(appDb.cookieDao.all))"))
         assertTrue(backupFunction.contains("BackupConfig.cookieContentKey in enabledContentKeys"))
-        assertTrue(backupFunction.contains("LocalConfig.password.isNullOrBlank()"))
+        assertTrue(backupFunction.contains("val password = LocalConfig.password"))
+        assertTrue(backupFunction.contains("password.isNullOrBlank()"))
         assertTrue(
-            backupFunction.indexOf("LocalConfig.password.isNullOrBlank()") <
+            backupFunction.indexOf("password.isNullOrBlank()") <
                 backupFunction.indexOf("LocalConfig.lastBackup = System.currentTimeMillis()")
         )
         assertTrue(restoreFunction.contains("!BackupConfig.ignoreCookies"))
-        assertTrue(restoreFunction.contains("LocalConfig.password.isNullOrBlank()"))
+        assertTrue(restoreFunction.contains("val password = LocalConfig.password"))
+        assertTrue(restoreFunction.contains("password.isNullOrBlank()"))
         assertTrue(restoreFunction.contains("aes.decryptStr(file.readText())"))
         assertTrue(
             restoreFunction.indexOf("val restoredCookies") <
