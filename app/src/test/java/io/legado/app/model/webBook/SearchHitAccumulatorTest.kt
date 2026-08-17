@@ -249,19 +249,34 @@ class SearchHitAccumulatorTest {
         assertFalse(viewModel.contains("SearchUiGeneration"))
         val searchFn = viewModel.substringAfter("fun search(key: String)").substringBefore("fun stop()")
         assertTrue(searchFn.contains("searchModel.cancelSearch()"))
-        assertTrue(searchFn.contains("searchID = System.currentTimeMillis()"))
+        assertTrue(searchFn.contains("searchID = searchPublishGate.mint()"))
         assertTrue(searchFn.contains("searchPublishGate.begin(searchID)"))
         assertTrue(searchFn.contains("searchModel.search(searchID, searchKey)"))
         assertTrue(searchFn.contains("execute {"))
         assertTrue(viewModel.contains("private var searchID = 0L"))
         assertTrue(viewModel.contains("SearchUiPublishGate"))
         assertTrue(viewModel.contains("searchPublishGate.publish("))
+        assertFalse(searchFn.contains("System.currentTimeMillis()"))
         val stopFn = viewModel.substringAfter("fun stop()").substringBefore("fun pause()")
         assertTrue(stopFn.contains("searchPublishGate.invalidate()"))
         assertFalse(stopFn.contains("resetAcceptedRevision"))
         assertTrue(searchFn.contains("generationDead") || searchFn.contains("!searchPublishGate.isActive"))
         assertFalse(viewModel.contains("searchStartLock"))
         assertFalse(viewModel.contains("SearchUiGeneration"))
+    }
+
+    @Test
+    fun mintNeverReusesIdsAcrossConsecutiveStarts() {
+        val gate = SearchUiPublishGate()
+        val ids = (1..500).map { gate.mint() }
+        assertEquals(500, ids.toSet().size)
+        assertFalse(ids.contains(0L))
+        assertTrue(ids.zipWithNext().all { (a, b) -> b > a })
+        gate.begin(ids[0])
+        gate.invalidate()
+        val afterStop = gate.mint()
+        assertTrue(afterStop > ids.last())
+        assertFalse(ids.contains(afterStop))
     }
 
     @Test
@@ -277,13 +292,16 @@ class SearchHitAccumulatorTest {
     @Test
     fun stopInvalidatesGenerationSoLateOldRevisionCannotWin() {
         val gate = SearchUiPublishGate()
-        gate.begin(9L)
+        val oldId = gate.mint()
+        gate.begin(oldId)
         val posted = mutableListOf<String>()
-        assertTrue(gate.publish(9L, 5L, listOf(hit("old"))) { posted.add("r5") })
+        assertTrue(gate.publish(oldId, 5L, listOf(hit("old"))) { posted.add("r5") })
         gate.invalidate()
-        assertFalse(gate.publish(9L, 5L, listOf(hit("late"))) { posted.add("late-r5") })
-        gate.begin(10L)
-        assertTrue(gate.publish(10L, 1L, listOf(hit("new"))) { posted.add("r1") })
+        assertFalse(gate.publish(oldId, 5L, listOf(hit("late"))) { posted.add("late-r5") })
+        val newId = gate.mint()
+        assertTrue(newId != oldId)
+        gate.begin(newId)
+        assertTrue(gate.publish(newId, 1L, listOf(hit("new"))) { posted.add("r1") })
         assertEquals(listOf("r5", "r1"), posted)
     }
 

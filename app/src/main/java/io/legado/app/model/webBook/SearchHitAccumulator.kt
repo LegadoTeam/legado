@@ -1,6 +1,7 @@
 package io.legado.app.model.webBook
 
 import io.legado.app.data.entities.SearchBook
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Per-search raw hits. Replaces a shared mutable ArrayList so cancel/restart
@@ -114,11 +115,16 @@ internal object SearchResultGate {
 /**
  * Single synchronized publish point for search UI: generation + revision + post.
  * stop() must invalidate the generation so late callbacks cannot reuse the id.
+ * Generations are minted with a strictly increasing counter (never 0, never wall-clock).
  */
 internal class SearchUiPublishGate {
     private val lock = Any()
     private var currentId = 0L
     private var acceptedRevision = 0L
+    private val sequence = AtomicLong(0L)
+
+    /** Next generation id; never returns 0 and never reuses a prior mint from this gate. */
+    fun mint(): Long = sequence.incrementAndGet()
 
     fun begin(searchId: Long) {
         synchronized(lock) {

@@ -127,7 +127,7 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
                 val generationDead = !searchPublishGate.isActive(searchID)
                 if ((searchKey == key) || key.isNotEmpty() || generationDead) {
                     searchModel.cancelSearch()
-                    searchID = command
+                    searchID = searchPublishGate.mint()
                     searchPublishGate.begin(searchID)
                     if ((searchKey == key) || key.isNotEmpty()) {
                         searchBookLiveData.postValue(emptyList())
@@ -138,7 +138,7 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
                 if (searchKey.isEmpty()) {
                     return@runIfCurrent
                 }
-                searchModel.search(command, searchKey)
+                searchModel.search(searchID, searchKey)
             }
         }
     }
