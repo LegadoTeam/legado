@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
+import io.legado.app.R
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
@@ -58,6 +59,9 @@ internal fun selectedBackupFileNames(isEnabled: (String) -> Boolean): List<Strin
         }
         if (isEnabled(BackupConfig.sourceContentKey)) {
             addAll(listOf("bookSource.json", "rssSources.json", "rssStar.json", "sourceSub.json"))
+        }
+        if (isEnabled(BackupConfig.cookieContentKey)) {
+            add(BackupConfig.cookieFileName)
         }
         if (isEnabled(BackupConfig.ruleContentKey)) {
             addAll(
@@ -150,12 +154,18 @@ object Backup {
 
     private suspend fun backup(context: Context, path: String?) {
         LogUtils.d(TAG, "开始备份 path:$path")
-        LocalConfig.lastBackup = System.currentTimeMillis()
-        val aes = BackupAES()
-        FileUtils.delete(backupPath)
         val enabledContentKeys = BackupConfig.contentKeys.filterTo(hashSetOf()) {
             BackupConfig.contentIsEnabled(it)
         }
+        val password = LocalConfig.password
+        if (BackupConfig.cookieContentKey in enabledContentKeys &&
+            password.isNullOrBlank()
+        ) {
+            throw NoStackTraceException(appCtx.getString(R.string.cookie_backup_password_required))
+        }
+        LocalConfig.lastBackup = System.currentTimeMillis()
+        val aes = BackupAES(password)
+        FileUtils.delete(backupPath)
         val backupPersistedCovers = BackupConfig.persistedCoverContentKey in enabledContentKeys
         val backupOtherCovers = BackupConfig.otherCoverContentKey in enabledContentKeys
         val backupBackgrounds = BackupConfig.backgroundContentKey in enabledContentKeys
@@ -210,6 +220,12 @@ object Backup {
                 FileUtils.createFileIfNotExist(backupPath + File.separator + "servers.json")
                     .writeText(it)
             }
+        }
+        if (BackupConfig.cookieContentKey in enabledContentKeys) {
+            val encryptedCookies = aes.encryptBase64(GSON.toJson(appDb.cookieDao.all))
+            FileUtils.createFileIfNotExist(
+                backupPath + File.separator + BackupConfig.cookieFileName
+            ).writeText(encryptedCookies)
         }
         currentCoroutineContext().ensureActive()
         GSON.toJson(readConfigSnapshot).let {

@@ -4,6 +4,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteConstraintException
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
+import com.google.gson.JsonElement
 import io.legado.app.BuildConfig
 import io.legado.app.R
 import io.legado.app.constant.AppConst.androidId
@@ -16,6 +17,7 @@ import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookHighlight
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.Bookmark
+import io.legado.app.data.entities.Cookie
 import io.legado.app.data.entities.DictRule
 import io.legado.app.data.entities.HttpTTS
 import io.legado.app.data.entities.HighlightRule
@@ -28,6 +30,7 @@ import io.legado.app.data.entities.RuleSub
 import io.legado.app.data.entities.SearchKeyword
 import io.legado.app.data.entities.Server
 import io.legado.app.data.entities.TxtTocRule
+import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.DirectLinkUpload
 import io.legado.app.help.HighlightStyle
 import io.legado.app.help.LauncherIconHelp
@@ -37,6 +40,7 @@ import io.legado.app.help.book.upType
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ThemeConfig
+import io.legado.app.help.http.CookieStore
 import io.legado.app.lib.theme.WallpaperTheme
 import io.legado.app.model.VideoPlay.VIDEO_PREF_NAME
 import io.legado.app.model.BookCover
@@ -45,6 +49,7 @@ import io.legado.app.service.AutoTaskScheduler
 import io.legado.app.utils.ACache
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
+import io.legado.app.utils.GSONStrict
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.compress.ZipUtils
 import io.legado.app.utils.defaultSharedPreferences
@@ -67,6 +72,17 @@ import kotlinx.coroutines.withContext
 import splitties.init.appCtx
 import java.io.File
 import java.io.FileInputStream
+
+internal fun parseCookieBackup(json: String): List<Cookie> {
+    return GSONStrict.fromJsonArray<JsonElement>(json).getOrThrow().map { element ->
+        require(element.isJsonObject)
+        val url = element.asJsonObject.get("url")
+        val cookie = element.asJsonObject.get("cookie")
+        require(url != null && url.isJsonPrimitive && url.asJsonPrimitive.isString)
+        require(cookie != null && cookie.isJsonPrimitive && cookie.asJsonPrimitive.isString)
+        Cookie(url.asString.also { require(it.isNotBlank()) }, cookie.asString)
+    }
+}
 
 /**
  * 恢复
@@ -108,8 +124,21 @@ object Restore {
     }
 
     private suspend fun restore(path: String) {
-        val aes = BackupAES()
+        val password = LocalConfig.password
+        val aes = BackupAES(password)
         val backupRoot = File(path)
+        val restoredCookies = if (!BackupConfig.ignoreCookies) {
+            File(path, BackupConfig.cookieFileName).takeIf { it.exists() }?.let { file ->
+                if (password.isNullOrBlank()) {
+                    throw NoStackTraceException(
+                        appCtx.getString(R.string.cookie_backup_password_required)
+                    )
+                }
+                parseCookieBackup(aes.decryptStr(file.readText()))
+            }
+        } else {
+            null
+        }
         val restoredAutoTasks = fileToListT<AutoTaskRule>(path, "autoTask.json")
         fileToListT<Book>(path, "bookshelf.json")?.let {
             it.forEach { book ->
@@ -236,6 +265,13 @@ object Restore {
             }
         }?.onFailure {
             AppLog.put("恢复服务器配置出错\n${it.localizedMessage}", it)
+        }
+        restoredCookies?.filter { cookie -> cookie.url.isNotBlank() }?.forEach { cookie ->
+            if ('|' in cookie.url) {
+                appDb.cookieDao.insert(cookie)
+            } else {
+                CookieStore.restoreCookie(cookie.url, cookie.cookie)
+            }
         }
         File(path, DirectLinkUpload.ruleFileName).takeIf {
             it.exists()
