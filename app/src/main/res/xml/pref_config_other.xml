@@ -44,6 +44,12 @@
             app:iconSpaceReserved="false" />
 
         <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="false"
+            android:key="showDiscoveryFastScroller"
+            android:title="@string/show_discovery_fast_scroller"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.SwitchPreference
             android:defaultValue="true"
             android:key="showRss"
             android:title="@string/show_rss"

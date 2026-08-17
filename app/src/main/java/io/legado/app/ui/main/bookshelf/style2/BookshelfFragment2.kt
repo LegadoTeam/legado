@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.graphics.Rect
 import android.os.Bundle
 import android.view.View
+import android.view.ViewConfiguration
 import androidx.appcompat.widget.SearchView
 import androidx.core.view.isGone
 import androidx.lifecycle.Lifecycle
@@ -90,6 +91,8 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
 
     private fun initRecyclerView() {
         binding.rvBookshelf.setEdgeEffectColor(primaryColor)
+        binding.fastScroller.attachRecyclerView(binding.rvBookshelf)
+        upFastScrollerBar()
         binding.refreshLayout.setColorSchemeColors(accentColor)
         binding.refreshLayout.setOnRefreshListener {
             binding.refreshLayout.isRefreshing = false
@@ -143,6 +146,16 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
                 }
             }
         })
+    }
+
+    private fun upFastScrollerBar() {
+        val show = AppConfig.showBookshelfFastScroller
+        binding.fastScroller.isEnabled = show
+        binding.rvBookshelf.scrollBarSize = if (show) {
+            0
+        } else {
+            ViewConfiguration.get(requireContext()).scaledScrollBarSize
+        }
     }
 
     override fun upGroup(data: List<BookGroup>) {
@@ -309,6 +322,12 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         }
         observeEvent<String>(EventBus.BOOKSHELF_REFRESH) {
             booksAdapter.notifyDataSetChanged()
+            upFastScrollerBar()
         }
+    }
+
+    override fun onDestroyView() {
+        binding.fastScroller.detachRecyclerView()
+        super.onDestroyView()
     }
 }

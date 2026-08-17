@@ -5,6 +5,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.SubMenu
 import android.view.View
+import android.view.ViewConfiguration
 import androidx.appcompat.widget.SearchView
 import androidx.core.view.isGone
 import androidx.fragment.app.viewModels
@@ -122,6 +123,8 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         binding.rvFind.setEdgeEffectColor(primaryColor)
         binding.rvFind.layoutManager = linearLayoutManager
         binding.rvFind.adapter = adapter
+        binding.fastScroller.attachRecyclerView(binding.rvFind)
+        upFastScrollerBar()
         adapter.registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
 
             override fun onItemRangeInserted(positionStart: Int, itemCount: Int) {
@@ -131,6 +134,16 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 }
             }
         })
+    }
+
+    private fun upFastScrollerBar() {
+        val show = AppConfig.showDiscoveryFastScroller
+        binding.fastScroller.isEnabled = show
+        binding.rvFind.scrollBarSize = if (show) {
+            0
+        } else {
+            ViewConfiguration.get(requireContext()).scaledScrollBarSize
+        }
     }
 
     private fun initGroupData() {
@@ -184,6 +197,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     override fun onResume() {
         super.onResume()
+        upFastScrollerBar()
         adapter.upResumed(true)
     }
 
@@ -192,6 +206,11 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         searchView.clearFocus()
         adapter.onPause()
         super.onPause()
+    }
+
+    override fun onDestroyView() {
+        binding.fastScroller.detachRecyclerView()
+        super.onDestroyView()
     }
 
     private fun upGroupsMenu(resetMissingGroup: Boolean = false) {
