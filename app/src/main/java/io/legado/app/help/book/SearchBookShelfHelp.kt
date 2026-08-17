@@ -76,8 +76,10 @@ object SearchBookShelfHelp {
     ): Boolean {
         if (!BookAuthorIdentity.isWeakAuthor(searchBook.author)) return false
         store.getBook(searchBook.bookUrl)?.takeUnless { it.isNotShelf }?.let { return false }
-        val visible = sameName.filter { !it.isLocal && !it.isNotShelf }
-        return BookAuthorIdentity.soleRealAuthor(visible.map { it.author }) != null
+        val visibleWeb = sameName.filter { !it.isLocal && !it.isNotShelf }
+        if (BookAuthorIdentity.soleRealAuthor(visibleWeb.map { it.author }) != null) return true
+        // Empty/佚名 are the same weak author: do not insert a second official weak row.
+        return visibleWeb.any { BookAuthorIdentity.isWeakAuthor(it.author) }
     }
 
     fun isOfficialUrlOnShelf(bookUrl: String): Boolean {

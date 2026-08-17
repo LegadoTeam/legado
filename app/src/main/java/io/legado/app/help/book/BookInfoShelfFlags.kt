@@ -26,6 +26,35 @@ internal object BookInfoShelfFlags {
         }
     }
 
+    /**
+     * After migrateTo onto an existing official URL, keep that row's user
+     * fields (group / custom* / readConfig). Chapter progress may stay from
+     * migrateTo.
+     */
+    fun restoreOfficialUserFields(incoming: Book, existing: Book?) {
+        existing ?: return
+        if (existing.isNotShelf) return
+        incoming.group = existing.group
+        incoming.order = existing.order
+        incoming.customCoverUrl = existing.customCoverUrl
+        incoming.customIntro = existing.customIntro
+        incoming.customTag = existing.customTag
+        incoming.canUpdate = existing.canUpdate
+        incoming.readConfig = existing.readConfig
+    }
+
+    /** Before save: official rows keep DB user fields; temp rows keep progress. */
+    fun applyExistingBeforeSave(incoming: Book, existing: Book) {
+        if (existing.isNotShelf) {
+            incoming.durChapterIndex = existing.durChapterIndex
+            incoming.durChapterPos = existing.durChapterPos
+            incoming.durChapterTitle = existing.durChapterTitle
+        } else {
+            existing.updateTo(incoming)
+        }
+        keepExistingNotShelf(incoming, existing)
+    }
+
     fun promoteOrSkipTempBook(book: Book): Boolean {
         if (SearchBookShelfHelp.shouldSkipWeakInsert(book.name, book.author, book.bookUrl)) {
             return false

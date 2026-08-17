@@ -121,11 +121,31 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
 
     fun upBook(intent: Intent, success: (() -> Unit)? = null) {
         execute {
+            // Prefer the page we still hold: refresh its official-shelf flag first.
+            bookData.value?.let { refreshShelfFlags(it) }
             val name = intent.getStringExtra("name") ?: ""
             val author = intent.getStringExtra("author") ?: ""
             appDb.bookDao.getBook(name, author)?.let { book ->
-                upBook(book)
+                refreshShelfFlags(book)
+                bookSource = if (book.isLocal) null else
+                    appDb.bookSourceDao.getBookSource(book.origin)?.also {
+                        hasCustomBtn = it.customButton
+                    }
+                bookData.postValue(book)
+                upCoverByRule(book)
+                if (book.tocUrl.isEmpty() && !book.isLocal) {
+                    loadBookInfo(book, runPreUpdateJs = inBookshelf)
+                } else {
+                    val chapterList = appDb.bookChapterDao.getChapterList(book.bookUrl)
+                    if (chapterList.isNotEmpty()) {
+                        chapterListData.postValue(chapterList)
+                    } else {
+                        loadChapter(book, isFromBookInfo = true)
+                    }
+                }
             }
+            // After any name/author hit, recompute from the page URL we now hold.
+            bookData.value?.let { refreshShelfFlags(it) }
         }.onSuccess {
             success?.invoke()
         }
@@ -137,6 +157,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
 
     private fun upBook(book: Book) {
         execute {
+            refreshShelfFlags(book)
             bookSource = if (book.isLocal) null else
                 appDb.bookSourceDao.getBookSource(book.origin)?.also {
                     hasCustomBtn = it.customButton
@@ -440,6 +461,10 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 hasCustomBtn = it.customButton
             }
             bookData.value?.migrateTo(book, toc)
+            BookInfoShelfFlags.restoreOfficialUserFields(
+                book,
+                appDb.bookDao.getBook(book.bookUrl),
+            )
             if (book.isWebFile) {
                 loadWebFile(book)
             }
@@ -449,9 +474,9 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 appDb.bookDao.insert(book)
                 appDb.bookChapterDao.insert(*toc.toTypedArray())
             }
+            refreshShelfFlags(book)
             bookData.postValue(book)
             chapterListData.postValue(toc)
-            refreshShelfFlags(book)
         }.onSuccess {
             onSuccess()
         }.onFinally {
@@ -482,10 +507,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             }
             val byUrl = appDb.bookDao.getBook(book.bookUrl)
             if (byUrl != null) {
-                book.durChapterIndex = byUrl.durChapterIndex
-                book.durChapterPos = byUrl.durChapterPos
-                book.durChapterTitle = byUrl.durChapterTitle
-                BookInfoShelfFlags.keepExistingNotShelf(book, byUrl)
+                BookInfoShelfFlags.applyExistingBeforeSave(book, byUrl)
                 if (preserveCustomCoverUrl) {
                     book.savePreservingCustomCoverUrl()
                 } else {

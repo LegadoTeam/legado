@@ -680,6 +680,25 @@ class SearchBookShelfHelpTest {
     }
 
     @Test
+    fun soleWebWeakSkipsAnotherWeakInsertIncludingEmptyAuthor() {
+        val weak = Book(bookUrl = "w", name = "T", author = "佚名")
+        val store = FakeStore(weak)
+        val empty = SearchBookShelfHelp.addLoadedBooksToShelf(
+            listOf(searchBook("empty", "T", "")),
+            store,
+        )
+        assertEquals(0, empty.added)
+        assertEquals(1, store.books.size)
+        assertEquals("w", store.books.single().bookUrl)
+        val yiming = SearchBookShelfHelp.addLoadedBooksToShelf(
+            listOf(searchBook("yiming2", "T", "佚名")),
+            store,
+        )
+        assertEquals(0, yiming.added)
+        assertEquals("w", store.books.single().bookUrl)
+    }
+
+    @Test
     fun sameUrlActiveBookKeepsUnsavedMemoryState() {
         val activeBook = Book(
             bookUrl = "same-url",

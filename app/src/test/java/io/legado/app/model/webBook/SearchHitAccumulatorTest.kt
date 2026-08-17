@@ -253,6 +253,7 @@ class SearchHitAccumulatorTest {
         assertTrue(searchFn.contains("searchModel.search(searchID, searchKey)"))
         assertTrue(searchFn.contains("execute {"))
         assertTrue(viewModel.contains("private var searchID = 0L"))
+        assertTrue(viewModel.contains("SearchResultGate.accept(searchId, searchID)"))
     }
 
     private fun hit(bookUrl: String) = SearchBook(

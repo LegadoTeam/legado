@@ -175,6 +175,7 @@ class BookInfoLoadingIndicatorTest {
             .substringBefore("fun saveChapterList(")
         assertTrue(saveBook.contains("appDb.bookDao.getBook(book.bookUrl)"))
         assertTrue(saveBook.contains("SearchBookShelfHelp.persistIncomingBook(book)"))
+        assertTrue(saveBook.contains("BookInfoShelfFlags.applyExistingBeforeSave(book, byUrl)"))
         assertFalse(saveBook.contains("getBook(book.name, book.author)"))
         assertTrue(saveBook.contains("if (saved == true)"))
         assertFalse(saveBook.contains("shouldSkipWeakInsert"))
