@@ -88,6 +88,8 @@ class JsSourceMarshallerTest {
     @Test
     fun `accepts object variable in book info`() {
         val book = Book(bookUrl = "https://source.example/book")
+        book.variable = """{"old":"value"}"""
+        assertEquals("value", book.variableMap["old"])
 
         JsSourceMarshaller.mergeBookInfo(
             book,
@@ -97,6 +99,21 @@ class JsSourceMarshallerTest {
         )
 
         assertEquals("abc", book.variableMap["token"])
+        assertNull(book.variableMap["old"])
+    }
+
+    @Test
+    fun `ignores nonnumeric detail type`() {
+        val book = Book(bookUrl = "https://source.example/book", type = BookType.audio)
+
+        JsSourceMarshaller.mergeBookInfo(
+            book,
+            """{"type":"audio"}""",
+            textSource,
+            canReName = true,
+        )
+
+        assertEquals(BookType.audio, book.type)
     }
 
     @Test
@@ -144,6 +161,7 @@ class JsSourceMarshallerTest {
 
         val chapters = JsSourceMarshaller.parseChapters(
             """[
+                {"title":"第一卷","url":"第一卷","isVolume":true},
                 {"title":"第1章","url":"/read/1"},
                 {"title":"第2章","url":"https://other.example/read/2","isVip":true},
                 {"url":"缺标题"}
@@ -152,11 +170,14 @@ class JsSourceMarshallerTest {
             textSource,
         )
 
-        assertEquals(2, chapters.size)
-        assertEquals("https://source.example/read/1", chapters[0].url)
-        assertEquals(book.bookUrl, chapters[0].bookUrl)
-        assertEquals(book.tocUrl, chapters[0].baseUrl)
+        assertEquals(3, chapters.size)
+        assertEquals("第一卷", chapters[0].url)
+        assertTrue(chapters[0].isVolume)
         assertEquals(0, chapters[0].index)
-        assertTrue(chapters[1].isVip)
+        assertEquals("https://source.example/read/1", chapters[1].url)
+        assertEquals(book.bookUrl, chapters[1].bookUrl)
+        assertEquals(book.tocUrl, chapters[1].baseUrl)
+        assertEquals(1, chapters[1].index)
+        assertTrue(chapters[2].isVip)
     }
 }
