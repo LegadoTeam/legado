@@ -113,7 +113,7 @@ internal object SearchResultGate {
 
 /**
  * Single synchronized publish point for search UI: generation + revision + post.
- * Reset revision on stop/close so the same searchId can restart from rev 1.
+ * stop() must invalidate the generation so late callbacks cannot reuse the id.
  */
 internal class SearchUiPublishGate {
     private val lock = Any()
@@ -127,10 +127,17 @@ internal class SearchUiPublishGate {
         }
     }
 
-    /** After SearchModel.close() resets accumulator; keep the same searchId. */
-    fun resetAcceptedRevision() {
+    /** Reject all callbacks until the next [begin]. */
+    fun invalidate() {
         synchronized(lock) {
+            currentId = 0L
             acceptedRevision = 0L
+        }
+    }
+
+    fun isActive(searchId: Long): Boolean {
+        synchronized(lock) {
+            return currentId != 0L && currentId == searchId
         }
     }
 

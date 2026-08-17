@@ -48,13 +48,9 @@ internal object BookInfoShelfFlags {
         incoming.durChapterTime = durChapterTime
     }
 
-    /** Before save: official rows keep DB user fields; temp rows keep progress. */
+    /** Before save: official rows keep DB user fields; temp rows keep caller progress. */
     fun applyExistingBeforeSave(incoming: Book, existing: Book) {
-        if (existing.isNotShelf) {
-            incoming.durChapterIndex = existing.durChapterIndex
-            incoming.durChapterPos = existing.durChapterPos
-            incoming.durChapterTitle = existing.durChapterTitle
-        } else {
+        if (!existing.isNotShelf) {
             existing.updateTo(incoming)
         }
         keepExistingNotShelf(incoming, existing)

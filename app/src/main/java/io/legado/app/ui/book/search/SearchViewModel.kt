@@ -124,12 +124,15 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
         val command = searchCommands.next()
         execute {
             searchCommands.runIfCurrent(command) {
-                if ((searchKey == key) || key.isNotEmpty()) {
+                val generationDead = !searchPublishGate.isActive(searchID)
+                if ((searchKey == key) || key.isNotEmpty() || generationDead) {
                     searchModel.cancelSearch()
                     searchID = command
                     searchPublishGate.begin(searchID)
-                    searchBookLiveData.postValue(emptyList())
-                    searchKey = key
+                    if ((searchKey == key) || key.isNotEmpty()) {
+                        searchBookLiveData.postValue(emptyList())
+                        searchKey = key
+                    }
                     hasMore = true
                 }
                 if (searchKey.isEmpty()) {
@@ -146,7 +149,7 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
     fun stop() {
         searchCommands.invalidate {
             searchID = 0L
-            searchPublishGate.resetAcceptedRevision()
+            searchPublishGate.invalidate()
             searchModel.cancelSearch()
         }
     }
@@ -191,7 +194,7 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
         super.onCleared()
         searchCommands.invalidate {
             searchID = 0L
-            searchPublishGate.resetAcceptedRevision()
+            searchPublishGate.invalidate()
             searchModel.close()
         }
     }

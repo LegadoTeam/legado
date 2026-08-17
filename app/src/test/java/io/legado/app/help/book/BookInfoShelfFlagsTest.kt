@@ -58,6 +58,33 @@ class BookInfoShelfFlagsTest {
     }
 
     @Test
+    fun applyExistingBeforeSaveKeepsIncomingProgressOnTempRow() {
+        val existing = Book(
+            bookUrl = "A",
+            name = "T",
+            author = "甲",
+            type = BookType.text or BookType.notShelf,
+            durChapterIndex = 1,
+            durChapterPos = 2,
+            durChapterTitle = "old",
+        )
+        val incoming = Book(
+            bookUrl = "A",
+            name = "T",
+            author = "甲",
+            type = BookType.text or BookType.notShelf,
+            durChapterIndex = 9,
+            durChapterPos = 88,
+            durChapterTitle = "picked",
+        )
+        BookInfoShelfFlags.applyExistingBeforeSave(incoming, existing)
+        assertTrue(incoming.isNotShelf)
+        assertEquals(9, incoming.durChapterIndex)
+        assertEquals(88, incoming.durChapterPos)
+        assertEquals("picked", incoming.durChapterTitle)
+    }
+
+    @Test
     fun applyExistingBeforeSaveUsesUpdateToForOfficialRow() {
         val existing = Book(
             bookUrl = "A",

@@ -257,7 +257,9 @@ class SearchHitAccumulatorTest {
         assertTrue(viewModel.contains("SearchUiPublishGate"))
         assertTrue(viewModel.contains("searchPublishGate.publish("))
         val stopFn = viewModel.substringAfter("fun stop()").substringBefore("fun pause()")
-        assertTrue(stopFn.contains("searchPublishGate.resetAcceptedRevision()"))
+        assertTrue(stopFn.contains("searchPublishGate.invalidate()"))
+        assertFalse(stopFn.contains("resetAcceptedRevision"))
+        assertTrue(searchFn.contains("generationDead") || searchFn.contains("!searchPublishGate.isActive"))
         assertFalse(viewModel.contains("searchStartLock"))
         assertFalse(viewModel.contains("SearchUiGeneration"))
     }
@@ -273,14 +275,25 @@ class SearchHitAccumulatorTest {
     }
 
     @Test
-    fun stopResetsAcceptedRevisionSoSameSearchIdCanRestart() {
+    fun stopInvalidatesGenerationSoLateOldRevisionCannotWin() {
         val gate = SearchUiPublishGate()
         gate.begin(9L)
-        val posted = mutableListOf<Long>()
-        assertTrue(gate.publish(9L, 5L, listOf(hit("old"))) { posted.add(5L) })
-        gate.resetAcceptedRevision()
-        assertTrue(gate.publish(9L, 1L, listOf(hit("new"))) { posted.add(1L) })
-        assertEquals(listOf(5L, 1L), posted)
+        val posted = mutableListOf<String>()
+        assertTrue(gate.publish(9L, 5L, listOf(hit("old"))) { posted.add("r5") })
+        gate.invalidate()
+        assertFalse(gate.publish(9L, 5L, listOf(hit("late"))) { posted.add("late-r5") })
+        gate.begin(10L)
+        assertTrue(gate.publish(10L, 1L, listOf(hit("new"))) { posted.add("r1") })
+        assertEquals(listOf("r5", "r1"), posted)
+    }
+
+    @Test
+    fun invalidateClearsActiveGeneration() {
+        val gate = SearchUiPublishGate()
+        gate.begin(9L)
+        assertTrue(gate.isActive(9L))
+        gate.invalidate()
+        assertFalse(gate.isActive(9L))
     }
 
     @Test
