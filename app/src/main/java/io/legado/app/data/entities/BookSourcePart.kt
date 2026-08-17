@@ -1,6 +1,5 @@
 package io.legado.app.data.entities
 
-import android.text.TextUtils
 import androidx.room.DatabaseView
 import io.legado.app.constant.AppPattern
 import io.legado.app.data.appDb
@@ -74,17 +73,19 @@ data class BookSourcePart(
     }
 
     fun addGroup(groups: String) {
-        bookSourceGroup?.splitNotBlank(AppPattern.splitGroupRegex)?.toHashSet()?.let {
+        bookSourceGroup?.splitNotBlank(AppPattern.splitGroupRegex)
+            ?.toCollection(linkedSetOf())?.let {
             it.addAll(groups.splitNotBlank(AppPattern.splitGroupRegex))
-            bookSourceGroup = TextUtils.join(",", it)
+            bookSourceGroup = it.joinToString(",")
         }
         if (bookSourceGroup.isNullOrBlank()) bookSourceGroup = groups
     }
 
     fun removeGroup(groups: String) {
-        bookSourceGroup?.splitNotBlank(AppPattern.splitGroupRegex)?.toHashSet()?.let {
+        bookSourceGroup?.splitNotBlank(AppPattern.splitGroupRegex)
+            ?.toCollection(linkedSetOf())?.let {
             it.removeAll(groups.splitNotBlank(AppPattern.splitGroupRegex).toSet())
-            bookSourceGroup = TextUtils.join(",", it)
+            bookSourceGroup = it.joinToString(",")
         }
     }
 

@@ -1,7 +1,6 @@
 package io.legado.app.data.entities
 
 import android.os.Parcelable
-import android.text.TextUtils
 import android.webkit.JavascriptInterface
 import androidx.room.ColumnInfo
 import androidx.room.Entity
@@ -187,18 +186,20 @@ data class RssSource(
     }
 
     fun addGroup(groups: String): RssSource {
-        sourceGroup?.splitNotBlank(AppPattern.splitGroupRegex)?.toHashSet()?.let {
+        sourceGroup?.splitNotBlank(AppPattern.splitGroupRegex)
+            ?.toCollection(linkedSetOf())?.let {
             it.addAll(groups.splitNotBlank(AppPattern.splitGroupRegex))
-            sourceGroup = TextUtils.join(",", it)
+            sourceGroup = it.joinToString(",")
         }
         if (sourceGroup.isNullOrBlank()) sourceGroup = groups
         return this
     }
 
     fun removeGroup(groups: String): RssSource {
-        sourceGroup?.splitNotBlank(AppPattern.splitGroupRegex)?.toHashSet()?.let {
+        sourceGroup?.splitNotBlank(AppPattern.splitGroupRegex)
+            ?.toCollection(linkedSetOf())?.let {
             it.removeAll(groups.splitNotBlank(AppPattern.splitGroupRegex).toSet())
-            sourceGroup = TextUtils.join(",", it)
+            sourceGroup = it.joinToString(",")
         }
         return this
     }
