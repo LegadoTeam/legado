@@ -749,7 +749,6 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             }.onFailure { error ->
                 if (error is CancellationException) throw error
                 withContext(Dispatchers.Main) {
-                    currentWebView.resumeTimers()
                     currentWebView.onResume()
                     currentWebView.loadDataWithBaseURL(
                         url,

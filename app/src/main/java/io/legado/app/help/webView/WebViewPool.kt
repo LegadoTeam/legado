@@ -57,9 +57,6 @@ object WebViewPool {
                 setDarkeningAllowed(AppConfig.isNightTheme) //设置是否夜间
                 userAgentString = AppConfig.userAgent
             }
-            if (inUsePool.isEmpty()) {
-                realWebView.resumeTimers()
-            }
             isInUse = true
         }
         inUsePool[pooledWebView.id] = pooledWebView
@@ -114,9 +111,6 @@ object WebViewPool {
                             useWideViewPort = false // 恢复默认关闭宽视模式
                             loadWithOverviewMode = false // 恢复默认
                             textZoom = 100
-                        }
-                        if (inUsePool.isEmpty()) {
-                            webview.pauseTimers()
                         }
                         webview.onPause()
                     }
