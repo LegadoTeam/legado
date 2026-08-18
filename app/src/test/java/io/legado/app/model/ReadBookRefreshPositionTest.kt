@@ -1,5 +1,6 @@
 package io.legado.app.model
 
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -46,6 +47,24 @@ class ReadBookRefreshPositionTest {
             "pendingHighlightAnchor = positionAnchor?.takeIf"
         )
         assertTrue(readBook.contains("return pendingHighlightAnchor?.waitForLayout != true"))
+    }
+
+    @Test
+    fun `completed layout resolves refresh anchor without waiting for callback flag`() {
+        val readBook = source("app/src/main/java/io/legado/app/model/ReadBook.kt")
+        val loadCurrentChapter = readBook.substringAfter("suspend fun contentLoadFinishAwait(")
+            .substringBefore("fun pageAnim()")
+            .substringAfter("0 -> {")
+            .substringBefore("-1 -> {")
+        val anchorResolver = readBook.substringAfter("private fun resolvePendingHighlightAnchor(")
+            .substringBefore("private fun currentPositionAnchor()")
+
+        assertOrder(
+            loadCurrentChapter,
+            "for (page in textChapter.layoutChannel)",
+            "resolvePendingHighlightAnchor(book, textChapter)"
+        )
+        assertFalse(anchorResolver.contains("textChapter.isCompleted"))
     }
 
     private fun assertOrder(source: String, vararg expected: String) {

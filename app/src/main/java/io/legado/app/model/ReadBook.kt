@@ -1460,7 +1460,6 @@ object ReadBook : CoroutineScope by MainScope() {
             pendingHighlightAnchor = null
             return
         }
-        if (!textChapter.isCompleted) return
         val currentTitleLength = textChapter.layoutTitleLength.takeIf { it >= 0 } ?: return
         val expectedPosition = resolveHighlightChapterPosition(
             pending.rawPosition,
