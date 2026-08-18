@@ -240,7 +240,8 @@ class SearchHitAccumulatorTest {
         assertFalse(completion.contains("onSearchSuccess"))
         assertFalse(startSearch.contains("searchJob?.cancel()"))
         assertFalse(startSearch.contains("acceptFinish"))
-        assertFalse(startSearch.contains("CoroutineStart.LAZY"))
+        assertTrue(startSearch.contains("CoroutineStart.LAZY"))
+        assertTrue(src.contains("pageOwner.register"))
         val viewModel = sequenceOf(
             File("app/src/main/java/io/legado/app/ui/book/search/SearchViewModel.kt"),
             File("src/main/java/io/legado/app/ui/book/search/SearchViewModel.kt"),

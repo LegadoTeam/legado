@@ -12,6 +12,7 @@ import io.legado.app.ui.book.search.SearchScope
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.mapParallelSafe
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
