@@ -2,6 +2,7 @@ package io.legado.app.ui.book.read.page
 
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Rect
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.style.ReplacementSpan
@@ -14,6 +15,9 @@ import kotlin.math.max
 object BatteryIconGeometry {
     fun fillWidth(innerWidth: Int, level: Int): Int =
         innerWidth * level.coerceIn(0, 100) / 100
+
+    fun centerY(baseline: Int, glyphTop: Int, glyphBottom: Int): Float =
+        baseline + (glyphTop + glyphBottom) / 2f
 }
 
 object ReaderInfoTemplateRenderer {
@@ -39,6 +43,8 @@ object ReaderInfoTemplateRenderer {
 }
 
 class BatteryLevelSpan(private val level: Int) : ReplacementSpan() {
+
+    private val digitBounds = Rect()
 
     override fun equals(other: Any?): Boolean =
         other is BatteryLevelSpan && level == other.level
@@ -69,9 +75,9 @@ class BatteryLevelSpan(private val level: Int) : ReplacementSpan() {
         bottom: Int,
         paint: Paint,
     ) {
-        val fontMetrics = paint.fontMetricsInt
         val dimensions = dimensions(paint.textSize)
-        val centerY = y + (fontMetrics.ascent + fontMetrics.descent) / 2f
+        paint.getTextBounds("0", 0, 1, digitBounds)
+        val centerY = BatteryIconGeometry.centerY(y, digitBounds.top, digitBounds.bottom)
         val bodyLeft = x + dimensions.horizontalGap
         val bodyTop = centerY - dimensions.bodyHeight / 2f
         val bodyRight = bodyLeft + dimensions.bodyWidth
