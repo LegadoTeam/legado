@@ -40,6 +40,9 @@ class BatteryIconGeometryTest {
         assertTrue(source.contains("private fun dimensions(textSize: Float)"))
         assertFalse(source.contains("dimensions(paint.fontMetricsInt)"))
         assertTrue(source.contains("paint.getTextBounds(\"0\", 0, 1, digitBounds)"))
+        assertTrue(source.contains(
+            "BatteryIconGeometry.centerY(y, digitBounds.top, digitBounds.bottom)"
+        ))
         assertFalse(source.contains("fontMetrics.ascent + fontMetrics.descent"))
     }
 
