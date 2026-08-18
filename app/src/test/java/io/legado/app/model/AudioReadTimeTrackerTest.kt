@@ -83,6 +83,26 @@ class AudioReadTimeTrackerTest {
         assertTrue(viewModel.contains("AudioPlay.replaceBook(book)"))
     }
 
+    @Test
+    fun `generation invalidation settles old playback before stopping the player`() {
+        val model = projectFile("src/main/java/io/legado/app/model/AudioPlay.kt").readText()
+        val stopRequest = model.substringAfter("private fun stopPlayAndGetGeneration()")
+            .substringBefore("fun stopPlay()")
+        val stopAction = stopRequest.indexOf("IntentAction.stopPlay")
+        assertTrue(stopRequest.indexOf("invalidatePlayback()") in 0..<stopAction)
+
+        val service = projectFile(
+            "src/main/java/io/legado/app/service/AudioPlayService.kt"
+        ).readText()
+        val stopBranch = service.substringAfter("IntentAction.stopPlay -> {")
+            .substringBefore("IntentAction.pause ->")
+        val clearPlaying = stopBranch.indexOf("isPlaying = false")
+        val settleReadTime = stopBranch.indexOf("AudioPlay.upReadTime()")
+        val playerStop = stopBranch.indexOf("exoPlayer.stop()")
+        assertTrue(clearPlaying in 0..<settleReadTime)
+        assertTrue(settleReadTime in 0..<playerStop)
+    }
+
     private fun projectFile(pathInApp: String): File {
         return listOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull { it.isFile }
