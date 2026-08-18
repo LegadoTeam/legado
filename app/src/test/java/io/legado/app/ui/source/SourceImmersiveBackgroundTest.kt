@@ -58,6 +58,10 @@ class SourceImmersiveBackgroundTest {
         assertTrue(titleBar.contains("toolbar.navigationIcon?.colorFilter = colorFilter"))
         assertTrue(titleBar.contains("toolbar.overflowIcon?.colorFilter = colorFilter"))
         assertTrue(titleBar.contains("findViewById<SearchView>(R.id.search_view)?.applyTint(color)"))
+        assertTrue(titleBar.contains("findViewById<TabLayout>(R.id.tab_layout)"))
+        assertTrue(titleBar.contains("setTabTextColors(tabUnselectedColor, color)"))
+        assertTrue(titleBar.contains("R.color.md_light_secondary"))
+        assertTrue(titleBar.contains("R.color.md_dark_secondary"))
         assertTrue(titleBar.contains("toolbar.menu.forEach { item ->"))
 
         val menu = projectFile("src/main/java/io/legado/app/utils/MenuExtensions.kt").readText()

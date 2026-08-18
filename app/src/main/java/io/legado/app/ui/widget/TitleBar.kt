@@ -20,14 +20,18 @@ import androidx.core.view.forEach
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.children
 import com.google.android.material.appbar.AppBarLayout
+import com.google.android.material.tabs.TabLayout
 import io.legado.app.R
 import io.legado.app.help.config.AppConfig
+import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.elevation
 import io.legado.app.lib.theme.getToolbarTextColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.transparentNavBar
+import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.activity
 import io.legado.app.utils.applyTint
+import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.setOnApplyWindowInsetsListenerCompat
 import splitties.views.bottomPadding
 import splitties.views.topPadding
@@ -233,6 +237,15 @@ class TitleBar @JvmOverloads constructor(
         toolbar.navigationIcon?.colorFilter = colorFilter
         toolbar.overflowIcon?.colorFilter = colorFilter
         toolbar.findViewById<SearchView>(R.id.search_view)?.applyTint(color)
+        val tabUnselectedColor = context.getCompatColor(
+            if (ColorUtils.isColorLight(context.backgroundColor)) {
+                R.color.md_light_secondary
+            } else {
+                R.color.md_dark_secondary
+            }
+        )
+        toolbar.findViewById<TabLayout>(R.id.tab_layout)
+            ?.setTabTextColors(tabUnselectedColor, color)
         toolbar.menu.forEach { item ->
             (item.actionView as? SearchView)?.applyTint(color)
         }
