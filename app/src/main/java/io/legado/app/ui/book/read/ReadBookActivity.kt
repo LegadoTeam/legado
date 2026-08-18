@@ -598,6 +598,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             upContent()
         } else {
             ReadBook.book?.let {
+                ReadBook.preserveCurrentPositionForRefresh()
                 ReadBook.curTextChapter = null
                 binding.readView.upContent()
                 viewModel.refreshContentDur(it)
