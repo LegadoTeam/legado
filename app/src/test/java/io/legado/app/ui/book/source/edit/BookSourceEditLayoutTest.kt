@@ -103,6 +103,22 @@ class BookSourceEditLayoutTest {
     }
 
     @Test
+    fun `source editor suppresses focus scrolling but keeps caret scrolling`() {
+        val source = File(repositoryRoot, ACTIVITY_PATH).readText()
+        val initView = source.section("private fun initView()", "private fun initOptionPanel()")
+        val sendText = source.section("override fun sendText(text: String)", "private fun setSourceVariable()")
+        val layoutManager = File(repositoryRoot, LAYOUT_MANAGER_PATH).readText()
+
+        assertTrue(initView.contains("binding.recyclerView.layoutManager = NoChildScrollLinearLayoutManager(this)"))
+        assertFalse(initView.contains("adapter.editEntityMaxLine < 999"))
+        assertTrue(layoutManager.contains("override fun onRequestChildFocus("))
+        assertTrue(layoutManager.contains("return true"))
+        assertFalse(layoutManager.contains("requestChildRectangleOnScreen"))
+        assertTrue(initView.contains("newFocus.postDelayed({ sendText(\"\") }, 120)"))
+        assertTrue(sendText.contains("binding.recyclerView.smoothScrollBy(0, scrollDistance)"))
+    }
+
+    @Test
     fun `ported panel stays independent from legadoT theme stack`() {
         val source = listOf(LAYOUT_PATH, ACTIVITY_PATH)
             .joinToString("\n") { File(repositoryRoot, it).readText() }
@@ -208,6 +224,8 @@ class BookSourceEditLayoutTest {
             "app/src/main/java/io/legado/app/ui/autoTask/AutoTaskEditActivity.kt"
         const val FIELD_NAVIGATION_PATH =
             "app/src/main/java/io/legado/app/ui/widget/FieldNavigationExtensions.kt"
+        const val LAYOUT_MANAGER_PATH =
+            "app/src/main/java/io/legado/app/ui/widget/recycler/NoChildScrollLinearLayoutManager.kt"
         const val ANDROID_NAMESPACE = "http://schemas.android.com/apk/res/android"
         const val APP_NAMESPACE = "http://schemas.android.com/apk/res-auto"
         val CHECK_BOX_IDS = listOf(
