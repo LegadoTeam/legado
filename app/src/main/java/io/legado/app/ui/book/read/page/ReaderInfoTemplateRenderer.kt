@@ -52,7 +52,7 @@ class BatteryLevelSpan(private val level: Int) : ReplacementSpan() {
         end: Int,
         fm: Paint.FontMetricsInt?,
     ): Int {
-        val dimensions = dimensions(paint.fontMetricsInt)
+        val dimensions = dimensions(paint.textSize)
         return ceil(
             dimensions.horizontalGap * 2 + dimensions.bodyWidth + dimensions.terminalWidth
         ).toInt()
@@ -70,7 +70,7 @@ class BatteryLevelSpan(private val level: Int) : ReplacementSpan() {
         paint: Paint,
     ) {
         val fontMetrics = paint.fontMetricsInt
-        val dimensions = dimensions(fontMetrics)
+        val dimensions = dimensions(paint.textSize)
         val centerY = y + (fontMetrics.ascent + fontMetrics.descent) / 2f
         val bodyLeft = x + dimensions.horizontalGap
         val bodyTop = centerY - dimensions.bodyHeight / 2f
@@ -115,16 +115,16 @@ class BatteryLevelSpan(private val level: Int) : ReplacementSpan() {
         }
     }
 
-    private fun dimensions(fontMetrics: Paint.FontMetricsInt): Dimensions {
-        val fontHeight = max(1, fontMetrics.descent - fontMetrics.ascent).toFloat()
-        val bodyHeight = fontHeight * 0.58f
+    private fun dimensions(textSize: Float): Dimensions {
+        val iconSize = max(1f, textSize)
+        val bodyHeight = iconSize * 0.58f
         return Dimensions(
-            bodyWidth = fontHeight,
+            bodyWidth = iconSize,
             bodyHeight = bodyHeight,
-            terminalWidth = fontHeight * 0.12f,
+            terminalWidth = iconSize * 0.12f,
             terminalHeight = bodyHeight * 0.42f,
-            horizontalGap = fontHeight * 0.12f,
-            strokeWidth = max(1f, fontHeight * 0.06f),
+            horizontalGap = iconSize * 0.12f,
+            strokeWidth = max(1f, iconSize * 0.06f),
         )
     }
 

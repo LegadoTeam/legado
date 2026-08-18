@@ -1,8 +1,11 @@
 package io.legado.app.ui.book.read.page
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class BatteryIconGeometryTest {
 
@@ -19,6 +22,17 @@ class BatteryIconGeometryTest {
     fun `battery spans compare by level`() {
         assertEquals(BatteryLevelSpan(50), BatteryLevelSpan(50))
         assertNotEquals(BatteryLevelSpan(50), BatteryLevelSpan(51))
+    }
+
+    @Test
+    fun `battery icon follows configured text size instead of typeface line height`() {
+        val source = File(
+            "src/main/java/io/legado/app/ui/book/read/page/ReaderInfoTemplateRenderer.kt"
+        ).readText()
+
+        assertEquals(2, Regex("dimensions\\(paint\\.textSize\\)").findAll(source).count())
+        assertTrue(source.contains("private fun dimensions(textSize: Float)"))
+        assertFalse(source.contains("dimensions(paint.fontMetricsInt)"))
     }
 
 }
