@@ -19,6 +19,7 @@ import android.widget.FrameLayout
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.doOnLayout
 import androidx.core.view.get
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
@@ -2553,24 +2554,43 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     fun upBookmarkIndicator() {
-        val page = binding.readView.curPage.textPage
-        val hasBookmark = page.lines.isNotEmpty() && bookmarks.any {
-            it.chapterIndex == page.chapterIndex && page.containPos(it.chapterPos)
+        val pageView = binding.readView.curPage
+        val textPage = pageView.textPage
+        val hasBookmark = textPage.lines.isNotEmpty() && bookmarks.any {
+            it.chapterIndex == textPage.chapterIndex && textPage.containPos(it.chapterPos)
         }
         val showIndicator = AppConfig.pullToToggleBookmark &&
                 !binding.readView.isScroll && hasBookmark
-        val shownInHeader = binding.readView.curPage.showBookmarkIndicator(showIndicator)
-        binding.bookmarkIndicator.isVisible = showIndicator && !shownInHeader
+        val shownInHeader = pageView.showBookmarkIndicator(showIndicator)
+        binding.bookmarkIndicator.isVisible = showIndicator
+        binding.bookmarkIndicator.importantForAccessibility = if (shownInHeader) {
+            View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        } else {
+            View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+        }
         if (binding.bookmarkIndicator.isVisible) {
-            binding.bookmarkIndicator.post {
-                if (binding.bookmarkIndicator.isVisible) {
+            pageView.doOnLayout {
+                if (binding.bookmarkIndicator.isVisible &&
+                    pageView === binding.readView.curPage
+                ) {
                     binding.bookmarkIndicator.layoutParams =
                         (binding.bookmarkIndicator.layoutParams as FrameLayout.LayoutParams).apply {
-                            marginEnd = 12.dpToPx() +
-                                    binding.readView.curPage.displayCutoutPaddingEnd
+                            rightMargin = if (shownInHeader) {
+                                pageView.bookmarkIndicatorMarginRight(
+                                    binding.bookmarkIndicator.paddingRight,
+                                )
+                            } else {
+                                12.dpToPx() + pageView.displayCutoutPaddingRight
+                            }
                         }
-                    binding.bookmarkIndicator.translationY =
-                        (binding.readView.curPage.headerHeight + 8.dpToPx()).toFloat()
+                    binding.bookmarkIndicator.translationY = if (shownInHeader) {
+                        pageView.bookmarkIndicatorTop(
+                            binding.bookmarkIndicator.layoutParams.height,
+                            binding.bookmarkIndicator.paddingBottom,
+                        ).toFloat()
+                    } else {
+                        (pageView.headerHeight + 8.dpToPx()).toFloat()
+                    }
                 }
             }
         }

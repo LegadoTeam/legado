@@ -80,20 +80,28 @@ class PullBookmarkGestureTest {
     }
 
     @Test
-    fun `bookmark indicator uses the header before the floating fallback`() {
+    fun `bookmark indicator uses a fixed overlay aligned to the header slot`() {
         val activity = source("app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
         val update = activity.substringAfter("fun upBookmarkIndicator()")
             .substringBefore("override fun changeReplaceRuleState")
-        assertTrue(update.contains("curPage.showBookmarkIndicator(showIndicator)"))
-        assertTrue(update.contains("showIndicator && !shownInHeader"))
-        assertTrue(update.contains("curPage.displayCutoutPaddingEnd"))
+        assertTrue(update.contains("pageView.showBookmarkIndicator(showIndicator)"))
+        assertTrue(update.contains("bookmarkIndicator.isVisible = showIndicator"))
+        assertTrue(update.contains("View.IMPORTANT_FOR_ACCESSIBILITY_NO"))
+        assertTrue(update.contains("View.IMPORTANT_FOR_ACCESSIBILITY_AUTO"))
+        assertTrue(update.contains("pageView.doOnLayout"))
+        assertTrue(update.contains("rightMargin = if (shownInHeader)"))
+        assertTrue(update.contains("pageView.bookmarkIndicatorMarginRight("))
+        assertTrue(update.contains("bookmarkIndicator.paddingRight"))
+        assertTrue(update.contains("pageView.bookmarkIndicatorTop("))
+        assertTrue(update.contains("pageView.displayCutoutPaddingRight"))
 
         val pageView = source("app/src/main/java/io/legado/app/ui/book/read/page/PageView.kt")
         val render = pageView.substringAfter("private fun renderReaderInfo()")
             .substringBefore("private data class ReaderInfoView")
         assertTrue(render.contains("view === binding.tvHeaderRight"))
         assertTrue(render.contains("bookmarkIndicatorVisible"))
-        assertTrue(pageView.contains("R.drawable.ic_bookmark_filled"))
+        assertTrue(render.contains("view.minimumWidth = 32.dpToPx()"))
+        assertTrue(render.contains("view.setTextIfNotEqual(\" \")"))
         val showInHeader = pageView.substringAfter("fun showBookmarkIndicator(show: Boolean)")
             .substringBefore("private data class ReaderInfoView")
         assertTrue(showInHeader.contains("return show && !binding.llHeader.isGone"))
@@ -109,7 +117,13 @@ class PullBookmarkGestureTest {
                 styleRefresh.indexOf("upBookmarkIndicator()"))
 
         val layout = source("app/src/main/res/layout/activity_book_read.xml")
-        assertTrue(layout.contains("android:src=\"@drawable/ic_bookmark_filled\""))
+        val overlay = layout.substringAfter("android:id=\"@+id/bookmark_indicator\"")
+            .substringBefore("/>")
+        assertTrue(overlay.contains("android:layout_width=\"32dp\""))
+        assertTrue(overlay.contains("android:layout_height=\"32dp\""))
+        assertTrue(overlay.contains("android:layout_gravity=\"top|right\""))
+        assertTrue(overlay.contains("android:layout_marginRight=\"12dp\""))
+        assertTrue(overlay.contains("android:src=\"@drawable/ic_bookmark_filled\""))
         assertTrue(activity.substringAfter("private fun resetBookmarkObserver()")
             .substringBefore("fun upBookmarkIndicator()")
             .contains("curPage.showBookmarkIndicator(false)"))
@@ -117,18 +131,17 @@ class PullBookmarkGestureTest {
 
     @Test
     fun `bookmark indicator keeps the existing header line metrics`() {
-        assertEquals(16, BookmarkIndicatorGeometry.size(-12, 4))
-        assertEquals(18, BookmarkIndicatorGeometry.top(30, -12))
+        assertEquals(20, BookmarkIndicatorGeometry.marginRight(12, 12, 4))
+        assertEquals(-4, BookmarkIndicatorGeometry.marginRight(0, 0, 4))
+        assertEquals(6, BookmarkIndicatorGeometry.top(30, 28, 4, 0))
+        assertEquals(8, BookmarkIndicatorGeometry.top(10, 32, 4, 8))
 
         val pageView = source("app/src/main/java/io/legado/app/ui/book/read/page/PageView.kt")
         val indicator = pageView.substringAfter("if (bookmarkIndicatorVisible)")
             .substringBefore("return@forEach")
-        assertTrue(indicator.contains("bookmarkIndicatorText"))
+        assertTrue(indicator.contains("view.setTextIfNotEqual(\" \")"))
         assertFalse(indicator.contains("setCompoundDrawablesRelative"))
-        val span = pageView.substringAfter("private class BookmarkIndicatorSpan")
-            .substringBefore("class PageView")
-        assertTrue(span.contains("top = metrics.top"))
-        assertTrue(span.contains("bottom = metrics.bottom"))
+        assertFalse(pageView.contains("BookmarkIndicatorSpan"))
     }
 
     @Test
