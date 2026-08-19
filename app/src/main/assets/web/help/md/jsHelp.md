@@ -371,6 +371,8 @@ java.deleteFile(path: String): Boolean
 
 ### [js加解密类](https://github.com/LegadoTeam/legado/blob/master/app/src/main/java/io/legado/app/help/JsEncodeUtils.kt) 部分函数
 
+> 规则和 JavaScript 书源中可直接使用内置的 `CryptoJS`，例如 `CryptoJS.MD5("text").toString()`。
+
 > 提供在JavaScript环境中快捷调用crypto算法的函数，由[hutool-crypto](https://www.hutool.cn/docs/#/crypto/概述)实现  
 > 由于兼容性问题，hutool-crypto当前版本为5.8.22  
 
