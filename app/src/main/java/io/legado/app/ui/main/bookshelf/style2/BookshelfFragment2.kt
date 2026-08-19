@@ -91,6 +91,10 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
 
     private fun initRecyclerView() {
         binding.rvBookshelf.setEdgeEffectColor(primaryColor)
+        binding.rvBookshelf.canHandleHorizontalSwipe = { offset ->
+            adjacentBookshelfGroupId(bookGroups, groupId, offset) != null
+        }
+        binding.rvBookshelf.onHorizontalSwipe = ::switchBookGroup
         binding.fastScroller.attachRecyclerView(binding.rvBookshelf)
         upFastScrollerBar()
         binding.refreshLayout.setColorSchemeColors(accentColor)
@@ -237,6 +241,12 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         }
     }
 
+    private fun switchBookGroup(offset: Int) {
+        val targetGroupId = adjacentBookshelfGroupId(bookGroups, groupId, offset) ?: return
+        groupId = targetGroupId
+        initBooksData()
+    }
+
     private fun sortBooks(books: List<Book>, groupId: Long): List<Book> {
         return when (AppConfig.getBookSortByGroupId(groupId)) {
             1 -> books.sortedByDescending { it.latestChapterTime }
@@ -327,7 +337,19 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
     }
 
     override fun onDestroyView() {
+        binding.rvBookshelf.canHandleHorizontalSwipe = null
+        binding.rvBookshelf.onHorizontalSwipe = null
         binding.fastScroller.detachRecyclerView()
         super.onDestroyView()
     }
+}
+
+internal fun adjacentBookshelfGroupId(
+    groups: List<BookGroup>,
+    currentGroupId: Long,
+    offset: Int,
+): Long? {
+    val currentIndex = groups.indexOfFirst { it.groupId == currentGroupId }
+    if (currentIndex < 0) return null
+    return groups.getOrNull(currentIndex + offset)?.groupId
 }
