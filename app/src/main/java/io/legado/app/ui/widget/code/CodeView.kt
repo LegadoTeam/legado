@@ -39,6 +39,19 @@ class CodeView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
     private var largeTextMode = false
     private val mUpdateHandler = Handler(Looper.getMainLooper())
     private var mAutoCompleteTokenizer: Tokenizer? = null
+    private val selectionVisibilityRunnable = Runnable {
+        if (keepSelectionVisible && isFocused &&
+            selectionStart == selectionEnd && selectionEnd >= 0
+        ) {
+            bringPointIntoView(selectionEnd)
+        }
+    }
+    internal var keepSelectionVisible = false
+        set(value) {
+            field = value
+            if (value) requestSelectionVisible() else removeCallbacks(selectionVisibilityRunnable)
+        }
+
     private val displayDensity = resources.displayMetrics.density
     private val mErrorHashSet: SortedMap<Int, Int> = TreeMap()
     private val mSyntaxPatternMap: MutableMap<Pattern, Int> = HashMap()
@@ -120,6 +133,22 @@ class CodeView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
                 event.keyCode == KeyEvent.KEYCODE_PAGE_DOWN ||
                 event.keyCode == KeyEvent.KEYCODE_MOVE_HOME ||
                 event.keyCode == KeyEvent.KEYCODE_MOVE_END
+    }
+
+    override fun onSelectionChanged(selStart: Int, selEnd: Int) {
+        super.onSelectionChanged(selStart, selEnd)
+        if (keepSelectionVisible) requestSelectionVisible()
+    }
+
+    override fun performClick(): Boolean {
+        val handled = super.performClick()
+        if (keepSelectionVisible) requestSelectionVisible()
+        return handled
+    }
+
+    internal fun requestSelectionVisible() {
+        removeCallbacks(selectionVisibilityRunnable)
+        post(selectionVisibilityRunnable)
     }
 
     override fun showDropDown() {

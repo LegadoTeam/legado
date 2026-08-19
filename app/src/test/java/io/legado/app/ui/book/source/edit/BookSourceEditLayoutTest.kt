@@ -103,21 +103,35 @@ class BookSourceEditLayoutTest {
     }
 
     @Test
-    fun `source editor suppresses focus scrolling and follows repeated caret taps`() {
+    fun `source editor keeps the caret visible after selection and layout changes`() {
         val source = File(repositoryRoot, ACTIVITY_PATH).readText()
         val initView = source.section("private fun initView()", "private fun initOptionPanel()")
         val sendText = source.section("override fun sendText(text: String)", "private fun setSourceVariable()")
         val layoutManager = File(repositoryRoot, LAYOUT_MANAGER_PATH).readText()
+        val codeView = File(repositoryRoot, CODE_VIEW_PATH).readText()
 
         assertTrue(initView.contains("binding.recyclerView.layoutManager = NoChildScrollLinearLayoutManager(this)"))
         assertFalse(initView.contains("adapter.editEntityMaxLine < 999"))
         assertTrue(layoutManager.contains("override fun onRequestChildFocus("))
         assertTrue(layoutManager.contains("return true"))
         assertFalse(layoutManager.contains("requestChildRectangleOnScreen"))
-        assertTrue(initView.contains("newFocus.postDelayed({ sendText(\"\") }, 120)"))
-        assertTrue(initView.contains("(oldFocus as? CodeView)?.setOnClickListener(null)"))
-        assertTrue(initView.contains("newFocus.setOnClickListener { sendText(\"\") }"))
-        assertTrue(sendText.contains("binding.recyclerView.smoothScrollBy(0, scrollDistance)"))
+        assertTrue(initView.contains("(oldFocus as? CodeView)?.keepSelectionVisible = false"))
+        assertTrue(initView.contains("(newFocus as? CodeView)?.keepSelectionVisible = true"))
+        assertTrue(initView.contains("binding.recyclerView.addOnLayoutChangeListener"))
+        assertTrue(initView.contains("(binding.recyclerView.findFocus() as? CodeView)?.requestSelectionVisible()"))
+        assertTrue(codeView.contains("override fun onSelectionChanged("))
+        assertTrue(codeView.contains("super.onSelectionChanged(selStart, selEnd)"))
+        assertTrue(codeView.contains("override fun performClick(): Boolean"))
+        assertTrue(codeView.contains("val handled = super.performClick()"))
+        assertTrue(codeView.contains("removeCallbacks(selectionVisibilityRunnable)"))
+        assertTrue(codeView.contains("post(selectionVisibilityRunnable)"))
+        assertTrue(codeView.contains("keepSelectionVisible && isFocused"))
+        assertTrue(codeView.contains("selectionStart == selectionEnd && selectionEnd >= 0"))
+        assertTrue(codeView.contains("bringPointIntoView(selectionEnd)"))
+        assertFalse(codeView.contains("MotionEvent.ACTION_UP"))
+        assertFalse(initView.contains("setOnClickListener { sendText(\"\") }"))
+        assertFalse(sendText.contains("smoothScrollBy"))
+        assertFalse(sendText.contains("editEntityMaxLine"))
     }
 
     @Test
@@ -228,6 +242,8 @@ class BookSourceEditLayoutTest {
             "app/src/main/java/io/legado/app/ui/widget/FieldNavigationExtensions.kt"
         const val LAYOUT_MANAGER_PATH =
             "app/src/main/java/io/legado/app/ui/widget/recycler/NoChildScrollLinearLayoutManager.kt"
+        const val CODE_VIEW_PATH =
+            "app/src/main/java/io/legado/app/ui/widget/code/CodeView.kt"
         const val ANDROID_NAMESPACE = "http://schemas.android.com/apk/res/android"
         const val APP_NAMESPACE = "http://schemas.android.com/apk/res-auto"
         val CHECK_BOX_IDS = listOf(

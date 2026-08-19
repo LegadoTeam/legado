@@ -100,7 +100,7 @@ class RssSourceEditLayoutTest {
     }
 
     @Test
-    fun `editor suppresses code focus scrolling and follows repeated caret taps`() {
+    fun `editor keeps the caret visible after selection and layout changes`() {
         val source = File(repositoryRoot, ACTIVITY_PATH).readText()
         val initView = source.section("private fun initView()", "private fun initOptionPanel()")
         val sendText = source.section("override fun sendText(text: String)", "@RequiresApi")
@@ -108,10 +108,13 @@ class RssSourceEditLayoutTest {
         assertTrue(initView.contains("override fun onRequestChildFocus("))
         assertTrue(initView.contains(") = focused is CodeView"))
         assertFalse(initView.contains("requestChildRectangleOnScreen"))
-        assertTrue(initView.contains("(oldFocus as? CodeView)?.setOnClickListener(null)"))
-        assertTrue(initView.contains("newFocus.setOnClickListener { sendText(\"\") }"))
-        assertTrue(initView.contains("newFocus.postDelayed({ sendText(\"\") }, 120)"))
-        assertTrue(sendText.contains("binding.recyclerView.smoothScrollBy(0, scrollDistance)"))
+        assertTrue(initView.contains("(oldFocus as? CodeView)?.keepSelectionVisible = false"))
+        assertTrue(initView.contains("(newFocus as? CodeView)?.keepSelectionVisible = true"))
+        assertTrue(initView.contains("binding.recyclerView.addOnLayoutChangeListener"))
+        assertTrue(initView.contains("(binding.recyclerView.findFocus() as? CodeView)?.requestSelectionVisible()"))
+        assertFalse(initView.contains("setOnClickListener { sendText(\"\") }"))
+        assertFalse(sendText.contains("smoothScrollBy"))
+        assertFalse(sendText.contains("editEntityMaxLine"))
     }
 
     private fun parse(path: String): Document =

@@ -309,11 +309,11 @@ class RssSourceEditActivity :
         binding.recyclerView.adapter = adapter
         binding.fieldNav.bindFieldNavigation(binding.recyclerView)
         binding.recyclerView.viewTreeObserver.addOnGlobalFocusChangeListener { oldFocus, newFocus ->
-            (oldFocus as? CodeView)?.setOnClickListener(null)
-            if (newFocus is CodeView) {
-                newFocus.setOnClickListener { sendText("") }
-                newFocus.postDelayed({ sendText("") }, 120)
-            }
+            (oldFocus as? CodeView)?.keepSelectionVisible = false
+            (newFocus as? CodeView)?.keepSelectionVisible = true
+        }
+        binding.recyclerView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            (binding.recyclerView.findFocus() as? CodeView)?.requestSelectionVisible()
         }
         val transparentBar = transparentNavBar && !AppConfig.isEInkMode
         listOf(binding.tabLayout, binding.fieldNav).forEach { tabs ->
@@ -655,31 +655,6 @@ class RssSourceEditActivity :
                     edit.append(text)
                 } else {
                     edit.replace(start, end, text)//光标所在位置插入文字
-                }
-            }
-            if (adapter.editEntityMaxLine >= 999) {
-                view.post {
-                    val editTextLocation = IntArray(2)
-                    view.getLocationOnScreen(editTextLocation)
-                    val recyclerViewLocation = IntArray(2)
-                    binding.recyclerView.getLocationOnScreen(recyclerViewLocation)
-                    val layout = view.layout
-                    if (layout != null) {
-                        val line = layout.getLineForOffset(end)
-                        val cursorYInEditText = layout.getLineTop(line)
-                        // 光标相对于屏幕的位置
-                        val cursorYOnScreen = editTextLocation[1] + cursorYInEditText
-                        // 光标相对于RecyclerView的位置
-                        val cursorYInRecyclerView = cursorYOnScreen - recyclerViewLocation[1]
-                        val recyclerViewBottom = binding.recyclerView.height - 120 //考虑键盘的经验值
-                        // 如果光标不在可见范围内，则滚动到光标位置
-                        if (cursorYInRecyclerView !in 0..recyclerViewBottom) {
-                            val scrollDistance = cursorYInRecyclerView - recyclerViewBottom / 3
-                            if (scrollDistance > 0 && binding.recyclerView.canScrollVertically(1) || scrollDistance < 0 && binding.recyclerView.canScrollVertically(-1)) {
-                                binding.recyclerView.smoothScrollBy(0, scrollDistance)
-                            }
-                        }
-                    }
                 }
             }
         }
