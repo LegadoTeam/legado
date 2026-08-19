@@ -86,7 +86,7 @@ class JsSourceMarshallerTest {
     }
 
     @Test
-    fun `accepts object variable in book info`() {
+    fun `accepts object and JSON string variable in book info`() {
         val book = Book(bookUrl = "https://source.example/book")
         book.variable = """{"old":"value"}"""
         assertEquals("value", book.variableMap["old"])
@@ -100,6 +100,16 @@ class JsSourceMarshallerTest {
 
         assertEquals("abc", book.variableMap["token"])
         assertNull(book.variableMap["old"])
+
+        JsSourceMarshaller.mergeBookInfo(
+            book,
+            """{"variable":"{\"session\":\"xyz\"}"}""",
+            textSource,
+            canReName = true,
+        )
+
+        assertEquals("xyz", book.variableMap["session"])
+        assertNull(book.variableMap["token"])
     }
 
     @Test
