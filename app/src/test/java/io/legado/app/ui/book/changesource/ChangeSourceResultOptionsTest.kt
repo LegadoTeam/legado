@@ -125,6 +125,27 @@ class ChangeSourceResultOptionsTest {
         assertEquals(listOf("fast", "slow"), result.map { it.bookUrl })
     }
 
+    @Test
+    fun `pinned source stays first while other sources are filtered and sorted`() {
+        val books = listOf(
+            book("current", 8000, 500, 1),
+            book("hidden", 6000, 20, 2),
+            book("slow", 2000, 300, 3),
+            book("fast", 2500, 80, 4),
+        )
+
+        val result = apply(
+            books,
+            filterMode = ChangeSourceResultOptions.FILTER_ABSOLUTE,
+            minimum = 1000,
+            maximum = 3000,
+            comparator = ChangeSourceResultOptions.responseTimeComparator(fallback),
+            pinnedBookUrl = "current",
+        )
+
+        assertEquals(listOf("current", "fast", "slow"), result.map { it.bookUrl })
+    }
+
     private fun apply(
         books: List<SearchBook>,
         filterMode: Int = ChangeSourceResultOptions.FILTER_OFF,
@@ -132,6 +153,7 @@ class ChangeSourceResultOptionsTest {
         maximum: Int = 0,
         referenceWordCount: Int? = null,
         comparator: Comparator<SearchBook> = fallback,
+        pinnedBookUrl: String? = null,
     ) = ChangeSourceResultOptions.apply(
         books = books,
         filterMode = filterMode,
@@ -139,6 +161,7 @@ class ChangeSourceResultOptionsTest {
         maximum = maximum,
         referenceWordCount = referenceWordCount,
         comparator = comparator,
+        pinnedBookUrl = pinnedBookUrl,
     )
 
     private fun book(

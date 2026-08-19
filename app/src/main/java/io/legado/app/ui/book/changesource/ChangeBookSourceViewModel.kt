@@ -99,6 +99,7 @@ internal sealed interface SourceChangeResult {
 
 @Suppress("MemberVisibilityCanBePrivate")
 open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(application) {
+    protected open val pinCurrentSource = false
     private val threadCount = AppConfig.threadCount
     private var searchPool: ExecutorCoroutineDispatcher? = null
     val searchStateData = MutableLiveData<Boolean>()
@@ -165,6 +166,7 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
             maximum = AppConfig.changeSourceWordCountFilterMax,
             referenceWordCount = getReferenceWordCount(books),
             comparator = comparator,
+            pinnedBookUrl = if (pinCurrentSource) oldBook?.bookUrl else null,
         )
     }
 

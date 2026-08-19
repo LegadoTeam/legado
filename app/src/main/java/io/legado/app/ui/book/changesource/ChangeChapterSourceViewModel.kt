@@ -174,6 +174,7 @@ internal class ChapterSourceProgress {
 class ChangeChapterSourceViewModel(application: Application) :
     ChangeBookSourceViewModel(application) {
 
+    protected override val pinCurrentSource = true
     private val progress = ChapterSourceProgress()
     val chapterIndex: Int
         get() = progress.chapterIndex

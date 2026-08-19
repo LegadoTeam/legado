@@ -15,10 +15,13 @@ internal object ChangeSourceResultOptions {
         maximum: Int,
         referenceWordCount: Int?,
         comparator: Comparator<SearchBook>,
+        pinnedBookUrl: String? = null,
     ): List<SearchBook> {
         val lower = minOf(minimum, maximum).coerceAtLeast(0)
         val upper = maxOf(minimum, maximum).coerceAtLeast(0)
-        return books.asSequence()
+        val pinned = pinnedBookUrl?.let { url -> books.firstOrNull { it.bookUrl == url } }
+        val results = books.asSequence()
+            .filter { pinned == null || it.bookUrl != pinned.bookUrl }
             .filter { book ->
                 if (!book.hasMeasurement()) return@filter true
                 when (filterMode) {
@@ -37,6 +40,7 @@ internal object ChangeSourceResultOptions {
             }
             .sortedWith(comparator)
             .toList()
+        return if (pinned == null) results else listOf(pinned) + results
     }
 
     fun responseTimeComparator(
