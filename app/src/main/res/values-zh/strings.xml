@@ -82,6 +82,7 @@
     <string name="version">版本</string>
     <string name="local">本地</string>
     <string name="search">搜索</string>
+    <string name="config_search_empty">未找到匹配的设置</string>
     <string name="help_search_prev">上一个匹配项</string>
     <string name="help_search_next">下一个匹配项</string>
     <string name="origin_format">来源：%s</string>
