@@ -3,6 +3,7 @@ package io.legado.app.ui.code
 import com.google.gson.Gson
 import com.script.ScriptBindings
 import com.script.rhino.RhinoScriptEngine
+import io.github.rosemoe.sora.text.Content
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -164,6 +165,33 @@ class SafeEditorResultCodecTest {
         assertTrue(license.readText().contains("The MIT License"))
         assertTrue(viewModel.contains("appCtx.assets.open(\"scripts/beautify.min.js\")"))
         assertFalse(viewModel.contains("cdnjs.cloudflare.com/ajax/libs/js-beautify"))
+    }
+
+    @Test
+    fun `formatted text remains undoable`() {
+        val original = "function demo(){return 1;}"
+        val content = Content(original)
+        content.insert(0, content.length, " ")
+        val beforeFormat = content.toString()
+
+        content.replace(0, content.length, "function demo() { return 1; }")
+        assertTrue(content.canUndo())
+        content.undo()
+        assertEquals(beforeFormat, content.toString())
+        content.undo()
+        assertEquals(original, content.toString())
+        content.redo()
+        content.redo()
+
+        assertEquals("function demo() { return 1; }", content.toString())
+        val viewModel = File(
+            repositoryRoot(),
+            "app/src/main/java/io/legado/app/ui/code/CodeEditViewModel.kt"
+        ).readText()
+        assertTrue(viewModel.contains("val source = editor.text.toString()"))
+        assertTrue(viewModel.contains("editor.text.toString() == source"))
+        assertTrue(viewModel.contains("editor.text.replace(0, editor.text.length, formatted)"))
+        assertFalse(viewModel.contains("editor.setText(it)"))
     }
 
     @Test

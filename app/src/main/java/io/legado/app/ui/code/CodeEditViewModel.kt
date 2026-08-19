@@ -117,8 +117,9 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
     }
 
     fun formatCode(editor: CodeEditor) {
+        val source = editor.text.toString()
         execute {
-            val text = editor.text.toString()
+            val text = source
             if (languageName.contains("markdown")) {
                 context.toastOnUi("markdown不需要格式化")
                 return@execute text
@@ -173,8 +174,10 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
                 result += text.substring(start).trim()
             }
             result
-        }.onSuccess {
-            editor.setText(it)
+        }.onSuccess { formatted ->
+            if (formatted != null && formatted != source && editor.text.toString() == source) {
+                editor.text.replace(0, editor.text.length, formatted)
+            }
         }.onError {
             AppLog.put("格式化失败",it, true)
         }
