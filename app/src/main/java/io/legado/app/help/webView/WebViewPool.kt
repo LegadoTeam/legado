@@ -67,6 +67,8 @@ object WebViewPool {
     @Synchronized
     fun release(pooledWebView: PooledWebView) {
         if (inUsePool.remove(pooledWebView.id) == null) return
+        val recycleGeneration = ++pooledWebView.recycleGeneration
+        val recycleUrl = "$BLANK_HTML?legado-recycle=$recycleGeneration"
         // 重置WebView状态
         pooledWebView.realWebView.run {
             (parent as? ViewGroup)?.removeView(this)
@@ -101,25 +103,28 @@ object WebViewPool {
             webViewClient = object: WebViewClient() {
                 @SuppressLint("SetJavaScriptEnabled")
                 override fun onPageFinished(view: WebView?, url: String?) {
-                    if (url != BLANK_HTML) return
-                    view?.let{ webview ->
-                        webview.settings.apply {
-                            javaScriptEnabled = false
-                            javaScriptEnabled = true // 禁用再启用来重置js环境，注意需要禁用的订阅源需要再次执行
-                            blockNetworkImage = false // 确保允许加载网络图片
-                            cacheMode = WebSettings.LOAD_DEFAULT // 重置缓存模式
-                            useWideViewPort = false // 恢复默认关闭宽视模式
-                            loadWithOverviewMode = false // 恢复默认
-                            textZoom = 100
+                    if (url != recycleUrl) return
+                    synchronized(this@WebViewPool) {
+                        if (!pooledWebView.isInUse || pooledWebView.id in inUsePool) return
+                        view?.let { webview ->
+                            webview.settings.apply {
+                                javaScriptEnabled = false
+                                javaScriptEnabled = true // 禁用再启用来重置js环境，注意需要禁用的订阅源需要再次执行
+                                blockNetworkImage = false // 确保允许加载网络图片
+                                cacheMode = WebSettings.LOAD_DEFAULT // 重置缓存模式
+                                useWideViewPort = false // 恢复默认关闭宽视模式
+                                loadWithOverviewMode = false // 恢复默认
+                                textZoom = 100
+                            }
+                            webview.onPause()
                         }
-                        webview.onPause()
+                        pooledWebView.isInUse = false
+                        pooledWebView.lastUseTime = System.currentTimeMillis()
+                        idlePool.push(pooledWebView)
                     }
-                    pooledWebView.isInUse = false
-                    pooledWebView.lastUseTime = System.currentTimeMillis()
-                    idlePool.push(pooledWebView)
                 }
             }
-            loadUrl(BLANK_HTML)
+            loadUrl(recycleUrl)
         }
     }
 
