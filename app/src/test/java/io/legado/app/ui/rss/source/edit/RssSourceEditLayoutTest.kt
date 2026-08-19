@@ -99,6 +99,21 @@ class RssSourceEditLayoutTest {
         assertTrue(refresh.contains("EditSafety.isTooLongForInline(editEntity.value.orEmpty())"))
     }
 
+    @Test
+    fun `editor suppresses code focus scrolling and follows repeated caret taps`() {
+        val source = File(repositoryRoot, ACTIVITY_PATH).readText()
+        val initView = source.section("private fun initView()", "private fun initOptionPanel()")
+        val sendText = source.section("override fun sendText(text: String)", "@RequiresApi")
+        assertTrue(initView.contains("val gridLayoutManager = object : GridLayoutManager(this, 2)"))
+        assertTrue(initView.contains("override fun onRequestChildFocus("))
+        assertTrue(initView.contains(") = focused is CodeView"))
+        assertFalse(initView.contains("requestChildRectangleOnScreen"))
+        assertTrue(initView.contains("(oldFocus as? CodeView)?.setOnClickListener(null)"))
+        assertTrue(initView.contains("newFocus.setOnClickListener { sendText(\"\") }"))
+        assertTrue(initView.contains("newFocus.postDelayed({ sendText(\"\") }, 120)"))
+        assertTrue(sendText.contains("binding.recyclerView.smoothScrollBy(0, scrollDistance)"))
+    }
+
     private fun parse(path: String): Document =
         DocumentBuilderFactory.newInstance().apply {
             isNamespaceAware = true

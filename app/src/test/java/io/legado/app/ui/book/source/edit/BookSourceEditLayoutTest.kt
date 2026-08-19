@@ -103,7 +103,7 @@ class BookSourceEditLayoutTest {
     }
 
     @Test
-    fun `source editor suppresses focus scrolling but keeps caret scrolling`() {
+    fun `source editor suppresses focus scrolling and follows repeated caret taps`() {
         val source = File(repositoryRoot, ACTIVITY_PATH).readText()
         val initView = source.section("private fun initView()", "private fun initOptionPanel()")
         val sendText = source.section("override fun sendText(text: String)", "private fun setSourceVariable()")
@@ -115,6 +115,8 @@ class BookSourceEditLayoutTest {
         assertTrue(layoutManager.contains("return true"))
         assertFalse(layoutManager.contains("requestChildRectangleOnScreen"))
         assertTrue(initView.contains("newFocus.postDelayed({ sendText(\"\") }, 120)"))
+        assertTrue(initView.contains("(oldFocus as? CodeView)?.setOnClickListener(null)"))
+        assertTrue(initView.contains("newFocus.setOnClickListener { sendText(\"\") }"))
         assertTrue(sendText.contains("binding.recyclerView.smoothScrollBy(0, scrollDistance)"))
     }
 

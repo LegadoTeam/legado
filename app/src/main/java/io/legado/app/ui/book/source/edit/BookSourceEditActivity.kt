@@ -44,6 +44,7 @@ import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.qrcode.QrCodeResult
 import io.legado.app.ui.widget.bindFieldNavigation
+import io.legado.app.ui.widget.code.CodeView
 import io.legado.app.ui.widget.code.EditSafety
 import io.legado.app.ui.widget.dialog.UrlOptionDialog
 import io.legado.app.ui.widget.dialog.VariableDialog
@@ -330,8 +331,10 @@ class BookSourceEditActivity :
         binding.recyclerView.layoutManager = NoChildScrollLinearLayoutManager(this)
         binding.recyclerView.adapter = adapter
         binding.fieldNav.bindFieldNavigation(binding.recyclerView)
-        binding.recyclerView.viewTreeObserver.addOnGlobalFocusChangeListener { _, newFocus ->
-            if (newFocus is EditText) {
+        binding.recyclerView.viewTreeObserver.addOnGlobalFocusChangeListener { oldFocus, newFocus ->
+            (oldFocus as? CodeView)?.setOnClickListener(null)
+            if (newFocus is CodeView) {
+                newFocus.setOnClickListener { sendText("") }
                 newFocus.postDelayed({ sendText("") }, 120)
             }
         }

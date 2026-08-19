@@ -2,7 +2,6 @@ package io.legado.app.ui.rss.source.edit
 
 import android.content.Intent
 import android.graphics.Color
-import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
 import android.view.Menu
@@ -36,6 +35,7 @@ import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.qrcode.QrCodeResult
 import io.legado.app.ui.rss.source.debug.RssSourceDebugActivity
 import io.legado.app.ui.widget.bindFieldNavigation
+import io.legado.app.ui.widget.code.CodeView
 import io.legado.app.ui.widget.code.EditSafety
 import io.legado.app.ui.widget.dialog.UrlOptionDialog
 import io.legado.app.ui.widget.dialog.VariableDialog
@@ -293,24 +293,25 @@ class RssSourceEditActivity :
                 else -> 2 //占2个span（整行）
             }
         }
-        val gridLayoutManager = if (adapter.editEntityMaxLine < 999) {
-            object : GridLayoutManager(this, 2) {
-                init {
-                    spanSizeLookup = createSpanSizeLookup
-                }
-                override fun requestChildRectangleOnScreen(parent: RecyclerView, child: View, rect: Rect, immediate: Boolean, focusedChildVisible: Boolean) = false
-                override fun requestChildRectangleOnScreen(parent: RecyclerView, child: View, rect: Rect, immediate: Boolean) = false
-            }
-        } else {
-            GridLayoutManager(this, 2).apply {
+        val gridLayoutManager = object : GridLayoutManager(this, 2) {
+            init {
                 spanSizeLookup = createSpanSizeLookup
             }
+
+            override fun onRequestChildFocus(
+                parent: RecyclerView,
+                state: RecyclerView.State,
+                child: View,
+                focused: View?
+            ) = focused is CodeView
         }
         binding.recyclerView.layoutManager = gridLayoutManager
         binding.recyclerView.adapter = adapter
         binding.fieldNav.bindFieldNavigation(binding.recyclerView)
-        binding.recyclerView.viewTreeObserver.addOnGlobalFocusChangeListener { _, newFocus ->
-            if (newFocus is EditText) {
+        binding.recyclerView.viewTreeObserver.addOnGlobalFocusChangeListener { oldFocus, newFocus ->
+            (oldFocus as? CodeView)?.setOnClickListener(null)
+            if (newFocus is CodeView) {
+                newFocus.setOnClickListener { sendText("") }
                 newFocus.postDelayed({ sendText("") }, 120)
             }
         }
