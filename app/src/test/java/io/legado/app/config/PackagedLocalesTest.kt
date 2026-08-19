@@ -7,7 +7,7 @@ import java.io.File
 class PackagedLocalesTest {
 
     @Test
-    fun `packaged locales cover every app translation`() {
+    fun `packaged locales cover app and required dependency translations`() {
         val root = repositoryRoot()
         val buildFile = File(root, "app/build.gradle").readText()
         val marker = "resourceConfigurations += ["
@@ -28,10 +28,10 @@ class PackagedLocalesTest {
                 localeDirectory.matchEntire(directory.name)?.groupValues?.get(1)
             }
             .toSet()
-        val expectedLocales = translatedLocales + "en"
+        val expectedLocales = translatedLocales + setOf("en", "zh-rCN")
 
         assertEquals(
-            "Update resourceConfigurations when adding or removing translations",
+            "Update resourceConfigurations when translations or dependency locales change",
             expectedLocales.sorted(),
             configuredLocales.sorted(),
         )
