@@ -8,6 +8,32 @@ import java.io.File
 class ReadBookPopupActionMigrationTest {
 
     @Test
+    fun `reader source actions use the shared vertical popup menu`() {
+        val source = readProjectFile(READ_MENU)
+
+        assertFalse(source.contains("import androidx.appcompat.widget.PopupMenu"))
+        assertOrdered(
+            source,
+            "val hasLogin = ReadBook.bookSource?.hasLogin() == true",
+            "val canPay = hasLogin",
+            "&& ReadBook.curTextChapter?.isVip == true",
+            "&& ReadBook.curTextChapter?.isPay != true",
+            "item(context.getString(R.string.login), \"login\", hasLogin)",
+            "item(context.getString(R.string.chapter_pay), \"chapterPay\", canPay)",
+            "item(context.getString(R.string.edit_book_source), \"editSource\")",
+            "item(context.getString(R.string.disable_book_source), \"disableSource\")",
+            "\"login\" -> callBack.showLogin()",
+            "\"chapterPay\" -> callBack.payAction()",
+            "\"editSource\" -> callBack.openSourceEditActivity()",
+            "\"disableSource\" -> callBack.disableSource()"
+        )
+        assertFalse(
+            "legacy reader source menu should be removed",
+            sequenceOf(File(SOURCE_MENU), File("app/$SOURCE_MENU")).any(File::isFile)
+        )
+    }
+
+    @Test
     fun `reader long press menus use the shared vertical popup action menu`() {
         val source = readProjectFile(READ_BOOK_ACTIVITY)
         val changeMenu = section(
@@ -185,7 +211,9 @@ class ReadBookPopupActionMigrationTest {
 
     private companion object {
         const val READ_BOOK_ACTIVITY = "src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt"
+        const val READ_MENU = "src/main/java/io/legado/app/ui/book/read/ReadMenu.kt"
         const val CHANGE_SOURCE_MENU = "src/main/res/menu/book_read_change_source.xml"
         const val REFRESH_MENU = "src/main/res/menu/book_read_refresh.xml"
+        const val SOURCE_MENU = "src/main/res/menu/book_read_source.xml"
     }
 }
