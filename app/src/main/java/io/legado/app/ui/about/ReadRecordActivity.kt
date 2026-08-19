@@ -33,6 +33,16 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Locale
 
+internal fun formatDuring(mss: Long): String {
+    val hours = mss / (1000 * 60 * 60)
+    val minutes = mss % (1000 * 60 * 60) / (1000 * 60)
+    val seconds = mss % (1000 * 60) / 1000
+    val h = if (hours > 0) "${hours}小时" else ""
+    val m = if (minutes > 0) "${minutes}分钟" else ""
+    val s = if (seconds > 0) "${seconds}秒" else ""
+    return "$h$m$s".ifBlank { "0秒" }
+}
+
 class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
 
     private val adapter by lazy { RecordAdapter(this) }
@@ -214,16 +224,6 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
             }
         }
 
-    }
-
-    fun formatDuring(mss: Long): String {
-        val hours = mss / (1000 * 60 * 60)
-        val minutes = mss % (1000 * 60 * 60) / (1000 * 60)
-        val seconds = mss % (1000 * 60) / 1000
-        val h = if (hours > 0) "${hours}小时" else ""
-        val m = if (minutes > 0) "${minutes}分钟" else ""
-        val s = if (seconds > 0) "${seconds}秒" else ""
-        return "$h$m$s".ifBlank { "0秒" }
     }
 
 }
