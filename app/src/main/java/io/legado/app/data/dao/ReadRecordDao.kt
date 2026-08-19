@@ -41,8 +41,8 @@ interface ReadRecordDao {
     )
     fun search(searchKey: String): List<ReadRecordShow>
 
-    @Query("select sum(readTime) from readRecord where bookName = :bookName")
-    fun getReadTime(bookName: String): Long?
+    @Query("select readTime from readRecord where deviceId = :deviceId and bookName = :bookName")
+    fun getReadTime(deviceId: String, bookName: String): Long?
 
     @Query("select * from readRecord where deviceId = :deviceId and bookName = :bookName")
     fun getRecord(deviceId: String, bookName: String): ReadRecord?

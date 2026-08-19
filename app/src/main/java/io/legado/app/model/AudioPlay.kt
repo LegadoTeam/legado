@@ -291,13 +291,10 @@ object AudioPlay : CoroutineScope by MainScope() {
         kotlin.runCatching { readTimeWrite?.get() }.onFailure {
             AppLog.put("保存听书时长失败\n${it.localizedMessage}", it)
         }
-        readTimeTracker.setRecord(
-            ReadRecord(
-                bookName = book.name,
-                author = book.author,
-                readTime = appDb.readRecordDao.getReadTime(book.name) ?: 0,
-            )
-        )
+        val record = ReadRecord(bookName = book.name, author = book.author)
+        record.readTime = appDb.readRecordDao
+            .getReadTime(record.deviceId, record.bookName) ?: 0
+        readTimeTracker.setRecord(record)
         if (resumeIfPlaying && AudioPlayService.isPlaying) {
             markReadTimeStart()
         }
