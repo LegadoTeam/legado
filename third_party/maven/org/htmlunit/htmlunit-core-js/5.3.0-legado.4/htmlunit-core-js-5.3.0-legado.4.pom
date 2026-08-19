@@ -5,10 +5,10 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.htmlunit</groupId>
     <artifactId>htmlunit-core-js</artifactId>
-    <version>5.3.0-legado.3</version>
+    <version>5.3.0-legado.4</version>
     <name>HtmlUnit JavaScript Engine</name>
     <description>Legado-compatible build of HtmlUnit's Rhino fork.</description>
-    <url>https://github.com/skybbk1001/htmlunit-core-js</url>
+    <url>https://github.com/mgz0227/htmlunit-core-js</url>
     <licenses>
         <license>
             <name>Mozilla Public License 2.0 (Rhino-derived engine)</name>

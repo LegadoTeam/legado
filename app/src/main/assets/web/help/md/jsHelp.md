@@ -1,7 +1,7 @@
 # js变量和函数
-> 阅读使用 [HtmlUnit Core JS 5.3.0-legado.3](https://github.com/skybbk1001/htmlunit-core-js/tree/e31799f290b50f99fe2cef1f14acd9725f69653c) 提供的 Rhino 兼容 JavaScript 引擎，以便于[调用Java类和方法](https://m.jb51.net/article/92138.htm)
+> 阅读使用 [HtmlUnit Core JS 5.3.0-legado.4](https://github.com/mgz0227/htmlunit-core-js/tree/3eb5071cdca4a357119d1063a53d5f2d47984ed2) 提供的 Rhino 兼容 JavaScript 引擎，以便于[调用Java类和方法](https://m.jb51.net/article/92138.htm)
 
-> [JavaScript运行时](https://github.com/skybbk1001/htmlunit-core-js/blob/e31799f290b50f99fe2cef1f14acd9725f69653c/src/repackaged-rhino/java/org/htmlunit/corejs/javascript/ScriptRuntime.java)懒加载导入的Java类和方法
+> [JavaScript运行时](https://github.com/mgz0227/htmlunit-rhino-fork/blob/76460c0312bfd351df6f2bb11168102cdb54170a/rhino/src/main/java/org/mozilla/javascript/ScriptRuntime.java)懒加载导入的Java类和方法
 
 |构造函数|函数|对象|调用类|简要说明|
 |------|-----|------|----|------|

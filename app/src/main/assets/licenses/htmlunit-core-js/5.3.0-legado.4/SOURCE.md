@@ -1,9 +1,9 @@
-# htmlunit-core-js 5.3.0-legado.3
+# htmlunit-core-js 5.3.0-legado.4
 
 This binary is built from the following public source revisions:
 
-- Packaging: `skybbk1001/htmlunit-core-js@e31799f290b50f99fe2cef1f14acd9725f69653c`
-- Rhino: `skybbk1001/htmlunit-rhino-fork@c758621a0df4ec5687901570dc355c1f98f32652`
+- Packaging: `mgz0227/htmlunit-core-js@3eb5071cdca4a357119d1063a53d5f2d47984ed2`
+- Rhino: `mgz0227/htmlunit-rhino-fork@76460c0312bfd351df6f2bb11168102cdb54170a`
 
 `rhinoDiff.txt` records the Rhino changes from upstream merge base
 `46d0904a3b4a1adc014a0d53d66a91b699a548de` to the pinned fork revision.
@@ -11,13 +11,13 @@ This binary is built from the following public source revisions:
 Build command:
 
 ```shell
-mvn --batch-mode -U clean install -Dmaven.test.skip=true -Dgpg.skip=true -Dmaven.javadoc.skip=true -Dmaven.compiler.showWarnings=false
+mvn --batch-mode -T 1 -U clean install -Dmaven.test.skip=true -Dgpg.skip=true -Dmaven.javadoc.skip=true -Dmaven.compiler.showWarnings=false
 ```
 
-SHA-256 of `htmlunit-core-js-5.3.0-legado.3.jar`:
+SHA-256 of `htmlunit-core-js-5.3.0-legado.4.jar`:
 
 ```text
-9684b7d1780b9dbfe39c6f2b5f9e35c44371912e2e508dea4393a5c1ac3e081c
+d720f34285515025e4ccc80a5b92aed42cb26c03a7715ca53583d2c74ae51df7
 ```
 
 Licensing records from both source revisions are bundled in this APK asset
