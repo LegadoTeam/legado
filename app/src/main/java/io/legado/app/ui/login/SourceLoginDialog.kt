@@ -397,6 +397,8 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
                     }
                     editText.inputType =
                         InputType.TYPE_TEXT_VARIATION_PASSWORD or InputType.TYPE_CLASS_TEXT
+                    it.textInputLayout.endIconMode =
+                        com.google.android.material.textfield.TextInputLayout.END_ICON_PASSWORD_TOGGLE
                     editText.setText(loginInfo[name] ?: default)
                     action?.let { jsStr ->
                         val watcher = object : TextWatcher {
