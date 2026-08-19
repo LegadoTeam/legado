@@ -182,16 +182,9 @@ interface BaseSource : JsExtensions {
     fun getHeaderMap(hasLoginHeader: Boolean = false) = HashMap<String, String>().apply {
         header?.let {
             try {
-                val json = when {
-                    it.startsWith("@js:", true) ->
-                        JsSourceEngine.normalizeJsResult(evalJS(it.substring(4))).orEmpty()
-
-                    it.startsWith("<js>", true) -> JsSourceEngine.normalizeJsResult(
-                        evalJS(it.substring(4, it.lastIndexOf("<")))
-                    ).orEmpty()
-
-                    else -> it
-                }
+                val json = extractInlineJs(it)?.let { js ->
+                    JsSourceEngine.normalizeJsResult(evalJS(js)).orEmpty()
+                } ?: it
                 GSON.fromJsonObject<Map<String, String>>(json).getOrNull()?.let { map ->
                     putAll(map)
                 }
