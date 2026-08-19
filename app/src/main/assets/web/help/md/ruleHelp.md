@@ -323,26 +323,32 @@ let options = {
 ## 回调事件
 
 * 回调操作
-> 先启用事件监听按钮，然后软件触发事件时会执行回调规则的js代码。  
-可空字符串变量`result`的值为事件对应内容。  
-字符串变量`event`的值对应事件名称，目前的事件有
+> 先启用事件监听按钮，然后软件触发事件时会执行回调规则的 JS 代码。
+>
+> 所有事件都会显式绑定 `event`、`result`、`book` 和 `chapter`，其中后三项可能为 `null`。回调也保留书源脚本的通用变量：通知事件中的 `java` 是当前书源，交互事件中的 `java` 则为 `SourceLoginJsExtensions`。
+>
+> 对存在默认操作的交互事件，回调结果为假时执行默认操作，为真时跳过默认操作。`clickCustomButton`、`longClickCustomButton` 和 `longClickBookLabel` 没有默认操作，回调结果不影响后续行为。脚本执行失败时只记录错误，也不会执行默认操作。
+>
+> 回调结果会转为字符串并按通用的 `isTrue()` 规则判断；空白、`null`、`false`、`no`、`not`、`0` 和 `0.0` 都会被视为假。
+>
+> `event` 的值对应事件名称，目前有：
 ```js
 "clickBookName" //点击详情页书名
 "longClickBookName" //长按详情页书名
 "clickAuthor" //点击详情页作者
 "longClickAuthor" //长按详情页作者
-"clickCustomButton" //点击书源自定义按钮
-"longClickCustomButton" //长按书源自定义按钮（只存在小说的正文界面）
+"clickCustomButton" //点击书源自定义按钮；无默认操作
+"longClickCustomButton" //长按书源自定义按钮（只存在小说的正文界面）；无默认操作
 "clickShareBook" //点击详情页分享按钮
 "clickClearCache" //点击详情页清理缓存按钮
 "clickCopyBookUrl" //点击详情页拷贝书籍URl按钮
 "clickCopyTocUrl" //点击详情页拷贝目录URl按钮
 "clickCopyPlayUrl" //音频、视频界面点击拷贝播放URL按钮
 "clickBookLabel" //点击详情页标签
-"longClickBookLabel" //长按详情页标签
-//上面的事件回调执行结果返回true会消费事件，原本的软件操作不会再执行
+"longClickBookLabel" //长按详情页标签；无默认操作
+// 上面的交互事件中，提供默认操作的事件可由回调结果控制
 
-//下面的事件无法被回调结果消费
+// 下面的通知事件忽略回调结果，无法消费
 "addBookShelf" //添加到书架
 "delBookShelf" //移除书架
 "saveRead" //保存阅读进度
