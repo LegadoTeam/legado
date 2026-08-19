@@ -1,5 +1,6 @@
 package io.legado.app.data.dao
 
+import android.database.sqlite.SQLiteConstraintException
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
@@ -243,6 +244,23 @@ interface BookDao {
                     persistedCoverUrl = getPersistedCoverUrl(book.bookUrl),
                 )
             )
+        }
+    }
+
+    @Transaction
+    fun upsertPreservingVariable(book: Book) {
+        val existingByUrl = getBook(book.bookUrl)
+        (existingByUrl ?: getBook(book.name, book.author))?.let { existing ->
+            book.variable = existing.variable
+        }
+        if (existingByUrl != null) {
+            try {
+                update(book)
+            } catch (_: SQLiteConstraintException) {
+                insert(book)
+            }
+        } else {
+            insert(book)
         }
     }
 

@@ -59,19 +59,22 @@ import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getPrefInt
 import io.legado.app.utils.getPrefString
-import io.legado.app.utils.getSharedPreferences
 import io.legado.app.utils.isContentScheme
 import io.legado.app.utils.isJsonArray
 import io.legado.app.utils.openInputStream
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.Dispatchers.Main
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import splitties.init.appCtx
 import java.io.File
 import java.io.FileInputStream
+import java.util.UUID
 
 internal fun parseCookieBackup(json: String): List<Cookie> {
     return GSONStrict.fromJsonArray<JsonElement>(json).getOrThrow().map { element ->
@@ -96,14 +99,7 @@ object Restore {
     suspend fun restore(context: Context, uri: Uri) {
         LogUtils.d(TAG, "开始恢复备份 uri:$uri")
         kotlin.runCatching {
-            FileUtils.delete(Backup.backupPath)
-            if (uri.isContentScheme()) {
-                DocumentFile.fromSingleUri(context, uri)!!.openInputStream()!!.use {
-                    ZipUtils.unZipToPath(it, Backup.backupPath)
-                }
-            } else {
-                ZipUtils.unZipToPath(File(uri.path!!), Backup.backupPath)
-            }
+            extractBackup(context, uri)
         }.onFailure {
             AppLog.put("复制解压文件出错\n${it.localizedMessage}", it)
             return
@@ -117,17 +113,68 @@ object Restore {
         }
     }
 
-    suspend fun restoreLocked(path: String) {
-        mutex.withLock {
-            restore(path)
+    suspend fun restoreOrThrow(
+        context: Context,
+        uri: Uri,
+        lanTransfer: Boolean = false,
+    ) {
+        LogUtils.d(TAG, "开始恢复备份 uri:$uri")
+        val restorePath = if (lanTransfer) {
+            File(context.cacheDir, "lan_backup/restore/${UUID.randomUUID()}").absolutePath
+        } else {
+            Backup.backupPath
+        }
+        try {
+            extractBackup(context, uri, restorePath)
+            if (lanTransfer) {
+                LanBackupTransfer.requireRestoreMediaSpace(
+                    context,
+                    File(restorePath),
+                    includeBackgrounds = !BackupConfig.ignoreReadConfig,
+                )
+            }
+            restoreLocked(restorePath, lanTransfer)
+            LocalConfig.lastBackup = System.currentTimeMillis()
+        } finally {
+            if (lanTransfer) FileUtils.delete(restorePath)
         }
     }
 
-    private suspend fun restore(path: String) {
+    private fun extractBackup(
+        context: Context,
+        uri: Uri,
+        targetPath: String = Backup.backupPath,
+    ) {
+        FileUtils.delete(targetPath)
+        if (uri.isContentScheme()) {
+            DocumentFile.fromSingleUri(context, uri)!!.openInputStream()!!.use {
+                ZipUtils.unZipToPath(it, targetPath)
+            }
+        } else {
+            ZipUtils.unZipToPath(File(uri.path!!), targetPath)
+        }
+    }
+
+    suspend fun restoreLocked(path: String, lanTransfer: Boolean = false) {
+        mutex.withLock {
+            if (lanTransfer) {
+                currentCoroutineContext().ensureActive()
+                withContext(NonCancellable) {
+                    restore(path, lanTransfer = true)
+                }
+            } else {
+                restore(path)
+            }
+        }
+    }
+
+    private suspend fun restore(path: String, lanTransfer: Boolean = false) {
         val password = LocalConfig.password
         val aes = BackupAES(password)
         val backupRoot = File(path)
-        val restoredCookies = if (!BackupConfig.ignoreCookies) {
+        val restoredPreferences = readPreferenceSnapshot(appCtx, path, "config")
+        val restoredVideoPreferences = readPreferenceSnapshot(appCtx, path, "videoConfig")
+        val restoredCookies = if (!lanTransfer && !BackupConfig.ignoreCookies) {
             File(path, BackupConfig.cookieFileName).takeIf { it.exists() }?.let { file ->
                 if (password.isNullOrBlank()) {
                     throw NoStackTraceException(
@@ -142,6 +189,7 @@ object Restore {
         val restoredAutoTasks = fileToListT<AutoTaskRule>(path, "autoTask.json")
         fileToListT<Book>(path, "bookshelf.json")?.let {
             it.forEach { book ->
+                if (lanTransfer) book.variable = null
                 book.upType()
                 book.normalizeLegacyPersistedCover()
                 book.customCoverUrl = book.customCoverUrl?.let { coverPath ->
@@ -159,6 +207,10 @@ object Restore {
             val ignoreLocalBook = BackupConfig.ignoreLocalBook
             it.forEach { book ->
                 if (ignoreLocalBook && book.isLocal) {
+                    return@forEach
+                }
+                if (lanTransfer) {
+                    appDb.bookDao.upsertPreservingVariable(book)
                     return@forEach
                 }
                 if (appDb.bookDao.has(book.bookUrl)) {
@@ -254,7 +306,7 @@ object Restore {
             }
         }
         File(path, "servers.json").takeIf {
-            it.exists()
+            !lanTransfer && it.exists()
         }?.runCatching {
             var json = readText()
             if (!json.isJsonArray()) {
@@ -274,7 +326,7 @@ object Restore {
             }
         }
         File(path, DirectLinkUpload.ruleFileName).takeIf {
-            it.exists()
+            !lanTransfer && it.exists()
         }?.runCatching {
             val json = readText()
             ACache.get(cacheDir = false).put(DirectLinkUpload.ruleFileName, json)
@@ -321,11 +373,13 @@ object Restore {
             }
         }
         //AppWebDav.downBgs()
-        appCtx.getSharedPreferences(path, "config")?.all?.let { map ->
+        restoredPreferences?.let { map ->
             val edit = appCtx.defaultSharedPreferences.edit()
 
             map.forEach { (key, value) ->
-                if (BackupConfig.keyIsNotIgnore(key)) {
+                if (BackupConfig.keyIsNotIgnore(key) &&
+                    (!lanTransfer || key !in lanTransferIgnoredPrefKeys)
+                ) {
                     when (key) {
                         PreferKey.webDavPassword -> {
                             kotlin.runCatching {
@@ -347,13 +401,17 @@ object Restore {
                             is Long -> edit.putLong(key, value)
                             is Float -> edit.putFloat(key, value)
                             is String -> edit.putString(key, value)
+                            is Set<*> -> {
+                                @Suppress("UNCHECKED_CAST")
+                                edit.putStringSet(key, value as Set<String>)
+                            }
                         }
                     }
                 }
             }
             edit.apply()
         }
-        appCtx.getSharedPreferences(path, "videoConfig")?.all?.let { map ->
+        restoredVideoPreferences?.let { map ->
             appCtx.getSharedPreferences(VIDEO_PREF_NAME, Context.MODE_PRIVATE).edit().apply {
                 map.forEach { (key, value) ->
                     when (value) {
@@ -362,6 +420,10 @@ object Restore {
                         is Long -> putLong(key, value)
                         is Float -> putFloat(key, value)
                         is String -> putString(key, value)
+                        is Set<*> -> {
+                            @Suppress("UNCHECKED_CAST")
+                            putStringSet(key, value as Set<String>)
+                        }
                     }
                 }
                 apply()

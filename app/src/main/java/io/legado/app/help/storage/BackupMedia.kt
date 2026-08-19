@@ -5,6 +5,23 @@ import java.io.File
 
 internal val backupMediaDirectoryNames = listOf("covers", "bg")
 
+internal fun requiredRestoreMediaBytes(
+    backupRoot: File,
+    externalFilesRoot: File,
+    directoryNames: Collection<String>,
+): Long = directoryNames.fold(0L) { total, name ->
+    require(name in backupMediaDirectoryNames)
+    val source = File(backupRoot, name)
+    if (!source.hasFiles()) {
+        total
+    } else {
+        Math.addExact(
+            total,
+            Math.addExact(source.directoryBytes(), File(externalFilesRoot, name).directoryBytes()),
+        )
+    }
+}
+
 internal fun remapRestoredCoverPath(
     path: String,
     backupRoot: File,
@@ -73,6 +90,13 @@ private fun File.hasFiles(): Boolean {
     return isDirectory && runCatching {
         walkTopDown().any { it.isFile }
     }.getOrDefault(false)
+}
+
+private fun File.directoryBytes(): Long {
+    if (!isDirectory) return 0L
+    return walkTopDown().filter(File::isFile).fold(0L) { total, file ->
+        Math.addExact(total, file.length())
+    }
 }
 
 /**

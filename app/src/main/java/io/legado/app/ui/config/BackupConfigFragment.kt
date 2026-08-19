@@ -2,12 +2,16 @@ package io.legado.app.ui.config
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Build
 import android.os.Bundle
 import android.text.InputType
+import android.text.format.Formatter
 import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.View
+import androidx.appcompat.app.AlertDialog
+import androidx.core.net.toUri
 import androidx.core.view.MenuProvider
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
@@ -17,6 +21,7 @@ import androidx.preference.Preference
 import io.legado.app.R
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.PreferKey
+import io.legado.app.databinding.DialogLanBackupSendBinding
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.config.AppConfig
@@ -25,6 +30,8 @@ import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.storage.Backup
 import io.legado.app.help.storage.BackupConfig
 import io.legado.app.help.storage.ImportOldData
+import io.legado.app.help.storage.LanBackupSession
+import io.legado.app.help.storage.LanBackupTransfer
 import io.legado.app.help.storage.Restore
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
@@ -34,8 +41,10 @@ import io.legado.app.lib.prefs.fragment.PreferenceFragment
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.file.HandleFileContract
+import io.legado.app.ui.qrcode.QrCodeResult
 import io.legado.app.ui.widget.dialog.WaitDialog
 import io.legado.app.utils.FileDoc
+import io.legado.app.utils.QRCodeUtils
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.checkWrite
 import io.legado.app.utils.getPrefString
@@ -63,6 +72,9 @@ class BackupConfigFragment : PreferenceFragment(),
     private val waitDialog by lazy { WaitDialog(requireContext()) }
     private var backupJob: Job? = null
     private var restoreJob: Job? = null
+    private var lanBackupJob: Job? = null
+    private var lanBackupSession: LanBackupSession? = null
+    private var lanBackupDialog: AlertDialog? = null
 
     private val selectBackupPath = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
@@ -104,6 +116,9 @@ class BackupConfigFragment : PreferenceFragment(),
         it.uri?.let { uri ->
             ImportOldData.importUri(appCtx, uri)
         }
+    }
+    private val lanBackupQr = registerForActivityResult(QrCodeResult()) {
+        it?.let(::confirmLanBackupReceive)
     }
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
@@ -241,8 +256,158 @@ class BackupConfigFragment : PreferenceFragment(),
             PreferKey.restoreIgnore -> backupIgnore()
             "web_dav_backup" -> backup()
             "web_dav_restore" -> restore()
+            "lan_backup_transfer" -> lanBackupTransfer()
         }
         return super.onPreferenceTreeClick(preference)
+    }
+
+    private fun lanBackupTransfer() {
+        requireContext().selector(
+            titleSource = R.string.lan_backup_transfer,
+            items = listOf(
+                getString(R.string.lan_backup_send),
+                getString(R.string.lan_backup_receive),
+            ),
+        ) { _, index ->
+            when (index) {
+                0 -> confirmLanBackupSend()
+                1 -> lanBackupQr.launch()
+            }
+        }
+    }
+
+    private fun confirmLanBackupSend() {
+        alert(
+            titleResource = R.string.lan_backup_send,
+            messageResource = R.string.lan_backup_send_confirm,
+        ) {
+            okButton { sendLanBackup() }
+            cancelButton()
+        }
+    }
+
+    private fun sendLanBackup() {
+        lanBackupDialog?.dismiss()
+        lanBackupSession?.close()
+        lanBackupDialog = null
+        lanBackupSession = null
+        lanBackupJob?.cancel()
+        waitDialog.setText(R.string.lan_backup_send).show()
+        lanBackupJob = viewLifecycleOwner.lifecycleScope.launch {
+            var pendingSession: LanBackupSession? = null
+            try {
+                val prepared = withContext(IO) {
+                    val backupFile = Backup.backupForLanTransferLocked(appCtx)
+                    val deviceName = AppConfig.webDavDeviceName
+                        ?.takeIf { it.isNotBlank() }
+                        ?: "${Build.MANUFACTURER} ${Build.MODEL}".trim()
+                    val session = LanBackupTransfer.prepare(backupFile, deviceName)
+                    pendingSession = session
+                    val qrCode = QRCodeUtils.createQRCode(session.qrText)
+                        ?: throw NoStackTraceException("生成二维码失败")
+                    session to qrCode
+                }
+                pendingSession = prepared.first
+                ensureActive()
+                showLanBackupQr(prepared.first, prepared.second)
+                pendingSession = null
+            } catch (error: Throwable) {
+                ensureActive()
+                AppLog.put("局域网备份发送失败\n${error.localizedMessage}", error)
+                appCtx.toastOnUi(error.localizedMessage ?: getString(R.string.backup_fail, ""))
+            } finally {
+                pendingSession?.close()
+                waitDialog.dismiss()
+            }
+        }
+        waitDialog.setOnCancelListener { lanBackupJob?.cancel() }
+    }
+
+    private fun showLanBackupQr(
+        session: LanBackupSession,
+        qrCode: android.graphics.Bitmap,
+    ) {
+        lanBackupDialog?.dismiss()
+        lanBackupSession?.close()
+        lanBackupSession = session
+        val binding = DialogLanBackupSendBinding.inflate(layoutInflater).apply {
+            ivQrCode.setImageBitmap(qrCode)
+        }
+        lateinit var dialog: AlertDialog
+        val expireTask = Runnable {
+            if (lanBackupSession === session) dialog.dismiss()
+        }
+        dialog = alert(R.string.lan_backup_send) {
+            customView { binding.root }
+            cancelButton()
+            onDismiss {
+                binding.root.removeCallbacks(expireTask)
+                if (lanBackupSession === session) {
+                    lanBackupSession = null
+                    session.close()
+                }
+                if (lanBackupDialog === dialog) {
+                    lanBackupDialog = null
+                }
+            }
+        }
+        lanBackupDialog = dialog
+        binding.root.postDelayed(
+            expireTask,
+            (session.descriptor.expiresAt - System.currentTimeMillis()).coerceAtLeast(0L),
+        )
+    }
+
+    private fun confirmLanBackupReceive(qrText: String) {
+        val descriptor = LanBackupTransfer.decodeDescriptor(qrText).getOrElse { error ->
+            appCtx.toastOnUi(error.localizedMessage ?: getString(R.string.lan_backup_receive))
+            return
+        }
+        alert(
+            title = getString(R.string.lan_backup_receive),
+            message = getString(
+                R.string.lan_backup_receive_confirm,
+                Formatter.formatFileSize(requireContext(), descriptor.size),
+                descriptor.deviceName.ifBlank { descriptor.hosts.first() },
+            ),
+        ) {
+            okButton { receiveLanBackup(qrText) }
+            cancelButton()
+        }
+    }
+
+    private fun receiveLanBackup(qrText: String) {
+        lanBackupJob?.cancel()
+        waitDialog.setText(R.string.lan_backup_receive).show()
+        lanBackupJob = viewLifecycleOwner.lifecycleScope.launch {
+            var receivedFile: java.io.File? = null
+            try {
+                val received = LanBackupTransfer.receive(appCtx, qrText)
+                receivedFile = received.file
+                waitDialog.setText(R.string.backup)
+                withContext(IO) {
+                    Backup.backupBeforeLanRestoreLocked(appCtx)
+                    LanBackupTransfer.requireRestoreSpace(appCtx, received.uncompressedBytes)
+                }
+                ensureActive()
+                waitDialog.setText(R.string.restore)
+                withContext(IO) {
+                    Restore.restoreOrThrow(
+                        appCtx,
+                        received.file.toUri(),
+                        lanTransfer = true,
+                    )
+                }
+            } catch (error: Throwable) {
+                ensureActive()
+                AppLog.put("局域网备份接收失败\n${error.localizedMessage}", error)
+                appCtx.toastOnUi(error.localizedMessage ?: getString(R.string.lan_backup_receive))
+            } finally {
+                receivedFile?.parentFile?.deleteRecursively()
+                waitDialog.dismiss()
+            }
+        }
+        waitDialog.setOnCancelListener { lanBackupJob?.cancel() }
     }
 
     /**
@@ -412,8 +577,22 @@ class BackupConfigFragment : PreferenceFragment(),
     }
 
     override fun onDestroyView() {
+        lanBackupJob?.cancel()
+        lanBackupDialog?.dismiss()
+        lanBackupSession?.close()
+        lanBackupDialog = null
+        lanBackupSession = null
         super.onDestroyView()
         waitDialog.dismiss()
+    }
+
+    override fun onStop() {
+        lanBackupJob?.cancel()
+        lanBackupDialog?.dismiss()
+        lanBackupSession?.close()
+        lanBackupDialog = null
+        lanBackupSession = null
+        super.onStop()
     }
 
 }

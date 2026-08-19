@@ -10,6 +10,30 @@ import java.nio.file.Files
 class BackupMediaTest {
 
     @Test
+    fun restoreMediaSpaceCountsCurrentAndIncomingSelectedDirectories() =
+        withTempDirectory { root ->
+            val backupRoot = root.resolve("backup").apply { mkdirs() }
+            val externalRoot = root.resolve("external").apply { mkdirs() }
+            backupRoot.resolve("covers/incoming.cover").apply {
+                parentFile?.mkdirs()
+                writeText("1234")
+            }
+            externalRoot.resolve("covers/current.cover").apply {
+                parentFile?.mkdirs()
+                writeText("123456")
+            }
+            externalRoot.resolve("bg/current.png").apply {
+                parentFile?.mkdirs()
+                writeText("ignored")
+            }
+
+            assertEquals(
+                10L,
+                requiredRestoreMediaBytes(backupRoot, externalRoot, listOf("covers", "bg")),
+            )
+        }
+
+    @Test
     fun selectedBackupFilesFollowContentGroups() {
         assertEquals(
             listOf(

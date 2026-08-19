@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:paddingStart="24dp"
+    android:paddingTop="16dp"
+    android:paddingEnd="24dp"
+    android:paddingBottom="16dp">
+
+    <ImageView
+        android:id="@+id/iv_qr_code"
+        android:layout_width="240dp"
+        android:layout_height="240dp"
+        android:contentDescription="@string/lan_backup_waiting"
+        android:scaleType="fitCenter" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:gravity="center"
+        android:text="@string/lan_backup_waiting"
+        android:textColor="@color/primaryText"
+        android:textSize="14sp" />
+
+</LinearLayout>

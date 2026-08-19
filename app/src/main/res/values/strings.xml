@@ -120,6 +120,13 @@
     <string name="pt_auto_download">Auto-download</string>
     <string name="ps_auto_download">Download the latest chapters automatically  when updating books</string>
     <string name="backup_restore">Backup and restore</string>
+    <string name="lan_backup_transfer">LAN transfer</string>
+    <string name="lan_backup_transfer_summary">Send or receive the selected backup content while both devices are open</string>
+    <string name="lan_backup_send">Send backup</string>
+    <string name="lan_backup_receive">Receive backup</string>
+    <string name="lan_backup_send_confirm">Creates a temporary encrypted backup without saved cookies, login data, source/book variables, WebDAV/remote server settings, direct-link upload settings, caches, fonts, or local book files. Selected source/rule definitions and custom headers are transferred. Pair only with a trusted device and keep this screen open while it scans the QR code.</string>
+    <string name="lan_backup_receive_confirm">Receive %1$s from %2$s and restore it? The current device will be backed up first. Saved cookies, login data, source/book variables, server settings, caches, fonts, and local book files are not transferred; selected source/rule definitions and custom headers are transferred.</string>
+    <string name="lan_backup_waiting">Scan this QR code on the receiving device. The temporary session expires in five minutes.</string>
     <string name="web_dav_set">WebDav settings</string>
     <string name="web_dav_set_import_old">WebDav settings/Import legacy data</string>
     <string name="backup">Backup</string>

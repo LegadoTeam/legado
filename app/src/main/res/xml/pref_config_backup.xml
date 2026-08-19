@@ -90,6 +90,12 @@
             app:iconSpaceReserved="false" />
 
         <io.legado.app.lib.prefs.Preference
+            android:key="lan_backup_transfer"
+            android:summary="@string/lan_backup_transfer_summary"
+            android:title="@string/lan_backup_transfer"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
             android:key="web_dav_backup"
             android:summary="@string/backup_summary"
             android:title="@string/backup"

@@ -245,7 +245,8 @@ class AutoTaskPersistenceContractTest {
         assertTrue(backup.contains("appDb.autoTaskRuleDao.all()"))
         assertTrue(restore.contains("fileToListT<AutoTaskRule>(path, \"autoTask.json\")"))
         assertTrue(restore.contains("appDb.autoTaskRuleDao.upsert"))
-        val preferenceRestore = restore.indexOf("appCtx.getSharedPreferences(path, \"config\")")
+        val preferenceRestore =
+            restore.indexOf("readPreferenceSnapshot(appCtx, path, \"config\")")
         val taskUpsert = restore.indexOf("appDb.autoTaskRuleDao.upsert")
         val scheduleRefresh = restore.indexOf("AutoTaskScheduler.refresh(appCtx)")
         assertTrue(preferenceRestore >= 0)

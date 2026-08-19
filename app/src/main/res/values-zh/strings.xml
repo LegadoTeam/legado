@@ -118,6 +118,13 @@
     <string name="pt_auto_download">自动下载最新章节</string>
     <string name="ps_auto_download">更新书籍时自动下载最新章节</string>
     <string name="backup_restore">备份与恢复</string>
+    <string name="lan_backup_transfer">局域网传输</string>
+    <string name="lan_backup_transfer_summary">两台设备都保持打开时发送或接收当前选中的备份内容</string>
+    <string name="lan_backup_send">发送备份</string>
+    <string name="lan_backup_receive">接收备份</string>
+    <string name="lan_backup_send_confirm">将生成临时加密备份，不含已保存的 Cookie、登录信息、源/书籍变量、WebDAV/远程服务器设置、直链上传设置、缓存、字体和本地书原文件。所选书源和规则的定义文本及自定义请求头会传输，请仅与可信设备配对，并在扫码期间保持此页面打开。</string>
+    <string name="lan_backup_receive_confirm">接收来自“%2$s”的 %1$s 备份并恢复吗？恢复前会先备份当前设备。已保存的 Cookie、登录信息、源/书籍变量、服务器设置、缓存、字体和本地书原文件不会传输；所选书源和规则的定义文本及自定义请求头会传输。</string>
+    <string name="lan_backup_waiting">请在接收设备扫描此二维码。临时会话五分钟后失效。</string>
     <string name="web_dav_set">WebDav 设置</string>
     <string name="web_dav_set_import_old">WebDav 设置/导入旧版本数据</string>
     <string name="backup">备份</string>
