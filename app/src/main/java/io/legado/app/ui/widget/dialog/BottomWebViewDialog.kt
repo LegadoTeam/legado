@@ -50,6 +50,7 @@ import io.legado.app.help.webView.WebJsExtensions.Companion.nameCache
 import io.legado.app.help.webView.WebJsExtensions.Companion.nameJava
 import io.legado.app.help.webView.WebJsExtensions.Companion.nameSource
 import io.legado.app.help.webView.WebViewPool
+import io.legado.app.help.webView.shouldInjectPreloadJs
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.ui.association.OnLineImportActivity
 import io.legado.app.utils.invisible
@@ -1144,6 +1145,10 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                 }
                 val body = res.body
                 val contentType = body.contentType()
+                if (!shouldInjectPreloadJs(contentType, res.header("Content-Disposition"))) {
+                    res.close()
+                    return null
+                }
                 val mimeType = contentType?.toString()?.substringBefore(";") ?: "text/html"
                 val charset = contentType?.charset() ?: Charsets.UTF_8
                 val charsetSre = charset.name()

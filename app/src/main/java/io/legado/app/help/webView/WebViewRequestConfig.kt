@@ -2,6 +2,7 @@ package io.legado.app.help.webView
 
 import io.legado.app.constant.AppConst
 import io.legado.app.help.http.CookieManager.cookieJarHeader
+import okhttp3.MediaType
 
 internal data class WebViewRequestConfig(
     val userAgent: String,
@@ -32,4 +33,18 @@ internal fun Map<String, String>?.toWebViewRequestConfig(
         }
     }
     return WebViewRequestConfig(userAgent, additionalHeaders)
+}
+
+internal fun shouldInjectPreloadJs(
+    contentType: MediaType?,
+    contentDisposition: String?
+): Boolean {
+    if (contentDisposition
+            ?.substringBefore(';')
+            ?.trim()
+            ?.equals("attachment", ignoreCase = true) == true
+    ) return false
+    return contentType == null ||
+            contentType.type == "text" && contentType.subtype == "html" ||
+            contentType.type == "application" && contentType.subtype == "xhtml+xml"
 }

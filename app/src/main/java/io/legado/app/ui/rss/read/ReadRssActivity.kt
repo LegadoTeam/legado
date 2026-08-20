@@ -97,6 +97,7 @@ import io.legado.app.help.webView.WebViewPool
 import io.legado.app.help.webView.WebViewPool.BLANK_HTML
 import io.legado.app.help.webView.WebViewPool.DATA_HTML
 import io.legado.app.help.webView.toWebViewRequestConfig
+import io.legado.app.help.webView.shouldInjectPreloadJs
 import io.legado.app.model.Download
 import kotlinx.coroutines.Dispatchers.IO
 import java.lang.ref.WeakReference
@@ -703,6 +704,10 @@ class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>
                 }
                 val body = res.body
                 val contentType = body.contentType()
+                if (!shouldInjectPreloadJs(contentType, res.header("Content-Disposition"))) {
+                    res.close()
+                    return null
+                }
                 val mimeType = contentType?.toString()?.substringBefore(";") ?: "text/html"
                 val charset = contentType?.charset() ?: Charsets.UTF_8
                 val charsetSre = charset.name()
