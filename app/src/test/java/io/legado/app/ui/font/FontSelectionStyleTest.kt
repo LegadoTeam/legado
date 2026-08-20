@@ -30,6 +30,38 @@ class FontSelectionStyleTest {
         assertTrue(adapter.contains("}.getOrNull() ?: Typeface.DEFAULT"))
     }
 
+    @Test
+    fun `private fonts load independently of the optional external folder`() {
+        val dialog = readProjectFile("src/main/java/io/legado/app/ui/font/FontSelectDialog.kt")
+        val setup = dialog.substringAfter("val fontPath = getPrefString(PreferKey.fontFolder)")
+            .substringBefore("override fun onMenuItemClick")
+        val localLoaderMarker =
+            "private fun loadLocalFonts(openFolderWhenEmpty: Boolean = false)"
+        assertTrue(dialog.contains(localLoaderMarker))
+        val localLoader = dialog.substringAfter(localLoaderMarker)
+            .substringBefore("private fun getLocalFonts()")
+
+        assertTrue(setup.contains("loadLocalFonts(openFolderWhenEmpty = true)"))
+        assertTrue(setup.contains("loadFontFiles(FileDoc.fromDocumentFile(doc))"))
+        val readableFolder = setup.substringAfter("if (doc?.canRead() == true)")
+            .substringBefore("} else {")
+        assertFalse(readableFolder.contains("loadLocalFonts"))
+        assertTrue(localLoader.contains("getLocalFonts()"))
+        assertTrue(localLoader.contains("if (it.isNotEmpty())"))
+        assertTrue(localLoader.contains("adapter.setItems(it)"))
+        assertTrue(localLoader.contains("else if (openFolderWhenEmpty)"))
+        assertTrue(localLoader.contains("openFolder()"))
+
+        val permissionLoader = dialog.substringAfter("private fun loadFontFilesByPermission")
+            .substringBefore("private fun loadFontFiles(fileDoc")
+        assertTrue(permissionLoader.contains(".onDenied"))
+        assertTrue(permissionLoader.contains("loadLocalFonts()"))
+
+        val externalLoader = dialog.substringAfter("private fun loadFontFiles(fileDoc")
+            .substringBefore("private fun mergeFontItems")
+        assertTrue(externalLoader.substringAfter(".onError").contains("loadLocalFonts()"))
+    }
+
     private fun readProjectFile(pathInApp: String): String {
         return sequenceOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull(File::isFile)

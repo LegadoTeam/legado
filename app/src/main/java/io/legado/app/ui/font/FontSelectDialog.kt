@@ -86,14 +86,14 @@ class FontSelectDialog : BaseDialogFragment(R.layout.dialog_font_select),
 
         val fontPath = getPrefString(PreferKey.fontFolder)
         if (fontPath.isNullOrEmpty()) {
-            openFolder()
+            loadLocalFonts(openFolderWhenEmpty = true)
         } else {
             if (fontPath.isContentScheme()) {
                 val doc = DocumentFile.fromTreeUri(requireContext(), Uri.parse(fontPath))
                 if (doc?.canRead() == true) {
                     loadFontFiles(FileDoc.fromDocumentFile(doc))
                 } else {
-                    openFolder()
+                    loadLocalFonts(openFolderWhenEmpty = true)
                 }
             } else {
                 loadFontFilesByPermission(fontPath)
@@ -136,6 +136,18 @@ class FontSelectDialog : BaseDialogFragment(R.layout.dialog_font_select),
         }
     }
 
+    private fun loadLocalFonts(openFolderWhenEmpty: Boolean = false) {
+        execute {
+            mergeFontItems(arrayListOf(), getLocalFonts())
+        }.onSuccess {
+            if (it.isNotEmpty()) {
+                adapter.setItems(it)
+            } else if (openFolderWhenEmpty) {
+                openFolder()
+            }
+        }
+    }
+
     private fun getLocalFonts(): ArrayList<FileDoc> {
         val path = FileUtils.getPath(requireContext().externalFiles, "font")
         return File(path).listFileDocs {
@@ -151,6 +163,8 @@ class FontSelectDialog : BaseDialogFragment(R.layout.dialog_font_select),
                 loadFontFiles(
                     FileDoc.fromFile(File(path))
                 )
+            }.onDenied {
+                loadLocalFonts()
             }
             .request()
     }
@@ -166,6 +180,7 @@ class FontSelectDialog : BaseDialogFragment(R.layout.dialog_font_select),
         }.onError {
             AppLog.put("加载字体文件失败\n${it.localizedMessage}", it)
             toastOnUi("getFontFiles:${it.localizedMessage}")
+            loadLocalFonts()
         }
     }
 
