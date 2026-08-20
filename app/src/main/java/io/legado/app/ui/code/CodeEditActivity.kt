@@ -660,6 +660,7 @@ class CodeEditActivity :
                 (safeEditorStatus == SafeEditorStatus.READY && !safeEditorReadPending))
         menu.findItem(R.id.menu_search)?.isVisible = showSoraActions
         menu.findItem(R.id.menu_change_theme)?.isVisible = showSoraActions
+        menu.findItem(R.id.menu_select_all)?.isVisible = showSoraActions
         menu.findItem(R.id.menu_format_code)?.isVisible = showSoraActions
         menu.findItem(R.id.menu_check_javascript_syntax)?.isVisible =
             shouldShowJavaScriptSyntaxAction(useSafeEditor, viewModel.canCheckJavaScriptSyntax)
@@ -817,6 +818,7 @@ class CodeEditActivity :
             R.id.menu_save -> save(false)
             R.id.menu_debug_source -> returnText(RESULT_ACTION_DEBUG_SOURCE)
             R.id.menu_login -> returnText(RESULT_ACTION_LOGIN_SOURCE)
+            R.id.menu_select_all -> if (!useSafeEditor) editor.selectAll()
             R.id.menu_format_code -> if (!useSafeEditor) viewModel.formatCode(editor)
             R.id.menu_check_javascript_syntax -> if (!useSafeEditor) {
                 viewModel.checkJavaScriptSyntax(editor)
