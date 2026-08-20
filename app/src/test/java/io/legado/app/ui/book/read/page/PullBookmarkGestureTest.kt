@@ -26,6 +26,33 @@ class PullBookmarkGestureTest {
     }
 
     @Test
+    fun `bookmark pull moves the page with bounded resistance and rebounds`() {
+        assertEquals(0f, resolvePullBookmarkPageOffset(-20f, 1000), 0.001f)
+        assertEquals(50f, resolvePullBookmarkPageOffset(100f, 1000), 0.001f)
+        assertEquals(350f, resolvePullBookmarkPageOffset(1000f, 1000), 0.001f)
+
+        val readView = source("app/src/main/java/io/legado/app/ui/book/read/page/ReadView.kt")
+        val move = readView.substringAfter("MotionEvent.ACTION_MOVE ->")
+            .substringBefore("MotionEvent.ACTION_UP ->")
+        assertTrue(move.contains("setPullBookmarkPageOffset("))
+        assertTrue(readView.contains("ValueAnimator.ofFloat(startOffset, 0f)"))
+        val pointerChange = readView.substringAfter("//在多点触控时")
+            .substringBefore("when (event.actionMasked)")
+        assertTrue(pointerChange.contains("resetPullBookmarkGesture(animatePage = false)"))
+        assertTrue(pointerChange.indexOf("resetPullBookmarkGesture") <
+                pointerChange.indexOf("pageDelegate?.onTouch(event)"))
+
+        val activity = source("app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
+        val fallback = activity.substringAfter("override fun setPullBookmarkPageOffset")
+            .substringBefore("private suspend fun deleteBookmarks")
+        assertTrue(fallback.contains("bookmarkIndicator.translationY"))
+        assertTrue(fallback.contains("+ offset"))
+        val indicator = activity.substringAfter("fun upBookmarkIndicator()")
+            .substringBefore("override fun changeReplaceRuleState")
+        assertTrue(indicator.contains("+ pageView.translationY"))
+    }
+
+    @Test
     fun `only downward vertical pulls are consumed`() {
         assertEquals(
             PullBookmarkGestureState.NONE,

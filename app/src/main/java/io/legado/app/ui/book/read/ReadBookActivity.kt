@@ -2531,6 +2531,11 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
     }
 
+    override fun setPullBookmarkPageOffset(offset: Float) {
+        binding.bookmarkIndicator.translationY =
+            (binding.readView.curPage.headerHeight + 8.dpToPx()).toFloat() + offset
+    }
+
     private suspend fun deleteBookmarks(pageBookmarks: List<Bookmark>) {
         withContext(IO) {
             appDb.bookmarkDao.delete(*pageBookmarks.toTypedArray())
@@ -2582,7 +2587,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                             rightMargin = 12.dpToPx() + pageView.displayCutoutPaddingRight
                         }
                     binding.bookmarkIndicator.translationY =
-                        (pageView.headerHeight + 8.dpToPx()).toFloat()
+                        (pageView.headerHeight + 8.dpToPx()).toFloat() + pageView.translationY
                 }
             }
         }

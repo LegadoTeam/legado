@@ -1,5 +1,6 @@
 package io.legado.app.ui.book.read.page
 
+import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
@@ -83,6 +84,10 @@ internal fun classifyPullBookmarkGesture(
 
 internal fun resolvePullBookmarkDistance(configuredDistance: Int, touchSlop: Int): Int {
     return configuredDistance.takeIf { it > 0 } ?: touchSlop * 6
+}
+
+internal fun resolvePullBookmarkPageOffset(deltaY: Float, viewHeight: Int): Float {
+    return (deltaY * 0.5f).coerceIn(0f, viewHeight.coerceAtLeast(0) * 0.35f)
 }
 
 internal fun visibleParagraphRange(
@@ -180,6 +185,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
         get() = resolvePullBookmarkDistance(AppConfig.pullBookmarkDistance, slopSquare)
     private var pullBookmarkCandidate = false
     private var pullBookmarkState = PullBookmarkGestureState.NONE
+    private var pullBookmarkAnimator: ValueAnimator? = null
     private var pageSlopSquare: Int = slopSquare
     var pageSlopSquare2: Int = pageSlopSquare * pageSlopSquare
     private var pageTouchClick: Int = 0
@@ -288,12 +294,13 @@ class ReadView(context: Context, attrs: AttributeSet) :
         if (event.actionMasked == MotionEvent.ACTION_POINTER_DOWN ||
             event.actionMasked == MotionEvent.ACTION_POINTER_UP
         ) {
-            resetPullBookmarkGesture()
+            resetPullBookmarkGesture(animatePage = false)
             pageDelegate?.onTouch(event)
         }
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 finishReplacePreviewGesture(ReplacePreviewGestureState.IDLE)
+                resetPullBookmarkGesture(animatePage = false)
                 dismissTextMagnifier()
                 callBack.screenOffTimerStart()
                 if (isTextSelected) {
@@ -310,7 +317,6 @@ class ReadView(context: Context, attrs: AttributeSet) :
                 pullBookmarkCandidate = AppConfig.pullToToggleBookmark &&
                         !pressOnTextSelected && !isAutoPage &&
                         (!isScroll || curPage.isAtChapterTop())
-                pullBookmarkState = PullBookmarkGestureState.NONE
                 pageDelegate?.onTouch(event)
                 pageDelegate?.onDown()
                 setStartPoint(event.x, event.y, false)
@@ -338,6 +344,9 @@ class ReadView(context: Context, attrs: AttributeSet) :
                         isMove = true
                         longPressed = false
                         removeCallbacks(longPressRunnable)
+                        setPullBookmarkPageOffset(
+                            resolvePullBookmarkPageOffset(event.y - startY, height)
+                        )
                         return true
                     }
                     if (absX > slopSquare || absY > slopSquare) {
@@ -524,13 +533,32 @@ class ReadView(context: Context, attrs: AttributeSet) :
         longPressed = false
         pressDown = false
         pressOnTextSelected = false
-        resetPullBookmarkGesture()
+        resetPullBookmarkGesture(animatePage = false)
         finishReplacePreviewGesture(ReplacePreviewGestureState.IDLE)
     }
 
-    private fun resetPullBookmarkGesture() {
+    private fun resetPullBookmarkGesture(animatePage: Boolean = true) {
         pullBookmarkCandidate = false
         pullBookmarkState = PullBookmarkGestureState.NONE
+        pullBookmarkAnimator?.cancel()
+        pullBookmarkAnimator = null
+        val startOffset = curPage.translationY
+        if (!animatePage || startOffset == 0f) {
+            setPullBookmarkPageOffset(0f)
+            return
+        }
+        pullBookmarkAnimator = ValueAnimator.ofFloat(startOffset, 0f).apply {
+            duration = defaultAnimationSpeed.toLong()
+            addUpdateListener {
+                setPullBookmarkPageOffset(it.animatedValue as Float)
+            }
+            start()
+        }
+    }
+
+    private fun setPullBookmarkPageOffset(offset: Float) {
+        curPage.translationY = offset
+        callBack.setPullBookmarkPageOffset(offset)
     }
 
     fun cancelSelect(clearSearchResult: Boolean = false) {
@@ -1119,6 +1147,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
         fun openChapterList()
         fun addBookmark()
         fun toggleBookmark()
+        fun setPullBookmarkPageOffset(offset: Float)
         fun changeReplaceRuleState()
         fun setReplacePreview(enabled: Boolean)
         fun openSearchActivity(searchWord: String?)
