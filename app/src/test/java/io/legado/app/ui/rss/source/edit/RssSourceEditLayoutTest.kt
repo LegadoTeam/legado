@@ -112,6 +112,7 @@ class RssSourceEditLayoutTest {
         assertTrue(initView.contains("(newFocus as? CodeView)?.keepSelectionVisible = true"))
         assertTrue(initView.contains("binding.recyclerView.addOnLayoutChangeListener"))
         assertTrue(initView.contains("(binding.recyclerView.findFocus() as? CodeView)?.requestSelectionVisible()"))
+        assertTrue(initView.contains("resolveSelectionHandleClearance(this)"))
         assertFalse(initView.contains("setOnClickListener { sendText(\"\") }"))
         assertFalse(sendText.contains("smoothScrollBy"))
         assertFalse(sendText.contains("editEntityMaxLine"))

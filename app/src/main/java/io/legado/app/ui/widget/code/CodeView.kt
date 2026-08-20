@@ -14,16 +14,45 @@ import android.text.style.ReplacementSpan
 import android.util.AttributeSet
 import android.view.KeyEvent
 import androidx.annotation.ColorInt
+import io.legado.app.lib.theme.ThemeUtils
 import io.legado.app.ui.widget.text.ScrollMultiAutoCompleteTextView
+import io.legado.app.utils.dpToPx
 import java.util.*
 import java.util.regex.Matcher
 import java.util.regex.Pattern
 import kotlin.math.roundToInt
 
 internal const val MAX_CODE_HIGHLIGHT_LENGTH = 4096
+private const val MIN_SELECTION_HANDLE_DP = 40
+private val SELECTION_HANDLE_ATTRS = intArrayOf(
+    android.R.attr.textSelectHandle,
+    android.R.attr.textSelectHandleLeft,
+    android.R.attr.textSelectHandleRight
+)
 
 internal fun isCodeHighlightSupported(length: Int): Boolean =
     length in 1..MAX_CODE_HIGHLIGHT_LENGTH
+
+internal fun selectionVisibilityOffset(
+    previousStart: Int,
+    previousEnd: Int,
+    start: Int,
+    end: Int
+): Int? {
+    if (start < 0 || end < 0) return null
+    return if (previousStart != start && previousEnd == end) start else end
+}
+
+internal fun resolveSelectionHandleClearance(context: Context): Int {
+    var height = 0
+    SELECTION_HANDLE_ATTRS.forEach { attr ->
+        height = maxOf(
+            height,
+            ThemeUtils.resolveDrawable(context, attr)?.intrinsicHeight ?: 0
+        )
+    }
+    return maxOf(height, MIN_SELECTION_HANDLE_DP.dpToPx())
+}
 
 @Suppress("unused")
 class CodeView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
@@ -39,13 +68,46 @@ class CodeView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
     private var largeTextMode = false
     private val mUpdateHandler = Handler(Looper.getMainLooper())
     private var mAutoCompleteTokenizer: Tokenizer? = null
+    private var previousSelectionStart = -1
+    private var previousSelectionEnd = -1
+    private var activeSelectionOffset = -1
+    private var selectionTrackingReady = false
+    private val selectionHandleClearance by lazy { resolveSelectionHandleClearance(context) }
     private val selectionVisibilityRunnable = Runnable {
-        if (keepSelectionVisible && isFocused &&
-            selectionStart == selectionEnd && selectionEnd >= 0
-        ) {
-            bringPointIntoView(selectionEnd)
+        if (!keepSelectionVisible || !isFocused) return@Runnable
+        if (selectionStart < 0 || selectionEnd < 0) {
+            activeSelectionOffset = -1
+            return@Runnable
         }
+        val offset = (activeSelectionOffset.takeIf { it >= 0 } ?: selectionEnd)
+            .coerceIn(0, text.length)
+        activeSelectionOffset = offset
+        bringPointIntoView(offset)
+        requestSelectionHandleVisible(offset)
     }
+
+    private fun requestSelectionHandleVisible(offset: Int) {
+        val textLayout = layout ?: return
+        val safeOffset = offset.coerceIn(0, text.length)
+        val line = textLayout.getLineForOffset(safeOffset)
+        val top = totalPaddingTop + textLayout.getLineTop(line)
+        val bottom = totalPaddingTop + textLayout.getLineBottom(line) +
+                selectionHandleClearance
+        requestRectangleOnScreen(Rect(0, top, width, bottom), false)
+    }
+
+    private fun updateSelectionVisibilityOffset(start: Int, end: Int) {
+        if (!selectionTrackingReady) return
+        activeSelectionOffset = selectionVisibilityOffset(
+            previousSelectionStart,
+            previousSelectionEnd,
+            start,
+            end
+        ) ?: -1
+        previousSelectionStart = start
+        previousSelectionEnd = end
+    }
+
     internal var keepSelectionVisible = false
         set(value) {
             field = value
@@ -125,6 +187,7 @@ class CodeView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
             }
         )
         addTextChangedListener(mEditorTextWatcher)
+        selectionTrackingReady = true
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -137,6 +200,7 @@ class CodeView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
 
     override fun onSelectionChanged(selStart: Int, selEnd: Int) {
         super.onSelectionChanged(selStart, selEnd)
+        updateSelectionVisibilityOffset(selStart, selEnd)
         if (keepSelectionVisible) requestSelectionVisible()
     }
 
