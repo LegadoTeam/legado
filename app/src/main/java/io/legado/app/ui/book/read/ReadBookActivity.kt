@@ -386,9 +386,11 @@ class ReadBookActivity : BaseReadBookActivity(),
         super.onPostCreate(savedInstanceState)
         viewModel.initReadBookConfig(intent)
         ChapterProvider.clearReviewProviders()
-        Looper.myQueue().addIdleHandler {
-            viewModel.initData(intent)
-            false
+        binding.readView.doOnLayout {
+            Looper.myQueue().addIdleHandler {
+                viewModel.initData(intent)
+                false
+            }
         }
         justInitData = true
     }
