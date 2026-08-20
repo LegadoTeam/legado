@@ -56,6 +56,23 @@ class ExploreGroupMenuStateTest {
         assertTrue(log.contains("发现页书源分组菜单增加全部书源选项和当前分组勾选"))
     }
 
+    @Test
+    fun `discover toolbar opens book source management`() {
+        val source = readProjectFile(
+            "src/main/java/io/legado/app/ui/main/explore/ExploreFragment.kt"
+        )
+        val menu = readProjectFile("src/main/res/menu/main_explore.xml")
+
+        assertTrue(source.contains("item.itemId == R.id.menu_source_manage"))
+        assertTrue(source.contains("startActivity<BookSourceActivity>()"))
+        assertTrue(menu.contains("android:id=\"@+id/menu_source_manage\""))
+        assertTrue(menu.contains("android:title=\"@string/book_source_manage\""))
+        assertTrue(menu.contains("android:icon=\"@drawable/ic_settings\""))
+        val sourceManageItem = menu.substringAfter("android:id=\"@+id/menu_source_manage\"")
+            .substringBefore("/>")
+        assertTrue(sourceManageItem.contains("app:showAsAction=\"always\""))
+    }
+
     private fun readProjectFile(path: String): String =
         sequenceOf(File(path), File("app/$path"))
             .firstOrNull(File::isFile)
