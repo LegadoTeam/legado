@@ -31,4 +31,18 @@ class PredictiveBackTest {
             assertFalse(File(path).readText().contains("override fun finish()"))
         }
     }
+
+    @Test
+    fun `edit activities intercept back before finish may defer closing`() {
+        listOf(
+            "src/main/java/io/legado/app/ui/rss/source/edit/RssSourceEditActivity.kt",
+            "src/main/java/io/legado/app/ui/book/source/edit/BookSourceEditActivity.kt",
+            "src/main/java/io/legado/app/ui/code/CodeEditActivity.kt",
+            "src/main/java/io/legado/app/ui/autoTask/AutoTaskEditActivity.kt",
+        ).forEach { path ->
+            val source = File(path).readText()
+            assertTrue(source.contains("onBackPressedDispatcher.addCallback(this) { finish() }"))
+            assertTrue(source.contains("override fun finish()"))
+        }
+    }
 }

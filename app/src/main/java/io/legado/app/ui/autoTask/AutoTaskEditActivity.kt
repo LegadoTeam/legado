@@ -7,6 +7,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.EditText
+import androidx.activity.addCallback
 import androidx.core.view.children
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
@@ -75,6 +76,7 @@ class AutoTaskEditActivity : BaseActivity<ActivityAutoTaskEditBinding>() {
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        onBackPressedDispatcher.addCallback(this) { finish() }
         initFieldNavigation()
         val id = intent.getStringExtra(EXTRA_ID)
         if (id == null) {
