@@ -215,6 +215,10 @@ class PermissionActivity : AppCompatActivity() {
         }
         permissions.forEach {
             if (getDenyCount(it) > 5) {
+                RequestPlugins.sRequestCallback?.onRequestPermissionsResult(
+                    permissions,
+                    IntArray(0)
+                )
                 finish()
                 return
             }
