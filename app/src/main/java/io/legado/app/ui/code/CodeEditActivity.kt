@@ -135,6 +135,7 @@ class CodeEditActivity :
             nonPrintablePaintingFlags = AppConfig.editNonPrintable
             setEditorLanguage(viewModel.language)
             upEdit(AppConfig.editFontScale, null, AppConfig.editAutoWrap)
+            props.maxIPCTextLength = 64 * 1024
             setText(text)
             editable = viewModel.writable
             requestFocus()

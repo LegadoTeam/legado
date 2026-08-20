@@ -17,6 +17,7 @@ class CodeEditorSelectionContractTest {
         assertTrue(menu.contains("@string/select_all"))
         assertTrue(activity.contains("menu_select_all)?.isVisible = showSoraActions"))
         assertTrue(activity.contains("R.id.menu_select_all -> if (!useSafeEditor) editor.selectAll()"))
+        assertTrue(activity.contains("props.maxIPCTextLength = 64 * 1024"))
     }
 
     private fun projectFile(path: String): File {
