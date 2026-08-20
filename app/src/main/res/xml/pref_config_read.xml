@@ -149,6 +149,13 @@
         app:isBottomBackground="true" />
 
     <io.legado.app.lib.prefs.Preference
+        android:key="pullBookmarkDistance"
+        android:summary="@string/pull_bookmark_distance_summary"
+        android:title="@string/pull_bookmark_distance_title"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
+    <io.legado.app.lib.prefs.Preference
         android:key="pageTouchSlop"
         android:summary="@string/page_touch_slop_summary"
         android:title="@string/page_touch_slop_title"

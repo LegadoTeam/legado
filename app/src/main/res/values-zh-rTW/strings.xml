@@ -1088,6 +1088,9 @@
     <string name="reading_time_tag">閱讀時長：</string>
     <string name="last_read_time_tag">最後閱讀時間：</string>
     <string name="page_touch_slop_title">滑動翻頁閾值</string>
+    <string name="pull_bookmark_distance_title">下拉書籤閾值</string>
+    <string name="pull_bookmark_distance_dialog_title">下拉書籤閾值（0 = 預設值）</string>
+    <string name="pull_bookmark_distance_summary">下拉多遠距離才會切換書籤（預設值 %s px）</string>
     <string name="page_touch_slop_dialog_title">滑動翻頁閾值（0 = 系統預設值）</string>
     <string name="page_touch_slop_summary">滑動多長距離才會觸發滑動翻頁（系統預設值 %s px）</string>
     <string name="example">範例</string>

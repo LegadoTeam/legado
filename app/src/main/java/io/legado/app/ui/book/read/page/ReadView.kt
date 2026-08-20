@@ -67,6 +67,10 @@ internal fun classifyPullBookmarkGesture(
     }
 }
 
+internal fun resolvePullBookmarkDistance(configuredDistance: Int, touchSlop: Int): Int {
+    return configuredDistance.takeIf { it > 0 } ?: touchSlop * 6
+}
+
 /**
  * 阅读视图
  */
@@ -120,7 +124,8 @@ class ReadView(context: Context, attrs: AttributeSet) :
     private val locationOnScreen = IntArray(2)
 
     private val slopSquare by lazy { ViewConfiguration.get(context).scaledTouchSlop }
-    private val pullBookmarkDistance by lazy { slopSquare * 6 }
+    private val pullBookmarkDistance
+        get() = resolvePullBookmarkDistance(AppConfig.pullBookmarkDistance, slopSquare)
     private var pullBookmarkCandidate = false
     private var pullBookmarkState = PullBookmarkGestureState.NONE
     private var pageSlopSquare: Int = slopSquare

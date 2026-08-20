@@ -9,6 +9,23 @@ import java.io.File
 class PullBookmarkGestureTest {
 
     @Test
+    fun `bookmark pull distance preserves the old default and accepts overrides`() {
+        assertEquals(48, resolvePullBookmarkDistance(0, 8))
+        assertEquals(48, resolvePullBookmarkDistance(-1, 8))
+        assertEquals(96, resolvePullBookmarkDistance(96, 8))
+
+        val readView = source("app/src/main/java/io/legado/app/ui/book/read/page/ReadView.kt")
+        val settings = source(
+            "app/src/main/java/io/legado/app/ui/book/read/config/MoreConfigDialog.kt"
+        )
+        val preferences = source("app/src/main/res/xml/pref_config_read.xml")
+        assertTrue(readView.contains("AppConfig.pullBookmarkDistance"))
+        assertTrue(settings.contains("PreferKey.pullBookmarkDistance ->"))
+        assertTrue(settings.contains("AppConfig.pullBookmarkDistance = it"))
+        assertTrue(preferences.contains("android:key=\"pullBookmarkDistance\""))
+    }
+
+    @Test
     fun `only downward vertical pulls are consumed`() {
         assertEquals(
             PullBookmarkGestureState.NONE,
@@ -159,8 +176,10 @@ class PullBookmarkGestureTest {
             .substringBefore("private fun selectMoveAtRaw")
         assertTrue(magnifier.contains("Build.VERSION.SDK_INT < Build.VERSION_CODES.P"))
         assertTrue(magnifier.contains("SelectionMagnifierApi28(this)"))
-        assertTrue(readView.contains("@RequiresApi(Build.VERSION_CODES.P)\n" +
-                "    private class SelectionMagnifierApi28"))
+        assertTrue(readView.replace("\r\n", "\n").contains(
+            "@RequiresApi(Build.VERSION_CODES.P)\n" +
+                "    private class SelectionMagnifierApi28"
+        ))
 
         val handleMove = readView.substringAfter("private fun selectMoveAtRaw")
             .substringBefore("fun selectStartMoveAtRaw")

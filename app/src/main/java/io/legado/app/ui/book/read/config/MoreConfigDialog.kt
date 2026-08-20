@@ -85,6 +85,7 @@ class MoreConfigDialog : BasePrefDialogFragment() {
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             addPreferencesFromResource(R.xml.pref_config_read)
             upPreferenceSummary(PreferKey.pageTouchSlop, slopSquare.toString())
+            upPreferenceSummary(PreferKey.pullBookmarkDistance, (slopSquare * 6).toString())
             if (!CanvasRecorderFactory.isSupport) {
                 removePref(PreferKey.optimizeRender)
                 preferenceScreen.removePreferenceRecursively(PreferKey.optimizeRender)
@@ -202,6 +203,17 @@ class MoreConfigDialog : BasePrefDialogFragment() {
                         }
                 }
 
+                PreferKey.pullBookmarkDistance -> {
+                    NumberPickerDialog(requireContext())
+                        .setTitle(getString(R.string.pull_bookmark_distance_dialog_title))
+                        .setMaxValue(9999)
+                        .setMinValue(0)
+                        .setValue(AppConfig.pullBookmarkDistance)
+                        .show {
+                            AppConfig.pullBookmarkDistance = it
+                        }
+                }
+
                 PreferKey.pageTouchClick -> {
                     NumberPickerDialog(requireContext())
                         .setTitle(getString(R.string.page_touch_click_dialog_title))
@@ -223,6 +235,8 @@ class MoreConfigDialog : BasePrefDialogFragment() {
             when (preferenceKey) {
                 PreferKey.pageTouchSlop -> preference.summary =
                     getString(R.string.page_touch_slop_summary, value)
+                PreferKey.pullBookmarkDistance -> preference.summary =
+                    getString(R.string.pull_bookmark_distance_summary, value)
             }
         }
 

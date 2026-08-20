@@ -754,6 +754,12 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val pullToToggleBookmark
         get() = appCtx.getPrefBoolean(PreferKey.pullToToggleBookmark, false)
 
+    var pullBookmarkDistance: Int
+        get() = appCtx.getPrefInt(PreferKey.pullBookmarkDistance, 0)
+        set(value) {
+            appCtx.putPrefInt(PreferKey.pullBookmarkDistance, value)
+        }
+
     var bookshelfSort: Int
         get() = appCtx.getPrefInt(PreferKey.bookshelfSort, 0)
         set(value) {
