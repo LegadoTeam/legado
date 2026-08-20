@@ -483,6 +483,7 @@ class RssSourceEditActivity :
                 )
             )
             add(EditEntity("ruleContent", rs.ruleContent, R.string.r_content))
+            add(EditEntity("nextContentUrl", rs.nextContentUrl, R.string.rule_next_content))
             add(EditEntity("style", rs.style, R.string.r_style))
             add(EditEntity("injectJs", rs.injectJs, R.string.r_inject_js))
             add(EditEntity("contentWhitelist", rs.contentWhitelist, R.string.c_whitelist))
@@ -586,6 +587,9 @@ class RssSourceEditActivity :
                 "cacheFirst" -> source.cacheFirst = it.value.isTrue()
                 "ruleContent" -> source.ruleContent =
                     viewModel.ruleComplete(it.value, source.ruleArticles)
+
+                "nextContentUrl" -> source.nextContentUrl =
+                    viewModel.ruleComplete(it.value, type = 2)
 
                 "style" -> source.style = it.value
                 "injectJs" -> source.injectJs = it.value

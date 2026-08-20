@@ -69,6 +69,8 @@ data class RssSource(
     var ruleLink: String? = null,
     /**正文规则**/
     var ruleContent: String? = null,
+    /**正文下一页规则**/
+    var nextContentUrl: String? = null,
     /**正文url白名单**/
     var contentWhitelist: String? = null,
     /**正文url黑名单**/
@@ -157,6 +159,7 @@ data class RssSource(
                 && equal(ruleDescription, source.ruleDescription)
                 && equal(ruleLink, source.ruleLink)
                 && equal(ruleContent, source.ruleContent)
+                && equal(nextContentUrl, source.nextContentUrl)
                 && enableJs == source.enableJs
                 && loadWithBaseUrl == source.loadWithBaseUrl
                 && equal(variableComment, source.variableComment)
