@@ -23,6 +23,7 @@ import io.legado.app.ui.book.read.ReadBookActivity
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.postEvent
+import io.legado.app.utils.setLayout
 import io.legado.app.utils.throttle
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 
@@ -67,10 +68,10 @@ class PaddingConfigDialog : BaseDialogFragment(R.layout.dialog_read_padding) {
             decorView.setPadding(0, 0, 0, 0)
             attributes = attributes.apply {
                 dimAmount = 0.0f
-                gravity = Gravity.BOTTOM
+                gravity = Gravity.CENTER
             }
-            setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         }
+        setLayout(0.9f, ViewGroup.LayoutParams.WRAP_CONTENT)
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
@@ -100,7 +101,7 @@ class PaddingConfigDialog : BaseDialogFragment(R.layout.dialog_read_padding) {
         textColor = requireContext().getPrimaryTextColor(ColorUtils.isColorLight(bgColor))
         val radius = 8.dpToPx().toFloat()
         rootView.background = GradientDrawable().apply {
-            cornerRadii = floatArrayOf(radius, radius, radius, radius, 0f, 0f, 0f, 0f)
+            cornerRadius = radius
             setColor(bgColor)
         }
         swLockLr.setTextColor(textColor)
