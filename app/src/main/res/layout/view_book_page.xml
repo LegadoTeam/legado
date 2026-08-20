@@ -141,7 +141,7 @@
         app:layout_constraintBottom_toBottomOf="parent" />
 
     <ImageView
-        android:id="@+id/bookmark_indicator"
+        android:id="@+id/page_bookmark_indicator"
         android:layout_width="32dp"
         android:layout_height="32dp"
         android:alpha="0.88"

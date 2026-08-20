@@ -94,7 +94,7 @@ class PageView(context: Context) : FrameLayout(context) {
 
     init {
         if (!isInEditMode) {
-            binding.bookmarkIndicator.setColorFilter(context.accentColor)
+            binding.pageBookmarkIndicator.setColorFilter(context.accentColor)
             upStyle()
             binding.vwStatusBar.applyStatusBarPadding()
             binding.vwNavigationBar.applyNavigationBarPadding()
@@ -274,11 +274,11 @@ class PageView(context: Context) : FrameLayout(context) {
             bookmarkIndicatorVisible = showInHeader
             renderReaderInfo()
         }
-        binding.bookmarkIndicator.isVisible = showInHeader
+        binding.pageBookmarkIndicator.isVisible = showInHeader
         if (showInHeader) {
             doOnLayout {
-                if (binding.bookmarkIndicator.isVisible) {
-                    binding.bookmarkIndicator.run {
+                if (binding.pageBookmarkIndicator.isVisible) {
+                    binding.pageBookmarkIndicator.run {
                         translationX = (
                             this@PageView.width - bookmarkIndicatorMarginRight(paddingRight) - right
                             ).toFloat()

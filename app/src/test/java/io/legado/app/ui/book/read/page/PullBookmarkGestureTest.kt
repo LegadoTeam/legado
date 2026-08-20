@@ -117,7 +117,7 @@ class PullBookmarkGestureTest {
         assertTrue(render.contains("view.contentDescription = context.getString(R.string.bookmark)"))
         val showInHeader = pageView.substringAfter("fun showBookmarkIndicator(show: Boolean)")
             .substringBefore("private data class ReaderInfoView")
-        assertTrue(showInHeader.contains("bookmarkIndicator.isVisible = showInHeader"))
+        assertTrue(showInHeader.contains("pageBookmarkIndicator.isVisible = showInHeader"))
         assertTrue(showInHeader.contains("doOnLayout"))
         assertTrue(showInHeader.contains("translationX"))
         assertTrue(showInHeader.contains("translationY"))
@@ -136,8 +136,11 @@ class PullBookmarkGestureTest {
                 styleRefresh.indexOf("upBookmarkIndicator()"))
 
         val pageLayout = source("app/src/main/res/layout/view_book_page.xml")
-        val pageOverlay = pageLayout.substringAfter("android:id=\"@+id/bookmark_indicator\"")
+        val pageOverlayId = "android:id=\"@+id/page_bookmark_indicator\""
+        assertTrue(pageLayout.contains(pageOverlayId))
+        val pageOverlay = pageLayout.substringAfter(pageOverlayId)
             .substringBefore("/>")
+        assertFalse(pageLayout.contains("android:id=\"@+id/bookmark_indicator\""))
         assertTrue(pageOverlay.contains("android:layout_width=\"32dp\""))
         assertTrue(pageOverlay.contains("android:layout_height=\"32dp\""))
         assertTrue(pageOverlay.contains("android:contentDescription=\"@string/bookmark\""))
@@ -147,7 +150,9 @@ class PullBookmarkGestureTest {
         assertTrue(pageOverlay.contains("app:layout_constraintRight_toRightOf=\"parent\""))
 
         val activityLayout = source("app/src/main/res/layout/activity_book_read.xml")
-        val fallback = activityLayout.substringAfter("android:id=\"@+id/bookmark_indicator\"")
+        val fallbackId = "android:id=\"@+id/bookmark_indicator\""
+        assertTrue(activityLayout.contains(fallbackId))
+        val fallback = activityLayout.substringAfter(fallbackId)
             .substringBefore("/>")
         assertTrue(fallback.contains("android:layout_width=\"32dp\""))
         assertTrue(fallback.contains("android:layout_height=\"32dp\""))
