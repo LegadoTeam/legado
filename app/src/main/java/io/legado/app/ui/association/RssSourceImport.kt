@@ -48,3 +48,13 @@ internal fun parseRssSourceJson(text: String): RssSourceImportJson {
         else -> throw NoStackTraceException("不是订阅源")
     }
 }
+
+internal fun parseSingleRssSourceJson(text: String): RssSource {
+    val json = text.trim()
+    return when {
+        json.isJsonObject() -> GSON.fromJsonObject<RssSource>(json).getOrThrow()
+        json.isJsonArray() -> GSON.fromJsonArray<RssSource>(json).getOrThrow().singleOrNull()
+            ?: throw NoStackTraceException("不是单个订阅源")
+        else -> throw NoStackTraceException("不是单个订阅源")
+    }
+}

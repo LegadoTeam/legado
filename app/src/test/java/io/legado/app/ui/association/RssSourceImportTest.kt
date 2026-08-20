@@ -29,6 +29,43 @@ class RssSourceImportTest {
     }
 
     @Test
+    fun `single source parser accepts objects and one-item arrays`() {
+        val objectSource = parseSingleRssSourceJson(
+            """{"sourceUrl":"https://example.com/object","sourceName":"Object"}"""
+        )
+        val arraySource = parseSingleRssSourceJson(
+            """[{"sourceUrl":"https://example.com/array","sourceName":"Array"}]"""
+        )
+
+        assertEquals("https://example.com/object", objectSource.sourceUrl)
+        assertEquals("https://example.com/array", arraySource.sourceUrl)
+    }
+
+    @Test
+    fun `single source parser keeps incomplete objects editable`() {
+        val source = parseSingleRssSourceJson("""{"sourceName":"Draft"}""")
+
+        assertEquals("", source.sourceUrl)
+        assertEquals("Draft", source.sourceName)
+    }
+
+    @Test
+    fun `single source parser rejects empty and multi-item arrays`() {
+        listOf(
+            "[]",
+            """[
+                {"sourceUrl":"https://example.com/one"},
+                {"sourceUrl":"https://example.com/two"}
+            ]""".trimIndent(),
+        ).forEach { json ->
+            val error = assertThrows(NoStackTraceException::class.java) {
+                parseSingleRssSourceJson(json)
+            }
+            assertEquals("不是单个订阅源", error.message)
+        }
+    }
+
+    @Test
     fun `rejects a single object without a usable source url`() {
         val invalidSources = listOf(
             """{"sourceName":"Missing URL"}""",
