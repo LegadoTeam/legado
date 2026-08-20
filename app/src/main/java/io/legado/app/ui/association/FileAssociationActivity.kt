@@ -1,10 +1,13 @@
 package io.legado.app.ui.association
 
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.viewModels
+import androidx.core.content.IntentCompat
 import androidx.core.os.postDelayed
 import androidx.documentfile.provider.DocumentFile
+import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
@@ -75,6 +78,9 @@ class FileAssociationActivity :
         }
         viewModel.successLive.observe(this) {
             binding.rotateLoading.gone()
+            if (supportFragmentManager.fragments.any { fragment -> fragment is DialogFragment }) {
+                return@observe
+            }
             when (it.first) {
                 "bookSource" -> showDialogFragment(ImportBookSourceDialog(it.second, true))
                 "rssSource" -> showDialogFragment(ImportRssSourceDialog(it.second, true))
@@ -116,24 +122,65 @@ class FileAssociationActivity :
                 }
             }
         }
-        intent.data?.let { data ->
-            if (data.isContentScheme() && data.canRead()) {
-                viewModel.dispatchIntent(data)
+        if (viewModel.shouldDispatchInitialIntent()) {
+            dispatchIntent(intent)
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        toastOnUi(R.string.importing)
+    }
+
+    private fun dispatchIntent(intent: Intent) {
+        binding.rotateLoading.visible()
+        when (intent.action) {
+            Intent.ACTION_SEND -> if (isSupportedSharedImportMimeType(intent.type)) {
+                dispatchSharedIntent(intent)
             } else {
-                PermissionsCompat.Builder()
-                    .addPermissions(*Permissions.Group.STORAGE)
-                    .rationale(R.string.tip_perm_request_storage)
-                    .onGranted {
-                        viewModel.dispatchIntent(data)
-                    }.onDenied {
-                        binding.rotateLoading.gone()
-                        toastOnUi("请求存储权限失败。")
-                        handler.postDelayed(2000) {
-                            finish()
-                        }
-                    }.request()
+                viewModel.reportInvalidSharedContent()
             }
-        } ?: finish()
+
+            Intent.ACTION_VIEW -> intent.data?.let { data ->
+                dispatchUri(data) { viewModel.dispatchIntent(data) }
+            } ?: finish()
+
+            else -> viewModel.reportInvalidSharedContent()
+        }
+    }
+
+    private fun dispatchSharedIntent(intent: Intent) {
+        val uri = IntentCompat.getParcelableExtra(
+            intent,
+            Intent.EXTRA_STREAM,
+            Uri::class.java
+        )
+        val text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
+        when {
+            uri != null -> viewModel.dispatchSharedUri(uri)
+
+            !text.isNullOrBlank() -> viewModel.dispatchSharedText(text)
+
+            else -> viewModel.reportInvalidSharedContent()
+        }
+    }
+
+    private fun dispatchUri(uri: Uri, block: () -> Unit) {
+        if (uri.isContentScheme() && uri.canRead()) {
+            block()
+        } else {
+            PermissionsCompat.Builder()
+                .addPermissions(*Permissions.Group.STORAGE)
+                .rationale(R.string.tip_perm_request_storage)
+                .onGranted { block() }
+                .onDenied {
+                    binding.rotateLoading.gone()
+                    toastOnUi("请求存储权限失败。")
+                    handler.postDelayed(2000) {
+                        finish()
+                    }
+                }.request()
+        }
     }
 
     private fun importBook(uri: Uri) {
@@ -231,3 +278,8 @@ class FileAssociationActivity :
     }
 
 }
+
+internal fun isSupportedSharedImportMimeType(mimeType: String?): Boolean =
+    mimeType.equals("text/plain", ignoreCase = true) ||
+        mimeType.equals("text/*", ignoreCase = true) ||
+        mimeType.equals("application/json", ignoreCase = true)

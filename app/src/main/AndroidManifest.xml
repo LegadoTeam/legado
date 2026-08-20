@@ -414,6 +414,14 @@
             android:exported="true"
             android:launchMode="singleTop"
             android:theme="@style/AppTheme.Transparent">
+            <intent-filter android:label="@string/receiving_shared_import_label">
+                <action android:name="android.intent.action.SEND" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="application/json" />
+            </intent-filter>
             <!-- VIEW (Open with) action -->
             <!-- Works when an app knows the media type of a file, e.g. Gmail or Chrome. -->
             <intent-filter>

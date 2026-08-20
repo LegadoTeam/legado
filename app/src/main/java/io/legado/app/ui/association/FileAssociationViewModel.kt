@@ -3,18 +3,28 @@ package io.legado.app.ui.association
 import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.MutableLiveData
+import io.legado.app.R
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern
 import io.legado.app.constant.AppPattern.bookFileRegex
 import io.legado.app.data.entities.Book
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.utils.*
+import java.io.File
 
 class FileAssociationViewModel(application: Application) : BaseAssociationViewModel(application) {
     val importBookLiveData = MutableLiveData<Uri>()
     val onLineImportLive = MutableLiveData<Uri>()
     val openBookLiveData = MutableLiveData<Book>()
     val notSupportedLiveData = MutableLiveData<Pair<Uri, String>>()
+    private var sharedImportFile: File? = null
+    private var initialIntentDispatched = false
+
+    fun shouldDispatchInitialIntent(): Boolean {
+        if (initialIntentDispatched) return false
+        initialIntentDispatched = true
+        return true
+    }
 
     fun dispatchIntent(uri: Uri) {
         execute {
@@ -42,6 +52,30 @@ class FileAssociationViewModel(application: Application) : BaseAssociationViewMo
         }
     }
 
+    fun dispatchSharedUri(uri: Uri) {
+        execute {
+            require(uri.isContentScheme() && uri.canRead())
+            importJson(uri)
+        }.onError {
+            reportSharedImportError(it)
+        }
+    }
+
+    fun dispatchSharedText(text: String) {
+        execute {
+            val file = File.createTempFile("shared_import_", ".json", context.cacheDir)
+            sharedImportFile = file
+            file.writeText(text)
+            importJson(Uri.fromFile(file))
+        }.onError {
+            reportSharedImportError(it)
+        }
+    }
+
+    fun reportInvalidSharedContent() {
+        errorLive.value = context.getString(R.string.wrong_format)
+    }
+
     private fun dispatch(fileDoc: FileDoc) {
         kotlin.runCatching {
             if (fileDoc.openInputStream().getOrNull().looksLikeJson()) {
@@ -62,5 +96,16 @@ class FileAssociationViewModel(application: Application) : BaseAssociationViewMo
     fun importBook(uri: Uri) {
         val book = LocalBook.importFile(uri)
         openBookLiveData.postValue(book)
+    }
+
+    private fun reportSharedImportError(error: Throwable) {
+        error.printOnDebug()
+        errorLive.postValue(context.getString(R.string.wrong_format))
+        AppLog.put("尝试导入分享内容失败\n${error.localizedMessage}", error)
+    }
+
+    override fun onCleared() {
+        sharedImportFile?.delete()
+        super.onCleared()
     }
 }
