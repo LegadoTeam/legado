@@ -226,6 +226,14 @@ class DialogViewLifecycleContractTest {
         assertTrue(layout.contains("android:saveEnabled=\"false\""))
     }
 
+    @Test
+    fun `text dialog retints icons when overflow opens`() {
+        val source = source("widget/dialog/TextDialog.kt")
+
+        assertTrue(source.contains("binding.toolBar.installMd3OverflowMenu("))
+        assertTrue(source.contains("onOpenCustomMenu = { it.applyOpenTint(requireContext()) }"))
+    }
+
     private fun source(relativePath: String): String {
         return projectFile("src/main/java/io/legado/app/ui/$relativePath")
             .readText()

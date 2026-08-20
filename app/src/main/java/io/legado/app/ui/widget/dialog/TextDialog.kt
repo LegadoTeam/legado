@@ -30,8 +30,10 @@ import io.legado.app.help.parseHelpSections
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.code.CodeEditActivity
 import io.legado.app.utils.ColorUtils
+import io.legado.app.utils.applyOpenTint
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.hideSoftInput
+import io.legado.app.utils.installMd3OverflowMenu
 import io.legado.app.utils.setHtml
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.setMarkdown
@@ -99,6 +101,9 @@ class TextDialog() : BaseDialogFragment(R.layout.dialog_text_view) {
         binding.toolBar.setBackgroundColor(primaryColor)
         binding.toolBar.inflateMenu(R.menu.dialog_text)
         binding.toolBar.menu.applyTint(requireContext())
+        binding.toolBar.installMd3OverflowMenu(
+            onOpenCustomMenu = { it.applyOpenTint(requireContext()) }
+        )
         binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
         binding.drawerLayout.setDrawerTitle(GravityCompat.END, getString(R.string.chapter_list))
         selectedSection = savedInstanceState?.getInt(STATE_SELECTED_SECTION) ?: 0
