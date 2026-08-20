@@ -215,6 +215,7 @@ class PermissionActivity : AppCompatActivity() {
         }
         permissions.forEach {
             if (getDenyCount(it) > 5) {
+                toastOnUi(rationale)
                 RequestPlugins.sRequestCallback?.onRequestPermissionsResult(
                     permissions,
                     IntArray(0)

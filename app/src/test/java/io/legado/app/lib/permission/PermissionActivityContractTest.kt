@@ -18,8 +18,11 @@ class PermissionActivityContractTest {
             .substringBefore("return")
 
         val callback = "RequestPlugins.sRequestCallback?.onRequestPermissionsResult("
+        val notice = "toastOnUi(rationale)"
+        assertTrue(suppressedRequest.contains(notice))
         assertTrue(suppressedRequest.contains(callback))
         assertTrue(suppressedRequest.contains("IntArray(0)"))
+        assertTrue(suppressedRequest.indexOf(notice) < suppressedRequest.indexOf(callback))
         assertTrue(suppressedRequest.indexOf(callback) < suppressedRequest.indexOf("finish()"))
     }
 
