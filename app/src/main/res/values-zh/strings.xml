@@ -803,6 +803,8 @@
     <string name="aloud_config">朗读设置</string>
     <string name="main_activity">主界面</string>
     <string name="selectText">长按选择文本</string>
+    <string name="long_press_select_paragraph">长按选择整段</string>
+    <string name="long_press_select_paragraph_summary">长按时选择当前页内可见的段落片段</string>
     <string name="header">页眉</string>
     <string name="main_body">正文</string>
     <string name="footer">页脚</string>

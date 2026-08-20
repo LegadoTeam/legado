@@ -253,6 +253,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val textSelectAble: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.textSelectAble, true)
 
+    val longPressSelectParagraph: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.longPressSelectParagraph, false)
+
     val isTransparentStatusBar: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.transparentStatusBar, true)
 

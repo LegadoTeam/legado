@@ -806,6 +806,8 @@
     <string name="aloud_config">Speech settings</string>
     <string name="main_activity">Start page</string>
     <string name="selectText">Long Tap to select text</string>
+    <string name="long_press_select_paragraph">Select paragraph on long press</string>
+    <string name="long_press_select_paragraph_summary">Select the visible part of the paragraph on the current page</string>
     <string name="header">Header</string>
     <string name="main_body">Content</string>
     <string name="footer">Footer</string>

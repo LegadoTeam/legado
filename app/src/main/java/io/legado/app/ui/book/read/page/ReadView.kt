@@ -71,6 +71,32 @@ internal fun resolvePullBookmarkDistance(configuredDistance: Int, touchSlop: Int
     return configuredDistance.takeIf { it > 0 } ?: touchSlop * 6
 }
 
+internal fun visibleParagraphRange(
+    lineIndex: Int,
+    lineCount: Int,
+    isParagraphEnd: (Int) -> Boolean,
+): IntRange {
+    var start = lineIndex
+    while (start > 0 && !isParagraphEnd(start - 1)) {
+        start--
+    }
+    var end = lineIndex
+    while (end < lineCount - 1 && !isParagraphEnd(end)) {
+        end++
+    }
+    return start..end
+}
+
+internal fun selectableParagraphRange(
+    paragraphRange: IntRange,
+    hasColumns: (Int) -> Boolean,
+): IntRange? {
+    val first = paragraphRange.firstOrNull(hasColumns) ?: return null
+    val last = (paragraphRange.last downTo paragraphRange.first)
+        .firstOrNull(hasColumns) ?: return null
+    return first..last
+}
+
 /**
  * 阅读视图
  */
@@ -420,6 +446,22 @@ class ReadView(context: Context, attrs: AttributeSet) :
                 val startPos = textPos.copy()
                 val endPos = textPos.copy()
                 val page = curPage.relativePage(textPos.relativePagePos)
+                if (AppConfig.longPressSelectParagraph) {
+                    val range = visibleParagraphRange(
+                        textPos.lineIndex,
+                        page.lineSize,
+                    ) { page.getLine(it).isParagraphEnd }
+                    val selectableRange = selectableParagraphRange(range) {
+                        page.getLine(it).columns.isNotEmpty()
+                    } ?: return@longPress
+                    startPos.lineIndex = selectableRange.first
+                    startPos.columnIndex = 0
+                    endPos.lineIndex = selectableRange.last
+                    endPos.columnIndex = page.getLine(selectableRange.last).columns.lastIndex
+                    curPage.selectStartMoveIndex(startPos)
+                    curPage.selectEndMoveIndex(endPos)
+                    return@longPress
+                }
                 val stringBuilder = StringBuilder()
                 var cIndex = textPos.columnIndex
                 var lineStart = textPos.lineIndex

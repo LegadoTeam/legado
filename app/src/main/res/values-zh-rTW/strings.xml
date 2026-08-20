@@ -688,6 +688,8 @@
     <string name="aloud_config">朗讀設定</string>
     <string name="main_activity">主介面</string>
     <string name="selectText">長按選擇文字</string>
+    <string name="long_press_select_paragraph">長按選擇整段</string>
+    <string name="long_press_select_paragraph_summary">長按時選擇目前頁面內可見的段落片段</string>
     <string name="header">頁首</string>
     <string name="main_body">正文</string>
     <string name="footer">頁尾</string>

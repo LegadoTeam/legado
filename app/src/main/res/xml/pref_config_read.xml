@@ -184,6 +184,14 @@
         app:isBottomBackground="true" />
 
     <io.legado.app.lib.prefs.SwitchPreference
+        android:defaultValue="false"
+        android:key="longPressSelectParagraph"
+        android:summary="@string/long_press_select_paragraph_summary"
+        android:title="@string/long_press_select_paragraph"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
+    <io.legado.app.lib.prefs.SwitchPreference
         android:defaultValue="true"
         android:key="showBrightnessView"
         android:title="@string/show_brightness_view"
