@@ -73,6 +73,7 @@ class TextChapterLayout(
     private val textPages: MutableList<TextPage>,
     private val book: Book,
     private val bookContent: BookContent,
+    private val saveChapterData: Boolean,
 ) {
 
     @Volatile
@@ -187,9 +188,11 @@ class TextChapterLayout(
             start = CoroutineStart.LAZY,
             executeContext = IO
         ) {
-            launch {
-                val bookSource = book.getBookSource() ?: return@launch
-                BookHelp.saveImages(bookSource, book, bookChapter, bookContent.toString())
+            if (saveChapterData) {
+                launch {
+                    val bookSource = book.getBookSource() ?: return@launch
+                    BookHelp.saveImages(bookSource, book, bookChapter, bookContent.toString())
+                }
             }
             getTextChapter(book, bookChapter, displayTitle, bookContent)
         }.onError {
@@ -561,9 +564,11 @@ class TextChapterLayout(
             }
             stringBuilder.append("\n")
         }
-        val chapterWordCount = StringUtils.wordCountFormat(wordCount.toString())
-        bookChapter.wordCount = chapterWordCount
-        appDb.bookChapterDao.upWordCount(bookChapter.bookUrl, bookChapter.url, chapterWordCount)
+        if (saveChapterData) {
+            val chapterWordCount = StringUtils.wordCountFormat(wordCount.toString())
+            bookChapter.wordCount = chapterWordCount
+            appDb.bookChapterDao.upWordCount(bookChapter.bookUrl, bookChapter.url, chapterWordCount)
+        }
         val textPage = pendingTextPage
         val endPadding = 20.dpToPx()
         val durYPadding = durY + endPadding

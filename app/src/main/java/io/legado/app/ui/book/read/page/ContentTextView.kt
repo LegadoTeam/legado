@@ -741,7 +741,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
             val page = relativePage(relativePos)
             if (page.lines.isEmpty() || page.isMsgPage) continue
             val chapter = page.getTextChapter()
-            if (!chapter.isForBook(ReadBook.book)) {
+            if (chapter.isTransient || !chapter.isForBook(ReadBook.book)) {
                 page.lines.forEach { line ->
                     line.columns.forEach { column ->
                         if (column is TextBaseColumn) column.highlightStyle = null

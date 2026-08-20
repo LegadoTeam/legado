@@ -240,6 +240,7 @@ object ChapterProvider {
         displayTitle: String,
         bookContent: BookContent,
         chapterSize: Int,
+        saveChapterData: Boolean = true,
     ): TextChapter {
 
         val textChapter = TextChapter(
@@ -251,8 +252,9 @@ object ChapterProvider {
             bookChapter.isPay,
             bookContent.effectiveReplaceRules,
             hasBodyContent = bookContent.textList.isNotEmpty(),
+            isTransient = !saveChapterData,
         ).apply {
-            createLayout(scope, book, bookContent)
+            createLayout(scope, book, bookContent, saveChapterData)
         }
 
         return textChapter

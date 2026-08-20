@@ -105,11 +105,13 @@ class ContentProcessor private constructor(
         includeTitle: Boolean = true,
         useReplace: Boolean = true,
         chineseConvert: Boolean = true,
-        reSegment: Boolean = true
+        reSegment: Boolean = true,
+        replaceEnabledOverride: Boolean? = null,
     ): BookContent {
         var mContent = content
         var sameTitleRemoved = false
         var effectiveReplaceRules: ArrayList<ReplaceRule>? = null
+        val replaceEnabled = replaceEnabledOverride ?: (useReplace && book.getUseReplaceRule())
         val replaceBook by lazy { book.toReplaceBook() }
         if (content != "null") {
             //去除重复标题
@@ -121,7 +123,7 @@ class ContentProcessor private constructor(
                 if (matcher.find()) {
                     mContent = mContent.substring(matcher.end())
                     sameTitleRemoved = true
-                } else if (useReplace && book.getUseReplaceRule()) {
+                } else if (replaceEnabled) {
                     title = Pattern.quote(
                         chapter.getDisplayTitle(
                             titleReplaceRules,
@@ -161,7 +163,7 @@ class ContentProcessor private constructor(
                     placeholder
                 }
             }
-            if (useReplace && book.getUseReplaceRule()) {
+            if (replaceEnabled) {
                 //替换
                 effectiveReplaceRules = arrayListOf()
                 mContent = mContent.lines().joinToString("\n") { it.trim() }
@@ -205,7 +207,7 @@ class ContentProcessor private constructor(
             //重新添加标题
             mContent = chapter.getDisplayTitle(
                 getTitleReplaceRules(),
-                useReplace = useReplace && book.getUseReplaceRule(),
+                useReplace = replaceEnabled,
                 replaceBook = replaceBook
             ) + "\n" + mContent
         }

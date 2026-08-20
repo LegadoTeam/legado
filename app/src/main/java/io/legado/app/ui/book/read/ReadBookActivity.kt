@@ -159,6 +159,7 @@ import io.legado.app.utils.sysScreenOffTime
 import io.legado.app.utils.throttle
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.visible
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.Job
@@ -266,6 +267,8 @@ class ReadBookActivity : BaseReadBookActivity(),
     private var menu: Menu? = null
     private var backupJob: Job? = null
     private var bookmarkJob: Job? = null
+    private var replacePreviewJob: Job? = null
+    private var replacePreviewGeneration = 0L
     private val bookmarkToggleMutex = Mutex()
     private var bookmarkTogglePending = false
     private var bookmarkBookKey: Pair<String, String>? = null
@@ -460,6 +463,7 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     override fun onPause() {
         super.onPause()
+        binding.readView.cancelTouchGestures()
         autoPageStop()
         backupJob?.cancel()
         updateScrollReadPosition()
@@ -1261,6 +1265,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     private fun keyPage(direction: PageDirection) {
+        binding.readView.cancelTouchGestures()
         binding.readView.cancelSelect()
         binding.readView.pageDelegate?.isCancel = false
         binding.readView.pageDelegate?.keyTurnPage(direction)
@@ -1302,6 +1307,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         success: (() -> Unit)?
     ) {
         lifecycleScope.launch {
+            binding.readView.cancelTouchGestures()
             binding.readView.upContent(relativePosition, resetPageOffset)
             observeBookmarks()
             upBookmarkIndicator()
@@ -1319,6 +1325,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         resetPageOffset: Boolean,
         success: (() -> Unit)?
     ) = withContext(Main.immediate) {
+        binding.readView.cancelTouchGestures()
         binding.readView.upContent(relativePosition, resetPageOffset)
         observeBookmarks()
         upBookmarkIndicator()
@@ -2587,6 +2594,32 @@ class ReadBookActivity : BaseReadBookActivity(),
             ReadBook.saveRead()
             menu?.findItem(R.id.menu_enable_replace)?.isChecked = it.getUseReplaceRule()
             viewModel.replaceRuleChanged()
+        }
+    }
+
+    override fun setReplacePreview(enabled: Boolean) {
+        val generation = ++replacePreviewGeneration
+        replacePreviewJob?.cancel()
+        replacePreviewJob = null
+        if (!enabled) return
+        val sourcePosition = binding.readView.getReadPosition()
+            ?.takeIf { it.first == ReadBook.durChapterIndex }
+            ?.second?.chapterPosition
+            ?: ReadBook.durChapterPos
+        replacePreviewJob = lifecycleScope.launch {
+            val preview = try {
+                ReadBook.buildReplacePreview(sourcePosition)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.put("生成替换净化预览失败\n${e.localizedMessage}", e)
+                null
+            } ?: return@launch
+            if (generation != replacePreviewGeneration ||
+                !binding.readView.showReplacePreview(preview)
+            ) {
+                preview.previewChapter.cancelLayout()
+            }
         }
     }
 

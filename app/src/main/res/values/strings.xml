@@ -808,6 +808,8 @@
     <string name="selectText">Long Tap to select text</string>
     <string name="long_press_select_paragraph">Select paragraph on long press</string>
     <string name="long_press_select_paragraph_summary">Select the visible part of the paragraph on the current page</string>
+    <string name="two_finger_replace_preview">Preview replacements with two-finger hold</string>
+    <string name="two_finger_replace_preview_summary">Temporarily switch replacement effects for the current chapter while holding two fingers</string>
     <string name="header">Header</string>
     <string name="main_body">Content</string>
     <string name="footer">Footer</string>

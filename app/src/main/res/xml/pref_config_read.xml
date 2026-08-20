@@ -192,6 +192,14 @@
         app:isBottomBackground="true" />
 
     <io.legado.app.lib.prefs.SwitchPreference
+        android:defaultValue="false"
+        android:key="twoFingerReplacePreview"
+        android:summary="@string/two_finger_replace_preview_summary"
+        android:title="@string/two_finger_replace_preview"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
+    <io.legado.app.lib.prefs.SwitchPreference
         android:defaultValue="true"
         android:key="showBrightnessView"
         android:title="@string/show_brightness_view"

@@ -805,6 +805,8 @@
     <string name="selectText">长按选择文本</string>
     <string name="long_press_select_paragraph">长按选择整段</string>
     <string name="long_press_select_paragraph_summary">长按时选择当前页内可见的段落片段</string>
+    <string name="two_finger_replace_preview">双指长按预览替换净化</string>
+    <string name="two_finger_replace_preview_summary">双指按住时临时切换当前章节的替换效果，松开后恢复</string>
     <string name="header">页眉</string>
     <string name="main_body">正文</string>
     <string name="footer">页脚</string>

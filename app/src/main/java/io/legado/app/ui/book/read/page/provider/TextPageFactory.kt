@@ -38,6 +38,7 @@ class TextPageFactory(dataSource: DataSource) : PageFactory<TextPage>(dataSource
     }
 
     override fun moveToNext(upContent: Boolean): Boolean = with(dataSource) {
+        if (!allowPageMove) return@with false
         return if (hasNext()) {
             val pageIndex = pageIndex
             if (currentChapter == null || currentChapter?.isLastIndex(pageIndex) == true) {
@@ -58,6 +59,7 @@ class TextPageFactory(dataSource: DataSource) : PageFactory<TextPage>(dataSource
     }
 
     override fun moveToPrev(upContent: Boolean): Boolean = with(dataSource) {
+        if (!allowPageMove) return@with false
         return if (hasPrev()) {
             if (pageIndex <= 0) {
                 if (currentChapter == null && prevChapter == null) {

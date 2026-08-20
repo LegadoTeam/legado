@@ -51,6 +51,20 @@ internal enum class PullBookmarkGestureState {
     NONE, PULLING, READY
 }
 
+private enum class ReplacePreviewGestureState {
+    IDLE, PENDING, ACTIVE, CONSUMED
+}
+
+internal fun movedBeyondTouchSlop(
+    startX: Float,
+    startY: Float,
+    x: Float,
+    y: Float,
+    touchSlop: Int,
+): Boolean {
+    return abs(x - startX) > touchSlop || abs(y - startY) > touchSlop
+}
+
 internal fun classifyPullBookmarkGesture(
     deltaX: Float,
     deltaY: Float,
@@ -143,6 +157,18 @@ class ReadView(context: Context, attrs: AttributeSet) :
         longPressed = true
         onLongPress()
     }
+    private var replacePreviewGestureState = ReplacePreviewGestureState.IDLE
+    private val replacePreviewPointerIds = IntArray(2) { -1 }
+    private val replacePreviewStartX = FloatArray(2)
+    private val replacePreviewStartY = FloatArray(2)
+    private var replacePreview: ReadBook.ReplacePreview? = null
+    private var replacePreviewRestorePosition: Int? = null
+    private val replacePreviewRunnable = Runnable {
+        if (replacePreviewGestureState == ReplacePreviewGestureState.PENDING) {
+            replacePreviewGestureState = ReplacePreviewGestureState.ACTIVE
+            callBack.setReplacePreview(true)
+        }
+    }
     var isTextSelected = false
     private var pressOnTextSelected = false
     private val initialTextPos = TextPos(0, 0, 0)
@@ -230,6 +256,15 @@ class ReadView(context: Context, attrs: AttributeSet) :
      */
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (replacePreviewGestureState != ReplacePreviewGestureState.IDLE) {
+            if (event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
+                finishReplacePreviewGesture(ReplacePreviewGestureState.CONSUMED)
+                return true
+            }
+            handleReplacePreviewGesture(event)
+            return true
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val insets = this.rootWindowInsets.getInsetsIgnoringVisibility(
                 WindowInsets.Type.mandatorySystemGestures()
@@ -245,13 +280,20 @@ class ReadView(context: Context, attrs: AttributeSet) :
             }
         }
 
+        if (event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
+            if (startReplacePreviewGesture(event)) return true
+        }
+
         //在多点触控时，事件不走ACTION_DOWN分支而产生的特殊事件处理
-        if (event.actionMasked == MotionEvent.ACTION_POINTER_DOWN || event.actionMasked == MotionEvent.ACTION_POINTER_UP) {
+        if (event.actionMasked == MotionEvent.ACTION_POINTER_DOWN ||
+            event.actionMasked == MotionEvent.ACTION_POINTER_UP
+        ) {
             resetPullBookmarkGesture()
             pageDelegate?.onTouch(event)
         }
-        when (event.action) {
+        when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                finishReplacePreviewGesture(ReplacePreviewGestureState.IDLE)
                 dismissTextMagnifier()
                 callBack.screenOffTimerStart()
                 if (isTextSelected) {
@@ -377,6 +419,113 @@ class ReadView(context: Context, attrs: AttributeSet) :
             }
         }
         return true
+    }
+
+    private fun startReplacePreviewGesture(event: MotionEvent): Boolean {
+        if (!AppConfig.twoFingerReplacePreview ||
+            event.pointerCount != 2 ||
+            !pressDown ||
+            longPressed ||
+            pressOnTextSelected ||
+            isTextSelected ||
+            isMove ||
+            pageDelegate?.isMoved == true ||
+            isAutoPage
+        ) {
+            return false
+        }
+        removeCallbacks(longPressRunnable)
+        resetPullBookmarkGesture()
+        pageDelegate?.abortAnim()
+        for (index in 0..1) {
+            replacePreviewPointerIds[index] = event.getPointerId(index)
+            replacePreviewStartX[index] = event.getX(index)
+            replacePreviewStartY[index] = event.getY(index)
+        }
+        replacePreviewGestureState = ReplacePreviewGestureState.PENDING
+        isMove = true
+        postDelayed(replacePreviewRunnable, longPressTimeout)
+        return true
+    }
+
+    private fun handleReplacePreviewGesture(event: MotionEvent) {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_MOVE -> {
+                if (replacePreviewGestureState == ReplacePreviewGestureState.PENDING &&
+                    replacePreviewPointersMoved(event)
+                ) {
+                    finishReplacePreviewGesture(ReplacePreviewGestureState.CONSUMED)
+                }
+            }
+
+            MotionEvent.ACTION_POINTER_UP -> {
+                finishReplacePreviewGesture(ReplacePreviewGestureState.CONSUMED)
+            }
+
+            MotionEvent.ACTION_UP,
+            MotionEvent.ACTION_CANCEL -> {
+                finishReplacePreviewGesture(ReplacePreviewGestureState.IDLE)
+                pressDown = false
+                pressOnTextSelected = false
+                resetPullBookmarkGesture()
+            }
+        }
+    }
+
+    private fun replacePreviewPointersMoved(event: MotionEvent): Boolean {
+        if (event.pointerCount != 2) return true
+        for (pointer in 0..1) {
+            val index = event.findPointerIndex(replacePreviewPointerIds[pointer])
+            if (index < 0 || movedBeyondTouchSlop(
+                    replacePreviewStartX[pointer],
+                    replacePreviewStartY[pointer],
+                    event.getX(index),
+                    event.getY(index),
+                    slopSquare,
+                )
+            ) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun finishReplacePreviewGesture(nextState: ReplacePreviewGestureState) {
+        val wasActive = replacePreviewGestureState == ReplacePreviewGestureState.ACTIVE
+        removeCallbacks(replacePreviewRunnable)
+        replacePreviewGestureState = nextState
+        if (wasActive) callBack.setReplacePreview(false)
+        clearReplacePreview()
+    }
+
+    private fun clearReplacePreview() {
+        val preview = replacePreview ?: return
+        val stillCurrent = ReadBook.isCurrentReplacePreview(preview)
+        replacePreview = null
+        replacePreviewRestorePosition = preview.sourcePosition.takeIf { stillCurrent }
+        upContent(resetPageOffset = true)
+        preview.previewChapter.cancelLayout()
+    }
+
+    fun showReplacePreview(preview: ReadBook.ReplacePreview): Boolean {
+        if (replacePreviewGestureState != ReplacePreviewGestureState.ACTIVE ||
+            !ReadBook.isCurrentReplacePreview(preview)
+        ) {
+            return false
+        }
+        replacePreview?.previewChapter?.cancelLayout()
+        replacePreview = preview
+        upContent(resetPageOffset = true)
+        return true
+    }
+
+    fun cancelTouchGestures() {
+        removeCallbacks(longPressRunnable)
+        longPressed = false
+        pressDown = false
+        pressOnTextSelected = false
+        resetPullBookmarkGesture()
+        finishReplacePreviewGesture(ReplacePreviewGestureState.IDLE)
     }
 
     private fun resetPullBookmarkGesture() {
@@ -663,6 +812,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
      * 销毁事件
      */
     fun onDestroy() {
+        cancelTouchGestures()
         dismissTextMagnifier()
         pageDelegate?.onDestroy()
         curPage.cancelSelect()
@@ -683,6 +833,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
      * @param direction 翻页方向
      */
     fun fillPage(direction: PageDirection): Boolean {
+        if (replacePreview != null) return false
         return when (direction) {
             PageDirection.PREV -> {
                 pageFactory.moveToPrev(true)
@@ -748,7 +899,13 @@ class ReadView(context: Context, attrs: AttributeSet) :
         }
         if (isScroll && !isAutoPage) {
             if (relativePosition == 0) {
-                curPage.setContent(pageFactory.curPage, resetPageOffset)
+                curPage.setContent(
+                    pageFactory.curPage,
+                    resetPageOffset,
+                    replacePreview?.chapterPosition
+                        ?: replacePreviewRestorePosition
+                        ?: ReadBook.durChapterPos,
+                )
             } else {
                 curPage.invalidateContentView()
             }
@@ -764,6 +921,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
             }
         }
         callBack.screenOffTimerStart()
+        replacePreviewRestorePosition = null
     }
 
     private fun upProgress() {
@@ -867,10 +1025,12 @@ class ReadView(context: Context, attrs: AttributeSet) :
     }
 
     fun getReadPosition(): Pair<Int, TextLine>? {
+        if (replacePreview != null) return null
         return curPage.getReadPosition()
     }
 
     fun getReadAloudPos(): Pair<Int, TextLine>? {
+        if (replacePreview != null) return null
         return curPage.getReadAloudPos()
     }
 
@@ -914,26 +1074,39 @@ class ReadView(context: Context, attrs: AttributeSet) :
         upProgressThrottle.invoke()
     }
 
+    override val pageIndex: Int
+        get() = replacePreview?.let {
+            it.previewChapter.getPageIndexByCharIndex(it.chapterPosition)
+        } ?: ReadBook.durPageIndex
+
+    override val allowPageMove: Boolean
+        get() = replacePreview == null
+
     override val currentChapter: TextChapter?
         get() {
-            return if (callBack.isInitFinish) ReadBook.textChapter(0) else null
+            return replacePreview?.previewChapter
+                ?: if (callBack.isInitFinish) ReadBook.textChapter(0) else null
         }
 
     override val nextChapter: TextChapter?
         get() {
+            if (replacePreview != null) return null
             return if (callBack.isInitFinish) ReadBook.textChapter(1) else null
         }
 
     override val prevChapter: TextChapter?
         get() {
+            if (replacePreview != null) return null
             return if (callBack.isInitFinish) ReadBook.textChapter(-1) else null
         }
 
     override fun hasNextChapter(): Boolean {
+        if (replacePreview != null) return false
         return ReadBook.durChapterIndex < ReadBook.simulatedChapterSize - 1
     }
 
     override fun hasPrevChapter(): Boolean {
+        if (replacePreview != null) return false
         return ReadBook.durChapterIndex > 0
     }
 
@@ -947,6 +1120,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
         fun addBookmark()
         fun toggleBookmark()
         fun changeReplaceRuleState()
+        fun setReplacePreview(enabled: Boolean)
         fun openSearchActivity(searchWord: String?)
         fun upSystemUiVisibility()
         fun sureNewProgress(progress: BookProgress)

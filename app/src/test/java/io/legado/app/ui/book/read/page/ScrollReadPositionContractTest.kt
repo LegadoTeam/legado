@@ -45,7 +45,8 @@ class ScrollReadPositionContractTest {
         )
 
         val pageView = source("app/src/main/java/io/legado/app/ui/book/read/page/PageView.kt")
-        assertTrue(pageView.contains("restorePageOffset(ReadBook.durChapterPos)"))
+        assertTrue(pageView.contains("chapterPosition: Int = ReadBook.durChapterPos"))
+        assertTrue(pageView.contains("restorePageOffset(chapterPosition)"))
 
         val contentView = source(
             "app/src/main/java/io/legado/app/ui/book/read/page/ContentTextView.kt"

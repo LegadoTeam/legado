@@ -340,7 +340,11 @@ class PageView(context: Context) : FrameLayout(context) {
     /**
      * 设置内容
      */
-    fun setContent(textPage: TextPage, resetPageOffset: Boolean = true) {
+    fun setContent(
+        textPage: TextPage,
+        resetPageOffset: Boolean = true,
+        chapterPosition: Int = ReadBook.durChapterPos,
+    ) {
         if (isMainView && !isScroll) {
             setProgress(textPage)
         } else {
@@ -353,7 +357,7 @@ class PageView(context: Context) : FrameLayout(context) {
         }
         binding.contentTextView.setContent(textPage)
         if (resetPageOffset && isMainView && isScroll) {
-            binding.contentTextView.restorePageOffset(ReadBook.durChapterPos)
+            binding.contentTextView.restorePageOffset(chapterPosition)
         }
     }
 
