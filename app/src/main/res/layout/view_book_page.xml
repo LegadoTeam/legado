@@ -140,4 +140,18 @@
         android:layout_height="wrap_content"
         app:layout_constraintBottom_toBottomOf="parent" />
 
+    <ImageView
+        android:id="@+id/bookmark_indicator"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:alpha="0.88"
+        android:contentDescription="@string/bookmark"
+        android:importantForAccessibility="no"
+        android:padding="4dp"
+        android:src="@drawable/ic_bookmark_filled"
+        android:visibility="gone"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:ignore="RtlHardcoded,RtlSymmetry" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -2564,12 +2564,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         val showIndicator = AppConfig.pullToToggleBookmark &&
                 !binding.readView.isScroll && hasBookmark
         val shownInHeader = pageView.showBookmarkIndicator(showIndicator)
-        binding.bookmarkIndicator.isVisible = showIndicator
-        binding.bookmarkIndicator.importantForAccessibility = if (shownInHeader) {
-            View.IMPORTANT_FOR_ACCESSIBILITY_NO
-        } else {
-            View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
-        }
+        binding.bookmarkIndicator.isVisible = showIndicator && !shownInHeader
         if (binding.bookmarkIndicator.isVisible) {
             pageView.doOnLayout {
                 if (binding.bookmarkIndicator.isVisible &&
@@ -2577,22 +2572,10 @@ class ReadBookActivity : BaseReadBookActivity(),
                 ) {
                     binding.bookmarkIndicator.layoutParams =
                         (binding.bookmarkIndicator.layoutParams as FrameLayout.LayoutParams).apply {
-                            rightMargin = if (shownInHeader) {
-                                pageView.bookmarkIndicatorMarginRight(
-                                    binding.bookmarkIndicator.paddingRight,
-                                )
-                            } else {
-                                12.dpToPx() + pageView.displayCutoutPaddingRight
-                            }
+                            rightMargin = 12.dpToPx() + pageView.displayCutoutPaddingRight
                         }
-                    binding.bookmarkIndicator.translationY = if (shownInHeader) {
-                        pageView.bookmarkIndicatorTop(
-                            binding.bookmarkIndicator.layoutParams.height,
-                            binding.bookmarkIndicator.paddingBottom,
-                        ).toFloat()
-                    } else {
+                    binding.bookmarkIndicator.translationY =
                         (pageView.headerHeight + 8.dpToPx()).toFloat()
-                    }
                 }
             }
         }

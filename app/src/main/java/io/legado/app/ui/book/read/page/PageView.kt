@@ -8,8 +8,10 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.doOnLayout
 import androidx.core.view.isGone
 import androidx.core.view.isInvisible
+import androidx.core.view.isVisible
 import io.legado.app.R
 import io.legado.app.constant.AppConst.timeFormat
 import io.legado.app.data.entities.BookHighlight
@@ -20,6 +22,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ReadTipConfig
 import io.legado.app.help.config.ReaderInfoValues
+import io.legado.app.lib.theme.accentColor
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.ReadBookActivity
 import io.legado.app.ui.book.read.page.entities.TextLine
@@ -91,6 +94,7 @@ class PageView(context: Context) : FrameLayout(context) {
 
     init {
         if (!isInEditMode) {
+            binding.bookmarkIndicator.setColorFilter(context.accentColor)
             upStyle()
             binding.vwStatusBar.applyStatusBarPadding()
             binding.vwNavigationBar.applyNavigationBarPadding()
@@ -265,11 +269,27 @@ class PageView(context: Context) : FrameLayout(context) {
     }
 
     fun showBookmarkIndicator(show: Boolean): Boolean {
-        if (bookmarkIndicatorVisible != show) {
-            bookmarkIndicatorVisible = show
+        val showInHeader = show && !binding.llHeader.isGone
+        if (bookmarkIndicatorVisible != showInHeader) {
+            bookmarkIndicatorVisible = showInHeader
             renderReaderInfo()
         }
-        return show && !binding.llHeader.isGone
+        binding.bookmarkIndicator.isVisible = showInHeader
+        if (showInHeader) {
+            doOnLayout {
+                if (binding.bookmarkIndicator.isVisible) {
+                    binding.bookmarkIndicator.run {
+                        translationX = (
+                            this@PageView.width - bookmarkIndicatorMarginRight(paddingRight) - right
+                            ).toFloat()
+                        translationY = (
+                            bookmarkIndicatorTop(layoutParams.height, paddingBottom) - top
+                            ).toFloat()
+                    }
+                }
+            }
+        }
+        return showInHeader
     }
 
     private data class ReaderInfoView(
