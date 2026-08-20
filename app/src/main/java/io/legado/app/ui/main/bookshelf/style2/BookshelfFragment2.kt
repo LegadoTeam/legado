@@ -27,10 +27,13 @@ import io.legado.app.ui.book.group.GroupEditDialog
 import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.main.bookshelf.BaseBookshelfFragment
+import io.legado.app.utils.MenuExtensions
 import io.legado.app.utils.cnCompare
 import io.legado.app.utils.flowWithLifecycleAndDatabaseChangeFirst
+import io.legado.app.utils.getCompatDrawable
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.setEdgeEffectColor
+import io.legado.app.utils.setTintMutate
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.startActivityForBook
@@ -83,6 +86,7 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         setSupportToolbar(binding.titleBar.toolbar)
+        binding.titleBar.setNavigationOnClickListener { back() }
         bindShelfHeader(binding.shelfHeader)
         initRecyclerView()
         initBookGroupData()
@@ -174,6 +178,7 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
     }
 
     private fun initBooksData() {
+        upNavigationIcon()
         if (groupId == BookGroup.IdRoot) {
             if (isAdded) {
                 binding.titleBar.title = getString(R.string.bookshelf)
@@ -238,6 +243,23 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
                 binding.refreshLayout.isEnabled = enableRefresh && itemCount > 0
                 delay(100)
             }
+        }
+    }
+
+    private fun upNavigationIcon() {
+        binding.titleBar.toolbar.apply {
+            navigationIcon = if (groupId == BookGroup.IdRoot) {
+                null
+            } else {
+                getCompatDrawable(androidx.appcompat.R.drawable.abc_ic_ab_back_material)
+            }
+            navigationContentDescription = getString(R.string.back)
+            navigationIcon?.setTintMutate(
+                MenuExtensions.getMenuColor(
+                    requireContext(),
+                    transparentBar = binding.titleBar.usesTransparentForeground,
+                )
+            )
         }
     }
 

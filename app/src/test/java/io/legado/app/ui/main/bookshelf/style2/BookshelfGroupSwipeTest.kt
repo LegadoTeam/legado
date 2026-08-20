@@ -67,6 +67,20 @@ class BookshelfGroupSwipeTest {
         assertTrue(fragment.contains("onHorizontalSwipe = null"))
     }
 
+    @Test
+    fun `folder group exposes toolbar back navigation`() {
+        val fragment = projectFile(
+            "src/main/java/io/legado/app/ui/main/bookshelf/style2/BookshelfFragment2.kt",
+        ).readText().replace("\r\n", "\n")
+
+        assertTrue(fragment.contains("setNavigationOnClickListener { back() }"))
+        assertTrue(fragment.contains("private fun initBooksData() {\n        upNavigationIcon()"))
+        assertTrue(fragment.contains("navigationIcon = if (groupId == BookGroup.IdRoot)"))
+        assertTrue(fragment.contains("abc_ic_ab_back_material"))
+        assertTrue(fragment.contains("navigationContentDescription = getString(R.string.back)"))
+        assertTrue(fragment.contains("transparentBar = binding.titleBar.usesTransparentForeground"))
+    }
+
     private fun projectFile(pathInApp: String): File {
         return sequenceOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull(File::isFile)
