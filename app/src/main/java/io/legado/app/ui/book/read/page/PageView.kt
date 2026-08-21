@@ -3,6 +3,7 @@ package io.legado.app.ui.book.read.page
 import android.content.Context
 import android.graphics.drawable.LayerDrawable
 import android.view.LayoutInflater
+import android.view.View
 import android.widget.FrameLayout
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toDrawable
@@ -12,6 +13,7 @@ import androidx.core.view.doOnLayout
 import androidx.core.view.isGone
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
+import androidx.core.view.updateLayoutParams
 import io.legado.app.R
 import io.legado.app.constant.AppConst.timeFormat
 import io.legado.app.data.entities.BookHighlight
@@ -72,8 +74,6 @@ class PageView(context: Context) : FrameLayout(context) {
         get() {
             return binding.vwRoot.paddingStart
         }
-    val displayCutoutPaddingRight: Int
-        get() = binding.vwRoot.paddingRight
     fun bookmarkIndicatorMarginRight(indicatorPaddingRight: Int): Int =
         BookmarkIndicatorGeometry.marginRight(
             binding.vwRoot.paddingRight,
@@ -268,28 +268,54 @@ class PageView(context: Context) : FrameLayout(context) {
         }
     }
 
-    fun showBookmarkIndicator(show: Boolean): Boolean {
+    fun showBookmarkIndicator(show: Boolean) {
         val showInHeader = show && !binding.llHeader.isGone
         if (bookmarkIndicatorVisible != showInHeader) {
             bookmarkIndicatorVisible = showInHeader
             renderReaderInfo()
         }
-        binding.pageBookmarkIndicator.isVisible = showInHeader
-        if (showInHeader) {
+        binding.pageBookmarkIndicator.isVisible = show
+        if (show) {
+            binding.pageBookmarkIndicator.run {
+                val width = if (showInHeader) 32 else 20
+                val height = if (showInHeader) 32 else 40
+                updateLayoutParams {
+                    this.width = width.dpToPx()
+                    this.height = height.dpToPx()
+                }
+                val padding = if (showInHeader) 4.dpToPx() else 0
+                setPadding(padding, padding, padding, padding)
+                setImageResource(
+                    if (showInHeader) R.drawable.ic_bookmark_filled
+                    else R.drawable.ic_bookmark_long
+                )
+                importantForAccessibility = if (showInHeader) {
+                    View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                } else {
+                    View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+                }
+            }
             doOnLayout {
                 if (binding.pageBookmarkIndicator.isVisible) {
                     binding.pageBookmarkIndicator.run {
-                        translationX = (
-                            this@PageView.width - bookmarkIndicatorMarginRight(paddingRight) - right
-                            ).toFloat()
-                        translationY = (
-                            bookmarkIndicatorTop(layoutParams.height, paddingBottom) - top
-                            ).toFloat()
+                        if (showInHeader) {
+                            translationX = (
+                                this@PageView.width -
+                                    bookmarkIndicatorMarginRight(paddingRight) - right
+                                ).toFloat()
+                            translationY = (
+                                bookmarkIndicatorTop(layoutParams.height, paddingBottom) - top
+                                ).toFloat()
+                        } else {
+                            translationX = (
+                                this@PageView.width - binding.vwRoot.paddingRight - right
+                                ).toFloat()
+                            translationY = (headerHeight - top).toFloat()
+                        }
                     }
                 }
             }
         }
-        return showInHeader
     }
 
     private data class ReaderInfoView(

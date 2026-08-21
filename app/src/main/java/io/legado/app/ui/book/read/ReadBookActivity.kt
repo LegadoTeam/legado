@@ -15,7 +15,6 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
-import android.widget.FrameLayout
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -346,7 +345,6 @@ class ReadBookActivity : BaseReadBookActivity(),
         super.onActivityCreated(savedInstanceState)
         binding.cursorLeft.setColorFilter(accentColor)
         binding.cursorRight.setColorFilter(accentColor)
-        binding.bookmarkIndicator.setColorFilter(accentColor)
         binding.cursorLeft.setOnTouchListener(this)
         binding.cursorRight.setOnTouchListener(this)
         binding.readAloudFloatBarContainer.llBackToSpeech.setOnClickListener {
@@ -2531,11 +2529,6 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
     }
 
-    override fun setPullBookmarkPageOffset(offset: Float) {
-        binding.bookmarkIndicator.translationY =
-            (binding.readView.curPage.headerHeight + 8.dpToPx()).toFloat() + offset
-    }
-
     private suspend fun deleteBookmarks(pageBookmarks: List<Bookmark>) {
         withContext(IO) {
             appDb.bookmarkDao.delete(*pageBookmarks.toTypedArray())
@@ -2564,7 +2557,6 @@ class ReadBookActivity : BaseReadBookActivity(),
         bookmarkBookKey = null
         bookmarks = emptyList()
         binding.readView.curPage.showBookmarkIndicator(false)
-        binding.bookmarkIndicator.isGone = true
     }
 
     fun upBookmarkIndicator() {
@@ -2575,22 +2567,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
         val showIndicator = AppConfig.pullToToggleBookmark &&
                 !binding.readView.isScroll && hasBookmark
-        val shownInHeader = pageView.showBookmarkIndicator(showIndicator)
-        binding.bookmarkIndicator.isVisible = showIndicator && !shownInHeader
-        if (binding.bookmarkIndicator.isVisible) {
-            pageView.doOnLayout {
-                if (binding.bookmarkIndicator.isVisible &&
-                    pageView === binding.readView.curPage
-                ) {
-                    binding.bookmarkIndicator.layoutParams =
-                        (binding.bookmarkIndicator.layoutParams as FrameLayout.LayoutParams).apply {
-                            rightMargin = 12.dpToPx() + pageView.displayCutoutPaddingRight
-                        }
-                    binding.bookmarkIndicator.translationY =
-                        (pageView.headerHeight + 8.dpToPx()).toFloat() + pageView.translationY
-                }
-            }
-        }
+        pageView.showBookmarkIndicator(showIndicator)
     }
 
     override fun changeReplaceRuleState() {

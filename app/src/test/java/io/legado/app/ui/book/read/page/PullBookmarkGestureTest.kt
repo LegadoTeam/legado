@@ -42,14 +42,10 @@ class PullBookmarkGestureTest {
         assertTrue(pointerChange.indexOf("resetPullBookmarkGesture") <
                 pointerChange.indexOf("pageDelegate?.onTouch(event)"))
 
-        val activity = source("app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
-        val fallback = activity.substringAfter("override fun setPullBookmarkPageOffset")
-            .substringBefore("private suspend fun deleteBookmarks")
-        assertTrue(fallback.contains("bookmarkIndicator.translationY"))
-        assertTrue(fallback.contains("+ offset"))
-        val indicator = activity.substringAfter("fun upBookmarkIndicator()")
-            .substringBefore("override fun changeReplaceRuleState")
-        assertTrue(indicator.contains("+ pageView.translationY"))
+        val pageOffset = readView.substringAfter("private fun setPullBookmarkPageOffset")
+            .substringBefore("fun cancelSelect")
+        assertTrue(pageOffset.contains("curPage.translationY = offset"))
+        assertFalse(pageOffset.contains("callBack"))
     }
 
     @Test
@@ -133,15 +129,12 @@ class PullBookmarkGestureTest {
     }
 
     @Test
-    fun `fixed bookmark indicator follows the animated page when the header is visible`() {
+    fun `bookmark indicator follows the animated page in both header modes`() {
         val activity = source("app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
         val update = activity.substringAfter("fun upBookmarkIndicator()")
             .substringBefore("override fun changeReplaceRuleState")
         assertTrue(update.contains("pageView.showBookmarkIndicator(showIndicator)"))
-        assertTrue(update.contains("bookmarkIndicator.isVisible = showIndicator && !shownInHeader"))
-        assertTrue(update.contains("pageView.doOnLayout"))
-        assertTrue(update.contains("pageView.displayCutoutPaddingRight"))
-        assertTrue(update.contains("pageView.headerHeight + 8.dpToPx()"))
+        assertFalse(update.contains("binding.bookmarkIndicator"))
 
         val pageView = source("app/src/main/java/io/legado/app/ui/book/read/page/PageView.kt")
         val render = pageView.substringAfter("private fun renderReaderInfo()")
@@ -153,13 +146,18 @@ class PullBookmarkGestureTest {
         assertTrue(render.contains("view.contentDescription = context.getString(R.string.bookmark)"))
         val showInHeader = pageView.substringAfter("fun showBookmarkIndicator(show: Boolean)")
             .substringBefore("private data class ReaderInfoView")
-        assertTrue(showInHeader.contains("pageBookmarkIndicator.isVisible = showInHeader"))
+        assertTrue(showInHeader.contains("pageBookmarkIndicator.isVisible = show"))
+        assertTrue(showInHeader.contains("if (showInHeader) 32 else 20"))
+        assertTrue(showInHeader.contains("if (showInHeader) 32 else 40"))
+        assertTrue(showInHeader.contains("R.drawable.ic_bookmark_long"))
+        assertTrue(showInHeader.contains("View.IMPORTANT_FOR_ACCESSIBILITY_AUTO"))
         assertTrue(showInHeader.contains("doOnLayout"))
         assertTrue(showInHeader.contains("translationX"))
         assertTrue(showInHeader.contains("translationY"))
         assertTrue(showInHeader.contains("bookmarkIndicatorMarginRight("))
         assertTrue(showInHeader.contains("bookmarkIndicatorTop("))
-        assertTrue(showInHeader.contains("return showInHeader"))
+        assertTrue(showInHeader.contains("binding.vwRoot.paddingRight"))
+        assertTrue(showInHeader.contains("translationY = (headerHeight - top).toFloat()"))
         val insets = pageView.substringAfter("fun upPaddingDisplayCutouts()")
             .substringBefore("private fun upTipStyle()")
         assertTrue(insets.contains("readBookActivity?.upBookmarkIndicator()"))
@@ -186,16 +184,13 @@ class PullBookmarkGestureTest {
         assertTrue(pageOverlay.contains("app:layout_constraintRight_toRightOf=\"parent\""))
 
         val activityLayout = source("app/src/main/res/layout/activity_book_read.xml")
-        val fallbackId = "android:id=\"@+id/bookmark_indicator\""
-        assertTrue(activityLayout.contains(fallbackId))
-        val fallback = activityLayout.substringAfter(fallbackId)
-            .substringBefore("/>")
-        assertTrue(fallback.contains("android:layout_width=\"32dp\""))
-        assertTrue(fallback.contains("android:layout_height=\"32dp\""))
-        assertTrue(fallback.contains("android:layout_gravity=\"top|right\""))
-        assertTrue(fallback.contains("android:layout_marginRight=\"12dp\""))
-        assertTrue(fallback.contains("android:contentDescription=\"@string/bookmark\""))
-        assertTrue(fallback.contains("android:src=\"@drawable/ic_bookmark_filled\""))
+        assertFalse(activityLayout.contains("android:id=\"@+id/bookmark_indicator\""))
+        assertFalse(activity.contains("override fun setPullBookmarkPageOffset"))
+
+        val longIndicator = source("app/src/main/res/drawable/ic_bookmark_long.xml")
+        assertTrue(longIndicator.contains("android:width=\"20dp\""))
+        assertTrue(longIndicator.contains("android:height=\"40dp\""))
+        assertTrue(longIndicator.contains("android:pathData=\"M4,0h12v40"))
 
         val horizontal = source(
             "app/src/main/java/io/legado/app/ui/book/read/page/delegate/HorizontalPageDelegate.kt"

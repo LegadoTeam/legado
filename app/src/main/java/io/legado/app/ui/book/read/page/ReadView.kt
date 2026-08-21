@@ -565,7 +565,6 @@ class ReadView(context: Context, attrs: AttributeSet) :
 
     private fun setPullBookmarkPageOffset(offset: Float) {
         curPage.translationY = offset
-        callBack.setPullBookmarkPageOffset(offset)
     }
 
     fun cancelSelect(clearSearchResult: Boolean = false) {
@@ -1158,7 +1157,6 @@ class ReadView(context: Context, attrs: AttributeSet) :
         fun openChapterList()
         fun addBookmark()
         fun toggleBookmark()
-        fun setPullBookmarkPageOffset(offset: Float)
         fun changeReplaceRuleState()
         fun setReplacePreview(enabled: Boolean)
         fun openSearchActivity(searchWord: String?)
