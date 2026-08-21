@@ -116,6 +116,13 @@ internal fun selectableParagraphRange(
     return first..last
 }
 
+internal fun firstParagraphSelectionColumnIndex(
+    columnCount: Int,
+    textAt: (Int) -> String?,
+): Int = (0 until columnCount)
+    .firstOrNull { textAt(it)?.isBlank() != true }
+    ?: 0
+
 /**
  * 阅读视图
  */
@@ -631,8 +638,11 @@ class ReadView(context: Context, attrs: AttributeSet) :
                     val selectableRange = selectableParagraphRange(range) {
                         page.getLine(it).columns.isNotEmpty()
                     } ?: return@longPress
+                    val startLine = page.getLine(selectableRange.first)
                     startPos.lineIndex = selectableRange.first
-                    startPos.columnIndex = 0
+                    startPos.columnIndex = firstParagraphSelectionColumnIndex(
+                        startLine.columns.size,
+                    ) { (startLine.columns[it] as? TextBaseColumn)?.charData }
                     endPos.lineIndex = selectableRange.last
                     endPos.columnIndex = page.getLine(selectableRange.last).columns.lastIndex
                     curPage.selectStartMoveIndex(startPos)

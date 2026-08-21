@@ -18,6 +18,20 @@ class LongPressParagraphSelectionTest {
     }
 
     @Test
+    fun `paragraph selection starts at the first visible column`() {
+        fun indexOf(vararg columns: String?) = firstParagraphSelectionColumnIndex(
+            columns.size,
+        ) { columns[it] }
+
+        assertEquals(2, indexOf("\u3000", "\u3000", "text"))
+        assertEquals(3, indexOf(" ", "\t", "\u00a0", "text"))
+        assertEquals(0, indexOf("text"))
+        assertEquals(1, indexOf("\u3000", null, "text"))
+        assertEquals(0, indexOf("\u3000", "\t"))
+        assertEquals(0, indexOf())
+    }
+
+    @Test
     fun `paragraph selection is optional and uses the current page`() {
         val preferKey = source("app/src/main/java/io/legado/app/constant/PreferKey.kt")
         val appConfig = source("app/src/main/java/io/legado/app/help/config/AppConfig.kt")
@@ -36,7 +50,10 @@ class LongPressParagraphSelectionTest {
         assertTrue(readView.contains("visibleParagraphRange("))
         assertTrue(readView.contains("selectableParagraphRange("))
         assertTrue(readView.contains("columns.isNotEmpty()"))
-        assertTrue(readView.contains("startPos.columnIndex = 0"))
+        assertTrue(readView.contains("firstParagraphSelectionColumnIndex("))
+        assertTrue(
+            readView.contains("(startLine.columns[it] as? TextBaseColumn)?.charData")
+        )
         assertTrue(readView.contains("columns.lastIndex"))
         assertTrue(readView.contains("boundary.setText(stringBuilder.toString())"))
     }
