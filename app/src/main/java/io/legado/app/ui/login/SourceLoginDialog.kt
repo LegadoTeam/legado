@@ -673,12 +673,12 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
 
                 R.id.menu_show_login_header -> alert {
                     setTitle(R.string.login_header)
-                    source.getLoginHeader()?.let { loginHeader ->
+                    source.getLoginHeader()?.takeIf { it.isNotBlank() }?.let { loginHeader ->
                         setMessage(loginHeader)
                         positiveButton(R.string.copy_text) {
                             appCtx.sendToClip(loginHeader)
                         }
-                    }
+                    } ?: setMessage(R.string.empty)
                 }
 
                 R.id.menu_del_login_header -> source.removeLoginHeader()

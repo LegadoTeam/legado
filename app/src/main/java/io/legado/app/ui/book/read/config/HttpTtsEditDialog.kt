@@ -154,9 +154,9 @@ class HttpTtsEditDialog() : BaseDialogFragment(R.layout.dialog_http_tts_edit, tr
             }
             R.id.menu_show_login_header -> alert {
                 setTitle(R.string.login_header)
-                dataFromView().getLoginHeader()?.let { loginHeader ->
+                dataFromView().getLoginHeader()?.takeIf { it.isNotBlank() }?.let { loginHeader ->
                     setMessage(loginHeader)
-                }
+                } ?: setMessage(R.string.empty)
             }
             R.id.menu_del_login_header -> dataFromView().removeLoginHeader()
             R.id.menu_copy_source -> dataFromView().let {
