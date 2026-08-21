@@ -211,6 +211,9 @@ class BackupConfigFragment : PreferenceFragment(),
     private fun upPreferenceSummary(preferenceKey: String, value: String?) {
         val preference = findPreference<Preference>(preferenceKey) ?: return
         when (preferenceKey) {
+            PreferKey.backupPath -> preference.summary =
+                value?.takeIf { it.isNotBlank() } ?: getString(R.string.default_path)
+
             PreferKey.webDavUrl ->
                 if (value.isNullOrBlank()) {
                     preference.summary = getString(R.string.web_dav_url_s)
@@ -251,7 +254,7 @@ class BackupConfigFragment : PreferenceFragment(),
 
     override fun onPreferenceTreeClick(preference: Preference): Boolean {
         when (preference.key) {
-            PreferKey.backupPath -> selectBackupPath.launch()
+            PreferKey.backupPath -> showBackupPathSelector()
             PreferKey.backupContent -> backupContent()
             PreferKey.restoreIgnore -> backupIgnore()
             "web_dav_backup" -> backup()
@@ -259,6 +262,21 @@ class BackupConfigFragment : PreferenceFragment(),
             "lan_backup_transfer" -> lanBackupTransfer()
         }
         return super.onPreferenceTreeClick(preference)
+    }
+
+    private fun showBackupPathSelector() {
+        requireContext().selector(
+            titleSource = R.string.backup_path,
+            items = listOf(
+                getString(R.string.default_path),
+                getString(R.string.select_folder),
+            ),
+        ) { _, index ->
+            when (index) {
+                0 -> AppConfig.backupPath = null
+                1 -> selectBackupPath.launch()
+            }
+        }
     }
 
     private fun lanBackupTransfer() {
@@ -445,7 +463,7 @@ class BackupConfigFragment : PreferenceFragment(),
     fun backup() {
         val backupPath = AppConfig.backupPath
         if (backupPath.isNullOrEmpty()) {
-            backupDir.launch()
+            backup(null)
         } else {
             if (backupPath.isContentScheme()) {
                 lifecycleScope.launch {
@@ -464,7 +482,7 @@ class BackupConfigFragment : PreferenceFragment(),
         }
     }
 
-    private fun backup(backupPath: String) {
+    private fun backup(backupPath: String?) {
         waitDialog.setText("备份中…")
         waitDialog.setOnCancelListener {
             backupJob?.cancel()
