@@ -291,6 +291,36 @@ class SearchBookShelfHelpTest {
     }
 
     @Test
+    fun webEmptyAuthorBadgesAndSkipsIncomingYiming() {
+        val webEmpty = Book(bookUrl = "A", name = "T", author = "")
+        val incoming = searchBook("B", "T", "佚名")
+        val keys = SearchBookShelfHelp.shelfBadgeKeys(listOf(webEmpty))
+        assertTrue(SearchBookShelfHelp.isInShelfBadgeIndex(incoming, keys))
+        val store = FakeStore(webEmpty)
+        val result = SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
+        assertEquals(0, result.added)
+        assertEquals("A", store.books.single().bookUrl)
+    }
+
+    @Test
+    fun localYimingDoesNotBadgeEmptyWebHitAndEmptyWebStillInserts() {
+        val local = Book(
+            bookUrl = "local://x",
+            name = "T",
+            author = "佚名",
+            type = BookType.local or BookType.text,
+        )
+        val incoming = searchBook("W", "T", "")
+        val keys = SearchBookShelfHelp.shelfBadgeKeys(listOf(local))
+        assertFalse(SearchBookShelfHelp.isInShelfBadgeIndex(incoming, keys))
+        val store = FakeStore(local)
+        val result = SearchBookShelfHelp.addLoadedBooksToShelf(listOf(incoming), store)
+        assertEquals(1, result.added)
+        assertEquals(2, store.books.size)
+        assertEquals("W", result.addedBooks.single().bookUrl)
+    }
+
+    @Test
     fun localExactRealMarksWebRealAndBlocksInsert() {
         val local = Book(
             bookUrl = "local://x",

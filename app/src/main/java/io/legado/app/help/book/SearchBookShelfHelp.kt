@@ -9,7 +9,8 @@ import io.legado.app.data.entities.SearchBook
  * Search/explore bulk add. Does not delete or rewrite official bookshelf rows.
  * A new empty/佚名 hit is skipped when that title already has exactly one
  * visible web real author. Badge keys are URL and exact name-author; bare
- * title is added only when the shelf row itself has a weak author.
+ * title is added only for official web weak authors (same rows that skip a
+ * second web weak insert). Local weak rows do not contribute a bare title.
  */
 object SearchBookShelfHelp {
 
@@ -46,9 +47,10 @@ object SearchBookShelfHelp {
             if (book.isNotShelf) continue
             keys.add(book.bookUrl)
             keys.add("${book.name}-${book.author}")
-            // Bare title only for weak authors. Real-author rows must not make
-            // empty-author search hits look already-on-shelf.
-            if (BookAuthorIdentity.isWeakAuthor(book.author)) {
+            // Bare title only for official web weak authors — same rows that
+            // skip a second web empty/佚名 insert. Local weak must not make
+            // a web empty hit look already-on-shelf.
+            if (!book.isLocal && BookAuthorIdentity.isWeakAuthor(book.author)) {
                 keys.add(book.name)
             }
         }
@@ -57,8 +59,9 @@ object SearchBookShelfHelp {
 
     fun isInShelfBadgeIndex(book: SearchBook, index: Set<String>): Boolean {
         if (index.contains(book.bookUrl)) return true
-        val key = if (book.author.isNotBlank()) "${book.name}-${book.author}" else book.name
-        return index.contains(key)
+        if (index.contains("${book.name}-${book.author}")) return true
+        // Empty and 佚名 share the web-weak bare-title key.
+        return BookAuthorIdentity.isWeakAuthor(book.author) && index.contains(book.name)
     }
 
     fun shouldSkipWeakInsert(name: String, author: String, bookUrl: String): Boolean {
