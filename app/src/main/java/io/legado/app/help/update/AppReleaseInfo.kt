@@ -32,7 +32,7 @@ enum class AppVariant {
 @Keep
 data class GithubRelease(
     val assets: List<Asset>?,
-    val body: String,
+    val body: String?,
     @SerializedName("prerelease")
     val isPreRelease: Boolean,
     @SerializedName("tag_name")
@@ -40,10 +40,9 @@ data class GithubRelease(
 ) {
     fun gitReleaseToAppReleaseInfo(): List<AppReleaseInfo> {
         assets ?: throw NoStackTraceException("获取新版本出错")
-        val versionCode = parseReleaseVersionCode(body)
         return assets
             .filter { it.isValid }
-            .map { it.assetToAppReleaseInfo(isPreRelease, body, tagName, versionCode) }
+            .map { it.assetToAppReleaseInfo(isPreRelease, body.orEmpty(), tagName) }
     }
 }
 @Keep
@@ -68,8 +67,7 @@ data class Asset(
     fun assetToAppReleaseInfo(
         preRelease: Boolean,
         note: String,
-        releaseTag: String = "",
-        versionCode: Long = 0L
+        releaseTag: String = ""
     ): AppReleaseInfo {
         val instant = Instant.parse(createdAt)
         val timestamp: Long = instant.toEpochMilli()
@@ -83,7 +81,7 @@ data class Asset(
             assetUrl = url,
             versionName = parseReleaseVersionName(releaseTag, name),
             size = size,
-            versionCode = versionCode
+            versionCode = parseAssetVersionCode(name)
         )
     }
 }
@@ -93,8 +91,8 @@ private val legacyDottedVersionPattern = Regex("""^3\.(\d{2})\.(\d{6,})$""")
 private val compactVersionPattern = Regex("""^3\.(\d{8,})$""")
 private val releaseAPattern = Regex("""(?:^|[_\-.])releasea(?:[_\-.]|$)""", RegexOption.IGNORE_CASE)
 private val releasePattern = Regex("""(?:^|[_\-.])release(?:[_\-.]|$)""", RegexOption.IGNORE_CASE)
-private val releaseVersionCodePattern =
-    Regex("""<!--\s*legado-version-code:(\d+)\s*-->""")
+private val assetVersionCodePattern =
+    Regex("""(?:^|[_\-.])vc(\d+)(?:[_\-.]|$)""", RegexOption.IGNORE_CASE)
 
 internal fun inferAppVariant(assetName: String, preRelease: Boolean): AppVariant {
     return when {
@@ -115,8 +113,8 @@ internal fun parseReleaseVersionName(
     return normalizeLegadoVersionName(versionName)
 }
 
-internal fun parseReleaseVersionCode(releaseBody: String): Long {
-    return releaseVersionCodePattern.find(releaseBody)
+internal fun parseAssetVersionCode(assetName: String): Long {
+    return assetVersionCodePattern.find(assetName)
         ?.groupValues
         ?.get(1)
         ?.toLongOrNull()

@@ -14,11 +14,14 @@ class AppUpdateSelectorTest {
     fun formalReleaseAssetsKeepTheirConfiguredVariants() {
         assertEquals(
             AppVariant.BETA_RELEASE,
-            inferAppVariant("legado_app_3.26071313_release.apk", preRelease = false)
+            inferAppVariant("legado_app_3.26071313_release_vc38194.apk", preRelease = false)
         )
         assertEquals(
             AppVariant.BETA_RELEASEA,
-            inferAppVariant("legado_app_3.26071313_universal_releaseA.apk", preRelease = false)
+            inferAppVariant(
+                "legado_app_3.26071313_universal_releaseA_vc38194.apk",
+                preRelease = false
+            )
         )
         assertEquals(
             AppVariant.OFFICIAL,
@@ -66,27 +69,30 @@ class AppUpdateSelectorTest {
     }
 
     @Test
-    fun githubAssetMetadataIsKeptForTheUpdateDialog() {
+    fun githubAssetMetadataAndMissingBodyAreHandledForTheUpdateDialog() {
         val asset = Asset(
             apkUrl = "https://example.com/app.apk",
             contentType = "application/vnd.android.package-archive",
             createdAt = "2026-08-09T18:12:00Z",
             downloadCount = 0,
             id = 1,
-            name = "legado_app_3.26080918_release.apk",
+            name = "legado_app_3.26080918_release_vc38194.apk",
             state = "uploaded",
             url = "https://api.github.com/assets/1",
             size = 17_800_000
         )
 
-        val release = asset.assetToAppReleaseInfo(
-            preRelease = false,
-            note = "",
-            releaseTag = "3.26080918"
-        )
+        val release = GithubRelease(
+            assets = listOf(asset),
+            body = null,
+            isPreRelease = false,
+            tagName = "3.26080918"
+        ).gitReleaseToAppReleaseInfo().single()
 
         assertEquals(17_800_000, release.size)
         assertEquals(Instant.parse("2026-08-09T18:12:00Z").toEpochMilli(), release.createdAt)
+        assertEquals(38194L, release.versionCode)
+        assertEquals("", release.note)
     }
 
     @Test
@@ -120,14 +126,10 @@ class AppUpdateSelectorTest {
     }
 
     @Test
-    fun betaReleaseBodyExposesTheMonotonicVersionCode() {
-        assertEquals(
-            38194L,
-            parseReleaseVersionCode(
-                "<!-- legado-version-code:38194 -->\nBeta warning and changelog"
-            )
-        )
-        assertEquals(0L, parseReleaseVersionCode("Beta warning without marker"))
+    fun betaAssetNameExposesTheMonotonicVersionCode() {
+        assertEquals(38194L, parseAssetVersionCode("legado_app_release_vc38194.apk"))
+        assertEquals(38195L, parseAssetVersionCode("legado_app_release-VC38195.apk"))
+        assertEquals(0L, parseAssetVersionCode("legado_app_release.apk"))
     }
 
     @Test
@@ -189,6 +191,52 @@ class AppUpdateSelectorTest {
                 currentVersionName = "3.26082118",
                 supportedAbis = listOf("arm64-v8a"),
                 currentVersionCode = 38194
+            )
+        )
+    }
+
+    @Test
+    fun versionCodeOverridesConflictingDisplayVersions() {
+        val laterNameWithLowerCode = release(
+            "legado_app_3.26082123_release_vc38192.apk",
+            versionName = "3.26082123",
+            versionCode = 38192
+        )
+        val earlierNameWithHigherCode = release(
+            "legado_app_3.26082121_release_vc38194.apk",
+            versionName = "3.26082121",
+            versionCode = 38194
+        )
+
+        assertFalse(laterNameWithLowerCode.isNewerThan("3.26082122", 38193))
+        assertTrue(earlierNameWithHigherCode.isNewerThan("3.26082122", 38193))
+        assertFalse(
+            laterNameWithLowerCode.copy(versionCode = 38193)
+                .isNewerThan("3.26082122", 38193)
+        )
+    }
+
+    @Test
+    fun highestVersionCodeWinsEvenWithAnEarlierDisplayVersion() {
+        val lowerCode = release(
+            "legado_app_3.26082123_release_vc38194.apk",
+            versionName = "3.26082123",
+            versionCode = 38194
+        )
+        val higherCode = release(
+            "legado_app_3.26082122_release_vc38195.apk",
+            versionName = "3.26082122",
+            versionCode = 38195
+        )
+
+        assertSame(
+            higherCode,
+            selectUpdateRelease(
+                releases = listOf(lowerCode, higherCode),
+                appVariant = AppVariant.BETA_RELEASE,
+                currentVersionName = "3.26082121",
+                supportedAbis = listOf("arm64-v8a"),
+                currentVersionCode = 38193
             )
         )
     }

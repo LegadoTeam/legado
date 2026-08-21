@@ -38,13 +38,15 @@ jobs:
       - id: set-ver
         env:
           COMMIT_SHA: ${{ inputs.commit_sha || github.sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [[ ! "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]] || \
             ! git merge-base --is-ancestor "$COMMIT_SHA" origin/master; then
             echo "Commit must belong to master: $COMMIT_SHA"
             exit 1
           fi
-          version="3.$(TZ=Asia/Shanghai date +%y%m%d%H)"
+          commit_epoch=$(git show -s --format=%ct "$COMMIT_SHA")
+          version="3.$(TZ=Asia/Shanghai date -d "@$commit_epoch" +%y%m%d%H)"
           base_commit=$(sed -n "s/^def versionCodeBaseCommit = '\([^']*\)'.*/\1/p" app/build.gradle)
           base_code=$(awk '/^def versionCodeAtBase = / { print $4 }' app/build.gradle)
           if [[ ! "$base_commit" =~ ^[0-9a-f]{40}$ ]] || \
@@ -54,6 +56,26 @@ jobs:
           fi
           commit_count=$(git rev-list "${base_commit}..HEAD" --count --no-merges)
           version_code=$((base_code + commit_count))
+          current_beta_code=$(
+            gh api "repos/${GITHUB_REPOSITORY}/releases/tags/beta" \
+              --jq '.assets[].name' 2>/dev/null \
+              | sed -nE 's/.*[_\.-][vV][cC]([0-9]+)([_\.-].*)?$/\1/p' \
+              | sort -nr \
+              | head -n 1
+          )
+          if [[ -z "$current_beta_code" ]]; then
+            current_beta_code=$(
+              gh api "repos/${GITHUB_REPOSITORY}/releases/tags/beta" \
+                --jq '.body' 2>/dev/null \
+                | sed -nE 's/.*legado-version-code:([0-9]+).*/\1/p' \
+                | head -n 1
+            )
+          fi
+          if [[ "$current_beta_code" =~ ^[0-9]+$ ]] && \
+            (( version_code < current_beta_code )); then
+            echo "Refusing beta version-code downgrade: $version_code < $current_beta_code"
+            exit 1
+          fi
           branch="${GITHUB_REF_NAME//[^[:alnum:]._-]/_}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "versionCode=$version_code" >> "$GITHUB_OUTPUT"
@@ -239,10 +261,11 @@ jobs:
           rm -rf -- */
           for file in *.apk; do
             if [[ "$file" = *新包名* ]]; then
-              mv -- "$file" "${file/新包名/release}"
+              renamed="${file/新包名/release}"
             else
-              mv -- "$file" "${file/新共存/releaseA}"
+              renamed="${file/新共存/releaseA}"
             fi
+            mv -- "$file" "${renamed%.apk}_vc${VERSION_CODE}.apk"
           done
 
       - name: Prepare Release Notes
@@ -268,9 +291,18 @@ jobs:
           prerelease: true
           makeLatest: false
           allowUpdates: true
+          omitBodyDuringUpdate: true
           removeArtifacts: true
           artifactErrorsFailBuild: true
           artifacts: ${{ github.workspace }}/apk/*.apk
+
+      - name: Update Beta Release Notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release edit beta \
+            --repo "$GITHUB_REPOSITORY" \
+            --notes-file "$GITHUB_WORKSPACE/release-notes.md"
 
       - name: Prepare Lanzou APKs
         working-directory: apk/

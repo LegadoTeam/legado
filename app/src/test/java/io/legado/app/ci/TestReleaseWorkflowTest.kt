@@ -47,6 +47,8 @@ class TestReleaseWorkflowTest {
     @Test
     fun `test release only publishes beta and lanzou artifacts`() {
         val publish = workflowText.substringAfter("  publish:")
+        val publishAction = publish.indexOf("uses: ncipollo/release-action@v1")
+        val releaseNotesUpdate = publish.indexOf("gh release edit beta")
 
         assertTrue(workflowText.contains("tag: beta"))
         assertTrue(workflowText.contains("prerelease: true"))
@@ -54,8 +56,16 @@ class TestReleaseWorkflowTest {
         assertTrue(workflowText.contains("name: legado_app_${'$'}{{ env.VERSION }}"))
         assertTrue(workflowText.contains("versionCode: ${'$'}{{ steps.set-ver.outputs.versionCode }}"))
         assertTrue(workflowText.contains("git rev-list \"${'$'}{base_commit}..HEAD\" --count --no-merges"))
+        assertTrue(workflowText.contains("git show -s --format=%ct \"${'$'}COMMIT_SHA\""))
+        assertTrue(workflowText.contains("date -d \"@${'$'}commit_epoch\" +%y%m%d%H"))
+        assertTrue(workflowText.contains("Refusing beta version-code downgrade"))
+        assertTrue(workflowText.contains("--jq '.assets[].name'"))
         assertTrue(publish.contains("VERSION_CODE: ${'$'}{{ needs.prepare.outputs.versionCode }}"))
         assertTrue(publish.contains("<!-- legado-version-code:%s -->"))
+        assertTrue(publish.contains("${'$'}{renamed%.apk}_vc${'$'}{VERSION_CODE}.apk"))
+        assertTrue(publish.contains("omitBodyDuringUpdate: true"))
+        assertTrue(publishAction >= 0)
+        assertTrue(releaseNotesUpdate > publishAction)
         assertFalse(workflowText.contains("name: legado_test_"))
         assertTrue(workflowText.contains("此版本为提交测试版"))
         assertTrue(workflowText.contains("extract-latest-update.sh"))

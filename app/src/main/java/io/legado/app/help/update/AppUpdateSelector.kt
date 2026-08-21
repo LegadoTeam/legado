@@ -5,7 +5,7 @@ internal fun selectUpdateRelease(
     appVariant: AppVariant,
     currentVersionName: String,
     supportedAbis: List<String>,
-    currentVersionCode: Long = Long.MAX_VALUE
+    currentVersionCode: Long = 0L
 ): AppReleaseInfo? {
     val prefersArm = supportedAbis.firstOrNull()?.isArmAbi() == true
     val candidates = releases.filter {
@@ -13,13 +13,29 @@ internal fun selectUpdateRelease(
             it.isNewerThan(currentVersionName, currentVersionCode) &&
             (prefersArm || it.isUniversalPackage())
     }
-    val latest = candidates.maxWithOrNull(Comparator { left, right ->
-        compareReleaseVersions(left.versionName, right.versionName)
-            .takeIf { it != 0 }
+    val useVersionCode = currentVersionCode > 0L && candidates.any { it.versionCode > 0L }
+    val comparableCandidates = if (useVersionCode) {
+        candidates.filter { it.versionCode > 0L }
+    } else {
+        candidates
+    }
+    val latest = comparableCandidates.maxWithOrNull(Comparator { left, right ->
+        val comparison = if (useVersionCode) {
+            left.versionCode.compareTo(right.versionCode)
+        } else {
+            compareReleaseVersions(left.versionName, right.versionName)
+        }
+        comparison.takeIf { it != 0 }
             ?: left.createdAt.compareTo(right.createdAt)
     }) ?: return null
-    val sameVersion = candidates
-        .filter { compareReleaseVersions(it.versionName, latest.versionName) == 0 }
+    val sameVersion = comparableCandidates
+        .filter {
+            if (useVersionCode) {
+                it.versionCode == latest.versionCode
+            } else {
+                compareReleaseVersions(it.versionName, latest.versionName) == 0
+            }
+        }
         .sortedByDescending { it.createdAt }
     return if (prefersArm) {
         sameVersion.firstOrNull { !it.isUniversalPackage() } ?: sameVersion.firstOrNull()
@@ -30,11 +46,13 @@ internal fun selectUpdateRelease(
 
 internal fun AppReleaseInfo.isNewerThan(
     currentVersionName: String,
-    currentVersionCode: Long = Long.MAX_VALUE
+    currentVersionCode: Long = 0L
 ): Boolean {
-    val versionComparison = compareReleaseVersions(versionName, currentVersionName)
-    return versionComparison > 0 ||
-        (versionComparison == 0 && versionCode > currentVersionCode)
+    return if (versionCode > 0L && currentVersionCode > 0L) {
+        versionCode > currentVersionCode
+    } else {
+        compareReleaseVersions(versionName, currentVersionName) > 0
+    }
 }
 
 internal fun compareReleaseVersions(left: String, right: String): Int {
