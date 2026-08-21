@@ -1625,4 +1625,6 @@
     <string name="show_source_replacement">显示替换后的书源</string>
     <string name="source_replacement_error">替换失败：%1$s</string>
     <string name="import_status_error">替换错误</string>
+    <string name="live_update_notifications">实时更新通知</string>
+    <string name="live_update_notifications_summary">在 Android 16 上将系统允许的进度通知提升为实时更新</string>
 </resources>

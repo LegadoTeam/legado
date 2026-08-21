@@ -193,6 +193,12 @@
             android:title="@string/auto_update" />
 
         <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="false"
+            android:key="liveUpdateNotifications"
+            android:summary="@string/live_update_notifications_summary"
+            android:title="@string/live_update_notifications" />
+
+        <io.legado.app.lib.prefs.SwitchPreference
             android:defaultValue="true"
             android:key="showMangaUi"
             android:title="@string/show_manga_ui"

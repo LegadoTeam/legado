@@ -1736,4 +1736,6 @@
     <string name="curl_converter_failed">Conversion failed</string>
     <string name="curl_converter_no_output">Convert content first</string>
     <string name="curl_converter_insert_failed">The editor is not ready</string>
+    <string name="live_update_notifications">Live update notifications</string>
+    <string name="live_update_notifications_summary">Promote supported progress notifications on Android 16 when allowed by the system</string>
 </resources>

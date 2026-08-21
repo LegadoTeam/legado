@@ -125,7 +125,7 @@ class UpdateDialog() : BaseDialogFragment(R.layout.dialog_update) {
     private fun startDownload(url: String?) {
         val name = arguments?.getString("name")
         if (url.isNullOrBlank() || name.isNullOrBlank()) return
-        Download.start(requireContext(), url, name)
+        Download.start(requireContext(), url, name, isAppUpdate = true)
         toastOnUi(R.string.download_start)
         dismiss()
     }
