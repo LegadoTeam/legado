@@ -3,6 +3,8 @@ package io.legado.app.ui.about
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
+import androidx.core.view.isVisible
 import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.databinding.DialogUpdateBinding
@@ -34,14 +36,22 @@ class UpdateDialog() : BaseDialogFragment(R.layout.dialog_update) {
             putString("backupUrl", updateInfo.backupDownloadUrl)
             putLong("size", updateInfo.size)
             putLong("createdAt", updateInfo.createdAt)
+            putBoolean("isBeta", updateInfo.isBeta)
         }
     }
 
     val binding by viewBinding(DialogUpdateBinding::bind)
 
+    private val isBetaUpdate: Boolean
+        get() = arguments?.getBoolean("isBeta") == true
+
     override fun onStart() {
         super.onStart()
-        setLayout(0.9f, ViewGroup.LayoutParams.WRAP_CONTENT)
+        if (isBetaUpdate) {
+            setLayout(0.9f, 0.8f)
+        } else {
+            setLayout(0.9f, ViewGroup.LayoutParams.WRAP_CONTENT)
+        }
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
@@ -65,24 +75,39 @@ class UpdateDialog() : BaseDialogFragment(R.layout.dialog_update) {
                 .build()
                 .setMarkdown(binding.textView, updateBody)
         }
-        binding.toolBar.inflateMenu(R.menu.app_update)
-        binding.toolBar.menu.findItem(R.id.menu_download_backup).isVisible =
-            !arguments?.getString("backupUrl").isNullOrBlank()
-        binding.toolBar.setOnMenuItemClickListener {
-            when (it.itemId) {
-                R.id.menu_download -> startDownload(arguments?.getString("url"))
-                R.id.menu_download_backup -> startDownload(arguments?.getString("backupUrl"))
-                R.id.menu_open_in_browser -> arguments?.getString("backupUrl").orEmpty()
-                    .ifBlank { arguments?.getString("url").orEmpty() }
-                    .takeIf(String::isNotBlank)
-                    ?.let { url -> requireContext().openUrl(url) }
-                R.id.menu_ignore_version -> {
-                    LocalConfig.ignoreUpdateVersion = arguments?.getString("newVersion")
-                    toastOnUi(R.string.ignore_this_version)
-                    dismiss()
-                }
+        binding.betaActions.isVisible = isBetaUpdate
+        if (isBetaUpdate) {
+            (binding.textView.layoutParams as LinearLayout.LayoutParams).apply {
+                height = 0
+                weight = 1f
             }
-            return@setOnMenuItemClickListener true
+            binding.btnBetaCancel.setOnClickListener { dismiss() }
+            binding.btnBetaUpdate.setOnClickListener {
+                arguments?.getString("url")
+                    ?.takeIf(String::isNotBlank)
+                    ?.let { url -> requireContext().openUrl(url) }
+                dismiss()
+            }
+        } else {
+            binding.toolBar.inflateMenu(R.menu.app_update)
+            binding.toolBar.menu.findItem(R.id.menu_download_backup).isVisible =
+                !arguments?.getString("backupUrl").isNullOrBlank()
+            binding.toolBar.setOnMenuItemClickListener {
+                when (it.itemId) {
+                    R.id.menu_download -> startDownload(arguments?.getString("url"))
+                    R.id.menu_download_backup -> startDownload(arguments?.getString("backupUrl"))
+                    R.id.menu_open_in_browser -> arguments?.getString("backupUrl").orEmpty()
+                        .ifBlank { arguments?.getString("url").orEmpty() }
+                        .takeIf(String::isNotBlank)
+                        ?.let { url -> requireContext().openUrl(url) }
+                    R.id.menu_ignore_version -> {
+                        LocalConfig.ignoreUpdateVersion = arguments?.getString("newVersion")
+                        toastOnUi(R.string.ignore_this_version)
+                        dismiss()
+                    }
+                }
+                return@setOnMenuItemClickListener true
+            }
         }
     }
 

@@ -2,6 +2,7 @@ package io.legado.app.constant
 
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.os.Build
 import android.provider.Settings
 import androidx.annotation.Keep
 import cn.hutool.crypto.digest.DigestUtil
@@ -9,6 +10,9 @@ import io.legado.app.BuildConfig
 import io.legado.app.help.update.AppVariant
 import org.apache.commons.lang3.time.FastDateFormat
 import splitties.init.appCtx
+
+private const val BETA_SIGNATURE =
+    "E2400519DF26F329EFC3FA1288DB46E8A23C6AEEB14B5378AD80CA9F8136C146"
 
 @Suppress("ConstPropertyName")
 @SuppressLint("SimpleDateFormat")
@@ -28,9 +32,6 @@ object AppConst {
 
     private const val OFFICIAL_SIGNATURE =
         "8DACBF25EC667C9B1374DB1450C1A866C2AAA1173016E80BF6AD2F06FABDDC08"
-    private const val BETA_SIGNATURE =
-        "E2400519DF26F329EFC3FA1288DB46E8A23C6AEEB14B5378AD80CA9F8136C146"
-
     val timeFormat: FastDateFormat by lazy {
         FastDateFormat.getInstance("HH:mm")
     }
@@ -83,15 +84,38 @@ object AppConst {
     }
 
     @Suppress("DEPRECATION")
-    private val sha256Signature: String by lazy {
-        val packageInfo =
-            appCtx.packageManager.getPackageInfo(appCtx.packageName, PackageManager.GET_SIGNATURES)
-        DigestUtil.sha256Hex(packageInfo.signatures!![0].toByteArray()).uppercase()
+    private val sha256Signatures: List<String> by lazy {
+        val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            appCtx.packageManager.getPackageInfo(
+                appCtx.packageName,
+                PackageManager.GET_SIGNING_CERTIFICATES
+            )
+        } else {
+            appCtx.packageManager.getPackageInfo(
+                appCtx.packageName,
+                PackageManager.GET_SIGNATURES
+            )
+        }
+        val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            packageInfo.signingInfo?.apkContentsSigners
+        } else {
+            packageInfo.signatures
+        }
+        signatures.orEmpty().map {
+            DigestUtil.sha256Hex(it.toByteArray()).uppercase()
+        }
     }
+
+    private val sha256Signature: String?
+        get() = sha256Signatures.singleOrNull()
 
     private val isOfficial = sha256Signature == OFFICIAL_SIGNATURE
 
     private val isBeta = sha256Signature == BETA_SIGNATURE || BuildConfig.DEBUG
+
+    val betaUpdateVariant: AppVariant? by lazy {
+        resolveBetaUpdateVariant(appCtx.packageName, sha256Signatures)
+    }
 
     val charsets =
         arrayListOf("UTF-8", "GB2312", "GB18030", "GBK", "Unicode", "UTF-16", "UTF-16LE", "ASCII")
@@ -108,4 +132,17 @@ object AppConst {
      */
     const val authority = BuildConfig.APPLICATION_ID + ".fileProvider"
 
+}
+
+internal fun resolveBetaUpdateVariant(
+    packageName: String,
+    signatureSha256: List<String>
+): AppVariant? {
+    val currentSignature = signatureSha256.singleOrNull() ?: return null
+    if (!currentSignature.equals(BETA_SIGNATURE, ignoreCase = true)) return null
+    return when (packageName) {
+        "com.legado.app.release" -> AppVariant.BETA_RELEASE
+        "com.legado.app.releaseA" -> AppVariant.BETA_RELEASEA
+        else -> null
+    }
 }

@@ -9,6 +9,9 @@ object AppUpdate {
         AppUpdateGitHub
     }
 
+    fun checkBeta(scope: CoroutineScope): Coroutine<UpdateInfo> =
+        AppUpdateGitHub.checkBeta(scope)
+
     data class UpdateInfo(
         val tagName: String,
         val updateLog: String,
@@ -16,7 +19,8 @@ object AppUpdate {
         val fileName: String,
         val backupDownloadUrl: String? = null,
         val size: Long = 0L,
-        val createdAt: Long = 0L
+        val createdAt: Long = 0L,
+        val isBeta: Boolean = false
     )
 
     interface AppUpdateInterface {

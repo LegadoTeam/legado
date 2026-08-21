@@ -4,11 +4,14 @@ internal fun selectUpdateRelease(
     releases: List<AppReleaseInfo>,
     appVariant: AppVariant,
     currentVersionName: String,
-    supportedAbis: List<String>
+    supportedAbis: List<String>,
+    currentVersionCode: Long = Long.MAX_VALUE
 ): AppReleaseInfo? {
+    val prefersArm = supportedAbis.firstOrNull()?.isArmAbi() == true
     val candidates = releases.filter {
         it.appVariant == appVariant &&
-            compareReleaseVersions(it.versionName, currentVersionName) > 0
+            it.isNewerThan(currentVersionName, currentVersionCode) &&
+            (prefersArm || it.isUniversalPackage())
     }
     val latest = candidates.maxWithOrNull(Comparator { left, right ->
         compareReleaseVersions(left.versionName, right.versionName)
@@ -18,12 +21,20 @@ internal fun selectUpdateRelease(
     val sameVersion = candidates
         .filter { compareReleaseVersions(it.versionName, latest.versionName) == 0 }
         .sortedByDescending { it.createdAt }
-    val prefersArm = supportedAbis.firstOrNull()?.isArmAbi() == true
     return if (prefersArm) {
         sameVersion.firstOrNull { !it.isUniversalPackage() } ?: sameVersion.firstOrNull()
     } else {
-        sameVersion.firstOrNull { it.isUniversalPackage() } ?: sameVersion.firstOrNull()
+        sameVersion.firstOrNull { it.isUniversalPackage() }
     }
+}
+
+internal fun AppReleaseInfo.isNewerThan(
+    currentVersionName: String,
+    currentVersionCode: Long = Long.MAX_VALUE
+): Boolean {
+    val versionComparison = compareReleaseVersions(versionName, currentVersionName)
+    return versionComparison > 0 ||
+        (versionComparison == 0 && versionCode > currentVersionCode)
 }
 
 internal fun compareReleaseVersions(left: String, right: String): Int {

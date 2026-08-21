@@ -241,6 +241,12 @@
     <string name="paste_source">Paste source</string>
     <string name="source_rule_s">Source rules description</string>
     <string name="check_update">Check for Updates</string>
+    <string name="check_beta_update">Check for Beta Updates</string>
+    <string name="check_beta_update_failed">Failed to check for beta updates</string>
+    <string name="beta_update_unsupported">This installation cannot be updated to a beta build. Only beta-signed release or releaseA packages are supported.</string>
+    <string name="beta_update_no_compatible_apk">A newer beta exists, but it has no APK compatible with this device</string>
+    <string name="latest_beta_version">Already on the latest beta version</string>
+    <string name="beta_update_now">Update now</string>
     <string name="camera_scan">Scan QR code</string>
     <string name="scan_image">Scan local images</string>
     <string name="rule_summary">Rules description</string>

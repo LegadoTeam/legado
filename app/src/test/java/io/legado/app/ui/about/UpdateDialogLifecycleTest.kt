@@ -16,11 +16,17 @@ class UpdateDialogLifecycleTest {
         val about = functionBody(
             "src/main/java/io/legado/app/ui/about/AboutFragment.kt",
             "private fun checkUpdate()",
+            "private fun checkBetaUpdate()"
+        )
+        val beta = functionBody(
+            "src/main/java/io/legado/app/ui/about/AboutFragment.kt",
+            "private fun checkBetaUpdate()",
             "private fun joinQQGroup("
         )
 
         assertGuardBeforeDialog(main, "supportFragmentManager.isStateSaved")
         assertGuardBeforeDialog(about, "childFragmentManager.isStateSaved")
+        assertGuardBeforeDialog(beta, "childFragmentManager.isStateSaved")
     }
 
     @Test
@@ -33,6 +39,20 @@ class UpdateDialogLifecycleTest {
         assertTrue(source.contains("putLong(\"createdAt\", updateInfo.createdAt)"))
         assertTrue(source.contains("ConvertUtils.formatFileSize(size)"))
         assertTrue(source.contains("DateTimeFormatter.ISO_LOCAL_DATE"))
+    }
+
+    @Test
+    fun `beta update dialog opens the selected github asset in the browser`() {
+        val source = projectFile(
+            "src/main/java/io/legado/app/ui/about/UpdateDialog.kt"
+        ).readText()
+        val betaBranch = source
+            .substringAfter("binding.betaActions.isVisible = isBetaUpdate")
+            .substringBefore("} else {")
+
+        assertTrue(source.contains("putBoolean(\"isBeta\", updateInfo.isBeta)"))
+        assertTrue(betaBranch.contains("requireContext().openUrl(url)"))
+        assertTrue(!betaBranch.contains("startDownload("))
     }
 
     private fun assertGuardBeforeDialog(source: String, guard: String) {

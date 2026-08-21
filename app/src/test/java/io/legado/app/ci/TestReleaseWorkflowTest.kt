@@ -46,10 +46,16 @@ class TestReleaseWorkflowTest {
 
     @Test
     fun `test release only publishes beta and lanzou artifacts`() {
+        val publish = workflowText.substringAfter("  publish:")
+
         assertTrue(workflowText.contains("tag: beta"))
         assertTrue(workflowText.contains("prerelease: true"))
         assertTrue(workflowText.contains("removeArtifacts: true"))
         assertTrue(workflowText.contains("name: legado_app_${'$'}{{ env.VERSION }}"))
+        assertTrue(workflowText.contains("versionCode: ${'$'}{{ steps.set-ver.outputs.versionCode }}"))
+        assertTrue(workflowText.contains("git rev-list \"${'$'}{base_commit}..HEAD\" --count --no-merges"))
+        assertTrue(publish.contains("VERSION_CODE: ${'$'}{{ needs.prepare.outputs.versionCode }}"))
+        assertTrue(publish.contains("<!-- legado-version-code:%s -->"))
         assertFalse(workflowText.contains("name: legado_test_"))
         assertTrue(workflowText.contains("此版本为提交测试版"))
         assertTrue(workflowText.contains("extract-latest-update.sh"))

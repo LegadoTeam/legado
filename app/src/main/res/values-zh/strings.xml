@@ -239,6 +239,12 @@
     <string name="paste_source">粘贴源</string>
     <string name="source_rule_s">源规则说明</string>
     <string name="check_update">检查更新</string>
+    <string name="check_beta_update">检查测试版更新</string>
+    <string name="check_beta_update_failed">检查测试版更新失败</string>
+    <string name="beta_update_unsupported">当前安装包不能直接升级测试版，仅支持 beta 签名的 release 或 releaseA 安装包</string>
+    <string name="beta_update_no_compatible_apk">发现新版测试版，但没有适用于当前设备的安装包</string>
+    <string name="latest_beta_version">已是最新测试版本</string>
+    <string name="beta_update_now">立即更新</string>
     <string name="camera_scan">扫描二维码</string>
     <string name="scan_image">扫描本地图片</string>
     <string name="rule_summary">规则说明</string>

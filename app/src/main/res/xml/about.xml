@@ -22,6 +22,13 @@
         app:allowDividerBelow="false"
         app:iconSpaceReserved="false" />
 
+    <io.legado.app.lib.prefs.Preference
+        android:key="check_beta_update"
+        android:title="@string/check_beta_update"
+        app:allowDividerAbove="false"
+        app:allowDividerBelow="false"
+        app:iconSpaceReserved="false" />
+
     <io.legado.app.lib.prefs.PreferenceCategory
         android:title="@string/other"
         app:allowDividerAbove="true"

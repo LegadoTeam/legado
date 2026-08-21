@@ -58,6 +58,7 @@ class AboutFragment : PreferenceFragmentCompat() {
             "contributors" -> openUrl(R.string.contributors_url)
             "update_log" -> showMdFile(getString(R.string.update_log), "updateLog.md")
             "check_update" -> checkUpdate()
+            "check_beta_update" -> checkBetaUpdate()
             "mail" -> requireContext().sendMail(getString(R.string.email))
             "license" -> showMdFile(getString(R.string.license), "LICENSE.md")
             "disclaimer" -> showMdFile(getString(R.string.disclaimer), "disclaimer.md")
@@ -101,6 +102,21 @@ class AboutFragment : PreferenceFragmentCompat() {
                     waitDialog.dismiss()
                 }
         }
+    }
+
+    private fun checkBetaUpdate() {
+        waitDialog.show()
+        AppUpdate.checkBeta(lifecycleScope)
+            .onSuccess {
+                if (childFragmentManager.isStateSaved) return@onSuccess
+                showDialogFragment(UpdateDialog(it))
+            }.onError {
+                appCtx.toastOnUi(
+                    "${getString(R.string.check_beta_update)}\n${it.localizedMessage}"
+                )
+            }.onFinally {
+                waitDialog.dismiss()
+            }
     }
 
 

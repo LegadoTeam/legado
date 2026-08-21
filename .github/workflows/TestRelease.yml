@@ -26,6 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.set-ver.outputs.version }}
+      versionCode: ${{ steps.set-ver.outputs.versionCode }}
       label: ${{ steps.set-ver.outputs.label }}
       commit: ${{ steps.set-ver.outputs.commit }}
     steps:
@@ -44,8 +45,18 @@ jobs:
             exit 1
           fi
           version="3.$(TZ=Asia/Shanghai date +%y%m%d%H)"
+          base_commit=$(sed -n "s/^def versionCodeBaseCommit = '\([^']*\)'.*/\1/p" app/build.gradle)
+          base_code=$(awk '/^def versionCodeAtBase = / { print $4 }' app/build.gradle)
+          if [[ ! "$base_commit" =~ ^[0-9a-f]{40}$ ]] || \
+            [[ ! "$base_code" =~ ^[0-9]+$ ]]; then
+            echo "Unable to read version-code base from app/build.gradle"
+            exit 1
+          fi
+          commit_count=$(git rev-list "${base_commit}..HEAD" --count --no-merges)
+          version_code=$((base_code + commit_count))
           branch="${GITHUB_REF_NAME//[^[:alnum:]._-]/_}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "versionCode=$version_code" >> "$GITHUB_OUTPUT"
           echo "label=${branch}_${COMMIT_SHA:0:7}" >> "$GITHUB_OUTPUT"
           echo "commit=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
 
@@ -205,6 +216,7 @@ jobs:
       contents: write
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
+      VERSION_CODE: ${{ needs.prepare.outputs.versionCode }}
       RELEASE_LABEL: ${{ needs.prepare.outputs.label }}
       ylogin: ${{ secrets.LANZOU_ID }}
       phpdisk_info: ${{ secrets.LANZOU_PSD }}
@@ -236,6 +248,7 @@ jobs:
       - name: Prepare Release Notes
         run: |
           {
+            printf '<!-- legado-version-code:%s -->\n' "$VERSION_CODE"
             printf '此版本为提交测试版，可能存在不稳定情况，升级前请备份数据。\n\n'
             bash .github/scripts/extract-latest-update.sh \
               app/src/main/assets/updateLog.md
