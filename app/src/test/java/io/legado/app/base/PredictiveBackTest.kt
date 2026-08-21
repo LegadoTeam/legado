@@ -33,12 +33,14 @@ class PredictiveBackTest {
     }
 
     @Test
-    fun `edit activities intercept back before finish may defer closing`() {
+    fun `activities intercept back before finish may defer closing`() {
         listOf(
             "src/main/java/io/legado/app/ui/rss/source/edit/RssSourceEditActivity.kt",
             "src/main/java/io/legado/app/ui/book/source/edit/BookSourceEditActivity.kt",
             "src/main/java/io/legado/app/ui/code/CodeEditActivity.kt",
             "src/main/java/io/legado/app/ui/autoTask/AutoTaskEditActivity.kt",
+            "src/main/java/io/legado/app/ui/book/audio/AudioPlayActivity.kt",
+            "src/main/java/io/legado/app/ui/book/manga/ReadMangaActivity.kt",
         ).forEach { path ->
             val source = File(path).readText()
             assertTrue(source.contains("onBackPressedDispatcher.addCallback(this) { finish() }"))
