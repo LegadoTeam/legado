@@ -321,6 +321,8 @@
     <string name="fonts_folder">Por favor, coloque sus archivos de fuente al almacenamiento raíz y vuelve a seleccionar</string>
     <string name="default_font">Fuente predeterminada</string>
     <string name="select_font">Seleccionar fuentes</string>
+    <string name="font_item_external">%1$s · Carpeta externa</string>
+    <string name="font_item_private">%1$s · Carpeta de la aplicación</string>
     <string name="text_size">Tamaño de texto</string>
     <string name="line_size">Espacio entre líneas</string>
     <string name="paragraph_size">Espacio entre párrafos</string>

@@ -319,6 +319,8 @@
     <string name="fonts_folder">Vui lòng đặt tệp phông chữ vào thư mục Fonts của thư mục gốc bộ nhớ và chọn lại</string>
     <string name="default_font">Phông chữ mặc định</string>
     <string name="select_font">Chọn phông chữ</string>
+    <string name="font_item_external">%1$s · Thư mục ngoài</string>
+    <string name="font_item_private">%1$s · Thư mục ứng dụng</string>
     <string name="text_size">Cỡ chữ</string>
     <string name="line_size">Khoảng cách dòng</string>
     <string name="paragraph_size">Khoảng cách đoạn</string>

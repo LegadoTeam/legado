@@ -325,6 +325,8 @@
     <string name="fonts_folder">Favor colocar os arquivos de fontes na pasta Root de Fontes no armazenamento e selecionar novamente</string>
     <string name="default_font">Fonte padrão</string>
     <string name="select_font">Selecionar fontes</string>
+    <string name="font_item_external">%1$s · Pasta externa</string>
+    <string name="font_item_private">%1$s · Pasta do aplicativo</string>
     <string name="text_size">Tamanho do texto</string>
     <string name="line_size">Espaço entre linhas</string>
     <string name="paragraph_size">Espaço entre parágrafos</string>

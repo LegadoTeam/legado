@@ -1,6 +1,8 @@
 package io.legado.app.ui.font
 
+import android.graphics.Typeface
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.view.MenuItem
 import android.view.View
@@ -30,6 +32,7 @@ import io.legado.app.utils.getPrefString
 import io.legado.app.utils.isContentScheme
 import io.legado.app.utils.list
 import io.legado.app.utils.listFileDocs
+import io.legado.app.utils.openInputStream
 import io.legado.app.utils.putPrefString
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.toastOnUi
@@ -69,6 +72,9 @@ class FontSelectDialog : BaseDialogFragment(R.layout.dialog_font_select),
             }
         }
     }
+    private val importFont = registerForActivityResult(HandleFileContract()) {
+        it.uri?.let(::importFont)
+    }
 
     override fun onStart() {
         super.onStart()
@@ -84,6 +90,10 @@ class FontSelectDialog : BaseDialogFragment(R.layout.dialog_font_select),
         binding.recyclerView.layoutManager = LinearLayoutManager(context)
         binding.recyclerView.adapter = adapter
 
+        loadFonts()
+    }
+
+    private fun loadFonts() {
         val fontPath = getPrefString(PreferKey.fontFolder)
         if (fontPath.isNullOrEmpty()) {
             loadLocalFonts(openFolderWhenEmpty = true)
@@ -123,9 +133,42 @@ class FontSelectDialog : BaseDialogFragment(R.layout.dialog_font_select),
             R.id.menu_other -> {
                 openFolder()
             }
+            R.id.menu_import -> {
+                importFont.launch {
+                    mode = HandleFileContract.FILE
+                    title = getString(R.string.import_str)
+                }
+            }
         }
         return true
     }
+
+    private fun importFont(uri: Uri) {
+        val directory = getLocalFontDirectory()
+        execute {
+            val source = FileDoc.fromUri(uri, false)
+            source.openInputStream().getOrThrow().use { input ->
+                installFontFile(input, source.name, directory, ::isValidFont)
+            }
+        }.onSuccess {
+            toastOnUi(R.string.success)
+            loadFonts()
+        }.onError {
+            AppLog.put("导入字体失败\n${it.localizedMessage}", it)
+            toastOnUi(
+                if (it is IllegalArgumentException) R.string.wrong_format
+                else R.string.error_read_file
+            )
+        }
+    }
+
+    private fun isValidFont(file: File): Boolean = kotlin.runCatching {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Typeface.Builder(file).build() != null
+        } else {
+            Typeface.createFromFile(file) != Typeface.DEFAULT
+        }
+    }.getOrDefault(false)
 
     private fun openFolder() {
         lifecycleScope.launch {
@@ -149,10 +192,13 @@ class FontSelectDialog : BaseDialogFragment(R.layout.dialog_font_select),
     }
 
     private fun getLocalFonts(): ArrayList<FileDoc> {
-        val path = FileUtils.getPath(requireContext().externalFiles, "font")
-        return File(path).listFileDocs {
+        return getLocalFontDirectory().listFileDocs {
             it.name.matches(fontRegex)
         }
+    }
+
+    private fun getLocalFontDirectory(): File {
+        return File(FileUtils.getPath(requireContext().externalFiles, "font"))
     }
 
     private fun loadFontFilesByPermission(path: String) {
@@ -187,22 +233,18 @@ class FontSelectDialog : BaseDialogFragment(R.layout.dialog_font_select),
     private fun mergeFontItems(
         items1: ArrayList<FileDoc>,
         items2: ArrayList<FileDoc>
-    ): List<FileDoc> {
-        val items = ArrayList(items1)
-        items2.forEach { item2 ->
-            var isInFirst = false
-            items1.forEach for1@{ item1 ->
-                if (item2.name == item1.name) {
-                    isInFirst = true
-                    return@for1
-                }
-            }
-            if (!isInFirst) {
-                items.add(item2)
-            }
+    ): List<FontItem> {
+        val paths = hashSetOf<String>()
+        val items = ArrayList<FontItem>()
+        items1.forEach { item ->
+            if (paths.add(item.toString())) items.add(FontItem(item, privateFolder = false))
+        }
+        items2.forEach { item ->
+            if (paths.add(item.toString())) items.add(FontItem(item, privateFolder = true))
         }
         return items.sortedWith { o1, o2 ->
-            o1.name.cnCompare(o2.name)
+            o1.doc.name.cnCompare(o2.doc.name).takeIf { it != 0 }
+                ?: o1.privateFolder.compareTo(o2.privateFolder)
         }
     }
 
