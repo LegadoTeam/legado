@@ -53,6 +53,15 @@ class PullBookmarkGestureTest {
     }
 
     @Test
+    fun `bookmark pull exposes an opaque reader background`() {
+        val readView = source("app/src/main/java/io/legado/app/ui/book/read/page/ReadView.kt")
+        val upBg = readView.substringAfter("fun upBg()")
+            .substringBefore("fun upBgAlpha()")
+
+        assertTrue(upBg.contains("setBackgroundColor(ReadBookConfig.bgMeanColor)"))
+    }
+
+    @Test
     fun `only downward vertical pulls are consumed`() {
         assertEquals(
             PullBookmarkGestureState.NONE,

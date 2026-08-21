@@ -991,6 +991,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
      */
     fun upBg() {
         ReadBookConfig.upBg(width, height)
+        setBackgroundColor(ReadBookConfig.bgMeanColor)
         curPage.upBg()
         prevPage.upBg()
         nextPage.upBg()
