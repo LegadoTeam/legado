@@ -36,6 +36,7 @@ import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.model.ReadBook
 import io.legado.app.model.SourceCallBack
+import io.legado.app.service.BaseReadAloudService
 import io.legado.app.ui.browser.WebViewActivity
 import io.legado.app.ui.widget.popupActionMenu
 import io.legado.app.ui.widget.seekbar.SeekBarChangeListener
@@ -581,7 +582,11 @@ class ReadMenu @JvmOverloads constructor(
         //朗读
         llReadAloud.setOnClickListener {
             runMenuOut {
-                callBack.onClickReadAloud()
+                if (BaseReadAloudService.isRun) {
+                    callBack.showReadAloudDialog()
+                } else {
+                    callBack.onClickReadAloud()
+                }
             }
         }
         llReadAloud.onLongClick {
