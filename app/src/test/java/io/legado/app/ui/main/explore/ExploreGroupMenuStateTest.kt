@@ -52,6 +52,17 @@ class ExploreGroupMenuStateTest {
         ).forEach { expected ->
             assertTrue("ExploreFragment should contain $expected", source.contains(expected))
         }
+        val updateChecks = source.substringAfter("private fun updateGroupsMenuChecks")
+            .substringBefore("override val scope")
+        val nonExclusive = updateChecks.indexOf(
+            "menu.setGroupCheckable(R.id.menu_group_text, true, false)"
+        )
+        val checkedAssignment = updateChecks.indexOf("item.isChecked =")
+        val exclusive = updateChecks.indexOf(
+            "menu.setGroupCheckable(R.id.menu_group_text, true, true)"
+        )
+        assertTrue(nonExclusive in 0 until checkedAssignment)
+        assertTrue(exclusive > checkedAssignment)
         assertTrue(log.contains("**2026/07/25**"))
         assertTrue(log.contains("发现页书源分组菜单增加全部书源选项和当前分组勾选"))
     }

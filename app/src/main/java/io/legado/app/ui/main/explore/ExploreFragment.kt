@@ -239,6 +239,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private fun updateGroupsMenuChecks(query: CharSequence? = searchView.query) {
         val selectedGroup = selectedExploreGroup(query, groups)
         groupsMenu?.transaction { menu ->
+            menu.setGroupCheckable(R.id.menu_group_text, true, false)
             for (index in 0 until menu.size()) {
                 val item = menu.getItem(index)
                 if (item.groupId != R.id.menu_group_text) continue
@@ -248,6 +249,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     item.title.toString() == selectedGroup
                 }
             }
+            menu.setGroupCheckable(R.id.menu_group_text, true, true)
         }
     }
 
