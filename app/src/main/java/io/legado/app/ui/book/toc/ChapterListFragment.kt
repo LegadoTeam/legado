@@ -124,6 +124,7 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
         pendingAudioCacheChanges.clear()
         tocListState.clear()
         chapterList = emptyList()
+        adapter.clearDisplayTitle()
         adapter.setItems(emptyList())
         val normalizedSearchKey = viewModel.searchKey?.takeIf { it.isNotBlank() }
         currentSearchKey = normalizedSearchKey

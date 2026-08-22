@@ -19,4 +19,18 @@ class ChapterListAdapterContractTest {
         assertTrue(source.contains("getDisplayTitle(item)"))
         assertFalse(source.contains("displayTitleMap[chapter.title]"))
     }
+
+    @Test
+    fun `full chapter reload clears display title cache before resetting items`() {
+        val source = sequenceOf(File("src/main/java"), File("app/src/main/java"))
+            .first { it.isDirectory }
+            .resolve("io/legado/app/ui/book/toc/ChapterListFragment.kt")
+            .readText()
+        val initBook = source.substringAfter("private fun initBook(book: Book)")
+            .substringBefore("private fun submitChapterItems")
+        val clearCache = initBook.indexOf("adapter.clearDisplayTitle()")
+        val resetItems = initBook.indexOf("adapter.setItems(emptyList())")
+
+        assertTrue(clearCache in 0 until resetItems)
+    }
 }
