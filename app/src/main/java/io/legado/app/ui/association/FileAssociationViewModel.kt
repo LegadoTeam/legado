@@ -125,7 +125,32 @@ class FileAssociationViewModel(application: Application) : BaseAssociationViewMo
 private val sharedImportUrlRegex =
     Regex("""(?<!["'])https?://[^\s"'<>]+""", RegexOption.IGNORE_CASE)
 
+private val sharedImportUrlTrailingPunctuation =
+    setOf(
+        '.', ',', ';', ':', '!', '?',
+        '\u3002', '\uff0c', '\uff1b', '\uff1a', '\uff01', '\uff1f', '\u3001'
+    )
+
+private val sharedImportUrlBrackets =
+    listOf(
+        '(' to ')', '[' to ']', '{' to '}',
+        '\uff08' to '\uff09', '\u3010' to '\u3011', '\u300a' to '\u300b'
+    )
+
 internal fun extractSharedImportUrl(text: String): String? {
-    val url = sharedImportUrlRegex.findAll(text).singleOrNull()?.value ?: return null
-    return url.takeIf { it.toHttpUrlOrNull() != null }
+    if (text.isJson()) return null
+    return sharedImportUrlRegex.findAll(text)
+        .map { it.value.trimSharedImportUrlSuffix() }
+        .filter { it.toHttpUrlOrNull() != null }
+        .singleOrNull()
+}
+
+private fun String.trimSharedImportUrlSuffix(): String {
+    var result = trimEnd { it in sharedImportUrlTrailingPunctuation }
+    sharedImportUrlBrackets.forEach { (open, close) ->
+        while (result.endsWith(close) && result.count { it == close } > result.count { it == open }) {
+            result = result.dropLast(1)
+        }
+    }
+    return result
 }

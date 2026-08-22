@@ -23,9 +23,26 @@ class SharedImportAssociationTest {
             "https://例子.测试/source.json",
             extractSharedImportUrl("https://例子.测试/source.json")
         )
+        assertEquals(
+            "https://example.com/source.json",
+            extractSharedImportUrl("请导入（https://example.com/source.json）。")
+        )
+        assertEquals(
+            "https://en.wikipedia.org/wiki/Function_(mathematics)",
+            extractSharedImportUrl("https://en.wikipedia.org/wiki/Function_(mathematics)")
+        )
+        assertEquals(
+            "https://example.com/source.json",
+            extractSharedImportUrl("https://example.com/source.json https://")
+        )
         assertNull(extractSharedImportUrl("ftp://example.com/source.json"))
         assertNull(extractSharedImportUrl("https://one.example/a https://two.example/b"))
         assertNull(extractSharedImportUrl("{\"url\":\"https://example.com/source.json\"}"))
+        assertNull(
+            extractSharedImportUrl(
+                """{"bookSourceUrl":"https://source.example","bookSourceComment":"文档 https://docs.example"}"""
+            )
+        )
         assertNull(extractSharedImportUrl("https://"))
     }
 
