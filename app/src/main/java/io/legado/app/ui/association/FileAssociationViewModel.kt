@@ -11,6 +11,7 @@ import io.legado.app.data.entities.Book
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.utils.*
 import java.io.File
+import java.net.URI
 
 class FileAssociationViewModel(application: Application) : BaseAssociationViewModel(application) {
     val importBookLiveData = MutableLiveData<Uri>()
@@ -63,6 +64,17 @@ class FileAssociationViewModel(application: Application) : BaseAssociationViewMo
 
     fun dispatchSharedText(text: String) {
         execute {
+            extractSharedImportUrl(text)?.let { url ->
+                onLineImportLive.postValue(
+                    Uri.Builder()
+                        .scheme("legado")
+                        .authority("import")
+                        .appendPath("auto")
+                        .appendQueryParameter("src", url)
+                        .build()
+                )
+                return@execute
+            }
             val file = File.createTempFile("shared_import_", ".json", context.cacheDir)
             sharedImportFile = file
             file.writeText(text)
@@ -108,4 +120,12 @@ class FileAssociationViewModel(application: Application) : BaseAssociationViewMo
         sharedImportFile?.delete()
         super.onCleared()
     }
+}
+
+private val sharedImportUrlRegex = Regex("""https?://\S+""", RegexOption.IGNORE_CASE)
+
+internal fun extractSharedImportUrl(text: String): String? {
+    val url = sharedImportUrlRegex.findAll(text).singleOrNull()?.value ?: return null
+    val uri = runCatching { URI(url) }.getOrNull() ?: return null
+    return url.takeIf { !uri.host.isNullOrBlank() }
 }
