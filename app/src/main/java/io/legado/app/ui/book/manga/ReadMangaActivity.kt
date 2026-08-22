@@ -35,8 +35,8 @@ import io.legado.app.data.entities.BookProgress
 import io.legado.app.data.entities.BookSource
 import io.legado.app.databinding.ActivityMangaBinding
 import io.legado.app.databinding.ViewLoadMoreBinding
+import io.legado.app.help.book.BookInfoShelfFlags
 import io.legado.app.help.book.isImage
-import io.legado.app.help.book.removeType
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.storage.Backup
 import io.legado.app.lib.dialogs.alert
@@ -845,10 +845,20 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             alert(title = getString(R.string.add_to_bookshelf)) {
                 setMessage(getString(R.string.check_add_bookshelf, book.name))
                 okButton {
-                    ReadManga.book?.removeType(BookType.notShelf)
-                    ReadManga.book?.save()
-                    ReadManga.inBookshelf = true
-                    setResult(RESULT_OK)
+                    val current = ReadManga.book ?: return@okButton
+                    if (BookInfoShelfFlags.promoteOrSkipTempBook(current)) {
+                        ReadManga.inBookshelf = true
+                        setResult(RESULT_OK)
+                    } else {
+                        toastOnUi(
+                            getString(
+                                R.string.local_book_identity_conflict,
+                                current.name,
+                                current.author,
+                            )
+                        )
+                        viewModel.removeFromBookshelf { super.finish() }
+                    }
                 }
                 noButton { viewModel.removeFromBookshelf { super.finish() } }
             }

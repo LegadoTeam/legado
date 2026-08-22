@@ -11,9 +11,10 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.data.entities.SearchKeyword
 import io.legado.app.help.book.ReadRecordIndex
-import io.legado.app.help.book.isNotShelf
+import io.legado.app.help.book.SearchBookShelfHelp
 import io.legado.app.help.config.AppConfig
 import io.legado.app.model.webBook.SearchModel
+import io.legado.app.model.webBook.SearchUiPublishGate
 import io.legado.app.utils.ConflateLiveData
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -40,8 +41,9 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
     val searchProgressLiveData = MutableLiveData<Pair<Int, Int>>()
     var searchKey: String = ""
     var hasMore = true
-    private var searchID = 0L
     private val searchCommands = SearchCommandGate()
+    private var searchID = 0L
+    private val searchPublishGate = SearchUiPublishGate()
     private val searchModel = SearchModel(viewModelScope, object : SearchModel.CallBack {
 
         override fun getSearchScope(): SearchScope {
@@ -56,8 +58,10 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
             searchProgressLiveData.postValue(searched to total)
         }
 
-        override fun onSearchSuccess(searchBooks: List<SearchBook>) {
-            searchBookLiveData.postValue(searchBooks)
+        override fun onSearchSuccess(searchId: Long, revision: Long, searchBooks: List<SearchBook>) {
+            searchPublishGate.publish(searchId, revision, searchBooks) {
+                searchBookLiveData.postValue(it)
+            }
         }
 
         override fun onSearchFinish(isEmpty: Boolean, hasMore: Boolean) {
@@ -89,14 +93,7 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
         }
         execute {
             appDb.bookDao.flowAll().mapLatest { books ->
-                val keys = arrayListOf<String>()
-                books.filterNot { it.isNotShelf }
-                    .forEach {
-                        keys.add("${it.name}-${it.author}")
-                        keys.add(it.name)
-                        keys.add(it.bookUrl)
-                    }
-                keys
+                SearchBookShelfHelp.shelfBadgeKeys(books).toList()
             }.catch {
                 AppLog.put("搜索界面获取书籍列表失败\n${it.localizedMessage}", it)
             }.collect {
@@ -110,11 +107,7 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
     }
 
     fun isInBookShelf(book: SearchBook): Boolean {
-        val name = book.name
-        val author = book.author
-        val bookUrl = book.bookUrl
-        val key = if (author.isNotBlank()) "$name-$author" else name
-        return bookshelf.contains(key) || bookshelf.contains(bookUrl)
+        return SearchBookShelfHelp.isInShelfBadgeIndex(book, bookshelf)
     }
 
     fun hasReadRecord(book: SearchBook): Boolean {
@@ -131,11 +124,15 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
         val command = searchCommands.next()
         execute {
             searchCommands.runIfCurrent(command) {
-                if ((searchKey == key) || key.isNotEmpty()) {
+                val generationDead = !searchPublishGate.isActive(searchID)
+                if ((searchKey == key) || key.isNotEmpty() || generationDead) {
                     searchModel.cancelSearch()
-                    searchID = command
-                    searchBookLiveData.postValue(emptyList())
-                    searchKey = key
+                    searchID = searchPublishGate.mint()
+                    searchPublishGate.begin(searchID)
+                    if ((searchKey == key) || key.isNotEmpty()) {
+                        searchBookLiveData.postValue(emptyList())
+                        searchKey = key
+                    }
                     hasMore = true
                 }
                 if (searchKey.isEmpty()) {
@@ -150,7 +147,11 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
      * 停止搜索
      */
     fun stop() {
-        searchCommands.invalidate(searchModel::cancelSearch)
+        searchCommands.invalidate {
+            searchID = 0L
+            searchPublishGate.invalidate()
+            searchModel.cancelSearch()
+        }
     }
 
     fun pause() {
@@ -191,7 +192,11 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
-        searchCommands.invalidate(searchModel::close)
+        searchCommands.invalidate {
+            searchID = 0L
+            searchPublishGate.invalidate()
+            searchModel.close()
+        }
     }
 
 }

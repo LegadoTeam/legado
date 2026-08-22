@@ -41,7 +41,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
     private var searchPage = 1
     private var searchKey: String = ""
     private var bookSourceParts = emptyList<BookSourcePart>()
-    private var searchBooks = arrayListOf<SearchBook>()
+    private val rawHits = SearchHitAccumulator()
     private val pageOwner = SearchPageOwner()
     private var workingState = MutableStateFlow(true)
     private val activeProgress = AtomicReference<SearchProgressReporter?>()
@@ -64,9 +64,10 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                 if (mSearchId != 0L) {
                     close()
                 }
-                searchBooks.clear()
+                rawHits.begin(searchId)
                 bookSourceParts = callBack.getSearchScope().getBookSourceParts()
                 if (bookSourceParts.isEmpty()) {
+                    rawHits.reset()
                     callBack.onSearchCancel(NoStackTraceException("启用书源为空"))
                     return
                 }
@@ -81,6 +82,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
     }
 
     private fun startSearch() {
+        val searchId = mSearchId
         val precision = appCtx.getPrefBoolean(PreferKey.precisionSearch)
         var hasMore = false
         val sourceParts = bookSourceParts
@@ -120,20 +122,23 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                     }
                 }
             }.onEach { items ->
+                if (searchId != mSearchId) return@onEach
                 for (book in items) {
                     book.releaseHtmlData()
                 }
-                hasMore = hasMore || items.isNotEmpty()
                 appDb.searchBookDao.insert(*items.toTypedArray())
-                mergeItems(items, precision, key)
+                val published = mergeItems(searchId, items, precision, key) ?: return@onEach
+                hasMore = hasMore || published.changed
                 currentCoroutineContext().ensureActive()
-                callBack.onSearchSuccess(searchBooks)
+                if (!SearchResultGate.accept(searchId, mSearchId)) return@onEach
+                callBack.onSearchSuccess(searchId, published.revision, published.hits)
             }.onCompletion { error ->
                 val context = currentCoroutineContext()
                 pageOwner.complete(context[Job]) {
+                    val published = rawHits.published(searchId)
                     when {
                         error == null -> progress.finish {
-                            callBack.onSearchFinish(searchBooks.isEmpty(), hasMore)
+                            callBack.onSearchFinish(published.isNullOrEmpty(), hasMore)
                         }
                         context.isActive -> progress.finish {
                             callBack.onSearchCancel()
@@ -150,87 +155,61 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
         job.start()
     }
 
-    private suspend fun mergeItems(newDataS: List<SearchBook>, precision: Boolean, key: String) {
-        if (newDataS.isNotEmpty()) {
-            val copyData = ArrayList(searchBooks)
-            val equalData = arrayListOf<SearchBook>()
-            val containsData = arrayListOf<SearchBook>()
-            val tagsData = arrayListOf<SearchBook>()
-            val otherData = arrayListOf<SearchBook>()
-            copyData.forEach {
+    private suspend fun mergeItems(
+        searchId: Long,
+        newDataS: List<SearchBook>,
+        precision: Boolean,
+        key: String,
+    ): SearchHitAppend? {
+        val copies = if (newDataS.isEmpty()) {
+            emptyList()
+        } else {
+            val out = ArrayList<SearchBook>(newDataS.size)
+            for (book in newDataS) {
                 currentCoroutineContext().ensureActive()
-                if (it.name == key || it.author == key) {
-                    equalData.add(it)
-                } else if (it.kind?.contains(key) == true) {
-                    tagsData.add(it)
-                } else if (it.name.contains(key) || it.author.contains(key)) {
-                    containsData.add(it)
-                } else {
-                    otherData.add(it)
-                }
+                out.add(book.copy())
             }
-            newDataS.forEach { nBook ->
-                currentCoroutineContext().ensureActive()
-                if (nBook.name == key || nBook.author == key) {
-                    var hasSame = false
-                    equalData.forEach { pBook ->
-                        currentCoroutineContext().ensureActive()
-                        if (pBook.name == nBook.name && pBook.author == nBook.author) {
-                            pBook.addOrigin(nBook.origin)
-                            hasSame = true
-                        }
-                    }
-                    if (!hasSame) {
-                        equalData.add(nBook)
-                    }
-                } else if (nBook.kind?.contains(key) == true) {
-                    var hasSame = false
-                    tagsData.forEach { pBook ->
-                        currentCoroutineContext().ensureActive()
-                        if (pBook.name == nBook.name && pBook.author == nBook.author) {
-                            pBook.addOrigin(nBook.origin)
-                            hasSame = true
-                        }
-                    }
-                    if (!hasSame) {
-                        tagsData.add(nBook)
-                    }
-                } else if (nBook.name.contains(key) || nBook.author.contains(key)) {
-                    var hasSame = false
-                    containsData.forEach { pBook ->
-                        currentCoroutineContext().ensureActive()
-                        if (pBook.name == nBook.name && pBook.author == nBook.author) {
-                            pBook.addOrigin(nBook.origin)
-                            hasSame = true
-                        }
-                    }
-                    if (!hasSame) {
-                        containsData.add(nBook)
-                    }
-                } else if (!precision) {
-                    var hasSame = false
-                    otherData.forEach { pBook ->
-                        currentCoroutineContext().ensureActive()
-                        if (pBook.name == nBook.name && pBook.author == nBook.author) {
-                            pBook.addOrigin(nBook.origin)
-                            hasSame = true
-                        }
-                    }
-                    if (!hasSame) {
-                        otherData.add(nBook)
-                    }
-                }
-            }
-            currentCoroutineContext().ensureActive()
-            equalData.sortByDescending { it.origins.size }
-            equalData.addAll(tagsData.sortedByDescending { it.origins.size })
-            equalData.addAll(containsData.sortedByDescending { it.origins.size })
-            if (!precision) {
-                equalData.addAll(otherData)
-            }
-            currentCoroutineContext().ensureActive()
-            searchBooks = equalData
+            out
         }
+        currentCoroutineContext().ensureActive()
+        val appended = rawHits.append(searchId, copies) ?: return null
+        if (!appended.changed) {
+            return SearchHitAppend(
+                rawHits.published(searchId) ?: emptyList(),
+                changed = false,
+                revision = appended.revision,
+            )
+        }
+        val display = buildDisplay(appended.hits, precision, key)
+        val published = rawHits.publish(searchId, appended.revision, display) ?: return null
+        return SearchHitAppend(published, changed = true, revision = appended.revision)
+    }
+
+    private fun buildDisplay(
+        snapshot: List<SearchBook>,
+        precision: Boolean,
+        key: String,
+    ): List<SearchBook> {
+        val merged = SearchBookMerge.rebuildFromRawHits(snapshot)
+        val equalData = arrayListOf<SearchBook>()
+        val containsData = arrayListOf<SearchBook>()
+        val tagsData = arrayListOf<SearchBook>()
+        val otherData = arrayListOf<SearchBook>()
+        for (book in merged) {
+            when {
+                book.name == key || book.author == key -> equalData.add(book)
+                book.kind?.contains(key) == true -> tagsData.add(book)
+                book.name.contains(key) || book.author.contains(key) -> containsData.add(book)
+                !precision -> otherData.add(book)
+            }
+        }
+        equalData.sortByDescending { it.origins.size }
+        equalData.addAll(tagsData.sortedByDescending { it.origins.size })
+        equalData.addAll(containsData.sortedByDescending { it.origins.size })
+        if (!precision) {
+            equalData.addAll(otherData)
+        }
+        return equalData
     }
 
     fun pause() {
@@ -252,6 +231,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
             pageOwner.cancel()?.cancel()
             searchPool?.close()
             searchPool = null
+            rawHits.reset()
             mSearchId = 0L
         }
     }
@@ -260,7 +240,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
         fun getSearchScope(): SearchScope
         fun onSearchStart()
         fun onSearchProgress(searched: Int, total: Int)
-        fun onSearchSuccess(searchBooks: List<SearchBook>)
+        fun onSearchSuccess(searchId: Long, revision: Long, searchBooks: List<SearchBook>)
         fun onSearchFinish(isEmpty: Boolean, hasMore: Boolean)
         fun onSearchCancel(exception: Throwable? = null)
     }

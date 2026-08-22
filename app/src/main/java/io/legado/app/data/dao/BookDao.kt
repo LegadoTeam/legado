@@ -359,6 +359,9 @@ interface BookDao {
 
     @Query("delete from books where type & ${BookType.notShelf} > 0")
     fun deleteNotShelfBook()
+
+    @Query("delete from books where bookUrl = :bookUrl and type & ${BookType.notShelf} > 0")
+    fun deleteNotShelfByUrl(bookUrl: String): Int
 }
 
 internal fun String?.withAudioPlayMode(playMode: Int): String {

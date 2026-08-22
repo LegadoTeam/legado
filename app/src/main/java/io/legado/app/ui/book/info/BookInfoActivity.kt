@@ -155,7 +155,7 @@ class BookInfoActivity :
             )
         } ?: let {
             if (!viewModel.inBookshelf) {
-                viewModel.delBook() //进目录会保存book，此时退出目录触发的book删除，不通知书源回调
+                viewModel.delBook(onlyNotShelf = true) //临时落库才删；正式在架不删
             }
         }
     }
@@ -167,13 +167,10 @@ class BookInfoActivity :
     private val readBookResult = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
-        viewModel.upBook(intent)
+        viewModel.upBook(intent) {
+            upTvBookshelf()
+        }
         when (it.resultCode) {
-            RESULT_OK -> {
-                viewModel.inBookshelf = true
-                upTvBookshelf()
-            }
-
             RESULT_DELETED -> {
                 setResult(RESULT_OK)
                 finish()
@@ -337,6 +334,7 @@ class BookInfoActivity :
             }
 
             R.id.menu_edit -> {
+                if (!viewModel.inBookshelf) return true
                 viewModel.getBook()?.let {
                     infoEditResult.launch {
                         putExtra("bookUrl", it.bookUrl)
@@ -1095,14 +1093,15 @@ class BookInfoActivity :
                 toastOnUi(R.string.book_not_exist)
                 return@setOnClickListener
             }
-            if (!viewModel.inBookshelf) {
+            if (viewModel.inBookshelf) {
+                openChapterList()
+            } else {
+                book.addType(BookType.notShelf)
                 viewModel.saveBook(book) { //点击目录会保存book
                     viewModel.saveChapterList {
                         openChapterList()
                     }
                 }
-            } else {
-                openChapterList()
             }
         }
         tvChangeGroup.setOnClickListener {
@@ -1344,10 +1343,7 @@ class BookInfoActivity :
             chapterChanged = changed
             if (!viewModel.inBookshelf) {
                 book.addType(BookType.notShelf)
-                lifecycleScope.launch {
-                    withContext(IO) {
-                        book.save()
-                    }
+                viewModel.saveBook(book) {
                     viewModel.saveChapterList {
                         startReadActivity(
                             book,
@@ -1470,16 +1466,16 @@ class BookInfoActivity :
     }
 
     private fun readBook(book: Book) {
-        if (!viewModel.inBookshelf) {
-            book.addType(BookType.notShelf)
-            viewModel.saveBook(book) {
+            if (viewModel.inBookshelf) {
+                viewModel.saveBook(book) {
+                    startReadActivity(book)
+                }
+            } else {
+                book.addType(BookType.notShelf)
+                viewModel.saveBook(book) {
                 viewModel.saveChapterList {
                     startReadActivity(book)
                 }
-            }
-        } else {
-            viewModel.saveBook(book) {
-                startReadActivity(book)
             }
         }
     }

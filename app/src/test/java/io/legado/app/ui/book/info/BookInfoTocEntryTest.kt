@@ -1,5 +1,6 @@
 package io.legado.app.ui.book.info
 
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -25,8 +26,11 @@ class BookInfoTocEntryTest {
         assertTrue(tocEntry.contains("return@setOnClickListener"))
         assertTrue(tocEntry.contains("viewModel.saveBook(book)"))
         assertTrue(tocEntry.contains("viewModel.saveChapterList"))
+        assertTrue(tocEntry.contains("if (viewModel.inBookshelf)"))
+        assertTrue(tocEntry.contains("book.addType(BookType.notShelf)"))
+        assertFalse(tocEntry.contains("urlOnShelf"))
         assertTrue(savedOpen >= 0)
-        assertTrue(directOpen > savedOpen)
+        assertTrue(directOpen >= 0)
     }
 
     @Test
@@ -77,8 +81,9 @@ class BookInfoTocEntryTest {
         assertTrue(normalProgressFlow.contains("book.chapterInVolumeIndex = chapterInVolumeIndex"))
         assertTrue(readFlow.contains("chapterChanged = changed"))
         assertTrue(readFlow.contains("book.addType(BookType.notShelf)"))
-        assertTrue(!readFlow.contains("viewModel.saveBook(book)"))
-        assertTrue(notShelfFlow.contains("book.save()"))
+        assertTrue(readFlow.contains("viewModel.saveBook(book)"))
+        assertFalse(readFlow.contains("book.save()"))
+        assertTrue(notShelfFlow.contains("viewModel.saveBook(book)"))
         assertTrue(notShelfFlow.contains("viewModel.saveChapterList"))
         assertTrue(notShelfFlow.contains("highlightLayoutTitleLength.takeIf"))
         assertTrue(shelfFlow.contains("book.update()"))

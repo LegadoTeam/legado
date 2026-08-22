@@ -21,8 +21,12 @@ import io.legado.app.exception.NoBooksDirException
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.book.BookHelp
+import io.legado.app.help.book.BookInfoOpenResolver
+import io.legado.app.help.book.BookInfoShelfFlags
+import io.legado.app.help.book.SearchBookShelfHelp
 import io.legado.app.help.book.getExportFileName
 import io.legado.app.help.book.getRemoteUrl
+import io.legado.app.help.book.addType
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.book.isSameNameAuthor
@@ -30,7 +34,6 @@ import io.legado.app.help.book.isWebFile
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.savePreservingCustomCoverUrl
 import io.legado.app.help.book.update
-import io.legado.app.help.book.updateTo
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.lib.webdav.ObjectNotFoundException
 import io.legado.app.model.AudioPlay
@@ -76,23 +79,6 @@ internal fun normalizeWebFileName(
     }
 }
 
-internal class BookInfoNetworkLoadingCounter(
-    private val onLoadingChanged: (Boolean) -> Unit,
-) {
-    private var activeLoads = 0
-
-    @Synchronized
-    fun begin() {
-        if (activeLoads++ == 0) onLoadingChanged(true)
-    }
-
-    @Synchronized
-    fun end() {
-        check(activeLoads > 0) { "No active network load" }
-        if (--activeLoads == 0) onLoadingChanged(false)
-    }
-}
-
 class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     val bookData = MutableLiveData<Book>()
     val chapterListData = MutableLiveData<List<BookChapter>>()
@@ -116,45 +102,60 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             val name = intent.getStringExtra("name") ?: ""
             val author = intent.getStringExtra("author") ?: ""
             val bookUrl = intent.getStringExtra("bookUrl") ?: ""
-            appDb.bookDao.getBook(name, author)?.let {
-                inBookshelf = !it.isNotShelf
-                upBook(it)
-                return@execute
-            }
-            if (bookUrl.isNotBlank()) {
-                appDb.bookDao.getBook(bookUrl)?.let {
-                    inBookshelf = !it.isNotShelf
-                    upBook(it)
-                    return@execute
-                }
-                appDb.searchBookDao.getSearchBook(bookUrl)?.toBook()?.let {
-                    upBook(it)
-                    return@execute
-                }
-            }
-            appDb.searchBookDao.getFirstByNameAuthor(name, author)?.toBook()?.let {
-                upBook(it)
-                return@execute
-            }
-            throw NoStackTraceException("未找到书籍")
+            val opened = BookInfoOpenResolver.resolve(
+                bookUrl = bookUrl,
+                shelfByUrl = bookUrl.takeIf { it.isNotBlank() }?.let { appDb.bookDao.getBook(it) },
+                searchByUrl = bookUrl.takeIf { it.isNotBlank() }
+                    ?.let { appDb.searchBookDao.getSearchBook(it)?.toBook() },
+                shelfByNameAuthor = appDb.bookDao.getBook(name, author),
+                searchByNameAuthor = appDb.searchBookDao.getFirstByNameAuthor(name, author)
+                    ?.toBook(),
+            ) ?: throw NoStackTraceException("未找到书籍")
+            inBookshelf = opened.inBookshelf
+            upBook(opened.book)
         }.onError {
             AppLog.put(it.localizedMessage, it)
             context.toastOnUi(it.localizedMessage)
         }
     }
 
-    fun upBook(intent: Intent) {
+    fun upBook(intent: Intent, success: (() -> Unit)? = null) {
         execute {
+            // Prefer the page we still hold: refresh its official-shelf flag first.
+            bookData.value?.let { refreshShelfFlags(it) }
             val name = intent.getStringExtra("name") ?: ""
             val author = intent.getStringExtra("author") ?: ""
             appDb.bookDao.getBook(name, author)?.let { book ->
-                upBook(book)
+                refreshShelfFlags(book)
+                bookSource = if (book.isLocal) null else
+                    appDb.bookSourceDao.getBookSource(book.origin)?.also {
+                        hasCustomBtn = it.customButton
+                    }
+                bookData.postValue(book)
+                upCoverByRule(book)
+                if (book.tocUrl.isEmpty() && !book.isLocal) {
+                    loadBookInfo(book, runPreUpdateJs = inBookshelf)
+                } else {
+                    val chapterList = appDb.bookChapterDao.getChapterList(book.bookUrl)
+                    if (chapterList.isNotEmpty()) {
+                        chapterListData.postValue(chapterList)
+                    } else {
+                        loadChapter(book, isFromBookInfo = true)
+                    }
+                }
             }
+        }.onSuccess {
+            success?.invoke()
         }
+    }
+
+    private fun refreshShelfFlags(book: Book) {
+        inBookshelf = BookInfoShelfFlags.isOfficialUrl(book.bookUrl)
     }
 
     private fun upBook(book: Book) {
         execute {
+            refreshShelfFlags(book)
             bookSource = if (book.isLocal) null else
                 appDb.bookSourceDao.getBookSource(book.origin)?.also {
                     hasCustomBtn = it.customButton
@@ -246,18 +247,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             val oldBook = book.copy()
             WebBook.getBookInfo(scope, bookSource, book, canReName = canReName)
                 .onSuccess(IO) {
-                    var persistedBook = oldBook
-                    val dbBook = appDb.bookDao.getBook(book.name, book.author)
-                    if (!inBookshelf && dbBook != null && !dbBook.isNotShelf && dbBook.origin == book.origin) {
-                        /**
-                         * book 来自搜索时(inBookshelf == false)，搜索的书名不存在于书架，但是加载详情后，书名更新，存在同名书籍
-                         * 此时 book 的数据会与数据库中的不同，需要更新 #3652 #4619
-                         * book 加载详情后虽然书名作者相同，但是又可能不是数据库中(书源不同)的那本书 #3149
-                         */
-                        dbBook.updateTo(it)
-                        persistedBook = dbBook
-                        inBookshelf = true
-                    }
+                    refreshShelfFlags(it)
                     if (it.isWebFile) {
                         bookData.postValue(it)
                         if (inBookshelf) {
@@ -269,12 +259,11 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                             it,
                             runPreUpdateJs,
                             isFromBookInfo = true,
-                            oldBook = persistedBook,
+                            oldBook = oldBook,
                         )
                     }
                 }.onError {
-                    bookData.postValue(oldBook)
-                    chapterListData.postValue(chapterListData.value.orEmpty())
+                    restoreBookAfterLoadFailure(oldBook)
                     AppLog.put("获取书籍信息失败\n${it.localizedMessage}", it)
                     context.toastOnUi(R.string.error_get_book_info)
                 }
@@ -333,8 +322,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     bookData.postValue(book)
                     chapterListData.postValue(it)
                 }.onError {
-                    bookData.postValue(oldBook)
-                    chapterListData.postValue(chapterListData.value.orEmpty())
+                    restoreBookAfterLoadFailure(oldBook)
                     AppLog.put("获取目录失败\n${it.localizedMessage}", it)
                     context.toastOnUi(R.string.error_get_chapter_list)
                 }
@@ -342,6 +330,11 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
+    private fun restoreBookAfterLoadFailure(oldBook: Book) {
+        refreshShelfFlags(oldBook)
+        bookData.postValue(oldBook)
+        chapterListData.postValue(chapterListData.value.orEmpty())
+    }
 
     fun loadGroup(groupId: Long, success: ((groupNames: String?) -> Unit)) {
         execute {
@@ -466,6 +459,10 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 hasCustomBtn = it.customButton
             }
             bookData.value?.migrateTo(book, toc)
+            BookInfoShelfFlags.restoreOfficialUserFields(
+                book,
+                appDb.bookDao.getBook(book.bookUrl),
+            )
             if (book.isWebFile) {
                 loadWebFile(book)
             }
@@ -475,6 +472,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 appDb.bookDao.insert(book)
                 appDb.bookChapterDao.insert(*toc.toTypedArray())
             }
+            refreshShelfFlags(book)
             bookData.postValue(book)
             chapterListData.postValue(toc)
         }.onSuccess {
@@ -505,23 +503,39 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             if (book.order == 0) {
                 book.order = appDb.bookDao.minOrder - 1
             }
-            appDb.bookDao.getBook(book.name, book.author)?.let {
-                book.durChapterIndex = it.durChapterIndex
-                book.durChapterPos = it.durChapterPos
-                book.durChapterTitle = it.durChapterTitle
-            }
-            if (preserveCustomCoverUrl) {
-                book.savePreservingCustomCoverUrl()
+            val byUrl = appDb.bookDao.getBook(book.bookUrl)
+            if (byUrl != null) {
+                BookInfoShelfFlags.applyExistingBeforeSave(book, byUrl)
+                if (preserveCustomCoverUrl) {
+                    book.savePreservingCustomCoverUrl()
+                } else {
+                    book.save()
+                }
             } else {
-                book.save()
+                val persisted = SearchBookShelfHelp.persistIncomingBook(book)
+                if (persisted == null || persisted.bookUrl != book.bookUrl) {
+                    refreshShelfFlags(book)
+                    context.toastOnUi(
+                        context.getString(
+                            R.string.local_book_identity_conflict,
+                            book.name,
+                            book.author,
+                        )
+                    )
+                    return@execute false
+                }
             }
-            if (ReadBook.book?.isSameNameAuthor(book) == true) {
+            refreshShelfFlags(book)
+            if (ReadBook.book?.bookUrl == book.bookUrl) {
                 ReadBook.book = book
-            } else if (AudioPlay.book?.isSameNameAuthor(book) == true) {
+            } else if (AudioPlay.book?.bookUrl == book.bookUrl) {
                 AudioPlay.book = book
             }
-        }.onSuccess {
-            success?.invoke()
+            true
+        }.onSuccess { saved ->
+            if (saved == true) {
+                success?.invoke()
+            }
         }
     }
 
@@ -538,29 +552,72 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     fun addToBookshelf(success: (() -> Unit)?) { //点击书架按钮或在加分组时触发
         execute {
             bookData.value?.let { book ->
+                val incoming = book.copy()
+                incoming.removeType(BookType.notShelf)
+                if (incoming.order == 0) {
+                    incoming.order = appDb.bookDao.minOrder - 1
+                }
+                appDb.bookDao.getBook(incoming.name, incoming.author)?.let { existing ->
+                    if (existing.bookUrl == incoming.bookUrl) {
+                        incoming.durChapterIndex = existing.durChapterIndex
+                        incoming.durChapterPos = existing.durChapterPos
+                        incoming.durChapterTitle = existing.durChapterTitle
+                    }
+                }
+                if (SearchBookShelfHelp.shouldSkipWeakInsert(
+                        incoming.name,
+                        incoming.author,
+                        incoming.bookUrl,
+                    )
+                ) {
+                    refreshShelfFlags(incoming)
+                    context.toastOnUi(
+                        context.getString(
+                            R.string.local_book_identity_conflict,
+                            incoming.name,
+                            incoming.author,
+                        )
+                    )
+                    return@execute false
+                }
+                val persisted = SearchBookShelfHelp.persistIncomingBook(incoming)
+                val savedThisBook = persisted != null && persisted.bookUrl == incoming.bookUrl
+                if (!savedThisBook) {
+                    refreshShelfFlags(incoming)
+                    context.toastOnUi(
+                        context.getString(
+                            R.string.local_book_identity_conflict,
+                            incoming.name,
+                            incoming.author,
+                        )
+                    )
+                    return@execute false
+                }
                 book.removeType(BookType.notShelf)
-                if (book.order == 0) {
-                    book.order = appDb.bookDao.minOrder - 1
-                }
-                appDb.bookDao.getBook(book.name, book.author)?.let {
-                    book.durChapterIndex = it.durChapterIndex
-                    book.durChapterPos = it.durChapterPos
-                    book.durChapterTitle = it.durChapterTitle
-                }
+                book.order = incoming.order
+                book.author = incoming.author
+                book.durChapterIndex = incoming.durChapterIndex
+                book.durChapterPos = incoming.durChapterPos
+                book.durChapterTitle = incoming.durChapterTitle
                 if (ReadBook.book?.isSameNameAuthor(book) == true) {
                     ReadBook.book = book
                 } else if (AudioPlay.book?.isSameNameAuthor(book) == true) {
                     AudioPlay.book = book
                 }
-                book.save()
                 SourceCallBack.callBackBook(SourceCallBack.ADD_BOOK_SHELF, bookSource, book)
+                chapterListData.value?.let {
+                    appDb.bookChapterDao.insert(*it.toTypedArray())
+                }
+                inBookshelf = true
+                true
+            } ?: run {
+                inBookshelf = false
+                false
             }
-            chapterListData.value?.let {
-                appDb.bookChapterDao.insert(*it.toTypedArray())
+        }.onSuccess { saved ->
+            if (saved == true) {
+                success?.invoke()
             }
-            inBookshelf = true
-        }.onSuccess {
-            success?.invoke()
         }
     }
 
@@ -572,15 +629,32 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         return book
     }
 
-    fun delBook(deleteOriginal: Boolean = false, success: (() -> Unit)? = null) {
+    fun delBook(
+        deleteOriginal: Boolean = false,
+        onlyNotShelf: Boolean = false,
+        success: (() -> Unit)? = null,
+    ) {
         execute {
-            bookData.value?.let {
-                it.delete()
-                inBookshelf = false
-                if (it.isLocal) {
-                    LocalBook.deleteBook(it, deleteOriginal)
+            val book = bookData.value ?: return@execute
+            if (onlyNotShelf) {
+                val deleted = appDb.bookDao.deleteNotShelfByUrl(book.bookUrl)
+                if (deleted > 0 && ReadBook.book?.bookUrl == book.bookUrl) {
+                    ReadBook.book = null
+                }
+                if (deleted > 0 && book.isLocal) {
+                    LocalBook.deleteBook(book, deleteOriginal)
+                }
+            } else if (BookInfoShelfFlags.canDeleteBookUrl(
+                    book.bookUrl,
+                    appDb.bookDao.getBook(book.bookUrl)?.bookUrl,
+                )
+            ) {
+                book.delete()
+                if (book.isLocal) {
+                    LocalBook.deleteBook(book, deleteOriginal)
                 }
             }
+            refreshShelfFlags(book)
         }.onSuccess {
             success?.invoke()
         }

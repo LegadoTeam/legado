@@ -26,6 +26,7 @@ import io.legado.app.databinding.ActivityAudioPlayBinding
 import io.legado.app.databinding.DialogDownloadChoiceBinding
 import io.legado.app.help.audio.AudioCacheManager
 import io.legado.app.help.audio.AudioCachePolicy
+import io.legado.app.help.book.BookInfoShelfFlags
 import io.legado.app.help.book.isAudio
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.simulatedTotalChapterNum
@@ -519,11 +520,22 @@ class AudioPlayActivity :
             alert(title = getString(R.string.add_to_bookshelf)) {
                 setMessage(getString(R.string.check_add_bookshelf, book.name))
                 okButton {
-                    AudioPlay.book?.removeType(BookType.notShelf)
-                    AudioPlay.book?.save()
-                    SourceCallBack.callBackBook(SourceCallBack.ADD_BOOK_SHELF, AudioPlay.bookSource, AudioPlay.book)
-                    AudioPlay.inBookshelf = true
-                    setResult(RESULT_OK)
+                    val current = AudioPlay.book ?: return@okButton
+                    if (BookInfoShelfFlags.promoteOrSkipTempBook(current)) {
+                        SourceCallBack.callBackBook(SourceCallBack.ADD_BOOK_SHELF, AudioPlay.bookSource, current)
+                        AudioPlay.inBookshelf = true
+                        setResult(RESULT_OK)
+                    } else {
+                        toastOnUi(
+                            getString(
+                                R.string.local_book_identity_conflict,
+                                current.name,
+                                current.author,
+                            )
+                        )
+                        callBackBookEnd()
+                        viewModel.removeFromBookshelf { super.finish() }
+                    }
                 }
                 noButton {
                     callBackBookEnd()
