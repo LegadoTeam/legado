@@ -688,6 +688,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     val autoBackup get() = appCtx.getPrefBoolean(PreferKey.autoBackup, true)
 
+    val liveUpdateNotifications
+        get() = appCtx.getPrefBoolean(PreferKey.liveUpdateNotifications, false)
+
     val defaultHomePage get() = appCtx.getPrefString(PreferKey.defaultHomePage, "bookshelf")
 
     val updateToVariant get() = appCtx.getPrefString(PreferKey.updateToVariant, "default_version")

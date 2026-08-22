@@ -1308,4 +1308,6 @@
     <string name="drag_to_reorder">拖曳排序</string>
     <string name="move_to_more">移至更多</string>
     <string name="move_to_floating_bar">移至浮動列</string>
+    <string name="live_update_notifications">即時更新通知</string>
+    <string name="live_update_notifications_summary">在 Android 16 上將系統允許的進度通知提升為即時更新</string>
 </resources>

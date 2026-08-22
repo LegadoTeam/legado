@@ -217,6 +217,7 @@ object PreferKey {
     const val paddingDisplayCutouts = "paddingDisplayCutouts"
     const val autoCheckNewBackup = "autoCheckNewBackup"
     const val autoBackup = "autoBackup"
+    const val liveUpdateNotifications = "liveUpdateNotifications"
 
     const val dThemeName = "durThemeName"
     const val dNThemeName = "durThemeNameNight"
