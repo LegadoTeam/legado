@@ -8,6 +8,7 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
+import io.legado.app.BuildConfig
 import io.legado.app.R
 import io.legado.app.constant.AppConst.appInfo
 import io.legado.app.constant.AppLog
@@ -88,6 +89,21 @@ class AboutFragment : PreferenceFragmentCompat() {
      * 检测更新
      */
     private fun checkUpdate() {
+        if (BuildConfig.APPLICATION_ID.endsWith(".releaseA")) {
+            val fileName = "legado_live_update_test_${System.currentTimeMillis()}.apk"
+            showDialogFragment(
+                UpdateDialog(
+                    AppUpdate.UpdateInfo(
+                        tagName = "ColorOS 16 实时通知验证",
+                        updateLog = "测试专用入口：仅验证应用更新下载的实时通知、取消和完成状态。下载完成后无需安装，此代码不会合入正式 PR。",
+                        downloadUrl = "https://github.com/LegadoTeam/legado/releases/download/beta/legado_app_3.26082123_universal_releaseA_vc38194.apk",
+                        fileName = fileName,
+                        size = 26821102L
+                    )
+                )
+            )
+            return
+        }
         waitDialog.show()
         AppUpdate.gitHubUpdate.run {
             check(lifecycleScope)
