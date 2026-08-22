@@ -10,8 +10,8 @@ import io.legado.app.constant.AppPattern.bookFileRegex
 import io.legado.app.data.entities.Book
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.utils.*
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.io.File
-import java.net.URI
 
 class FileAssociationViewModel(application: Application) : BaseAssociationViewModel(application) {
     val importBookLiveData = MutableLiveData<Uri>()
@@ -122,10 +122,10 @@ class FileAssociationViewModel(application: Application) : BaseAssociationViewMo
     }
 }
 
-private val sharedImportUrlRegex = Regex("""https?://\S+""", RegexOption.IGNORE_CASE)
+private val sharedImportUrlRegex =
+    Regex("""(?<!["'])https?://[^\s"'<>]+""", RegexOption.IGNORE_CASE)
 
 internal fun extractSharedImportUrl(text: String): String? {
     val url = sharedImportUrlRegex.findAll(text).singleOrNull()?.value ?: return null
-    val uri = runCatching { URI(url) }.getOrNull() ?: return null
-    return url.takeIf { !uri.host.isNullOrBlank() }
+    return url.takeIf { it.toHttpUrlOrNull() != null }
 }

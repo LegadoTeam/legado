@@ -19,6 +19,10 @@ class SharedImportAssociationTest {
             "HTTP://example.com/source.json",
             extractSharedImportUrl("HTTP://example.com/source.json")
         )
+        assertEquals(
+            "https://例子.测试/source.json",
+            extractSharedImportUrl("https://例子.测试/source.json")
+        )
         assertNull(extractSharedImportUrl("ftp://example.com/source.json"))
         assertNull(extractSharedImportUrl("https://one.example/a https://two.example/b"))
         assertNull(extractSharedImportUrl("{\"url\":\"https://example.com/source.json\"}"))
