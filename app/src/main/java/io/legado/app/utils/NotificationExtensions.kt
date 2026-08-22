@@ -66,19 +66,18 @@ internal fun NotificationCompat.Builder.applyPromotedProgress(
 
     val style = NotificationCompat.ProgressStyle()
     if (max > 0) {
+        val boundedProgress = progress.coerceIn(0, max)
+        setProgress(max, boundedProgress, false)
         style.addProgressSegment(NotificationCompat.ProgressStyle.Segment(max))
-            .setProgress(progress.coerceIn(0, max))
+            .setProgress(boundedProgress)
         setShortCriticalText("${progressPercent(progress, max)}%")
     } else {
+        setProgress(0, 0, true)
         style.setProgressIndeterminate(true)
     }
     setStyle(style)
         .setOngoing(true)
-    if (usesExplicitPromotedNotificationContract()) {
-        setRequestPromotedOngoing(true)
-        setColorized(false)
-    } else {
-        setColorized(true)
-    }
+    setRequestPromotedOngoing(true)
+    setColorized(!usesExplicitPromotedNotificationContract())
     return true
 }
