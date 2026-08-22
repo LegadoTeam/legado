@@ -38,7 +38,8 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
 
     val cacheFileNames = hashSetOf<String>()
     val audioCacheKeys = hashSetOf<AudioCacheKey>()
-    private val displayTitleMap = ConcurrentHashMap<String, String>()
+    @Volatile
+    private var displayTitleMap = ConcurrentHashMap<String, String>()
     private val handler = Handler(Looper.getMainLooper())
     private val baseStartPadding = 12.dpToPx()
     private val depthIndent = 10.dpToPx()
@@ -110,12 +111,13 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
 
     fun clearDisplayTitle() {
         upDisplayTitleJob?.cancel()
-        displayTitleMap.clear()
+        displayTitleMap = ConcurrentHashMap()
     }
 
     fun upDisplayTitles(startIndex: Int) {
         if (released) return
         upDisplayTitleJob?.cancel()
+        val displayTitleMap = displayTitleMap
         upDisplayTitleJob = Coroutine.async(callback.scope) {
             val book = callback.book ?: return@async
             val items = getItems()
@@ -126,12 +128,16 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
             val useReplace = AppConfig.tocUiUseReplace && book.getUseReplaceRule()
             launch {
                 for (i in safeStartIndex until items.size) {
-                    updateDisplayTitle(items, i, replaceRules, useReplace, replaceBook)
+                    updateDisplayTitle(
+                        items, i, replaceRules, useReplace, replaceBook, displayTitleMap
+                    )
                 }
             }
             launch {
                 for (i in safeStartIndex - 1 downTo 0) {
-                    updateDisplayTitle(items, i, replaceRules, useReplace, replaceBook)
+                    updateDisplayTitle(
+                        items, i, replaceRules, useReplace, replaceBook, displayTitleMap
+                    )
                 }
             }
         }
@@ -143,6 +149,7 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
         replaceRules: List<io.legado.app.data.entities.ReplaceRule>,
         useReplace: Boolean,
         replaceBook: ReplaceBook,
+        displayTitleMap: ConcurrentHashMap<String, String>,
     ) {
         val item = items[index]
         val chapter = item.chapter
@@ -156,7 +163,9 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
         currentCoroutineContext().ensureActive()
         displayTitleMap[item.key] = displayTitle
         handler.post {
-            if (!released && getItem(index)?.key == item.key) {
+            if (displayTitleMap === this.displayTitleMap &&
+                !released && getItem(index)?.key == item.key
+            ) {
                 notifyItemChanged(index, true)
             }
         }
