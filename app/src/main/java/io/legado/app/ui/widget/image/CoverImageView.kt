@@ -44,6 +44,20 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import splitties.init.appCtx
 
+internal fun coverTitleTextSize(
+    viewWidth: Float,
+    viewHeight: Float,
+    characterCount: Int,
+    largeTextHeight: Float
+): Float = if (
+    (characterCount - 2) * largeTextHeight > viewHeight * 0.7f ||
+    (characterCount - 3) * largeTextHeight > viewHeight * 0.6f
+) {
+    viewWidth / 10
+} else {
+    viewWidth / 7
+}
+
 /**
  * 封面
  */
@@ -186,6 +200,12 @@ class CoverImageView @JvmOverloads constructor(
         name?.toStringArray()?.let { name ->
             var line = 0
             namePaint.textSize = viewWidth / 7
+            namePaint.textSize = coverTitleTextSize(
+                viewWidth,
+                viewHeight,
+                name.size,
+                namePaint.textHeight
+            )
             namePaint.strokeWidth = namePaint.textSize / 6
             name.forEachIndexed { index, char ->
                 namePaint.color = backgroundColor
@@ -198,18 +218,15 @@ class CoverImageView @JvmOverloads constructor(
                 if (startY > viewHeight * 0.9) {
                     if ((name.size - index - 1) == 1) { //只剩一个字
                         startY -= namePaint.textHeight / 5
-                        namePaint.textSize = viewWidth / 9
                         return@forEachIndexed
                     }
                     startX += namePaint.textSize
                     line++
-                    namePaint.textSize = viewWidth / 10
                     startY = viewHeight * 0.2f + namePaint.textHeight * line
                 }
                 else if (startY > viewHeight * 0.8 && (name.size - index - 1) > 2) { //剩余字数大于2
                     startX += namePaint.textSize
                     line++
-                    namePaint.textSize = viewWidth / 10
                     startY = viewHeight * 0.2f + namePaint.textHeight * line
                 }
             }

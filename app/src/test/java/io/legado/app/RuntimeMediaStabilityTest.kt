@@ -3,6 +3,7 @@ package io.legado.app
 import io.legado.app.data.entities.Book
 import io.legado.app.service.buildHttpTtsCacheFileName
 import io.legado.app.ui.book.info.normalizeWebFileName
+import io.legado.app.ui.widget.image.coverTitleTextSize
 import io.legado.app.utils.calculateSvgBitmapSize
 import io.legado.app.utils.isForegroundServiceStartDenied
 import org.junit.Assert.assertEquals
@@ -109,6 +110,35 @@ class RuntimeMediaStabilityTest {
         assertTrue(generation.contains("nameBitmapCache.put(cacheKey, bitmap)"))
         assertTrue(generation.contains("currentNameBitmap = cacheKey to bitmap"))
         assertTrue(generation.contains("postInvalidate()"))
+    }
+
+    @Test
+    fun textCoverKeepsOneTitleSizeAcrossColumns() {
+        val width = 105f
+        val height = 140f
+        val largeTextHeight = 18f
+
+        for (characterCount in 4..7) {
+            assertEquals(
+                width / 7,
+                coverTitleTextSize(width, height, characterCount, largeTextHeight),
+                0.001f
+            )
+        }
+        assertEquals(
+            width / 10,
+            coverTitleTextSize(width, height, 8, largeTextHeight),
+            0.001f
+        )
+
+        val source = listOf(File("src/main/java"), File("app/src/main/java"))
+            .first { it.isDirectory }
+            .resolve("io/legado/app/ui/widget/image/CoverImageView.kt")
+            .readText()
+        val titleLoop = source.substringAfter("name.forEachIndexed { index, char ->")
+            .substringBefore("if (!drawBookAuthor)")
+
+        assertFalse(titleLoop.contains("namePaint.textSize ="))
     }
 
     @Test
