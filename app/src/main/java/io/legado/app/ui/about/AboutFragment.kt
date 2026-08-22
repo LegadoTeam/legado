@@ -97,7 +97,7 @@ class AboutFragment : PreferenceFragmentCompat() {
                         UpdateDialog(it)
                     )
                 }.onError {
-                    appCtx.toastOnUi("${getString(R.string.check_update)}\n${it.localizedMessage}")
+                    appCtx.toastOnUi(it.localizedMessage)
                 }.onFinally {
                     waitDialog.dismiss()
                 }
@@ -111,9 +111,7 @@ class AboutFragment : PreferenceFragmentCompat() {
                 if (childFragmentManager.isStateSaved) return@onSuccess
                 showDialogFragment(UpdateDialog(it))
             }.onError {
-                appCtx.toastOnUi(
-                    "${getString(R.string.check_beta_update)}\n${it.localizedMessage}"
-                )
+                appCtx.toastOnUi(it.localizedMessage)
             }.onFinally {
                 waitDialog.dismiss()
             }
