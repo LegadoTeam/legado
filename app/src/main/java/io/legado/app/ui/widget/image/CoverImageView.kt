@@ -103,8 +103,6 @@ class CoverImageView @JvmOverloads constructor(
         private val nameBitmapCache by lazy { LruCache<String, Bitmap>(33) }
         private val needNameBitmap by lazy { LruCache<String, Boolean>(99) }
     }
-    private var viewWidth: Float = 0f
-    private var viewHeight: Float = 0f
     private var currentJob: Job? = null
     @Volatile
     private var currentNameBitmap: Pair<String, Bitmap>? = null
@@ -141,6 +139,10 @@ class CoverImageView @JvmOverloads constructor(
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
+        if (w != oldw || h != oldh) {
+            currentJob?.cancel()
+            currentNameBitmap = null
+        }
         outlineProvider = object : ViewOutlineProvider() {
             override fun getOutline(view: View, outline: Outline) {
                 outline.setRoundRect(0, 0, w, h, 12f)
@@ -227,6 +229,7 @@ class CoverImageView @JvmOverloads constructor(
         asyncAwait: Boolean
     ) {
         currentJob?.cancel()
+        val requestedBitmapPath = bitmapPath
         currentJob = CoroutineScope(Dispatchers.Default).launch {
             try {
                 if (asyncAwait) {
@@ -243,11 +246,14 @@ class CoverImageView @JvmOverloads constructor(
                     } while (width == 0 && attempts < 2000)
                 }
                 ensureActive()
+                val renderWidth = width
+                val renderHeight = height
+                if (renderWidth <= 0 || renderHeight <= 0) return@launch
                 val cacheKey = coverBitmapCacheKey(
                     name,
                     author,
-                    width,
-                    height,
+                    renderWidth,
+                    renderHeight,
                     horizontal,
                     drawAuthor,
                     backgroundColor,
@@ -260,13 +266,15 @@ class CoverImageView @JvmOverloads constructor(
                 val bitmap = generateCoverBitmap(
                     name,
                     author,
+                    renderWidth,
+                    renderHeight,
                     horizontal,
                     drawAuthor,
                     backgroundColor,
                     accentColor
                 )
                 ensureActive()
-                needNameBitmap.put(bitmapPath.toString(), true)
+                needNameBitmap.put(requestedBitmapPath.toString(), true)
                 nameBitmapCache.put(cacheKey, bitmap)
                 currentNameBitmap = cacheKey to bitmap
                 postInvalidate()
@@ -280,16 +288,18 @@ class CoverImageView @JvmOverloads constructor(
     private fun generateCoverBitmap(
         name: String?,
         author: String?,
+        renderWidth: Int,
+        renderHeight: Int,
         horizontal: Boolean,
         drawAuthor: Boolean,
         backgroundColor: Int,
         accentColor: Int
     ): Bitmap {
-        viewWidth = width.toFloat()
-        viewHeight = height.toFloat()
-        val bitmap = createBitmap(width, height)
+        val viewWidth = renderWidth.toFloat()
+        val viewHeight = renderHeight.toFloat()
+        val bitmap = createBitmap(renderWidth, renderHeight)
         val bitmapCanvas = Canvas(bitmap)
-        var startX = width * 0.2f
+        var startX = renderWidth * 0.2f
         var startY = viewHeight * 0.2f
         if (horizontal) {
             drawHorizontalTextCover(
@@ -298,7 +308,9 @@ class CoverImageView @JvmOverloads constructor(
                 author,
                 backgroundColor,
                 accentColor,
-                drawAuthor
+                drawAuthor,
+                viewWidth,
+                viewHeight
             )
             return bitmap
         }
@@ -350,7 +362,7 @@ class CoverImageView @JvmOverloads constructor(
         author?.toStringArray()?.let { author ->
             authorPaint.textSize = viewWidth / 10
             authorPaint.strokeWidth = authorPaint.textSize / 5
-            startX = width * 0.8f
+            startX = renderWidth * 0.8f
             startY = viewHeight * 0.95f - author.size * authorPaint.textHeight
             startY = maxOf(startY, viewHeight * 0.3f)
             author.forEach {
@@ -375,7 +387,9 @@ class CoverImageView @JvmOverloads constructor(
         author: String?,
         backgroundColor: Int,
         accentColor: Int,
-        drawAuthor: Boolean
+        drawAuthor: Boolean,
+        viewWidth: Float,
+        viewHeight: Float
     ) {
         val basePaint = TextPaint().apply {
             isAntiAlias = true
@@ -389,7 +403,7 @@ class CoverImageView @JvmOverloads constructor(
                 strokeWidth = textSize / 6
             }
             var titleLayout = horizontalTitleLayout(title, titlePaint, titleWidth)
-            if (titleLayout.lineCount > 1) {
+            if (titleLayout.lineCount > 1 || titlePaint.measureText(title) > titleWidth) {
                 titlePaint.textSize = viewWidth / 9
                 titlePaint.strokeWidth = titlePaint.textSize / 6
                 titleLayout = horizontalTitleLayout(title, titlePaint, titleWidth)

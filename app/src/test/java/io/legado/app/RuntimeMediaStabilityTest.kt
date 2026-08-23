@@ -174,12 +174,16 @@ class RuntimeMediaStabilityTest {
         assertTrue(horizontal.contains("HORIZONTAL_TITLE_MAX_LINES"))
         assertTrue(horizontal.contains("setMaxLines(HORIZONTAL_TITLE_MAX_LINES)"))
         assertTrue(horizontal.contains("TextUtils.TruncateAt.END"))
+        assertTrue(horizontal.contains("titlePaint.measureText(title) > titleWidth"))
         assertTrue(horizontal.contains("textAlign = Paint.Align.RIGHT"))
         assertTrue(horizontal.contains("textSize = viewWidth / 10"))
         assertTrue(horizontal.contains("viewHeight * 0.92f"))
 
         assertTrue(source.contains("sourceName = name"))
         assertTrue(source.contains("updateNormalizedText()"))
+        assertTrue(source.contains("val renderWidth = width"))
+        assertTrue(source.contains("val renderHeight = height"))
+        assertTrue(source.contains("currentJob?.cancel()"))
         val configSource = File("src/main/java/io/legado/app/ui/config/CoverConfigFragment.kt")
             .takeIf { it.isFile }
             ?: File("app/src/main/java/io/legado/app/ui/config/CoverConfigFragment.kt")
