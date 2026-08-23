@@ -7,10 +7,12 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
 import android.widget.SeekBar
 import androidx.activity.addCallback
 import androidx.activity.viewModels
 import androidx.core.view.doOnLayout
+import androidx.core.view.doOnNextLayout
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
@@ -446,12 +448,18 @@ class AudioPlayActivity :
         }
         // Keep the lyric view out of the draw pass until ConstraintLayout has assigned its width.
         lyricViewX.invisible()
-        lyricViewX.doOnLayout {
-            if (oldLyric == lyric) {
+        fun loadLyricWhenWide(view: View) {
+            // LyricViewX subtracts 16dp padding on both sides before building StaticLayout.
+            // A narrow landscape window can otherwise produce a negative layout width.
+            if (oldLyric != lyric) return
+            if (view.width <= 32.dpToPx()) {
+                view.doOnNextLayout(::loadLyricWhenWide)
+            } else {
                 lyricViewX.loadLyric(lyric)
                 lyricViewX.visible()
             }
         }
+        lyricViewX.doOnLayout(::loadLyricWhenWide)
         if (firstLyric) {
             lyricViewX.postDelayed({
                 upLyricP(AudioPlay.durChapterPos)

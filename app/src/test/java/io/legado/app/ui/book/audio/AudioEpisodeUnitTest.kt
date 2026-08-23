@@ -89,12 +89,16 @@ class AudioEpisodeUnitTest {
             .substringBefore("override fun upLyricP(position: Int)")
         val invisible = upLyric.indexOf("lyricViewX.invisible()")
         val layout = upLyric.indexOf("lyricViewX.doOnLayout")
+        val widthGuard = upLyric.indexOf("view.width <= 32.dpToPx()")
+        val retry = upLyric.indexOf("view.doOnNextLayout(::loadLyricWhenWide)")
         val load = upLyric.indexOf("lyricViewX.loadLyric(lyric)")
         val visible = upLyric.indexOf("lyricViewX.visible()")
 
         assertTrue(invisible >= 0)
         assertTrue(layout > invisible)
-        assertTrue(load > layout)
+        assertTrue(widthGuard >= 0)
+        assertTrue(retry > widthGuard)
+        assertTrue(load > widthGuard)
         assertTrue(visible > load)
     }
 
