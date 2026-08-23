@@ -367,6 +367,7 @@ abstract class BaseReadAloudService : BaseService(),
                 pos = page.chapterPosition -
                         textChapter.paragraphs[nowSpeak].chapterPosition
             }
+            readAloudChapterStart = readAloudNumber
             if (toLast) {
                 toLast = false
                 readAloudNumber = textChapter.getLastParagraphPosition()
@@ -376,7 +377,6 @@ abstract class BaseReadAloudService : BaseService(),
                             textChapter.paragraphs[nowSpeak].chapterPosition
                 }
             }
-            readAloudChapterStart = readAloudNumber
             paragraphStartPos = pos
             launch(Main) {
                 if (play) play() else pageChanged = true
