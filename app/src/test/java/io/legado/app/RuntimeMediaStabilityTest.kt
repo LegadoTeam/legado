@@ -149,12 +149,16 @@ class RuntimeMediaStabilityTest {
         assertEquals("Title, Author", normalizeCoverText("Title, Author", true))
         assertEquals("Title", normalizeCoverText("  Title  ", true))
         assertNotEquals(
-            coverBitmapCacheKey("TitleAuthor", 105, false, true),
-            coverBitmapCacheKey("TitleAuthor", 105, true, true)
+            coverBitmapCacheKey("ab", "c", 105, 140, false, true, 1, 2),
+            coverBitmapCacheKey("a", "bc", 105, 140, false, true, 1, 2)
         )
         assertNotEquals(
-            coverBitmapCacheKey("TitleAuthor", 105, true, true),
-            coverBitmapCacheKey("TitleAuthor", 105, true, false)
+            coverBitmapCacheKey("Title", "Author", 105, 140, false, true, 1, 2),
+            coverBitmapCacheKey("Title", "Author", 105, 140, true, true, 1, 2)
+        )
+        assertNotEquals(
+            coverBitmapCacheKey("Title", "Author", 105, 140, true, true, 1, 2),
+            coverBitmapCacheKey("Title", "Author", 105, 140, true, true, 3, 4)
         )
     }
 
@@ -173,6 +177,13 @@ class RuntimeMediaStabilityTest {
         assertTrue(horizontal.contains("textAlign = Paint.Align.RIGHT"))
         assertTrue(horizontal.contains("textSize = viewWidth / 10"))
         assertTrue(horizontal.contains("viewHeight * 0.92f"))
+
+        assertTrue(source.contains("sourceName = name"))
+        assertTrue(source.contains("updateNormalizedText()"))
+        val configSource = File("src/main/java/io/legado/app/ui/config/CoverConfigFragment.kt")
+            .takeIf { it.isFile }
+            ?: File("app/src/main/java/io/legado/app/ui/config/CoverConfigFragment.kt")
+        assertTrue(configSource.readText().contains("postEvent(EventBus.BOOKSHELF_REFRESH, \"\")"))
     }
 
     @Test
