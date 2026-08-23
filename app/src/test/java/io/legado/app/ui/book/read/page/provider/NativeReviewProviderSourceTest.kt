@@ -68,7 +68,7 @@ class NativeReviewProviderSourceTest {
     }
 
     @Test
-    fun `review overflow remains inside the screen clip`() {
+    fun `drawing overflow remains inside the screen clip`() {
         val provider = projectFile(
             "src/main/java/io/legado/app/ui/book/read/page/provider/ChapterProvider.kt"
         ).readText().normalizeLines()
@@ -77,6 +77,7 @@ class NativeReviewProviderSourceTest {
         val visibleRectBlock = layoutBlock.substringAfter("visibleRect.set(")
 
         assertTrue(visibleRectBlock.contains("viewWidth.toFloat(),"))
+        assertTrue(visibleRectBlock.contains("visibleBottom.toFloat() + 10f.dpToPx()"))
     }
 
     private fun String.normalizeLines(): String = replace("\r\n", "\n")
