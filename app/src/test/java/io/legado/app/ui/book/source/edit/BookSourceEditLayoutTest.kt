@@ -103,6 +103,43 @@ class BookSourceEditLayoutTest {
     }
 
     @Test
+    fun `edit adapters replay current safety state after holder reuse`() {
+        listOf(BOOK_SOURCE_ADAPTER_PATH, RSS_SOURCE_ADAPTER_PATH).forEach { path ->
+            val source = File(repositoryRoot, path).readText()
+            val bind = source.section(
+                "fun bind(editEntity: EditEntity)",
+                "private fun applyInteractionState()"
+            )
+            val stateUpdate = Regex(
+                "(?m)^\\s*isUnsafeText\\s*=\\s*!presentation\\.isInlineEditable\\s*$"
+            ).find(bind)?.range?.first ?: -1
+            val stateReplay = Regex(
+                "(?m)^\\s*applyInteractionState\\(\\)\\s*$"
+            ).find(bind)?.range?.first ?: -1
+
+            assertTrue(
+                "$path must keep safety state on the holder",
+                Regex("private\\s+var\\s+isUnsafeText\\s*=\\s*false").containsMatchIn(source)
+            )
+            assertTrue(
+                "$path must replay safety state when attached",
+                Regex(
+                    "onViewAttachedToWindow\\([^)]*\\)\\s*\\{\\s*" +
+                        "applyInteractionState\\(\\)"
+                ).containsMatchIn(source)
+            )
+            assertTrue("$path must update holder safety state while binding", stateUpdate >= 0)
+            assertTrue(
+                "$path must replay safety state after updating it",
+                stateReplay > stateUpdate
+            )
+            assertTrue(Regex("isFocusable\\s*=\\s*!isUnsafeText").containsMatchIn(source))
+            assertTrue(Regex("isFocusableInTouchMode\\s*=\\s*!isUnsafeText")
+                .containsMatchIn(source))
+        }
+    }
+
+    @Test
     fun `source editor keeps the caret visible after selection and layout changes`() {
         val source = File(repositoryRoot, ACTIVITY_PATH).readText()
         val initView = source.section("private fun initView()", "private fun initOptionPanel()")
@@ -233,6 +270,10 @@ class BookSourceEditLayoutTest {
         const val LAYOUT_PATH = "app/src/main/res/layout/activity_book_source_edit.xml"
         const val ACTIVITY_PATH =
             "app/src/main/java/io/legado/app/ui/book/source/edit/BookSourceEditActivity.kt"
+        const val BOOK_SOURCE_ADAPTER_PATH =
+            "app/src/main/java/io/legado/app/ui/book/source/edit/BookSourceEditAdapter.kt"
+        const val RSS_SOURCE_ADAPTER_PATH =
+            "app/src/main/java/io/legado/app/ui/rss/source/edit/RssSourceEditAdapter.kt"
         const val CARD_VIEW = "androidx.cardview.widget.CardView"
         const val FLEXBOX = "com.google.android.flexbox.FlexboxLayout"
         const val TAB_LAYOUT = "com.google.android.material.tabs.TabLayout"
