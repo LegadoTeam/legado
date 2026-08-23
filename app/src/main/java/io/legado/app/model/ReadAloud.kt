@@ -83,7 +83,7 @@ object ReadAloud {
         play: Boolean = true,
         pageIndex: Int = ReadBook.durPageIndex,
         startPos: Int = 0,
-        rewindToParagraphStart: Boolean = false
+        rewindToSentenceStart: Boolean = false
     ) {
         if (!BaseReadAloudService.isRun) {
             restoreReadAloudFollow()
@@ -93,7 +93,7 @@ object ReadAloud {
         intent.putExtra("play", play)
         intent.putExtra("pageIndex", pageIndex)
         intent.putExtra("startPos", startPos)
-        intent.putExtra("rewindToParagraphStart", rewindToParagraphStart)
+        intent.putExtra("rewindToSentenceStart", rewindToSentenceStart)
         LogUtils.d("ReadAloud", intent.toString())
         try {
             context.startForegroundServiceCompat(intent)

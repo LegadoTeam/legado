@@ -2125,21 +2125,21 @@ class ReadBookActivity : BaseReadBookActivity(),
                             ReadBook.openChapter(index, line.chapterPosition, false) {
                                 ReadBook.readAloud(
                                     startPos = line.pagePosition,
-                                    rewindToParagraphStart = true
+                                    rewindToSentenceStart = true
                                 )
                             }
                         } else {
                             ReadBook.durChapterPos = line.chapterPosition
                             ReadBook.readAloud(
                                 startPos = line.pagePosition,
-                                rewindToParagraphStart = true
+                                rewindToSentenceStart = true
                             )
                         }
                     } else {
-                        ReadBook.readAloud(rewindToParagraphStart = true)
+                        ReadBook.readAloud(rewindToSentenceStart = true)
                     }
                 } else {
-                    ReadBook.readAloud(rewindToParagraphStart = true)
+                    ReadBook.readAloud(rewindToSentenceStart = true)
                 }
             }
 
@@ -2154,18 +2154,18 @@ class ReadBookActivity : BaseReadBookActivity(),
                             ReadBook.openChapter(index, line.chapterPosition, false) {
                                 ReadBook.readAloud(
                                     startPos = line.pagePosition,
-                                    rewindToParagraphStart = true
+                                    rewindToSentenceStart = true
                                 )
                             }
                         } else {
                             ReadBook.durChapterPos = line.chapterPosition
                             ReadBook.readAloud(
                                 startPos = line.pagePosition,
-                                rewindToParagraphStart = true
+                                rewindToSentenceStart = true
                             )
                         }
                     } else {
-                        ReadBook.readAloud(rewindToParagraphStart = true)
+                        ReadBook.readAloud(rewindToSentenceStart = true)
                     }
                 } else {
                     ReadAloud.resume(this)

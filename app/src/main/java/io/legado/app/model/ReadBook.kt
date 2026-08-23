@@ -910,7 +910,7 @@ object ReadBook : CoroutineScope by MainScope() {
     fun readAloud(
         play: Boolean = true,
         startPos: Int = 0,
-        rewindToParagraphStart: Boolean = false
+        rewindToSentenceStart: Boolean = false
     ) {
         book ?: return
         val textChapter = curTextChapter ?: return
@@ -919,7 +919,7 @@ object ReadBook : CoroutineScope by MainScope() {
                 appCtx,
                 play,
                 startPos = startPos,
-                rewindToParagraphStart = rewindToParagraphStart
+                rewindToSentenceStart = rewindToSentenceStart
             )
         }
     }

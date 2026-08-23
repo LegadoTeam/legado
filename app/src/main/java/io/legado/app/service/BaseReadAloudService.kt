@@ -59,6 +59,7 @@ import io.legado.app.utils.observeEvent
 import io.legado.app.utils.observeSharedPreferences
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.toastOnUi
+import java.text.BreakIterator
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.Job
@@ -72,11 +73,19 @@ import splitties.systemservices.powerManager
 import splitties.systemservices.telephonyManager
 import splitties.systemservices.wifiManager
 
-internal fun shouldRewindReadAloudToParagraphStart(
-    rewindToParagraphStart: Boolean,
+internal fun shouldRewindReadAloudToSentenceStart(
+    rewindToSentenceStart: Boolean,
     readAloudByPage: Boolean,
     toLast: Boolean
-): Boolean = rewindToParagraphStart && !readAloudByPage && !toLast
+): Boolean = rewindToSentenceStart && !readAloudByPage && !toLast
+
+internal fun findReadAloudSentenceStart(text: String, visibleOffset: Int): Int {
+    if (text.isEmpty()) return 0
+    val limit = visibleOffset.coerceIn(0, text.length)
+    val sentenceIterator = BreakIterator.getSentenceInstance().apply { setText(text) }
+    val searchOffset = if (limit < text.length) limit + 1 else limit
+    return sentenceIterator.preceding(searchOffset).coerceAtLeast(0)
+}
 
 /**
  * 朗读服务
@@ -253,8 +262,8 @@ abstract class BaseReadAloudService : BaseService(),
             val play = it.getBoolean("play")
             val pageIndex = it.getInt("pageIndex")
             val startPos = it.getInt("startPos")
-            val rewindToParagraphStart = it.getBoolean("rewindToParagraphStart")
-            newReadAloud(play, pageIndex, startPos, rewindToParagraphStart)
+            val rewindToSentenceStart = it.getBoolean("rewindToSentenceStart")
+            newReadAloud(play, pageIndex, startPos, rewindToSentenceStart)
         }
         observeSharedPreferences { _, key ->
             when (key) {
@@ -305,7 +314,7 @@ abstract class BaseReadAloudService : BaseService(),
                 intent.getBooleanExtra("play", true),
                 intent.getIntExtra("pageIndex", ReadBook.durPageIndex),
                 intent.getIntExtra("startPos", 0),
-                intent.getBooleanExtra("rewindToParagraphStart", false)
+                intent.getBooleanExtra("rewindToSentenceStart", false)
             )
 
             IntentAction.pause -> pauseReadAloud()
@@ -328,7 +337,7 @@ abstract class BaseReadAloudService : BaseService(),
         play: Boolean,
         pageIndex: Int,
         startPos: Int,
-        rewindToParagraphStart: Boolean
+        rewindToSentenceStart: Boolean
     ) {
         playStop()
         restoreReadAloudFollow()
@@ -355,14 +364,19 @@ abstract class BaseReadAloudService : BaseService(),
                 }
             }
             nowSpeak = textChapter.getParagraphNum(readAloudNumber + 1, readAloudByPage) - 1
-            if (shouldRewindReadAloudToParagraphStart(
-                    rewindToParagraphStart,
+            if (shouldRewindReadAloudToSentenceStart(
+                    rewindToSentenceStart,
                     readAloudByPage,
                     toLast
                 )
             ) {
-                readAloudNumber = textChapter.paragraphs[nowSpeak].chapterPosition
-                pos = 0
+                val paragraph = textChapter.paragraphs[nowSpeak]
+                val sentenceStart = findReadAloudSentenceStart(
+                    paragraph.text,
+                    readAloudNumber - paragraph.chapterPosition
+                )
+                readAloudNumber = paragraph.chapterPosition + sentenceStart
+                pos = sentenceStart
             } else if (!readAloudByPage && startPos == 0 && !toLast) {
                 pos = page.chapterPosition -
                         textChapter.paragraphs[nowSpeak].chapterPosition
