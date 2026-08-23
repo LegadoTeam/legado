@@ -1120,6 +1120,10 @@
     <string name="cover_show_name_summary">Book title shown on cover</string>
     <string name="cover_show_author">show author</string>
     <string name="cover_show_author_summary">Author shown on cover</string>
+    <string name="cover_horizontal">Horizontal cover text</string>
+    <string name="cover_horizontal_summary">Draw the title at the top and the author at the lower right</string>
+    <string name="cover_keep_punctuation">Keep title and author punctuation</string>
+    <string name="cover_keep_punctuation_summary">Do not remove punctuation from generated cover text</string>
     <string name="read_aloud_prev_paragraph">Read aloud the previous paragraph</string>
     <string name="read_aloud_next_paragraph">Read aloud the next paragraph</string>
     <string name="wait_download">wait download</string>

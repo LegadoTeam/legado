@@ -1117,6 +1117,10 @@
     <string name="cover_show_name_summary">封面上显示书名</string>
     <string name="cover_show_author">显示作者</string>
     <string name="cover_show_author_summary">封面上显示作者</string>
+    <string name="cover_horizontal">横向显示封面文字</string>
+    <string name="cover_horizontal_summary">书名显示在顶部，作者显示在右下角</string>
+    <string name="cover_keep_punctuation">保留书名和作者标点</string>
+    <string name="cover_keep_punctuation_summary">生成文字封面时不移除标点符号</string>
     <string name="read_aloud_prev_paragraph">朗读上一段</string>
     <string name="read_aloud_next_paragraph">朗读下一段</string>
     <string name="wait_download">待下载</string>

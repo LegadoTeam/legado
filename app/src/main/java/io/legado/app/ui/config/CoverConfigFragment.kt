@@ -90,7 +90,9 @@ class CoverConfigFragment : PreferenceFragment(),
             }
 
             PreferKey.coverShowAuthor,
-            PreferKey.coverShowAuthorN -> {
+            PreferKey.coverShowAuthorN,
+            PreferKey.coverHorizontal,
+            PreferKey.coverKeepPunctuation -> {
                 BookCover.upDefaultCover()
             }
         }

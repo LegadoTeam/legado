@@ -24,6 +24,8 @@ object PreferKey {
     const val coverShowAuthor = "coverShowAuthor"
     const val coverShowNameN = "coverShowNameN"
     const val coverShowAuthorN = "coverShowAuthorN"
+    const val coverHorizontal = "coverHorizontal"
+    const val coverKeepPunctuation = "coverKeepPunctuation"
     const val remoteServerId = "remoteServerId"
     const val hideStatusBar = "hideStatusBar"
     const val clickActionTL = "clickActionTopLeft"

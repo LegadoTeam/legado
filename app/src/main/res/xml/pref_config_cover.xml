@@ -25,6 +25,24 @@
         app:allowDividerBelow="false"
         app:iconSpaceReserved="false" />
 
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:defaultValue="false"
+        android:key="coverHorizontal"
+        android:title="@string/cover_horizontal"
+        android:summary="@string/cover_horizontal_summary"
+        app:allowDividerAbove="false"
+        app:allowDividerBelow="false"
+        app:iconSpaceReserved="false" />
+
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:defaultValue="false"
+        android:key="coverKeepPunctuation"
+        android:title="@string/cover_keep_punctuation"
+        android:summary="@string/cover_keep_punctuation_summary"
+        app:allowDividerAbove="false"
+        app:allowDividerBelow="false"
+        app:iconSpaceReserved="false" />
+
     <io.legado.app.lib.prefs.PreferenceCategory
         android:key="dayThemeCategory"
         android:title="@string/day"

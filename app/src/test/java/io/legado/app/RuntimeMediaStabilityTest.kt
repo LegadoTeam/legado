@@ -3,7 +3,9 @@ package io.legado.app
 import io.legado.app.data.entities.Book
 import io.legado.app.service.buildHttpTtsCacheFileName
 import io.legado.app.ui.book.info.normalizeWebFileName
+import io.legado.app.ui.widget.image.coverBitmapCacheKey
 import io.legado.app.ui.widget.image.coverTitleTextSize
+import io.legado.app.ui.widget.image.normalizeCoverText
 import io.legado.app.utils.calculateSvgBitmapSize
 import io.legado.app.utils.isForegroundServiceStartDenied
 import org.junit.Assert.assertEquals
@@ -74,7 +76,7 @@ class RuntimeMediaStabilityTest {
         val load = source.substringAfter("path: String? = null,")
             .substringBefore("override fun onDetachedFromWindow")
         val emptyPath = load.substringAfter("if (currentPath == null) {")
-            .substringBefore("if (drawBookName")
+            .substringBefore("if (BookCover.drawBookName")
 
         assertTrue(load.contains("currentJob?.cancel()"))
         assertTrue(load.contains("triggerChannel.tryReceive()"))
@@ -126,7 +128,7 @@ class RuntimeMediaStabilityTest {
             )
         }
         assertEquals(
-            width / 10,
+            width / 9,
             coverTitleTextSize(width, height, 8, largeTextHeight),
             0.001f
         )
@@ -139,6 +141,38 @@ class RuntimeMediaStabilityTest {
             .substringBefore("if (!drawBookAuthor)")
 
         assertFalse(titleLoop.contains("namePaint.textSize ="))
+    }
+
+    @Test
+    fun coverTextOptionsPreservePunctuationAndSeparateRenderCaches() {
+        assertEquals("Title Author", normalizeCoverText("Title, Author", false))
+        assertEquals("Title, Author", normalizeCoverText("Title, Author", true))
+        assertEquals("Title", normalizeCoverText("  Title  ", true))
+        assertNotEquals(
+            coverBitmapCacheKey("TitleAuthor", 105, false, true),
+            coverBitmapCacheKey("TitleAuthor", 105, true, true)
+        )
+        assertNotEquals(
+            coverBitmapCacheKey("TitleAuthor", 105, true, true),
+            coverBitmapCacheKey("TitleAuthor", 105, true, false)
+        )
+    }
+
+    @Test
+    fun horizontalTextCoverHonorsReportedLayoutContract() {
+        val source = listOf(File("src/main/java"), File("app/src/main/java"))
+            .first { it.isDirectory }
+            .resolve("io/legado/app/ui/widget/image/CoverImageView.kt")
+            .readText()
+        val horizontal = source.substringAfter("private fun drawHorizontalTextCover")
+            .substringBefore("fun setHeight")
+
+        assertTrue(horizontal.contains("HORIZONTAL_TITLE_MAX_LINES"))
+        assertTrue(horizontal.contains("setMaxLines(HORIZONTAL_TITLE_MAX_LINES)"))
+        assertTrue(horizontal.contains("TextUtils.TruncateAt.END"))
+        assertTrue(horizontal.contains("textAlign = Paint.Align.RIGHT"))
+        assertTrue(horizontal.contains("textSize = viewWidth / 10"))
+        assertTrue(horizontal.contains("viewHeight * 0.92f"))
     }
 
     @Test

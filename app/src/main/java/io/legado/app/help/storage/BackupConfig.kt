@@ -149,7 +149,9 @@ object BackupConfig {
         PreferKey.coverShowName,
         PreferKey.coverShowAuthor,
         PreferKey.coverShowNameN,
-        PreferKey.coverShowAuthorN
+        PreferKey.coverShowAuthorN,
+        PreferKey.coverHorizontal,
+        PreferKey.coverKeepPunctuation
     )
 
     fun keyIsNotIgnore(key: String): Boolean {
