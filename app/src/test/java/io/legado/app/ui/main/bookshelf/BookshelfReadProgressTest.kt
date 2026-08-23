@@ -213,6 +213,19 @@ class BookshelfReadProgressTest {
         assertTrue(query.contains("durChapterTime DESC limit 1"))
     }
 
+    @Test
+    fun `reading count query only includes started shelf books`() {
+        val source = projectFile("src/main/java/io/legado/app/data/dao/BookDao.kt").readText()
+        val propertyIndex = source.indexOf("val readingCount")
+        val queryStart = source.lastIndexOf("@get:Query(", propertyIndex)
+        val query = source.substring(queryStart, propertyIndex)
+
+        assertTrue(query.contains("(durChapterIndex > 0 OR durChapterPos > 0)"))
+        assertTrue(query.contains("and type & \${BookType.notShelf} = 0"))
+        assertFalse(query.replace("BookType.notShelf", "").contains("BookType."))
+        assertFalse(query.contains("durChapterTime"))
+    }
+
     private fun parseProjectXml(pathInApp: String): Document {
         return DocumentBuilderFactory.newInstance().apply {
             isNamespaceAware = true
