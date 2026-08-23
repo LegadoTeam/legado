@@ -362,7 +362,7 @@ class ExportBookService : BaseService() {
         return resolveExportChapterContent(
             content = BookHelp.getContent(book, chapter),
             isVolume = chapter.isVolume
-        )
+        )?.let(::sanitizeExportContent)
     }
 
     private suspend fun exportTxt(path: String, book: Book) {
@@ -578,15 +578,17 @@ class ExportBookService : BaseService() {
                             imagePdfContentBlocks(rawContent, exportChapter.isVolume)
                         } else {
                             val textContent = rawContent ?: return@forEachIndexed
-                            val displayContent = contentProcessor.getContent(
-                                book,
-                                exportChapter,
-                                textContent,
-                                includeTitle = false,
-                                useReplace = useReplace,
-                                chineseConvert = false,
-                                reSegment = false
-                            ).toString()
+                            val displayContent = sanitizeExportContent(
+                                contentProcessor.getContent(
+                                    book,
+                                    exportChapter,
+                                    textContent,
+                                    includeTitle = false,
+                                    useReplace = useReplace,
+                                    chineseConvert = false,
+                                    reSegment = false
+                                ).toString()
+                            )
                             splitPdfContentBlocks(displayContent)
                         }
                         if (!AppConfig.exportNoChapterName) {
@@ -741,7 +743,7 @@ class ExportBookService : BaseService() {
                 "\n" + HtmlFormatter.format(book.getDisplayIntro())
             )
         }"
-        append(qy, null)
+        append(sanitizeExportContent(qy), null)
         val threads = if (AppConfig.parallelExportBook) {
             AppConst.MAX_THREAD
         } else {
@@ -769,17 +771,18 @@ class ExportBookService : BaseService() {
     ): Pair<String, ArrayList<SrcData>?> {
         val content = getChapterContentForExport(book, chapter)
             ?: return Pair("", null)
-        val content1 = contentProcessor
-            .getContent(
+        val content1 = HtmlFormatter.format(
+            contentProcessor.getContent(
                 book,
                 // 不导出vip标识
                 chapter.apply { isVip = false },
-                content,
+                removeExportImages(content),
                 includeTitle = !AppConfig.exportNoChapterName,
                 useReplace = useReplace,
                 chineseConvert = false,
                 reSegment = false
             ).toString()
+        )
         if (AppConfig.exportPictureFile) {
             //txt导出图片文件
             val srcList = arrayListOf<SrcData>()
@@ -1010,8 +1013,8 @@ class ExportBookService : BaseService() {
             )
             // 不导出vip标识
             chapter.isVip = false
-            val content1 = contentProcessor
-                .getContent(
+            val content1 = sanitizeExportContent(
+                contentProcessor.getContent(
                     book,
                     chapter,
                     contentFix,
@@ -1020,6 +1023,7 @@ class ExportBookService : BaseService() {
                     chineseConvert = false,
                     reSegment = false
                 ).toString()
+            )
             val title = chapter.run {
                 // 不导出vip标识
                 isVip = false
@@ -1206,8 +1210,8 @@ class ExportBookService : BaseService() {
                     ?: return@forEachIndexed
                 val (contentFix, resources) = fixPic(book, content, chapter)
                 epubBook.resources.addAll(resources)
-                val content1 = contentProcessor
-                    .getContent(
+                val content1 = sanitizeExportContent(
+                    contentProcessor.getContent(
                         book,
                         chapter,
                         contentFix,
@@ -1216,6 +1220,7 @@ class ExportBookService : BaseService() {
                         chineseConvert = false,
                         reSegment = false
                     ).toString()
+                )
                 val title = chapter.run {
                     // 不导出vip标识
                     isVip = false
