@@ -6,7 +6,6 @@ import io.legado.app.utils.isPromotableNotificationChannel
 import io.legado.app.utils.progressPercent
 import io.legado.app.utils.shouldPromoteProgressNotification
 import io.legado.app.utils.supportsPromotedNotifications
-import io.legado.app.utils.usesExplicitPromotedNotificationContract
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -21,9 +20,6 @@ class LiveUpdateNotificationTest {
         assertFalse(supportsPromotedNotifications(35))
         assertTrue(supportsPromotedNotifications(36))
         assertTrue(supportsPromotedNotifications(37))
-        assertFalse(usesExplicitPromotedNotificationContract(36, 3_600_000))
-        assertTrue(usesExplicitPromotedNotificationContract(36, 3_600_001))
-        assertTrue(usesExplicitPromotedNotificationContract(37, 3_700_000))
 
         assertTrue(shouldPromoteProgressNotification(true, true, true, true))
         assertFalse(shouldPromoteProgressNotification(false, true, true, true))
@@ -84,7 +80,9 @@ class LiveUpdateNotificationTest {
         assertTrue(helper.contains("setOngoing(true)"))
         assertTrue(helper.contains("setProgress(max, boundedProgress, false)"))
         assertTrue(helper.contains("setProgress(0, 0, true)"))
-        assertTrue(helper.contains("setColorized(!usesExplicitPromotedNotificationContract())"))
+        assertTrue(helper.contains("setColorized(false)"))
+        assertTrue(helper.contains("build().hasPromotableCharacteristics()"))
+        assertFalse(helper.contains("SDK_INT_FULL"))
         assertTrue(download.contains("isAppUpdate: Boolean = false"))
         assertTrue(settings.contains("canConfigurePromotedNotifications()"))
         assertTrue(settings.contains("canPostPromotedNotifications() ||"))

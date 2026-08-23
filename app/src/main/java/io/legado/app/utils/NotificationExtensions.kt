@@ -1,5 +1,6 @@
 package io.legado.app.utils
 
+import android.annotation.SuppressLint
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
@@ -7,25 +8,10 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import io.legado.app.help.config.AppConfig
 
-internal const val ANDROID_16_QPR2_SDK_INT_FULL = 3_600_001
-
 internal fun supportsPromotedNotifications(sdkInt: Int): Boolean = sdkInt >= 36
 
 internal fun supportsPromotedNotifications(): Boolean =
     supportsPromotedNotifications(Build.VERSION.SDK_INT)
-
-internal fun usesExplicitPromotedNotificationContract(
-    sdkInt: Int,
-    sdkIntFull: Int
-): Boolean = sdkInt >= 36 && sdkIntFull >= ANDROID_16_QPR2_SDK_INT_FULL
-
-internal fun usesExplicitPromotedNotificationContract(): Boolean {
-    if (Build.VERSION.SDK_INT < 36) return false
-    return usesExplicitPromotedNotificationContract(
-        Build.VERSION.SDK_INT,
-        Build.VERSION.SDK_INT_FULL
-    )
-}
 
 internal fun isPromotableNotificationChannel(importance: Int): Boolean =
     importance > NotificationManager.IMPORTANCE_MIN
@@ -42,6 +28,7 @@ internal fun progressPercent(progress: Int, max: Int): Int? {
     return (progress.coerceIn(0, max).toLong() * 100 / max).toInt()
 }
 
+@SuppressLint("NewApi")
 internal fun NotificationCompat.Builder.applyPromotedProgress(
     context: Context,
     channelId: String,
@@ -78,6 +65,8 @@ internal fun NotificationCompat.Builder.applyPromotedProgress(
     setStyle(style)
         .setOngoing(true)
     setRequestPromotedOngoing(true)
-    setColorized(!usesExplicitPromotedNotificationContract())
-    return true
+    setColorized(false)
+    if (build().hasPromotableCharacteristics()) return true
+    setColorized(true)
+    return build().hasPromotableCharacteristics()
 }
