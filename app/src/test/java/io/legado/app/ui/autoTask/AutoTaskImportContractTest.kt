@@ -82,6 +82,18 @@ class AutoTaskImportContractTest {
         assertTrue(editBlock.contains("validateImportedTask(task)"))
     }
 
+    @Test
+    fun `automatic task import keeps the dialog title readable`() {
+        val dialog = projectFile(
+            "src/main/java/io/legado/app/ui/autoTask/ImportAutoTaskDialog.kt"
+        )
+        val setup = dialog.substringAfter("override fun onFragmentCreated")
+            .substringBefore("binding.rotateLoading.visible()")
+
+        assertTrue(setup.contains("binding.toolBar.setBackgroundColor(primaryColor)"))
+        assertTrue(setup.indexOf("setBackgroundColor") < setup.indexOf("setTitle"))
+    }
+
     private fun projectFile(pathInApp: String): String {
         return listOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull { it.isFile }
