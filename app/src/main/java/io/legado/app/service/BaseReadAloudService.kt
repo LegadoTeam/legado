@@ -72,6 +72,12 @@ import splitties.systemservices.powerManager
 import splitties.systemservices.telephonyManager
 import splitties.systemservices.wifiManager
 
+internal fun shouldRewindReadAloudToParagraphStart(
+    rewindToParagraphStart: Boolean,
+    readAloudByPage: Boolean,
+    toLast: Boolean
+): Boolean = rewindToParagraphStart && !readAloudByPage && !toLast
+
 /**
  * 朗读服务
  */
@@ -247,7 +253,8 @@ abstract class BaseReadAloudService : BaseService(),
             val play = it.getBoolean("play")
             val pageIndex = it.getInt("pageIndex")
             val startPos = it.getInt("startPos")
-            newReadAloud(play, pageIndex, startPos)
+            val rewindToParagraphStart = it.getBoolean("rewindToParagraphStart")
+            newReadAloud(play, pageIndex, startPos, rewindToParagraphStart)
         }
         observeSharedPreferences { _, key ->
             when (key) {
@@ -297,7 +304,8 @@ abstract class BaseReadAloudService : BaseService(),
             IntentAction.play -> newReadAloud(
                 intent.getBooleanExtra("play", true),
                 intent.getIntExtra("pageIndex", ReadBook.durPageIndex),
-                intent.getIntExtra("startPos", 0)
+                intent.getIntExtra("startPos", 0),
+                intent.getBooleanExtra("rewindToParagraphStart", false)
             )
 
             IntentAction.pause -> pauseReadAloud()
@@ -316,7 +324,12 @@ abstract class BaseReadAloudService : BaseService(),
         return START_NOT_STICKY
     }
 
-    private fun newReadAloud(play: Boolean, pageIndex: Int, startPos: Int) {
+    private fun newReadAloud(
+        play: Boolean,
+        pageIndex: Int,
+        startPos: Int,
+        rewindToParagraphStart: Boolean
+    ) {
         playStop()
         restoreReadAloudFollow()
         execute(executeContext = IO) {
@@ -328,7 +341,6 @@ abstract class BaseReadAloudService : BaseService(),
             }
             updateReadAloudChapterIndex(textChapter.chapter.index)
             readAloudNumber = textChapter.getReadLength(pageIndex) + startPos
-            readAloudChapterStart = readAloudNumber
             readAloudByPage = getPrefBoolean(PreferKey.readAloudByPage)
             contentList = textChapter.getNeedReadAloud(0, readAloudByPage, 0)
                 .split("\n")
@@ -343,7 +355,15 @@ abstract class BaseReadAloudService : BaseService(),
                 }
             }
             nowSpeak = textChapter.getParagraphNum(readAloudNumber + 1, readAloudByPage) - 1
-            if (!readAloudByPage && startPos == 0 && !toLast) {
+            if (shouldRewindReadAloudToParagraphStart(
+                    rewindToParagraphStart,
+                    readAloudByPage,
+                    toLast
+                )
+            ) {
+                readAloudNumber = textChapter.paragraphs[nowSpeak].chapterPosition
+                pos = 0
+            } else if (!readAloudByPage && startPos == 0 && !toLast) {
                 pos = page.chapterPosition -
                         textChapter.paragraphs[nowSpeak].chapterPosition
             }
@@ -356,6 +376,7 @@ abstract class BaseReadAloudService : BaseService(),
                             textChapter.paragraphs[nowSpeak].chapterPosition
                 }
             }
+            readAloudChapterStart = readAloudNumber
             paragraphStartPos = pos
             launch(Main) {
                 if (play) play() else pageChanged = true

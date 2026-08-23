@@ -907,11 +907,20 @@ object ReadBook : CoroutineScope by MainScope() {
     /**
      * 朗读
      */
-    fun readAloud(play: Boolean = true, startPos: Int = 0) {
+    fun readAloud(
+        play: Boolean = true,
+        startPos: Int = 0,
+        rewindToParagraphStart: Boolean = false
+    ) {
         book ?: return
         val textChapter = curTextChapter ?: return
         if (textChapter.isCompleted) {
-            ReadAloud.play(appCtx, play, startPos = startPos)
+            ReadAloud.play(
+                appCtx,
+                play,
+                startPos = startPos,
+                rewindToParagraphStart = rewindToParagraphStart
+            )
         }
     }
 

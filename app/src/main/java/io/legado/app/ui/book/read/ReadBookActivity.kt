@@ -2123,17 +2123,23 @@ class ReadBookActivity : BaseReadBookActivity(),
                         val (index, line) = pos
                         if (ReadBook.durChapterIndex != index) {
                             ReadBook.openChapter(index, line.chapterPosition, false) {
-                                ReadBook.readAloud(startPos = line.pagePosition)
+                                ReadBook.readAloud(
+                                    startPos = line.pagePosition,
+                                    rewindToParagraphStart = true
+                                )
                             }
                         } else {
                             ReadBook.durChapterPos = line.chapterPosition
-                            ReadBook.readAloud(startPos = line.pagePosition)
+                            ReadBook.readAloud(
+                                startPos = line.pagePosition,
+                                rewindToParagraphStart = true
+                            )
                         }
                     } else {
-                        ReadBook.readAloud()
+                        ReadBook.readAloud(rewindToParagraphStart = true)
                     }
                 } else {
-                    ReadBook.readAloud()
+                    ReadBook.readAloud(rewindToParagraphStart = true)
                 }
             }
 
@@ -2146,14 +2152,20 @@ class ReadBookActivity : BaseReadBookActivity(),
                         val (index, line) = pos
                         if (ReadBook.durChapterIndex != index) {
                             ReadBook.openChapter(index, line.chapterPosition, false) {
-                                ReadBook.readAloud(startPos = line.pagePosition)
+                                ReadBook.readAloud(
+                                    startPos = line.pagePosition,
+                                    rewindToParagraphStart = true
+                                )
                             }
                         } else {
                             ReadBook.durChapterPos = line.chapterPosition
-                            ReadBook.readAloud(startPos = line.pagePosition)
+                            ReadBook.readAloud(
+                                startPos = line.pagePosition,
+                                rewindToParagraphStart = true
+                            )
                         }
                     } else {
-                        ReadBook.readAloud()
+                        ReadBook.readAloud(rewindToParagraphStart = true)
                     }
                 } else {
                     ReadAloud.resume(this)
