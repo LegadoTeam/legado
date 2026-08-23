@@ -185,6 +185,12 @@ class AutoTaskPersistenceContractTest {
         assertTrue(service.contains("return AutoTaskScheduler.shouldRetry(this)"))
         assertTrue(service.contains("start = CoroutineStart.LAZY"))
         assertTrue(service.contains("jobs.remove(jobId, currentJob)"))
+        val scheduleNext = service.indexOf(
+            "val nextScheduled = AutoTaskScheduler.refresh(this, afterBatch = true)"
+        )
+        val runDueTasks = service.indexOf("AutoTaskRunner.runDueTasks(this@AutoTaskJobService)")
+        assertTrue(scheduleNext >= 0)
+        assertTrue(runDueTasks > scheduleNext)
         val saveJob = service.indexOf("jobs[jobId] = currentJob")
         val startJob = service.indexOf("currentJob.start()")
         assertTrue(saveJob >= 0)
