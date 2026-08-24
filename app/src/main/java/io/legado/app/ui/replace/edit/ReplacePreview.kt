@@ -97,7 +97,7 @@ object ReplacePreview {
     ): String {
         // The editor has no real book/chapter object; reject direct property access rather than
         // silently evaluating it against null. String literals such as "book" remain valid.
-        if (CONTEXT_TOKEN_REGEX.containsMatchIn(script)) {
+        if (containsContextReference(script)) {
             throw ReplacePreviewException(ReplacePreviewException.Reason.CONTEXT_UNAVAILABLE)
         }
         return try {
@@ -165,9 +165,74 @@ object ReplacePreview {
 
     private class PreviewDeadlineException : RuntimeException()
 
-    private val CONTEXT_TOKEN_REGEX = Regex(
-        "(?<![A-Za-z0-9_$])(chapter|book)(?=\\s*(?:\\.|\\[))"
-    )
+    private fun containsContextReference(script: String): Boolean {
+        var index = 0
+        var quote: Char? = null
+        var escaped = false
+        var lineComment = false
+        var blockComment = false
+        while (index < script.length) {
+            val current = script[index]
+            val next = script.getOrNull(index + 1)
+            if (lineComment) {
+                if (current == '\n' || current == '\r') lineComment = false
+                index++
+                continue
+            }
+            if (blockComment) {
+                if (current == '*' && next == '/') {
+                    blockComment = false
+                    index += 2
+                } else {
+                    index++
+                }
+                continue
+            }
+            if (quote != null) {
+                if (escaped) {
+                    escaped = false
+                } else if (current == '\\') {
+                    escaped = true
+                } else if (current == quote) {
+                    quote = null
+                }
+                index++
+                continue
+            }
+            if ((current == '\'' || current == '"' || current == '`')) {
+                quote = current
+                index++
+                continue
+            }
+            if (current == '/' && next == '/') {
+                lineComment = true
+                index += 2
+                continue
+            }
+            if (current == '/' && next == '*') {
+                blockComment = true
+                index += 2
+                continue
+            }
+            if (current.isLetter() || current == '_' || current == '$') {
+                val start = index
+                index++
+                while (index < script.length &&
+                    (script[index].isLetterOrDigit() || script[index] == '_' || script[index] == '$')
+                ) {
+                    index++
+                }
+                if (script.substring(start, index) == "book" ||
+                    script.substring(start, index) == "chapter"
+                ) {
+                    return true
+                }
+                continue
+            }
+            index++
+        }
+        return false
+    }
 }
 
 internal class ReplacePreviewException(val reason: Reason) : NoStackTraceException(reason.name) {

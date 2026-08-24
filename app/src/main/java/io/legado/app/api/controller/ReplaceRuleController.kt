@@ -27,12 +27,18 @@ object ReplaceRuleController {
         if (rule == null) {
             returnData.setErrorMsg("格式不对")
         } else {
+            val oldRule = appDb.replaceRuleDao.findById(rule.id)
             if (rule.order == Int.MIN_VALUE) {
                 rule.order = appDb.replaceRuleDao.maxOrder + 1
             }
             val insertedId = appDb.replaceRuleDao.insert(rule).firstOrNull()
             if (insertedId != null) {
-                ReplacePreviewConfig.saveImportedSamples(listOf(rule), listOf(insertedId))
+                ReplacePreviewConfig.saveImportedSamples(
+                    listOf(rule),
+                    listOf(insertedId),
+                    clearMissing = oldRule != null &&
+                        (oldRule.pattern != rule.pattern || oldRule.replacement != rule.replacement)
+                )
             }
         }
         return returnData

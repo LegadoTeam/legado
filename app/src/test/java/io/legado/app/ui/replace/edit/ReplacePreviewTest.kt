@@ -85,6 +85,21 @@ class ReplacePreviewTest {
     }
 
     @Test
+    fun `preview reports missing context for non property book references`() {
+        val rule = ReplaceRule(
+            pattern = ".",
+            replacement = "@js:book == null ? result : ''",
+            isRegex = true
+        )
+
+        val error = assertThrows(ReplacePreviewException::class.java) {
+            preview(rule, "x")
+        }
+
+        assertEquals(ReplacePreviewException.Reason.CONTEXT_UNAVAILABLE, error.reason)
+    }
+
+    @Test
     fun `preview allows book as a js string literal`() {
         val rule = ReplaceRule(
             pattern = ".",

@@ -88,15 +88,20 @@ object RuleUpdate {
                 2 -> GSON.fromJsonArray<ReplaceRule>(it).getOrThrow().let { lists ->
                     lists.forEach { list ->
                         val oldRule = appDb.replaceRuleDao.findById(list.id)
+                        val contentChanged = oldRule != null &&
+                            (list.pattern != oldRule.pattern || list.replacement != oldRule.replacement)
                         val previewChanged = list.previewText != null &&
                             list.previewText != ReplacePreviewConfig.sample(list.id)
-                        if (oldRule == null || list.pattern != oldRule.pattern ||
-                            list.replacement != oldRule.replacement || previewChanged
+                        if (oldRule == null || contentChanged || previewChanged
                         ) {
                             if (silentUpdate) {
                                 val insertedId = appDb.replaceRuleDao.insert(list).firstOrNull()
                                 if (insertedId != null) {
-                                    ReplacePreviewConfig.saveImportedSamples(listOf(list), listOf(insertedId))
+                                    ReplacePreviewConfig.saveImportedSamples(
+                                        listOf(list),
+                                        listOf(insertedId),
+                                        clearMissing = contentChanged
+                                    )
                                 }
                                 upRules = true
                             }
