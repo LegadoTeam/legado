@@ -154,4 +154,7 @@ for class_name in \
     || fail "missing ProGuard keep rule for $class_name"
 done
 
+grep -F -- '-keepclassmembers class * extends org.chromium.net.internal.com.google.protobuf.GeneratedMessageLite' "$PROGUARD_FILE" \
+  >/dev/null || fail "missing ProGuard keep rule for Cronet protobuf message fields"
+
 echo "Cronet bundle verified: $cronet_version (${#EXPECTED_JARS[@]} JARs)"

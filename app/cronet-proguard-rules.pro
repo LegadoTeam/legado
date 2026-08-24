@@ -60,6 +60,13 @@
 -dontwarn internal.org.chromium.build.NativeLibraries
 -dontwarn org.chromium.base.version_info.VersionConstantsBridgeJni
 
+# Cronet 152 repackages protobuf under org.chromium.net.internal. Generated
+# message fields are read by the protobuf schema runtime through reflection.
+# Keep them from being removed or renamed by the app's release shrinker.
+-keepclassmembers class * extends org.chromium.net.internal.com.google.protobuf.GeneratedMessageLite {
+  <fields>;
+}
+
 # Part of the Android System SDK; false positive when R8 runs against the
 # standard public SDK. Cronet's telemetry code references these classes on
 # newer platform releases, while the app still supports older API levels.
