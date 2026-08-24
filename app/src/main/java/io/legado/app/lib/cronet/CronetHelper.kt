@@ -23,6 +23,9 @@ import splitties.init.appCtx
 
 internal const val BUFFER_SIZE = 32 * 1024
 
+@Volatile
+private var cronetEngineFailure: Throwable? = null
+
 val cronetEngine: ExperimentalCronetEngine? by lazy {
     try {
         CronetLoader.preDownload()
@@ -42,6 +45,7 @@ val cronetEngine: ExperimentalCronetEngine? by lazy {
         DebugLog.d("Cronet Version:", engine.versionString)
         engine
     } catch (e: Throwable) {
+        cronetEngineFailure = e
         AppLog.put("初始化cronetEngine出错", e)
         null
     }
@@ -53,10 +57,14 @@ internal fun getCronetEngineOrNull(): ExperimentalCronetEngine? {
     return try {
         if (!CronetLoader.install()) null else cronetEngine
     } catch (e: Throwable) {
+        cronetEngineFailure = e
         AppLog.put("初始化cronetEngine出错", e)
         null
     }
 }
+
+internal fun cronetUnavailableException(message: String): CronetUnavailableException =
+    CronetUnavailableException(message, cronetEngineFailure)
 
 val options by lazy {
     val options = JSONObject()

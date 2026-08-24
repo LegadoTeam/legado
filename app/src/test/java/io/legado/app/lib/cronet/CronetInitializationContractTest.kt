@@ -1,5 +1,6 @@
 package io.legado.app.lib.cronet
 
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -7,7 +8,7 @@ import java.io.File
 class CronetInitializationContractTest {
 
     @Test
-    fun `cronet initialization and interceptors keep a safe fallback boundary`() {
+    fun `cronet initialization keeps failures isolated from startup`() {
         val helper = readProjectFile(
             "app/src/main/java/io/legado/app/lib/cronet/CronetHelper.kt"
         )
@@ -24,6 +25,12 @@ class CronetInitializationContractTest {
         assertTrue(helper.indexOf("try {") < helper.indexOf("CronetLoader.preDownload()"))
         assertTrue(helper.contains("ExperimentalCronetEngine.Builder(appCtx)"))
         assertTrue(helper.contains("catch (e: Throwable)"))
+        assertTrue(helper.contains("cronetEngineFailure = e"))
+        assertTrue(helper.contains("CronetUnavailableException"))
+        assertTrue(interceptor.contains("throw cronetUnavailableException"))
+        assertTrue(coroutineInterceptor.contains("throw cronetUnavailableException"))
+        assertFalse(interceptor.contains("chain.proceed(original)"))
+        assertFalse(coroutineInterceptor.contains("chain.proceed(original)"))
         assertTrue(interceptor.contains("getCronetEngineOrNull()"))
         assertTrue(interceptor.contains("catch (e: Throwable)"))
         assertTrue(coroutineInterceptor.contains("getCronetEngineOrNull()"))
@@ -31,6 +38,13 @@ class CronetInitializationContractTest {
         assertTrue(app.contains("runCatching { Cronet.preDownload() }"))
         assertTrue(config.contains("val isCronet = appCtx.getPrefBoolean(PreferKey.cronet)"))
         assertTrue(httpHelper.contains("if (AppConfig.isCronet)"))
+    }
+
+    @Test
+    fun `cronet interceptors preserve explicit proxy bypass`() {
+        val httpHelper = readProjectFile("app/src/main/java/io/legado/app/help/http/HttpHelper.kt")
+
+        assertTrue(httpHelper.contains("Cronet.interceptor?.let { builder.interceptors().remove(it) }"))
     }
 
     private fun readProjectFile(path: String): String {

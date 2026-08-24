@@ -27,10 +27,11 @@ class CronetCoroutineInterceptor(private val cookieJar: CookieJar) : Interceptor
             throw IOException("Canceled")
         }
         val original: Request = chain.request()
-        //Cronet未初始化或初始化失败
-        return if (getCronetEngineOrNull() == null) {
-            chain.proceed(original)
-        } else try {
+        // Cronet is the selected transport. Do not silently switch to OkHttp.
+        if (getCronetEngineOrNull() == null) {
+            throw cronetUnavailableException("Cronet engine is unavailable")
+        }
+        return try {
             val builder: Request.Builder = original.newBuilder()
             //移除Keep-Alive,手动设置会导致400 BadRequest
             builder.removeHeader("Keep-Alive")
@@ -60,14 +61,13 @@ class CronetCoroutineInterceptor(private val cookieJar: CookieJar) : Interceptor
             }
 
         } catch (e: Throwable) {
-            //不能抛出错误,抛出错误会导致应用崩溃
-            //遇到Cronet处理有问题时的情况，如证书过期等等，回退到okhttp处理
+            if (e is java.util.concurrent.CancellationException) throw e
             if (!e.message.toString().contains("ERR_CERT_", true)
                 && !e.message.toString().contains("ERR_SSL_", true)
             ) {
                 e.printOnDebug()
             }
-            chain.proceed(original)
+            throw CronetUnavailableException("Cronet request failed", e)
         }
 
     }
@@ -101,9 +101,11 @@ class CronetCoroutineInterceptor(private val cookieJar: CookieJar) : Interceptor
 
             }
 
-            val req = buildRequest(request, callBack)?.also { it.start() }
+            val req = buildRequest(request, callBack)
+                ?: throw cronetUnavailableException("Cronet request could not be built")
+            req.start()
             coroutine.invokeOnCancellation {
-                req?.cancel()
+                req.cancel()
             }
 
 
