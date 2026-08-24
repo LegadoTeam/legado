@@ -146,6 +146,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
     val defaultAnimationSpeed = 300
     private var pressDown = false
     private var isMove = false
+    private val readPositionVersion = ReadPositionVersion()
 
     //起始点
     var startX: Float = 0f
@@ -614,6 +615,12 @@ class ReadView(context: Context, attrs: AttributeSet) :
         pageDelegate?.onScroll()
         val offset = touchY - lastY
         touchY -= offset - offset.toInt()
+    }
+
+    fun getReadPositionVersion(): Long = readPositionVersion.snapshot()
+
+    fun markReadPositionChanged() {
+        readPositionVersion.markChanged()
     }
 
     /**

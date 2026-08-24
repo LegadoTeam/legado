@@ -1302,11 +1302,14 @@ class ReadBookActivity : BaseReadBookActivity(),
     override fun upContent(
         relativePosition: Int,
         resetPageOffset: Boolean,
+        readPositionVersion: Long?,
         success: (() -> Unit)?
     ) {
         lifecycleScope.launch {
+            val shouldResetPageOffset = resetPageOffset &&
+                (readPositionVersion == null || isReadPositionVersionCurrent(readPositionVersion))
             binding.readView.cancelTouchGestures()
-            binding.readView.upContent(relativePosition, resetPageOffset)
+            binding.readView.upContent(relativePosition, shouldResetPageOffset)
             observeBookmarks()
             upBookmarkIndicator()
             if (relativePosition == 0) {
@@ -1318,13 +1321,24 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
     }
 
+    override fun readPositionVersion(): Long {
+        return binding.readView.getReadPositionVersion()
+    }
+
+    override fun isReadPositionVersionCurrent(version: Long): Boolean {
+        return binding.readView.getReadPositionVersion() == version
+    }
+
     override suspend fun upContentAwait(
         relativePosition: Int,
         resetPageOffset: Boolean,
+        readPositionVersion: Long?,
         success: (() -> Unit)?
     ) = withContext(Main.immediate) {
+        val shouldResetPageOffset = resetPageOffset &&
+            (readPositionVersion == null || isReadPositionVersionCurrent(readPositionVersion))
         binding.readView.cancelTouchGestures()
-        binding.readView.upContent(relativePosition, resetPageOffset)
+        binding.readView.upContent(relativePosition, shouldResetPageOffset)
         observeBookmarks()
         upBookmarkIndicator()
         if (relativePosition == 0) {

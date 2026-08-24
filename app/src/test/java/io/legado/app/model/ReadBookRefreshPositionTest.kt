@@ -67,6 +67,31 @@ class ReadBookRefreshPositionTest {
         assertFalse(anchorResolver.contains("textChapter.isCompleted"))
     }
 
+    @Test
+    fun `toc refresh carries a scroll version while explicit jumps keep reset`() {
+        val readBook = source("app/src/main/java/io/legado/app/model/ReadBook.kt")
+        val chapterUpdate = readBook.substringAfter("fun onChapterListUpdated(")
+            .substringBefore("private fun shouldApplyReadPositionReset")
+        assertTrue(chapterUpdate.contains("readPositionVersion = callBack?.readPositionVersion()"))
+        assertTrue(readBook.contains("readPositionVersion = readPositionVersion"))
+        assertTrue(readBook.contains("resetPageOffset = resetPageOffset"))
+
+        val openChapter = readBook.substringAfter("fun openChapter(")
+            .substringBefore("private fun curPageChanged")
+        assertTrue(openChapter.contains("loadContent(resetPageOffset = true)"))
+        assertFalse(openChapter.contains("readPositionVersion ="))
+
+        val setProgress = readBook.substringAfter("fun setProgress(")
+            .substringBefore("//暂时保存跳转前进度")
+        assertTrue(setProgress.contains("loadContent(resetPageOffset = true)"))
+        assertFalse(setProgress.contains("readPositionVersion ="))
+
+        val activity = source("app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
+        val upContent = activity.substringAfter("override fun upContent(")
+            .substringBefore("override fun readPositionVersion")
+        assertTrue(upContent.contains("isReadPositionVersionCurrent(readPositionVersion)"))
+    }
+
     private fun assertOrder(source: String, vararg expected: String) {
         var position = -1
         expected.forEach { text ->

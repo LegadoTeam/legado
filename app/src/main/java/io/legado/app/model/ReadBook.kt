@@ -960,13 +960,25 @@ object ReadBook : CoroutineScope by MainScope() {
      */
     fun loadContent(
         resetPageOffset: Boolean,
-        success: (() -> Unit)? = null
+        readPositionVersion: Long? = null,
+        success: (() -> Unit)? = null,
     ) {
-        loadContent(durChapterIndex, resetPageOffset = resetPageOffset) {
-            success?.invoke()
-        }
-        loadContent(durChapterIndex + 1, resetPageOffset = resetPageOffset)
-        loadContent(durChapterIndex - 1, resetPageOffset = resetPageOffset)
+        loadContent(
+            durChapterIndex,
+            resetPageOffset = resetPageOffset,
+            readPositionVersion = readPositionVersion,
+            success = { success?.invoke() },
+        )
+        loadContent(
+            durChapterIndex + 1,
+            resetPageOffset = resetPageOffset,
+            readPositionVersion = readPositionVersion,
+        )
+        loadContent(
+            durChapterIndex - 1,
+            resetPageOffset = resetPageOffset,
+            readPositionVersion = readPositionVersion,
+        )
     }
 
     fun loadOrUpContent(success: (() -> Unit)? = null) {
@@ -1066,7 +1078,8 @@ object ReadBook : CoroutineScope by MainScope() {
         index: Int,
         upContent: Boolean = true,
         resetPageOffset: Boolean = false,
-        success: (() -> Unit)? = null
+        readPositionVersion: Long? = null,
+        success: (() -> Unit)? = null,
     ) {
         Coroutine.async {
             val book = book!!
@@ -1079,12 +1092,14 @@ object ReadBook : CoroutineScope by MainScope() {
                         it,
                         upContent,
                         resetPageOffset,
+                        readPositionVersion = readPositionVersion,
                         success = success
                     )
                 } ?: download(
                     downloadScope,
                     chapter,
-                    resetPageOffset
+                    resetPageOffset,
+                    readPositionVersion = readPositionVersion,
                 )
             }
         }.onError {
@@ -1096,14 +1111,22 @@ object ReadBook : CoroutineScope by MainScope() {
         index: Int,
         upContent: Boolean = true,
         resetPageOffset: Boolean = false,
-        success: (() -> Unit)? = null
+        readPositionVersion: Long? = null,
+        success: (() -> Unit)? = null,
     ) = withContext(IO) {
         if (addLoading(index)) {
             try {
                 val book = book!!
                 val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, index)!!
                 val content = BookHelp.getContent(book, chapter) ?: downloadAwait(chapter)
-                contentLoadFinishAwait(book, chapter, content, upContent, resetPageOffset)
+                contentLoadFinishAwait(
+                    book,
+                    chapter,
+                    content,
+                    upContent,
+                    resetPageOffset,
+                    readPositionVersion,
+                )
                 success?.invoke()
             } catch (e: Exception) {
                 AppLog.put("加载正文出错\n${e.localizedMessage}")
@@ -1142,12 +1165,19 @@ object ReadBook : CoroutineScope by MainScope() {
         chapter: BookChapter,
         resetPageOffset: Boolean,
         semaphore: Semaphore? = null,
-        success: (() -> Unit)? = null
+        readPositionVersion: Long? = null,
+        success: (() -> Unit)? = null,
     ) {
         val book = book ?: return removeLoading(chapter.index)
         val bookSource = bookSource
         if (bookSource != null) {
-            CacheBook.getOrCreate(bookSource, book).download(scope, chapter, semaphore)
+            CacheBook.getOrCreate(bookSource, book).download(
+                scope,
+                chapter,
+                semaphore,
+                resetPageOffset = resetPageOffset,
+                readPositionVersion = readPositionVersion,
+            )
         } else {
             val msg = if (book.isLocal) "无内容" else "没有书源"
             contentLoadFinish(
@@ -1155,6 +1185,7 @@ object ReadBook : CoroutineScope by MainScope() {
                 chapter,
                 "加载正文失败\n$msg",
                 resetPageOffset = resetPageOffset,
+                readPositionVersion = readPositionVersion,
                 success = success
             )
         }
@@ -1194,12 +1225,15 @@ object ReadBook : CoroutineScope by MainScope() {
         upContent: Boolean = true,
         resetPageOffset: Boolean,
         canceled: Boolean = false,
-        success: (() -> Unit)? = null
+        readPositionVersion: Long? = null,
+        success: (() -> Unit)? = null,
     ) {
         removeLoading(chapter.index)
         if (canceled || chapter.index !in durChapterIndex - 1..durChapterIndex + 1) {
             return
         }
+        val shouldResetPageOffset = resetPageOffset &&
+            shouldApplyReadPositionReset(readPositionVersion)
         chapterLoadingJobs[chapter.index]?.cancel()
         val job = Coroutine.async(this, start = CoroutineStart.LAZY) {
             val contentProcessor = ContentProcessor.get(book.name, book.origin)
@@ -1229,7 +1263,11 @@ object ReadBook : CoroutineScope by MainScope() {
                         val positionReady = resolvePendingHighlightJump(book, textChapter)
                         if (positionReady && !available && page.containPos(durChapterPos)) {
                             if (upContent) {
-                                callBack?.upContent(offset, resetPageOffset)
+                                callBack?.upContent(
+                                    offset,
+                                    shouldResetPageOffset,
+                                    readPositionVersion = readPositionVersion,
+                                )
                             }
                             available = true
                         }
@@ -1241,7 +1279,13 @@ object ReadBook : CoroutineScope by MainScope() {
                         callBack?.onLayoutPageCompleted(index, page)
                     }
                     resolvePendingHighlightAnchor(book, textChapter)
-                    if (upContent) callBack?.upContent(offset, !available && resetPageOffset)
+                    if (upContent) {
+                        callBack?.upContent(
+                            offset,
+                            !available && shouldResetPageOffset,
+                            readPositionVersion = readPositionVersion,
+                        )
+                    }
                     curPageChanged(
                         syncReadAloudFollow = BaseReadAloudService.shouldSyncSpeechNavigation()
                     )
@@ -1256,7 +1300,13 @@ object ReadBook : CoroutineScope by MainScope() {
                         observeHighlightRuleLayout(textChapter)
                     }
                     textChapter.layoutChannel.receiveAsFlow().collect()
-                    if (upContent) callBack?.upContent(offset, resetPageOffset)
+                    if (upContent) {
+                        callBack?.upContent(
+                            offset,
+                            shouldResetPageOffset,
+                            readPositionVersion = readPositionVersion,
+                        )
+                    }
                 }
 
                 1 -> nextChapterLoadingLock.withLock {
@@ -1270,7 +1320,13 @@ object ReadBook : CoroutineScope by MainScope() {
                         if (page.index > 1) {
                             continue
                         }
-                        if (upContent) callBack?.upContent(offset, resetPageOffset)
+                        if (upContent) {
+                            callBack?.upContent(
+                                offset,
+                                shouldResetPageOffset,
+                                readPositionVersion = readPositionVersion,
+                            )
+                        }
                     }
                 }
             }
@@ -1294,12 +1350,15 @@ object ReadBook : CoroutineScope by MainScope() {
         chapter: BookChapter,
         content: String,
         upContent: Boolean = true,
-        resetPageOffset: Boolean
+        resetPageOffset: Boolean,
+        readPositionVersion: Long? = null,
     ) {
         removeLoading(chapter.index)
         if (chapter.index !in durChapterIndex - 1..durChapterIndex + 1) {
             return
         }
+        val shouldResetPageOffset = resetPageOffset &&
+            shouldApplyReadPositionReset(readPositionVersion)
         kotlin.runCatching {
             val contentProcessor = ContentProcessor.get(book.name, book.origin)
             val displayTitle = chapter.getDisplayTitle(
@@ -1326,7 +1385,11 @@ object ReadBook : CoroutineScope by MainScope() {
                         val positionReady = resolvePendingHighlightJump(book, textChapter)
                         if (positionReady && !available && page.containPos(durChapterPos)) {
                             if (upContent) {
-                                callBack?.upContent(offset, resetPageOffset)
+                                callBack?.upContent(
+                                    offset,
+                                    shouldResetPageOffset,
+                                    readPositionVersion = readPositionVersion,
+                                )
                             }
                             available = true
                         }
@@ -1338,7 +1401,13 @@ object ReadBook : CoroutineScope by MainScope() {
                         callBack?.onLayoutPageCompleted(index, page)
                     }
                     resolvePendingHighlightAnchor(book, textChapter)
-                    if (upContent) callBack?.upContent(offset, !available && resetPageOffset)
+                    if (upContent) {
+                        callBack?.upContent(
+                            offset,
+                            !available && shouldResetPageOffset,
+                            readPositionVersion = readPositionVersion,
+                        )
+                    }
                     curPageChanged(
                         syncReadAloudFollow = BaseReadAloudService.shouldSyncSpeechNavigation()
                     )
@@ -1352,7 +1421,13 @@ object ReadBook : CoroutineScope by MainScope() {
                         observeHighlightRuleLayout(textChapter)
                     }
                     textChapter.layoutChannel.receiveAsFlow().collect()
-                    if (upContent) callBack?.upContent(offset, resetPageOffset)
+                    if (upContent) {
+                        callBack?.upContent(
+                            offset,
+                            shouldResetPageOffset,
+                            readPositionVersion = readPositionVersion,
+                        )
+                    }
                 }
 
                 1 -> {
@@ -1365,7 +1440,13 @@ object ReadBook : CoroutineScope by MainScope() {
                         if (page.index > 1) {
                             continue
                         }
-                        if (upContent) callBack?.upContent(offset, resetPageOffset)
+                        if (upContent) {
+                            callBack?.upContent(
+                                offset,
+                                shouldResetPageOffset,
+                                readPositionVersion = readPositionVersion,
+                            )
+                        }
                     }
                 }
             }
@@ -1504,9 +1585,17 @@ object ReadBook : CoroutineScope by MainScope() {
                     it.bookUrl == newBook.bookUrl && it.chapterIndex == durChapterIndex
                 }
             } else if (loadContent) {
-                loadContent(true)
+                loadContent(
+                    resetPageOffset = true,
+                    readPositionVersion = callBack?.readPositionVersion(),
+                )
             }
         }
+    }
+
+    private fun shouldApplyReadPositionReset(readPositionVersion: Long?): Boolean {
+        return readPositionVersion == null ||
+            callBack?.isReadPositionVersionCurrent(readPositionVersion) != false
     }
 
     private fun clearExpiredChapterLoadingJob(clearAll: Boolean = false) {
@@ -1664,12 +1753,18 @@ object ReadBook : CoroutineScope by MainScope() {
         fun upContent(
             relativePosition: Int = 0,
             resetPageOffset: Boolean = true,
+            readPositionVersion: Long? = null,
             success: (() -> Unit)? = null
         )
+
+        fun readPositionVersion(): Long? = null
+
+        fun isReadPositionVersionCurrent(version: Long): Boolean = true
 
         suspend fun upContentAwait(
             relativePosition: Int = 0,
             resetPageOffset: Boolean = true,
+            readPositionVersion: Long? = null,
             success: (() -> Unit)? = null
         )
 

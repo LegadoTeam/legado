@@ -83,6 +83,7 @@ abstract class HorizontalPageDelegate(readView: ReadView) : PageDelegate(readVie
             val distance = deltaX * deltaX + deltaY * deltaY
             isMoved = distance > slopSquare
             if (isMoved) {
+                readView.markReadPositionChanged()
                 if (sumX - startX > 0) {
                     //如果上一页不存在
                     if (!hasPrev()) {
