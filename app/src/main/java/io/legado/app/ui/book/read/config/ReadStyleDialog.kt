@@ -81,7 +81,7 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
         dsbTextLetterSpacing.valueFormat = {
             ((it - 50) / 100f).toString()
         }
-        dsbLineSize.valueFormat = { ((it - 10) / 10f).toString() }
+        dsbLineSize.valueFormat = { lineSpacingDisplayValue(it) }
         dsbParagraphSpacing.valueFormat = { (it / 10f).toString() }
         styleAdapter = StyleAdapter()
         rvStyle.adapter = styleAdapter
@@ -153,7 +153,7 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
             postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
         }
         dsbLineSize.onChanged = {
-            ReadBookConfig.lineSpacingExtra = it
+            ReadBookConfig.lineSpacingExtra = lineSpacingFromProgress(it)
             postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
         }
         dsbParagraphSpacing.onChanged = {
@@ -193,7 +193,7 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
         ReadBookConfig.let {
             dsbTextSize.progress = it.textSize - 5
             dsbTextLetterSpacing.progress = (it.letterSpacing * 100).toInt() + 50
-            dsbLineSize.progress = it.lineSpacingExtra
+            dsbLineSize.progress = lineSpacingToProgress(it.lineSpacingExtra)
             dsbParagraphSpacing.progress = it.paragraphSpacing
         }
     }
@@ -251,4 +251,22 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
         }
 
     }
+}
+
+private const val LINE_SPACING_CONFIG_MIN = -10
+private const val LINE_SPACING_CONFIG_MAX = 40
+private const val LINE_SPACING_PROGRESS_OFFSET = 10
+
+internal fun lineSpacingToProgress(value: Int): Int {
+    return (value + LINE_SPACING_PROGRESS_OFFSET)
+        .coerceIn(0, LINE_SPACING_CONFIG_MAX - LINE_SPACING_CONFIG_MIN)
+}
+
+internal fun lineSpacingFromProgress(progress: Int): Int {
+    return (progress - LINE_SPACING_PROGRESS_OFFSET)
+        .coerceIn(LINE_SPACING_CONFIG_MIN, LINE_SPACING_CONFIG_MAX)
+}
+
+internal fun lineSpacingDisplayValue(progress: Int): String {
+    return ((lineSpacingFromProgress(progress) - 10) / 10f).toString()
 }

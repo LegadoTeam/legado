@@ -150,7 +150,7 @@
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="16dp"
         app:isBottomBackground="true"
-        app:max="20"
+        app:max="50"
         app:title="@string/line_size" />
 
     <io.legado.app.ui.widget.DetailSeekBar
