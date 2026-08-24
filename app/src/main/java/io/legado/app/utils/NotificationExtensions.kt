@@ -35,7 +35,9 @@ internal fun NotificationCompat.Builder.applyPromotedProgress(
     eligible: Boolean,
     ongoing: Boolean,
     max: Int,
-    progress: Int
+    progress: Int,
+    criticalText: String,
+    terminal: Boolean = false
 ): Boolean {
     if (!supportsPromotedNotifications()) return false
     val enabled = AppConfig.liveUpdateNotifications
@@ -52,15 +54,21 @@ internal fun NotificationCompat.Builder.applyPromotedProgress(
     ) return false
 
     val style = NotificationCompat.ProgressStyle()
-    if (max > 0) {
-        val boundedProgress = progress.coerceIn(0, max)
-        setProgress(max, boundedProgress, false)
-        style.addProgressSegment(NotificationCompat.ProgressStyle.Segment(max))
+    if (max > 0 || terminal) {
+        val effectiveMax = max.coerceAtLeast(1)
+        val boundedProgress = if (terminal) {
+            effectiveMax
+        } else {
+            progress.coerceIn(0, effectiveMax)
+        }
+        setProgress(effectiveMax, boundedProgress, false)
+        style.addProgressSegment(NotificationCompat.ProgressStyle.Segment(effectiveMax))
             .setProgress(boundedProgress)
-        setShortCriticalText("${progressPercent(progress, max)}%")
+        setShortCriticalText(criticalText)
     } else {
         setProgress(0, 0, true)
         style.setProgressIndeterminate(true)
+        setShortCriticalText(criticalText)
     }
     setStyle(style)
         .setOngoing(true)
