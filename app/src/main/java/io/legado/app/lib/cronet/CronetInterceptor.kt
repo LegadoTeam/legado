@@ -24,10 +24,8 @@ class CronetInterceptor(private val cookieJar: CookieJar) : Interceptor {
             throw IOException("Canceled")
         }
         val original: Request = chain.request()
-        //Cronet未初始化
-        if (!CronetLoader.install() || cronetEngine == null) {
-            return chain.proceed(original)
-        }
+        //Cronet未初始化或初始化失败
+        if (getCronetEngineOrNull() == null) return chain.proceed(original)
         val cronetException: Exception
         try {
             val builder: Request.Builder = original.newBuilder()

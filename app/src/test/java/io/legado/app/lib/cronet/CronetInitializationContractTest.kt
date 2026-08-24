@@ -1,0 +1,36 @@
+package io.legado.app.lib.cronet
+
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.io.File
+
+class CronetInitializationContractTest {
+
+    @Test
+    fun `cronet initialization and interceptors keep a safe fallback boundary`() {
+        val helper = readProjectFile(
+            "app/src/main/java/io/legado/app/lib/cronet/CronetHelper.kt"
+        )
+        val interceptor = readProjectFile(
+            "app/src/main/java/io/legado/app/lib/cronet/CronetInterceptor.kt"
+        )
+        val coroutineInterceptor = readProjectFile(
+            "app/src/main/java/io/legado/app/lib/cronet/CronetCoroutineInterceptor.kt"
+        )
+
+        assertTrue(helper.indexOf("try {") < helper.indexOf("CronetLoader.preDownload()"))
+        assertTrue(helper.contains("ExperimentalCronetEngine.Builder(appCtx)"))
+        assertTrue(helper.contains("catch (e: Throwable)"))
+        assertTrue(interceptor.contains("getCronetEngineOrNull()"))
+        assertTrue(coroutineInterceptor.contains("getCronetEngineOrNull()"))
+    }
+
+    private fun readProjectFile(path: String): String {
+        val userDir = requireNotNull(System.getProperty("user.dir"))
+        return generateSequence(File(userDir)) {
+            it.parentFile
+        }.map {
+            File(it, path)
+        }.first { it.isFile }.readText()
+    }
+}
