@@ -100,6 +100,24 @@ class ManagePopupActionMigrationTest {
     }
 
     @Test
+    fun `dialog overflow menus use the shared vertical bridge`() {
+        listOf(
+            "src/main/java/io/legado/app/ui/about/AppLogDialog.kt",
+            "src/main/java/io/legado/app/ui/about/CrashLogsDialog.kt",
+            "src/main/java/io/legado/app/ui/login/SourceLoginDialog.kt"
+        ).forEach { path ->
+            val source = readProjectFile(path)
+            assertContains(path, source, "installMd3OverflowMenu(")
+            assertContains(path, source, "showIcons = true")
+            assertContains(
+                path,
+                source,
+                "onOpenCustomMenu = { it.applyOpenTint(requireContext()) }"
+            )
+        }
+    }
+
+    @Test
     fun `five management adapters use the shared vertical menu`() {
         adapterFiles.forEach { path ->
             val source = readProjectFile(path)

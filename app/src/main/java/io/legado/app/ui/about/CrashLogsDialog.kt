@@ -23,9 +23,11 @@ import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.widget.dialog.TextDialog
 import io.legado.app.utils.FileDoc
 import io.legado.app.utils.FileUtils
+import io.legado.app.utils.applyOpenTint
 import io.legado.app.utils.delete
 import io.legado.app.utils.find
 import io.legado.app.utils.getFile
+import io.legado.app.utils.installMd3OverflowMenu
 import io.legado.app.utils.list
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.showDialogFragment
@@ -50,6 +52,10 @@ class CrashLogsDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
         binding.toolBar.setBackgroundColor(primaryColor)
         binding.toolBar.setTitle(R.string.crash_log)
         binding.toolBar.inflateMenu(R.menu.crash_log)
+        binding.toolBar.installMd3OverflowMenu(
+            showIcons = true,
+            onOpenCustomMenu = { it.applyOpenTint(requireContext()) }
+        )
         binding.toolBar.setOnMenuItemClickListener(this)
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = adapter

@@ -21,6 +21,8 @@ import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.widget.dialog.TextDialog
 import io.legado.app.utils.LogUtils
+import io.legado.app.utils.applyOpenTint
+import io.legado.app.utils.installMd3OverflowMenu
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.share
@@ -53,6 +55,10 @@ class AppLogDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
             toolBar.setBackgroundColor(primaryColor)
             toolBar.setTitle(R.string.log)
             toolBar.inflateMenu(R.menu.app_log)
+            toolBar.installMd3OverflowMenu(
+                showIcons = true,
+                onOpenCustomMenu = { it.applyOpenTint(requireContext()) }
+            )
             toolBar.setOnMenuItemClickListener(this@AppLogDialog)
             recyclerView.layoutManager = LinearLayoutManager(requireContext())
             recyclerView.adapter = adapter
