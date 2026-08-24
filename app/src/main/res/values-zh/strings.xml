@@ -855,6 +855,7 @@
     <string name="title_center">居中</string>
     <string name="title_hide">隐藏</string>
     <string name="title_color">章节名颜色</string>
+    <string name="title_line_spacing">标题行距</string>
     <string name="split_chapter_title">章节编号与标题分行</string>
     <string name="title_number_font_size">编号字号</string>
     <string name="title_number_spacing">编号下边距</string>

@@ -107,7 +107,13 @@ data class TextPage(
             val lastLine = textLines[leftLineSize - 1]
             if (lastLine.isImage) return@run
             val lastLineHeight = with(lastLine) { lineBottom - lineTop }
-            val pageHeight = lastLine.lineBottom + contentPaintTextHeight * lineSpacingExtra
+            val lineHeight = if (lastLine.isTitle && !lastLine.isTitleNumber) {
+                lastLine.height
+            } else {
+                contentPaintTextHeight
+            }
+            val pageHeight = lastLine.lineBottom +
+                    lineHeight * ChapterProvider.lineSpacingFor(lastLine)
             if (visibleHeight - pageHeight >= lastLineHeight) return@run
             val surplus = (visibleBottom - lastLine.lineBottom)
             if (surplus == 0f) return@run
@@ -125,7 +131,13 @@ data class TextPage(
             val lastLine = textLines.last()
             if (lastLine.isImage) return@run
             val lastLineHeight = with(lastLine) { lineBottom - lineTop }
-            val pageHeight = lastLine.lineBottom + contentPaintTextHeight * lineSpacingExtra
+            val lineHeight = if (lastLine.isTitle && !lastLine.isTitleNumber) {
+                lastLine.height
+            } else {
+                contentPaintTextHeight
+            }
+            val pageHeight = lastLine.lineBottom +
+                    lineHeight * ChapterProvider.lineSpacingFor(lastLine)
             if (visibleHeight - pageHeight >= lastLineHeight) return@run
             val surplus = (visibleBottom - lastLine.lineBottom)
             if (surplus == 0f) return@run

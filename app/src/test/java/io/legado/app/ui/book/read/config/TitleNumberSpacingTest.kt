@@ -10,24 +10,24 @@ class TitleNumberSpacingTest {
 
     @Test
     fun `spacing maps to seek bar progress`() {
-        assertEquals(0, titleNumberSpacingToProgress(-20))
-        assertEquals(20, titleNumberSpacingToProgress(0))
-        assertEquals(120, titleNumberSpacingToProgress(100))
+        assertEquals(0, titleNumberSpacingToProgress(-50))
+        assertEquals(50, titleNumberSpacingToProgress(0))
+        assertEquals(150, titleNumberSpacingToProgress(100))
     }
 
     @Test
     fun `seek bar progress maps to spacing`() {
-        assertEquals(-20, titleNumberSpacingFromProgress(0))
-        assertEquals(0, titleNumberSpacingFromProgress(20))
-        assertEquals(100, titleNumberSpacingFromProgress(120))
+        assertEquals(-50, titleNumberSpacingFromProgress(0))
+        assertEquals(0, titleNumberSpacingFromProgress(50))
+        assertEquals(100, titleNumberSpacingFromProgress(150))
     }
 
     @Test
     fun `out of range values are clamped`() {
-        assertEquals(0, titleNumberSpacingToProgress(-21))
-        assertEquals(120, titleNumberSpacingToProgress(101))
-        assertEquals(-20, titleNumberSpacingFromProgress(-1))
-        assertEquals(100, titleNumberSpacingFromProgress(121))
+        assertEquals(0, titleNumberSpacingToProgress(-51))
+        assertEquals(150, titleNumberSpacingToProgress(101))
+        assertEquals(-50, titleNumberSpacingFromProgress(-1))
+        assertEquals(100, titleNumberSpacingFromProgress(151))
     }
 
     @Test
@@ -42,7 +42,7 @@ class TitleNumberSpacingTest {
             .map { seekBars.item(it) as Element }
             .single { it.getAttribute("android:id") == "@+id/dsb_title_number_spacing" }
 
-        assertEquals("120", spacing.getAttribute("app:max"))
+        assertEquals("150", spacing.getAttribute("app:max"))
     }
 
     private fun projectFile(pathInApp: String): File {

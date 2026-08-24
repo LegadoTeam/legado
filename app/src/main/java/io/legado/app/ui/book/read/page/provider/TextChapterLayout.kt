@@ -99,6 +99,7 @@ class TextChapterLayout(
     private val titleBottomSpacing = ChapterProvider.titleBottomSpacing
     private val titleNumberSpacing = ReadBookConfig.titleNumberSpacing.dpToPx()
     private val lineSpacingExtra = ChapterProvider.lineSpacingExtra
+    private val titleLineSpacingExtra = ChapterProvider.titleLineSpacingExtra
     private val paragraphSpacing = ChapterProvider.paragraphSpacing
 
     private val visibleHeight = ChapterProvider.visibleHeight
@@ -1001,6 +1002,11 @@ class TextChapterLayout(
         srcList: LinkedList<String>? = null,
         clickList: LinkedList<String?>?
     ) {
+        val lineSpacing = if (isTitle && !isTitleNumber) {
+            titleLineSpacingExtra
+        } else {
+            lineSpacingExtra
+        }
         val widthsArray = allocateFloatArray(text.length)
         textPaint.getTextWidthsCompat(text, widthsArray, reviewCharWidth)
         //标点挤压改写字宽,断行与列排布都用挤压后的宽度,标题不参与
@@ -1033,15 +1039,24 @@ class TextChapterLayout(
         } else {
             StaticLayout(text, textPaint, textLayoutWidth, Layout.Alignment.ALIGN_NORMAL, 0f, 0f, true)
         }
+        val layoutHeight = if (isTitle && !isTitleNumber) {
+            if (layout.lineCount == 0) {
+                0f
+            } else {
+                textHeight * (1f + (layout.lineCount - 1) * lineSpacing)
+            }
+        } else {
+            layout.lineCount * textHeight
+        }
         durY = when {
             //标题y轴居中
             emptyContent && textPages.isEmpty() -> {
                 val textPage = pendingTextPage
                 if (textPage.lineSize == 0) {
-                    val ty = (visibleHeight - layout.lineCount * textHeight) / 2
+                    val ty = (visibleHeight - layoutHeight) / 2
                     if (ty > titleTopSpacing) ty else titleTopSpacing.toFloat()
                 } else {
-                    var textLayoutHeight = layout.lineCount * textHeight
+                    var textLayoutHeight = layoutHeight
                     val fistLine = textPage.getLine(0)
                     if (fistLine.lineTop < textLayoutHeight + titleTopSpacing) {
                         textLayoutHeight = fistLine.lineTop - titleTopSpacing
@@ -1058,7 +1073,7 @@ class TextChapterLayout(
             isTitle && textPages.isEmpty() && pendingTextPage.lines.isEmpty() -> {
                 when (imageStyle?.uppercase()) {
                     Book.imgStyleSingle -> {
-                        val ty = (visibleHeight - layout.lineCount * textHeight) / 2
+                        val ty = (visibleHeight - layoutHeight) / 2
                         if (ty > titleTopSpacing) ty else titleTopSpacing.toFloat()
                     }
 
@@ -1158,7 +1173,7 @@ class TextChapterLayout(
             textLine.upTopBottom(durY, textHeight, fontMetrics)
             val textPage = pendingTextPage
             textPage.addLine(textLine)
-            durY += textHeight * lineSpacingExtra
+            durY += textHeight * lineSpacing
             if (textPage.height < durY) {
                 textPage.height = durY
             }
