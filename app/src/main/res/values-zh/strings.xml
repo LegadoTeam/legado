@@ -1134,6 +1134,8 @@
     <string name="double_page_horizontal">平板/横屏双页</string>
     <string name="open_in_browser">浏览器打开</string>
     <string name="download_from_github">GitHub 直链下载</string>
+    <string name="download_from_backup_cdn">从 cdn.gigu.edu.kg 下载</string>
+    <string name="download_from_second_cdn">从 cdn.mgz.edu.kg 下载</string>
     <string name="ignore_this_version">忽略此版本</string>
     <string name="copy_url">拷贝 URL</string>
     <string name="full_screen">全屏</string>

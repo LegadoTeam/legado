@@ -34,6 +34,8 @@ class UpdateDialog() : BaseDialogFragment(R.layout.dialog_update) {
             putString("url", updateInfo.downloadUrl)
             putString("name", updateInfo.fileName)
             putString("backupUrl", updateInfo.backupDownloadUrl)
+            putString("mirrorUrl", updateInfo.mirrorDownloadUrl)
+            putString("alternateMirrorUrl", updateInfo.alternateMirrorDownloadUrl)
             putLong("size", updateInfo.size)
             putLong("createdAt", updateInfo.createdAt)
             putBoolean("isBeta", updateInfo.isBeta)
@@ -92,10 +94,17 @@ class UpdateDialog() : BaseDialogFragment(R.layout.dialog_update) {
             binding.toolBar.inflateMenu(R.menu.app_update)
             binding.toolBar.menu.findItem(R.id.menu_download_backup).isVisible =
                 !arguments?.getString("backupUrl").isNullOrBlank()
+            binding.toolBar.menu.findItem(R.id.menu_download_mirror).isVisible =
+                !arguments?.getString("mirrorUrl").isNullOrBlank()
+            binding.toolBar.menu.findItem(R.id.menu_download_alternate_mirror).isVisible =
+                !arguments?.getString("alternateMirrorUrl").isNullOrBlank()
             binding.toolBar.setOnMenuItemClickListener {
                 when (it.itemId) {
                     R.id.menu_download -> startDownload(arguments?.getString("url"))
                     R.id.menu_download_backup -> startDownload(arguments?.getString("backupUrl"))
+                    R.id.menu_download_mirror -> startDownload(arguments?.getString("mirrorUrl"))
+                    R.id.menu_download_alternate_mirror ->
+                        startDownload(arguments?.getString("alternateMirrorUrl"))
                     R.id.menu_open_in_browser -> arguments?.getString("backupUrl").orEmpty()
                         .ifBlank { arguments?.getString("url").orEmpty() }
                         .takeIf(String::isNotBlank)

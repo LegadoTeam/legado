@@ -102,6 +102,22 @@ internal fun resolveAppUpdateDownloadUrl(fileName: String, githubUrl: String): S
     }
 }
 
+internal fun resolveAppUpdateMirrorUrl(fileName: String, primaryUrl: String): String? {
+    if (fileName.contains("_._")) return null
+    return "https://cdn.gigu.edu.kg/app/$fileName".takeUnless { it == primaryUrl }
+}
+
+internal fun resolveAppUpdateAlternateMirrorUrl(
+    fileName: String,
+    primaryUrl: String,
+    mirrorUrl: String?
+): String? {
+    if (fileName.contains("_._")) return null
+    return "https://cdn.mgz.edu.kg/app/$fileName".takeUnless {
+        it == primaryUrl || it == mirrorUrl
+    }
+}
+
 internal fun resolveAppUpdateBackupUrl(primaryUrl: String, githubUrl: String): String? =
     githubUrl.takeUnless { it == primaryUrl }
 

@@ -57,6 +57,43 @@ class UpdateDialogLifecycleTest {
     }
 
     @Test
+    fun `formal update dialog exposes the backup cdn separately from github`() {
+        val source = projectFile(
+            "src/main/java/io/legado/app/ui/about/UpdateDialog.kt"
+        ).readText()
+
+        assertTrue(source.contains("putString(\"mirrorUrl\", updateInfo.mirrorDownloadUrl)"))
+        assertTrue(
+            source.contains(
+                "putString(\"alternateMirrorUrl\", updateInfo.alternateMirrorDownloadUrl)"
+            )
+        )
+        assertTrue(source.contains("R.id.menu_download_mirror).isVisible"))
+        assertTrue(
+            source.contains(
+                "R.id.menu_download_mirror -> startDownload(arguments?.getString(\"mirrorUrl\"))"
+            )
+        )
+        assertTrue(source.contains("R.id.menu_download_alternate_mirror).isVisible"))
+        assertTrue(
+            source.contains(
+                "R.id.menu_download_alternate_mirror ->"
+            ) && source.contains("startDownload(arguments?.getString(\"alternateMirrorUrl\"))")
+        )
+        assertTrue(source.contains("R.id.menu_download_backup -> startDownload"))
+        assertTrue(
+            projectFile("src/main/res/menu/app_update.xml")
+                .readText()
+                .contains("android:id=\"@+id/menu_download_mirror\"")
+        )
+        assertTrue(
+            projectFile("src/main/res/menu/app_update.xml")
+                .readText()
+                .contains("android:id=\"@+id/menu_download_alternate_mirror\"")
+        )
+    }
+
+    @Test
     fun `manual update errors show their message without a redundant action prefix`() {
         val source = projectFile(
             "src/main/java/io/legado/app/ui/about/AboutFragment.kt"

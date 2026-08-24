@@ -348,11 +348,27 @@ class AppUpdateSelectorTest {
 
     @Test
     fun updateDownloadsUseCdnExceptForHistoricalSanitizedNames() {
+        val armFile = "legado_app_3.26071309_release.apk"
         assertEquals(
             "https://cdn.mgz.la/app/legado_app_3.26071309_release.apk",
             resolveAppUpdateDownloadUrl(
-                "legado_app_3.26071309_release.apk",
+                armFile,
                 "https://github.com/example/arm.apk"
+            )
+        )
+        assertEquals(
+            "https://cdn.gigu.edu.kg/app/legado_app_3.26071309_release.apk",
+            resolveAppUpdateMirrorUrl(
+                armFile,
+                "https://cdn.mgz.la/app/$armFile"
+            )
+        )
+        assertEquals(
+            "https://cdn.mgz.edu.kg/app/legado_app_3.26071309_release.apk",
+            resolveAppUpdateAlternateMirrorUrl(
+                armFile,
+                "https://cdn.mgz.la/app/$armFile",
+                "https://cdn.gigu.edu.kg/app/$armFile"
             )
         )
         assertEquals(
@@ -369,6 +385,19 @@ class AppUpdateSelectorTest {
                 "https://github.com/example/legacy-universal.apk"
             )
         )
+        assertNull(
+            resolveAppUpdateMirrorUrl(
+                "legado_app_3.26.0713082212_._release.apk",
+                "https://github.com/example/legacy-universal.apk"
+            )
+        )
+        assertNull(
+            resolveAppUpdateAlternateMirrorUrl(
+                "legado_app_3.26.0713082212_._release.apk",
+                "https://github.com/example/legacy-universal.apk",
+                null
+            )
+        )
     }
 
     @Test
@@ -377,6 +406,30 @@ class AppUpdateSelectorTest {
         val cdnUrl = resolveAppUpdateDownloadUrl("legado_app_release.apk", githubUrl)
 
         assertEquals(githubUrl, resolveAppUpdateBackupUrl(cdnUrl, githubUrl))
+        assertEquals(
+            "https://cdn.gigu.edu.kg/app/legado_app_release.apk",
+            resolveAppUpdateMirrorUrl("legado_app_release.apk", cdnUrl)
+        )
+        assertEquals(
+            "https://cdn.mgz.edu.kg/app/legado_app_release.apk",
+            resolveAppUpdateAlternateMirrorUrl(
+                "legado_app_release.apk",
+                cdnUrl,
+                "https://cdn.gigu.edu.kg/app/legado_app_release.apk"
+            )
+        )
+        val update = release("legado_app_release.apk").copy(downloadUrl = githubUrl)
+            .toUpdateInfo()
+        assertEquals(cdnUrl, update.downloadUrl)
+        assertEquals(
+            "https://cdn.gigu.edu.kg/app/legado_app_release.apk",
+            update.mirrorDownloadUrl
+        )
+        assertEquals(
+            "https://cdn.mgz.edu.kg/app/legado_app_release.apk",
+            update.alternateMirrorDownloadUrl
+        )
+        assertEquals(githubUrl, update.backupDownloadUrl)
         assertNull(resolveAppUpdateBackupUrl(githubUrl, githubUrl))
         assertTrue(isIgnoredAppUpdate("3.26080220", "3.26080220"))
         assertFalse(isIgnoredAppUpdate("3.26080221", "3.26080220"))
@@ -390,6 +443,8 @@ class AppUpdateSelectorTest {
 
         assertEquals(release.downloadUrl, update.downloadUrl)
         assertNull(update.backupDownloadUrl)
+        assertNull(update.mirrorDownloadUrl)
+        assertNull(update.alternateMirrorDownloadUrl)
         assertTrue(update.isBeta)
     }
 

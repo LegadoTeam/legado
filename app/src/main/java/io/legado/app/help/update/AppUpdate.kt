@@ -18,6 +18,8 @@ object AppUpdate {
         val downloadUrl: String,
         val fileName: String,
         val backupDownloadUrl: String? = null,
+        val mirrorDownloadUrl: String? = null,
+        val alternateMirrorDownloadUrl: String? = null,
         val size: Long = 0L,
         val createdAt: Long = 0L,
         val isBeta: Boolean = false

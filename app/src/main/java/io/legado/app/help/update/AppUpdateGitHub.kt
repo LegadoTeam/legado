@@ -109,12 +109,20 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
 
 internal fun AppReleaseInfo.toUpdateInfo(isBeta: Boolean = false): AppUpdate.UpdateInfo {
     val primaryUrl = if (isBeta) downloadUrl else resolveAppUpdateDownloadUrl(name, downloadUrl)
+    val mirrorUrl = if (isBeta) null else resolveAppUpdateMirrorUrl(name, primaryUrl)
+    val alternateMirrorUrl = if (isBeta) {
+        null
+    } else {
+        resolveAppUpdateAlternateMirrorUrl(name, primaryUrl, mirrorUrl)
+    }
     return AppUpdate.UpdateInfo(
         tagName = versionName,
         updateLog = note,
         downloadUrl = primaryUrl,
         fileName = name,
         backupDownloadUrl = if (isBeta) null else resolveAppUpdateBackupUrl(primaryUrl, downloadUrl),
+        mirrorDownloadUrl = mirrorUrl,
+        alternateMirrorDownloadUrl = alternateMirrorUrl,
         size = size,
         createdAt = createdAt,
         isBeta = isBeta
