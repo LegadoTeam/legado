@@ -32,7 +32,7 @@
     "vue3-virtual-scroll-list": "^0.2.1"
   },
   "devDependencies": {
-    "@tsconfig/node20": "^20.1.4",
+    "@tsconfig/node20": "^20.1.10",
     "@types/node": "^20.16.11",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vue/eslint-config-prettier": "^10.0.0",
