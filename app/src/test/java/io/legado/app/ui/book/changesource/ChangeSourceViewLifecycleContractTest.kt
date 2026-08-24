@@ -51,6 +51,33 @@ class ChangeSourceViewLifecycleContractTest {
     }
 
     @Test
+    fun `book source dialog locates the current source after first results`() {
+        val dialog = source("ChangeBookSourceDialog.kt")
+        val collector = dialog.section(
+            "viewModel.searchDataFlow",
+            "viewModel.changeSourceProgress",
+        )
+
+        assertTrue(dialog.contains("private var autoScrollCurrentSource = true"))
+        assertTrue(collector.contains("if (autoScrollCurrentSource && it.isNotEmpty())"))
+        assertTrue(collector.contains("binding.recyclerView.post"))
+        assertTrue(collector.contains("if (scrollToDurSource()) autoScrollCurrentSource = false"))
+        assertTrue(dialog.contains("autoScrollCurrentSource = true"))
+        assertTrue(
+            dialog.section("private fun scrollToDurSource(): Boolean", "override fun changeTo")
+                .contains("if (searchBook.bookUrl == oldBookUrl)")
+        )
+    }
+
+    @Test
+    fun `current book source keeps a subtle background and check mark`() {
+        val adapter = source("ChangeBookSourceAdapter.kt")
+        assertTrue(adapter.contains("viewSelectedBackground"))
+        assertTrue(adapter.contains("ColorUtils.withAlpha(context.accentColor, 0.1f)"))
+        assertTrue(adapter.contains("ivChecked.visible()"))
+    }
+
+    @Test
     fun `pending business results wait for the current host to resume`() {
         val book = source("ChangeBookSourceDialog.kt")
         val chapter = source("ChangeChapterSourceDialog.kt")

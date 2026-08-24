@@ -76,6 +76,7 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
     private var searchFinishDialog: AlertDialog? = null
     private var typeMismatchDialog: AlertDialog? = null
     private var adapterDataObserver: RecyclerView.AdapterDataObserver? = null
+    private var autoScrollCurrentSource = true
     private val adapter by lazy { ChangeBookSourceAdapter(requireContext(), viewModel, this) }
     private val editSourceResult =
         registerForActivityResult(StartActivityContract(BookSourceEditActivity::class.java)) {
@@ -88,6 +89,7 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
+        autoScrollCurrentSource = true
         binding.toolBar.setBackgroundColor(primaryColor)
         viewModel.initData(arguments, callBack?.oldBook, activity is ReadBookActivity)
         showTitle()
@@ -270,6 +272,11 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
             owner.lifecycle.currentStateFlow.first { it.isAtLeast(STARTED) }
             viewModel.searchDataFlow.conflate().collect {
                 adapter.setItems(it)
+                if (autoScrollCurrentSource && it.isNotEmpty()) {
+                    binding.recyclerView.post {
+                        if (scrollToDurSource()) autoScrollCurrentSource = false
+                    }
+                }
                 delay(1000)
             }
         }
@@ -417,14 +424,15 @@ class ChangeBookSourceDialog() : BaseDialogFragment(R.layout.dialog_book_change_
         return false
     }
 
-    private fun scrollToDurSource() {
+    private fun scrollToDurSource(): Boolean {
         adapter.getItems().forEachIndexed { index, searchBook ->
             if (searchBook.bookUrl == oldBookUrl) {
                 (binding.recyclerView.layoutManager as LinearLayoutManager)
                     .scrollToPositionWithOffset(index, 60.dpToPx())
-                return
+                return true
             }
         }
+        return false
     }
 
     override fun changeTo(searchBook: SearchBook) {
