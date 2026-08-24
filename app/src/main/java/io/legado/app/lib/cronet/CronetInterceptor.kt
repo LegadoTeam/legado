@@ -3,6 +3,7 @@ package io.legado.app.lib.cronet
 import android.annotation.SuppressLint
 import android.os.Build
 import androidx.annotation.Keep
+import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.CookieManager
 import io.legado.app.help.http.CookieManager.cookieJarHeader
 import io.legado.app.utils.printOnDebug
@@ -24,6 +25,7 @@ class CronetInterceptor(private val cookieJar: CookieJar) : Interceptor {
             throw IOException("Canceled")
         }
         val original: Request = chain.request()
+        if (!AppConfig.isCronet) return chain.proceed(original)
         // Cronet is the selected transport. Do not silently switch to OkHttp.
         if (getCronetEngineOrNull() == null) {
             throw cronetUnavailableException("Cronet engine is unavailable")

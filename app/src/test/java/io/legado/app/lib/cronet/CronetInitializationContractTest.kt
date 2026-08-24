@@ -27,10 +27,18 @@ class CronetInitializationContractTest {
         assertTrue(helper.contains("catch (e: Throwable)"))
         assertTrue(helper.contains("cronetEngineFailure = e"))
         assertTrue(helper.contains("CronetUnavailableException"))
+        assertTrue(interceptor.contains("if (!AppConfig.isCronet) return chain.proceed(original)"))
+        assertTrue(coroutineInterceptor.contains("if (!AppConfig.isCronet) return chain.proceed(original)"))
         assertTrue(interceptor.contains("throw cronetUnavailableException"))
         assertTrue(coroutineInterceptor.contains("throw cronetUnavailableException"))
-        assertFalse(interceptor.contains("chain.proceed(original)"))
-        assertFalse(coroutineInterceptor.contains("chain.proceed(original)"))
+        val interceptorStrictPath = interceptor.substringAfter(
+            "// Cronet is the selected transport. Do not silently switch to OkHttp."
+        )
+        val coroutineStrictPath = coroutineInterceptor.substringAfter(
+            "// Cronet is the selected transport. Do not silently switch to OkHttp."
+        )
+        assertFalse(interceptorStrictPath.contains("chain.proceed(original)"))
+        assertFalse(coroutineStrictPath.contains("chain.proceed(original)"))
         assertTrue(interceptor.contains("getCronetEngineOrNull()"))
         assertTrue(interceptor.contains("catch (e: Throwable)"))
         assertTrue(coroutineInterceptor.contains("getCronetEngineOrNull()"))
