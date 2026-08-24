@@ -17,12 +17,16 @@ class CronetInitializationContractTest {
         val coroutineInterceptor = readProjectFile(
             "app/src/main/java/io/legado/app/lib/cronet/CronetCoroutineInterceptor.kt"
         )
+        val app = readProjectFile("app/src/main/java/io/legado/app/App.kt")
 
         assertTrue(helper.indexOf("try {") < helper.indexOf("CronetLoader.preDownload()"))
         assertTrue(helper.contains("ExperimentalCronetEngine.Builder(appCtx)"))
         assertTrue(helper.contains("catch (e: Throwable)"))
         assertTrue(interceptor.contains("getCronetEngineOrNull()"))
+        assertTrue(interceptor.contains("catch (e: Throwable)"))
         assertTrue(coroutineInterceptor.contains("getCronetEngineOrNull()"))
+        assertTrue(coroutineInterceptor.contains("catch (e: Throwable)"))
+        assertTrue(app.contains("runCatching { Cronet.preDownload() }"))
     }
 
     private fun readProjectFile(path: String): String {

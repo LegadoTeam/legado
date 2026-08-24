@@ -26,7 +26,7 @@ class CronetInterceptor(private val cookieJar: CookieJar) : Interceptor {
         val original: Request = chain.request()
         //Cronet未初始化或初始化失败
         if (getCronetEngineOrNull() == null) return chain.proceed(original)
-        val cronetException: Exception
+        val cronetException: Throwable
         try {
             val builder: Request.Builder = original.newBuilder()
             //移除Keep-Alive,手动设置会导致400 BadRequest
@@ -50,7 +50,7 @@ class CronetInterceptor(private val cookieJar: CookieJar) : Interceptor {
             }
 
             return proceedWithCronet(newReq, chain.call(), chain.readTimeoutMillis())!!
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             cronetException = e
             //不能抛出错误,抛出错误会导致应用崩溃
             //遇到Cronet处理有问题时的情况，如证书过期等等，回退到okhttp处理

@@ -59,7 +59,7 @@ class CronetCoroutineInterceptor(private val cookieJar: CookieJar) : Interceptor
                 }
             }
 
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             //不能抛出错误,抛出错误会导致应用崩溃
             //遇到Cronet处理有问题时的情况，如证书过期等等，回退到okhttp处理
             if (!e.message.toString().contains("ERR_CERT_", true)

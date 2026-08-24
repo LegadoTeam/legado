@@ -16,6 +16,7 @@ import com.script.rhino.ReadOnlyJavaObject
 import com.script.rhino.RhinoScriptEngine
 import com.script.rhino.RhinoWrapFactory
 import io.legado.app.base.AppContextWrapper
+import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppConst.channelIdDownload
 import io.legado.app.constant.AppConst.channelIdReadAloud
 import io.legado.app.constant.AppConst.channelIdWeb
@@ -88,7 +89,8 @@ class App : Application() {
             LogUtils.logDeviceInfo()
             //预下载Cronet so
             if (AppConfig.isCronet) {
-                Cronet.preDownload()
+                runCatching { Cronet.preDownload() }
+                    .onFailure { AppLog.put("预下载Cronet失败", it) }
             }
             createNotificationChannels()
             LiveEventBus.config()
