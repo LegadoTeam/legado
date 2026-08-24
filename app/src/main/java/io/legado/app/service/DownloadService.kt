@@ -76,7 +76,7 @@ class DownloadService : BaseService() {
     override fun onDestroy() {
         upStateJob?.cancel()
         terminalJobs.values.forEach { it.cancel() }
-        downloads.values.forEach {
+        downloads.values.filter { it.isPromoted }.forEach {
             notificationManager.cancel(it.notificationId)
         }
         unregisterReceiver(downloadReceiver)
