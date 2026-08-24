@@ -18,7 +18,8 @@ class ReadRecordDeviceScopeTest {
         assertTrue(dao.contains("fun getReadTime(deviceId: String, bookName: String)"))
         assertTrue(
             normalizedDao.contains(
-                "select bookName, sum(readTime) as readTime, max(lastRead) as lastRead " +
+                "select bookName, sum(readTime) as readTime, max(lastRead) as lastRead, " +
+                    "group_concat(author, char(31)) as author " +
                     "from readRecord group by bookName"
             )
         )

@@ -6,6 +6,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.ViewGroup
 import androidx.appcompat.widget.SearchView
+import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.base.BaseActivity
@@ -181,6 +182,12 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
         ) {
             binding.apply {
                 tvBookName.text = item.bookName
+                tvAuthor.isVisible = item.displayAuthor.isNotBlank()
+                tvAuthor.text = if (tvAuthor.isVisible) {
+                    context.getString(R.string.author_show, item.displayAuthor)
+                } else {
+                    ""
+                }
                 tvReadingTime.text = formatDuring(item.readTime)
                 if (item.lastRead > 0) {
                     tvLastReadTime.text = dateFormat.format(item.lastRead)

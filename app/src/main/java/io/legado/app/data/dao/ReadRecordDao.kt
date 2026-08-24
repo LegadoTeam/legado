@@ -21,7 +21,8 @@ interface ReadRecordDao {
 
     @get:Query(
         """
-        select bookName, sum(readTime) as readTime, max(lastRead) as lastRead 
+        select bookName, sum(readTime) as readTime, max(lastRead) as lastRead,
+            group_concat(author, char(31)) as author
         from readRecord 
         group by bookName 
         order by bookName collate localized"""
@@ -33,7 +34,8 @@ interface ReadRecordDao {
 
     @Query(
         """
-        select bookName, sum(readTime) as readTime, max(lastRead) as lastRead 
+        select bookName, sum(readTime) as readTime, max(lastRead) as lastRead,
+            group_concat(author, char(31)) as author
         from readRecord 
         where bookName like '%' || :searchKey || '%'
         group by bookName 
