@@ -118,6 +118,32 @@ class ManagePopupActionMigrationTest {
     }
 
     @Test
+    fun `dialog menu actions provide icons for the vertical menu`() {
+        val menus = mapOf(
+            "app_log.xml" to listOf("menu_clear", "menu_export"),
+            "crash_log.xml" to listOf("menu_clear"),
+            "source_login.xml" to listOf(
+                "menu_ok",
+                "menu_show_login_header",
+                "menu_del_login_header",
+                "menu_clear_login_info",
+                "menu_log"
+            )
+        )
+        menus.forEach { (file, ids) ->
+            val source = readProjectFile("src/main/res/menu/$file")
+            ids.forEach { id ->
+                val item = source.substringAfter("android:id=\"@+id/$id\"")
+                    .substringBefore("/>")
+                assertTrue(
+                    "$file/$id should declare an icon",
+                    item.contains("android:icon=\"@drawable/")
+                )
+            }
+        }
+    }
+
+    @Test
     fun `five management adapters use the shared vertical menu`() {
         adapterFiles.forEach { path ->
             val source = readProjectFile(path)
