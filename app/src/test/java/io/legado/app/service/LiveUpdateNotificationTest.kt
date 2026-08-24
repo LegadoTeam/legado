@@ -65,7 +65,7 @@ class LiveUpdateNotificationTest {
 
         assertTrue(manifest.contains("android.permission.POST_PROMOTED_NOTIFICATIONS"))
         assertTrue(service.contains("private var nextNotificationId = NotificationId.Download"))
-        assertTrue(service.contains("DownloadInfo(downloadId, url, fileName, allocateNotificationId()"))
+        assertTrue(service.contains("allocateNotificationId(url, fileName)"))
         assertTrue(service.contains("notificationManager.activeNotifications"))
         assertTrue(service.contains("putExtra(\"notificationId\", downloadInfo.notificationId)"))
         assertTrue(service.contains("TERMINAL_NOTIFICATION_DURATION = 4_500L"))
@@ -78,12 +78,24 @@ class LiveUpdateNotificationTest {
             1,
             Regex("""notificationManager\.notify\(""").findAll(service).count()
         )
-        assertTrue(service.contains("eligible = true"))
+        assertTrue(service.contains("eligible = !result"))
         assertTrue(service.contains("criticalText = criticalText"))
         assertTrue(service.contains("setContentText(downloadInfo.fileName)"))
-        assertTrue(service.contains("if (!terminal)"))
+        assertTrue(service.contains("if (!terminal && !result)"))
         assertTrue(service.contains("download_live_update_completed"))
         assertTrue(service.contains("download_live_canceled"))
+        assertTrue(service.contains("private fun updateResultNotification(downloadInfo: DownloadInfo)"))
+        assertTrue(service.contains("result = true"))
+        assertTrue(service.contains("EXTRA_RESULT_NOTIFICATION"))
+        assertTrue(service.contains("EXTRA_DOWNLOAD_ID"))
+        assertTrue(service.contains("ownsNotification(downloadId, fallbackNotificationId)"))
+        assertTrue(service.contains("downloads.values.forEach { downloadInfo ->"))
+        assertTrue(service.contains("updateResultNotification(downloadInfo)"))
+        assertTrue(service.contains("IntentAction.start"))
+        assertTrue(service.contains("putExtra(\"isAppUpdate\", downloadInfo.isAppUpdate)"))
+        assertTrue(service.contains("notificationManager.cancel(downloadInfo.notificationId)"))
+        assertTrue(service.contains("downloads[downloadId]?.isPromoted == true"))
+        assertTrue(service.contains("TERMINAL_NOTIFICATION_DURATION + RESULT_NOTIFICATION_DELAY"))
         assertTrue(helper.contains("setRequestPromotedOngoing(true)"))
         assertTrue(helper.contains("setOngoing(true)"))
         assertTrue(helper.contains("setProgress(effectiveMax, boundedProgress, false)"))
@@ -105,6 +117,24 @@ class LiveUpdateNotificationTest {
         assertTrue(settings.contains("intent.resolveActivity(requireContext().packageManager)"))
         assertTrue(settings.contains("putPrefBoolean(PreferKey.liveUpdateNotifications, false)"))
         assertTrue(updateDialog.contains("isAppUpdate = true"))
+    }
+
+    @Test
+    fun `terminal copy keeps only successful and failed ordinary results`() {
+        val service = source("app/src/main/java/io/legado/app/service/DownloadService.kt")
+        val strings = source("app/src/main/res/values-zh/strings.xml")
+
+        assertTrue(service.contains("DownloadState.COMPLETED ||"))
+        assertTrue(service.contains("DownloadState.FAILED"))
+        assertTrue(service.contains("DownloadState.COMPLETED -> getString(R.string.download_success)"))
+        assertTrue(service.contains("DownloadState.FAILED -> getString(R.string.download_error)"))
+        assertTrue(service.contains("setAutoCancel(true)"))
+        assertTrue(strings.contains("<string name=\"download_live_downloading\">%1\$d%%</string>"))
+        assertTrue(strings.contains("<string name=\"download_live_waiting\">下载中</string>"))
+        assertTrue(strings.contains("<string name=\"download_live_completed\">已完成</string>"))
+        assertTrue(strings.contains("<string name=\"download_live_update_completed\">待安装</string>"))
+        assertTrue(strings.contains("<string name=\"download_live_canceled\">已取消</string>"))
+        assertTrue(strings.contains("<string name=\"download_live_failed\">下载失败</string>"))
     }
 
     private fun source(path: String): String {
