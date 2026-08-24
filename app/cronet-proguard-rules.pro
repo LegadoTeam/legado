@@ -59,6 +59,14 @@
 # them.
 -dontwarn internal.org.chromium.build.NativeLibraries
 -dontwarn org.chromium.base.version_info.VersionConstantsBridgeJni
+
+# Part of the Android System SDK; false positive when R8 runs against the
+# standard public SDK. Cronet's telemetry code references these classes on
+# newer platform releases, while the app still supports older API levels.
+-dontwarn android.util.StatsEvent
+-dontwarn android.util.StatsEvent$*
+-dontwarn android.util.StatsLog
+
 # -------- Config Path: third_party/jni_zero/proguard.flags --------
 # Copyright 2023 The Chromium Authors
 # Use of this source code is governed by a BSD-style license that can be
