@@ -14,6 +14,7 @@ import io.legado.app.help.DirectLinkUpload
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
+import io.legado.app.help.config.ReplacePreviewConfig
 import io.legado.app.help.config.ThemeConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.BookCover
@@ -272,7 +273,11 @@ object Backup {
         writeListToJson(appDb.bookSourceDao.all, "bookSource.json", backupPath)
         writeListToJson(appDb.rssSourceDao.all, "rssSources.json", backupPath)
         writeListToJson(appDb.rssStarDao.all, "rssStar.json", backupPath)
-        writeListToJson(appDb.replaceRuleDao.all, "replaceRule.json", backupPath)
+        writeListToJson(
+            ReplacePreviewConfig.withSamples(appDb.replaceRuleDao.all),
+            "replaceRule.json",
+            backupPath
+        )
         writeListToJson(appDb.readRecordDao.all, "readRecord.json", backupPath)
         writeListToJson(appDb.searchKeywordDao.all, "searchHistory.json", backupPath)
         writeListToJson(appDb.ruleSubDao.all, "sourceSub.json", backupPath)

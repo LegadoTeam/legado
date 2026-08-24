@@ -4,6 +4,7 @@ import android.app.Application
 import io.legado.app.base.BaseViewModel
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.ReplaceRule
+import io.legado.app.help.config.ReplacePreviewConfig
 import io.legado.app.utils.renameGroupExact
 
 /**
@@ -21,6 +22,7 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
     fun delete(rule: ReplaceRule) {
         execute {
             appDb.replaceRuleDao.delete(rule)
+            ReplacePreviewConfig.removeSample(rule.id)
         }
     }
 
@@ -89,6 +91,7 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
     fun delSelection(rules: List<ReplaceRule>) {
         execute {
             appDb.replaceRuleDao.delete(*rules.toTypedArray())
+            rules.forEach { ReplacePreviewConfig.removeSample(it.id) }
         }
     }
 

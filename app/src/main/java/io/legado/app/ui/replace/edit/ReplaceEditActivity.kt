@@ -10,6 +10,7 @@ import android.widget.EditText
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
+import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
@@ -25,6 +26,11 @@ import io.legado.app.utils.setOnApplyWindowInsetsListenerCompat
 import io.legado.app.utils.showHelp
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 /**
  * 编辑替换规则
@@ -34,6 +40,8 @@ class ReplaceEditActivity :
     KeyboardToolPop.CallBack {
 
     companion object {
+
+        private const val PREVIEW_DEBOUNCE_MILLIS = 250L
 
         fun startIntent(
             context: Context,
@@ -58,6 +66,9 @@ class ReplaceEditActivity :
     private val softKeyboardTool by lazy {
         KeyboardToolPop(this, lifecycleScope, binding.root, this)
     }
+
+    private var previewJob: Job? = null
+    private var updatingView = false
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         softKeyboardTool.attachToWindow(window)
@@ -89,7 +100,7 @@ class ReplaceEditActivity :
     }
     private fun onFullEditClicked() {
         val view = window.decorView.findFocus()
-        if (view is EditText) {
+        if (view is EditText && view !== binding.etPreviewOutput) {
             val hint = findParentTextInputLayout(view)?.hint?.toString()
             val currentText = view.text.toString()
             val intent = Intent(this, CodeEditActivity::class.java).apply {
@@ -107,12 +118,16 @@ class ReplaceEditActivity :
     override fun onCompatOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.menu_fullscreen_edit -> onFullEditClicked()
-            R.id.menu_save -> viewModel.save(getReplaceRule()) {
-                setResult(RESULT_OK)
-                finish()
+            R.id.menu_save -> {
+                val rule = getReplaceRule()
+                viewModel.save(rule) {
+                    viewModel.saveSample(rule.id, binding.etPreviewInput.text.toString())
+                    setResult(RESULT_OK)
+                    finish()
+                }
             }
 
-            R.id.menu_copy_rule -> sendToClip(GSON.toJson(getReplaceRule()))
+            R.id.menu_copy_rule -> sendToClip(GSON.toJson(getReplaceRuleForExport()))
             R.id.menu_paste_rule -> viewModel.pasteRule {
                 upReplaceView(it)
             }
@@ -121,6 +136,7 @@ class ReplaceEditActivity :
     }
 
     override fun onDestroy() {
+        previewJob?.cancel()
         super.onDestroy()
         softKeyboardTool.dismiss()
     }
@@ -129,6 +145,33 @@ class ReplaceEditActivity :
         binding.ivHelp.setOnClickListener {
             showHelp("regexHelp")
         }
+        binding.etPreviewOutput.apply {
+            keyListener = null
+            showSoftInputOnFocus = false
+            isCursorVisible = false
+            setTextIsSelectable(true)
+        }
+        binding.etPreviewInput.doAfterTextChanged { text ->
+            if (updatingView) return@doAfterTextChanged
+            val value = text?.toString().orEmpty()
+            val normalized = ReplacePreview.normalizeSample(value)
+            if (value != normalized) {
+                updatingView = true
+                try {
+                    binding.etPreviewInput.setText(normalized)
+                    binding.etPreviewInput.setSelection(normalized.length)
+                } finally {
+                    updatingView = false
+                }
+                toastOnUi(getString(R.string.replace_preview_truncated, ReplacePreview.MAX_SAMPLE_LENGTH))
+            }
+            schedulePreview()
+        }
+        binding.etName.doAfterTextChanged { schedulePreview() }
+        binding.etReplaceRule.doAfterTextChanged { schedulePreview() }
+        binding.etReplaceTo.doAfterTextChanged { schedulePreview() }
+        binding.etTimeout.doAfterTextChanged { schedulePreview() }
+        binding.cbUseRegex.setOnCheckedChangeListener { _, _ -> schedulePreview() }
         binding.root.setOnApplyWindowInsetsListenerCompat { _, windowInsets ->
             softKeyboardTool.initialPadding = windowInsets.imeHeight
             windowInsets
@@ -136,17 +179,64 @@ class ReplaceEditActivity :
     }
 
     private fun upReplaceView(replaceRule: ReplaceRule) = binding.run {
-        etName.setText(replaceRule.name)
-        etGroup.setText(replaceRule.group)
-        etReplaceRule.setText(replaceRule.pattern)
-        cbUseRegex.isChecked = replaceRule.isRegex
-        etReplaceTo.setText(replaceRule.replacement)
-        cbScopeTitle.isChecked = replaceRule.scopeTitle
-        cbScopeSource.isChecked = replaceRule.scopeSource
-        cbScopeContent.isChecked = replaceRule.scopeContent
-        etScope.setText(replaceRule.scope)
-        etExcludeScope.setText(replaceRule.excludeScope)
-        etTimeout.setText(replaceRule.timeoutMillisecond.toString())
+        updatingView = true
+        try {
+            etName.setText(replaceRule.name)
+            etGroup.setText(replaceRule.group)
+            etReplaceRule.setText(replaceRule.pattern)
+            cbUseRegex.isChecked = replaceRule.isRegex
+            etReplaceTo.setText(replaceRule.replacement)
+            cbScopeTitle.isChecked = replaceRule.scopeTitle
+            cbScopeSource.isChecked = replaceRule.scopeSource
+            cbScopeContent.isChecked = replaceRule.scopeContent
+            etScope.setText(replaceRule.scope)
+            etExcludeScope.setText(replaceRule.excludeScope)
+            etTimeout.setText(replaceRule.timeoutMillisecond.toString())
+            val editingRuleId = viewModel.replaceRule?.id ?: replaceRule.id
+            etPreviewInput.setText(
+                replaceRule.previewText ?: viewModel.sampleFor(editingRuleId)
+            )
+            etPreviewInput.setSelection(etPreviewInput.text?.length ?: 0)
+        } finally {
+            updatingView = false
+        }
+        schedulePreview()
+    }
+
+    private fun schedulePreview() {
+        if (updatingView) return
+        previewJob?.cancel()
+        val sample = ReplacePreview.normalizeSample(binding.etPreviewInput.text.toString())
+        val rule = getReplaceRule().copy()
+        previewJob = lifecycleScope.launch {
+            delay(PREVIEW_DEBOUNCE_MILLIS)
+            val result = try {
+                Result.success(ReplacePreview.apply(rule, sample))
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: StackOverflowError) {
+                Result.failure(error)
+            } catch (error: Exception) {
+                Result.failure(error)
+            }
+            if (!isActive) return@launch
+            result.onSuccess {
+                binding.tilPreviewOutput.error = null
+                binding.etPreviewOutput.setText(it)
+            }.onFailure {
+                binding.etPreviewOutput.setText(sample)
+                binding.tilPreviewOutput.error = getString(
+                    when ((it as? ReplacePreviewException)?.reason) {
+                        ReplacePreviewException.Reason.TIMEOUT -> R.string.replace_preview_timeout
+                        ReplacePreviewException.Reason.CONTEXT_UNAVAILABLE ->
+                            R.string.replace_preview_context_unavailable
+                        ReplacePreviewException.Reason.JS_EVALUATION ->
+                            R.string.replace_preview_js_error
+                        null -> R.string.replace_preview_error
+                    }
+                )
+            }
+        }
     }
 
     private fun getReplaceRule(): ReplaceRule = binding.run {
@@ -161,8 +251,16 @@ class ReplaceEditActivity :
         replaceRule.scopeContent = cbScopeContent.isChecked
         replaceRule.scope = etScope.text.toString()
         replaceRule.excludeScope = etExcludeScope.text.toString()
-        replaceRule.timeoutMillisecond = etTimeout.text.toString().ifEmpty { "3000" }.toLong()
+        replaceRule.timeoutMillisecond = etTimeout.text.toString().toLongOrNull() ?: 3000L
         return replaceRule
+    }
+
+    private fun getReplaceRuleForExport(): ReplaceRule {
+        return getReplaceRule().also { rule ->
+            rule.previewText = ReplacePreview.normalizeSample(
+                binding.etPreviewInput.text.toString()
+            ).takeIf { it.isNotEmpty() }
+        }
     }
 
     override fun helpActions(): List<SelectItem<String>> {
@@ -180,7 +278,7 @@ class ReplaceEditActivity :
     override fun sendText(text: String) {
         if (text.isEmpty()) return
         val view = window?.decorView?.findFocus()
-        if (view is EditText) {
+        if (view is EditText && view !== binding.etPreviewOutput) {
             var start = view.selectionStart
             var end = view.selectionEnd
             if (start > end) {
@@ -202,7 +300,7 @@ class ReplaceEditActivity :
     @RequiresApi(Build.VERSION_CODES.M)
     override fun onUndoClicked() {
         val editText = window.decorView.findFocus()
-        if (editText is EditText) {
+        if (editText is EditText && editText !== binding.etPreviewOutput) {
             editText.onTextContextMenuItem(android.R.id.undo)
         }
     }
@@ -210,7 +308,7 @@ class ReplaceEditActivity :
     @RequiresApi(Build.VERSION_CODES.M)
     override fun onRedoClicked() {
         val editText = window.decorView.findFocus()
-        if (editText is EditText) {
+        if (editText is EditText && editText !== binding.etPreviewOutput) {
             editText.onTextContextMenuItem(android.R.id.redo)
         }
     }

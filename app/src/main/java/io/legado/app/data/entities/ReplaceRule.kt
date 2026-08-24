@@ -62,6 +62,11 @@ data class ReplaceRule(
     var order: Int = Int.MIN_VALUE
 ) : Parcelable {
 
+    /** Optional JSON-only explanation sample used by the replacement-rule editor. */
+    @Ignore
+    @IgnoredOnParcel
+    var previewText: String? = null
+
     override fun equals(other: Any?): Boolean {
         if (other is ReplaceRule) {
             return other.id == id

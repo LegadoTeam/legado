@@ -39,6 +39,7 @@ import io.legado.app.help.book.normalizeLegacyPersistedCover
 import io.legado.app.help.book.upType
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
+import io.legado.app.help.config.ReplacePreviewConfig
 import io.legado.app.help.config.ThemeConfig
 import io.legado.app.help.http.CookieStore
 import io.legado.app.lib.theme.WallpaperTheme
@@ -268,7 +269,8 @@ object Restore {
             appDb.rssStarDao.insert(*it.toTypedArray())
         }
         fileToListT<ReplaceRule>(path, "replaceRule.json")?.let {
-            appDb.replaceRuleDao.insert(*it.toTypedArray())
+            val insertedIds = appDb.replaceRuleDao.insert(*it.toTypedArray())
+            ReplacePreviewConfig.saveImportedSamples(it, insertedIds)
         }
         fileToListT<SearchKeyword>(path, "searchHistory.json")?.let {
             appDb.searchKeywordDao.insert(*it.toTypedArray())

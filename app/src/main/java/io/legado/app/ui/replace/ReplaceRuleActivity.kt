@@ -22,6 +22,7 @@ import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.DirectLinkUpload
 import io.legado.app.help.SourceSharePassphrase
 import io.legado.app.help.book.ContentProcessor
+import io.legado.app.help.config.ReplacePreviewConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.sourceSharePassphraseButton
@@ -286,7 +287,7 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
                 mode = HandleFileContract.EXPORT
                 fileData = HandleFileContract.FileData(
                     "exportReplaceRule.json",
-                    GSON.toJson(adapter.selection).toByteArray(),
+                    GSON.toJson(ReplacePreviewConfig.withSamples(adapter.selection)).toByteArray(),
                     "application/json"
                 )
             }

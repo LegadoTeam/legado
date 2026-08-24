@@ -278,6 +278,13 @@
     <string name="book_source_share_url">Book sources sharing</string>
     <string name="replace_rule_summary">Rule name</string>
     <string name="replace_rule_invalid">Pattern rule is empty or does not conform the regex specification.</string>
+    <string name="replace_preview_input">Preview input</string>
+    <string name="replace_preview_output">Preview result</string>
+    <string name="replace_preview_truncated">Preview text is limited to %1$d characters</string>
+    <string name="replace_preview_error">Preview failed; check the pattern or replacement.</string>
+    <string name="replace_preview_timeout">Preview timed out; check the regular expression or JS replacement.</string>
+    <string name="replace_preview_context_unavailable">JS preview failed. This editor has no book or chapter context; check the script.</string>
+    <string name="replace_preview_js_error">JS preview failed; check the replacement script.</string>
     <string name="select_action">Selection action</string>
     <string name="select_all">Select all</string>
     <string name="select_all_count">Select all(%1$d/%2$d)</string>
