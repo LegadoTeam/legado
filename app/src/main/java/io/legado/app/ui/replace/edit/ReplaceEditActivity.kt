@@ -194,7 +194,9 @@ class ReplaceEditActivity :
             etTimeout.setText(replaceRule.timeoutMillisecond.toString())
             val editingRuleId = viewModel.replaceRule?.id ?: replaceRule.id
             etPreviewInput.setText(
-                replaceRule.previewText ?: viewModel.sampleFor(editingRuleId)
+                ReplacePreview.normalizeSample(
+                    replaceRule.previewText ?: viewModel.sampleFor(editingRuleId)
+                )
             )
             etPreviewInput.setSelection(etPreviewInput.text?.length ?: 0)
         } finally {

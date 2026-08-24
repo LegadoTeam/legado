@@ -270,7 +270,7 @@ object Restore {
         }
         fileToListT<ReplaceRule>(path, "replaceRule.json")?.let {
             val insertedIds = appDb.replaceRuleDao.insert(*it.toTypedArray())
-            ReplacePreviewConfig.saveImportedSamples(it, insertedIds)
+            ReplacePreviewConfig.saveImportedSamples(it, insertedIds, clearMissing = true)
         }
         fileToListT<SearchKeyword>(path, "searchHistory.json")?.let {
             appDb.searchKeywordDao.insert(*it.toTypedArray())

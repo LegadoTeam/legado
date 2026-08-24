@@ -57,11 +57,18 @@ object ReplacePreviewConfig {
     }
 
     /** Persists optional JSON samples against the IDs actually returned by Room. */
-    fun saveImportedSamples(rules: List<ReplaceRule>, insertedIds: List<Long>) {
+    fun saveImportedSamples(
+        rules: List<ReplaceRule>,
+        insertedIds: List<Long>,
+        clearMissing: Boolean = false
+    ) {
         rules.forEachIndexed { index, rule ->
-            val sample = rule.previewText ?: return@forEachIndexed
             val ruleId = insertedIds.getOrNull(index)?.takeIf { it > 0 } ?: rule.id
-            if (ruleId > 0) {
+            if (ruleId <= 0) return@forEachIndexed
+            val sample = rule.previewText
+            if (sample == null) {
+                if (clearMissing) removeSample(ruleId)
+            } else {
                 saveSample(ruleId, sample)
             }
         }

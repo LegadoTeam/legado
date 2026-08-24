@@ -31,6 +31,7 @@ class ReplacePreviewPersistenceContractTest {
 
         assertTrue(backup.contains("ReplacePreviewConfig.withSamples"))
         assertTrue(restore.contains("ReplacePreviewConfig.saveImportedSamples"))
+        assertTrue(restore.contains("clearMissing = true"))
     }
 
     @Test
