@@ -2734,7 +2734,10 @@ class ReadBookActivity : BaseReadBookActivity(),
                     3 -> readView.upBgAlpha()
                     4 -> readView.upPageSlopSquare()
                     5 -> if (isInitFinish) {
-                        ReadBook.loadContent(resetPageOffset = ReadBook.isScroll)
+                        ReadBook.loadContent(
+                            resetPageOffset = ReadBook.isScroll,
+                            readPositionVersion = readView.getReadPositionVersion(),
+                        )
                     }
                     6 -> readView.upContent(resetPageOffset = false)
                     8 -> ChapterProvider.upStyle()
