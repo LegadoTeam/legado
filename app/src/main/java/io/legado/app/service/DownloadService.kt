@@ -101,7 +101,8 @@ class DownloadService : BaseService() {
             IntentAction.start -> startDownload(
                 intent.getStringExtra("url"),
                 intent.getStringExtra("fileName"),
-                intent.getBooleanExtra("isAppUpdate", false)
+                intent.getBooleanExtra("isAppUpdate", false),
+                intent.getIntExtra("notificationId", 0)
             )
 
             IntentAction.play -> {
@@ -123,8 +124,9 @@ class DownloadService : BaseService() {
 
             IntentAction.stop -> {
                 val downloadId = intent.getLongExtra("downloadId", 0)
-                val notificationId = intent.getIntExtra("notificationId", 0)
-                cancelDownload(downloadId, notificationId)
+                if (!intent.getBooleanExtra(EXTRA_RESULT_NOTIFICATION, false)) {
+                    cancelDownload(downloadId)
+                }
             }
         }
         val result = super.onStartCommand(intent, flags, startId)
@@ -138,7 +140,12 @@ class DownloadService : BaseService() {
      * 开始下载
      */
     @Synchronized
-    private fun startDownload(url: String?, fileName: String?, isAppUpdate: Boolean) {
+    private fun startDownload(
+        url: String?,
+        fileName: String?,
+        isAppUpdate: Boolean,
+        preferredNotificationId: Int = 0
+    ) {
         if (url == null || fileName == null) {
             if (downloads.isEmpty()) {
                 stopSelf()
@@ -163,7 +170,7 @@ class DownloadService : BaseService() {
                     downloadId,
                     url,
                     fileName,
-                    allocateNotificationId(url, fileName),
+                    allocateNotificationId(url, fileName, preferredNotificationId),
                     isAppUpdate
                 )
             queryState()
@@ -185,14 +192,9 @@ class DownloadService : BaseService() {
      * 取消下载
      */
     @Synchronized
-    private fun cancelDownload(downloadId: Long, fallbackNotificationId: Int = 0) {
+    private fun cancelDownload(downloadId: Long) {
         val downloadInfo = downloads[downloadId]
-        if (downloadInfo == null) {
-            if (fallbackNotificationId > 0 && ownsNotification(downloadId, fallbackNotificationId)) {
-                notificationManager.cancel(fallbackNotificationId)
-            }
-            return
-        }
+        if (downloadInfo == null) return
         if (downloadInfo.state != DownloadState.ACTIVE) return
         downloadManager.remove(downloadId)
         downloadInfo.state = DownloadState.CANCELED
@@ -370,15 +372,6 @@ class DownloadService : BaseService() {
         )
     }
 
-    private fun ownsNotification(downloadId: Long, notificationId: Int): Boolean {
-        val notification = notificationManager.activeNotifications
-            .firstOrNull { it.id == notificationId }
-            ?: return false
-        val owner = notification.notification.extras
-            .getLong(EXTRA_DOWNLOAD_ID, Long.MIN_VALUE)
-        return owner == Long.MIN_VALUE || owner == downloadId
-    }
-
     /**
      * 打开下载文件
      */
@@ -434,6 +427,7 @@ class DownloadService : BaseService() {
                             if (action == IntentAction.start) {
                                 putExtra("url", downloadInfo.url)
                                 putExtra("isAppUpdate", downloadInfo.isAppUpdate)
+                                putExtra("notificationId", downloadInfo.notificationId)
                             }
                         }
                     )
@@ -449,11 +443,14 @@ class DownloadService : BaseService() {
                 servicePendingIntent<DownloadService>(IntentAction.stop, downloadInfo.id.toInt()) {
                     putExtra("downloadId", downloadInfo.id)
                     putExtra("notificationId", downloadInfo.notificationId)
+                    putExtra(EXTRA_RESULT_NOTIFICATION, result)
                 }
             )
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setGroup(groupKey)
             .setWhen(downloadInfo.startTime)
+            .apply {
+                if (!result) setGroup(groupKey)
+            }
             .apply {
                 if (terminal) setTimeoutAfter(TERMINAL_NOTIFICATION_DURATION)
             }
@@ -487,7 +484,11 @@ class DownloadService : BaseService() {
         return promoted
     }
 
-    private fun allocateNotificationId(url: String, fileName: String): Int {
+    private fun allocateNotificationId(
+        url: String,
+        fileName: String,
+        preferredNotificationId: Int = 0
+    ): Int {
         val oldTerminal = downloads.values.firstOrNull {
             it.url == url && it.fileName == fileName && it.state != DownloadState.ACTIVE
         }
@@ -506,6 +507,11 @@ class DownloadService : BaseService() {
         if (oldResult != null) {
             notificationManager.cancel(oldResult.id)
             return oldResult.id
+        }
+        if (preferredNotificationId > 0 && notificationManager.activeNotifications.none {
+                it.id == preferredNotificationId
+            }) {
+            return preferredNotificationId
         }
         val activeIds = notificationManager.activeNotifications.mapTo(hashSetOf()) { it.id }
         while (nextNotificationId in activeIds) {
