@@ -276,7 +276,14 @@ class ImportBookSourceStateTest {
         val rssDialog = readProjectFile(
             "src/main/java/io/legado/app/ui/association/ImportRssSourceDialog.kt"
         )
-        assertTrue(rssDialog.contains("menu_replace_source)?.isVisible = false"))
+        assertTrue(rssDialog.contains("viewModel.setUseSourceReplacement(item.isChecked)"))
+        assertTrue(rssDialog.contains("viewModel.originalSourceJson(position)"))
+        assertTrue(rssDialog.contains("alternateCode = viewModel.replacedSourceJson(position)"))
+        assertTrue(rssDialog.contains("showReplaceRules = true"))
+        assertTrue(rssDialog.contains("override fun onOpenReplaceRules"))
+        assertTrue(rssDialog.contains("pendingReplacementRefresh"))
+        assertTrue(rssDialog.contains("viewModel.refreshSourceReplacements(index, source)"))
+        assertFalse(rssDialog.contains("menu_replace_source)?.isVisible = false"))
     }
 
     private fun readProjectFile(pathInApp: String): String {

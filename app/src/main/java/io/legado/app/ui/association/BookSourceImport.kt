@@ -9,7 +9,6 @@ import io.legado.app.utils.fromJsonArray
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.isJsonArray
 import io.legado.app.utils.isJsonObject
-import io.legado.app.utils.replace
 import kotlinx.coroutines.CancellationException
 
 internal sealed interface BookSourceImportJson {
@@ -39,7 +38,7 @@ internal fun prepareBookSourceImportCandidate(
     val sourceName = source.bookSourceName.orEmpty()
     val sourceUrl = source.bookSourceUrl.orEmpty()
     val matchingRules = rules.filter {
-        it.pattern.isNotEmpty() && it.matchesSource(sourceName, sourceUrl)
+        it.pattern.isNotEmpty() && it.matchesSourceImport(sourceName, sourceUrl)
     }
     if (matchingRules.isEmpty()) {
         return BookSourceImportCandidate(source, originalJson, source)
@@ -48,17 +47,7 @@ internal fun prepareBookSourceImportCandidate(
     var replacedJson = originalJson
     try {
         matchingRules.forEach { rule ->
-            replacedJson = if (rule.isRegex) {
-                replacedJson.replace(
-                    rule.name,
-                    rule.regex,
-                    rule.replacement,
-                    rule.getValidTimeoutMillisecond(),
-                    includeContentInTimeoutMessage = false,
-                )
-            } else {
-                replacedJson.replace(rule.pattern, rule.replacement)
-            }
+            replacedJson = applySourceImportReplacement(replacedJson, rule)
         }
         val replaced = (parseBookSourceJson(replacedJson, allowSourceUrls = false)
                 as BookSourceImportJson.Sources).items.single()
@@ -88,17 +77,6 @@ internal fun refreshBookSourceImportCandidates(
             rules,
         )
     }
-}
-
-private fun ReplaceRule.matchesSource(name: String, url: String): Boolean {
-    if (!isEnabled || !scopeSource) return false
-    fun String.matchesSourceValue(): Boolean =
-        (name.isNotBlank() && contains(name, ignoreCase = true)) ||
-            (url.isNotBlank() && contains(url, ignoreCase = true))
-
-    val included = scope.isNullOrEmpty() || scope.orEmpty().matchesSourceValue()
-    val excluded = !excludeScope.isNullOrEmpty() && excludeScope.orEmpty().matchesSourceValue()
-    return included && !excluded
 }
 
 internal fun parseBookSourceJson(

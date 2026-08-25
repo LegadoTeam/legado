@@ -1,6 +1,7 @@
 package io.legado.app.ui.association
 
 import com.google.gson.JsonObject
+import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.data.entities.RssSource
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.source.requireSourceUrl
@@ -56,5 +57,71 @@ internal fun parseSingleRssSourceJson(text: String): RssSource {
         json.isJsonArray() -> GSON.fromJsonArray<RssSource>(json).getOrThrow().singleOrNull()
             ?: throw NoStackTraceException("不是单个订阅源")
         else -> throw NoStackTraceException("不是单个订阅源")
+    }
+}
+
+internal data class RssSourceImportCandidate(
+    val original: RssSource,
+    val originalJson: String,
+    val replaced: RssSource? = null,
+    val replacedJson: String? = null,
+    val replacementError: String? = null,
+) {
+    fun source(useReplacement: Boolean): RssSource =
+        if (useReplacement) replaced ?: original else original
+
+    fun canImport(useReplacement: Boolean): Boolean =
+        !useReplacement || replacementError == null
+}
+
+internal fun prepareRssSourceImportCandidate(
+    source: RssSource,
+    rules: List<ReplaceRule>,
+): RssSourceImportCandidate {
+    val originalJson = GSON.toJson(source)
+    val matchingRules = rules.filter {
+        it.pattern.isNotEmpty() &&
+            it.matchesSourceImport(source.sourceName, source.sourceUrl)
+    }
+    if (matchingRules.isEmpty()) {
+        return RssSourceImportCandidate(source, originalJson, source)
+    }
+
+    var replacedJson = originalJson
+    try {
+        matchingRules.forEach { rule ->
+            replacedJson = applySourceImportReplacement(replacedJson, rule)
+        }
+        val replaced = parseSingleRssSourceJson(replacedJson).also { it.requireSourceUrl() }
+        return RssSourceImportCandidate(
+            source,
+            originalJson,
+            replaced,
+            replacedJson,
+        )
+    } catch (error: kotlinx.coroutines.CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        return RssSourceImportCandidate(
+            source,
+            originalJson,
+            replacedJson = replacedJson,
+            replacementError = error.localizedMessage ?: error.javaClass.simpleName,
+        )
+    }
+}
+
+internal fun refreshRssSourceImportCandidates(
+    candidates: List<RssSourceImportCandidate>,
+    editedIndex: Int,
+    editedSource: RssSource?,
+    rules: List<ReplaceRule>,
+): List<RssSourceImportCandidate> {
+    require(editedIndex in candidates.indices)
+    return candidates.mapIndexed { index, candidate ->
+        prepareRssSourceImportCandidate(
+            if (index == editedIndex) editedSource ?: candidate.original else candidate.original,
+            rules,
+        )
     }
 }
