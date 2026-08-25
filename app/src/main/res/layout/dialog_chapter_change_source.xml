@@ -13,6 +13,7 @@
         android:background="@color/background_menu"
         android:elevation="5dp"
         android:theme="?attr/actionBarStyle"
+        app:contentInsetEndWithActions="16dp"
         app:displayHomeAsUp="false"
         app:fitStatusBar="false"
         app:layout_constraintTop_toTopOf="parent"
