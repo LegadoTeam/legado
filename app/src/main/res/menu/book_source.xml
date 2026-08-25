@@ -141,6 +141,7 @@
     <item
         android:id="@+id/menu_group_sources_by_domain"
         android:checkable="true"
+        android:icon="@drawable/ic_add_online"
         android:title="@string/group_sources_by_domain"
         app:showAsAction="never" />
 

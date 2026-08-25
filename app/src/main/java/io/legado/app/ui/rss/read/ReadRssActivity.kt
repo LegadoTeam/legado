@@ -113,7 +113,8 @@ internal fun shouldPreserveRssArticleOnRefresh(
 /**
  * rss阅读界面
  */
-class ReadRssActivity : VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>(),
+class ReadRssActivity :
+    VMBaseActivity<ActivityRssReadBinding, ReadRssViewModel>(showOpenMenuIcon = false),
     RssFavoritesDialog.Callback {
 
     override val binding by viewBinding(ActivityRssReadBinding::inflate)

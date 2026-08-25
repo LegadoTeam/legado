@@ -12,7 +12,7 @@
 
     <item
         android:id="@+id/menu_show_login_header"
-        android:icon="@drawable/ic_description"
+        android:icon="@drawable/ic_add_online"
         android:title="@string/show_login_header"
         app:showAsAction="never" />
 
