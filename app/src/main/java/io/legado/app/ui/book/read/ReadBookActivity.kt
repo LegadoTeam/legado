@@ -522,7 +522,11 @@ class ReadBookActivity : BaseReadBookActivity(),
                 R.id.menu_group_text -> item.isVisible = book.isLocalTxt
                 R.id.menu_group_epub -> item.isVisible = book.isEpub
                 else -> when (item.itemId) {
-                    R.id.menu_enable_replace -> item.isChecked = book.getUseReplaceRule()
+                    R.id.menu_enable_replace -> {
+                        item.isVisible = !AppConfig.manualReplaceRule
+                        item.isChecked = book.getUseReplaceRule()
+                    }
+                    R.id.menu_manual_replace_rule -> item.isVisible = AppConfig.manualReplaceRule
                     R.id.menu_re_segment -> item.isChecked = book.getReSegment()
 //                    R.id.menu_enable_review -> {
 //                        item.isVisible = BuildConfig.DEBUG
@@ -663,6 +667,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             }
 
             R.id.menu_enable_replace -> changeReplaceRuleState()
+            R.id.menu_manual_replace_rule -> showDialogFragment<ManualReplaceRulesDialog>()
             R.id.menu_re_segment -> ReadBook.book?.let {
                 it.setReSegment(!it.getReSegment())
                 item.isChecked = it.getReSegment()
