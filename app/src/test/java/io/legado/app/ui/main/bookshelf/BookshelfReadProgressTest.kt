@@ -45,7 +45,7 @@ class BookshelfReadProgressTest {
             val document = parseProjectXml("src/main/res/layout/$layout")
             val progress = document.findElementById("@+id/pb_read_progress")
             assertEquals("gone", progress.androidAttribute("visibility"))
-            assertEquals("2dp", progress.appAttribute("trackThickness"))
+            assertEquals("4dp", progress.appAttribute("trackThickness"))
 
             val percent = document.findElementsById("@+id/tv_read_percent")
             if (layout.startsWith("item_bookshelf_list")) {
