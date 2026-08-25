@@ -53,6 +53,14 @@ internal const val MIN_UNDERLINE_DISTANCE = 0f
 internal const val MAX_UNDERLINE_DISTANCE = 30f
 private const val UNDERLINE_CONFIG_VERSION = 1
 
+internal fun underlineConfigReferencesChanged(
+    previous: List<ReadBookConfig.Config>,
+    current: List<ReadBookConfig.Config>,
+): Boolean {
+    if (previous.size != current.size) return true
+    return previous.indices.any { previous[it] !== current[it] }
+}
+
 private fun migrateLegacyUnderline(
     config: ReadBookConfig.Config,
     raw: JsonObject,
@@ -139,6 +147,8 @@ object ReadBookConfig {
     val configList: ArrayList<Config> = arrayListOf()
     lateinit var shareConfig: Config
     private var underlineConfigInitialized = false
+    private var normalizedUnderlineConfigRefs: List<Config> = emptyList()
+    private var normalizedShareConfig: Config? = null
 
     private fun underlineConfigs(): List<Config> {
         val configs = configList.toMutableList()
@@ -148,12 +158,25 @@ object ReadBookConfig {
         return configs
     }
 
+    private fun underlineConfigSourcesChanged(): Boolean {
+        if (underlineConfigReferencesChanged(normalizedUnderlineConfigRefs, configList)) {
+            return true
+        }
+        val share = if (::shareConfig.isInitialized && configList.none { it === shareConfig }) {
+            shareConfig
+        } else {
+            null
+        }
+        return share !== normalizedShareConfig
+    }
+
     private fun normalizeUnderlineConfig() {
         val shareNeedsInit = ::shareConfig.isInitialized &&
             shareConfig.underlineConfigVersion < UNDERLINE_CONFIG_VERSION
         if (underlineConfigInitialized &&
             !configList.any { it.underlineConfigVersion < UNDERLINE_CONFIG_VERSION } &&
-            !shareNeedsInit
+            !shareNeedsInit &&
+            !underlineConfigSourcesChanged()
         ) {
             return
         }
@@ -162,6 +185,12 @@ object ReadBookConfig {
             appCtx.getPrefInt(PreferKey.readStyleSelect)
         )
         underlineConfigInitialized = true
+        normalizedUnderlineConfigRefs = configList.toList()
+        normalizedShareConfig = if (::shareConfig.isInitialized && configList.none { it === shareConfig }) {
+            shareConfig
+        } else {
+            null
+        }
     }
 
     private inline fun updateUnderlineConfig(update: Config.() -> Unit) {
@@ -208,6 +237,8 @@ object ReadBookConfig {
     fun initConfigs() {
         // A restored/imported config can contain the legacy per-style underline value.
         underlineConfigInitialized = false
+        normalizedUnderlineConfigRefs = emptyList()
+        normalizedShareConfig = null
         val configFile = File(configFilePath)
         var configs: List<Config>? = null
         if (configFile.exists()) {
@@ -226,6 +257,8 @@ object ReadBookConfig {
 
     fun initShareConfig() {
         underlineConfigInitialized = false
+        normalizedUnderlineConfigRefs = emptyList()
+        normalizedShareConfig = null
         val configFile = File(shareConfigFilePath)
         var c: Config? = null
         if (configFile.exists()) {

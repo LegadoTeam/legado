@@ -345,11 +345,12 @@ data class TextPage(
         val overflow = 10.dpToPx().toFloat()
         for (i in lines.indices) {
             val line = lines[i]
+            val renderBottom = line.renderBottom()
             if (line.onlyTextColumn && !line.hasOverflowTextStyle && canvas.quickReject(
                     0f,
                     line.lineTop - overflow,
                     view.width.toFloat(),
-                    line.lineBottom + overflow,
+                    renderBottom + overflow,
                     Canvas.EdgeType.AA
                 )
             ) {
@@ -400,10 +401,6 @@ data class TextPage(
     }
 
     fun upRenderHeight() {
-        renderHeight = ceil(lines.last().lineBottom).toInt()
-        if (leftLineSize > 0 && leftLineSize != lines.size) {
-            val leftHeight = ceil(lines[leftLineSize - 1].lineBottom).toInt()
-            renderHeight = max(renderHeight, leftHeight)
-        }
+        renderHeight = ceil(lines.maxOf { it.renderBottom() }).toInt()
     }
 }

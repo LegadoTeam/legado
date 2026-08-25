@@ -32,6 +32,25 @@ import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.utils.canvasrecorder.CanvasRecorderFactory
 import io.legado.app.utils.canvasrecorder.recordIfNeededThenDraw
 import io.legado.app.utils.dpToPx
+import kotlin.math.ceil
+import kotlin.math.max
+
+internal fun underlineRenderBottom(
+    mode: Int,
+    baseline: Float,
+    distancePx: Float,
+    strokeWidthPx: Float,
+    oneDpPx: Float,
+    waveAmplitudePx: Float,
+): Float {
+    val strokeExtent = when (mode) {
+        UNDERLINE_MODE_DOUBLE,
+        UNDERLINE_MODE_DOUBLE_DASHED -> strokeWidthPx + oneDpPx
+        UNDERLINE_MODE_WAVY -> strokeWidthPx / 2f + waveAmplitudePx
+        else -> strokeWidthPx / 2f
+    }
+    return baseline + distancePx + strokeExtent
+}
 
 /**
  * 行信息
@@ -208,11 +227,40 @@ data class TextLine(
 
     fun draw(view: ContentTextView, canvas: Canvas) {
         if (AppConfig.optimizeRender && !hasOverflowTextStyle) {
-            canvasRecorder.recordIfNeededThenDraw(canvas, view.width, height.toInt()) {
+            canvasRecorder.recordIfNeededThenDraw(canvas, view.width, renderedHeight()) {
                 drawTextLine(view, this)
             }
         } else {
             drawTextLine(view, canvas)
+        }
+    }
+
+    fun renderBottom(): Float = lineTop + renderedHeight()
+
+    private fun renderedHeight(): Int {
+        val mode = activeUnderlineMode() ?: return ceil(height).toInt()
+        val baseline = lineBase - lineTop
+        val bottom = underlineRenderBottom(
+            mode = mode,
+            baseline = baseline,
+            distancePx = ReadBookConfig.underlineDistance.dpToPx(),
+            strokeWidthPx = ReadBookConfig.underlineWidth.dpToPx(),
+            oneDpPx = 1f.dpToPx(),
+            waveAmplitudePx = ReadBookConfig.underlineWidth.dpToPx(),
+        )
+        return ceil(max(height, bottom)).toInt()
+    }
+
+    private fun activeUnderlineMode(): Int? {
+        val mode = ReadBookConfig.underlineMode
+        if (mode == UNDERLINE_MODE_OFF) return null
+        val enabled = if (isTitle) {
+            ReadBookConfig.underlineTitleEnabled
+        } else {
+            ReadBookConfig.underlineBodyEnabled
+        }
+        return mode.takeIf {
+            enabled && !isImage && !isHtml && ReadBook.book?.isImage != true
         }
     }
 
@@ -241,16 +289,7 @@ data class TextLine(
             PaintPool.recycle(underlinePaint)
         }
 
-        val underlineMode = ReadBookConfig.underlineMode
-        if (underlineMode == UNDERLINE_MODE_OFF) return
-        val underlineEnabled = if (isTitle) {
-            ReadBookConfig.underlineTitleEnabled
-        } else {
-            ReadBookConfig.underlineBodyEnabled
-        }
-        if (underlineEnabled && !isImage && !isHtml && ReadBook.book?.isImage != true) {
-            drawUnderline(canvas, underlineMode)
-        }
+        activeUnderlineMode()?.let { drawUnderline(canvas, it) }
     }
 
     @SuppressLint("NewApi")

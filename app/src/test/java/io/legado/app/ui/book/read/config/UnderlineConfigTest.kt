@@ -4,6 +4,11 @@ import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.normalizeUnderlineConfigs
 import io.legado.app.help.config.parseReadConfigArray
 import io.legado.app.help.config.parseReadConfigObject
+import io.legado.app.help.config.underlineConfigReferencesChanged
+import io.legado.app.help.config.UNDERLINE_MODE_DOUBLE
+import io.legado.app.help.config.UNDERLINE_MODE_SOLID
+import io.legado.app.help.config.UNDERLINE_MODE_WAVY
+import io.legado.app.ui.book.read.page.entities.underlineRenderBottom
 import io.legado.app.utils.GSON
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -106,6 +111,55 @@ class UnderlineConfigTest {
     }
 
     @Test
+    fun `replacing an already normalized style invalidates the source snapshot`() {
+        val old = ReadBookConfig.Config(underlineConfigVersion = 1)
+        val replacement = ReadBookConfig.Config(underlineConfigVersion = 1)
+
+        assertFalse(underlineConfigReferencesChanged(listOf(old), listOf(old)))
+        assertTrue(underlineConfigReferencesChanged(listOf(old), listOf(replacement)))
+    }
+
+    @Test
+    fun `render bounds include configured underline distance and double stroke`() {
+        assertEquals(
+            21f,
+            underlineRenderBottom(
+                mode = UNDERLINE_MODE_SOLID,
+                baseline = 16f,
+                distancePx = 4f,
+                strokeWidthPx = 2f,
+                oneDpPx = 1f,
+                waveAmplitudePx = 2f,
+            ),
+            0.001f
+        )
+        assertEquals(
+            23f,
+            underlineRenderBottom(
+                mode = UNDERLINE_MODE_DOUBLE,
+                baseline = 16f,
+                distancePx = 4f,
+                strokeWidthPx = 2f,
+                oneDpPx = 1f,
+                waveAmplitudePx = 2f,
+            ),
+            0.001f
+        )
+        assertEquals(
+            29f,
+            underlineRenderBottom(
+                mode = UNDERLINE_MODE_WAVY,
+                baseline = 16f,
+                distancePx = 4f,
+                strokeWidthPx = 6f,
+                oneDpPx = 1f,
+                waveAmplitudePx = 6f,
+            ),
+            0.001f
+        )
+    }
+
+    @Test
     fun `dialog exposes all underline controls and renderer uses baseline distance`() {
         val layout = projectFile("src/main/res/layout/dialog_read_bg_text.xml")
         val document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(layout)
@@ -125,6 +179,12 @@ class UnderlineConfigTest {
         assertFalse(renderer.contains("ChapterProvider.lineSpacingExtra * 10 - 11"))
         assertTrue(renderer.contains("ReadBookConfig.underlineTitleEnabled"))
         assertTrue(renderer.contains("ReadBookConfig.underlineBodyEnabled"))
+        assertTrue(renderer.contains("canvasRecorder.recordIfNeededThenDraw(canvas, view.width, renderedHeight())"))
+        assertTrue(renderer.contains("fun renderBottom(): Float = lineTop + renderedHeight()"))
+        assertTrue(renderer.contains("waveAmplitudePx = ReadBookConfig.underlineWidth.dpToPx()"))
+        val page = projectFile("src/main/java/io/legado/app/ui/book/read/page/entities/TextPage.kt").readText()
+        assertTrue(page.contains("lines.maxOf { it.renderBottom() }"))
+        assertTrue(page.contains("renderBottom + overflow"))
     }
 
     private fun projectFile(pathInApp: String): File {
