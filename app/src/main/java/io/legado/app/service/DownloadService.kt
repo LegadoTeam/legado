@@ -233,13 +233,8 @@ class DownloadService : BaseService() {
 
     private fun scheduleTerminalCleanup(downloadId: Long) {
         terminalJobs.remove(downloadId)?.cancel()
-        val terminalDuration = if (downloads[downloadId]?.isPromoted == true) {
-            TERMINAL_NOTIFICATION_DURATION + RESULT_NOTIFICATION_DELAY
-        } else {
-            0L
-        }
         terminalJobs[downloadId] = lifecycleScope.launch {
-            delay(terminalDuration)
+            delay(TERMINAL_NOTIFICATION_DURATION + RESULT_NOTIFICATION_DELAY)
             finishDownload(downloadId)
         }
     }

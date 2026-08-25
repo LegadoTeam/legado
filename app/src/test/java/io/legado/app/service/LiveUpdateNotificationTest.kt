@@ -95,7 +95,7 @@ class LiveUpdateNotificationTest {
         assertTrue(service.contains("IntentAction.start"))
         assertTrue(service.contains("putExtra(\"isAppUpdate\", downloadInfo.isAppUpdate)"))
         assertTrue(service.contains("notificationManager.cancel(downloadInfo.notificationId)"))
-        assertTrue(service.contains("downloads[downloadId]?.isPromoted == true"))
+        assertTrue(service.contains("delay(TERMINAL_NOTIFICATION_DURATION + RESULT_NOTIFICATION_DELAY)"))
         assertTrue(service.contains("TERMINAL_NOTIFICATION_DURATION + RESULT_NOTIFICATION_DELAY"))
         assertTrue(service.contains("preferredNotificationId"))
         assertTrue(service.contains("putExtra(\"notificationId\", downloadInfo.notificationId)"))
