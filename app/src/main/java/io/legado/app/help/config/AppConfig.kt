@@ -663,6 +663,10 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     val replaceEnableDefault get() = appCtx.getPrefBoolean(PreferKey.replaceEnableDefault, true)
 
+    var manualReplaceRule: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.manualReplaceRule, false)
+        set(value) = appCtx.putPrefBoolean(PreferKey.manualReplaceRule, value)
+
     val webDavDir get() = appCtx.getPrefString(PreferKey.webDavDir, "legado")
 
     val webDavDeviceName get() = appCtx.getPrefString(PreferKey.webDavDeviceName, Build.MODEL)
