@@ -333,11 +333,14 @@ interface BookDao {
         val storedBookUrl = if (has(newBook.bookUrl)) newBook.bookUrl else oldBook.bookUrl
         val customCoverUrl = getCustomCoverUrl(storedBookUrl)
         val persistedCoverUrl = getPersistedCoverUrl(storedBookUrl)
+        val readConfig = oldBook.readConfig
+            ?: GSON.fromJsonObject<Book.ReadConfig>(getReadConfigJson(oldBook.bookUrl)).getOrNull()
         delete(oldBook)
         insert(
             newBook.copy(
                 customCoverUrl = customCoverUrl,
                 persistedCoverUrl = persistedCoverUrl,
+                readConfig = readConfig,
             )
         )
     }

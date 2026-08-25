@@ -499,7 +499,9 @@ data class Book(
         var closeCredits: Int = 0,       //音频片尾
         var playMode: Int = 0,           //音频播放模式
         var playSpeed: Float = 1.0f,     //音频播放速度
-        var useGlobalAudioSkip: Boolean = false
+        var useGlobalAudioSkip: Boolean = false,
+        // 阅读页手动选择的替换规则；旧书籍配置缺失时保持空集合。
+        var manualReplaceRuleIds: List<Long> = emptyList()
     ) : Parcelable
 
     class Converters {
