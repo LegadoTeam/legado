@@ -258,6 +258,7 @@
     <string name="import_local">Import local</string>
     <string name="import_on_line">Import online</string>
     <string name="replace_rule_title">Replacement</string>
+    <string name="manual_replace_rule">Select replacements</string>
     <string name="replace_rule_edit">Edit replacement rule</string>
     <string name="replace_rule">Pattern</string>
     <string name="replace_to">Replacement</string>

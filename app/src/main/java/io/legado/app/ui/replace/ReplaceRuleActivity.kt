@@ -22,6 +22,7 @@ import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.DirectLinkUpload
 import io.legado.app.help.SourceSharePassphrase
 import io.legado.app.help.book.ContentProcessor
+import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReplacePreviewConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.lib.dialogs.alert
@@ -129,6 +130,7 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
         groupMenu = menu.findItem(R.id.menu_group)?.subMenu
+        menu.findItem(R.id.menu_manual_replace_rule)?.isChecked = AppConfig.manualReplaceRule
         upGroupMenu()
         return super.onPrepareOptionsMenu(menu)
     }
@@ -250,6 +252,12 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
                 editActivity.launch(ReplaceEditActivity.startIntent(this))
 
             R.id.menu_group_manage -> showDialogFragment<GroupManageDialog>()
+            R.id.menu_manual_replace_rule -> {
+                AppConfig.manualReplaceRule = !AppConfig.manualReplaceRule
+                item.isChecked = AppConfig.manualReplaceRule
+                setResult(RESULT_OK)
+                invalidateOptionsMenu()
+            }
             R.id.menu_enabled_group -> {
                 searchView.setQuery(getString(R.string.enabled), true)
             }
