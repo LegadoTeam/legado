@@ -37,6 +37,12 @@
     </item>
 
     <item
+        android:id="@+id/menu_manual_replace_rule"
+        android:checkable="true"
+        android:title="@string/manual_replace_rule"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_add_replace_rule"
         android:icon="@drawable/ic_add"
         android:title="@string/add_replace_rule"
