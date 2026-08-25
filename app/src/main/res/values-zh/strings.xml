@@ -256,6 +256,7 @@
     <string name="import_local">本地导入</string>
     <string name="import_on_line">网络导入</string>
     <string name="replace_rule_title">替换管理</string>
+    <string name="manual_replace_rule">手动选择替换</string>
     <string name="replace_rule_edit">替换规则编辑</string>
     <string name="replace_rule">替换规则</string>
     <string name="replace_to">替换为</string>
