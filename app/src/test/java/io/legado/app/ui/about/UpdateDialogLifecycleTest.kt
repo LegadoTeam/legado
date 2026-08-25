@@ -43,17 +43,29 @@ class UpdateDialogLifecycleTest {
     }
 
     @Test
-    fun `beta update dialog opens the selected github asset in the browser`() {
+    fun `update dialog keeps beta browser and formal download actions distinct`() {
         val source = projectFile(
             "src/main/java/io/legado/app/ui/about/UpdateDialog.kt"
         ).readText()
-        val betaBranch = source
-            .substringAfter("binding.betaActions.isVisible = isBetaUpdate")
-            .substringBefore("} else {")
 
         assertTrue(source.contains("putBoolean(\"isBeta\", updateInfo.isBeta)"))
-        assertTrue(betaBranch.contains("requireContext().openUrl(url)"))
-        assertTrue(!betaBranch.contains("startDownload("))
+        assertTrue(source.contains("binding.betaActions.isVisible = true"))
+        assertTrue(source.contains("setLayout(0.9f, 0.8f)"))
+        assertTrue(source.contains("if (isBetaUpdate) R.string.beta_update_now else R.string.action_download"))
+        assertTrue(source.contains("url?.takeIf(String::isNotBlank)?.let { requireContext().openUrl(it) }"))
+        assertTrue(source.contains("startDownload(url)"))
+    }
+
+    @Test
+    fun `formal update hides only the primary toolbar download action`() {
+        val source = projectFile(
+            "src/main/java/io/legado/app/ui/about/UpdateDialog.kt"
+        ).readText()
+
+        assertTrue(source.contains("binding.toolBar.menu.findItem(R.id.menu_download).isVisible = false"))
+        assertTrue(source.contains("R.id.menu_download_backup).isVisible"))
+        assertTrue(source.contains("R.id.menu_download_mirror).isVisible"))
+        assertTrue(source.contains("R.id.menu_download_alternate_mirror).isVisible"))
     }
 
     @Test

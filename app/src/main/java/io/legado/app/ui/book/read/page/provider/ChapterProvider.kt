@@ -131,6 +131,10 @@ object ChapterProvider {
         private set
 
     @JvmStatic
+    var titleLineSpacingExtra = 1f
+        private set
+
+    @JvmStatic
     var paragraphSpacing = 0
         private set
 
@@ -166,6 +170,15 @@ object ChapterProvider {
 
     @JvmStatic
     var contentPaintFontMetrics = FontMetrics()
+
+    @JvmStatic
+    fun lineSpacingFor(line: TextLine): Float {
+        return if (line.isTitle && !line.isTitleNumber) {
+            titleLineSpacingExtra
+        } else {
+            lineSpacingExtra
+        }
+    }
 
     @JvmStatic
     var typeface: Typeface? = Typeface.DEFAULT
@@ -285,6 +298,8 @@ object ChapterProvider {
         reviewPaint.isAntiAlias = true
         //间距
         lineSpacingExtra = ReadBookConfig.lineSpacingExtra / 10f
+        titleLineSpacingExtra =
+            (100 + ReadBookConfig.titleLineSpacingExtra.coerceIn(-20, 30)) / 100f
         paragraphSpacing = ReadBookConfig.paragraphSpacing
         titleTopSpacing = ReadBookConfig.titleTopSpacing.dpToPx()
         titleBottomSpacing = ReadBookConfig.titleBottomSpacing.dpToPx()

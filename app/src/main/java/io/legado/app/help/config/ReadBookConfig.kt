@@ -309,6 +309,12 @@ object ReadBookConfig {
             config.lineSpacingExtra = value
         }
 
+    var titleLineSpacingExtra: Int
+        get() = config.titleLineSpacingExtra
+        set(value) {
+            config.titleLineSpacingExtra = value
+        }
+
     var paragraphSpacing: Int
         get() = config.paragraphSpacing
         set(value) {
@@ -506,6 +512,7 @@ object ReadBookConfig {
             exportConfig.textSize = shareConfig.textSize
             exportConfig.letterSpacing = shareConfig.letterSpacing
             exportConfig.lineSpacingExtra = shareConfig.lineSpacingExtra
+            exportConfig.titleLineSpacingExtra = shareConfig.titleLineSpacingExtra
             exportConfig.paragraphSpacing = shareConfig.paragraphSpacing
             exportConfig.titleMode = shareConfig.titleMode
             exportConfig.titleSize = shareConfig.titleSize
@@ -656,6 +663,7 @@ object ReadBookConfig {
         var textSize: Int = 20,//文字大小
         var letterSpacing: Float = 0.1f,//字间距
         var lineSpacingExtra: Int = 12,//行间距
+        var titleLineSpacingExtra: Int = 0,//章节名行距相对字体行高的偏移，单位0.1
         var paragraphSpacing: Int = 2,//段距
         var titleMode: Int = 0,//标题位置 0:居左 1:居中 2:隐藏 3:居右
         var titleSize: Int = 0,
@@ -979,6 +987,7 @@ object ReadBookConfig {
             "textSize" to textSize,
             "letterSpacing" to letterSpacing,
             "lineSpacingExtra" to lineSpacingExtra,
+            "titleLineSpacingExtra" to titleLineSpacingExtra,
             "paragraphSpacing" to paragraphSpacing,
             "titleMode" to titleMode,
             "titleSize" to titleSize,

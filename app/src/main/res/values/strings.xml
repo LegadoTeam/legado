@@ -864,6 +864,7 @@
     <string name="title_center">Center</string>
     <string name="title_hide">Hide</string>
     <string name="title_color">Chapter title color</string>
+    <string name="title_line_spacing">Chapter title line spacing</string>
     <string name="split_chapter_title">Separate chapter number and title</string>
     <string name="title_number_font_size">Chapter number font size</string>
     <string name="title_number_spacing">Space below chapter number</string>

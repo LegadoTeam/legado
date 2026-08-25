@@ -63,6 +63,9 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
             }
         )
         binding.dsbTitleSize.progress = ReadBookConfig.titleSize
+        binding.dsbTitleLineSpacing.valueFormat = ::titleLineSpacingDisplayValue
+        binding.dsbTitleLineSpacing.progress =
+            titleLineSpacingToProgress(ReadBookConfig.titleLineSpacingExtra)
         upTitleColor()
         binding.swSplitChapterTitle.isChecked = ReadBookConfig.splitChapterTitle
         binding.dsbTitleNumberSize.progress = ReadBookConfig.titleNumberSize
@@ -155,6 +158,10 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
         }
         dsbTitleSize.onChanged = {
             ReadBookConfig.titleSize = it
+            postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
+        }
+        dsbTitleLineSpacing.onChanged = {
+            ReadBookConfig.titleLineSpacingExtra = titleLineSpacingFromProgress(it)
             postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
         }
         llTitleColor.setOnClickListener {
@@ -357,7 +364,24 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
 
 }
 
-private const val TITLE_NUMBER_SPACING_MIN = -20
+private const val TITLE_LINE_SPACING_MIN = -20
+private const val TITLE_LINE_SPACING_MAX = 30
+
+internal fun titleLineSpacingToProgress(spacing: Int): Int {
+    return (spacing.coerceIn(TITLE_LINE_SPACING_MIN, TITLE_LINE_SPACING_MAX) -
+        TITLE_LINE_SPACING_MIN)
+}
+
+internal fun titleLineSpacingFromProgress(progress: Int): Int {
+    return (progress + TITLE_LINE_SPACING_MIN)
+        .coerceIn(TITLE_LINE_SPACING_MIN, TITLE_LINE_SPACING_MAX)
+}
+
+internal fun titleLineSpacingDisplayValue(progress: Int): String {
+    return (titleLineSpacingFromProgress(progress) / 10f).toString()
+}
+
+private const val TITLE_NUMBER_SPACING_MIN = -50
 private const val TITLE_NUMBER_SPACING_MAX = 100
 
 internal fun titleNumberSpacingToProgress(spacing: Int): Int {

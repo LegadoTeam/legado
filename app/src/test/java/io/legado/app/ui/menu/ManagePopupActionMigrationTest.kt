@@ -122,6 +122,7 @@ class ManagePopupActionMigrationTest {
         val menus = mapOf(
             "app_log.xml" to listOf("menu_clear", "menu_export"),
             "crash_log.xml" to listOf("menu_clear"),
+            "rss_read_record.xml" to listOf("menu_clear"),
             "source_login.xml" to listOf(
                 "menu_ok",
                 "menu_show_login_header",
@@ -140,6 +141,20 @@ class ManagePopupActionMigrationTest {
                     item.contains("android:icon=\"@drawable/")
                 )
             }
+        }
+    }
+
+    @Test
+    fun `dialog action icons use the shared toolbar tint`() {
+        mapOf(
+            "src/main/java/io/legado/app/ui/about/AppLogDialog.kt" to
+                "toolBar.menu.applyTint(requireContext())",
+            "src/main/java/io/legado/app/ui/about/CrashLogsDialog.kt" to
+                "binding.toolBar.menu.applyTint(requireContext())",
+            "src/main/java/io/legado/app/ui/rss/article/ReadRecordDialog.kt" to
+                "toolBar.menu.applyTint(requireContext())",
+        ).forEach { (path, expected) ->
+            assertContains(path, readProjectFile(path), expected)
         }
     }
 
