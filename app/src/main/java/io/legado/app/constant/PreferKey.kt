@@ -113,6 +113,7 @@ object PreferKey {
     const val defaultCover = "defaultCover"
     const val defaultCoverDark = "defaultCoverDark"
     const val replaceEnableDefault = "replaceEnableDefault"
+    const val manualReplaceRule = "manualReplaceRule"
     const val showBrightnessView = "showBrightnessView"
     const val autoClearExpired = "autoClearExpired"
     const val autoChangeSource = "autoChangeSource"

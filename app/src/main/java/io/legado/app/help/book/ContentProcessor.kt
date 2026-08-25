@@ -107,11 +107,17 @@ class ContentProcessor private constructor(
         chineseConvert: Boolean = true,
         reSegment: Boolean = true,
         replaceEnabledOverride: Boolean? = null,
+        titleReplaceRulesOverride: List<ReplaceRule>? = null,
+        contentReplaceRulesOverride: List<ReplaceRule>? = null,
     ): BookContent {
         var mContent = content
         var sameTitleRemoved = false
         var effectiveReplaceRules: ArrayList<ReplaceRule>? = null
         val replaceEnabled = replaceEnabledOverride ?: (useReplace && book.getUseReplaceRule())
+        val titleRules = titleReplaceRulesOverride ?: titleReplaceRules
+        val contentRules = contentReplaceRulesOverride ?: contentReplaceRules
+        val contentReplaceEnabled = replaceEnabled &&
+            (contentReplaceRulesOverride == null || contentRules.isNotEmpty())
         val replaceBook by lazy { book.toReplaceBook() }
         if (content != "null") {
             //去除重复标题
@@ -126,7 +132,7 @@ class ContentProcessor private constructor(
                 } else if (replaceEnabled) {
                     title = Pattern.quote(
                         chapter.getDisplayTitle(
-                            titleReplaceRules,
+                            titleRules,
                             chineseConvert = false,
                             replaceBook = replaceBook
                         )
@@ -163,11 +169,11 @@ class ContentProcessor private constructor(
                     placeholder
                 }
             }
-            if (replaceEnabled) {
+            if (contentReplaceEnabled) {
                 //替换
                 effectiveReplaceRules = arrayListOf()
                 mContent = mContent.lines().joinToString("\n") { it.trim() }
-                getContentReplaceRules().forEach { item ->
+                contentRules.forEach { item ->
                     if (item.pattern.isEmpty()) {
                         return@forEach
                     }
@@ -206,7 +212,7 @@ class ContentProcessor private constructor(
         if (includeTitle) {
             //重新添加标题
             mContent = chapter.getDisplayTitle(
-                getTitleReplaceRules(),
+                titleRules,
                 useReplace = replaceEnabled,
                 replaceBook = replaceBook
             ) + "\n" + mContent
