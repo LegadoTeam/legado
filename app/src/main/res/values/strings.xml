@@ -1403,6 +1403,12 @@
     <string name="only_update_read">仅更新已读完</string>
     <string name="ps_only_update_read">自动刷新时，只更新已读完的书籍</string>
     <string name="text_underline">Text underline</string>
+    <string name="underline_color">Underline color</string>
+    <string name="underline_width">Underline width</string>
+    <string name="underline_distance">Underline distance</string>
+    <string name="underline_body">Body</string>
+    <string name="underline_title">Title</string>
+    <string name="underline_double_dashed">Double dashed</string>
     <string name="select_new_source">Select new source</string>
     <string name="select_update_source">Select update source</string>
     <string name="set_local_password">Setting the local password</string>

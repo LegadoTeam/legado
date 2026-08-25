@@ -63,6 +63,7 @@
         tools:ignore="TouchTargetSizeCheck" />
 
     <LinearLayout
+        android:id="@+id/underline_style_row"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
@@ -82,6 +83,63 @@
             android:layout_height="wrap_content"
             android:theme="@style/Spinner" />
     </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/underline_actions_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="6dp">
+
+        <io.legado.app.ui.widget.text.StrokeTextView
+            android:id="@+id/tv_underline_color"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="6dp"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:gravity="center"
+            android:padding="6dp"
+            android:singleLine="true"
+            android:text="@string/underline_color"
+            android:textSize="14sp"
+            app:isBottomBackground="true" />
+
+        <io.legado.app.lib.theme.view.ThemeSwitch
+            android:id="@+id/sw_underline_body"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/underline_body"
+            tools:ignore="TouchTargetSizeCheck" />
+
+        <io.legado.app.lib.theme.view.ThemeSwitch
+            android:id="@+id/sw_underline_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/underline_title"
+            tools:ignore="TouchTargetSizeCheck" />
+    </LinearLayout>
+
+    <io.legado.app.ui.widget.DetailSeekBar
+        android:id="@+id/dsb_underline_width"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="6dp"
+        app:isBottomBackground="true"
+        app:max="18"
+        app:title="@string/underline_width" />
+
+    <io.legado.app.ui.widget.DetailSeekBar
+        android:id="@+id/dsb_underline_distance"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="6dp"
+        app:isBottomBackground="true"
+        app:max="60"
+        app:title="@string/underline_distance" />
 
     <LinearLayout
         android:layout_width="match_parent"

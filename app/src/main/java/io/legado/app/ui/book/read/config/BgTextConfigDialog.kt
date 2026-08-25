@@ -80,6 +80,7 @@ import io.legado.app.help.http.newCallResponse
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.utils.setSelectionSafely
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
 
@@ -88,6 +89,7 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
         const val BG_COLOR = 122
         const val TEXT_ACCENT_COLOR = 123
         const val REVIEW_ICON_COLOR = 124
+        const val UNDERLINE_COLOR = 125
     }
 
     private val binding by viewBinding(DialogReadBgTextBinding::bind)
@@ -159,10 +161,27 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
         ivDelete.setColorFilter(primaryTextColor, PorterDuff.Mode.SRC_IN)
         tvBgAlpha.setTextColor(primaryTextColor)
         tvBgImage.setTextColor(primaryTextColor)
+        tvUnderlineColor.setTextColor(primaryTextColor)
+        swUnderlineBody.setTextColor(primaryTextColor)
+        swUnderlineTitle.setTextColor(primaryTextColor)
+        dsbUnderlineWidth.valueFormat = { "${(1f + it / 2f)}dp" }
+        dsbUnderlineDistance.valueFormat = { "${(it / 2f)}dp" }
         if (ReadBook.book?.isImage == true) {
+            underlineStyleRow.isGone = true
+            underlineActionsRow.isGone = true
+            dsbUnderlineWidth.isGone = true
+            dsbUnderlineDistance.isGone = true
             spUnderline.isGone = true
         } else {
-            val textStyles = arrayOf("关闭", "实线", "虚线")
+            val textStyles = arrayOf(
+                getString(R.string.highlight_action_trigger_off),
+                getString(R.string.highlight_underline_solid),
+                getString(R.string.highlight_underline_dashed),
+                getString(R.string.highlight_underline_dotted),
+                getString(R.string.highlight_underline_double),
+                getString(R.string.highlight_underline_wavy),
+                getString(R.string.underline_double_dashed)
+            )
             val adapter = object : ArrayAdapter<String>(requireContext(), R.layout.item_text_common, textStyles) {
                 override fun getDropDownView(
                     position: Int,
@@ -186,7 +205,7 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
                         isInitializing = false
                         return
                     }
-                    ReadBookConfig.durConfig.underlineMode = position
+                    ReadBookConfig.underlineMode = position
                     postEvent(EventBus.UP_CONFIG, arrayListOf(6, 9, 11))
                 }
                 override fun onNothingSelected(parent: AdapterView<*>) { }
@@ -215,7 +234,20 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
     private fun initData() = with(ReadBookConfig.durConfig) {
         binding.tvName.text = name.ifBlank { "文字" }
         binding.swDarkStatusIcon.isChecked = curStatusIconDark()
-        binding.spUnderline.setSelectionSafely(underlineMode)
+        binding.spUnderline.setSelectionSafely(ReadBookConfig.underlineMode)
+        binding.dsbUnderlineWidth.progress =
+            ((ReadBookConfig.underlineWidth - 1f) * 2f).roundToInt().coerceIn(0, 18)
+        binding.dsbUnderlineDistance.progress =
+            (ReadBookConfig.underlineDistance * 2f).roundToInt().coerceIn(0, 60)
+        binding.swUnderlineBody.isChecked = ReadBookConfig.underlineBodyEnabled
+        binding.swUnderlineTitle.isChecked = ReadBookConfig.underlineTitleEnabled
+        binding.tvUnderlineColor.setTextColor(
+            if (ReadBookConfig.underlineColorSet) {
+                ReadBookConfig.underlineColor
+            } else {
+                ReadBookConfig.textColor
+            }
+        )
         binding.sbBgAlpha.progress = bgAlpha
     }
 
@@ -258,6 +290,17 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
                 .setShowAlphaSlider(false)
                 .setDialogType(ColorPickerDialog.TYPE_CUSTOM)
                 .setDialogId(TEXT_COLOR)
+                .show(requireActivity())
+        }
+        binding.tvUnderlineColor.setOnClickListener {
+            ColorPickerDialog.newBuilder()
+                .setColor(
+                    ReadBookConfig.underlineColor.takeIf { ReadBookConfig.underlineColorSet }
+                        ?: ReadBookConfig.textColor
+                )
+                .setShowAlphaSlider(true)
+                .setDialogType(ColorPickerDialog.TYPE_CUSTOM)
+                .setDialogId(UNDERLINE_COLOR)
                 .show(requireActivity())
         }
         binding.tvTextAccentColor.setOnClickListener {
@@ -361,6 +404,22 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
                 postEvent(EventBus.UP_CONFIG, arrayListOf(3))
             }
         })
+        binding.dsbUnderlineWidth.onChanged = { progress ->
+            ReadBookConfig.underlineWidth = 1f + progress / 2f
+            postEvent(EventBus.UP_CONFIG, arrayListOf(6, 9, 11))
+        }
+        binding.dsbUnderlineDistance.onChanged = { progress ->
+            ReadBookConfig.underlineDistance = progress / 2f
+            postEvent(EventBus.UP_CONFIG, arrayListOf(6, 9, 11))
+        }
+        binding.swUnderlineBody.setOnUserCheckedChangeListener { checked ->
+            ReadBookConfig.underlineBodyEnabled = checked
+            postEvent(EventBus.UP_CONFIG, arrayListOf(6, 9, 11))
+        }
+        binding.swUnderlineTitle.setOnUserCheckedChangeListener { checked ->
+            ReadBookConfig.underlineTitleEnabled = checked
+            postEvent(EventBus.UP_CONFIG, arrayListOf(6, 9, 11))
+        }
     }
 
     private fun showReviewIconTemplates() {

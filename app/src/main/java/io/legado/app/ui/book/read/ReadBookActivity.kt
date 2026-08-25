@@ -97,6 +97,7 @@ import io.legado.app.ui.book.read.config.BgTextConfigDialog.Companion.BG_COLOR
 import io.legado.app.ui.book.read.config.BgTextConfigDialog.Companion.REVIEW_ICON_COLOR
 import io.legado.app.ui.book.read.config.BgTextConfigDialog.Companion.TEXT_ACCENT_COLOR
 import io.legado.app.ui.book.read.config.BgTextConfigDialog.Companion.TEXT_COLOR
+import io.legado.app.ui.book.read.config.BgTextConfigDialog.Companion.UNDERLINE_COLOR
 import io.legado.app.ui.book.read.config.MoreConfigDialog
 import io.legado.app.ui.book.read.config.ReadAloudDialog
 import io.legado.app.ui.book.read.config.ReadStyleDialog
@@ -2271,6 +2272,11 @@ class ReadBookActivity : BaseReadBookActivity(),
             REVIEW_ICON_COLOR -> {
                 ReadBookConfig.reviewIconColor = color
                 postEvent(EventBus.UP_CONFIG, arrayListOf(8, 9, 11))
+            }
+
+            UNDERLINE_COLOR -> {
+                ReadBookConfig.underlineColor = color
+                postEvent(EventBus.UP_CONFIG, arrayListOf(6, 9, 11))
             }
 
             HighlightStyleDialog.HL_FILL,
