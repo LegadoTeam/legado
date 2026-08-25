@@ -60,12 +60,16 @@ import io.legado.app.utils.observeSharedPreferences
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.toastOnUi
 import java.text.BreakIterator
+import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import splitties.init.appCtx
 import splitties.systemservices.audioManager
 import splitties.systemservices.notificationManager
@@ -205,6 +209,8 @@ abstract class BaseReadAloudService : BaseService(),
     private var registeredPhoneStateListener = false
     private val chapterStopTimer = ChapterStopTimer()
     private var dsJob: Job? = null
+    private var readAloudJob: Coroutine<*>? = null
+    private val readAloudGeneration = AtomicLong()
     private var upNotificationJob: Coroutine<*>? = null
     private var cover: Bitmap =
         BitmapFactory.decodeResource(appCtx.resources, R.drawable.icon_read_book)
@@ -213,6 +219,18 @@ abstract class BaseReadAloudService : BaseService(),
     var paragraphStartPos = 0
     var readAloudByPage = false
         private set
+
+    private data class PreparedReadAloud(
+        val textChapter: TextChapter,
+        val pageIndex: Int,
+        val readAloudNumber: Int,
+        val readAloudByPage: Boolean,
+        val contentList: List<String>,
+        val nowSpeak: Int,
+        val readAloudChapterStart: Int,
+        val paragraphStartPos: Int,
+        val consumedToLast: Boolean
+    )
 
     private val broadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -276,6 +294,8 @@ abstract class BaseReadAloudService : BaseService(),
     }
 
     override fun onDestroy() {
+        readAloudGeneration.incrementAndGet()
+        readAloudJob?.cancel()
         super.onDestroy()
         restoreReadAloudFollow()
         updateReadAloudChapterIndex(-1)
@@ -339,21 +359,19 @@ abstract class BaseReadAloudService : BaseService(),
         startPos: Int,
         rewindToSentenceStart: Boolean
     ) {
+        val generation = readAloudGeneration.incrementAndGet()
+        val toLast = this@BaseReadAloudService.toLast
+        readAloudJob?.cancel()
         playStop()
         restoreReadAloudFollow()
-        execute(executeContext = IO) {
-            this@BaseReadAloudService.pageIndex = pageIndex
-            textChapter = ReadBook.curTextChapter
-            val textChapter = textChapter ?: return@execute
-            if (!textChapter.isCompleted) {
-                return@execute
-            }
-            updateReadAloudChapterIndex(textChapter.chapter.index)
-            readAloudNumber = textChapter.getReadLength(pageIndex) + startPos
-            readAloudByPage = getPrefBoolean(PreferKey.readAloudByPage)
-            contentList = textChapter.getNeedReadAloud(0, readAloudByPage, 0)
+        readAloudJob = execute(executeContext = IO) {
+            val textChapter = ReadBook.curTextChapter ?: return@execute
+            if (!textChapter.isCompleted) return@execute
+            val readAloudByPage = getPrefBoolean(PreferKey.readAloudByPage)
+            val contentList = textChapter.getNeedReadAloud(0, readAloudByPage, 0)
                 .split("\n")
                 .filter { it.isNotEmpty() }
+            var readAloudNumber = textChapter.getReadLength(pageIndex) + startPos
             var pos = startPos
             val page = textChapter.getPage(pageIndex)!!
             if (pos > 0) {
@@ -363,7 +381,7 @@ abstract class BaseReadAloudService : BaseService(),
                     pos = tmp
                 }
             }
-            nowSpeak = textChapter.getParagraphNum(readAloudNumber + 1, readAloudByPage) - 1
+            var nowSpeak = textChapter.getParagraphNum(readAloudNumber + 1, readAloudByPage) - 1
             if (shouldRewindReadAloudToSentenceStart(
                     rewindToSentenceStart,
                     readAloudByPage,
@@ -381,9 +399,10 @@ abstract class BaseReadAloudService : BaseService(),
                 pos = page.chapterPosition -
                         textChapter.paragraphs[nowSpeak].chapterPosition
             }
-            readAloudChapterStart = readAloudNumber
+            val readAloudChapterStart = readAloudNumber
+            var consumedToLast = false
             if (toLast) {
-                toLast = false
+                consumedToLast = true
                 readAloudNumber = textChapter.getLastParagraphPosition()
                 nowSpeak = contentList.lastIndex
                 if (page.paragraphs.size == 1) {
@@ -391,12 +410,36 @@ abstract class BaseReadAloudService : BaseService(),
                             textChapter.paragraphs[nowSpeak].chapterPosition
                 }
             }
-            paragraphStartPos = pos
-            launch(Main) {
+            val prepared = PreparedReadAloud(
+                textChapter = textChapter,
+                pageIndex = pageIndex,
+                readAloudNumber = readAloudNumber,
+                readAloudByPage = readAloudByPage,
+                contentList = contentList,
+                nowSpeak = nowSpeak,
+                readAloudChapterStart = readAloudChapterStart,
+                paragraphStartPos = pos,
+                consumedToLast = consumedToLast
+            )
+            ensureActive()
+            withContext(Main.immediate) {
+                if (generation != readAloudGeneration.get()) return@withContext
+                this@BaseReadAloudService.pageIndex = prepared.pageIndex
+                this@BaseReadAloudService.textChapter = prepared.textChapter
+                this@BaseReadAloudService.readAloudNumber = prepared.readAloudNumber
+                this@BaseReadAloudService.readAloudByPage = prepared.readAloudByPage
+                this@BaseReadAloudService.contentList = prepared.contentList
+                this@BaseReadAloudService.nowSpeak = prepared.nowSpeak
+                updateReadAloudChapterIndex(prepared.textChapter.chapter.index)
+                BaseReadAloudService.readAloudChapterStart = prepared.readAloudChapterStart
+                this@BaseReadAloudService.paragraphStartPos = prepared.paragraphStartPos
+                if (prepared.consumedToLast) this@BaseReadAloudService.toLast = false
                 if (play) play() else pageChanged = true
             }
-        }.onError {
-            AppLog.put("启动朗读出错\n${it.localizedMessage}", it, true)
+        }.onError(Main) {
+            if (it !is CancellationException && generation == readAloudGeneration.get()) {
+                AppLog.put("启动朗读出错\n${it.localizedMessage}", it, true)
+            }
         }
     }
 
