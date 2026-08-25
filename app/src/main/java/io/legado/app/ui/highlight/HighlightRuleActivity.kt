@@ -76,7 +76,10 @@ class HighlightRuleActivity :
 
     private fun initSelectActionView() {
         binding.selectActionBar.setMainActionText(R.string.delete)
-        binding.selectActionBar.inflateMenu(R.menu.replace_rule_sel)
+        binding.selectActionBar.inflateMenu(R.menu.replace_rule_sel)?.apply {
+            findItem(R.id.menu_add_group)?.isVisible = false
+            findItem(R.id.menu_remove_group)?.isVisible = false
+        }
         binding.selectActionBar.setOnMenuItemClickListener(this)
         binding.selectActionBar.setCallBack(this)
     }

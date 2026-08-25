@@ -88,6 +88,24 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
         }
     }
 
+    fun selectionAddToGroups(rules: List<ReplaceRule>, groups: String) {
+        execute {
+            val array = Array(rules.size) {
+                rules[it].copy().addGroup(groups)
+            }
+            appDb.replaceRuleDao.update(*array)
+        }
+    }
+
+    fun selectionRemoveFromGroups(rules: List<ReplaceRule>, groups: String) {
+        execute {
+            val array = Array(rules.size) {
+                rules[it].copy().removeGroup(groups)
+            }
+            appDb.replaceRuleDao.update(*array)
+        }
+    }
+
     fun delSelection(rules: List<ReplaceRule>) {
         execute {
             appDb.replaceRuleDao.delete(*rules.toTypedArray())

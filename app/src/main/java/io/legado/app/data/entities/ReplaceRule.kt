@@ -9,7 +9,9 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import io.legado.app.R
 import io.legado.app.constant.AppLog
+import io.legado.app.constant.AppPattern
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.utils.splitNotBlank
 import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
 import splitties.init.appCtx
@@ -91,6 +93,25 @@ data class ReplaceRule(
         } else {
             String.format("%s (%s)", name, group)
         }
+    }
+
+    fun addGroup(groups: String): ReplaceRule {
+        group?.splitNotBlank(AppPattern.splitGroupRegex)
+            ?.toCollection(linkedSetOf())?.let {
+                it.addAll(groups.splitNotBlank(AppPattern.splitGroupRegex))
+                group = it.joinToString(",")
+            }
+        if (group.isNullOrBlank()) group = groups
+        return this
+    }
+
+    fun removeGroup(groups: String): ReplaceRule {
+        group?.splitNotBlank(AppPattern.splitGroupRegex)
+            ?.toCollection(linkedSetOf())?.let {
+                it.removeAll(groups.splitNotBlank(AppPattern.splitGroupRegex).toSet())
+                group = it.joinToString(",")
+            }
+        return this
     }
 
     fun isValid(): Boolean {

@@ -32,6 +32,24 @@ class ReplaceRuleViewModelGroupContractTest {
         assertTrue(bottom.contains("it.order = maxOrder++"))
     }
 
+    @Test
+    fun `selection group actions copy rules and update only group members`() {
+        assertTrue(
+            source.contains(
+                "fun selectionAddToGroups(rules: List<ReplaceRule>, groups: String)"
+            )
+        )
+        assertTrue(
+            source.contains(
+                "fun selectionRemoveFromGroups(rules: List<ReplaceRule>, groups: String)"
+            )
+        )
+        assertTrue(source.contains("rules[it].copy().addGroup(groups)"))
+        assertTrue(source.contains("rules[it].copy().removeGroup(groups)"))
+        assertFalse(source.contains("scope = groups"))
+        assertFalse(source.contains("excludeScope = groups"))
+    }
+
     private fun projectFile(pathInApp: String): File {
         return listOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull { it.isFile }

@@ -149,6 +149,8 @@ class SelectActionBarPopupActionMigrationTest {
             "replace_rule_sel.xml" to listOf(
                 "@+id/menu_enable_selection",
                 "@+id/menu_disable_selection",
+                "@+id/menu_add_group",
+                "@+id/menu_remove_group",
                 "@+id/menu_top_sel",
                 "@+id/menu_bottom_sel",
                 "@+id/menu_export_selection"
