@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.net.Uri
+import android.os.Bundle
 import android.os.Environment
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -42,6 +43,11 @@ internal fun isActiveDownloadStatus(statusCode: Int): Boolean =
 class DownloadService : BaseService() {
     companion object {
         private const val TERMINAL_NOTIFICATION_DURATION = 4_500L
+        private const val RESULT_NOTIFICATION_DELAY = 100L
+        private const val EXTRA_DOWNLOAD_ID = "io.legado.app.download.id"
+        private const val EXTRA_DOWNLOAD_URL = "io.legado.app.download.url"
+        private const val EXTRA_DOWNLOAD_FILE_NAME = "io.legado.app.download.file_name"
+        private const val EXTRA_RESULT_NOTIFICATION = "io.legado.app.download.result"
     }
 
     private enum class DownloadState {
@@ -76,8 +82,15 @@ class DownloadService : BaseService() {
     override fun onDestroy() {
         upStateJob?.cancel()
         terminalJobs.values.forEach { it.cancel() }
-        downloads.values.filter { it.isPromoted }.forEach {
-            notificationManager.cancel(it.notificationId)
+        downloads.values.forEach { downloadInfo ->
+            if (downloadInfo.state == DownloadState.COMPLETED ||
+                downloadInfo.state == DownloadState.FAILED
+            ) {
+                notificationManager.cancel(downloadInfo.notificationId)
+                updateResultNotification(downloadInfo)
+            } else if (downloadInfo.isPromoted) {
+                notificationManager.cancel(downloadInfo.notificationId)
+            }
         }
         unregisterReceiver(downloadReceiver)
         super.onDestroy()
@@ -88,7 +101,8 @@ class DownloadService : BaseService() {
             IntentAction.start -> startDownload(
                 intent.getStringExtra("url"),
                 intent.getStringExtra("fileName"),
-                intent.getBooleanExtra("isAppUpdate", false)
+                intent.getBooleanExtra("isAppUpdate", false),
+                intent.getIntExtra("notificationId", 0)
             )
 
             IntentAction.play -> {
@@ -110,8 +124,9 @@ class DownloadService : BaseService() {
 
             IntentAction.stop -> {
                 val downloadId = intent.getLongExtra("downloadId", 0)
-                val notificationId = intent.getIntExtra("notificationId", 0)
-                cancelDownload(downloadId, notificationId)
+                if (!intent.getBooleanExtra(EXTRA_RESULT_NOTIFICATION, false)) {
+                    cancelDownload(downloadId)
+                }
             }
         }
         val result = super.onStartCommand(intent, flags, startId)
@@ -125,7 +140,12 @@ class DownloadService : BaseService() {
      * 开始下载
      */
     @Synchronized
-    private fun startDownload(url: String?, fileName: String?, isAppUpdate: Boolean) {
+    private fun startDownload(
+        url: String?,
+        fileName: String?,
+        isAppUpdate: Boolean,
+        preferredNotificationId: Int = 0
+    ) {
         if (url == null || fileName == null) {
             if (downloads.isEmpty()) {
                 stopSelf()
@@ -146,7 +166,13 @@ class DownloadService : BaseService() {
             // 添加一个下载任务
             val downloadId = downloadManager.enqueue(request)
             downloads[downloadId] =
-                DownloadInfo(downloadId, url, fileName, allocateNotificationId(), isAppUpdate)
+                DownloadInfo(
+                    downloadId,
+                    url,
+                    fileName,
+                    allocateNotificationId(url, fileName, preferredNotificationId),
+                    isAppUpdate
+                )
             queryState()
             if (upStateJob == null) {
                 checkDownloadState()
@@ -166,14 +192,9 @@ class DownloadService : BaseService() {
      * 取消下载
      */
     @Synchronized
-    private fun cancelDownload(downloadId: Long, fallbackNotificationId: Int = 0) {
+    private fun cancelDownload(downloadId: Long) {
         val downloadInfo = downloads[downloadId]
-        if (downloadInfo == null) {
-            if (fallbackNotificationId > 0) {
-                notificationManager.cancel(fallbackNotificationId)
-            }
-            return
-        }
+        if (downloadInfo == null) return
         if (downloadInfo.state != DownloadState.ACTIVE) return
         downloadManager.remove(downloadId)
         downloadInfo.state = DownloadState.CANCELED
@@ -213,7 +234,7 @@ class DownloadService : BaseService() {
     private fun scheduleTerminalCleanup(downloadId: Long) {
         terminalJobs.remove(downloadId)?.cancel()
         terminalJobs[downloadId] = lifecycleScope.launch {
-            delay(TERMINAL_NOTIFICATION_DURATION)
+            delay(TERMINAL_NOTIFICATION_DURATION + RESULT_NOTIFICATION_DELAY)
             finishDownload(downloadId)
         }
     }
@@ -223,6 +244,11 @@ class DownloadService : BaseService() {
         val downloadInfo = downloads.remove(downloadId) ?: return
         terminalJobs.remove(downloadId)
         notificationManager.cancel(downloadInfo.notificationId)
+        if (downloadInfo.state == DownloadState.COMPLETED ||
+            downloadInfo.state == DownloadState.FAILED
+        ) {
+            updateResultNotification(downloadInfo)
+        }
         if (downloads.isEmpty()) {
             stopSelf()
         }
@@ -326,6 +352,21 @@ class DownloadService : BaseService() {
         )
     }
 
+    private fun updateResultNotification(downloadInfo: DownloadInfo) {
+        val statusText = when (downloadInfo.state) {
+            DownloadState.COMPLETED -> getString(R.string.download_success)
+            DownloadState.FAILED -> getString(R.string.download_error)
+            else -> return
+        }
+        upDownloadNotification(
+            downloadInfo,
+            statusText,
+            statusText,
+            terminal = false,
+            result = true
+        )
+    }
+
     /**
      * 打开下载文件
      */
@@ -358,7 +399,8 @@ class DownloadService : BaseService() {
         downloadInfo: DownloadInfo,
         contentText: String,
         criticalText: String,
-        terminal: Boolean
+        terminal: Boolean,
+        result: Boolean = false
     ): Boolean {
         val notificationBuilder = NotificationCompat.Builder(this, AppConst.channelIdDownload)
             .setSmallIcon(R.drawable.ic_download)
@@ -367,38 +409,57 @@ class DownloadService : BaseService() {
             .setContentText(downloadInfo.fileName)
             .setOnlyAlertOnce(true)
             .apply {
-                if (downloadInfo.state == DownloadState.COMPLETED) {
+                if (result || downloadInfo.state == DownloadState.COMPLETED) {
+                    val action = if (result && downloadInfo.state == DownloadState.FAILED) {
+                        IntentAction.start
+                    } else {
+                        IntentAction.play
+                    }
                     setContentIntent(
-                        servicePendingIntent<DownloadService>(IntentAction.play, downloadInfo.id.toInt()) {
+                        servicePendingIntent<DownloadService>(action, downloadInfo.id.toInt()) {
                             putExtra("downloadId", downloadInfo.id)
                             putExtra("fileName", downloadInfo.fileName)
+                            if (action == IntentAction.start) {
+                                putExtra("url", downloadInfo.url)
+                                putExtra("isAppUpdate", downloadInfo.isAppUpdate)
+                                putExtra("notificationId", downloadInfo.notificationId)
+                            }
                         }
                     )
                 }
             }
+            .addExtras(Bundle().apply {
+                putLong(EXTRA_DOWNLOAD_ID, downloadInfo.id)
+                putString(EXTRA_DOWNLOAD_URL, downloadInfo.url)
+                putString(EXTRA_DOWNLOAD_FILE_NAME, downloadInfo.fileName)
+                putBoolean(EXTRA_RESULT_NOTIFICATION, result)
+            })
             .setDeleteIntent(
                 servicePendingIntent<DownloadService>(IntentAction.stop, downloadInfo.id.toInt()) {
                     putExtra("downloadId", downloadInfo.id)
                     putExtra("notificationId", downloadInfo.notificationId)
+                    putExtra(EXTRA_RESULT_NOTIFICATION, result)
                 }
             )
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setGroup(groupKey)
             .setWhen(downloadInfo.startTime)
+            .apply {
+                if (!result) setGroup(groupKey)
+            }
             .apply {
                 if (terminal) setTimeoutAfter(TERMINAL_NOTIFICATION_DURATION)
             }
         val promoted = notificationBuilder.applyPromotedProgress(
             this,
             AppConst.channelIdDownload,
-            eligible = true,
-            ongoing = true,
+            eligible = !result,
+            ongoing = !result,
             max = downloadInfo.max,
             progress = downloadInfo.progress,
             criticalText = criticalText,
             terminal = terminal
         )
-        if (!terminal) {
+        if (!terminal && !result) {
             notificationBuilder.addAction(
                 R.drawable.ic_stop_black_24dp,
                 getString(R.string.cancel),
@@ -411,11 +472,42 @@ class DownloadService : BaseService() {
                 notificationBuilder.setProgress(downloadInfo.max, downloadInfo.progress, false)
             }
         }
+        if (result) {
+            notificationBuilder.setAutoCancel(true)
+        }
         notificationManager.notify(downloadInfo.notificationId, notificationBuilder.build())
         return promoted
     }
 
-    private fun allocateNotificationId(): Int {
+    private fun allocateNotificationId(
+        url: String,
+        fileName: String,
+        preferredNotificationId: Int = 0
+    ): Int {
+        val oldTerminal = downloads.values.firstOrNull {
+            it.url == url && it.fileName == fileName && it.state != DownloadState.ACTIVE
+        }
+        if (oldTerminal != null) {
+            terminalJobs.remove(oldTerminal.id)?.cancel()
+            downloads.remove(oldTerminal.id)
+            notificationManager.cancel(oldTerminal.notificationId)
+            return oldTerminal.notificationId
+        }
+        val oldResult = notificationManager.activeNotifications.firstOrNull { item ->
+            val extras = item.notification.extras
+            extras.getBoolean(EXTRA_RESULT_NOTIFICATION) &&
+                extras.getString(EXTRA_DOWNLOAD_URL) == url &&
+                extras.getString(EXTRA_DOWNLOAD_FILE_NAME) == fileName
+        }
+        if (oldResult != null) {
+            notificationManager.cancel(oldResult.id)
+            return oldResult.id
+        }
+        if (preferredNotificationId > 0 && notificationManager.activeNotifications.none {
+                it.id == preferredNotificationId
+            }) {
+            return preferredNotificationId
+        }
         val activeIds = notificationManager.activeNotifications.mapTo(hashSetOf()) { it.id }
         while (nextNotificationId in activeIds) {
             nextNotificationId++
