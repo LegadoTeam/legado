@@ -2,7 +2,6 @@ package io.legado.app.ui.about
 
 import android.os.Bundle
 import android.view.View
-import android.view.ViewGroup
 import android.widget.LinearLayout
 import androidx.core.view.isVisible
 import io.legado.app.R
@@ -49,11 +48,7 @@ class UpdateDialog() : BaseDialogFragment(R.layout.dialog_update) {
 
     override fun onStart() {
         super.onStart()
-        if (isBetaUpdate) {
-            setLayout(0.9f, 0.8f)
-        } else {
-            setLayout(0.9f, ViewGroup.LayoutParams.WRAP_CONTENT)
-        }
+        setLayout(0.9f, 0.8f)
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
@@ -77,21 +72,27 @@ class UpdateDialog() : BaseDialogFragment(R.layout.dialog_update) {
                 .build()
                 .setMarkdown(binding.textView, updateBody)
         }
-        binding.betaActions.isVisible = isBetaUpdate
-        if (isBetaUpdate) {
-            (binding.textView.layoutParams as LinearLayout.LayoutParams).apply {
-                height = 0
-                weight = 1f
-            }
-            binding.btnBetaCancel.setOnClickListener { dismiss() }
-            binding.btnBetaUpdate.setOnClickListener {
-                arguments?.getString("url")
-                    ?.takeIf(String::isNotBlank)
-                    ?.let { url -> requireContext().openUrl(url) }
+        binding.betaActions.isVisible = true
+        (binding.textView.layoutParams as LinearLayout.LayoutParams).apply {
+            height = 0
+            weight = 1f
+        }
+        binding.btnBetaCancel.setOnClickListener { dismiss() }
+        binding.btnBetaUpdate.setText(
+            if (isBetaUpdate) R.string.beta_update_now else R.string.action_download
+        )
+        binding.btnBetaUpdate.setOnClickListener {
+            val url = arguments?.getString("url")
+            if (isBetaUpdate) {
+                url?.takeIf(String::isNotBlank)?.let { requireContext().openUrl(it) }
                 dismiss()
+            } else {
+                startDownload(url)
             }
-        } else {
+        }
+        if (!isBetaUpdate) {
             binding.toolBar.inflateMenu(R.menu.app_update)
+            binding.toolBar.menu.findItem(R.id.menu_download).isVisible = false
             binding.toolBar.menu.findItem(R.id.menu_download_backup).isVisible =
                 !arguments?.getString("backupUrl").isNullOrBlank()
             binding.toolBar.menu.findItem(R.id.menu_download_mirror).isVisible =
