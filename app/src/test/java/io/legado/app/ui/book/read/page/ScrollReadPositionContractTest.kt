@@ -43,6 +43,11 @@ class ScrollReadPositionContractTest {
             configUpdate.indexOf("updateScrollReadPosition()") <
                 configUpdate.indexOf("values.forEach")
         )
+        assertTrue(
+            configUpdate.contains(
+                "readPositionVersion = readView.getReadPositionVersion()"
+            )
+        )
 
         val pageView = source("app/src/main/java/io/legado/app/ui/book/read/page/PageView.kt")
         assertTrue(pageView.contains("chapterPosition: Int = ReadBook.durChapterPos"))
