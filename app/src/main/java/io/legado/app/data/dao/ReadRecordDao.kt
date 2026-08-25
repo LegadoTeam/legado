@@ -37,8 +37,9 @@ interface ReadRecordDao {
         select bookName, sum(readTime) as readTime, max(lastRead) as lastRead,
             group_concat(author, char(31)) as author
         from readRecord 
-        where bookName like '%' || :searchKey || '%'
         group by bookName 
+        having bookName like '%' || :searchKey || '%'
+            or group_concat(author, char(31)) like '%' || :searchKey || '%'
         order by bookName collate localized"""
     )
     fun search(searchKey: String): List<ReadRecordShow>
