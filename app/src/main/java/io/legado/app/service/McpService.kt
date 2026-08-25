@@ -159,7 +159,8 @@ class McpService : BaseService() {
 
     @Synchronized
     private fun upMcpServer() {
-        if (destroyed || stopping) return
+        if (destroyed) return
+        if (stopping) return
         val token = AppConfig.jsSourceApiToken
         if (AppConfig.jsSourceApiTokenRequired && token.isNullOrBlank()) {
             stopWithError(getString(R.string.mcp_service_token_required))
