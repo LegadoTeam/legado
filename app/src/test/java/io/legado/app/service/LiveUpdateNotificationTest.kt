@@ -107,6 +107,35 @@ class LiveUpdateNotificationTest {
         assertTrue(updateDialog.contains("isAppUpdate = true"))
     }
 
+    @Test
+    fun `web and MCP services reuse one live notification through stop`() {
+        val web = source("app/src/main/java/io/legado/app/service/WebService.kt")
+        val mcp = source("app/src/main/java/io/legado/app/service/McpService.kt")
+        val updateLog = source("app/src/main/assets/updateLog.md")
+
+        assertTrue(web.contains("applyPromotedProgress("))
+        assertTrue(web.contains("eligible = terminal || httpServer?.isAlive == true"))
+        assertTrue(web.contains("terminal = terminal"))
+        assertTrue(web.contains("startForeground(NotificationId.WebService"))
+        assertTrue(web.contains("IntentAction.stop -> stopServiceWithNotification()"))
+        assertTrue(web.contains("setTimeoutAfter(TERMINAL_NOTIFICATION_DURATION)"))
+        assertTrue(web.contains("terminalStopJob"))
+        assertTrue(web.contains("if (isRun)"))
+        assertTrue(web.contains("createNotification(terminal = stopping)"))
+
+        assertTrue(mcp.contains("applyPromotedProgress("))
+        assertTrue(mcp.contains("eligible = terminal || isRun"))
+        assertTrue(mcp.contains("terminal = terminal"))
+        assertTrue(mcp.contains("startForeground(NotificationId.McpService"))
+        assertTrue(mcp.contains("IntentAction.stop -> stopServiceWithNotification()"))
+        assertTrue(mcp.contains("setTimeoutAfter(TERMINAL_NOTIFICATION_DURATION)"))
+        assertTrue(mcp.contains("terminalStopJob"))
+        assertTrue(mcp.contains("if (isRun)"))
+        assertTrue(mcp.contains("createNotification(terminal = stopping)"))
+
+        assertTrue(updateLog.contains("Web 与 MCP 服务支持 Android 16 实时更新通知"))
+    }
+
     private fun source(path: String): String {
         return listOf(File(path), File("../$path"))
             .first { it.isFile }

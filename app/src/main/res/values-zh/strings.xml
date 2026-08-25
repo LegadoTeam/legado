@@ -296,6 +296,10 @@
     <string name="download_live_update_completed">下载完成 请安装</string>
     <string name="download_live_canceled">下载 已取消</string>
     <string name="download_live_failed">下载 失败</string>
+    <string name="web_service_live_started">Web已开启</string>
+    <string name="web_service_live_stopped">Web已关闭</string>
+    <string name="mcp_service_live_started">MCP已开启</string>
+    <string name="mcp_service_live_stopped">MCP已关闭</string>
     <string name="no_download">暂无任务</string>
     <string name="download_count">已下载 %1$d/%2$d</string>
     <string name="import_select_book">导入选择书籍</string>

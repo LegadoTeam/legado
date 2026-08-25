@@ -299,6 +299,10 @@
     <string name="download_live_update_completed">Download completed, install</string>
     <string name="download_live_canceled">Download canceled</string>
     <string name="download_live_failed">Download failed</string>
+    <string name="web_service_live_started">Web service started</string>
+    <string name="web_service_live_stopped">Web service stopped</string>
+    <string name="mcp_service_live_started">MCP service started</string>
+    <string name="mcp_service_live_stopped">MCP service stopped</string>
     <string name="no_download">No download</string>
     <string name="download_count">Downloaded %1$d/%2$d</string>
     <string name="import_select_book">Import selected book(s)</string>
