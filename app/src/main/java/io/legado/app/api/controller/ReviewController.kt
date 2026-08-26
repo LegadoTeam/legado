@@ -2,6 +2,7 @@ package io.legado.app.api.controller
 
 import androidx.annotation.Keep
 import androidx.collection.LruCache
+import com.google.gson.JsonParser
 import com.google.gson.annotations.SerializedName
 import com.script.rhino.runScriptWithContext
 import io.legado.app.api.ReturnData
@@ -22,12 +23,57 @@ import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
+import java.net.URLEncoder
 import java.util.UUID
 import kotlin.coroutines.coroutineContext
 
 private val legacyReviewClickPattern = Regex(
     """^(?:getDP\(\s*\d+\s*,\s*\d+\s*\)|getZP\(\s*\d+\s*\))$"""
 )
+private val legacyHeifUrlPattern = Regex("""(?i)^https?://.*\.(?:heic|heif)(?:[?#].*|$)""")
+private val legacyReviewImageTagPattern = Regex("""(?is)<img\b[^>]*>""")
+private val legacyReviewImageAttributePattern = Regex(
+    """(?i)(\b(?:src|data-src|data-original)\s*=\s*)([\"'])(.*?)\2"""
+)
+
+internal fun rewriteLegacyReviewImages(html: String, bookUrl: String): String =
+    legacyReviewImageTagPattern.replace(html) { tag ->
+        legacyReviewImageAttributePattern.replace(tag.value) { attribute ->
+            val raw = attribute.groupValues[3]
+            if (!legacyHeifUrlPattern.matches(raw)) {
+                attribute.value
+            } else {
+                val proxy = "/image?path=${encodeLegacyReviewQuery(raw)}" +
+                    "&url=${encodeLegacyReviewQuery(bookUrl)}&width=2048"
+                attribute.groupValues[1] + attribute.groupValues[2] +
+                    escapeHtmlAttribute(proxy) + attribute.groupValues[2]
+            }
+        }
+    }
+
+internal fun rewriteLegacyReviewResult(result: String, bookUrl: String): String {
+    val parsed = runCatching { JsonParser.parseString(result) }.getOrNull()
+    if (parsed?.isJsonObject == true) {
+        val json = parsed.asJsonObject
+        val html = json.get("html")
+            ?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
+            ?.asString
+        if (html != null) {
+            json.addProperty("html", rewriteLegacyReviewImages(html, bookUrl))
+            return GSON.toJson(json)
+        }
+    }
+    return rewriteLegacyReviewImages(result, bookUrl)
+}
+
+private fun encodeLegacyReviewQuery(value: String): String =
+    URLEncoder.encode(value, Charsets.UTF_8.name())
+
+private fun escapeHtmlAttribute(value: String): String = value
+    .replace("&", "&amp;")
+    .replace("\"", "&quot;")
+    .replace("<", "&lt;")
+    .replace(">", "&gt;")
 
 internal fun parseLegacyReviewClickScript(src: String): String? {
     val matcher = AnalyzeUrl.paramPattern.matcher(src)
@@ -363,7 +409,12 @@ object ReviewController {
             browserPage = it
         }
         val page = requireNotNull(browserPage) { "旧评论脚本未返回页面" }
-        require(!page.html.isNullOrBlank()) { "旧评论页面内容为空" }
+        val pageHtml = requireNotNull(page.html?.takeIf { it.isNotBlank() }) {
+            "旧评论页面内容为空"
+        }
+        val normalizedPage = page.copy(
+            html = rewriteLegacyReviewImages(pageHtml, context.book.bookUrl)
+        )
 
         val id = UUID.randomUUID().toString()
         val nonce = UUID.randomUUID().toString()
@@ -375,7 +426,7 @@ object ReviewController {
                     chapterIndex = context.chapter.index,
                     sourceKey = source.getKey(),
                     nonce = nonce,
-                    page = page,
+                    page = normalizedPage,
                     frameOrigin = frameOrigin,
                     expiresAt = System.currentTimeMillis() + LEGACY_REVIEW_SESSION_TTL,
                 )
@@ -395,12 +446,13 @@ object ReviewController {
         val context = requireContext(session.bookUrl, session.chapterIndex)
         require(context.source?.getKey() == session.sourceKey) { "书源已变更，请重新打开评论" }
         val source = requireNotNull(context.source) { "未找到书源" }
-        requireNotNull(runScriptWithContext {
+        val result = requireNotNull(runScriptWithContext {
             AnalyzeRule(context.book, source)
                 .setChapter(context.chapter)
                 .setCoroutineContext(coroutineContext)
                 .evalJS(request.script)
         }) { "旧评论脚本未返回结果" }.toString()
+        rewriteLegacyReviewResult(result, session.bookUrl)
     }
 
     internal fun getLegacyReviewPage(
@@ -411,7 +463,7 @@ object ReviewController {
         val session = getLegacyReviewSession(id) ?: return null
         if (nonce != session.nonce) return null
         return LegacyReviewWebPage(
-            html = injectLegacyReviewBridge(session.nonce, session.page),
+            html = injectLegacyReviewBridge(session.nonce, session.bookUrl, session.page),
             frameOrigin = session.frameOrigin,
         )
     }
@@ -448,6 +500,7 @@ object ReviewController {
 
     private fun injectLegacyReviewBridge(
         nonce: String,
+        bookUrl: String,
         page: LegacyReviewBrowserPage,
     ): String {
         val bridge = """
@@ -457,6 +510,71 @@ object ReviewController {
               window.setInterval = (callback, delay, ...args) =>
                 nativeSetInterval(callback, Math.max(100, Number(delay) || 0), ...args);
               const nonce = ${GSON.toJson(nonce)};
+              const bookUrl = ${GSON.toJson(bookUrl).replace("<", "\\u003c")};
+              const heifPattern = /\.(?:heic|heif)(?:[?#]|$)/i;
+              const isProxyImageUrl = raw => {
+                try {
+                  const target = new URL(String(raw || ''), window.location.href);
+                  return target.pathname === '/image' &&
+                    target.searchParams.has('path') && target.searchParams.has('url');
+                } catch (_) {
+                  return false;
+                }
+              };
+              const proxyImageUrl = raw => {
+                const value = String(raw || '');
+                if (isProxyImageUrl(value) || !/^https?:/i.test(value) || !heifPattern.test(value)) {
+                  return value;
+                }
+                try {
+                  const target = new URL('/image', window.location.href);
+                  target.searchParams.set('path', value);
+                  target.searchParams.set('url', bookUrl);
+                  target.searchParams.set('width', '2048');
+                  return target.toString();
+                } catch (_) {
+                  return value;
+                }
+              };
+              const rewriteImage = image => {
+                if (!(image instanceof HTMLImageElement)) return;
+                const dataOriginal = image.getAttribute('data-original') ||
+                  image.getAttribute('data-src') || '';
+                const current = image.getAttribute('src') || '';
+                const storedOriginal = image.getAttribute('data-legado-original-src') || '';
+                const raw = storedOriginal ||
+                  (heifPattern.test(dataOriginal) ? dataOriginal :
+                    heifPattern.test(current) ? current : dataOriginal || current);
+                const proxied = proxyImageUrl(raw);
+                if (proxied === raw) return;
+                if (!storedOriginal) image.setAttribute('data-legado-original-src', raw);
+                if (image.getAttribute('data-original') !== proxied)
+                  image.setAttribute('data-original', proxied);
+                if (current !== proxied) image.setAttribute('src', proxied);
+              };
+              const rewriteImages = root => {
+                if (!root) return;
+                rewriteImage(root);
+                root.querySelectorAll?.('img').forEach(rewriteImage);
+              };
+              const observeImages = () => {
+                const root = document.documentElement;
+                if (!root) {
+                  document.addEventListener('DOMContentLoaded', observeImages, {once: true});
+                  return;
+                }
+                rewriteImages(document);
+                new MutationObserver(records => records.forEach(record => {
+                  record.addedNodes.forEach(node => rewriteImages(node));
+                  if (record.type === 'attributes') rewriteImage(record.target);
+                })).observe(root, {
+                  childList: true,
+                  subtree: true,
+                  attributes: true,
+                  attributeFilter: ['src', 'data-src', 'data-original']
+                });
+              };
+              observeImages();
               const finishLoading = () =>
                 document.getElementById('loading')?.classList.add('hidden');
               const showError = error => {
@@ -526,12 +644,6 @@ object ReviewController {
         }
         return injection + page.html
     }
-
-    private fun escapeHtmlAttribute(value: String): String = value
-        .replace("&", "&amp;")
-        .replace("\"", "&quot;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
 
     private fun respond(block: suspend () -> Any): ReturnData {
         return try {

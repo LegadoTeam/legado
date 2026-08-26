@@ -1,5 +1,10 @@
 package io.legado.app.api
 
+import com.google.gson.JsonParser
+import io.legado.app.api.controller.rewriteLegacyReviewImages
+import io.legado.app.api.controller.rewriteLegacyReviewResult
+import io.legado.app.utils.GSON
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -127,6 +132,16 @@ class ReviewWebApiContractTest {
         assertTrue(controller.contains("image instanceof HTMLImageElement"))
         assertTrue(controller.contains("type: 'legado-legacy-review-image'"))
         assertTrue(controller.contains("image.currentSrc || image.src"))
+        assertTrue(controller.contains("const bookUrl = ${'$'}{GSON.toJson(bookUrl)"))
+        assertTrue(controller.contains("new URL('/image', window.location.href)"))
+        assertTrue(controller.contains("/\\.(?:heic|heif)(?:[?#]|${'$'})/i"))
+        assertTrue(controller.contains("target.pathname === '/image'"))
+        assertTrue(controller.contains("target.searchParams.has('path')"))
+        assertTrue(controller.contains("MutationObserver"))
+        assertTrue(controller.contains("observeImages();"))
+        assertTrue(controller.contains("data-legado-original-src"))
+        assertTrue(controller.contains("image.setAttribute('data-original', proxied)"))
+        assertFalse(controller.contains("wsrv.nl"))
         assertFalse(controller.contains("fetch('runLegacyReview'"))
         assertTrue(server.contains("http-equiv=\\\"Content-Security-Policy\\\""))
         assertTrue(controller.contains("if (nonce != session.nonce) return null"))
@@ -152,6 +167,28 @@ class ReviewWebApiContractTest {
         val imageBranch = dialog.indexOf("message.type === 'legado-legacy-review-image'")
         assertTrue(dialog.indexOf("event.source !== frameWindow") in 0 until imageBranch)
         assertTrue(dialog.indexOf("message.nonce !== props.sessionNonce") in 0 until imageBranch)
+    }
+
+    @Test
+    fun `legacy review HEIF URLs are rewritten in initial and JSON HTML`() {
+        val imageUrl = "https://cdn.example/review.heic?token=a&x-signature=b"
+        val bookUrl = "https://books.example/book?id=1"
+        val html = "<img src=\"$imageUrl\" data-original=\"$imageUrl\"><img src=\"https://cdn.example/review.jpg\">"
+
+        val rewritten = rewriteLegacyReviewImages(html, bookUrl)
+        assertFalse(rewritten.contains(imageUrl))
+        assertTrue(rewritten.contains("/image?path=https%3A%2F%2Fcdn.example%2Freview.heic"))
+        assertTrue(rewritten.contains("&amp;url=https%3A%2F%2Fbooks.example%2Fbook%3Fid%3D1"))
+        assertTrue(rewritten.contains("https://cdn.example/review.jpg"))
+
+        val result = rewriteLegacyReviewResult(
+            GSON.toJson(mapOf("html" to html, "refferContent" to "<span>3</span>")),
+            bookUrl,
+        )
+        val resultJson = JsonParser.parseString(result).asJsonObject
+        assertTrue(resultJson["html"].asString.contains("/image?path="))
+        assertTrue(resultJson["html"].asString.contains("&amp;url="))
+        assertEquals("<span>3</span>", resultJson["refferContent"].asString)
     }
 
     private fun readProjectFile(path: String): String {
