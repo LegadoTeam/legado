@@ -37,12 +37,6 @@
     </item>
 
     <item
-        android:id="@+id/menu_manual_replace_rule"
-        android:checkable="true"
-        android:title="@string/manual_replace_rule"
-        app:showAsAction="never" />
-
-    <item
         android:id="@+id/menu_add_replace_rule"
         android:icon="@drawable/ic_add"
         android:title="@string/add_replace_rule"
@@ -64,6 +58,13 @@
         android:id="@+id/menu_import_qr"
         android:icon="@drawable/ic_import"
         android:title="@string/import_by_qr_code"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_manual_replace_rule"
+        android:checkable="true"
+        android:icon="@drawable/ic_find_replace"
+        android:title="@string/manual_replace_rule"
         app:showAsAction="never" />
 
     <item
