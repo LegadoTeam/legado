@@ -135,6 +135,7 @@ class LiveUpdateNotificationTest {
         assertTrue(web.contains("IntentAction.stop -> stopServiceWithNotification()"))
         assertTrue(web.contains("setTimeoutAfter(TERMINAL_NOTIFICATION_DURATION)"))
         assertTrue(web.contains("terminalStopJob"))
+        assertTrue(web.contains("notificationManager.cancel(NotificationId.WebService)"))
         assertTrue(web.contains("if (isRun)"))
         assertTrue(web.contains("createNotification(terminal = stopping)"))
 
@@ -145,6 +146,7 @@ class LiveUpdateNotificationTest {
         assertTrue(mcp.contains("IntentAction.stop -> stopServiceWithNotification()"))
         assertTrue(mcp.contains("setTimeoutAfter(TERMINAL_NOTIFICATION_DURATION)"))
         assertTrue(mcp.contains("terminalStopJob"))
+        assertTrue(mcp.contains("notificationManager.cancel(NotificationId.McpService)"))
         assertTrue(mcp.contains("if (isRun)"))
         assertTrue(mcp.contains("createNotification(terminal = stopping)"))
 
