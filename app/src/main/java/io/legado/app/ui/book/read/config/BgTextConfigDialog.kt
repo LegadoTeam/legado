@@ -164,7 +164,7 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
         tvUnderlineColor.setTextColor(primaryTextColor)
         swUnderlineBody.setTextColor(primaryTextColor)
         swUnderlineTitle.setTextColor(primaryTextColor)
-        dsbUnderlineWidth.valueFormat = { "${(1f + it / 2f)}dp" }
+        dsbUnderlineWidth.valueFormat = { "${it / 2f}dp" }
         dsbUnderlineDistance.valueFormat = { "${(it / 2f)}dp" }
         if (ReadBook.book?.isImage == true) {
             underlineStyleRow.isGone = true
@@ -236,7 +236,7 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
         binding.swDarkStatusIcon.isChecked = curStatusIconDark()
         binding.spUnderline.setSelectionSafely(ReadBookConfig.underlineMode)
         binding.dsbUnderlineWidth.progress =
-            ((ReadBookConfig.underlineWidth - 1f) * 2f).roundToInt().coerceIn(0, 18)
+            (ReadBookConfig.underlineWidth * 2f).roundToInt().coerceIn(0, 20)
         binding.dsbUnderlineDistance.progress =
             (ReadBookConfig.underlineDistance * 2f).roundToInt().coerceIn(0, 60)
         binding.swUnderlineBody.isChecked = ReadBookConfig.underlineBodyEnabled
@@ -405,7 +405,7 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
             }
         })
         binding.dsbUnderlineWidth.onChanged = { progress ->
-            ReadBookConfig.underlineWidth = 1f + progress / 2f
+            ReadBookConfig.underlineWidth = progress / 2f
             postEvent(EventBus.UP_CONFIG, arrayListOf(6, 9, 11))
         }
         binding.dsbUnderlineDistance.onChanged = { progress ->
