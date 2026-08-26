@@ -32,6 +32,19 @@ class ImageDecoderContractTest {
         assertTrue(bookHelp.contains("BitmapUtils.isImage(bytes)"))
     }
 
+    @Test
+    fun `legacy browser converts heif requests through native decoder`() {
+        val dialog = projectFile(
+            "src/main/java/io/legado/app/ui/widget/dialog/BottomWebViewDialog.kt"
+        ).readText()
+        assertTrue(dialog.contains("ImageLoader.loadBitmap(appCtx, url, sourceOrigin)"))
+        assertTrue(dialog.contains(".disallowHardwareConfig()"))
+        assertTrue(dialog.contains("path.endsWith(\".heic\", ignoreCase = true)"))
+        assertTrue(dialog.contains("path.endsWith(\".heif\", ignoreCase = true)"))
+        assertTrue(dialog.contains("Bitmap.CompressFormat.PNG"))
+        assertTrue(dialog.contains("\"image/png\""))
+    }
+
     private fun projectFile(pathInApp: String): File {
         return listOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull { it.isFile }

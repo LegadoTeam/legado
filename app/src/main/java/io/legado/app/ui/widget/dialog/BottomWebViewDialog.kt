@@ -31,6 +31,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.net.toUri
 import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.lifecycleScope
+import com.bumptech.glide.Glide
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import io.legado.app.R
@@ -41,6 +42,7 @@ import io.legado.app.data.entities.BaseSource
 import io.legado.app.databinding.DialogWebViewBinding
 import io.legado.app.help.WebCacheManager
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.glide.ImageLoader
 import io.legado.app.help.webView.PooledWebView
 import io.legado.app.help.webView.WebJsExtensions
 import io.legado.app.help.webView.WebJsExtensions.Companion.JS_INJECTION
@@ -90,11 +92,14 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.lang.ref.WeakReference
 import java.net.URLDecoder
 import java.util.ArrayDeque
 import java.util.Date
+import java.util.concurrent.TimeUnit
 import androidx.core.graphics.createBitmap
+import splitties.init.appCtx
 
 internal data class BottomSheetHeightConfig(
     val dialogHeight: Int?,
@@ -1105,6 +1110,40 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             view: WebView, request: WebResourceRequest
         ): WebResourceResponse? {
             val url = request.url.toString()
+            if (!request.isForMainFrame && request.method.equals("GET", ignoreCase = true) &&
+                request.url.path?.let { path ->
+                    path.endsWith(".heic", ignoreCase = true) ||
+                        path.endsWith(".heif", ignoreCase = true)
+                } == true
+            ) {
+                val sourceOrigin = source?.getKey()
+                val converted = runBlocking(IO) {
+                    val target = runCatching {
+                        ImageLoader.loadBitmap(appCtx, url, sourceOrigin)
+                            .disallowHardwareConfig()
+                            .submit(2048, 2048)
+                    }.getOrNull() ?: return@runBlocking null
+                    try {
+                        val bitmap = target.get(10, TimeUnit.SECONDS)
+                        ByteArrayOutputStream().use { output ->
+                            if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
+                                null
+                            } else {
+                                WebResourceResponse(
+                                    "image/png",
+                                    null,
+                                    ByteArrayInputStream(output.toByteArray())
+                                )
+                            }
+                        }
+                    } catch (_: Exception) {
+                        null
+                    } finally {
+                        Glide.with(appCtx).clear(target)
+                    }
+                }
+                if (converted != null) return converted
+            }
             if (request.isForMainFrame) {
                 if (!preloadJs.isNullOrEmpty()) {
                     jsInjected = false
