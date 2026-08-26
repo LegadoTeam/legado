@@ -158,11 +158,8 @@ object ImageProvider {
         bookSource: BookSource?
     ): Size {
         val file = cacheImage(book, src, bookSource)
-        val op = BitmapFactory.Options()
-        // inJustDecodeBounds如果设置为true,仅仅返回图片实际的宽和高,宽和高是赋值给opts.outWidth,opts.outHeight;
-        op.inJustDecodeBounds = true
-        BitmapFactory.decodeFile(file.absolutePath, op)
-        if (op.outWidth < 1 && op.outHeight < 1) {
+        BitmapUtils.getImageSize(file.absolutePath)?.let { return it }
+        run {
             //svg size
             val size = SvgUtils.getSize(file.absolutePath)
             if (size != null) return size
@@ -170,7 +167,6 @@ object ImageProvider {
             //file.delete() 重复下载
             return Size(errorBitmap.width, errorBitmap.height)
         }
-        return Size(op.outWidth, op.outHeight)
     }
 
     /**

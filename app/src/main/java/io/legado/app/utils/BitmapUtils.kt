@@ -9,6 +9,9 @@ import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.NinePatchDrawable
+import android.os.Build
+import android.util.Size
+import androidx.annotation.RequiresApi
 import com.google.android.renderscript.Toolkit
 import java.io.*
 import kotlin.math.*
@@ -29,7 +32,7 @@ object BitmapUtils {
     @Throws(IOException::class)
     fun decodeBitmap(path: String, width: Int, height: Int? = null): Bitmap? {
         val fis = FileInputStream(path)
-        return fis.use {
+        val bitmap = fis.use {
             val op = BitmapFactory.Options()
             // inJustDecodeBounds如果设置为true,仅仅返回图片实际的宽和高,宽和高是赋值给opts.outWidth,opts.outHeight;
             op.inJustDecodeBounds = true
@@ -37,6 +40,39 @@ object BitmapUtils {
             op.inSampleSize = calculateInSampleSize(op, width, height)
             op.inJustDecodeBounds = false
             BitmapFactory.decodeFileDescriptor(fis.fd, null, op)
+        }
+        return bitmap ?: if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            decodeBitmapWithImageDecoder(File(path), width, height)
+        } else {
+            null
+        }
+    }
+
+    /**
+     * 获取图片尺寸。BitmapFactory 不认识的格式（例如 HEIF/HEIC）交给系统解码器探测。
+     */
+    fun getImageSize(path: String): Size? {
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(path, options)
+        if (options.outWidth > 0 && options.outHeight > 0) {
+            return Size(options.outWidth, options.outHeight)
+        }
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            decodeImageSizeWithImageDecoder(File(path))
+        } else {
+            null
+        }
+    }
+
+    /** 检测网络返回的图片字节，保留 SVG 的调用方回退。 */
+    fun isImage(bytes: ByteArray): Boolean {
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+        if (options.outWidth > 0 && options.outHeight > 0) return true
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            isImageWithImageDecoder(bytes)
+        } else {
+            false
         }
     }
 
@@ -62,16 +98,83 @@ object BitmapUtils {
         options: BitmapFactory.Options,
         width: Int? = null,
         height: Int? = null
+    ): Int = calculateInSampleSize(options.outWidth, options.outHeight, width, height)
+
+    private fun calculateInSampleSize(
+        imageWidth: Int,
+        imageHeight: Int,
+        width: Int? = null,
+        height: Int? = null
     ): Int {
         //获取比例大小
-        val wRatio = width?.let { options.outWidth / it } ?: -1
-        val hRatio = height?.let { options.outHeight / it } ?: -1
+        val wRatio = width?.takeIf { it > 0 }?.let { imageWidth / it } ?: -1
+        val hRatio = height?.takeIf { it > 0 }?.let { imageHeight / it } ?: -1
         //如果超出指定大小，则缩小相应的比例
         return when {
             wRatio > 1 && hRatio > 1 -> max(wRatio, hRatio)
             wRatio > 1 -> wRatio
             hRatio > 1 -> hRatio
             else -> 1
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.P)
+    private fun decodeBitmapWithImageDecoder(file: File, width: Int, height: Int?): Bitmap? {
+        return try {
+            android.graphics.ImageDecoder.decodeBitmap(
+                android.graphics.ImageDecoder.createSource(file)
+            ) { decoder, info, _ ->
+                decoder.setAllocator(android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE)
+                val sampleSize = calculateInSampleSize(
+                    info.size.width,
+                    info.size.height,
+                    width,
+                    height,
+                )
+                if (sampleSize > 1) decoder.setTargetSampleSize(sampleSize)
+            }
+        } catch (_: IOException) {
+            null
+        } catch (_: RuntimeException) {
+            null
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.P)
+    private fun decodeImageSizeWithImageDecoder(file: File): Size? {
+        var imageSize: Size? = null
+        return try {
+            val bitmap = android.graphics.ImageDecoder.decodeBitmap(
+                android.graphics.ImageDecoder.createSource(file)
+            ) { decoder, info, _ ->
+                imageSize = info.size
+                decoder.setAllocator(android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE)
+                decoder.setTargetSize(1, 1)
+            }
+            bitmap.recycle()
+            imageSize
+        } catch (_: IOException) {
+            null
+        } catch (_: RuntimeException) {
+            null
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.P)
+    private fun isImageWithImageDecoder(bytes: ByteArray): Boolean {
+        return try {
+            val bitmap = android.graphics.ImageDecoder.decodeBitmap(
+                android.graphics.ImageDecoder.createSource(bytes)
+            ) { decoder, _, _ ->
+                decoder.setAllocator(android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE)
+                decoder.setTargetSize(1, 1)
+            }
+            bitmap.recycle()
+            true
+        } catch (_: IOException) {
+            false
+        } catch (_: RuntimeException) {
+            false
         }
     }
 
