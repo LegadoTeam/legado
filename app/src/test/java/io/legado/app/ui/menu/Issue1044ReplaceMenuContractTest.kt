@@ -25,7 +25,7 @@ class Issue1044ReplaceMenuContractTest {
 
         val manual = menu.substringAfter("android:id=\"@+id/menu_manual_replace_rule\"")
             .substringBefore("/>")
-        assertTrue(manual.contains("android:icon=\"@drawable/ic_find_replace\""))
+        assertTrue(manual.contains("android:icon=\"@drawable/ic_manual_replace\""))
 
         val zhStrings = readProjectFile("src/main/res/values-zh/strings.xml")
         assertTrue(zhStrings.contains("<string name=\"manual_replace_rule\">手动替换</string>"))
