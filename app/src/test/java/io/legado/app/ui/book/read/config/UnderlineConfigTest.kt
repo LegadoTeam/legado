@@ -1,6 +1,9 @@
 package io.legado.app.ui.book.read.config
 
 import io.legado.app.help.config.ReadBookConfig
+import io.legado.app.help.config.DEFAULT_UNDERLINE_WIDTH
+import io.legado.app.help.config.MAX_UNDERLINE_WIDTH
+import io.legado.app.help.config.MIN_UNDERLINE_WIDTH
 import io.legado.app.help.config.normalizeUnderlineConfigs
 import io.legado.app.help.config.parseReadConfigArray
 import io.legado.app.help.config.parseReadConfigObject
@@ -19,6 +22,13 @@ import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 
 class UnderlineConfigTest {
+
+    @Test
+    fun `underline width keeps the requested range and default`() {
+        assertEquals(0f, MIN_UNDERLINE_WIDTH, 0.001f)
+        assertEquals(1f, DEFAULT_UNDERLINE_WIDTH, 0.001f)
+        assertEquals(10f, MAX_UNDERLINE_WIDTH, 0.001f)
+    }
 
     @Test
     fun `legacy boolean underline survives object and array imports`() {
@@ -88,6 +98,19 @@ class UnderlineConfigTest {
         assertTrue(first.underlineColorSet)
         assertFalse(second.underlineBodyEnabled)
         assertTrue(second.underlineColorSet)
+    }
+
+    @Test
+    fun `zero underline width is preserved for normalized new configs`() {
+        val config = ReadBookConfig.Config(
+            underlineMode = UNDERLINE_MODE_SOLID,
+            underlineWidth = 0f,
+            underlineConfigVersion = 1
+        )
+
+        normalizeUnderlineConfigs(listOf(config))
+
+        assertEquals(0f, config.underlineWidth, 0.001f)
     }
 
     @Test
@@ -167,10 +190,24 @@ class UnderlineConfigTest {
             .map { document.getElementsByTagName("io.legado.app.ui.widget.DetailSeekBar").item(it) as Element }
             .associateBy { it.getAttribute("android:id") }
 
-        assertEquals("18", seekBars["@+id/dsb_underline_width"]?.getAttribute("app:max"))
+        assertEquals("20", seekBars["@+id/dsb_underline_width"]?.getAttribute("app:max"))
         assertEquals("60", seekBars["@+id/dsb_underline_distance"]?.getAttribute("app:max"))
         assertTrue(layout.readText().contains("@+id/sw_underline_body"))
         assertTrue(layout.readText().contains("@+id/sw_underline_title"))
+        val switches = (0 until document.getElementsByTagName("io.legado.app.lib.theme.view.ThemeSwitch").length)
+            .map { document.getElementsByTagName("io.legado.app.lib.theme.view.ThemeSwitch").item(it) as Element }
+            .associateBy { it.getAttribute("android:id") }
+        assertEquals("wrap_content", switches["@+id/sw_underline_body"]?.getAttribute("android:layout_width"))
+        assertEquals("wrap_content", switches["@+id/sw_underline_title"]?.getAttribute("android:layout_width"))
+        assertFalse(switches["@+id/sw_underline_body"]?.hasAttribute("android:layout_weight") == true)
+        assertFalse(switches["@+id/sw_underline_title"]?.hasAttribute("android:layout_weight") == true)
+
+        val dialog = projectFile(
+            "src/main/java/io/legado/app/ui/book/read/config/BgTextConfigDialog.kt"
+        ).readText()
+        assertTrue(dialog.contains("ReadBookConfig.underlineWidth * 2f"))
+        assertTrue(dialog.contains("ReadBookConfig.underlineWidth = progress / 2f"))
+        assertFalse(dialog.contains("underlineWidth - 1f"))
 
         val renderer = projectFile(
             "src/main/java/io/legado/app/ui/book/read/page/entities/TextLine.kt"
@@ -179,6 +216,7 @@ class UnderlineConfigTest {
         assertFalse(renderer.contains("ChapterProvider.lineSpacingExtra * 10 - 11"))
         assertTrue(renderer.contains("ReadBookConfig.underlineTitleEnabled"))
         assertTrue(renderer.contains("ReadBookConfig.underlineBodyEnabled"))
+        assertTrue(renderer.contains("ReadBookConfig.underlineWidth > 0f"))
         assertTrue(renderer.contains("canvasRecorder.recordIfNeededThenDraw(canvas, view.width, renderedHeight())"))
         assertTrue(renderer.contains("fun renderBottom(): Float = lineTop + renderedHeight()"))
         assertTrue(renderer.contains("waveAmplitudePx = ReadBookConfig.underlineWidth.dpToPx()"))

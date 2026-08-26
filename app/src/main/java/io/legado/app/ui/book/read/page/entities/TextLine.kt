@@ -260,7 +260,8 @@ data class TextLine(
             ReadBookConfig.underlineBodyEnabled
         }
         return mode.takeIf {
-            enabled && !isImage && !isHtml && ReadBook.book?.isImage != true
+            enabled && ReadBookConfig.underlineWidth > 0f &&
+                !isImage && !isHtml && ReadBook.book?.isImage != true
         }
     }
 
