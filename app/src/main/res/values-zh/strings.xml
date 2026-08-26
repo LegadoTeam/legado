@@ -1082,6 +1082,10 @@
     <string name="complete">完成</string>
     <string name="show_unread">显示未读标志</string>
     <string name="show_read_progress">显示阅读进度</string>
+    <string name="read_progress">阅读进度</string>
+    <string name="read_progress_hidden">隐藏</string>
+    <string name="read_progress_standard">标准（2dp）</string>
+    <string name="read_progress_enhanced">增强（4dp）</string>
     <string name="use_default_cover">总是使用默认封面</string>
     <string name="use_default_cover_s">总是显示默认封面（不显示网络封面）</string>
     <string name="title_font_size">字号</string>

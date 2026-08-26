@@ -9,6 +9,7 @@ import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.utils.GSON
 import io.legado.app.utils.canvasrecorder.CanvasRecorderFactory
+import io.legado.app.utils.defaultSharedPreferences
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getPrefInt
@@ -212,10 +213,25 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefBoolean(PreferKey.showSearchReadRecord, value)
         }
 
-    var showBookshelfReadProgress: Boolean
-        get() = appCtx.getPrefBoolean(PreferKey.showBookshelfReadProgress, true)
+    var bookshelfReadProgressMode: Int
+        get() = BookshelfReadProgressMode.resolve(
+            appCtx.defaultSharedPreferences.all[PreferKey.bookshelfReadProgressMode],
+            appCtx.defaultSharedPreferences.all[PreferKey.showBookshelfReadProgress],
+        )
         set(value) {
-            appCtx.putPrefBoolean(PreferKey.showBookshelfReadProgress, value)
+            val mode = BookshelfReadProgressMode.normalize(value)
+            appCtx.putPrefInt(PreferKey.bookshelfReadProgressMode, mode)
+            appCtx.putPrefBoolean(
+                PreferKey.showBookshelfReadProgress,
+                mode != BookshelfReadProgressMode.HIDDEN,
+            )
+        }
+
+    var showBookshelfReadProgress: Boolean
+        get() = bookshelfReadProgressMode != BookshelfReadProgressMode.HIDDEN
+        set(value) {
+            bookshelfReadProgressMode =
+                if (value) BookshelfReadProgressMode.STANDARD else BookshelfReadProgressMode.HIDDEN
         }
 
     var showBookshelfRecentReading: Boolean

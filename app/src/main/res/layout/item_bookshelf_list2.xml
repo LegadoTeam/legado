@@ -221,7 +221,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="@id/fl_has_new"
         app:layout_constraintStart_toStartOf="@+id/tv_name"
-        app:trackThickness="4dp"
+        app:trackThickness="2dp"
         tools:ignore="UnusedAttribute"
         tools:progress="60"
         tools:visibility="visible" />

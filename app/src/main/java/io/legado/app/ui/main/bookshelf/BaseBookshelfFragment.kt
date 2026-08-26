@@ -280,6 +280,7 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
             var bookshelfLayout = AppConfig.bookshelfLayout
             var bookshelfSort = AppConfig.bookshelfSort
             var showBookname = AppConfig.showBookname
+            var readProgressMode = AppConfig.bookshelfReadProgressMode
             val alertBinding =
                 DialogBookshelfConfigBinding.inflate(layoutInflater)
                     .apply {
@@ -298,10 +299,14 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
                             showBookname = 0
                             AppConfig.showBookname = 0
                         }
+                        if (readProgressMode !in 0..<spReadProgress.count) {
+                            readProgressMode = 1
+                            AppConfig.bookshelfReadProgressMode = readProgressMode
+                        }
                         spGroupStyle.setSelection(AppConfig.bookGroupStyle)
+                        spReadProgress.setSelection(readProgressMode)
                         swShowUnread.isChecked = AppConfig.showUnread
                         swShowLastUpdateTime.isChecked = AppConfig.showLastUpdateTime
-                        swShowReadProgress.isChecked = AppConfig.showBookshelfReadProgress
                         swShowWaitUpBooks.isChecked = AppConfig.showWaitUpCount
                         swShowBookshelfFastScroller.isChecked = AppConfig.showBookshelfFastScroller
                         swShowRecentReading.isChecked = AppConfig.showBookshelfRecentReading
@@ -343,8 +348,8 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
                         AppConfig.showLastUpdateTime = swShowLastUpdateTime.isChecked
                         postEvent(EventBus.BOOKSHELF_REFRESH, "")
                     }
-                    if (AppConfig.showBookshelfReadProgress != swShowReadProgress.isChecked) {
-                        AppConfig.showBookshelfReadProgress = swShowReadProgress.isChecked
+                    if (readProgressMode != spReadProgress.selectedItemPosition) {
+                        AppConfig.bookshelfReadProgressMode = spReadProgress.selectedItemPosition
                         postEvent(EventBus.BOOKSHELF_REFRESH, "")
                     }
                     if (AppConfig.showWaitUpCount != swShowWaitUpBooks.isChecked) {

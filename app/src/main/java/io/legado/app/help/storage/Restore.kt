@@ -37,6 +37,7 @@ import io.legado.app.help.LauncherIconHelp
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.normalizeLegacyPersistedCover
 import io.legado.app.help.book.upType
+import io.legado.app.help.config.BookshelfReadProgressMode
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ReplacePreviewConfig
@@ -409,6 +410,25 @@ object Restore {
                             }
                         }
                     }
+                }
+            }
+            if (PreferKey.bookshelfReadProgressMode !in map &&
+                PreferKey.showBookshelfReadProgress in map
+            ) {
+                val legacyEnabled = when (val value = map[PreferKey.showBookshelfReadProgress]) {
+                    is Boolean -> value
+                    is String -> value.toBooleanStrictOrNull()
+                    else -> null
+                }
+                legacyEnabled?.let { enabled ->
+                    edit.putInt(
+                        PreferKey.bookshelfReadProgressMode,
+                        if (enabled) {
+                            BookshelfReadProgressMode.STANDARD
+                        } else {
+                            BookshelfReadProgressMode.HIDDEN
+                        },
+                    )
                 }
             }
             edit.apply()

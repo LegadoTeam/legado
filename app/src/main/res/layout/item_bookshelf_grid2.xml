@@ -95,7 +95,7 @@
                 app:layout_constraintBottom_toBottomOf="@+id/iv_cover"
                 app:layout_constraintEnd_toEndOf="@+id/iv_cover"
                 app:layout_constraintStart_toStartOf="@+id/iv_cover"
-                app:trackThickness="4dp"
+                app:trackThickness="2dp"
                 tools:ignore="UnusedAttribute"
                 tools:progress="60"
                 tools:visibility="visible" />

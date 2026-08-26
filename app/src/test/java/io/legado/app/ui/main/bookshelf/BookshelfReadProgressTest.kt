@@ -2,6 +2,7 @@ package io.legado.app.ui.main.bookshelf
 
 import io.legado.app.data.entities.Book
 import io.legado.app.help.book.readProgress
+import io.legado.app.help.config.BookshelfReadProgressMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -45,7 +46,7 @@ class BookshelfReadProgressTest {
             val document = parseProjectXml("src/main/res/layout/$layout")
             val progress = document.findElementById("@+id/pb_read_progress")
             assertEquals("gone", progress.androidAttribute("visibility"))
-            assertEquals("4dp", progress.appAttribute("trackThickness"))
+            assertEquals("2dp", progress.appAttribute("trackThickness"))
 
             val percent = document.findElementsById("@+id/tv_read_percent")
             if (layout.startsWith("item_bookshelf_list")) {
@@ -55,6 +56,46 @@ class BookshelfReadProgressTest {
                 assertTrue(percent.isEmpty())
             }
         }
+    }
+
+    @Test
+    fun `bookshelf progress modes preserve legacy settings and thickness`() {
+        assertEquals(
+            BookshelfReadProgressMode.HIDDEN,
+            BookshelfReadProgressMode.resolve(null, false),
+        )
+        assertEquals(
+            BookshelfReadProgressMode.STANDARD,
+            BookshelfReadProgressMode.resolve(null, true),
+        )
+        assertEquals(
+            BookshelfReadProgressMode.ENHANCED,
+            BookshelfReadProgressMode.resolve("2", false),
+        )
+        assertEquals(
+            BookshelfReadProgressMode.STANDARD_THICKNESS_DP,
+            BookshelfReadProgressMode.thicknessDp(BookshelfReadProgressMode.HIDDEN),
+        )
+        assertEquals(
+            BookshelfReadProgressMode.STANDARD_THICKNESS_DP,
+            BookshelfReadProgressMode.thicknessDp(BookshelfReadProgressMode.STANDARD),
+        )
+        assertEquals(
+            BookshelfReadProgressMode.ENHANCED_THICKNESS_DP,
+            BookshelfReadProgressMode.thicknessDp(BookshelfReadProgressMode.ENHANCED),
+        )
+
+        val appConfig = projectFile("src/main/java/io/legado/app/help/config/AppConfig.kt").readText()
+        assertTrue(appConfig.contains("PreferKey.bookshelfReadProgressMode"))
+        assertTrue(appConfig.contains("PreferKey.showBookshelfReadProgress"))
+        val renderer = projectFile(
+            "src/main/java/io/legado/app/ui/main/bookshelf/BookshelfReadProgress.kt",
+        ).readText()
+        assertTrue(renderer.contains("BookshelfReadProgressMode"))
+        assertTrue(renderer.contains("thicknessDp(AppConfig.bookshelfReadProgressMode)"))
+        val restore = projectFile("src/main/java/io/legado/app/help/storage/Restore.kt").readText()
+        assertTrue(restore.contains("PreferKey.bookshelfReadProgressMode !in map"))
+        assertTrue(restore.contains("BookshelfReadProgressMode.STANDARD"))
     }
 
     @Test
@@ -68,7 +109,11 @@ class BookshelfReadProgressTest {
     @Test
     fun `bookshelf settings expose display switches in order`() {
         val document = parseProjectXml("src/main/res/layout/dialog_bookshelf_config.xml")
-        val progressSwitch = document.findElementById("@+id/sw_show_read_progress")
+        val progressRow = document.findElementById("@+id/ll_read_progress")
+        val progressLabel = progressRow.getElementsByTagName("TextView").item(0) as Element
+        val progressSpinner = document.findElementById("@+id/sp_read_progress")
+        val unreadSwitch = document.findElementById("@+id/sw_show_unread")
+        val lastUpdateSwitch = document.findElementById("@+id/sw_show_last_update_time")
         val waitSwitch = document.findElementById("@+id/sw_show_wait_up_books")
         val fastScrollerSwitch =
             document.findElementById("@+id/sw_show_bookshelf_fast_scroller")
@@ -79,13 +124,22 @@ class BookshelfReadProgressTest {
         val columnsBottom = document.findElementById("@+id/layout_columns_bottom")
         val bookNameChoice = document.findElementById("@+id/book_name_choice")
 
-        assertEquals("@string/show_read_progress", progressSwitch.androidAttribute("text"))
+        assertEquals("@string/read_progress", progressLabel.androidAttribute("text"))
+        assertEquals("@array/bookshelf_read_progress", progressSpinner.androidAttribute("entries"))
         assertEquals(
-            "@+id/sw_show_last_update_time",
-            progressSwitch.appAttribute("layout_constraintTop_toBottomOf"),
+            "@+id/ll_group_style",
+            progressRow.appAttribute("layout_constraintTop_toBottomOf"),
         )
         assertEquals(
-            "@+id/sw_show_read_progress",
+            "@+id/ll_read_progress",
+            unreadSwitch.appAttribute("layout_constraintTop_toBottomOf"),
+        )
+        assertEquals(
+            "@+id/sw_show_unread",
+            lastUpdateSwitch.appAttribute("layout_constraintTop_toBottomOf"),
+        )
+        assertEquals(
+            "@+id/sw_show_last_update_time",
             waitSwitch.appAttribute("layout_constraintTop_toBottomOf"),
         )
         assertEquals(
@@ -119,6 +173,7 @@ class BookshelfReadProgressTest {
             "@+id/sw_show_wait_up_books",
             fastScrollerSwitch.appAttribute("layout_constraintTop_toBottomOf"),
         )
+        assertFalse(document.findElementsById("@+id/sw_show_read_progress").isNotEmpty())
     }
 
     @Test
