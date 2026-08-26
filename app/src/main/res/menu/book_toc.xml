@@ -37,6 +37,12 @@
             app:showAsAction="never" />
 
         <item
+            android:id="@+id/menu_expand_toc"
+            android:checkable="true"
+            android:title="@string/expand_toc"
+            app:showAsAction="never" />
+
+        <item
             android:id="@+id/menu_use_replace"
             android:checkable="true"
             android:title="@string/use_replace"

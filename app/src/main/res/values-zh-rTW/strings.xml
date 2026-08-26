@@ -939,6 +939,7 @@
     <string name="hide">隱藏</string>
     <string name="hide_when_status_bar_show">狀態欄顯示時隱藏</string>
     <string name="reverse_toc">反轉目錄</string>
+    <string name="expand_toc">目錄展開</string>
     <string name="show_discovery">顯示發現</string>
     <string name="style">樣式</string>
     <string name="group_style">分組樣式</string>

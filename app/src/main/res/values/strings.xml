@@ -1099,6 +1099,7 @@
     <string name="hide">Hide</string>
     <string name="hide_when_status_bar_show">Hide when status bar show</string>
     <string name="reverse_toc">Reverse toc</string>
+    <string name="expand_toc">Expand chapters</string>
     <string name="show_discovery">Show Discovery</string>
     <string name="show_discovery_fast_scroller">Show discovery quick scroll bar</string>
     <string name="style">Style</string>

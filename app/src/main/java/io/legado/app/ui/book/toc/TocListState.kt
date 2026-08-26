@@ -35,8 +35,13 @@ class TocListState {
         chapters: List<BookChapter>,
         reverseOrder: Boolean,
         resetCollapse: Boolean = false,
+        defaultExpanded: Boolean = true,
+        currentChapterIndex: Int? = null,
     ) {
         val directionChanged = this.reverseOrder != reverseOrder
+        val previousCollapsibleVolumeIndexes = volumeGroupByIndex
+            .filterValues { it.chapters.isNotEmpty() }
+            .keys
         this.reverseOrder = reverseOrder
         fullChapters = chapters
         groups = buildGroups(chapters, reverseOrder)
@@ -45,9 +50,18 @@ class TocListState {
             .filter { it.volume != null && it.chapters.isNotEmpty() }
             .mapTo(mutableSetOf()) { it.volume!!.index }
         if (resetCollapse || directionChanged) {
-            collapsedVolumeIndexes.clear()
+            applyDefaultCollapse(defaultExpanded, currentChapterIndex)
         } else {
             collapsedVolumeIndexes.retainAll(collapsibleVolumeIndexes)
+            val currentVolumeIndex = currentChapterIndex?.let(::volumeIndexContaining)
+            currentVolumeIndex?.let(collapsedVolumeIndexes::remove)
+            if (!defaultExpanded) {
+                (collapsibleVolumeIndexes - previousCollapsibleVolumeIndexes).forEach { volumeIndex ->
+                    if (volumeIndex != currentVolumeIndex) {
+                        collapsedVolumeIndexes.add(volumeIndex)
+                    }
+                }
+            }
         }
     }
 
@@ -259,6 +273,18 @@ class TocListState {
         }
         parentVolumeByChapterIndex = parentMap
         volumeGroupByIndex = volumeMap
+    }
+
+    private fun applyDefaultCollapse(defaultExpanded: Boolean, currentChapterIndex: Int?) {
+        collapsedVolumeIndexes.clear()
+        if (defaultExpanded) return
+        val currentVolumeIndex = currentChapterIndex?.let(::volumeIndexContaining)
+        groups.forEach { group ->
+            val volumeIndex = group.volume?.index ?: return@forEach
+            if (group.chapters.isNotEmpty() && volumeIndex != currentVolumeIndex) {
+                collapsedVolumeIndexes.add(volumeIndex)
+            }
+        }
     }
 
     private fun volumeIndexContaining(chapterIndex: Int): Int? {

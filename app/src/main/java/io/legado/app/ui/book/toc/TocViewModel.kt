@@ -70,6 +70,20 @@ class TocViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
+    fun setTocExpanded(expanded: Boolean) {
+        val book = bookData.value ?: return
+        book.setTocExpanded(expanded)
+        execute {
+            appDb.bookDao.updateTocExpanded(book.bookUrl, expanded)
+        }.onSuccess {
+            chapterListCallBack?.upChapterList(
+                searchKey,
+                resetCollapse = true,
+                replaceAll = true,
+            )
+        }
+    }
+
     fun startChapterListSearch(newText: String?) {
         chapterListCallBack?.upChapterList(newText)
     }

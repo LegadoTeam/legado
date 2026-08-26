@@ -1095,6 +1095,7 @@
     <string name="hide">隐藏</string>
     <string name="hide_when_status_bar_show">状态栏显示时隐藏</string>
     <string name="reverse_toc">反转目录</string>
+    <string name="expand_toc">目录展开</string>
     <string name="show_discovery">显示发现</string>
     <string name="show_discovery_fast_scroller">发现页显示快速滚动条</string>
     <string name="style">样式</string>

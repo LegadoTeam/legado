@@ -139,6 +139,8 @@ class TocActivity : VMBaseActivity<ActivityChapterListBinding, TocViewModel>(),
             AppConfig.tocCountWords
         menu.findItem(R.id.menu_split_long_chapter)?.isChecked =
             viewModel.bookData.value?.getSplitLongChapter() == true
+        menu.findItem(R.id.menu_expand_toc)?.isChecked =
+            viewModel.bookData.value?.getTocExpanded() != false
         return super.onMenuOpened(featureId, menu)
     }
 
@@ -154,6 +156,12 @@ class TocActivity : VMBaseActivity<ActivityChapterListBinding, TocViewModel>(),
                     book.setSplitLongChapter(item.isChecked)
                     upBookAndToc(book)
                 }
+            }
+
+            R.id.menu_expand_toc -> {
+                val expanded = !item.isChecked
+                item.isChecked = expanded
+                viewModel.setTocExpanded(expanded)
             }
 
             R.id.menu_reverse_toc -> viewModel.reverseToc {

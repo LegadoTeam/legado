@@ -8,7 +8,9 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import com.google.gson.JsonElement
 import com.google.gson.JsonObject
+import com.google.gson.JsonPrimitive
 import io.legado.app.constant.BookType
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookCacheCleanupSnapshot
@@ -325,6 +327,11 @@ interface BookDao {
         updateReadConfigJson(bookUrl, getReadConfigJson(bookUrl).withAudioPlaySpeed(playSpeed))
     }
 
+    @Transaction
+    fun updateTocExpanded(bookUrl: String, expanded: Boolean) {
+        updateReadConfigJson(bookUrl, getReadConfigJson(bookUrl).withTocExpanded(expanded))
+    }
+
     @Delete
     fun delete(vararg book: Book)
 
@@ -372,10 +379,18 @@ internal fun String?.withAudioPlaySpeed(playSpeed: Float): String {
     return withAudioPlayPreference("playSpeed", playSpeed)
 }
 
+internal fun String?.withTocExpanded(expanded: Boolean): String {
+    return withReadConfigProperty("tocExpanded", JsonPrimitive(expanded))
+}
+
 private fun String?.withAudioPlayPreference(key: String, value: Number): String {
+    return withReadConfigProperty(key, JsonPrimitive(value))
+}
+
+private fun String?.withReadConfigProperty(key: String, value: JsonElement): String {
     val readConfig = GSON.fromJsonObject<JsonObject>(this).getOrNull() ?: JsonObject().apply {
         addProperty("useGlobalAudioSkip", true)
     }
-    readConfig.addProperty(key, value)
+    readConfig.add(key, value)
     return GSON.toJson(readConfig)
 }

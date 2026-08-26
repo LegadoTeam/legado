@@ -137,6 +137,8 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                 chapters = chapters,
                 reverseOrder = book.getReverseToc(),
                 resetCollapse = true,
+                defaultExpanded = book.getTocExpanded(),
+                currentChapterIndex = durChapterIndex,
             )
             adapter.setItems(
                 if (normalizedSearchKey == null) {
@@ -227,6 +229,8 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                         chapters = chapters,
                         reverseOrder = reverseOrder,
                         resetCollapse = resetCollapse,
+                        defaultExpanded = currentBook.getTocExpanded(),
+                        currentChapterIndex = durChapterIndex,
                     )
                 }
                 submitChapterItems(
@@ -242,6 +246,8 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                         chapters = chapters,
                         reverseOrder = reverseOrder,
                         resetCollapse = resetCollapse,
+                        defaultExpanded = currentBook.getTocExpanded(),
+                        currentChapterIndex = durChapterIndex,
                     )
                 }
                 submitChapterItems(
