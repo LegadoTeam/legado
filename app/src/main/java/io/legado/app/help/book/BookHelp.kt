@@ -1,6 +1,5 @@
 package io.legado.app.help.book
 
-import android.graphics.BitmapFactory
 import android.os.ParcelFileDescriptor
 import androidx.documentfile.provider.DocumentFile
 import com.script.rhino.runScriptWithContext
@@ -23,6 +22,7 @@ import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.StringUtils
 import io.legado.app.utils.SvgUtils
+import io.legado.app.utils.BitmapUtils
 import io.legado.app.utils.UrlUtil
 import io.legado.app.utils.createFileIfNotExist
 import io.legado.app.utils.exists
@@ -490,8 +490,6 @@ object BookHelp {
             return false
         }
         var ret = true
-        val op = BitmapFactory.Options()
-        op.inJustDecodeBounds = true
         getContent(book, bookChapter)?.let {
             val matcher = AppPattern.imgPattern.matcher(it)
             while (matcher.find()) {
@@ -501,8 +499,7 @@ object BookHelp {
                     ret = false
                     continue
                 }
-                BitmapFactory.decodeFile(image.absolutePath, op)
-                if (op.outWidth < 1 && op.outHeight < 1) {
+                if (BitmapUtils.getImageSize(image.absolutePath) == null) {
                     if (SvgUtils.getSize(image.absolutePath) != null) {
                         continue
                     }
@@ -515,13 +512,8 @@ object BookHelp {
     }
 
     private fun checkImage(bytes: ByteArray): Boolean {
-        val op = BitmapFactory.Options()
-        op.inJustDecodeBounds = true
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, op)
-        if (op.outWidth < 1 && op.outHeight < 1) {
-            return SvgUtils.getSize(ByteArrayInputStream(bytes)) != null
-        }
-        return true
+        return BitmapUtils.isImage(bytes) ||
+            SvgUtils.getSize(ByteArrayInputStream(bytes)) != null
     }
 
     /**
