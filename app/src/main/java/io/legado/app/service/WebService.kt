@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
 import splitties.init.appCtx
 import splitties.systemservices.powerManager
 import splitties.systemservices.wifiManager
+import splitties.systemservices.notificationManager
 import java.io.IOException
 
 class WebService : BaseService() {
@@ -184,6 +185,7 @@ class WebService : BaseService() {
         terminalStopJob?.cancel()
         terminalStopJob = lifecycleScope.launch {
             delay(TERMINAL_NOTIFICATION_DURATION)
+            notificationManager.cancel(NotificationId.WebService)
             stopSelf()
         }
     }

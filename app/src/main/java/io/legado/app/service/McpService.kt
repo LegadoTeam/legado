@@ -33,6 +33,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import splitties.init.appCtx
+import splitties.systemservices.notificationManager
 
 class McpService : BaseService() {
 
@@ -153,6 +154,7 @@ class McpService : BaseService() {
         terminalStopJob?.cancel()
         terminalStopJob = lifecycleScope.launch {
             delay(TERMINAL_NOTIFICATION_DURATION)
+            notificationManager.cancel(NotificationId.McpService)
             stopSelf()
         }
     }
