@@ -825,6 +825,13 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         set(value) {
             appCtx.putPrefBoolean(PreferKey.showReadTitleAddition, value)
         }
+
+    var showReadTitleChapterNameOnly: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.showReadTitleChapterNameOnly, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.showReadTitleChapterNameOnly, value)
+        }
+
     var readBarStyleFollowPage: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.readBarStyleFollowPage, false)
         set(value) {

@@ -245,6 +245,7 @@ object PreferKey {
     const val wallpaperColorAutoUpdate = "wallpaperColorAutoUpdate"
 
     const val showReadTitleAddition = "showReadTitleAddition"
+    const val showReadTitleChapterNameOnly = "showReadTitleChapterNameOnly"
     const val readBarStyleFollowPage = "readBarStyleFollowPage"
     const val contentSelectSpeakMod = "contentReadAloudMod"
     const val highlightLastStyle = "highlightLastStyle"
