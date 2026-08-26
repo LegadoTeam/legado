@@ -95,6 +95,12 @@ body:
       required: true
 
   - type: textarea
+    id: attempted
+    attributes:
+      label: 已尝试的解决方法
+      description: 说明已经尝试过的设置、清缓存、重启或其他排查步骤，以及结果。
+
+  - type: textarea
     id: logs
     attributes:
       label: 日志或截图
