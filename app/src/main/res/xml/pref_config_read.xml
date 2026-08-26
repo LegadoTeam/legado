@@ -271,6 +271,11 @@
 
     <io.legado.app.lib.prefs.SwitchPreference
         android:defaultValue="false"
+        android:key="showReadTitleChapterNameOnly"
+        android:title="@string/show_read_title_chapter_name_only" />
+
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:defaultValue="false"
         android:key="readBarStyleFollowPage"
         android:title="@string/read_bar_style_follow_page" />
 </androidx.preference.PreferenceScreen>

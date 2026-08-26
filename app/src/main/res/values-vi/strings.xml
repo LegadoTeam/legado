@@ -1050,6 +1050,7 @@
     <string name="tag_explore_enabled">Cờ: đã bật khám phá</string>
     <string name="tag_explore_disabled">Cờ: đã tắt khám phá</string>
     <string name="show_read_title_addition">Hiển thị vùng bổ sung tiêu đề đã đọc</string>
+    <string name="show_read_title_chapter_name_only">Chỉ hiển thị tên chương trong vùng bổ sung tiêu đề</string>
     <string name="read_bar_style_follow_page">Kiểu thanh đọc theo trang</string>
     <string name="rule_image_decode">Giải mã hình ảnh (imageDecode)</string>
     <string name="like_source">Thích</string>

@@ -1122,6 +1122,7 @@
     <string name="tag_explore_enabled">标志:发现已启用</string>
     <string name="tag_explore_disabled">标志:发现已禁用</string>
     <string name="show_read_title_addition">展示顶部工具栏附加区域</string>
+    <string name="show_read_title_chapter_name_only">附加区域仅显示章节名</string>
     <string name="read_bar_style_follow_page">工具栏样式跟随页面</string>
     <string name="rule_image_decode">图片解密（imageDecode）</string>
     <string name="like_source">赞</string>

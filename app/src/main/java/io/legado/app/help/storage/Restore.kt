@@ -431,6 +431,11 @@ object Restore {
                     )
                 }
             }
+            if (!BackupConfig.ignoreReadConfig &&
+                PreferKey.showReadTitleChapterNameOnly !in map
+            ) {
+                edit.putBoolean(PreferKey.showReadTitleChapterNameOnly, false)
+            }
             edit.apply()
         }
         restoredVideoPreferences?.let { map ->

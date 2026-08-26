@@ -9,11 +9,15 @@ import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.provider.Settings
 import android.util.AttributeSet
+import android.util.TypedValue
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
 import android.view.animation.Animation
 import android.widget.FrameLayout
 import android.widget.SeekBar
+import androidx.constraintlayout.widget.ConstraintSet
+import androidx.core.view.doOnLayout
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import io.legado.app.R
@@ -71,6 +75,7 @@ class ReadMenu @JvmOverloads constructor(
     var canShowMenu: Boolean = false
     private val callBack: CallBack get() = activity as CallBack
     private val binding = ViewReadMenuBinding.inflate(LayoutInflater.from(context), this, true)
+    private val chapterNameTextSize = binding.tvChapterName.textSize
     private var confirmSkipToChapter: Boolean = false
     private var isMenuOutAnimating = false
     private val menuTopIn: Animation by lazy {
@@ -227,6 +232,7 @@ class ReadMenu @JvmOverloads constructor(
         } else {
             titleBarAddition.gone()
         }
+        updateTitleAdditionLayout()
         upBrightnessVwPos()
         /**
          * 确保视图不被导航栏遮挡
@@ -621,16 +627,53 @@ class ReadMenu @JvmOverloads constructor(
             binding.tvChapterName.visible()
             if (!ReadBook.isLocalBook) {
                 binding.tvChapterUrl.text = it.chapter.getAbsoluteURL()
-                binding.tvChapterUrl.visible()
             } else {
+                binding.tvChapterUrl.text = null
                 binding.tvChapterUrl.gone()
             }
+            updateTitleAdditionLayout()
             upSeekBar()
             binding.tvPre.isEnabled = ReadBook.durChapterIndex != 0
             binding.tvNext.isEnabled = ReadBook.durChapterIndex != ReadBook.simulatedChapterSize - 1
         } ?: let {
             binding.tvChapterName.gone()
             binding.tvChapterUrl.gone()
+        }
+    }
+
+    private fun updateTitleAdditionLayout() = binding.run {
+        val chapterNameOnly = AppConfig.showReadTitleChapterNameOnly
+        val scaledDensity = resources.displayMetrics.scaledDensity
+        val hasChapterUrl = !tvChapterUrl.text.isNullOrBlank()
+        tvChapterName.gravity = Gravity.CENTER_VERTICAL
+        tvChapterUrl.gravity = Gravity.CENTER_VERTICAL
+        tvChapterName.setTextSize(
+            TypedValue.COMPLEX_UNIT_PX,
+            chapterNameTextSize + if (chapterNameOnly) 2f * scaledDensity else 0f
+        )
+        tvChapterUrl.alpha = if (chapterNameOnly && hasChapterUrl) 0f else 1f
+        if (hasChapterUrl) {
+            tvChapterUrl.visible()
+        } else {
+            tvChapterUrl.gone()
+        }
+        ConstraintSet().apply {
+            clone(titleBarAddition)
+            val bottomTarget = if (tvChapterUrl.isGone) {
+                R.id.tv_chapter_name
+            } else {
+                R.id.tv_chapter_url
+            }
+            connect(R.id.tv_custom_btn, ConstraintSet.BOTTOM, bottomTarget, ConstraintSet.BOTTOM)
+            connect(R.id.tv_source_action, ConstraintSet.BOTTOM, bottomTarget, ConstraintSet.BOTTOM)
+            applyTo(titleBarAddition)
+        }
+        tvChapterName.translationY = 0f
+        if (chapterNameOnly && tvChapterName.isVisible) {
+            titleBarAddition.doOnLayout {
+                tvChapterName.translationY =
+                    (titleBarAddition.height - tvChapterName.height) / 2f - tvChapterName.top
+            }
         }
     }
 

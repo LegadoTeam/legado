@@ -1054,6 +1054,7 @@
     <string name="tag_explore_enabled">标志:发现已启用</string>
     <string name="tag_explore_disabled">标志:发现已禁用</string>
     <string name="show_read_title_addition">show read title addition área</string>
+    <string name="show_read_title_chapter_name_only">mostrar solo el nombre del capítulo en el área adicional del título</string>
     <string name="read_bar_style_follow_page">read bar style follow page</string>
     <string name="rule_image_decode">Decode Image(imageDecode)</string>
     <string name="like_source">赞</string>
