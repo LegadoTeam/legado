@@ -1658,6 +1658,14 @@
     <string name="drag_to_reorder">Drag to reorder</string>
     <string name="move_to_more">Move to More</string>
     <string name="move_to_floating_bar">Move to floating bar</string>
+    <string name="reader_menu_config">Customize reader menu</string>
+    <string name="reader_menu_config_summary">Choose and reorder actions in the reader overflow menu</string>
+    <string name="reader_menu_more">More</string>
+    <string name="reader_menu_all_features">All features</string>
+    <string name="reader_menu_select_all">Show all actions</string>
+    <string name="reader_menu_select_none">Move all actions to More</string>
+    <string name="reader_menu_zone_primary">First-level menu</string>
+    <string name="reader_menu_zone_more">More menu</string>
     <string name="js_source_new">新建 JS 书源</string>
     <string name="js_source_edit">编辑 JS 书源</string>
     <string name="js_source_badge">JS</string>

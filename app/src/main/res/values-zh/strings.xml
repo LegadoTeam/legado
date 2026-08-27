@@ -1546,6 +1546,14 @@
     <string name="drag_to_reorder">拖动排序</string>
     <string name="move_to_more">移至更多</string>
     <string name="move_to_floating_bar">移至浮动条</string>
+    <string name="reader_menu_config">自定义阅读菜单</string>
+    <string name="reader_menu_config_summary">选择和调整阅读页右上角菜单中的操作</string>
+    <string name="reader_menu_more">更多</string>
+    <string name="reader_menu_all_features">全部功能</string>
+    <string name="reader_menu_select_all">全部显示</string>
+    <string name="reader_menu_select_none">全部移至更多</string>
+    <string name="reader_menu_zone_primary">一级菜单</string>
+    <string name="reader_menu_zone_more">更多菜单</string>
     <string name="audio_cache_select_folder">选择音频缓存文件夹</string>
     <string name="audio_cache_range">缓存章节范围</string>
     <string name="audio_cache_clear_current_chapter">清除本章缓存</string>

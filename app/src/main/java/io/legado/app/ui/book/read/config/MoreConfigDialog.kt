@@ -192,6 +192,10 @@ class MoreConfigDialog : BasePrefDialogFragment() {
                     (activity as? ReadBookActivity)?.showTextSelectMenuConfig()
                 }
 
+                "customReaderMenu" -> {
+                    (activity as? ReadBookActivity)?.showReaderMenuConfig()
+                }
+
                 PreferKey.pageTouchSlop -> {
                     NumberPickerDialog(requireContext())
                         .setTitle(getString(R.string.page_touch_slop_dialog_title))

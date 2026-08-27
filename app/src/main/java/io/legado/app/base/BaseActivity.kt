@@ -139,9 +139,19 @@ abstract class BaseActivity<VB : ViewBinding>(
             onPrepareMenu = { toolbarMenu -> onPrepareOptionsMenu(toolbarMenu) },
             onOpenCustomMenu = { toolbarMenu ->
                 onMenuOpened(Window.FEATURE_OPTIONS_PANEL, toolbarMenu)
+            },
+            onShowCustomMenu = { anchor, toolbarMenu ->
+                onShowActivityOverflowMenu(anchor, toolbarMenu)
             }
         )
     }
+
+    /**
+     * Gives an activity a chance to render its own overflow menu.
+     *
+     * Returning true means the shared popup has already been shown.
+     */
+    open fun onShowActivityOverflowMenu(anchor: View, menu: Menu): Boolean = false
 
     final override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId == android.R.id.home) {

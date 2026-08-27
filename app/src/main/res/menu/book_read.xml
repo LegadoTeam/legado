@@ -163,4 +163,16 @@
         android:title="@string/help"
         app:showAsAction="never" />
 
+    <item
+        android:id="@+id/menu_reader_more"
+        android:title="@string/reader_menu_more"
+        android:visible="false"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_reader_all_features"
+        android:title="@string/reader_menu_all_features"
+        android:visible="false"
+        app:showAsAction="never" />
+
 </menu>
