@@ -40,6 +40,22 @@ object HighlightGeometry {
         return baseline + (ascent + descent) / 2f
     }
 
+    fun underlineRenderBottom(
+        baseline: Float,
+        distancePx: Float,
+        strokeWidthPx: Float,
+        kind: HighlightStyle.Kind
+    ): Float {
+        val width = strokeWidthPx.coerceAtLeast(0f)
+        val distance = distancePx.coerceAtLeast(0f)
+        val extent = when (kind) {
+            HighlightStyle.Kind.DOUBLE -> width + 1f
+            HighlightStyle.Kind.WAVY -> width * 1.5f
+            else -> width / 2f
+        }
+        return baseline + distance + extent
+    }
+
     fun glyphTop(baseline: Float, ascent: Float, height: Float): Float {
         return (baseline + ascent).coerceIn(0f, height)
     }

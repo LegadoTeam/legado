@@ -83,6 +83,25 @@ class HighlightStyleTest {
     }
 
     @Test
+    fun `underline values are normalized before drawing`() {
+        val normalized = Underline(
+            kind = Kind.DASHED,
+            width = Float.POSITIVE_INFINITY,
+            distance = -4f,
+        ).normalized()
+
+        assertEquals(Underline.DEFAULT_WIDTH, normalized.width, 0f)
+        assertEquals(Underline.MIN_DISTANCE, normalized.distance, 0f)
+        assertEquals(Kind.DASHED, normalized.kind)
+        assertEquals(
+            Underline.MAX_WIDTH,
+            Underline(width = Underline.MAX_WIDTH + 1f).normalized().width,
+            0f,
+        )
+        assertEquals(Underline(), Underline(width = 1f, distance = 0f).normalized())
+    }
+
+    @Test
     fun `normalization reuses valid style instances`() {
         val shadow = Shadow(radius = 4f, dx = -2f, dy = 6f)
         val style = HighlightStyle(shadow = shadow)

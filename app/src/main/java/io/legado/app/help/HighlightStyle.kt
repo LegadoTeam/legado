@@ -16,7 +16,45 @@ data class HighlightStyle(
     val shadow: Shadow? = null,
     val fontPath: String = ""
 ) {
-    data class Underline(val kind: Kind = Kind.SOLID, val color: Int = 0)
+    data class Underline(
+        val kind: Kind = Kind.SOLID,
+        val color: Int = 0,
+        val width: Float = DEFAULT_WIDTH,
+        val distance: Float = DEFAULT_DISTANCE
+    ) {
+        fun normalized(): Underline {
+            @Suppress("USELESS_ELVIS")
+            val normalizedKind = kind ?: Kind.SOLID
+            val normalizedWidth = width.takeIf { it.isFinite() }
+                ?.coerceIn(MIN_WIDTH, MAX_WIDTH)
+                ?: DEFAULT_WIDTH
+            val normalizedDistance = distance.takeIf { it.isFinite() }
+                ?.coerceIn(MIN_DISTANCE, MAX_DISTANCE)
+                ?: DEFAULT_DISTANCE
+            return if (
+                normalizedKind == kind &&
+                normalizedWidth == width &&
+                normalizedDistance == distance
+            ) {
+                this
+            } else {
+                copy(
+                    kind = normalizedKind,
+                    width = normalizedWidth,
+                    distance = normalizedDistance
+                )
+            }
+        }
+
+        companion object {
+            const val DEFAULT_WIDTH = 1f
+            const val MIN_WIDTH = 0f
+            const val MAX_WIDTH = 10f
+            const val DEFAULT_DISTANCE = 0f
+            const val MIN_DISTANCE = 0f
+            const val MAX_DISTANCE = 30f
+        }
+    }
 
     data class Deco(val color: Int = 0)
 
@@ -60,8 +98,13 @@ data class HighlightStyle(
             box != null || emphasis != null || shadow != null || resolvedFontPath.isNotEmpty()
 
     fun normalized(): HighlightStyle {
+        val normalizedUnderline = underline?.normalized()
         val normalizedShadow = shadow?.normalized()
-        return if (normalizedShadow === shadow) this else copy(shadow = normalizedShadow)
+        return if (normalizedUnderline === underline && normalizedShadow === shadow) {
+            this
+        } else {
+            copy(underline = normalizedUnderline, shadow = normalizedShadow)
+        }
     }
 
     companion object {

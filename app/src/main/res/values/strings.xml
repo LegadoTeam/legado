@@ -389,6 +389,9 @@
     <string name="highlight_underline_dashed">Dashed</string>
     <string name="highlight_underline_dotted">Dotted</string>
     <string name="highlight_underline_double">Double</string>
+    <string name="highlight_underline_adjust">Width / distance</string>
+    <string name="highlight_underline_width">Width</string>
+    <string name="highlight_underline_distance">Distance</string>
     <string name="highlight_fill_rectangle">Rectangle</string>
     <string name="highlight_fill_rounded">Rounded</string>
     <string name="highlight_fill_marker">Marker</string>

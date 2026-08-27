@@ -43,6 +43,40 @@ class HighlightGeometryTest {
     }
 
     @Test
+    fun `highlight underline bottom follows kind width and distance`() {
+        assertEquals(
+            35f,
+            HighlightGeometry.underlineRenderBottom(
+                baseline = 30f,
+                distancePx = 4f,
+                strokeWidthPx = 2f,
+                kind = HighlightStyle.Kind.SOLID,
+            ),
+            1e-4f,
+        )
+        assertEquals(
+            37f,
+            HighlightGeometry.underlineRenderBottom(
+                baseline = 30f,
+                distancePx = 4f,
+                strokeWidthPx = 2f,
+                kind = HighlightStyle.Kind.DOUBLE,
+            ),
+            1e-4f,
+        )
+        assertEquals(
+            37f,
+            HighlightGeometry.underlineRenderBottom(
+                baseline = 30f,
+                distancePx = 4f,
+                strokeWidthPx = 2f,
+                kind = HighlightStyle.Kind.WAVY,
+            ),
+            1e-4f,
+        )
+    }
+
+    @Test
     fun `legacy rectangle keeps the full line height`() {
         val band = HighlightGeometry.fillBand(
             baseline = 30f,

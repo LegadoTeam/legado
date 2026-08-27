@@ -386,6 +386,9 @@
     <string name="highlight_underline_dashed">虚线</string>
     <string name="highlight_underline_dotted">点线</string>
     <string name="highlight_underline_double">双线</string>
+    <string name="highlight_underline_adjust">距离/粗细</string>
+    <string name="highlight_underline_width">粗细</string>
+    <string name="highlight_underline_distance">距离</string>
     <string name="highlight_fill_rectangle">矩形</string>
     <string name="highlight_fill_rounded">圆角</string>
     <string name="highlight_fill_marker">马克笔</string>
