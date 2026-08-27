@@ -264,6 +264,13 @@
         app:iconSpaceReserved="false"
         app:isBottomBackground="true" />
 
+    <io.legado.app.lib.prefs.Preference
+        android:key="customReaderMenu"
+        android:summary="@string/reader_menu_config_summary"
+        android:title="@string/reader_menu_config"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
     <io.legado.app.lib.prefs.SwitchPreference
         android:defaultValue="true"
         android:key="showReadTitleAddition"

@@ -1316,6 +1316,14 @@
     <string name="drag_to_reorder">拖曳排序</string>
     <string name="move_to_more">移至更多</string>
     <string name="move_to_floating_bar">移至浮動列</string>
+    <string name="reader_menu_config">自訂閱讀選單</string>
+    <string name="reader_menu_config_summary">選擇和調整閱讀頁右上角選單中的操作</string>
+    <string name="reader_menu_more">更多</string>
+    <string name="reader_menu_all_features">全部功能</string>
+    <string name="reader_menu_select_all">全部顯示</string>
+    <string name="reader_menu_select_none">全部移至更多</string>
+    <string name="reader_menu_zone_primary">第一層選單</string>
+    <string name="reader_menu_zone_more">更多選單</string>
     <string name="live_update_notifications">即時更新通知</string>
     <string name="live_update_notifications_summary">在 Android 16 上將系統允許的進度通知提升為即時更新</string>
 </resources>
