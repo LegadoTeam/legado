@@ -10,6 +10,7 @@ import android.net.http.SslError
 import android.os.Build
 import android.os.Bundle
 import android.util.Base64
+import android.util.LruCache
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.KeyEvent
@@ -1053,6 +1054,10 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     }
 
     inner class CustomWebViewClient : WebViewClient() {
+        private val heifResponseCache = object : LruCache<String, ByteArray>(8 * 1024 * 1024) {
+            override fun sizeOf(key: String, value: ByteArray): Int = value.size
+        }
+
         override fun shouldOverrideUrlLoading(
             view: WebView?, request: WebResourceRequest?
         ): Boolean {
@@ -1117,29 +1122,41 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                 } == true
             ) {
                 val sourceOrigin = source?.getKey()
-                val converted = runBlocking(IO) {
-                    val target = runCatching {
-                        ImageLoader.loadBitmap(appCtx, url, sourceOrigin)
-                            .disallowHardwareConfig()
-                            .submit(2048, 2048)
-                    }.getOrNull() ?: return@runBlocking null
-                    try {
-                        val bitmap = target.get(10, TimeUnit.SECONDS)
-                        ByteArrayOutputStream().use { output ->
-                            if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
-                                null
-                            } else {
-                                WebResourceResponse(
-                                    "image/png",
-                                    null,
-                                    ByteArrayInputStream(output.toByteArray())
-                                )
+                val cacheKey = "${sourceOrigin.orEmpty()}\u0000$url"
+                val cached = heifResponseCache.get(cacheKey)
+                val converted = if (cached != null) {
+                    WebResourceResponse(
+                        "image/png",
+                        null,
+                        ByteArrayInputStream(cached)
+                    )
+                } else {
+                    runBlocking(IO) {
+                        val target = runCatching {
+                            ImageLoader.loadBitmap(appCtx, url, sourceOrigin)
+                                .disallowHardwareConfig()
+                                .submit(2048, 2048)
+                        }.getOrNull() ?: return@runBlocking null
+                        try {
+                            val bitmap = target.get(10, TimeUnit.SECONDS)
+                            ByteArrayOutputStream().use { output ->
+                                if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
+                                    null
+                                } else {
+                                    val bytes = output.toByteArray()
+                                    heifResponseCache.put(cacheKey, bytes)
+                                    WebResourceResponse(
+                                        "image/png",
+                                        null,
+                                        ByteArrayInputStream(bytes)
+                                    )
+                                }
                             }
+                        } catch (_: Exception) {
+                            null
+                        } finally {
+                            Glide.with(appCtx).clear(target)
                         }
-                    } catch (_: Exception) {
-                        null
-                    } finally {
-                        Glide.with(appCtx).clear(target)
                     }
                 }
                 if (converted != null) return converted

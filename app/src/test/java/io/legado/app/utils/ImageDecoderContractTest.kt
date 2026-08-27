@@ -1,6 +1,8 @@
 package io.legado.app.utils
 
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.io.File
 
@@ -21,6 +23,9 @@ class ImageDecoderContractTest {
         assertTrue(source.contains("ImageDecoder.createSource(file)"))
         assertTrue(source.contains("ImageDecoder.createSource(bytes)"))
         assertTrue(source.contains("setAllocator(android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE)"))
+        assertTrue(source.contains("isHeifPath(path)"))
+        assertTrue(source.contains("setTargetSampleSize(sampleSize)"))
+        assertTrue(source.contains("imageSizeCache"))
     }
 
     @Test
@@ -43,6 +48,55 @@ class ImageDecoderContractTest {
         assertTrue(dialog.contains("path.endsWith(\".heif\", ignoreCase = true)"))
         assertTrue(dialog.contains("Bitmap.CompressFormat.PNG"))
         assertTrue(dialog.contains("\"image/png\""))
+        assertTrue(dialog.contains("heifResponseCache"))
+    }
+
+    @Test
+    fun `heif file signatures are recognized without pixel decoding`() {
+        assertTrue(BitmapUtils.hasHeifFileSignature(bytesWithBrand("heic")))
+        assertTrue(BitmapUtils.hasHeifFileSignature(bytesWithBrand("mif1")))
+        assertTrue(BitmapUtils.hasHeifFileSignature(bytesWithCompatibleBrand("heix")))
+        assertFalse(BitmapUtils.hasHeifFileSignature(bytesWithBrand("avif")))
+        assertFalse(BitmapUtils.hasHeifFileSignature(ByteArray(32)))
+    }
+
+    @Test
+    fun `heif path detection ignores query and fragment`() {
+        assertTrue(BitmapUtils.isHeifPath("/cache/image.HEIF?token=1"))
+        assertTrue(BitmapUtils.isHeifPath("/cache/image.heic#preview"))
+        assertFalse(BitmapUtils.isHeifPath("/cache/image.jpg?format=heic"))
+    }
+
+    @Test
+    fun `heif dimensions can be read from the ispe metadata box`() {
+        val bytes = ByteArray(64)
+        writeUInt32(bytes, 16, 20)
+        "ispe".toByteArray().copyInto(bytes, 20)
+        writeUInt32(bytes, 28, 1280)
+        writeUInt32(bytes, 32, 720)
+        val dimensions = BitmapUtils.findHeifImageDimensions(bytes)
+        assertEquals(1280, dimensions?.first)
+        assertEquals(720, dimensions?.second)
+    }
+
+    private fun bytesWithBrand(brand: String): ByteArray {
+        val bytes = ByteArray(24)
+        "ftyp".toByteArray().copyInto(bytes, 4)
+        brand.toByteArray().copyInto(bytes, 8)
+        return bytes
+    }
+
+    private fun bytesWithCompatibleBrand(brand: String): ByteArray {
+        val bytes = bytesWithBrand("mif1")
+        brand.toByteArray().copyInto(bytes, 16)
+        return bytes
+    }
+
+    private fun writeUInt32(bytes: ByteArray, offset: Int, value: Int) {
+        bytes[offset] = (value ushr 24).toByte()
+        bytes[offset + 1] = (value ushr 16).toByte()
+        bytes[offset + 2] = (value ushr 8).toByte()
+        bytes[offset + 3] = value.toByte()
     }
 
     private fun projectFile(pathInApp: String): File {

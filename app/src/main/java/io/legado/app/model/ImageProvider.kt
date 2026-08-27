@@ -203,6 +203,7 @@ object ImageProvider {
 
     fun clear() {
         bitmapLruCache.evictAll()
+        BitmapUtils.clearImageSizeCache()
     }
 
 }
