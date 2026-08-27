@@ -91,6 +91,51 @@ internal fun coverTitleTextSize(
     viewWidth / 7
 }
 
+internal fun coverTitleColumnStartY(
+    top: Float,
+    maxColumnBottom: Float,
+    columnBottom: Float
+): Float = top + (maxColumnBottom - columnBottom).coerceAtLeast(0f)
+
+internal fun coverTitleColumnOffsets(
+    characterCount: Int,
+    viewHeight: Float,
+    textHeight: Float
+): List<List<Float>> {
+    if (characterCount <= 0 || viewHeight <= 0f || textHeight <= 0f) return emptyList()
+    val columns = mutableListOf<List<Float>>()
+    var column = mutableListOf<Float>()
+    var columnOffset = 0f
+    var line = 0
+    var nextY = viewHeight * 0.2f
+    repeat(characterCount) { index ->
+        column += columnOffset
+        columnOffset += textHeight
+        nextY += textHeight
+        val remaining = characterCount - index - 1
+        if (nextY > viewHeight * 0.9f) {
+            if (remaining == 1) {
+                nextY -= textHeight / 5
+                columnOffset -= textHeight / 5
+            } else if (remaining > 0) {
+                columns += column.toList()
+                column = mutableListOf()
+                columnOffset = 0f
+                line++
+                nextY = viewHeight * 0.2f + textHeight * line
+            }
+        } else if (nextY > viewHeight * 0.8f && remaining > 2) {
+            columns += column.toList()
+            column = mutableListOf()
+            columnOffset = 0f
+            line++
+            nextY = viewHeight * 0.2f + textHeight * line
+        }
+    }
+    if (column.isNotEmpty()) columns += column.toList()
+    return columns
+}
+
 /**
  * 封面
  */
@@ -300,7 +345,6 @@ class CoverImageView @JvmOverloads constructor(
         val bitmap = createBitmap(renderWidth, renderHeight)
         val bitmapCanvas = Canvas(bitmap)
         var startX = renderWidth * 0.2f
-        var startY = viewHeight * 0.2f
         if (horizontal) {
             drawHorizontalTextCover(
                 bitmapCanvas,
@@ -320,7 +364,6 @@ class CoverImageView @JvmOverloads constructor(
             textAlign = Paint.Align.CENTER
         }
         name?.toStringArray()?.let { name ->
-            var line = 0
             namePaint.textSize = viewWidth / 7
             namePaint.textSize = coverTitleTextSize(
                 viewWidth,
@@ -329,27 +372,28 @@ class CoverImageView @JvmOverloads constructor(
                 namePaint.textHeight
             )
             namePaint.strokeWidth = namePaint.textSize / 6
-            name.forEachIndexed { index, char ->
-                namePaint.color = backgroundColor
-                namePaint.style = Paint.Style.STROKE
-                bitmapCanvas.drawText(char, startX, startY, namePaint)
-                namePaint.color = accentColor
-                namePaint.style = Paint.Style.FILL
-                bitmapCanvas.drawText(char, startX, startY, namePaint)
-                startY += namePaint.textHeight
-                if (startY > viewHeight * 0.9) {
-                    if ((name.size - index - 1) == 1) { //只剩一个字
-                        startY -= namePaint.textHeight / 5
-                        return@forEachIndexed
-                    }
-                    startX += namePaint.textSize
-                    line++
-                    startY = viewHeight * 0.2f + namePaint.textHeight * line
-                }
-                else if (startY > viewHeight * 0.8 && (name.size - index - 1) > 2) { //剩余字数大于2
-                    startX += namePaint.textSize
-                    line++
-                    startY = viewHeight * 0.2f + namePaint.textHeight * line
+            val titleColumns = coverTitleColumnOffsets(
+                name.size,
+                viewHeight,
+                namePaint.textHeight
+            )
+            val maxColumnBottom = titleColumns.maxOfOrNull { it.last() } ?: 0f
+            var nameIndex = 0
+            titleColumns.forEachIndexed { columnIndex, offsets ->
+                startX = renderWidth * 0.2f + namePaint.textSize * columnIndex
+                val startY = coverTitleColumnStartY(
+                    viewHeight * 0.2f,
+                    maxColumnBottom,
+                    offsets.last()
+                )
+                offsets.forEach { offsetY ->
+                    val char = name[nameIndex++]
+                    namePaint.color = backgroundColor
+                    namePaint.style = Paint.Style.STROKE
+                    bitmapCanvas.drawText(char, startX, startY + offsetY, namePaint)
+                    namePaint.color = accentColor
+                    namePaint.style = Paint.Style.FILL
+                    bitmapCanvas.drawText(char, startX, startY + offsetY, namePaint)
                 }
             }
         }
@@ -363,7 +407,7 @@ class CoverImageView @JvmOverloads constructor(
             authorPaint.textSize = viewWidth / 10
             authorPaint.strokeWidth = authorPaint.textSize / 5
             startX = renderWidth * 0.8f
-            startY = viewHeight * 0.95f - author.size * authorPaint.textHeight
+            var startY = viewHeight * 0.95f - author.size * authorPaint.textHeight
             startY = maxOf(startY, viewHeight * 0.3f)
             author.forEach {
                 authorPaint.color = backgroundColor
