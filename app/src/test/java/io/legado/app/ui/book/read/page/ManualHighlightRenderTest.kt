@@ -254,11 +254,13 @@ class ManualHighlightRenderTest {
     }
 
     @Test
-    fun `underline variants do not depend on clipped or path-effect drawing`() {
+    fun `underline variants use configurable baseline geometry`() {
         val draw = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/HighlightDraw.kt")
 
         assertFalse(draw.contains("DashPathEffect"))
-        assertTrue(draw.contains("height - 3.5f.dpToPx()"))
+        assertTrue(draw.contains("underline?.normalized()?.takeIf { it.width > 0f }"))
+        assertTrue(draw.contains("val width = it.width.dpToPx()"))
+        assertTrue(draw.contains("val y = baseline + it.distance.dpToPx()"))
         assertTrue(draw.contains("while (start < x1)"))
         assertTrue(draw.contains("canvas.drawCircle(center, y, radius, fillPaint)"))
     }

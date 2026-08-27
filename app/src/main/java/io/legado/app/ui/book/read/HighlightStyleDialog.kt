@@ -25,6 +25,7 @@ import io.legado.app.utils.showDialogFragment
 
 class HighlightStyleDialog : BottomSheetDialogFragment(),
     ShadowEditDialog.Callback,
+    UnderlineEditDialog.Callback,
     FontSelectDialog.CallBack {
 
     interface StyleHost {
@@ -259,6 +260,13 @@ class HighlightStyleDialog : BottomSheetDialogFragment(),
                     channel.changeExtra?.let { apply(it(currentStyle())) }
                 }
             }
+            row.tvTune.setOnClickListener {
+                if (channel.labelRes == R.string.highlight_underline) {
+                    currentStyle().underline?.let {
+                        UnderlineEditDialog.show(childFragmentManager, it)
+                    }
+                }
+            }
             binding.llChannels.addView(row.root)
             rows.add(row)
         }
@@ -283,6 +291,9 @@ class HighlightStyleDialog : BottomSheetDialogFragment(),
             val extra = channel.extra?.invoke(style)
             row.tvExtra.visibility = if (extra != null && enabled) View.VISIBLE else View.GONE
             row.tvExtra.text = extra.orEmpty()
+            val tuneVisible = channel.labelRes == R.string.highlight_underline && enabled
+            row.tvTune.visibility = if (tuneVisible) View.VISIBLE else View.GONE
+            if (tuneVisible) row.tvTune.text = getString(R.string.highlight_underline_adjust)
         }
         val fontPath = style.resolvedFontPath
         binding.tvHighlightFontValue.text = if (fontPath.isEmpty()) {
@@ -337,6 +348,10 @@ class HighlightStyleDialog : BottomSheetDialogFragment(),
 
     override fun onShadowChanged(shadow: Shadow) {
         apply(currentStyle().copy(shadow = shadow))
+    }
+
+    override fun onUnderlineChanged(underline: Underline) {
+        apply(currentStyle().copy(underline = underline))
     }
 
     companion object {

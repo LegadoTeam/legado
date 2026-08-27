@@ -238,17 +238,39 @@ data class TextLine(
     fun renderBottom(): Float = lineTop + renderedHeight()
 
     private fun renderedHeight(): Int {
-        val mode = activeUnderlineMode() ?: return ceil(height).toInt()
         val baseline = lineBase - lineTop
-        val bottom = underlineRenderBottom(
-            mode = mode,
-            baseline = baseline,
-            distancePx = ReadBookConfig.underlineDistance.dpToPx(),
-            strokeWidthPx = ReadBookConfig.underlineWidth.dpToPx(),
-            oneDpPx = 1f.dpToPx(),
-            waveAmplitudePx = ReadBookConfig.underlineWidth.dpToPx(),
-        )
-        return ceil(max(height, bottom)).toInt()
+        var bottom = height
+        activeUnderlineMode()?.let { mode ->
+            bottom = max(
+                bottom,
+                underlineRenderBottom(
+                    mode = mode,
+                    baseline = baseline,
+                    distancePx = ReadBookConfig.underlineDistance.dpToPx(),
+                    strokeWidthPx = ReadBookConfig.underlineWidth.dpToPx(),
+                    oneDpPx = 1f.dpToPx(),
+                    waveAmplitudePx = ReadBookConfig.underlineWidth.dpToPx(),
+                )
+            )
+        }
+        bottom = max(bottom, highlightUnderlineRenderBottom())
+        return ceil(bottom).toInt()
+    }
+
+    private fun highlightUnderlineRenderBottom(): Float {
+        val baseline = lineBase - lineTop
+        return columns.asSequence()
+            .mapNotNull { (it as? TextBaseColumn)?.highlightStyle?.underline?.normalized() }
+            .filter { it.width > 0f }
+            .map {
+                HighlightGeometry.underlineRenderBottom(
+                    baseline = baseline,
+                    distancePx = it.distance.dpToPx(),
+                    strokeWidthPx = it.width.dpToPx(),
+                    kind = it.kind
+                )
+            }
+            .maxOrNull() ?: height
     }
 
     private fun activeUnderlineMode(): Int? {

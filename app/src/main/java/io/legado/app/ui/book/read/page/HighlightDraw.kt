@@ -182,23 +182,25 @@ object HighlightDraw {
     ) {
         val state = drawState.get()!!
         val strokePaint = state.strokePaint
-        strokePaint.strokeWidth = 1.5f.dpToPx()
+        val defaultStrokeWidth = 1.5f.dpToPx()
+        strokePaint.strokeWidth = defaultStrokeWidth
         strokePaint.pathEffect = null
 
-        underline?.let {
+        underline?.normalized()?.takeIf { it.width > 0f }?.let {
             strokePaint.color = if (it.color != 0) it.color else fallbackColor
-            val y = height - 2f.dpToPx()
+            val width = it.width.dpToPx()
+            strokePaint.strokeWidth = width
+            val y = baseline + it.distance.dpToPx()
             when (it.kind) {
                 HighlightStyle.Kind.SOLID -> canvas.drawLine(x0, y, x1, y, strokePaint)
                 HighlightStyle.Kind.DOUBLE -> {
-                    strokePaint.strokeWidth = 1f.dpToPx()
+                    val separation = width + 1f.dpToPx()
                     canvas.drawLine(
-                        x0, height - 3.5f.dpToPx(), x1, height - 3.5f.dpToPx(), strokePaint
+                        x0, y - separation / 2f, x1, y - separation / 2f, strokePaint
                     )
                     canvas.drawLine(
-                        x0, height - 1.5f.dpToPx(), x1, height - 1.5f.dpToPx(), strokePaint
+                        x0, y + separation / 2f, x1, y + separation / 2f, strokePaint
                     )
-                    strokePaint.strokeWidth = 1.5f.dpToPx()
                 }
 
                 HighlightStyle.Kind.DASHED -> {
@@ -212,7 +214,7 @@ object HighlightDraw {
                 }
                 HighlightStyle.Kind.DOTTED -> {
                     val fillPaint = state.fillPaint
-                    val radius = 0.9f.dpToPx()
+                    val radius = width / 2f
                     val step = 3.5f.dpToPx()
                     fillPaint.color = strokePaint.color
                     var center = x0 + radius
@@ -227,6 +229,7 @@ object HighlightDraw {
             }
         }
 
+        strokePaint.strokeWidth = defaultStrokeWidth
         strike?.let {
             strokePaint.color = if (it.color != 0) it.color else fallbackColor
             val y = HighlightGeometry.strikeY(
@@ -269,8 +272,8 @@ object HighlightDraw {
         val points = HighlightGeometry.wavePoints(
             x0,
             x1,
-            y - 1f.dpToPx(),
-            1.5f.dpToPx(),
+            y,
+            paint.strokeWidth.coerceAtLeast(1f.dpToPx()),
             6f.dpToPx(),
             2f.dpToPx()
         )
