@@ -60,6 +60,7 @@ class BackupMediaTest {
                 "rssStar.json",
                 "sourceSub.json",
                 "cookies.json",
+                "runtimeSourceCache.json",
                 "replaceRule.json",
                 "txtTocRule.json",
                 "httpTTS.json",
@@ -86,6 +87,14 @@ class BackupMediaTest {
         assertEquals(
             listOf("cookies.json"),
             selectedBackupFileNames { it == "backupCookies" },
+        )
+    }
+
+    @Test
+    fun sourceVariablesAreOptInBackupContent() {
+        assertEquals(
+            listOf("runtimeSourceCache.json"),
+            selectedBackupFileNames { it == "backupSourceVariables" },
         )
     }
 
