@@ -113,7 +113,7 @@ class AutoTaskEditActivity : BaseActivity<ActivityAutoTaskEditBinding>() {
                 startActivity(AutoTaskDebugActivity.intent(this, saved.id))
             }
             R.id.menu_login -> save { saved ->
-                if (saved.loginUrl.isNullOrBlank()) {
+                if (!AutoTask.buildSource(saved).hasLogin()) {
                     toastOnUi(R.string.source_no_login)
                 } else {
                     startActivity<SourceLoginActivity> {
