@@ -25,6 +25,7 @@ object BackupConfig {
     private const val coverConfigKey = "coverConfig"
     private const val localBookKey = "localBook"
     private const val cookieIgnoreKey = "ignoreCookies"
+    private const val runtimeSourceCacheIgnoreKey = "ignoreSourceVariables"
 
     internal const val bookshelfContentKey = "backupBookshelf"
     internal const val annotationContentKey = "backupAnnotations"
@@ -37,6 +38,8 @@ object BackupConfig {
     internal const val backgroundContentKey = "backupBackgrounds"
     internal const val cookieContentKey = "backupCookies"
     internal const val cookieFileName = "cookies.json"
+    internal const val runtimeSourceCacheContentKey = "backupSourceVariables"
+    internal const val runtimeSourceCacheFileName = "runtimeSourceCache.json"
 
     val contentKeys = arrayOf(
         bookshelfContentKey,
@@ -49,6 +52,7 @@ object BackupConfig {
         otherCoverContentKey,
         backgroundContentKey,
         cookieContentKey,
+        runtimeSourceCacheContentKey,
     )
 
     val contentTitles = arrayOf(
@@ -62,6 +66,7 @@ object BackupConfig {
         appCtx.getString(R.string.backup_content_other_covers),
         appCtx.getString(R.string.backup_content_backgrounds),
         appCtx.getString(R.string.backup_content_cookies),
+        appCtx.getString(R.string.backup_content_source_variables),
     )
 
     //配置忽略key
@@ -75,6 +80,7 @@ object BackupConfig {
         PreferKey.threadCount,
         localBookKey,
         cookieIgnoreKey,
+        runtimeSourceCacheIgnoreKey,
     )
 
     //配置忽略标题
@@ -88,6 +94,7 @@ object BackupConfig {
         appCtx.getString(R.string.thread_count),
         appCtx.getString(R.string.local_book),
         appCtx.getString(R.string.backup_content_cookies),
+        appCtx.getString(R.string.backup_content_source_variables),
     )
 
     //自动忽略keys
@@ -189,12 +196,17 @@ object BackupConfig {
     val ignoreCookies: Boolean
         get() = ignoreConfig[cookieIgnoreKey] == true
 
+    val ignoreSourceVariables: Boolean
+        get() = ignoreConfig[runtimeSourceCacheIgnoreKey] == true
+
     internal fun contentIsEnabled(key: String): Boolean {
-        return if (key == cookieContentKey) {
-            ignoreConfig[key] == false
-        } else {
-            ignoreConfig[key] != true
+        if (key == cookieContentKey) {
+            return ignoreConfig[key] == false
         }
+        if (key == runtimeSourceCacheContentKey) {
+            return ignoreConfig[key] == false
+        }
+        return ignoreConfig[key] != true
     }
 
     fun saveIgnoreConfig() {

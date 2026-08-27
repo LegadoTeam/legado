@@ -17,6 +17,7 @@ import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookHighlight
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.Bookmark
+import io.legado.app.data.entities.Cache
 import io.legado.app.data.entities.Cookie
 import io.legado.app.data.entities.DictRule
 import io.legado.app.data.entities.HttpTTS
@@ -31,6 +32,7 @@ import io.legado.app.data.entities.SearchKeyword
 import io.legado.app.data.entities.Server
 import io.legado.app.data.entities.TxtTocRule
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.AppCacheManager
 import io.legado.app.help.DirectLinkUpload
 import io.legado.app.help.HighlightStyle
 import io.legado.app.help.LauncherIconHelp
@@ -87,6 +89,52 @@ internal fun parseCookieBackup(json: String): List<Cookie> {
         require(cookie != null && cookie.isJsonPrimitive && cookie.asJsonPrimitive.isString)
         Cookie(url.asString.also { require(it.isNotBlank()) }, cookie.asString)
     }
+}
+
+private val runtimeSourceCachePrefixes = arrayOf(
+    "v_",
+    "userInfo_",
+    "loginHeader_",
+    "sourceVariable_",
+    "infoMap_",
+)
+
+internal fun isRuntimeSourceCacheKey(key: String): Boolean {
+    return runtimeSourceCachePrefixes.any { prefix ->
+        key.startsWith(prefix) && key.length > prefix.length
+    }
+}
+
+internal fun parseRuntimeSourceCacheBackup(json: String): List<Cache> {
+    val latestByKey = linkedMapOf<String, Cache>()
+    GSONStrict.fromJsonArray<JsonElement>(json).getOrThrow().forEach { element ->
+        require(element.isJsonObject)
+        val objectElement = element.asJsonObject
+        val keyElement = objectElement.get("key")
+        require(keyElement != null && keyElement.isJsonPrimitive && keyElement.asJsonPrimitive.isString)
+        val key = keyElement.asString
+        require(isRuntimeSourceCacheKey(key))
+
+        val valueElement = objectElement.get("value")
+        require(
+            valueElement != null && (valueElement.isJsonNull ||
+                (valueElement.isJsonPrimitive && valueElement.asJsonPrimitive.isString))
+        )
+        val deadlineElement = objectElement.get("deadline")
+        require(
+            deadlineElement != null && deadlineElement.isJsonPrimitive &&
+                deadlineElement.asJsonPrimitive.isNumber
+        )
+        val deadline = deadlineElement.asJsonPrimitive.asString.toLongOrNull()
+            ?: throw IllegalArgumentException("deadline must be an integer")
+        require(deadline >= 0L)
+        latestByKey[key] = Cache(
+            key = key,
+            value = if (valueElement.isJsonNull) null else valueElement.asString,
+            deadline = deadline,
+        )
+    }
+    return latestByKey.values.toList()
 }
 
 /**
@@ -184,6 +232,26 @@ object Restore {
                     )
                 }
                 parseCookieBackup(aes.decryptStr(file.readText()))
+            }
+        } else {
+            null
+        }
+        val restoredRuntimeSourceCaches = if (!lanTransfer &&
+            !BackupConfig.ignoreSourceVariables
+        ) {
+            File(path, BackupConfig.runtimeSourceCacheFileName).takeIf { it.exists() }?.let { file ->
+                if (password.isNullOrBlank()) {
+                    throw NoStackTraceException(
+                        appCtx.getString(R.string.source_variables_backup_password_required)
+                    )
+                }
+                val raw = file.readText()
+                val json = if (raw.isJsonArray()) {
+                    raw
+                } else {
+                    aes.decryptStr(raw)
+                }
+                parseRuntimeSourceCacheBackup(json)
             }
         } else {
             null
@@ -327,6 +395,11 @@ object Restore {
             } else {
                 CookieStore.restoreCookie(cookie.url, cookie.cookie)
             }
+        }
+        restoredRuntimeSourceCaches?.takeIf { it.isNotEmpty() }?.let { caches ->
+            // REPLACE updates matching keys while leaving local-only runtime entries intact.
+            appDb.cacheDao.insert(*caches.toTypedArray())
+            AppCacheManager.clearSourceVariables()
         }
         File(path, DirectLinkUpload.ruleFileName).takeIf {
             !lanTransfer && it.exists()
