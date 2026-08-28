@@ -1,18 +1,18 @@
 package com.script.rhino
 
-import org.htmlunit.corejs.javascript.Context
-import org.htmlunit.corejs.javascript.Function
-import org.htmlunit.corejs.javascript.NativeJavaArray
-import org.htmlunit.corejs.javascript.NativeJavaList
-import org.htmlunit.corejs.javascript.NativeJavaMap
-import org.htmlunit.corejs.javascript.NativeJavaMethod
-import org.htmlunit.corejs.javascript.NativeJavaObject
-import org.htmlunit.corejs.javascript.Scriptable
-import org.htmlunit.corejs.javascript.Undefined
-import org.htmlunit.corejs.javascript.VarScope
-import org.htmlunit.corejs.javascript.Wrapper
-import org.htmlunit.corejs.javascript.lc.type.TypeInfo
-import org.htmlunit.corejs.javascript.lc.type.TypeInfoFactory
+import org.mozilla.javascript.Context
+import org.mozilla.javascript.Function
+import org.mozilla.javascript.NativeJavaArray
+import org.mozilla.javascript.NativeJavaList
+import org.mozilla.javascript.NativeJavaMap
+import org.mozilla.javascript.NativeJavaMethod
+import org.mozilla.javascript.NativeJavaObject
+import org.mozilla.javascript.Scriptable
+import org.mozilla.javascript.Undefined
+import org.mozilla.javascript.VarScope
+import org.mozilla.javascript.Wrapper
+import org.mozilla.javascript.lc.type.TypeInfo
+import org.mozilla.javascript.lc.type.TypeInfoFactory
 
 open class CatchableNativeJavaObject(
     scope: VarScope?,

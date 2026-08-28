@@ -4,12 +4,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-package org.htmlunit.corejs.javascript.xmlimpl;
+package org.mozilla.javascript.xmlimpl;
 
-import org.htmlunit.corejs.javascript.Scriptable;
-import org.htmlunit.corejs.javascript.VarScope;
-import org.htmlunit.corejs.javascript.WithScope;
-import org.htmlunit.corejs.javascript.xml.XMLObject;
+import org.mozilla.javascript.Scriptable;
+import org.mozilla.javascript.VarScope;
+import org.mozilla.javascript.WithScope;
+import org.mozilla.javascript.xml.XMLObject;
 
 final class XMLWithScope extends WithScope {
     private static final long serialVersionUID = -696429282095170887L;

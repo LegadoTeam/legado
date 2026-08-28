@@ -1,6 +1,6 @@
 package com.script
 
-import org.htmlunit.corejs.javascript.VarScope
+import org.mozilla.javascript.VarScope
 import kotlin.coroutines.CoroutineContext
 
 abstract class CompiledScript {

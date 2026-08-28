@@ -14,8 +14,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.runBlocking
-import org.htmlunit.corejs.javascript.ConsString
-import org.htmlunit.corejs.javascript.Scriptable
+import org.mozilla.javascript.ConsString
+import org.mozilla.javascript.Scriptable
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

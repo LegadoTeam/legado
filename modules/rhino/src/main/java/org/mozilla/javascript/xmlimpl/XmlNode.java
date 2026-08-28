@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-package org.htmlunit.corejs.javascript.xmlimpl;
+package org.mozilla.javascript.xmlimpl;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.htmlunit.corejs.javascript.Undefined;
+import org.mozilla.javascript.Undefined;
 import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;

@@ -10,7 +10,7 @@ import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.jsSource.JsSourceConfig
 import io.legado.app.model.jsSource.JsSourceEngine
-import org.htmlunit.corejs.javascript.TopLevel
+import org.mozilla.javascript.TopLevel
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame

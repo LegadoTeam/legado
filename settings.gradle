@@ -3,12 +3,12 @@ pluginManagement {
         repositories {
             mavenCentral()
             maven {
-                url = uri("https://storage.googleapis.com/r8-releases/raw")
+                url = uri("https://maven.aliyun.com/repository/public")
             }
         }
         dependencies {
             // Kotlin 2.4 metadata requires R8 9.1.29 or newer.
-            classpath("com.android.tools:r8:9.1.29")
+            // classpath("com.android.tools:r8:9.1.29")
         }
     }
     repositories {
@@ -23,10 +23,10 @@ pluginManagement {
         gradlePluginPortal()
         mavenCentral()
         //镜像仓库,无法连接源仓库自行启用镜像仓库,不要提交修改
-        //maven { url "https://maven-central-asia.storage-download.googleapis.com/maven2/" }
-        //maven { url 'https://maven.aliyun.com/repository/google' }
-        //maven { url 'https://maven.aliyun.com/repository/public' }
-        //maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
+        maven { url "https://maven-central-asia.storage-download.googleapis.com/maven2/" }
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
         //maven { url 'https://repo.huaweicloud.com/repository/maven/' }
     }
 }
@@ -37,7 +37,6 @@ dependencyResolutionManagement {
         maven {
             url = uri("$rootDir/third_party/maven")
             content {
-                includeModule("org.htmlunit", "htmlunit-core-js")
             }
         }
         //原仓库
@@ -57,9 +56,9 @@ dependencyResolutionManagement {
         mavenCentral()
 
         //镜像仓库,无法连接源仓库自行启用镜像仓库,不要提交修改
-        //maven { url "https://maven-central-asia.storage-download.googleapis.com/maven2/" }
-        //maven { url 'https://maven.aliyun.com/repository/google' }
-        //maven { url 'https://maven.aliyun.com/repository/public' }
+        maven { url "https://maven-central-asia.storage-download.googleapis.com/maven2/" }
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
         //maven { url 'https://repo.huaweicloud.com/repository/maven/' }
     }
 }

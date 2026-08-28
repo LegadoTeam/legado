@@ -39,7 +39,7 @@ class RuntimeResourceCompatibilityTest {
 
     private companion object {
         const val messagesBundleName =
-            "org.htmlunit.corejs.javascript.resources.Messages"
+            "org.mozilla.javascript.resources.Messages"
         const val duplicateParameterKey = "msg.dup.parms"
         val kotlinBuiltinsRuntimeClasses = listOf(
             "kotlin.reflect.jvm.internal.impl.builtins.BuiltInsLoader",

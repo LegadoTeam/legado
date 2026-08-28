@@ -11,18 +11,18 @@ import io.legado.app.model.SharedJsScope
 import io.legado.app.model.login.LoginUiV2
 import io.legado.app.utils.GSON
 import kotlinx.coroutines.CancellationException
-import org.htmlunit.corejs.javascript.Function
-import org.htmlunit.corejs.javascript.Parser
-import org.htmlunit.corejs.javascript.Scriptable
-import org.htmlunit.corejs.javascript.ScriptableObject
-import org.htmlunit.corejs.javascript.ast.FunctionCall
-import org.htmlunit.corejs.javascript.ast.FunctionNode
-import org.htmlunit.corejs.javascript.ast.Name
-import org.htmlunit.corejs.javascript.ast.NumberLiteral
-import org.htmlunit.corejs.javascript.ast.ObjectLiteral
-import org.htmlunit.corejs.javascript.ast.ObjectProperty
-import org.htmlunit.corejs.javascript.ast.StringLiteral
-import org.htmlunit.corejs.javascript.ast.VariableInitializer
+import org.mozilla.javascript.Function
+import org.mozilla.javascript.Parser
+import org.mozilla.javascript.Scriptable
+import org.mozilla.javascript.ScriptableObject
+import org.mozilla.javascript.ast.FunctionCall
+import org.mozilla.javascript.ast.FunctionNode
+import org.mozilla.javascript.ast.Name
+import org.mozilla.javascript.ast.NumberLiteral
+import org.mozilla.javascript.ast.ObjectLiteral
+import org.mozilla.javascript.ast.ObjectProperty
+import org.mozilla.javascript.ast.StringLiteral
+import org.mozilla.javascript.ast.VariableInitializer
 import kotlin.coroutines.CoroutineContext
 
 object JsSourceConfig {

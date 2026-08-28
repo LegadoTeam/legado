@@ -24,14 +24,14 @@
  */
 package com.script.rhino
 
-import org.htmlunit.corejs.javascript.Context
-import org.htmlunit.corejs.javascript.NativeJavaPackage
-import org.htmlunit.corejs.javascript.ScriptRuntime
-import org.htmlunit.corejs.javascript.Scriptable
-import org.htmlunit.corejs.javascript.VarScope
-import org.htmlunit.corejs.javascript.WrapFactory
-import org.htmlunit.corejs.javascript.lc.type.TypeInfo
-import org.htmlunit.corejs.javascript.lc.type.TypeInfoFactory
+import org.mozilla.javascript.Context
+import org.mozilla.javascript.NativeJavaPackage
+import org.mozilla.javascript.ScriptRuntime
+import org.mozilla.javascript.Scriptable
+import org.mozilla.javascript.VarScope
+import org.mozilla.javascript.WrapFactory
+import org.mozilla.javascript.lc.type.TypeInfo
+import org.mozilla.javascript.lc.type.TypeInfoFactory
 
 /**
  * This wrap factory is used for security reasons. JSR 223 script

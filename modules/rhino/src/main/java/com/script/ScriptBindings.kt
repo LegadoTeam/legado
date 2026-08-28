@@ -1,12 +1,12 @@
 package com.script
 
 import com.script.rhino.RhinoScriptEngine
-import org.htmlunit.corejs.javascript.ConcurrentNativeObject
-import org.htmlunit.corejs.javascript.Context
-import org.htmlunit.corejs.javascript.NativeObject
-import org.htmlunit.corejs.javascript.Scriptable
-import org.htmlunit.corejs.javascript.ScriptableObject
-import org.htmlunit.corejs.javascript.TopLevel
+import org.mozilla.javascript.ConcurrentNativeObject
+import org.mozilla.javascript.Context
+import org.mozilla.javascript.NativeObject
+import org.mozilla.javascript.Scriptable
+import org.mozilla.javascript.ScriptableObject
+import org.mozilla.javascript.TopLevel
 
 class SharedGlobalStateHandle internal constructor(
     internal val key: String,

@@ -2,8 +2,8 @@ package io.legado.app.help.rhino
 
 import com.script.rhino.CatchableNativeJavaObject
 import com.script.rhino.JavaObjectWrapFactory
-import org.htmlunit.corejs.javascript.Scriptable
-import org.htmlunit.corejs.javascript.VarScope
+import org.mozilla.javascript.Scriptable
+import org.mozilla.javascript.VarScope
 
 class NativeBaseSource(scope: VarScope?, javaObject: Any, staticType: Class<*>?) :
     CatchableNativeJavaObject(scope, javaObject, staticType) {

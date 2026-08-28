@@ -30,7 +30,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.htmlunit.corejs.javascript.NativeObject
+import org.mozilla.javascript.NativeObject
 import org.jsoup.Jsoup
 import java.io.ByteArrayOutputStream
 import java.io.File

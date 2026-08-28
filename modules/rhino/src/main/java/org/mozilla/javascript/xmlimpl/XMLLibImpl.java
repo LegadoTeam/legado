@@ -4,20 +4,20 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-package org.htmlunit.corejs.javascript.xmlimpl;
+package org.mozilla.javascript.xmlimpl;
 
 import java.io.Serial;
 import java.io.Serializable;
-import org.htmlunit.corejs.javascript.Context;
-import org.htmlunit.corejs.javascript.Kit;
-import org.htmlunit.corejs.javascript.Node;
-import org.htmlunit.corejs.javascript.Ref;
-import org.htmlunit.corejs.javascript.ScriptRuntime;
-import org.htmlunit.corejs.javascript.Undefined;
-import org.htmlunit.corejs.javascript.VarScope;
-import org.htmlunit.corejs.javascript.Wrapper;
-import org.htmlunit.corejs.javascript.xml.XMLLib;
-import org.htmlunit.corejs.javascript.xml.XMLObject;
+import org.mozilla.javascript.Context;
+import org.mozilla.javascript.Kit;
+import org.mozilla.javascript.Node;
+import org.mozilla.javascript.Ref;
+import org.mozilla.javascript.ScriptRuntime;
+import org.mozilla.javascript.Undefined;
+import org.mozilla.javascript.VarScope;
+import org.mozilla.javascript.Wrapper;
+import org.mozilla.javascript.xml.XMLLib;
+import org.mozilla.javascript.xml.XMLObject;
 import org.xml.sax.SAXException;
 
 public final class XMLLibImpl extends XMLLib implements Serializable {

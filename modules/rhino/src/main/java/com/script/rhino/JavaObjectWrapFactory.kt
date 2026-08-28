@@ -1,7 +1,7 @@
 package com.script.rhino
 
-import org.htmlunit.corejs.javascript.Scriptable
-import org.htmlunit.corejs.javascript.VarScope
+import org.mozilla.javascript.Scriptable
+import org.mozilla.javascript.VarScope
 
 fun interface JavaObjectWrapFactory {
 

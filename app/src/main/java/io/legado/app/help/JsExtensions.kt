@@ -64,10 +64,10 @@ import kotlinx.coroutines.runBlocking
 import okio.use
 import org.jsoup.Connection
 import org.jsoup.Jsoup
-import org.htmlunit.corejs.javascript.Function
-import org.htmlunit.corejs.javascript.Scriptable
-import org.htmlunit.corejs.javascript.ScriptableObject
-import org.htmlunit.corejs.javascript.Undefined
+import org.mozilla.javascript.Function
+import org.mozilla.javascript.Scriptable
+import org.mozilla.javascript.ScriptableObject
+import org.mozilla.javascript.Undefined
 import splitties.init.appCtx
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream

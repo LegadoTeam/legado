@@ -1,8 +1,8 @@
 package com.script.rhino
 
-import org.htmlunit.corejs.javascript.NativeJavaClass
-import org.htmlunit.corejs.javascript.Scriptable
-import org.htmlunit.corejs.javascript.VarScope
+import org.mozilla.javascript.NativeJavaClass
+import org.mozilla.javascript.Scriptable
+import org.mozilla.javascript.VarScope
 
 class ProtectedNativeJavaClass(
     scope: VarScope,

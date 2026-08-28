@@ -14,8 +14,8 @@ import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.fromJsonArray
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.isDataUrl
-import org.htmlunit.corejs.javascript.NativeArray
-import org.htmlunit.corejs.javascript.Scriptable
+import org.mozilla.javascript.NativeArray
+import org.mozilla.javascript.Scriptable
 import kotlin.coroutines.CoroutineContext
 
 internal object ReviewRuleParser {

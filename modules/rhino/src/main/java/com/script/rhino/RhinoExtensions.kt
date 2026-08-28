@@ -2,7 +2,7 @@ package com.script.rhino
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.runBlocking
-import org.htmlunit.corejs.javascript.Context
+import org.mozilla.javascript.Context
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract

@@ -4,18 +4,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-package org.htmlunit.corejs.javascript.xmlimpl;
+package org.mozilla.javascript.xmlimpl;
 
-import static org.htmlunit.corejs.javascript.ClassDescriptor.Destination.PROTO;
+import static org.mozilla.javascript.ClassDescriptor.Destination.PROTO;
 
-import org.htmlunit.corejs.javascript.ClassDescriptor;
-import org.htmlunit.corejs.javascript.Context;
-import org.htmlunit.corejs.javascript.JSFunction;
-import org.htmlunit.corejs.javascript.ScriptRuntime;
-import org.htmlunit.corejs.javascript.Scriptable;
-import org.htmlunit.corejs.javascript.ScriptableObject;
-import org.htmlunit.corejs.javascript.Undefined;
-import org.htmlunit.corejs.javascript.VarScope;
+import org.mozilla.javascript.ClassDescriptor;
+import org.mozilla.javascript.Context;
+import org.mozilla.javascript.JSFunction;
+import org.mozilla.javascript.ScriptRuntime;
+import org.mozilla.javascript.Scriptable;
+import org.mozilla.javascript.ScriptableObject;
+import org.mozilla.javascript.Undefined;
+import org.mozilla.javascript.VarScope;
 
 /** Class Namespace */
 class Namespace extends ScriptableObject {

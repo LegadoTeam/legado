@@ -44,7 +44,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
-import org.htmlunit.corejs.javascript.WrappedException
+import org.mozilla.javascript.WrappedException
 import splitties.init.appCtx
 import splitties.systemservices.notificationManager
 import java.net.InetSocketAddress

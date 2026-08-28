@@ -7,7 +7,7 @@ import dalvik.system.DexClassLoader
 import org.intellij.lang.annotations.Language
 import org.junit.Assert
 import org.junit.Test
-import org.htmlunit.corejs.javascript.DefiningClassLoader
+import org.mozilla.javascript.DefiningClassLoader
 import java.net.URLClassLoader
 
 class AndroidJsTest {
@@ -58,7 +58,7 @@ class AndroidJsTest {
         DexClassLoader.getSystemClassLoader()
         @Language("js")
         val js = """
-            var ji = new JavaImporter(Packages.org.htmlunit.corejs.javascript.DefiningClassLoader)
+            var ji = new JavaImporter(Packages.org.mozilla.javascript.DefiningClassLoader)
             with(ji) {
               let x = DefiningClassLoader.getSystemClassLoader()
             }

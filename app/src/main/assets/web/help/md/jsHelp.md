@@ -5,9 +5,9 @@
 
 |构造函数|函数|对象|调用类|简要说明|
 |------|-----|------|----|------|
-|JavaImporter|importClass importPackage| |[ImporterTopLevel](https://github.com/HtmlUnit/htmlunit-core-js/blob/master/src/main/java/org/htmlunit/corejs/javascript/ImporterTopLevel.java)|导入Java类到JavaScript|
-||getClass|Packages java javax ...|[NativeJavaTopPackage](https://github.com/HtmlUnit/htmlunit-core-js/blob/master/src/main/java/org/htmlunit/corejs/javascript/NativeJavaTopPackage.java)|默认导入JavaScript中的Java类|
-|JavaAdapter|||[JavaAdapter](https://github.com/HtmlUnit/htmlunit-core-js/blob/master/src/main/java/org/htmlunit/corejs/javascript/JavaAdapter.java)|继承Java类|
+|JavaImporter|importClass importPackage| |[ImporterTopLevel](https://github.com/HtmlUnit/htmlunit-core-js/blob/master/src/main/java/org.mozilla/javascript/ImporterTopLevel.java)|导入Java类到JavaScript|
+||getClass|Packages java javax ...|[NativeJavaTopPackage](https://github.com/HtmlUnit/htmlunit-core-js/blob/master/src/main/java/org.mozilla/javascript/NativeJavaTopPackage.java)|默认导入JavaScript中的Java类|
+|JavaAdapter|||[JavaAdapter](https://github.com/HtmlUnit/htmlunit-core-js/blob/master/src/main/java/org.mozilla/javascript/JavaAdapter.java)|继承Java类|
 
 > 注意`java`变量指向已经被阅读修改，如果想要调用`java.*`下的包，请使用`Packages.java.*`
 

@@ -18,13 +18,13 @@ import io.legado.app.model.SharedJsScope
 import io.legado.app.utils.GSON
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import org.htmlunit.corejs.javascript.Context
-import org.htmlunit.corejs.javascript.NativeJSON
-import org.htmlunit.corejs.javascript.Scriptable
-import org.htmlunit.corejs.javascript.ScriptableObject
-import org.htmlunit.corejs.javascript.Undefined
-import org.htmlunit.corejs.javascript.Wrapper
-import org.htmlunit.corejs.javascript.Function as JsFunction
+import org.mozilla.javascript.Context
+import org.mozilla.javascript.NativeJSON
+import org.mozilla.javascript.Scriptable
+import org.mozilla.javascript.ScriptableObject
+import org.mozilla.javascript.Undefined
+import org.mozilla.javascript.Wrapper
+import org.mozilla.javascript.Function as JsFunction
 import kotlin.coroutines.CoroutineContext
 
 /**

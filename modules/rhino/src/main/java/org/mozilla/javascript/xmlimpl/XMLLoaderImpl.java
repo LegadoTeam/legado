@@ -1,9 +1,9 @@
-package org.htmlunit.corejs.javascript.xmlimpl;
+package org.mozilla.javascript.xmlimpl;
 
-import org.htmlunit.corejs.javascript.LazilyLoadedCtor;
-import org.htmlunit.corejs.javascript.ScopeObject;
-import org.htmlunit.corejs.javascript.xml.XMLLib;
-import org.htmlunit.corejs.javascript.xml.XMLLoader;
+import org.mozilla.javascript.LazilyLoadedCtor;
+import org.mozilla.javascript.ScopeObject;
+import org.mozilla.javascript.xml.XMLLib;
+import org.mozilla.javascript.xml.XMLLoader;
 
 public class XMLLoaderImpl implements XMLLoader {
     @Override

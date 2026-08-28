@@ -1,7 +1,7 @@
 package com.script.rhino
 
 import kotlinx.coroutines.ThreadContextElement
-import org.htmlunit.corejs.javascript.Context
+import org.mozilla.javascript.Context
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 

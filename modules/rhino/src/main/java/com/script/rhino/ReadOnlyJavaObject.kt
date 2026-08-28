@@ -1,7 +1,7 @@
 package com.script.rhino
 
-import org.htmlunit.corejs.javascript.Scriptable
-import org.htmlunit.corejs.javascript.VarScope
+import org.mozilla.javascript.Scriptable
+import org.mozilla.javascript.VarScope
 
 class ReadOnlyJavaObject(scope: VarScope?, javaObject: Any, staticType: Class<*>?) :
     CatchableNativeJavaObject(scope, javaObject, staticType) {

@@ -4,14 +4,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-package org.htmlunit.corejs.javascript.xmlimpl;
+package org.mozilla.javascript.xmlimpl;
 
-import org.htmlunit.corejs.javascript.Context;
-import org.htmlunit.corejs.javascript.EcmaError;
-import org.htmlunit.corejs.javascript.Kit;
-import org.htmlunit.corejs.javascript.Ref;
-import org.htmlunit.corejs.javascript.ScriptRuntime;
-import org.htmlunit.corejs.javascript.Undefined;
+import org.mozilla.javascript.Context;
+import org.mozilla.javascript.EcmaError;
+import org.mozilla.javascript.Kit;
+import org.mozilla.javascript.Ref;
+import org.mozilla.javascript.ScriptRuntime;
+import org.mozilla.javascript.Undefined;
 
 class XMLName extends Ref {
     static final long serialVersionUID = 3832176310755686977L;

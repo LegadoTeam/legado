@@ -9,11 +9,11 @@ import com.script.rhino.RhinoWrapFactory
 import org.intellij.lang.annotations.Language
 import org.junit.Assert
 import org.junit.Test
-import org.htmlunit.corejs.javascript.Context
-import org.htmlunit.corejs.javascript.NativeJavaClass
-import org.htmlunit.corejs.javascript.Scriptable
-import org.htmlunit.corejs.javascript.ScriptableObject
-import org.htmlunit.corejs.javascript.Wrapper
+import org.mozilla.javascript.Context
+import org.mozilla.javascript.NativeJavaClass
+import org.mozilla.javascript.Scriptable
+import org.mozilla.javascript.ScriptableObject
+import org.mozilla.javascript.Wrapper
 
 class JsEngineCapabilitiesTest {
 

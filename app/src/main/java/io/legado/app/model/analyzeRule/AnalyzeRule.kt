@@ -41,10 +41,10 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.apache.commons.text.StringEscapeUtils
 import org.jsoup.nodes.Node
-import org.htmlunit.corejs.javascript.NativeArray
-import org.htmlunit.corejs.javascript.NativeObject
-import org.htmlunit.corejs.javascript.Scriptable
-import org.htmlunit.corejs.javascript.TopLevel
+import org.mozilla.javascript.NativeArray
+import org.mozilla.javascript.NativeObject
+import org.mozilla.javascript.Scriptable
+import org.mozilla.javascript.TopLevel
 import java.lang.ref.WeakReference
 import java.net.URL
 import java.util.Locale
