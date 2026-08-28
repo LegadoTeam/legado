@@ -1,5 +1,5 @@
 # js变量和函数
-> 阅读使用 [HtmlUnit Core JS 5.3.0-legado.4](https://github.com/mgz0227/htmlunit-core-js/tree/3eb5071cdca4a357119d1063a53d5f2d47984ed2) 提供的 Rhino 兼容 JavaScript 引擎，以便于[调用Java类和方法](https://m.jb51.net/article/92138.htm)
+> 阅读使用 [Mozilla Rhino 1.8.0](https://github.com/mgz0227/htmlunit-core-js/tree/3eb5071cdca4a357119d1063a53d5f2d47984ed2) 提供的 Rhino 兼容 JavaScript 引擎，以便于[调用Java类和方法](https://m.jb51.net/article/92138.htm)
 
 > [JavaScript运行时](https://github.com/mgz0227/htmlunit-rhino-fork/blob/76460c0312bfd351df6f2bb11168102cdb54170a/rhino/src/main/java/org/mozilla/javascript/ScriptRuntime.java)懒加载导入的Java类和方法
 
