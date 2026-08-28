@@ -1,5 +1,6 @@
 package io.legado.app.ui.book.read.config
 
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
@@ -15,15 +16,18 @@ import io.legado.app.help.config.ReadTipConfig
 import io.legado.app.help.config.ReaderInfoTemplate
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
+import io.legado.app.ui.font.FontSelectDialog
 import io.legado.app.ui.widget.text.AccentBgTextView
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.hexString
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.setLayout
+import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 
-class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
+class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config),
+    FontSelectDialog.CallBack {
 
     companion object {
         const val TIP_COLOR = 7897
@@ -66,6 +70,7 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
         binding.dsbTitleLineSpacing.valueFormat = ::titleLineSpacingDisplayValue
         binding.dsbTitleLineSpacing.progress =
             titleLineSpacingToProgress(ReadBookConfig.titleLineSpacingExtra)
+        upTitleFont()
         upTitleColor()
         binding.swSplitChapterTitle.isChecked = ReadBookConfig.splitChapterTitle
         binding.dsbTitleNumberSize.progress = ReadBookConfig.titleNumberSize
@@ -137,6 +142,17 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
         }
     }
 
+    private fun upTitleFont() {
+        binding.tvTitleFont.text = ReadBookConfig.titleFont.takeIf { it.isNotEmpty() }
+            ?.let { path ->
+                Uri.decode(path)
+                    .substringAfterLast('/')
+                    .substringAfterLast('\\')
+                    .ifBlank { path }
+            }
+            ?: getString(R.string.follow_text_font)
+    }
+
     private fun upTitleNumberColor() {
         val color = ReadBookConfig.titleNumberColor
         binding.tvTitleNumberColor.text = if (color == 0) {
@@ -163,6 +179,9 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
         dsbTitleLineSpacing.onChanged = {
             ReadBookConfig.titleLineSpacingExtra = titleLineSpacingFromProgress(it)
             postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
+        }
+        llTitleFont.setOnClickListener {
+            showDialogFragment<FontSelectDialog>()
         }
         llTitleColor.setOnClickListener {
             context?.selector(items = ReadTipConfig.tipColorNames) { _, i ->
@@ -322,6 +341,19 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
                         .show(requireActivity())
                 }
             }
+        }
+    }
+
+    override val curFontPath: String
+        get() = ReadBookConfig.titleFont
+
+    override val selectSystemTypefaceOnDefault = false
+
+    override fun selectFont(path: String) {
+        if (path != ReadBookConfig.titleFont || path.isEmpty()) {
+            ReadBookConfig.titleFont = path
+            upTitleFont()
+            postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
         }
     }
 

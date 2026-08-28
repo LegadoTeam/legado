@@ -598,20 +598,34 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
             val configFile = configDir.getFile("readConfig.json")
             configFile.createFileReplace()
             val config = ReadBookConfig.getExportConfig()
-            val fontPath = ReadBookConfig.textFont
-            if (fontPath.isNotEmpty()) {
+            fun exportFont(fontPath: String, archiveName: String? = null): String? {
+                if (fontPath.isEmpty()) return null
                 val fontDoc = FileDoc.fromFile(fontPath)
-                val fontName = fontDoc.name
+                val fontName = archiveName ?: fontDoc.name
                 val fontInputStream = fontDoc.openInputStream().getOrNull()
-                fontInputStream?.use {
+                return fontInputStream?.use {
                     val fontExportFile = FileUtils.createFileIfNotExist(configDir, fontName)
                     fontExportFile.outputStream().use { out ->
                         it.copyTo(out)
                     }
-                    config.textFont = fontName
                     exportFiles.add(fontExportFile)
+                    fontName
                 }
             }
+
+            val textFontPath = ReadBookConfig.textFont
+            val exportedTextFont = exportFont(textFontPath)
+            config.textFont = exportedTextFont.orEmpty()
+
+            val titleFontPath = ReadBookConfig.titleFont
+            config.titleFont = if (titleFontPath == textFontPath && exportedTextFont != null) {
+                exportedTextFont
+            } else if (titleFontPath.isNotEmpty()) {
+                val titleFontName = FileDoc.fromFile(titleFontPath).name.let {
+                    if (it == exportedTextFont) "title_$it" else it
+                }
+                exportFont(titleFontPath, titleFontName).orEmpty()
+            } else ""
             configFile.writeText(GSON.toJson(config))
             exportFiles.add(configFile)
             repeat(3) {

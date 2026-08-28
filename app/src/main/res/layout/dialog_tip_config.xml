@@ -69,6 +69,36 @@
             app:title="@string/title_line_spacing" />
 
         <LinearLayout
+            android:id="@+id/ll_title_font"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:gravity="center_vertical"
+            android:minHeight="48dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:padding="6dp"
+                android:text="@string/title_font"
+                android:textColor="@color/primaryText" />
+
+            <TextView
+                android:id="@+id/tv_title_font"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="middle"
+                android:maxWidth="180dp"
+                android:maxLines="1"
+                android:padding="6dp"
+                android:text="@string/follow_text_font"
+                android:textColor="@color/primaryText" />
+
+        </LinearLayout>
+
+        <LinearLayout
             android:id="@+id/ll_title_color"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

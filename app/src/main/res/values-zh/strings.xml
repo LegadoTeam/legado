@@ -1093,6 +1093,8 @@
     <string name="use_default_cover">总是使用默认封面</string>
     <string name="use_default_cover_s">总是显示默认封面（不显示网络封面）</string>
     <string name="title_font_size">字号</string>
+    <string name="title_font">标题字体</string>
+    <string name="follow_text_font">跟随正文字体</string>
     <string name="title_margin_top">上边距</string>
     <string name="title_margin_bottom">下边距</string>
     <string name="show">显示</string>

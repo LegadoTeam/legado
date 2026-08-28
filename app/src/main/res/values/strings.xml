@@ -1097,6 +1097,8 @@
     <string name="content_src">Content source code</string>
     <string name="list_src">List source code</string>
     <string name="title_font_size">Font size</string>
+    <string name="title_font">Title font</string>
+    <string name="follow_text_font">Follow text font</string>
     <string name="title_margin_top">Margin top</string>
     <string name="title_margin_bottom">Margin bottom</string>
     <string name="show">Show</string>
