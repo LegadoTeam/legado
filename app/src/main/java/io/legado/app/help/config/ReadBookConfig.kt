@@ -451,6 +451,15 @@ object ReadBookConfig {
             config.textFont = value
         }
 
+    var titleFont: String
+        get() = config.titleFont
+        set(value) {
+            config.titleFont = value
+        }
+
+    val resolvedTitleFont: String
+        get() = config.titleFont.ifEmpty { config.textFont }
+
     var textBold: Int
         get() = config.textBold
         set(value) {
@@ -715,6 +724,7 @@ object ReadBookConfig {
         val exportConfig = durConfig.copy()
         if (shareLayout) {
             exportConfig.textFont = shareConfig.textFont
+            exportConfig.titleFont = shareConfig.titleFont
             exportConfig.textBold = shareConfig.textBold
             exportConfig.textSize = shareConfig.textSize
             exportConfig.letterSpacing = shareConfig.letterSpacing
@@ -785,20 +795,22 @@ object ReadBookConfig {
         ZipUtils.unZipToPath(zipFile, configDir)
         val configFile = configDir.getFile(configFileName)
         val config: Config = parseReadConfigObject(configFile.readText()).getOrThrow()
-        if (config.textFont.isNotEmpty()) {
-            val fontName = config.textFont
+        fun importFont(fontName: String): String {
+            if (fontName.isEmpty()) return ""
             val fontPath =
                 FileUtils.getPath(appCtx.externalFiles, "font", fontName)
             val fontFile = configDir.getFile(fontName)
-            if (fontFile.exists()) {
+            return if (fontFile.exists()) {
                 if (!FileUtils.exist(fontPath)) {
                     fontFile.copyTo(File(fontPath))
                 }
-                config.textFont = fontPath
+                fontPath
             } else {
-                config.textFont = ""
+                ""
             }
         }
+        config.textFont = importFont(config.textFont)
+        config.titleFont = importFont(config.titleFont)
         if (config.bgType == 2) {
             val bgName = FileUtils.getName(config.bgStr)
             config.bgStr = bgName
@@ -874,6 +886,7 @@ object ReadBookConfig {
         private var pageAnim: Int = 0,//翻页动画
         private var pageAnimEInk: Int = 4,
         var textFont: String = "",//字体
+        var titleFont: String = "",//标题字体, 空值跟随正文字体
         var textBold: Int = 0,//是否粗体字 0:正常, 1:粗体, 2:细体
         var textSize: Int = 20,//文字大小
         var letterSpacing: Float = 0.1f,//字间距
@@ -1205,6 +1218,7 @@ object ReadBookConfig {
             "pageAnim" to pageAnim,
             "pageAnimEInk" to pageAnimEInk,
             "textFont" to textFont,
+            "titleFont" to titleFont,
             "textBold" to textBold,
             "textSize" to textSize,
             "letterSpacing" to letterSpacing,
