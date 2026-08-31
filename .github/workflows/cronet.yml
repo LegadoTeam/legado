@@ -18,12 +18,12 @@ jobs:
           chmod +x .github/scripts/cronet.sh
           .github/scripts/cronet.sh Stable 100
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         if: ${{ env.cronet == 'ok' }}
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
-          java-version: 17
+          java-version: 21
 
       - uses: gradle/actions/setup-gradle@v6.3.0
         if: ${{ env.cronet == 'ok' }}
