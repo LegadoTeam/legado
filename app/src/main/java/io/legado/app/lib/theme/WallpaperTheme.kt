@@ -2,6 +2,7 @@ package io.legado.app.lib.theme
 
 import android.app.WallpaperManager
 import android.content.Context
+import android.content.SharedPreferences
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -18,6 +19,9 @@ import io.legado.app.utils.getPrefBoolean
 import org.json.JSONArray
 
 object WallpaperTheme {
+
+    //未设置的颜色占位值,与颜色偏好的默认读取值一致
+    private const val UNSET_COLOR = Int.MIN_VALUE
 
     internal val colorPreferenceKeys = arrayOf(
         PreferKey.cPrimary,
@@ -39,6 +43,11 @@ object WallpaperTheme {
 
     fun isAvailable(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
+    /**
+     * 开启或关闭跟随壁纸配色
+     *
+     * @param restoreColors 关闭时是否恢复开启前备份的颜色,手动改色退出跟随时传 false
+     */
     @MainThread
     fun setFollow(
         context: Context,
@@ -126,20 +135,25 @@ object WallpaperTheme {
             ?.toArgb()
     }.getOrNull()
 
-    //首次开启跟随时备份当前颜色,备份存在则不覆盖
+    /** 首次开启跟随时备份当前颜色,已有备份不覆盖 */
     private fun backupColors(context: Context) {
         val preferences = context.defaultSharedPreferences
-        if (preferences.getString(PreferKey.wallpaperColorBackup, null) != null) return
-        val colors = JSONArray()
-        colorPreferenceKeys.forEach { key ->
-            colors.put(preferences.getInt(key, Int.MIN_VALUE))
-        }
+        if (preferences.contains(PreferKey.wallpaperColorBackup)) return
         preferences.edit {
-            putString(PreferKey.wallpaperColorBackup, colors.toString())
+            putString(PreferKey.wallpaperColorBackup, backedUpColors(preferences).toString())
         }
     }
 
-    //恢复备份的颜色并清除备份,未备份过的颜色键移除以回落默认值
+    /** 读取颜色偏好生成备份,未设置的颜色以[UNSET_COLOR]占位 */
+    private fun backedUpColors(preferences: SharedPreferences): JSONArray {
+        val colors = JSONArray()
+        colorPreferenceKeys.forEach { key ->
+            colors.put(preferences.getInt(key, UNSET_COLOR))
+        }
+        return colors
+    }
+
+    /** 恢复备份的颜色并清除备份,[UNSET_COLOR]表示键未备份过,移除以回落默认值 */
     private fun restoreBackedUpColors(context: Context) {
         val preferences = context.defaultSharedPreferences
         val backup = preferences.getString(PreferKey.wallpaperColorBackup, null) ?: return
@@ -148,11 +162,9 @@ object WallpaperTheme {
         try {
             preferences.edit {
                 colorPreferenceKeys.indices.forEach { index ->
-                    val color = colors.optInt(index, Int.MIN_VALUE)
-                    if (color == Int.MIN_VALUE) {
-                        remove(colorPreferenceKeys[index])
-                    } else {
-                        putInt(colorPreferenceKeys[index], color)
+                    when (val color = colors.optInt(index, UNSET_COLOR)) {
+                        UNSET_COLOR -> remove(colorPreferenceKeys[index])
+                        else -> putInt(colorPreferenceKeys[index], color)
                     }
                 }
                 remove(PreferKey.wallpaperColorBackup)
@@ -163,6 +175,7 @@ object WallpaperTheme {
         ThemeConfig.applyDayNight(context, recreateAllActivities = true)
     }
 
+    /** 丢弃颜色备份,跟随中手动改色时以手动颜色为准 */
     private fun discardBackedUpColors(context: Context) {
         context.defaultSharedPreferences.edit {
             remove(PreferKey.wallpaperColorBackup)
@@ -172,7 +185,7 @@ object WallpaperTheme {
     private fun applyColors(context: Context, colors: IntArray, recreate: Boolean) {
         val preferences = context.defaultSharedPreferences
         val colorsUnchanged = colorPreferenceKeys.indices.all { index ->
-            preferences.getInt(colorPreferenceKeys[index], Int.MIN_VALUE) == colors[index]
+            preferences.getInt(colorPreferenceKeys[index], UNSET_COLOR) == colors[index]
         }
         if (colorsUnchanged) return
         applyingColors = true
