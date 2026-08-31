@@ -9,8 +9,11 @@ import com.google.gson.JsonParseException
 import com.google.gson.JsonSyntaxException
 import com.google.gson.Strictness
 import com.google.gson.ToNumberPolicy
+import com.google.gson.TypeAdapter
 import com.google.gson.internal.LinkedTreeMap
 import com.google.gson.reflect.TypeToken
+import com.google.gson.stream.JsonReader
+import com.google.gson.stream.JsonToken
 import com.google.gson.stream.JsonWriter
 import io.legado.app.data.entities.rule.BookInfoRule
 import io.legado.app.data.entities.rule.ContentRule
@@ -23,6 +26,7 @@ import java.io.InputStreamReader
 import java.io.OutputStream
 import java.io.OutputStreamWriter
 import java.lang.reflect.Type
+import java.time.LocalDate
 import kotlin.math.ceil
 
 val INITIAL_GSON: Gson by lazy {
@@ -33,6 +37,7 @@ val INITIAL_GSON: Gson by lazy {
         )
         .registerTypeAdapter(Int::class.java, IntJsonDeserializer())
         .registerTypeAdapter(String::class.java, StringJsonDeserializer())
+        .registerTypeAdapter(LocalDate::class.java, LocalDateTypeAdapter())
         .setObjectToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
         .disableHtmlEscaping()
         .setPrettyPrinting()
@@ -241,4 +246,69 @@ class MapDeserializerDoubleAsIntFix :
         return null
     }
 
+}
+
+private class LocalDateTypeAdapter : TypeAdapter<LocalDate?>() {
+
+    override fun write(out: JsonWriter, value: LocalDate?) {
+        if (value == null) {
+            out.nullValue()
+        } else {
+            out.value(value.toString())
+        }
+    }
+
+    override fun read(input: JsonReader): LocalDate? {
+        return when (input.peek()) {
+            JsonToken.NULL -> {
+                input.nextNull()
+                null
+            }
+
+            JsonToken.STRING -> runCatching {
+                LocalDate.parse(input.nextString())
+            }.getOrNull()
+
+            JsonToken.BEGIN_OBJECT -> readLegacyObject(input)
+            else -> {
+                input.skipValue()
+                null
+            }
+        }
+    }
+
+    private fun readLegacyObject(input: JsonReader): LocalDate? {
+        var year: Int? = null
+        var month: Int? = null
+        var day: Int? = null
+        input.beginObject()
+        while (input.hasNext()) {
+            when (input.nextName()) {
+                "year" -> year = input.nextIntOrNull()
+                "month" -> month = input.nextIntOrNull()
+                "day" -> day = input.nextIntOrNull()
+                else -> input.skipValue()
+            }
+        }
+        input.endObject()
+        val validYear = year ?: return null
+        val validMonth = month ?: return null
+        val validDay = day ?: return null
+        return runCatching { LocalDate.of(validYear, validMonth, validDay) }.getOrNull()
+    }
+
+    private fun JsonReader.nextIntOrNull(): Int? {
+        return when (peek()) {
+            JsonToken.NUMBER, JsonToken.STRING -> nextString().toIntOrNull()
+            JsonToken.NULL -> {
+                nextNull()
+                null
+            }
+
+            else -> {
+                skipValue()
+                null
+            }
+        }
+    }
 }

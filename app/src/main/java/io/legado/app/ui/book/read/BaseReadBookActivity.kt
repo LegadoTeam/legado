@@ -312,7 +312,9 @@ abstract class BaseReadBookActivity :
             startDate.isCursorVisible = false // 不显示光标
             startDate.setOnClickListener {
                 // 获取当前日期
-                val localStartDate = LocalDate.parse(startDate.text)
+                val localStartDate = runCatching {
+                    LocalDate.parse(startDate.text)
+                }.getOrDefault(LocalDate.now())
                 // 创建 DatePickerDialog
                 val datePickerDialog = DatePickerDialog(
                     root.context,
@@ -332,16 +334,14 @@ abstract class BaseReadBookActivity :
             customView { alertBinding.root }
             okButton {
                 alertBinding.run {
-                    val start = editStart.text!!.toString().let {
-                        if (it.isEmpty()) 0 else it.toInt()
-                    }
-                    val num = editNum.text!!.toString().let {
-                        if (it.isEmpty()) book.totalChapterNum else it.toInt()
-                    }
+                    val start = editStart.text.toString().toIntOrNull()?.coerceAtLeast(0) ?: 0
+                    val num = editNum.text.toString().toIntOrNull()?.coerceAtLeast(1)
+                        ?: book.totalChapterNum.coerceAtLeast(1)
                     val enabled = srEnabled.isChecked
-                    val date = startDate.text!!.toString().let {
+                    val date = startDate.text.toString().let {
                         if (it.isEmpty()) LocalDate.now()
-                        else LocalDate.parse(it, dateFormatter)
+                        else runCatching { LocalDate.parse(it, dateFormatter) }
+                            .getOrDefault(LocalDate.now())
                     }
                     book.setStartDate(date)
                     book.setDailyChapters(num)
