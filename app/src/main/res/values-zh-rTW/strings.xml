@@ -850,6 +850,8 @@
     <string name="save_night_theme_summary">儲存夜間主題配置以供呼叫和分享</string>
     <string name="theme_list">主題列表</string>
     <string name="theme_list_summary">使用儲存主題，匯入、分享主題</string>
+    <string name="disable_predictive_back">停用預測性返回動畫</string>
+    <string name="disable_predictive_back_summary">開啟後全域停用預測性返回動畫</string>
     <string name="wallpaper_color_follow">跟隨桌布配色</string>
     <string name="wallpaper_color_follow_summary">使用系統桌布色盤產生日間和夜間主題（Android 12+）</string>
     <string name="wallpaper_color_auto_update">桌布變更時自動更新</string>

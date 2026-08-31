@@ -281,6 +281,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val immNavigationBar: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.immNavigationBar, true)
 
+    val disablePredictiveBack: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.disablePredictiveBack, false)
+
     val screenOrientation: String?
         get() = appCtx.getPrefString(PreferKey.screenOrientation)
 

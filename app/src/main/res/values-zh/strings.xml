@@ -1008,6 +1008,8 @@
     <string name="save_night_theme_summary">保存夜间主题配置以供调用和分享</string>
     <string name="theme_list">主题列表</string>
     <string name="theme_list_summary">使用、保存、导入或分享主题</string>
+    <string name="disable_predictive_back">禁用预测性返回动画</string>
+    <string name="disable_predictive_back_summary">开启后全局禁用预测性返回动画</string>
     <string name="wallpaper_color_follow">跟随壁纸配色</string>
     <string name="wallpaper_color_follow_summary">使用系统壁纸色板生成日间和夜间主题（Android 12+）</string>
     <string name="wallpaper_color_auto_update">壁纸变化时自动更新</string>

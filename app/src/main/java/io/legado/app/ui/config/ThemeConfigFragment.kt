@@ -182,8 +182,9 @@ class ThemeConfigFragment : PreferenceFragment(),
             PreferKey.wallpaperColorFollow ->
                 findPreference<SwitchPreference>(PreferKey.wallpaperColorFollow)?.isChecked =
                     getPrefBoolean(PreferKey.wallpaperColorFollow)
-            PreferKey.transparentStatusBar -> recreateActivities()
-            PreferKey.immNavigationBar -> recreateActivities()
+            PreferKey.transparentStatusBar,
+            PreferKey.immNavigationBar,
+            PreferKey.disablePredictiveBack -> recreateActivities()
             PreferKey.cPrimary,
             PreferKey.cAccent,
             PreferKey.cBackground,
