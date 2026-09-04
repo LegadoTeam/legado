@@ -44,7 +44,8 @@ class CronetInitializationContractTest {
         assertTrue(coroutineInterceptor.contains("getCronetEngineOrNull()"))
         assertTrue(coroutineInterceptor.contains("catch (e: Throwable)"))
         assertTrue(app.contains("runCatching { Cronet.preDownload() }"))
-        assertTrue(config.contains("val isCronet = appCtx.getPrefBoolean(PreferKey.cronet)"))
+        assertTrue(config.contains("val isCronet: Boolean"))
+        assertTrue(config.contains("get() = appCtx.getPrefBoolean(PreferKey.cronet)"))
         assertTrue(httpHelper.contains("if (AppConfig.isCronet)"))
     }
 

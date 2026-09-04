@@ -32,7 +32,8 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     private const val JS_SOURCE_API_PREFS = "js_source_api_credentials"
     private const val JS_SOURCE_API_TOKEN = "token"
 
-    val isCronet = appCtx.getPrefBoolean(PreferKey.cronet)
+    val isCronet: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.cronet)
     var useAntiAlias = appCtx.getPrefBoolean(PreferKey.antiAlias)
     var userAgent: String = getPrefUserAgent()
     var customHosts = appCtx.getPrefString(PreferKey.customHosts)
