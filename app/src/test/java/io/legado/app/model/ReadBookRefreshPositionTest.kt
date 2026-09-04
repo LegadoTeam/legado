@@ -92,6 +92,14 @@ class ReadBookRefreshPositionTest {
         assertTrue(upContent.contains("isReadPositionVersionCurrent(readPositionVersion)"))
     }
 
+    @Test
+    fun `initial chapter load carries the reader position version`() {
+        val viewModel = source("app/src/main/java/io/legado/app/ui/book/read/ReadBookViewModel.kt")
+        val initBook = viewModel.substringAfter("private suspend fun initBook(")
+            .substringBefore("private fun checkLocalBookFileExist")
+        assertTrue(initBook.contains("readPositionVersion = ReadBook.callBack?.readPositionVersion()"))
+    }
+
     private fun assertOrder(source: String, vararg expected: String) {
         var position = -1
         expected.forEach { text ->

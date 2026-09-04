@@ -149,7 +149,10 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
         }
         ReadBook.upMsg(null)
         if (!isSameBook) {
-            ReadBook.loadContent(resetPageOffset = true) {
+            ReadBook.loadContent(
+                resetPageOffset = true,
+                readPositionVersion = ReadBook.callBack?.readPositionVersion(),
+            ) {
                 ReadBook.bookSource?.let {
                     SourceCallBack.callBackBook(SourceCallBack.START_READ, it, book, ReadBook.curTextChapter?.chapter)
                 }
