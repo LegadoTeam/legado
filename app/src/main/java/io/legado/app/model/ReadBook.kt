@@ -1287,7 +1287,9 @@ object ReadBook : CoroutineScope by MainScope() {
             )
             ensureActive()
             val textChapter = ChapterProvider.getTextChapterAsync(
-                this, book, chapter, displayTitle, contents, simulatedChapterSize
+                this, book, chapter, displayTitle, contents, simulatedChapterSize,
+                hasBodyContent = contents.textList.isNotEmpty() &&
+                        !content.isContentLoadFailurePlaceholder(),
             )
             when (val offset = chapter.index - durChapterIndex) {
                 0 -> curChapterLoadingLock.withLock {
@@ -1420,7 +1422,9 @@ object ReadBook : CoroutineScope by MainScope() {
                 contentReplaceRulesOverride = manualRules?.content,
             )
             val textChapter = ChapterProvider.getTextChapterAsync(
-                this@ReadBook, book, chapter, displayTitle, contents, simulatedChapterSize
+                this@ReadBook, book, chapter, displayTitle, contents, simulatedChapterSize,
+                hasBodyContent = contents.textList.isNotEmpty() &&
+                        !content.isContentLoadFailurePlaceholder(),
             )
             when (val offset = chapter.index - durChapterIndex) {
                 0 -> {
@@ -1833,6 +1837,9 @@ object ReadBook : CoroutineScope by MainScope() {
     }
 
 }
+
+internal fun String.isContentLoadFailurePlaceholder(): Boolean =
+    startsWith("获取正文失败\n") || startsWith("加载正文失败\n")
 
 internal fun BookHighlight.isForBook(book: Book?): Boolean {
     return book != null && bookUrl == book.bookUrl
