@@ -244,6 +244,7 @@ object PreferKey {
     const val tNavBarN = "transparentNavBarNight"
     const val wallpaperColorFollow = "wallpaperColorFollow"
     const val wallpaperColorAutoUpdate = "wallpaperColorAutoUpdate"
+    const val disablePredictiveBack = "disablePredictiveBack"
 
     const val showReadTitleAddition = "showReadTitleAddition"
     const val showReadTitleChapterNameOnly = "showReadTitleChapterNameOnly"

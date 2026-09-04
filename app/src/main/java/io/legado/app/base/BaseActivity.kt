@@ -12,6 +12,8 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.Window
 import android.widget.FrameLayout
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
@@ -85,6 +87,7 @@ abstract class BaseActivity<VB : ViewBinding>(
         initTheme()
         super.onCreate(savedInstanceState)
         setupSystemBar()
+        setupPredictiveBack()
         setContentView(binding.root)
         upBackgroundImage()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -93,6 +96,21 @@ abstract class BaseActivity<VB : ViewBinding>(
         }
         observeLiveBus()
         onActivityCreated(savedInstanceState)
+    }
+
+    /**
+     * 注册返回回调接管返回操作,系统不再播放预测性返回动画
+     */
+    private fun setupPredictiveBack() {
+        if (!AppConfig.disablePredictiveBack
+            || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+        ) {
+            return
+        }
+        onBackInvokedDispatcher.registerOnBackInvokedCallback(
+            OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+            OnBackInvokedCallback { finish() }
+        )
     }
 
     @RequiresApi(Build.VERSION_CODES.O)

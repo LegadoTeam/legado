@@ -1012,6 +1012,8 @@
     <string name="save_night_theme_summary">Save night theme config</string>
     <string name="theme_list">Theme list</string>
     <string name="theme_list_summary">Save, Import, Share theme</string>
+    <string name="disable_predictive_back">Disable predictive back animation</string>
+    <string name="disable_predictive_back_summary">Disable predictive back animations globally when enabled</string>
     <string name="wallpaper_color_follow">Follow wallpaper colors</string>
     <string name="wallpaper_color_follow_summary">Use the system wallpaper palette for day and night themes (Android 12+)</string>
     <string name="wallpaper_color_auto_update">Update when wallpaper changes</string>
