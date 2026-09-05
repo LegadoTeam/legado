@@ -8,6 +8,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookProgress
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.ReadRecord
+import io.legado.app.data.entities.updateSnapshot
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.ConcurrentRateLimiter
 import io.legado.app.help.book.BookHelp
@@ -136,6 +137,7 @@ object ReadManga : CoroutineScope by MainScope() {
     //每次切换章节更新阅读记录
     fun upReadTime() {
         val record = synchronized(readRecord) {
+            val currentBook = book ?: return
             val author = book?.author ?: return
             val now = System.currentTimeMillis()
             val elapsed = now - readStartTime
@@ -143,6 +145,7 @@ object ReadManga : CoroutineScope by MainScope() {
             readRecord.author = author
             readRecord.readTime += elapsed
             readRecord.lastRead = now
+            readRecord.updateSnapshot(currentBook, durChapterIndex, durChapterPos)
             readRecord.copy()
         }
         executor.execute {

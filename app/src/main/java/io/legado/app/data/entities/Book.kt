@@ -476,6 +476,7 @@ data class Book(
         if (ReadBook.book?.bookUrl == bookUrl) {
             ReadBook.book = null
         }
+        saveReadRecordSnapshot()
         appDb.bookDao.delete(this)
     }
 

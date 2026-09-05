@@ -374,7 +374,10 @@ object Restore {
                 } else {
                     val current = appDb.readRecordDao
                         .getRecord(normalizedRecord.deviceId, normalizedRecord.bookName)
-                    if (current == null || current.readTime < normalizedRecord.readTime) {
+                    if (current == null || current.readTime < normalizedRecord.readTime ||
+                        (current.readTime == normalizedRecord.readTime &&
+                            current.lastRead < normalizedRecord.lastRead)
+                    ) {
                         appDb.readRecordDao.insert(normalizedRecord)
                     } else if (normalizedRecord.author.isNotBlank()) {
                         appDb.readRecordDao.insert(current.copy(author = normalizedRecord.author))
