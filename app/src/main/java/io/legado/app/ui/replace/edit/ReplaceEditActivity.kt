@@ -119,6 +119,7 @@ class ReplaceEditActivity :
             val hint = findParentTextInputLayout(view)?.hint?.toString()
             val currentText = rawFields[view.id] ?: view.text.toString()
             val intent = Intent(this, CodeEditActivity::class.java).apply {
+                putExtra("useTextFile", true)
                 if (currentText.length > EditSafety.MAX_INLINE_TEXT_LENGTH) {
                     putExtra("textFile", CodeTextTransfer.write(this@ReplaceEditActivity, currentText))
                 } else putExtra("text", currentText)

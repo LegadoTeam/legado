@@ -563,7 +563,9 @@ class CodeEditActivity :
     }
 
     private fun putEditorText(intent: Intent, text: String) {
-        if (text.length > io.legado.app.ui.widget.code.EditSafety.MAX_INLINE_TEXT_LENGTH) {
+        if (intent.getBooleanExtra("useTextFile", false) &&
+            text.length > io.legado.app.ui.widget.code.EditSafety.MAX_INLINE_TEXT_LENGTH
+        ) {
             intent.putExtra("textFile", CodeTextTransfer.write(this, text))
         } else {
             intent.putExtra("text", text)
