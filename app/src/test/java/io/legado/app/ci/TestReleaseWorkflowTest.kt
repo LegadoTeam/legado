@@ -85,5 +85,8 @@ class TestReleaseWorkflowTest {
         assertTrue(lanzouUploaderText.contains("sys.exit(main(sys.argv[1:]))"))
         assertFalse(lanzouUploaderText.contains("\"name\": '{file_name}'"))
         assertFalse(lanzouUploaderText.contains("retry_tim+"))
+        assertTrue(lanzouUploaderText.contains("mydisk.php?item=files&action=index&u="))
+        assertTrue(lanzouUploaderText.contains("allow_redirects=False"))
+        assertTrue(lanzouUploaderText.contains("accounts.woozooo.com"))
     }
 }

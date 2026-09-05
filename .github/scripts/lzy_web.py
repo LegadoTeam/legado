@@ -6,9 +6,9 @@ import time
 import requests
 
 # Cookie 中 phpdisk_info 的值
-cookie_phpdisk_info = os.environ.get('phpdisk_info')
+cookie_phpdisk_info = os.environ.get('phpdisk_info', '').strip()
 # Cookie 中 ylogin 的值
-cookie_ylogin = os.environ.get('ylogin')
+cookie_ylogin = os.environ.get('ylogin', '').strip()
 
 # 请求头
 headers = {
@@ -34,16 +34,24 @@ def log(msg):
 
 # 检查是否已登录
 def login_by_cookie():
-    url_account = "https://accounts.woozooo.com/accounts.php"
-    if cookie['phpdisk_info'] is None:
+    url_account = "https://pc.woozooo.com/mydisk.php?item=files&action=index&u=" + cookie_ylogin
+    if not cookie['phpdisk_info']:
         log('ERROR: 请指定 Cookie 中 phpdisk_info 的值！')
         return False
-    if cookie['ylogin'] is None:
+    if not cookie['ylogin']:
         log('ERROR: 请指定 Cookie 中 ylogin 的值！')
         return False
-    res = requests.get(url_account, headers=headers, cookies=cookie, verify=True)
-    if '网盘用户登录' in res.text:
-        log('ERROR: 登录失败,请更新Cookie')
+    res = requests.get(
+        url_account,
+        headers=headers,
+        cookies=cookie,
+        allow_redirects=False,
+        timeout=30,
+        verify=True,
+    )
+    location = res.headers.get('Location', '')
+    if res.status_code >= 300 or 'accounts.woozooo.com' in location or '网盘用户登录' in res.text:
+        log(f'ERROR: 登录失败,请更新Cookie (HTTP {res.status_code})')
         return False
     else:
         log('登录成功')
