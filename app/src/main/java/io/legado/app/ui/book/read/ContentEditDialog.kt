@@ -3,6 +3,7 @@ package io.legado.app.ui.book.read
 import android.app.Application
 import android.content.DialogInterface
 import android.os.Bundle
+import android.text.NoCopySpan
 import android.text.Spanned
 import android.text.style.BackgroundColorSpan
 import android.view.View
@@ -11,6 +12,7 @@ import android.view.ViewTreeObserver
 import android.view.inputmethod.EditorInfo
 import android.widget.SeekBar
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.doOnLayout
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.viewModels
@@ -32,16 +34,16 @@ import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.model.ReadBook
 import io.legado.app.model.webBook.WebBook
-import io.legado.app.utils.applyTint
 import io.legado.app.utils.ColorUtils
+import io.legado.app.utils.applyTint
 import io.legado.app.utils.hideSoftInput
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.showSoftInput
 import io.legado.app.utils.viewbindingdelegate.viewBinding
+import kotlinx.coroutines.Dispatchers.Default
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
-import kotlinx.coroutines.Dispatchers.Default
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -243,7 +245,7 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
         setupSearch(savedInstanceState)
         viewModel.initContent(editTarget)
         val owner = viewLifecycleOwner
-        contentView.post {
+        contentView.doOnLayout {
             if (owner.lifecycle.currentState.isAtLeast(Lifecycle.State.CREATED) && viewModel.hasDraft) {
                 restoredScrollY?.let {
                     contentView.scrollTo(0, it.coerceIn(0, maxScrollY()))
@@ -254,18 +256,16 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
-        val hadHighlight = searchSpan != null
-        clearSearchHighlight()
         super.onSaveInstanceState(outState)
         outState.putBoolean(STATE_HAS_DRAFT, viewModel.hasDraft)
         outState.putBoolean(STATE_HAS_CHANGES, viewModel.hasChanges)
+        if (view == null) return
         outState.putString(STATE_SEARCH_QUERY, binding.searchInput.text?.toString())
         outState.putBoolean(STATE_SEARCH_VISIBLE, binding.searchBar.isVisible)
         outState.putBoolean(STATE_SEARCH_REGEX, binding.searchRegex.isChecked)
         outState.putBoolean(STATE_SEARCH_CASE, binding.searchMatchCase.isChecked)
         outState.putInt(STATE_SEARCH_ANCHOR, searchMatches.getOrNull(searchIndex)?.first ?: 0)
         outState.putInt(STATE_SCROLL_Y, binding.contentView.scrollY)
-        if (hadHighlight) showCurrentMatch(scrollToMatch = false)
     }
 
     override fun onDestroyView() {
@@ -386,7 +386,7 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
         val contentView = binding.contentView
         val editable = contentView.text ?: return
         if (!range.isEmpty()) {
-            searchSpan = BackgroundColorSpan(ColorUtils.adjustAlpha(primaryColor, 0.35f)).also {
+            searchSpan = object : BackgroundColorSpan(ColorUtils.adjustAlpha(primaryColor, 0.35f)), NoCopySpan {}.also {
                 editable.setSpan(it, range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
         }
