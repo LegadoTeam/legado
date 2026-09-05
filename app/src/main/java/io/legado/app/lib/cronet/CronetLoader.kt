@@ -72,6 +72,7 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
 
     @Volatile
     private var cacheInstall = false
+    private val installRetry = AtomicBoolean(false)
 
     init {
         soUrl = ("https://storage.googleapis.com/chromium-cronet/android/"
@@ -106,6 +107,23 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
         }
         cacheInstall = soFile.exists()
         return cacheInstall
+    }
+
+    /** Retry one failed dynamic library install in the current process. */
+    internal fun installWithRetry(): Boolean {
+        if (install()) {
+            installRetry.set(false)
+            return true
+        }
+        if (!installRetry.compareAndSet(false, true)) {
+            return install()
+        }
+        preDownload()
+        val installed = install()
+        if (installed) {
+            installRetry.set(false)
+        }
+        return installed
     }
 
 

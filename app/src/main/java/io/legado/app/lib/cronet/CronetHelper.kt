@@ -55,7 +55,7 @@ internal fun getCronetEngineOrNull(): ExperimentalCronetEngine? {
     // Cronet remains the preferred transport when it initializes successfully.
     // This guard only protects users carrying a broken pre-fix build from a crash.
     return try {
-        if (!CronetLoader.install()) null else cronetEngine
+        if (!CronetLoader.installWithRetry()) null else cronetEngine
     } catch (e: Throwable) {
         cronetEngineFailure = e
         AppLog.put("初始化cronetEngine出错", e)
