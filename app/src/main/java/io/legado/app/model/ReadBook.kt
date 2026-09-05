@@ -1,5 +1,6 @@
 package io.legado.app.model
 
+import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.PageAnim.scrollPageAnim
@@ -172,6 +173,7 @@ object ReadBook : CoroutineScope by MainScope() {
         val positionAnchor = pendingHighlightAnchor
         releaseAndCancel()
         ReadBook.book = book
+        readRecord.deviceId = AppConst.androidId
         loadHighlights(book)
         loadHighlightRules(book)
         readRecord.bookName = book.name

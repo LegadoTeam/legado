@@ -1,5 +1,6 @@
 package io.legado.app.model
 
+import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
@@ -69,6 +70,7 @@ object ReadManga : CoroutineScope by MainScope() {
     val hasNextChapter get() = durChapterIndex < simulatedChapterSize - 1
 
     fun resetData(book: Book) {
+        readRecord.deviceId = AppConst.androidId
         val readTime = appDb.readRecordDao
             .getReadTime(readRecord.deviceId, book.name) ?: 0
         synchronized(readRecord) {
