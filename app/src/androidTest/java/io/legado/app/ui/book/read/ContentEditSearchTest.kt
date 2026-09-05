@@ -224,7 +224,10 @@ class ContentEditSearchTest {
             assertEquals(1, text.getSpans(0, text.length, BackgroundColorSpan::class.java).size)
         }
         scenario!!.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
-        awaitDialog { it.binding.root.width > it.binding.root.height && it.binding.searchCount.text.toString() == "1/1" }
+        awaitDialog(stableMillis = 300) {
+            it.binding.root.width > it.binding.root.height &&
+                it.binding.searchCount.text.toString() == "1/1"
+        }
         onDialog {
             val ui = it.binding
             assertTrue(ui.contentView.height > 0)
@@ -249,15 +252,22 @@ class ContentEditSearchTest {
 
     private fun awaitCount(count: String) = awaitDialog { it.binding.searchCount.text.toString() == count }
 
-    private fun awaitDialog(condition: (ContentEditDialog) -> Boolean) {
+    private fun awaitDialog(stableMillis: Long = 0, condition: (ContentEditDialog) -> Boolean) {
         val deadline = SystemClock.uptimeMillis() + 15000
+        var satisfiedSince: Long? = null
         do {
             var satisfied = false
             scenario!!.onActivity {
                 val dialog = it.supportFragmentManager.findFragmentByTag("content-search") as? ContentEditDialog
                 if (dialog?.view != null) satisfied = condition(dialog)
             }
-            if (satisfied) return
+            if (satisfied) {
+                val now = SystemClock.uptimeMillis()
+                if (satisfiedSince == null) satisfiedSince = now
+                if (now - satisfiedSince >= stableMillis) return
+            } else {
+                satisfiedSince = null
+            }
             SystemClock.sleep(50)
         } while (SystemClock.uptimeMillis() < deadline)
         var state = ""
