@@ -2,6 +2,7 @@ package io.legado.app.ui.book.explore
 
 import android.app.Application
 import android.content.Intent
+import android.os.Bundle
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import io.legado.app.BuildConfig
@@ -12,10 +13,13 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.SearchBook
+import io.legado.app.data.entities.rule.ExploreKind
 import io.legado.app.help.book.SearchBookShelfHelp
 import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.book.mergeActiveShelfBook
 import io.legado.app.help.coroutine.Coroutine
+import io.legado.app.help.config.AppConfig
+import io.legado.app.help.source.exploreKinds
 import io.legado.app.model.AudioPlay
 import io.legado.app.model.ReadBook
 import io.legado.app.model.ReadManga
@@ -39,14 +43,17 @@ import java.util.concurrent.ConcurrentHashMap
 class ExploreShowViewModel(application: Application) : BaseViewModel(application) {
     val bookshelf: MutableSet<String> = ConcurrentHashMap.newKeySet()
     val upAdapterLiveData = MutableLiveData<String>()
-    val booksData = MutableLiveData<List<SearchBook>>()
-    val addBooksData = MutableLiveData<List<SearchBook>>()
+    internal val booksData = MutableLiveData<ExploreListState>()
+    internal val categoryData = MutableLiveData<ExploreCategory>()
+    val categoriesData = MutableLiveData<List<ExploreKind>>()
     val errorLiveData = MutableLiveData<String>()
     val errorTopLiveData = MutableLiveData<String>()
     val pageLiveData = MutableLiveData<Int>()
     val addBooksBusy = MutableLiveData(false)
     private var bookSource: BookSource? = null
-    private var exploreUrl: String? = null
+    private var initialized = false
+    private var categoriesLoading = false
+    private var firstLoadedPage = 1
     private val paginationState = ExplorePaginationState()
     private val booksLock = Any()
     private var books = linkedSetOf<SearchBook>()
@@ -76,15 +83,55 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
         }
     }
 
-    fun initData(intent: Intent) {
+    fun initData(intent: Intent, savedState: Bundle? = null) {
+        if (initialized) return
+        initialized = true
+        categoryData.value = ExploreCategory(
+            savedState?.getString("exploreName") ?: intent.getStringExtra("exploreName").orEmpty(),
+            savedState?.getString("exploreUrl") ?: intent.getStringExtra("exploreUrl").orEmpty(),
+        )
+        skipPage((savedState?.getInt("explorePage", 1) ?: 1).coerceAtLeast(1))
         execute {
-            val sourceUrl = intent.getStringExtra("sourceUrl")
-            exploreUrl = intent.getStringExtra("exploreUrl")
-            if (bookSource == null && sourceUrl != null) {
-                bookSource = appDb.bookSourceDao.getBookSource(sourceUrl)
-            }
+            intent.getStringExtra("sourceUrl")?.let { appDb.bookSourceDao.getBookSource(it) }
+                ?: error(context.getString(R.string.error_no_source))
+        }.onSuccess {
+            bookSource = it
             explore()
+            if (AppConfig.showExploreCategories) loadCategories()
+        }.onError {
+            errorLiveData.value = it.stackTraceStr
         }
+    }
+
+    fun saveState(outState: Bundle) {
+        categoryData.value?.let {
+            outState.putString("exploreName", it.title)
+            outState.putString("exploreUrl", it.url)
+        }
+        outState.putInt("explorePage", pageLiveData.value ?: firstLoadedPage)
+    }
+
+    fun loadCategories() {
+        val source = bookSource ?: return
+        if (categoriesLoading || categoriesData.value != null) return
+        categoriesLoading = true
+        execute { source.exploreKinds() }.onSuccess { kinds ->
+            categoriesData.value = kinds.filter {
+                it.type == ExploreKind.Type.url && !it.url.isNullOrBlank() &&
+                        !it.title.startsWith("ERROR:")
+            }
+        }.onError {
+            context.toastOnUi(it.localizedMessage)
+        }.onFinally { categoriesLoading = false }
+    }
+
+    internal fun switchCategory(category: ExploreCategory) {
+        if (bookSource == null || category.url.isBlank() || categoryData.value == category) return
+        skipPage(1)
+        errorLiveData.value = null
+        errorTopLiveData.value = null
+        categoryData.value = category
+        explore()
     }
 
     /**
@@ -92,8 +139,9 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
      */
     fun explore(page: Int) {
         val source = bookSource
-        val url = exploreUrl
+        val url = categoryData.value?.url
         if (source == null || url == null) return
+        if (paginationState.isLoading) return
         val request = paginationState.startPage(page) ?: return
         WebBook.exploreBook(viewModelScope, source, url, request.page)
             .timeout(if (BuildConfig.DEBUG) 0L else 60000L)
@@ -102,13 +150,21 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
                 appDb.searchBookDao.insert(*searchBooks.toTypedArray())
                 withContext(Main) {
                     if (!paginationState.complete(request)) return@withContext
-                    synchronized(booksLock) {
+                    val previousCount = synchronized(booksLock) { books.size }
+                    val loadedBooks = synchronized(booksLock) {
                         val newBooks = linkedSetOf<SearchBook>()
                         newBooks.addAll(searchBooks)
                         newBooks.addAll(books)
                         books = newBooks
+                        books.toList()
                     }
-                    addBooksData.value = searchBooks
+                    firstLoadedPage = request.page
+                    booksData.value = ExploreListState(
+                        loadedBooks,
+                        firstLoadedPage,
+                        hasMore = booksData.value?.hasMore ?: true,
+                        prependCount = loadedBooks.size - previousCount,
+                    )
                     pageLiveData.value = request.page
                 }
             }.onError {
@@ -123,13 +179,17 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
             synchronized(booksLock) {
                 books.clear()
             }
+            firstLoadedPage = page
+            pageLiveData.value = page
+            booksData.value = ExploreListState(emptyList(), page, loading = true)
         }
     }
 
     fun explore() {
         val source = bookSource
-        val url = exploreUrl
+        val url = categoryData.value?.url
         if (source == null || url == null) return
+        if (paginationState.isLoading) return
         val request = paginationState.startNextPage()
         WebBook.exploreBook(viewModelScope, source, url, request.page)
             .timeout(if (BuildConfig.DEBUG) 0L else 60000L)
@@ -138,11 +198,16 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
                 appDb.searchBookDao.insert(*searchBooks.toTypedArray())
                 withContext(Main) {
                     if (!paginationState.complete(request)) return@withContext
+                    val previousCount = synchronized(booksLock) { books.size }
                     val loadedBooks = synchronized(booksLock) {
                         books.addAll(searchBooks)
                         books.toList()
                     }
-                    booksData.value = loadedBooks
+                    booksData.value = ExploreListState(
+                        loadedBooks,
+                        firstLoadedPage,
+                        hasMore = loadedBooks.size > previousCount,
+                    )
                     pageLiveData.value = request.page
                 }
             }.onError {
@@ -277,10 +342,23 @@ internal data class ExplorePageRequest(
     internal val advancesNextPage: Boolean,
 )
 
+internal data class ExploreCategory(val title: String, val url: String)
+
+internal data class ExploreListState(
+    val books: List<SearchBook>,
+    val firstPage: Int,
+    val hasMore: Boolean = true,
+    val loading: Boolean = false,
+    val prependCount: Int = 0,
+)
+
 internal class ExplorePaginationState {
 
     private var requestSequence = 0L
     private var activeRequestId: Long? = null
+
+    val isLoading: Boolean
+        @Synchronized get() = activeRequestId != null
 
     var nextPage = 1
         private set

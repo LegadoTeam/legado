@@ -1,4 +1,4 @@
-name: Source Browser Regression
+name: Android UI Regression
 
 on:
   pull_request:
@@ -13,6 +13,9 @@ on:
       - 'app/src/main/java/io/legado/app/help/JsExtensions.kt'
       - 'app/src/main/java/io/legado/app/utils/HandlerUtils.kt'
       - 'app/src/androidTest/java/io/legado/app/ui/widget/dialog/**'
+      - 'app/src/main/java/io/legado/app/ui/book/explore/**'
+      - 'app/src/main/res/layout/activity_explore_show.xml'
+      - 'app/src/androidTest/java/io/legado/app/ui/book/explore/**'
   workflow_dispatch:
 
 permissions:
@@ -52,18 +55,16 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Verify source browser windows on Android 16
+      - name: Verify source browser and discovery on Android 16
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: 36
           target: google_apis
           arch: x86_64
           disable-animations: true
-          script: >-
-            ./gradlew :app:connectedAppDebugAndroidTest
-            --init-script .github/scripts/source-browser-test.init.gradle
-            -Pandroid.testInstrumentationRunnerArguments.class=io.legado.app.ui.widget.dialog.BottomWebViewDialogShowTest
-            --build-cache --no-daemon --max-workers=2
+          script: |
+            ./gradlew :app:connectedAppDebugAndroidTest --init-script .github/scripts/source-browser-test.init.gradle -Pandroid.testInstrumentationRunnerArguments.class=io.legado.app.ui.widget.dialog.BottomWebViewDialogShowTest,io.legado.app.ui.book.explore.ExploreCategoriesTest --build-cache --no-daemon --max-workers=2
+            adb pull /sdcard/Android/data/com.legado.app.debug/files/ui-regression app/build/ui-regression
 
       - name: Upload test results
         if: always()
@@ -73,3 +74,4 @@ jobs:
           path: |
             app/build/reports/androidTests/connected/
             app/build/outputs/androidTest-results/connected/
+            app/build/ui-regression/

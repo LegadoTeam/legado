@@ -352,6 +352,10 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val showDiscoveryFastScroller: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.showDiscoveryFastScroller, false)
 
+    var showExploreCategories: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.showExploreCategories, false)
+        set(value) = appCtx.putPrefBoolean(PreferKey.showExploreCategories, value)
+
     val showRSS: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.showRss, true)
 
