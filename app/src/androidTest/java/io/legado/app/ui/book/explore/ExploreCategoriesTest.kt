@@ -24,6 +24,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.storage.Restore
 import io.legado.app.help.storage.writePreferenceSnapshot
 import io.legado.app.utils.defaultSharedPreferences
+import io.legado.app.utils.dpToPx
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -122,6 +123,7 @@ class ExploreCategoriesTest {
             assertTrue(AppConfig.showExploreCategories)
             assertEquals(listOf(8, 7, 7), rows(it).map { tabs -> tabs.tabCount })
             assertTrue(rows(it).all { tabs -> tabs.tabMode == TabLayout.MODE_SCROLLABLE })
+            assertTrue(rows(it).all { tabs -> tabs.minimumHeight <= 40.dpToPx() })
             val categoriesLocation = IntArray(2)
             val booksLocation = IntArray(2)
             it.ui.categoriesContainer.getLocationOnScreen(categoriesLocation)
@@ -198,6 +200,7 @@ class ExploreCategoriesTest {
             assertEquals(top, manager.findViewByPosition(position)!!.top)
         }
     }
+
 
     @Test
     fun categorySwitchRejectsLateResponseAndRetainsPageAfterRecreation() {
