@@ -138,7 +138,7 @@ object ReadManga : CoroutineScope by MainScope() {
     fun upReadTime() {
         val record = synchronized(readRecord) {
             val currentBook = book ?: return
-            val author = currentBook.author
+            val author = book?.author ?: return
             val now = System.currentTimeMillis()
             val elapsed = now - readStartTime
             readStartTime = now
