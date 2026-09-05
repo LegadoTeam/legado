@@ -67,6 +67,9 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
                 val cacheText = CacheManager.getFromMemory(cacheKey) as? String ?: throw Exception("未获取到查看文本")
                 writable = false
                 initialText = cacheText
+            } else if (intent.hasExtra("textFile")) {
+                initialText = CodeTextTransfer.read(context, intent.getStringExtra("textFile").orEmpty())
+                    ?: throw Exception("未获取到待编辑文本")
             } else {
                 initialText = intent.getStringExtra("text") ?: throw Exception("未获取到待编辑文本")
             }
