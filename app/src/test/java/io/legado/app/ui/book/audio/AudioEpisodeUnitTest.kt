@@ -95,6 +95,7 @@ class AudioEpisodeUnitTest {
         val visible = upLyric.indexOf("lyricViewX.visible()")
 
         assertTrue(invisible >= 0)
+        assertTrue(upLyric.contains("lyric.equals(\"null\", ignoreCase = true)"))
         assertTrue(layout > invisible)
         assertTrue(widthGuard >= 0)
         assertTrue(retry > widthGuard)

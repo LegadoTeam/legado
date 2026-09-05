@@ -426,7 +426,7 @@ class AudioPlayActivity :
     override fun upLyric(lyric: String?) {
         if (oldLyric == lyric) return
         oldLyric = lyric
-        if(lyric.isNullOrBlank()) {
+        if (lyric.isNullOrBlank() || lyric.equals("null", ignoreCase = true)) {
             binding.lyricViewX.gone()
             return
         }
