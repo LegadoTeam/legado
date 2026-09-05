@@ -3,9 +3,11 @@ package io.legado.app.ui.book.explore
 import android.content.Intent
 import android.graphics.Bitmap
 import android.os.SystemClock
+import android.view.View
 import androidx.core.view.children
 import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -16,6 +18,7 @@ import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.rule.ExploreRule
+import io.legado.app.databinding.ActivityExploreShowBinding
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.storage.Restore
 import io.legado.app.help.storage.writePreferenceSnapshot
@@ -78,7 +81,7 @@ class ExploreCategoriesTest {
         )
         appDb.bookSourceDao.insert(source)
         launch()
-        awaitActivity { it.viewModel.getLoadedBooks().size == 20 }
+        awaitActivity { it.model.getLoadedBooks().size == 20 }
     }
 
     @After
@@ -104,28 +107,28 @@ class ExploreCategoriesTest {
     fun globalToggleRendersBalancedRowsAndSurvivesReopening() {
         scenario!!.onActivity {
             assertFalse(AppConfig.showExploreCategories)
-            assertFalse(it.binding.categoriesContainer.isVisible)
-            it.binding.titleBar.menu.performIdentifierAction(R.id.menu_show_explore_categories, 0)
+            assertFalse(it.ui.categoriesContainer.isVisible)
+            it.ui.titleBar.menu.performIdentifierAction(R.id.menu_show_explore_categories, 0)
         }
-        awaitActivity { it.binding.categoriesContainer.childCount == 3 }
+        awaitActivity { it.ui.categoriesContainer.childCount == 3 }
         scenario!!.onActivity {
             assertTrue(AppConfig.showExploreCategories)
             assertEquals(listOf(8, 7, 7), rows(it).map { tabs -> tabs.tabCount })
             assertTrue(rows(it).all { tabs -> tabs.tabMode == TabLayout.MODE_SCROLLABLE })
             val categoriesLocation = IntArray(2)
             val booksLocation = IntArray(2)
-            it.binding.categoriesContainer.getLocationOnScreen(categoriesLocation)
-            it.binding.recyclerView.getLocationOnScreen(booksLocation)
-            assertTrue(categoriesLocation[1] + it.binding.categoriesContainer.height <= booksLocation[1])
+            it.ui.categoriesContainer.getLocationOnScreen(categoriesLocation)
+            it.ui.recyclerView.getLocationOnScreen(booksLocation)
+            assertTrue(categoriesLocation[1] + it.ui.categoriesContainer.height <= booksLocation[1])
         }
         screenshot("explore-categories")
         scenario!!.close()
         launch()
-        awaitActivity { it.binding.categoriesContainer.isVisible }
+        awaitActivity { it.ui.categoriesContainer.isVisible }
         scenario!!.onActivity {
-            assertTrue(it.binding.titleBar.menu.findItem(R.id.menu_show_explore_categories).isChecked)
-            it.binding.titleBar.menu.performIdentifierAction(R.id.menu_show_explore_categories, 0)
-            assertFalse(it.binding.categoriesContainer.isVisible)
+            assertTrue(it.ui.titleBar.menu.findItem(R.id.menu_show_explore_categories).isChecked)
+            it.ui.titleBar.menu.performIdentifierAction(R.id.menu_show_explore_categories, 0)
+            assertFalse(it.ui.categoriesContainer.isVisible)
         }
     }
 
@@ -157,29 +160,29 @@ class ExploreCategoriesTest {
     @Test
     fun categorySwitchRejectsLateResponseAndRetainsPageAfterRecreation() {
         scenario!!.onActivity {
-            it.binding.titleBar.menu.performIdentifierAction(R.id.menu_show_explore_categories, 0)
+            it.ui.titleBar.menu.performIdentifierAction(R.id.menu_show_explore_categories, 0)
         }
-        awaitActivity { it.binding.categoriesContainer.childCount == 3 }
+        awaitActivity { it.ui.categoriesContainer.childCount == 3 }
         scenario!!.onActivity { rows(it)[0].getTabAt(1)!!.select() }
         assertTrue("Slow category request started", slowStarted.await(15, TimeUnit.SECONDS))
         scenario!!.onActivity { rows(it)[1].getTabAt(0)!!.select() }
-        awaitActivity { it.viewModel.getLoadedBooks().firstOrNull()?.name?.startsWith("Category 8") == true }
+        awaitActivity { it.model.getLoadedBooks().firstOrNull()?.name?.startsWith("Category 8") == true }
         releaseSlow.countDown()
         assertTrue(slowFinished.await(15, TimeUnit.SECONDS))
-        scenario!!.onActivity { it.viewModel.explore() }
-        awaitActivity { it.viewModel.pageLiveData.value == 2 }
+        scenario!!.onActivity { it.model.explore() }
+        awaitActivity { it.model.pageLiveData.value == 2 }
         scenario!!.onActivity {
-            assertEquals(40, it.viewModel.getLoadedBooks().size)
-            assertTrue(it.viewModel.getLoadedBooks().all { book -> book.name.startsWith("Category 8") })
+            assertEquals(40, it.model.getLoadedBooks().size)
+            assertTrue(it.model.getLoadedBooks().all { book -> book.name.startsWith("Category 8") })
         }
         scenario!!.moveToState(Lifecycle.State.CREATED).moveToState(Lifecycle.State.RESUMED)
         scenario!!.recreate()
-        awaitActivity { it.binding.categoriesContainer.childCount == 3 }
+        awaitActivity { it.ui.categoriesContainer.childCount == 3 }
         scenario!!.onActivity {
-            assertEquals("Category 8", it.binding.titleBar.title.toString())
-            assertEquals(2, it.viewModel.pageLiveData.value)
-            assertEquals(40, it.viewModel.getLoadedBooks().size)
-            assertEquals(40, (it.binding.recyclerView.adapter as ExploreShowAdapter).getActualItemCount())
+            assertEquals("Category 8", it.ui.titleBar.title.toString())
+            assertEquals(2, it.model.pageLiveData.value)
+            assertEquals(40, it.model.getLoadedBooks().size)
+            assertEquals(40, (it.ui.recyclerView.adapter as ExploreShowAdapter).getActualItemCount())
             assertEquals(listOf(-1, 0, -1), rows(it).map { tabs -> tabs.selectedTabPosition })
         }
         screenshot("explore-category-restored")
@@ -194,7 +197,13 @@ class ExploreCategoriesTest {
     }
 
     private fun rows(activity: ExploreShowActivity) =
-        activity.binding.categoriesContainer.children.map { it as TabLayout }.toList()
+        activity.ui.categoriesContainer.children.map { it as TabLayout }.toList()
+
+    private val ExploreShowActivity.ui: ActivityExploreShowBinding
+        get() = ActivityExploreShowBinding.bind(findViewById<View>(R.id.title_bar).parent as View)
+
+    private val ExploreShowActivity.model: ExploreShowViewModel
+        get() = ViewModelProvider(this)[ExploreShowViewModel::class.java]
 
     private fun awaitActivity(condition: (ExploreShowActivity) -> Boolean) {
         val deadline = SystemClock.uptimeMillis() + 15000
@@ -205,7 +214,7 @@ class ExploreCategoriesTest {
             SystemClock.sleep(50)
         } while (SystemClock.uptimeMillis() < deadline)
         scenario!!.onActivity {
-            assertTrue("Timed out: ${it.viewModel.errorLiveData.value}", condition(it))
+            assertTrue("Timed out: ${it.model.errorLiveData.value}", condition(it))
         }
     }
 
