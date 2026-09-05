@@ -13,12 +13,12 @@ class AudioPlayLayoutContractTest {
             .substringBefore("<TextView")
 
         assertTrue(
-            subtitle.contains("app:layout_constraintTop_toBottomOf=\"@+id/lyricViewX\""),
             "The subtitle must stay below the lyric area when LyricViewX is GONE",
+            subtitle.contains("app:layout_constraintTop_toBottomOf=\"@+id/lyricViewX\""),
         )
         assertTrue(
-            subtitle.contains("app:layout_constraintBottom_toTopOf=\"@+id/tv_chapter_index\""),
             "The subtitle must remain above the chapter index",
+            subtitle.contains("app:layout_constraintBottom_toTopOf=\"@+id/tv_chapter_index\""),
         )
     }
 }
