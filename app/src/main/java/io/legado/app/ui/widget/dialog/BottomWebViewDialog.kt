@@ -2,6 +2,7 @@ package io.legado.app.ui.widget.dialog
 
 import android.annotation.SuppressLint
 import android.app.Dialog
+import android.content.DialogInterface
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.graphics.Bitmap
@@ -60,6 +61,7 @@ import io.legado.app.utils.invisible
 import io.legado.app.utils.keepScreenOn
 import io.legado.app.utils.longSnackbar
 import io.legado.app.utils.openUrl
+import io.legado.app.utils.runOnUI
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.toastOnUi
@@ -250,6 +252,15 @@ internal fun resolveBottomSheetBehaviorSpec(
     }
 }
 
+internal data class BrowserDialogRequest(
+    val sourceKey: String?,
+    val bookType: Int,
+    val url: String?,
+    val html: String?,
+    val preloadJs: String?,
+    val config: String?,
+)
+
 class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view), WebJsExtensions.Callback {
 
     private data class SheetSizeSnapshot(
@@ -304,6 +315,18 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     private var maxHeightTracksHeightMode = false
     private var sheetSizeBeforeFullScreen: SheetSizeSnapshot? = null
     private val pendingFullScreenConfigs = ArrayDeque<Config>()
+    private var dismissed = false
+    private val browserRequest: BrowserDialogRequest?
+        get() = arguments?.let {
+            BrowserDialogRequest(
+                it.getString("sourceKey"),
+                it.getInt("bookType", 0),
+                it.getString("url"),
+                it.getString("html"),
+                it.getString("preloadJs"),
+                it.getString("config"),
+            )
+        }
 
     @Suppress("DEPRECATION")
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
@@ -316,17 +339,33 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     }
 
     override fun onStart() {
+        dismissed = false
         super.onStart()
         setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
     }
 
     override fun show(manager: FragmentManager, tag: String?) {
-        kotlin.runCatching {
-            manager.beginTransaction().remove(this).commit()
-            super.show(manager, tag)
-        }.onFailure {
-            AppLog.put("显示对话框失败 tag:$tag", it)
+        runOnUI {
+            kotlin.runCatching {
+                if (manager.isDestroyed || manager.isStateSaved || isAdded) return@runCatching
+                val request = browserRequest
+                if (request != null && manager.fragments.any {
+                    it is BottomWebViewDialog && !it.dismissed && !it.isRemoving &&
+                            it.browserRequest == request
+                }) return@runCatching
+                // Register synchronously so another queued script cannot add the same request.
+                dismissed = false
+                super.showNow(manager, tag)
+            }.onFailure {
+                AppLog.put("显示对话框失败 tag:$tag", it)
+            }
         }
+    }
+
+    override fun onDismiss(dialog: DialogInterface) {
+        // DialogFragment removes the fragment asynchronously after dismissing its window.
+        dismissed = true
+        super.onDismiss(dialog)
     }
 
     private fun setConfig(config: Config, first: Boolean = false) {

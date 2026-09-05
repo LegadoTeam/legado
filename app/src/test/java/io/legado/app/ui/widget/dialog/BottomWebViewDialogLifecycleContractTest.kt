@@ -14,6 +14,28 @@ class BottomWebViewDialogLifecycleContractTest {
     }
 
     @Test
+    fun `duplicate check and synchronous show share the UI dispatch`() {
+        val show = section("override fun show(manager:", "override fun onDismiss")
+        val ui = show.indexOf("runOnUI {")
+        val state = show.indexOf("manager.isDestroyed || manager.isStateSaved || isAdded")
+        val duplicates = show.indexOf("manager.fragments.any")
+        val display = show.indexOf("super.showNow(manager, tag)")
+
+        assertTrue(ui >= 0)
+        assertTrue(state > ui)
+        assertTrue(duplicates > state)
+        assertTrue(display > duplicates)
+        assertTrue(show.contains("!it.dismissed && !it.isRemoving"))
+        assertTrue(show.contains("it.browserRequest == request"))
+        assertFalse(show.contains("remove(this)"))
+        assertFalse(show.contains("super.show(manager, tag)"))
+
+        val dismiss = section("override fun onDismiss", "private fun setConfig")
+        assertTrue(dismiss.indexOf("dismissed = true") < dismiss.indexOf("super.onDismiss(dialog)"))
+        assertTrue(section("override fun onStart", "override fun show").contains("dismissed = false"))
+    }
+
+    @Test
     fun `pooled webview follows the view lifecycle`() {
         val fields = section("private var pooledWebView", "private var source")
         val onViewCreated = section("override fun onViewCreated", "private fun initWebView")
