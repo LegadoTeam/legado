@@ -21,6 +21,7 @@ class CronetInitializationContractTest {
         val app = readProjectFile("app/src/main/java/io/legado/app/App.kt")
         val config = readProjectFile("app/src/main/java/io/legado/app/help/config/AppConfig.kt")
         val httpHelper = readProjectFile("app/src/main/java/io/legado/app/help/http/HttpHelper.kt")
+        val loader = readProjectFile("app/src/main/java/io/legado/app/lib/cronet/CronetLoader.kt")
 
         assertTrue(helper.indexOf("try {") < helper.indexOf("CronetLoader.preDownload()"))
         assertTrue(helper.contains("ExperimentalCronetEngine.Builder(appCtx)"))
@@ -44,6 +45,8 @@ class CronetInitializationContractTest {
         assertTrue(coroutineInterceptor.contains("getCronetEngineOrNull()"))
         assertTrue(coroutineInterceptor.contains("catch (e: Throwable)"))
         assertTrue(app.contains("runCatching { Cronet.preDownload() }"))
+        assertTrue(loader.contains("downloadState.awaitCompletion()"))
+        assertTrue(loader.contains("downloadState.awaitCompletion()\n                if (install())"))
         assertTrue(config.contains("val isCronet: Boolean"))
         assertTrue(config.contains("get() = appCtx.getPrefBoolean(PreferKey.cronet)"))
         assertTrue(httpHelper.contains("if (AppConfig.isCronet)"))
