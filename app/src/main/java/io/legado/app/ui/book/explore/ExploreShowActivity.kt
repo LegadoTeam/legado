@@ -1,22 +1,29 @@
 package io.legado.app.ui.book.explore
 
 import android.os.Bundle
+import android.view.Menu
 import android.view.MenuItem
 import android.view.ViewGroup
+import android.widget.LinearLayout
 import androidx.activity.viewModels
+import androidx.core.view.isVisible
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.tabs.TabLayout
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.databinding.ActivityExploreShowBinding
 import io.legado.app.databinding.ViewLoadMoreBinding
+import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
+import io.legado.app.lib.theme.accentColor
 import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.widget.number.NumberPickerDialog
 import io.legado.app.ui.widget.recycler.LoadMoreView
 import io.legado.app.ui.widget.recycler.VerticalDivider
 import io.legado.app.utils.applyNavigationBarPadding
+import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
@@ -34,17 +41,32 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
     private val loadMoreViewTop by lazy { LoadMoreView(this) }
     private var oldPage = -1
     private var isClearAll = false
-    private val menuAddLoadedBooks by lazy {
-        binding.titleBar.menu.add(R.string.add_loaded_books_to_bookshelf).apply {
+    private val categoryTabs = arrayListOf<Pair<ExploreCategory, TabLayout.Tab>>()
+    private var renderedCategories: List<ExploreCategory>? = null
+    private var menuCategories: MenuItem? = null
+    private var menuAddLoadedBooks: MenuItem? = null
+    private var menuPage: MenuItem? = null
+
+    override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
+        menuCategories = menu.add(Menu.NONE, R.id.menu_show_explore_categories, Menu.NONE,
+            R.string.show_explore_categories).apply {
+            isCheckable = true
+            setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+            setOnMenuItemClickListener {
+                AppConfig.showExploreCategories = !AppConfig.showExploreCategories
+                updateCategories()
+                true
+            }
+        }
+        menuAddLoadedBooks = menu.add(R.string.add_loaded_books_to_bookshelf).apply {
+            isEnabled = viewModel.addBooksBusy.value != true
             setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
             setOnMenuItemClickListener {
                 alertAddLoadedBooksToShelf()
                 true
             }
         }
-    }
-    private val menuPage by lazy {
-        binding.titleBar.menu.add(getString(R.string.menu_page, 1)).apply {
+        menuPage = menu.add(getString(R.string.menu_page, viewModel.pageLiveData.value ?: 1)).apply {
             setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
             setOnMenuItemClickListener {
                 val page = viewModel.pageLiveData.value ?: 1
@@ -55,17 +77,7 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
                     .setValue(page)
                     .show {
                         if (page != it) {
-                            if (oldPage == -1 && it != 1) { //初次添加头
-                                adapter.addHeaderView {
-                                    ViewLoadMoreBinding.bind(loadMoreViewTop)
-                                }
-                            } else if (it != 1) { //把头显示出来
-                                val layoutParams = loadMoreViewTop.layoutParams
-                                if (layoutParams?.height == 0) {
-                                    layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT
-                                    loadMoreViewTop.layoutParams = layoutParams
-                                }
-                            }
+                            updateTopHeader(it)
                             oldPage = it
                             viewModel.skipPage(it)
                             loadMoreViewTop.stopLoad()
@@ -78,20 +90,25 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
                 true
             }
         }
+        updateCategories()
+        return true
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         binding.titleBar.title = intent.getStringExtra("exploreName")
         initRecyclerView()
-        menuAddLoadedBooks
         viewModel.booksData.observe(this) { upData(it) }
-        viewModel.addBooksData.observe(this) { upDataTop(it) }
-        viewModel.initData(intent)
+        viewModel.categoryData.observe(this) {
+            binding.titleBar.title = it.title
+            updateCategorySelection()
+        }
+        viewModel.categoriesData.observe(this) { updateCategories() }
+        viewModel.initData(intent, savedInstanceState)
         viewModel.errorLiveData.observe(this) {
-            loadMoreView.error(it)
+            if (it != null) loadMoreView.error(it)
         }
         viewModel.errorTopLiveData.observe(this) {
-            loadMoreViewTop.error(it)
+            if (it != null) loadMoreViewTop.error(it)
         }
         viewModel.upAdapterLiveData.observe(this) {
             adapter.notifyItemRangeChanged(0, adapter.itemCount, Bundle().apply {
@@ -99,10 +116,86 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
             })
         }
         viewModel.pageLiveData.observe(this) {
-            menuPage.title = getString(R.string.menu_page, it)
+            menuPage?.title = getString(R.string.menu_page, it)
         }
         viewModel.addBooksBusy.observe(this) {
-            menuAddLoadedBooks.isEnabled = !it
+            menuAddLoadedBooks?.isEnabled = !it
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateCategories()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        viewModel.saveState(outState)
+        super.onSaveInstanceState(outState)
+    }
+
+    private fun updateCategories() {
+        val show = AppConfig.showExploreCategories
+        menuCategories?.isChecked = show
+        if (show) viewModel.loadCategories()
+        val categories = viewModel.categoriesData.value.orEmpty().map {
+            ExploreCategory(it.title, it.url.orEmpty())
+        }
+        binding.categoriesContainer.isVisible = show && categories.isNotEmpty()
+        if (!show || categories == renderedCategories) return
+        renderedCategories = categories
+        binding.categoriesContainer.removeAllViews()
+        categoryTabs.clear()
+        splitExploreCategoryRows(categories).forEach { row ->
+            val tabs = TabLayout(this).apply {
+                tabMode = TabLayout.MODE_SCROLLABLE
+                tabGravity = TabLayout.GRAVITY_START
+                setTabTextColors(getCompatColor(R.color.primaryText), accentColor)
+                setSelectedTabIndicatorColor(accentColor)
+                setTabIndicatorFullWidth(false)
+            }
+            row.forEach { category ->
+                val tab = tabs.newTab().setText(category.title).setTag(category)
+                tabs.addTab(tab, false)
+                categoryTabs.add(category to tab)
+            }
+            tabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+                override fun onTabSelected(tab: TabLayout.Tab) {
+                    val category = tab.tag as ExploreCategory
+                    if (category != viewModel.categoryData.value) {
+                        isClearAll = false
+                        binding.recyclerView.scrollToPosition(0)
+                        viewModel.switchCategory(category)
+                    }
+                }
+
+                override fun onTabUnselected(tab: TabLayout.Tab) = Unit
+                override fun onTabReselected(tab: TabLayout.Tab) = Unit
+            })
+            binding.categoriesContainer.addView(tabs, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+            ))
+        }
+        updateCategorySelection()
+    }
+
+    private fun updateCategorySelection() {
+        val selected = viewModel.categoryData.value
+        categoryTabs.forEach { (category, tab) ->
+            if (category == selected) {
+                tab.select()
+            } else if (tab.isSelected) {
+                tab.parent?.selectTab(null)
+            }
+        }
+    }
+
+    private fun updateTopHeader(page: Int) {
+        if (page > 1 && adapter.getHeaderCount() == 0) {
+            adapter.addHeaderView { ViewLoadMoreBinding.bind(loadMoreViewTop) }
+        }
+        loadMoreViewTop.layoutParams?.let {
+            it.height = if (page > 1) ViewGroup.LayoutParams.WRAP_CONTENT else 0
+            loadMoreViewTop.layoutParams = it
         }
     }
 
@@ -161,40 +254,37 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
     private fun scrollToTop(forceLoad: Boolean = false) {
         if ((oldPage > 1 && !loadMoreView.isLoading && !loadMoreViewTop.isLoading) || forceLoad) {
             loadMoreViewTop.hasMore()
-            oldPage--
-            viewModel.explore(oldPage)
+            viewModel.explore(oldPage - 1)
         }
     }
 
-    private fun upData(books: List<SearchBook>) {
-        loadMoreView.stopLoad()
-        if (books.isEmpty() && adapter.isEmpty()) {
+    private fun upData(state: ExploreListState) {
+        val layoutManager = binding.recyclerView.layoutManager as LinearLayoutManager
+        val hadBooks = !adapter.isEmpty()
+        val position = layoutManager.findFirstVisibleItemPosition()
+        val anchor = adapter.getItemByLayoutPosition(position)
+        val offset = layoutManager.findViewByPosition(position)?.top ?: 0
+        adapter.setItems(state.books)
+        oldPage = state.firstPage
+        updateTopHeader(oldPage)
+        loadMoreViewTop.stopLoad()
+        if (state.loading) {
+            loadMoreView.hasMore()
+        } else if (state.books.isEmpty()) {
             loadMoreView.noMore(getString(R.string.empty))
-        } else if (adapter.getActualItemCount() == books.size) {
+        } else if (!state.hasMore) {
             loadMoreView.noMore()
         } else {
-            adapter.setItems(books)
-            if (isClearAll) { //全清空后,加了头,位置下移一个
-                val layoutManager = binding.recyclerView.layoutManager as LinearLayoutManager
-                layoutManager.scrollToPositionWithOffset(1, 0)
-                isClearAll = false
-            }
+            loadMoreView.hasMore()
+            loadMoreView.stopLoad()
         }
-    }
-
-    private fun upDataTop(books: List<SearchBook>) {
-        loadMoreViewTop.stopLoad()
-        adapter.addItems(0, books)
-        val layoutManager = binding.recyclerView.layoutManager as LinearLayoutManager
-        if (layoutManager.findFirstVisibleItemPosition() <= 1) { //顶部刷新,未滚动，矫正位置
-            layoutManager.scrollToPositionWithOffset(books.size, 0)
-        }
-        if (oldPage <= 1) { //已到顶,隐藏头
-            val layoutParams = loadMoreViewTop.layoutParams
-            if (layoutParams != null) {
-                layoutParams.height = 0
-                loadMoreViewTop.layoutParams = layoutParams
-            }
+        if (hadBooks && state.prependCount != null && position >= 0) {
+            val target = anchor?.let { state.books.indexOf(it) }?.takeIf { it >= 0 }
+                ?.plus(adapter.getHeaderCount()) ?: (position + state.prependCount)
+            layoutManager.scrollToPositionWithOffset(target, offset)
+        } else if (!state.loading && isClearAll) {
+            layoutManager.scrollToPositionWithOffset(adapter.getHeaderCount(), 0)
+            isClearAll = false
         }
     }
 
@@ -208,5 +298,17 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
             putExtra("author", book.author)
             putExtra("bookUrl", book.bookUrl)
         }
+    }
+}
+
+internal fun <T> splitExploreCategoryRows(categories: List<T>): List<List<T>> {
+    if (categories.isEmpty()) return emptyList()
+    val rowCount = ((categories.size - 1) / 10 + 1).coerceAtMost(3)
+    val perRow = categories.size / rowCount
+    val extra = categories.size % rowCount
+    var start = 0
+    return List(rowCount) { row ->
+        val end = start + perRow + if (row < extra) 1 else 0
+        categories.subList(start, end).also { start = end }
     }
 }

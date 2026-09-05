@@ -50,6 +50,7 @@ object PreferKey {
     const val nextKeys = "nextKeyCodes"
     const val showDiscovery = "showDiscovery"
     const val showDiscoveryFastScroller = "showDiscoveryFastScroller"
+    const val showExploreCategories = "showExploreCategories"
     const val enableReview = "enableReview"
     const val showRss = "showRss"
     const val bookshelfLayout = "bookshelfLayout"

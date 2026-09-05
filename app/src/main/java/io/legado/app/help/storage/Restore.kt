@@ -518,6 +518,9 @@ object Restore {
             ) {
                 edit.putBoolean(PreferKey.showReadTitleChapterNameOnly, false)
             }
+            if (PreferKey.showExploreCategories !in map) {
+                edit.putBoolean(PreferKey.showExploreCategories, false)
+            }
             edit.apply()
         }
         restoredVideoPreferences?.let { map ->
