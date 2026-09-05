@@ -450,7 +450,7 @@ object BottomBarSkinManager {
             return null
         }
         if (isSvgName(file.name)) {
-            val size = SvgUtils.getSize(file) ?: return null
+            val size = SvgUtils.getSize(file.absolutePath) ?: return null
             return (size.width to size.height).takeIf { (width, height) ->
                 width > 0 && height > 0
             }
