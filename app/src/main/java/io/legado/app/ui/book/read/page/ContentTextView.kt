@@ -290,11 +290,13 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                 }
 
                 is ReviewColumn -> {
-                    callBack.onReviewClick(
-                        resolveReviewId(textLine),
-                        column.count,
-                        textPage.chapterIndex
-                    )
+                    if (!debounceClick) {
+                        callBack.onReviewClick(
+                            resolveReviewId(textLine),
+                            column.count,
+                            textPage.chapterIndex
+                        )
+                    }
                     handled = true
                 }
 
