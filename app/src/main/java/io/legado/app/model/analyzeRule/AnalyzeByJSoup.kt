@@ -160,7 +160,7 @@ class AnalyzeByJSoup(doc: Any) {
                         for (et in el) {
                             es.addAll(getElements(et, rl))
                         }
-                        el.clear()
+                        el.deselectAll()
                         el.addAll(es)
                     }
                     el
@@ -213,7 +213,6 @@ class AnalyzeByJSoup(doc: Any) {
             for (elt in elements) {
                 es.addAll(ElementsSingle().getElementsSingle(elt, rules[i]))
             }
-            elements.clear()
             elements = es
         }
         return if (elements.isEmpty()) null else getResultLast(elements, rules[last])
@@ -381,9 +380,9 @@ class AnalyzeByJSoup(doc: Any) {
              * */
             if (split == '!') { //排除
 
-                // jsoup 1.23 no longer permits nullable Elements entries.
-                // Remove from the end so the remaining element order is unchanged.
-                for (pcInt in indexSet.sortedDescending()) elements.removeAt(pcInt)
+                // Filter only the result list, without removing nodes from the source DOM.
+                // Work backwards so the remaining indexes stay valid.
+                for (pcInt in indexSet.sortedDescending()) elements.deselect(pcInt)
 
             } else if (split == '.') { //选择
 
