@@ -1948,9 +1948,17 @@ class ReadBookActivity : BaseReadBookActivity(),
             return
         }
         val source = ReadBook.bookSource ?: return
+        val reviewDialogTag = ReviewDetailDialog::class.simpleName
+        val fragmentManager = supportFragmentManager
+        if (fragmentManager.isStateSaved ||
+            fragmentManager.findFragmentByTag(reviewDialogTag) != null
+        ) return
+        fun showReviewDialog(dialog: ReviewDetailDialog) {
+            dialog.showNow(fragmentManager, reviewDialogTag)
+        }
         if (source.isJsSource()) {
             val book = ReadBook.book ?: return
-            showDialogFragment(
+            showReviewDialog(
                 ReviewDetailDialog(
                     paragraphNum = paragraphNum,
                     totalCount = count,
@@ -1980,7 +1988,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             return
         }
         val book = ReadBook.book ?: return
-        showDialogFragment(
+        showReviewDialog(
             ReviewDetailDialog(
                 paragraphNum = paragraphNum,
                 totalCount = count,
