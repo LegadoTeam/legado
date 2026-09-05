@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.os.Bundle
 import android.os.SystemClock
 import android.text.style.BackgroundColorSpan
+import android.view.InputDevice
 import android.view.MotionEvent
 import androidx.core.view.isVisible
 import androidx.test.core.app.ActivityScenario
@@ -165,6 +166,7 @@ class ContentEditSearchTest {
         listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE, MotionEvent.ACTION_UP).forEachIndexed { index, action ->
             val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, x,
                 if (index == 0) startY else endY, 0)
+            event.source = InputDevice.SOURCE_TOUCHSCREEN
             try { assertTrue(instrumentation.uiAutomation.injectInputEvent(event, true)) }
             finally { event.recycle() }
         }
