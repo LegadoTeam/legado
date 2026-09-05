@@ -22,6 +22,10 @@ on:
       - 'app/src/main/res/layout/dialog_content_edit.xml'
       - 'app/src/main/res/menu/content_edit.xml'
       - 'app/src/androidTest/java/io/legado/app/ui/book/read/ContentEditSearchTest.kt'
+      - 'app/src/main/java/io/legado/app/ui/replace/**'
+      - 'app/src/main/java/io/legado/app/ui/book/toc/rule/**'
+      - 'app/src/main/java/io/legado/app/ui/dict/rule/**'
+      - 'app/src/androidTest/java/io/legado/app/ui/association/**'
   workflow_dispatch:
 
 permissions:

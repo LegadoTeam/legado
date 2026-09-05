@@ -529,9 +529,7 @@ class CodeEditActivity :
                     intent.getBooleanExtra("returnUnchangedText", false)
                 if (returnText || cursorPos > 0) {
                     val result = Intent().apply {
-                        if (returnText) {
-                            putExtra("text", text)
-                        }
+                        if (returnText) putEditorText(this, text)
                         putExtra("cursorPosition", cursorPos)
                     }
                     setResult(RESULT_OK, result)
@@ -555,12 +553,20 @@ class CodeEditActivity :
             }
             else -> {
                 val result = Intent().apply {
-                    putExtra("text", text)
+                    putEditorText(this, text)
                     putExtra("cursorPosition", cursorPos)
                 }
                 setResult(RESULT_OK, result)
                 super.finish()
             }
+        }
+    }
+
+    private fun putEditorText(intent: Intent, text: String) {
+        if (text.length > io.legado.app.ui.widget.code.EditSafety.MAX_INLINE_TEXT_LENGTH) {
+            intent.putExtra("textFile", CodeTextTransfer.write(this, text))
+        } else {
+            intent.putExtra("text", text)
         }
     }
 
@@ -583,7 +589,7 @@ class CodeEditActivity :
 
     private fun returnText(action: String, text: String, cursorPosition: Int) {
         val result = Intent().apply {
-            putExtra("text", text)
+            putEditorText(this, text)
             putExtra("cursorPosition", cursorPosition)
             putExtra(EXTRA_RESULT_ACTION, action)
         }

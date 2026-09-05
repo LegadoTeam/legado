@@ -45,9 +45,12 @@ import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.launch
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setEdgeEffectColor
+import io.legado.app.utils.share
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.showHelp
 import io.legado.app.utils.splitNotBlank
+import io.legado.app.utils.stackTraceStr
+import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.transaction
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
@@ -57,6 +60,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
+import java.io.File
 
 /**
  * 替换规则管理
@@ -294,6 +298,7 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
             R.id.menu_remove_group -> selectionRemoveFromGroups()
             R.id.menu_top_sel -> viewModel.topSelect(adapter.selection)
             R.id.menu_bottom_sel -> viewModel.bottomSelect(adapter.selection)
+            R.id.menu_share_source -> shareSelection()
             R.id.menu_export_selection -> exportResult.launch {
                 mode = HandleFileContract.EXPORT
                 fileData = HandleFileContract.FileData(
@@ -304,6 +309,20 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
             }
         }
         return false
+    }
+
+    private fun shareSelection() {
+        val rules = adapter.selection.toList()
+        if (rules.isEmpty()) return
+        viewModel.execute(scope = lifecycleScope) {
+            File.createTempFile("replaceRule_", ".json", cacheDir).apply {
+                writeText(GSON.toJson(ReplacePreviewConfig.withSamples(rules)))
+            }
+        }.onSuccess {
+            share(it)
+        }.onError {
+            toastOnUi(it.stackTraceStr)
+        }
     }
 
     @SuppressLint("InflateParams")

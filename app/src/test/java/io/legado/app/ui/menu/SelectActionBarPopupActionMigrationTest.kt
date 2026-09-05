@@ -139,12 +139,14 @@ class SelectActionBarPopupActionMigrationTest {
             "txt_toc_rule_sel.xml" to listOf(
                 "@+id/menu_enable_selection",
                 "@+id/menu_disable_selection",
-                "@+id/menu_export_selection"
+                "@+id/menu_export_selection",
+                "@+id/menu_share_source"
             ),
             "dict_rule_sel.xml" to listOf(
                 "@+id/menu_enable_selection",
                 "@+id/menu_disable_selection",
-                "@+id/menu_export_selection"
+                "@+id/menu_export_selection",
+                "@+id/menu_share_source"
             ),
             "replace_rule_sel.xml" to listOf(
                 "@+id/menu_enable_selection",
@@ -153,7 +155,8 @@ class SelectActionBarPopupActionMigrationTest {
                 "@+id/menu_remove_group",
                 "@+id/menu_top_sel",
                 "@+id/menu_bottom_sel",
-                "@+id/menu_export_selection"
+                "@+id/menu_export_selection",
+                "@+id/menu_share_source"
             ),
             "rss_source_sel.xml" to listOf(
                 "@+id/menu_enable_selection",
