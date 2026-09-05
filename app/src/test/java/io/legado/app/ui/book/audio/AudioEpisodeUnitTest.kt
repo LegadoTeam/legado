@@ -91,16 +91,43 @@ class AudioEpisodeUnitTest {
         val layout = upLyric.indexOf("lyricViewX.doOnLayout")
         val widthGuard = upLyric.indexOf("view.width <= 32.dpToPx()")
         val retry = upLyric.indexOf("view.doOnNextLayout(::loadLyricWhenWide)")
-        val load = upLyric.indexOf("lyricViewX.loadLyric(lyric)")
+        val load = upLyric.indexOf("lyricViewX.loadLyric(lyricEntries)")
         val visible = upLyric.indexOf("lyricViewX.visible()")
 
         assertTrue(invisible >= 0)
-        assertTrue(upLyric.contains("lyric.equals(\"null\", ignoreCase = true)"))
         assertTrue(layout > invisible)
         assertTrue(widthGuard >= 0)
         assertTrue(retry > widthGuard)
         assertTrue(load > widthGuard)
         assertTrue(visible > load)
+        assertTrue(upLyric.indexOf("upLyricP(AudioPlay.durChapterPos)") > load)
+    }
+
+    @Test
+    fun lyricPlayerHidesEmptyParsedLyricsAndRejectsStaleResults() {
+        val source = projectFile(
+            "src/main/java/io/legado/app/ui/book/audio/AudioPlayActivity.kt"
+        ).readText()
+        val upLyric = source.substringAfter("override fun upLyric(lyric: String?)")
+            .substringBefore("override fun upLyricP(position: Int)")
+        val hide = upLyric.indexOf("binding.lyricViewX.gone()")
+        val background = upLyric.indexOf("withContext(Default)")
+        val parse = upLyric.indexOf("LyricUtil.parseLrc(arrayOf(lyric, null))")
+        val emptyOrStale = upLyric.indexOf(
+            "if (oldLyric != lyric || lyricEntries.isNullOrEmpty()) return@launch"
+        )
+        val layout = upLyric.indexOf("fun loadLyricWhenWide(view: View)")
+        val staleLayout = upLyric.indexOf("if (oldLyric != lyric) return", layout)
+        val load = upLyric.indexOf("lyricViewX.loadLyric(lyricEntries)")
+
+        assertTrue(hide >= 0)
+        assertTrue(background > hide)
+        assertTrue(parse > background)
+        assertTrue(emptyOrStale > parse)
+        assertTrue(upLyric.indexOf("lyricViewX.invisible()") > emptyOrStale)
+        assertTrue(staleLayout > layout)
+        assertTrue(load > staleLayout)
+        assertTrue(upLyric.contains("setLabel(\"\")"))
     }
 
     private fun chineseString(name: String) = stringValue("values-zh", name)
