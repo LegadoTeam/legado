@@ -7,6 +7,7 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.StateListDrawable
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
+import io.legado.app.utils.SvgUtils
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.putPrefString
@@ -366,6 +367,26 @@ object BottomBarSkinManager {
 
     private fun writePng(source: File, destination: File) {
         val bounds = readBounds(source) ?: error("invalid image")
+        if (isSvgName(source.name)) {
+            val bitmap = SvgUtils.createBitmap(
+                source.absolutePath,
+                STORED_ICON_SIZE,
+                STORED_ICON_SIZE,
+            ) ?: error("invalid image")
+            try {
+                FileOutputStream(destination).use {
+                    require(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) {
+                        "cannot encode image"
+                    }
+                }
+                require(destination.length() <= BottomBarSkinArchive.MAX_ENTRY_BYTES) {
+                    "encoded image too large"
+                }
+            } finally {
+                bitmap.recycle()
+            }
+            return
+        }
         var sample = 1
         while (maxOf(bounds.first, bounds.second) / sample > STORED_ICON_SIZE * 2) {
             sample *= 2
@@ -428,6 +449,12 @@ object BottomBarSkinManager {
         if (!file.isFile || file.length() <= 0 || file.length() > BottomBarSkinArchive.MAX_ENTRY_BYTES) {
             return null
         }
+        if (isSvgName(file.name)) {
+            val size = SvgUtils.getSize(file) ?: return null
+            return (size.width to size.height).takeIf { (width, height) ->
+                width > 0 && height > 0
+            }
+        }
         val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.absolutePath, options)
         return if (options.outWidth > 0 && options.outHeight > 0) {
@@ -440,6 +467,11 @@ object BottomBarSkinManager {
     private fun decodeSquared(file: File, sizePx: Int): Bitmap? {
         val bounds = readBounds(file) ?: return null
         if (sizePx <= 0) return null
+        if (isSvgName(file.name)) {
+            return SvgUtils.createBitmap(file.absolutePath, sizePx, sizePx)?.let {
+                centerOnSquare(it, sizePx)
+            }
+        }
         val maxSide = maxOf(bounds.first, bounds.second)
         var sample = 1
         while (maxSide / sample > sizePx * 2) sample *= 2
@@ -447,6 +479,10 @@ object BottomBarSkinManager {
             file.absolutePath,
             BitmapFactory.Options().apply { inSampleSize = sample },
         ) ?: return null
+        return centerOnSquare(source, sizePx)
+    }
+
+    private fun centerOnSquare(source: Bitmap, sizePx: Int): Bitmap {
         val scale = sizePx.toFloat() / maxOf(source.width, source.height)
         val width = (source.width * scale).toInt().coerceAtLeast(1)
         val height = (source.height * scale).toInt().coerceAtLeast(1)
@@ -457,4 +493,7 @@ object BottomBarSkinManager {
         scaled.recycle()
         return output
     }
+
+    private fun isSvgName(name: String): Boolean =
+        name.substringAfterLast('/').substringAfterLast('\\').endsWith(".svg", ignoreCase = true)
 }
