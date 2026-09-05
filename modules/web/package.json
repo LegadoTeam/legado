@@ -28,7 +28,7 @@
     "hotkeys-js": "^4.0.5",
     "pinia": "^4.0.2",
     "vue": "^3.5.42",
-    "vue-router": "^5.1.0",
+    "vue-router": "^5.3.0",
     "vue3-virtual-scroll-list": "^0.2.1"
   },
   "devDependencies": {
