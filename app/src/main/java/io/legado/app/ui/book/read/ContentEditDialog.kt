@@ -3,9 +3,17 @@ package io.legado.app.ui.book.read
 import android.app.Application
 import android.content.DialogInterface
 import android.os.Bundle
+import android.text.NoCopySpan
+import android.text.Spanned
+import android.text.style.BackgroundColorSpan
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
+import android.view.inputmethod.EditorInfo
+import android.widget.SeekBar
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.doOnLayout
+import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -26,14 +34,22 @@ import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.model.ReadBook
 import io.legado.app.model.webBook.WebBook
+import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.applyTint
+import io.legado.app.utils.hideSoftInput
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setLayout
+import io.legado.app.utils.showSoftInput
 import io.legado.app.utils.viewbindingdelegate.viewBinding
+import kotlinx.coroutines.Dispatchers.Default
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.regex.PatternSyntaxException
 
 internal data class ContentDraftRequest(val generation: Long, val revision: Long)
 
@@ -102,6 +118,12 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
         private const val ARG_TITLE = "title"
         private const val STATE_HAS_DRAFT = "hasDraft"
         private const val STATE_HAS_CHANGES = "hasChanges"
+        private const val STATE_SEARCH_QUERY = "contentSearchQuery"
+        private const val STATE_SEARCH_VISIBLE = "contentSearchVisible"
+        private const val STATE_SEARCH_REGEX = "contentSearchRegex"
+        private const val STATE_SEARCH_CASE = "contentSearchCase"
+        private const val STATE_SEARCH_ANCHOR = "contentSearchAnchor"
+        private const val STATE_SCROLL_Y = "contentScrollY"
 
         fun newInstance(): ContentEditDialog? {
             val book = ReadBook.book ?: return null
@@ -126,6 +148,14 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
     val binding by viewBinding(DialogContentEditBinding::bind)
     val viewModel by viewModels<ContentEditViewModel>()
     private var editTitleDialog: AlertDialog? = null
+    private var searchJob: Job? = null
+    private var searchGeneration = 0L
+    private var searchMatches = emptyList<IntRange>()
+    private var searchIndex = -1
+    private var searchSpan: BackgroundColorSpan? = null
+    private var restoredScrollY: Int? = null
+    private val scrollListener = ViewTreeObserver.OnScrollChangedListener { updatePositionBar() }
+    private val layoutListener = ViewTreeObserver.OnGlobalLayoutListener { updatePositionBar() }
     private val editTarget by lazy(LazyThreadSafetyMode.NONE) {
         ContentEditTarget(
             bookUrl = arguments?.getString(ARG_BOOK_URL).orEmpty(),
@@ -142,6 +172,7 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         val owner = viewLifecycleOwner
         val contentView = binding.contentView
+        restoredScrollY = savedInstanceState?.getInt(STATE_SCROLL_Y)
         binding.toolBar.setBackgroundColor(primaryColor)
         binding.toolBar.title = viewModel.titleLiveData.value
             ?: arguments?.getString(ARG_TITLE)
@@ -149,6 +180,15 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
             binding.toolBar.title = it
         }
         initMenu()
+        contentView.viewTreeObserver.addOnScrollChangedListener(scrollListener)
+        contentView.viewTreeObserver.addOnGlobalLayoutListener(layoutListener)
+        binding.positionBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
+                if (fromUser) contentView.scrollTo(0, (maxScrollY() * progress.toLong() / bar.max).toInt())
+            }
+            override fun onStartTrackingTouch(bar: SeekBar) = Unit
+            override fun onStopTrackingTouch(bar: SeekBar) = Unit
+        })
         binding.toolBar.setOnClickListener {
             if (editTitleDialog != null) return@setOnClickListener
             owner.lifecycleScope.launch {
@@ -176,9 +216,11 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
                     return@post
                 }
                 contentView.apply {
-                    val lineIndex = layout.getLineForOffset(editTarget.chapterPos)
-                    val lineHeight = layout.getLineTop(lineIndex)
-                    scrollTo(0, lineHeight)
+                    val textLayout = layout ?: return@post
+                    val lineIndex = textLayout.getLineForOffset(editTarget.chapterPos.coerceIn(0, length()))
+                    val target = restoredScrollY ?: textLayout.getLineTop(lineIndex)
+                    restoredScrollY = null
+                    scrollTo(0, target.coerceIn(0, maxScrollY()))
                 }
             }
         }
@@ -187,6 +229,7 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
     override fun onViewStateRestored(savedInstanceState: Bundle?) {
         super.onViewStateRestored(savedInstanceState)
         val contentView = binding.contentView
+        val owner = viewLifecycleOwner
         if (savedInstanceState?.getBoolean(STATE_HAS_DRAFT) == true) {
             viewModel.restoreDraft(
                 contentView.text?.toString().orEmpty(),
@@ -198,17 +241,43 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
         }
         contentView.doAfterTextChanged {
             viewModel.updateDraft(it?.toString().orEmpty())
+            scheduleSearch(scrollToMatch = false)
+            contentView.post {
+                if (owner.lifecycle.currentState.isAtLeast(Lifecycle.State.CREATED)) updatePositionBar()
+            }
         }
+        setupSearch(savedInstanceState)
         viewModel.initContent(editTarget)
+        contentView.doOnLayout {
+            if (owner.lifecycle.currentState.isAtLeast(Lifecycle.State.CREATED) && viewModel.hasDraft) {
+                restoredScrollY?.let {
+                    contentView.scrollTo(0, it.coerceIn(0, maxScrollY()))
+                    restoredScrollY = null
+                }
+            }
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putBoolean(STATE_HAS_DRAFT, viewModel.hasDraft)
         outState.putBoolean(STATE_HAS_CHANGES, viewModel.hasChanges)
+        if (view == null) return
+        outState.putString(STATE_SEARCH_QUERY, binding.searchInput.text?.toString())
+        outState.putBoolean(STATE_SEARCH_VISIBLE, binding.searchBar.isVisible)
+        outState.putBoolean(STATE_SEARCH_REGEX, binding.searchRegex.isChecked)
+        outState.putBoolean(STATE_SEARCH_CASE, binding.searchMatchCase.isChecked)
+        outState.putInt(STATE_SEARCH_ANCHOR, searchMatches.getOrNull(searchIndex)?.first ?: 0)
+        outState.putInt(STATE_SCROLL_Y, binding.contentView.scrollY)
     }
 
     override fun onDestroyView() {
+        searchJob?.cancel()
+        searchJob = null
+        searchGeneration++
+        clearSearchHighlight()
+        binding.contentView.viewTreeObserver.removeOnScrollChangedListener(scrollListener)
+        binding.contentView.viewTreeObserver.removeOnGlobalLayoutListener(layoutListener)
         editTitleDialog?.dismiss()
         editTitleDialog = null
         super.onDestroyView()
@@ -219,6 +288,7 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
         binding.toolBar.menu.applyTint(requireContext())
         binding.toolBar.setOnMenuItemClickListener {
             when (it.itemId) {
+                R.id.menu_search -> toggleSearch()
                 R.id.menu_save -> {
                     save()
                     dismiss()
@@ -229,6 +299,129 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
             }
             return@setOnMenuItemClickListener true
         }
+    }
+
+    private fun setupSearch(savedState: Bundle?) {
+        binding.searchInput.setText(savedState?.getString(STATE_SEARCH_QUERY).orEmpty())
+        binding.searchRegex.isChecked = savedState?.getBoolean(STATE_SEARCH_REGEX) == true
+        binding.searchMatchCase.isChecked = savedState?.getBoolean(STATE_SEARCH_CASE) == true
+        binding.searchBar.isVisible = savedState?.getBoolean(STATE_SEARCH_VISIBLE) == true
+        binding.searchInput.doAfterTextChanged { scheduleSearch(scrollToMatch = true) }
+        binding.searchRegex.setOnCheckedChangeListener { _, _ -> scheduleSearch(scrollToMatch = true) }
+        binding.searchMatchCase.setOnCheckedChangeListener { _, _ -> scheduleSearch(scrollToMatch = true) }
+        binding.btnSearchPrev.setOnClickListener { moveToMatch(-1) }
+        binding.btnSearchNext.setOnClickListener { moveToMatch(1) }
+        binding.btnCloseSearch.setOnClickListener { toggleSearch() }
+        binding.searchInput.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                moveToMatch(1)
+                true
+            } else false
+        }
+        scheduleSearch(scrollToMatch = false, anchor = savedState?.getInt(STATE_SEARCH_ANCHOR) ?: 0)
+    }
+
+    private fun toggleSearch() {
+        binding.searchBar.isVisible = !binding.searchBar.isVisible
+        if (binding.searchBar.isVisible) {
+            binding.searchInput.requestFocus()
+            binding.searchInput.showSoftInput()
+        } else {
+            binding.searchInput.hideSoftInput()
+            binding.contentView.requestFocus()
+        }
+        scheduleSearch(scrollToMatch = true)
+    }
+
+    private fun scheduleSearch(
+        scrollToMatch: Boolean,
+        anchor: Int = binding.contentView.selectionStart.coerceAtLeast(0),
+    ) {
+        searchJob?.cancel()
+        val generation = ++searchGeneration
+        clearSearchHighlight()
+        searchMatches = emptyList()
+        searchIndex = -1
+        binding.btnSearchPrev.isEnabled = false
+        binding.btnSearchNext.isEnabled = false
+        binding.searchInput.error = null
+        binding.searchCount.text = "0/0"
+        val query = binding.searchInput.text?.toString().orEmpty()
+        if (!binding.searchBar.isVisible || query.isEmpty()) return
+        val text = binding.contentView.text?.toString().orEmpty()
+        val regex = binding.searchRegex.isChecked
+        val matchCase = binding.searchMatchCase.isChecked
+        val owner = viewLifecycleOwner
+        binding.searchCount.text = getString(R.string.loading)
+        searchJob = owner.lifecycleScope.launch {
+            delay(120)
+            val matches = try {
+                withContext(Default) { findContentMatches(text, query, regex, matchCase) { ensureActive() } }
+            } catch (error: PatternSyntaxException) {
+                if (generation == searchGeneration) {
+                    binding.searchInput.error = getString(R.string.content_search_invalid_regex)
+                    binding.searchCount.text = "0/0"
+                }
+                return@launch
+            }
+            if (generation != searchGeneration) return@launch
+            searchMatches = matches
+            searchIndex = matches.indexOfFirst { it.first >= anchor }.let {
+                if (it >= 0) it else if (matches.isEmpty()) -1 else 0
+            }
+            showCurrentMatch(scrollToMatch)
+        }
+    }
+
+    private fun moveToMatch(direction: Int) {
+        if (searchMatches.isEmpty()) return
+        searchIndex = cycleContentMatchIndex(searchIndex, direction, searchMatches.size)
+        showCurrentMatch(scrollToMatch = true)
+    }
+
+    private fun showCurrentMatch(scrollToMatch: Boolean) {
+        clearSearchHighlight()
+        val range = searchMatches.getOrNull(searchIndex)
+        binding.btnSearchPrev.isEnabled = range != null
+        binding.btnSearchNext.isEnabled = range != null
+        binding.searchCount.text = "${searchIndex + 1}/${searchMatches.size}"
+        if (range == null) return
+        val contentView = binding.contentView
+        val editable = contentView.text ?: return
+        if (!range.isEmpty()) {
+            searchSpan = object : BackgroundColorSpan(ColorUtils.adjustAlpha(primaryColor, 0.35f)), NoCopySpan {}.also {
+                editable.setSpan(it, range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+        }
+        if (!scrollToMatch) return
+        contentView.setSelection(range.first, range.last + 1)
+        val generation = searchGeneration
+        contentView.post {
+            if (!contentView.isAttachedToWindow || generation != searchGeneration ||
+                searchMatches.getOrNull(searchIndex) != range
+            ) return@post
+            val layout = contentView.layout ?: return@post
+            val lineTop = layout.getLineTop(layout.getLineForOffset(range.first))
+            contentView.scrollTo(0, (lineTop - contentView.height / 3).coerceIn(0, maxScrollY()))
+        }
+    }
+
+    private fun clearSearchHighlight() {
+        searchSpan?.let { binding.contentView.text?.removeSpan(it) }
+        searchSpan = null
+    }
+
+    private fun maxScrollY(): Int {
+        val content = binding.contentView
+        return ((content.layout?.height ?: 0) + content.totalPaddingTop +
+            content.totalPaddingBottom - content.height).coerceAtLeast(0)
+    }
+
+    private fun updatePositionBar() {
+        val max = maxScrollY()
+        binding.positionBar.isEnabled = max > 0
+        binding.positionBar.progress = if (max == 0) 0 else
+            (binding.contentView.scrollY.coerceIn(0, max) * 10000L / max).toInt()
     }
 
     private fun editTitle(chapter: BookChapter) {
