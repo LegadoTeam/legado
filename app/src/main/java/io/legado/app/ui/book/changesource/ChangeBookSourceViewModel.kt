@@ -685,6 +685,9 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
             if (book.isWebFile) {
                 val source = appDb.bookSourceDao.getBookSource(book.origin)
                     ?: throw NoStackTraceException("书源不存在")
+                if (book.downloadUrls.isNullOrEmpty()) {
+                    WebBook.getBookInfoAwait(source, book)
+                }
                 Triple(book, emptyList(), source)
             } else {
                 val (toc, source) = tocMap[book.primaryStr()]?.let { toc ->
