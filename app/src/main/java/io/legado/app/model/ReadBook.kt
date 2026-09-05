@@ -14,6 +14,7 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.HighlightRule
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.data.entities.ReadRecord
+import io.legado.app.data.entities.updateSnapshot
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.HighlightAnchor
 import io.legado.app.help.HighlightRuleMatcher
@@ -619,12 +620,14 @@ object ReadBook : CoroutineScope by MainScope() {
         if (!AppConfig.enableReadRecord) {
             return
         }
-        val author = book?.author.orEmpty()
+        val currentBook = book ?: return
+        val author = currentBook.author
         executor.execute {
             readRecord.author = author
             readRecord.readTime = readRecord.readTime + System.currentTimeMillis() - readStartTime
             readStartTime = System.currentTimeMillis()
             readRecord.lastRead = System.currentTimeMillis()
+            readRecord.updateSnapshot(currentBook, durChapterIndex, durChapterPos)
             appDb.readRecordDao.insert(readRecord)
         }
     }

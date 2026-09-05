@@ -2,6 +2,8 @@ package io.legado.app.data.entities
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import io.legado.app.constant.AppConst
+import io.legado.app.data.appDb
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
 
@@ -17,8 +19,47 @@ data class ReadRecord(
     @ColumnInfo(defaultValue = "0")
     var readTime: Long = 0L,
     @ColumnInfo(defaultValue = "0")
-    var lastRead: Long = System.currentTimeMillis()
+    var lastRead: Long = System.currentTimeMillis(),
+    /** Snapshot fields keep the record useful after its bookshelf row is removed. */
+    var lastChapterTitle: String? = null,
+    @ColumnInfo(defaultValue = "-1")
+    var lastChapterIndex: Int = -1,
+    @ColumnInfo(defaultValue = "0")
+    var lastChapterPos: Int = 0,
+    var coverUrl: String? = null,
 )
+
+fun ReadRecord.updateSnapshot(
+    book: Book,
+    chapterIndex: Int = book.durChapterIndex,
+    chapterPos: Int = book.durChapterPos,
+) {
+    lastChapterIndex = chapterIndex
+    book.durChapterTitle?.takeIf { it.isNotBlank() }?.let { lastChapterTitle = it }
+    lastChapterPos = chapterPos
+    book.getDisplayCover()?.takeIf { it.isNotBlank() }?.let { coverUrl = it }
+}
+
+/** Copy the bookshelf data before deleting it so the history row remains displayable. */
+fun Book.saveReadRecordSnapshot() {
+    val current = appDb.readRecordDao.getRecord(AppConst.androidId, name)
+    if (current == null && durChapterIndex == 0 && durChapterPos == 0 &&
+        durChapterTitle.isNullOrBlank()
+    ) {
+        return
+    }
+    val record = (current ?: ReadRecord(deviceId = AppConst.androidId, bookName = name))
+        .copy(
+            deviceId = AppConst.androidId,
+            bookName = name,
+            author = author.ifBlank { current?.author.orEmpty() },
+            lastChapterTitle = durChapterTitle ?: current?.lastChapterTitle,
+            lastChapterIndex = durChapterIndex,
+            lastChapterPos = durChapterPos,
+            coverUrl = getDisplayCover() ?: current?.coverUrl,
+        )
+    appDb.readRecordDao.insert(record)
+}
 
 /** 同设备同书名共用主键,复用 author 列保存作者集合,纯文本仍兼容旧记录. */
 internal object ReadRecordAuthors {

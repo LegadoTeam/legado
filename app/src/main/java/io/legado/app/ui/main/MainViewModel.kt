@@ -13,6 +13,7 @@ import io.legado.app.constant.EventBus
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.saveReadRecordSnapshot
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.DefaultData
 import io.legado.app.help.book.BookHelp
@@ -362,6 +363,7 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
 
     private fun deleteNotShelfBook() {
         execute {
+            appDb.bookDao.getNotShelfBooks().forEach { it.saveReadRecordSnapshot() }
             appDb.bookDao.deleteNotShelfBook()
         }
     }

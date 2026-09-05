@@ -15,6 +15,7 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.ReadRecord
+import io.legado.app.data.entities.updateSnapshot
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.getBookSource
 import io.legado.app.help.book.readSimulating
@@ -123,6 +124,12 @@ internal class AudioReadTimeTracker {
     fun updateAuthor(author: String) {
         record.author = author
         activeRecord?.author = author
+    }
+
+    @Synchronized
+    fun updateSnapshot(book: Book, chapterIndex: Int, chapterPos: Int) {
+        record.updateSnapshot(book, chapterIndex, chapterPos)
+        activeRecord?.updateSnapshot(book, chapterIndex, chapterPos)
     }
 
     @Synchronized
@@ -317,12 +324,14 @@ object AudioPlay : CoroutineScope by MainScope() {
     fun markReadTimeStart() {
         if (AppConfig.enableReadRecord) {
             readTimeTracker.updateAuthor(book?.author.orEmpty())
+            book?.let { readTimeTracker.updateSnapshot(it, durChapterIndex, durChapterPos) }
             readTimeTracker.start(SystemClock.elapsedRealtime())
         }
     }
 
     @Synchronized
     fun upReadTime() {
+        book?.let { readTimeTracker.updateSnapshot(it, durChapterIndex, durChapterPos) }
         val record = readTimeTracker.stop(
             now = SystemClock.elapsedRealtime(),
             lastRead = System.currentTimeMillis(),

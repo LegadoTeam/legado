@@ -10,6 +10,7 @@ import io.legado.app.constant.AppLog
 import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.saveReadRecordSnapshot
 import io.legado.app.data.entities.BookSource
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.installPersistentCover
@@ -94,6 +95,7 @@ class BookshelfManageViewModel(application: Application) : BaseViewModel(applica
 
     fun deleteBook(books: List<Book>, deleteOriginal: Boolean = false) {
         execute {
+            books.forEach { it.saveReadRecordSnapshot() }
             appDb.bookDao.delete(*books.toTypedArray())
             books.forEach {
                 if (it.isLocal) {
