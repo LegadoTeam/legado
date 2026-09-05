@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/source-browser-test.yml'
       - '.github/scripts/source-browser-test.init.gradle'
+      - '.github/scripts/run-ui-regression.sh'
       - 'app/build.gradle'
       - 'gradle.properties'
       - 'gradle/libs.versions.toml'
@@ -67,9 +68,7 @@ jobs:
           target: google_apis
           arch: x86_64
           disable-animations: true
-          script: |
-            ./gradlew :app:connectedAppDebugAndroidTest --init-script .github/scripts/source-browser-test.init.gradle -Pandroid.testInstrumentationRunnerArguments.class=io.legado.app.ui.widget.dialog.BottomWebViewDialogShowTest,io.legado.app.ui.book.explore.ExploreCategoriesTest,io.legado.app.ui.book.read.ContentEditSearchTest --build-cache --no-daemon --max-workers=2
-            adb pull /sdcard/Android/data/com.legado.app.debug/files/ui-regression app/build/ui-regression
+          script: bash .github/scripts/run-ui-regression.sh
 
       - name: Upload test results
         if: always()

@@ -229,6 +229,7 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
     override fun onViewStateRestored(savedInstanceState: Bundle?) {
         super.onViewStateRestored(savedInstanceState)
         val contentView = binding.contentView
+        val owner = viewLifecycleOwner
         if (savedInstanceState?.getBoolean(STATE_HAS_DRAFT) == true) {
             viewModel.restoreDraft(
                 contentView.text?.toString().orEmpty(),
@@ -241,10 +242,12 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
         contentView.doAfterTextChanged {
             viewModel.updateDraft(it?.toString().orEmpty())
             scheduleSearch(scrollToMatch = false)
+            contentView.post {
+                if (owner.lifecycle.currentState.isAtLeast(Lifecycle.State.CREATED)) updatePositionBar()
+            }
         }
         setupSearch(savedInstanceState)
         viewModel.initContent(editTarget)
-        val owner = viewLifecycleOwner
         contentView.doOnLayout {
             if (owner.lifecycle.currentState.isAtLeast(Lifecycle.State.CREATED) && viewModel.hasDraft) {
                 restoredScrollY?.let {

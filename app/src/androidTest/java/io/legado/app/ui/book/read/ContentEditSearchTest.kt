@@ -183,8 +183,12 @@ class ContentEditSearchTest {
                 ui.contentView.totalPaddingBottom - ui.contentView.height
             val expected = (ui.contentView.scrollY.coerceIn(0, max) * 10000L / max).toInt()
             assertEquals(expected, ui.positionBar.progress)
-            ui.contentView.text!!.clear()
+            ui.contentView.setText("Short text")
         }
+        awaitDialog { !it.binding.positionBar.isEnabled && it.binding.positionBar.progress == 0 }
+        onDialog { it.binding.contentView.text!!.append("\n" + "More text\n".repeat(500)) }
+        awaitDialog { it.binding.positionBar.isEnabled }
+        onDialog { it.binding.contentView.text!!.clear() }
         awaitDialog { !it.binding.positionBar.isEnabled && it.binding.positionBar.progress == 0 }
     }
 
@@ -258,7 +262,8 @@ class ContentEditSearchTest {
         } while (SystemClock.uptimeMillis() < deadline)
         var state = ""
         onDialog { state = "count=${it.binding.searchCount.text}, error=${it.binding.searchInput.error}, " +
-            "length=${it.binding.contentView.length()}, scroll=${it.binding.contentView.scrollY}" }
+            "length=${it.binding.contentView.length()}, scroll=${it.binding.contentView.scrollY}, " +
+            "bar=${it.binding.positionBar.progress}, enabled=${it.binding.positionBar.isEnabled}" }
         throw AssertionError("Timed out: $state")
     }
 
