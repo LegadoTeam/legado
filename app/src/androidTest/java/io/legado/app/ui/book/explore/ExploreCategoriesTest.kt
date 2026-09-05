@@ -40,7 +40,7 @@ import java.util.concurrent.TimeUnit
 @RunWith(AndroidJUnit4::class)
 class ExploreCategoriesTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
-    private val context = instrumentation.targetContext
+    private val context = instrumentation.targetContext.applicationContext
     private val preferences = context.defaultSharedPreferences
     private val originalCategories = preferences.all[PreferKey.showExploreCategories]
     private val originalCronet = preferences.all[PreferKey.cronet]
