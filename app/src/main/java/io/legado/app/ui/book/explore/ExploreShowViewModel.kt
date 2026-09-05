@@ -349,7 +349,7 @@ internal data class ExploreListState(
     val firstPage: Int,
     val hasMore: Boolean = true,
     val loading: Boolean = false,
-    val prependCount: Int = 0,
+    val prependCount: Int? = null,
 )
 
 internal class ExplorePaginationState {

@@ -8,6 +8,7 @@ import androidx.core.view.children
 import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -55,8 +56,14 @@ class ExploreCategoriesTest {
             }
             val category = session.uri.substringAfterLast('/')
             val page = session.parameters["page"]?.firstOrNull() ?: "1"
-            val html = (1..20).joinToString("") {
-                "<a href='/book/$category/$page/$it'>Category $category page $page book $it</a>"
+            val ids = when {
+                category == "2" && page == "3" -> (50..69).toList()
+                category == "2" && page == "2" -> listOf(51) + (30..48)
+                else -> (1..20).toList()
+            }
+            val html = ids.joinToString("") {
+                val bookPath = if (category == "2") "/book/$category/$it" else "/book/$category/$page/$it"
+                "<a href='$bookPath'>Category $category page $page book $it</a>"
             }
             if (category == "1") slowFinished.countDown()
             return newFixedLengthResponse(Response.Status.OK, "text/html", html)
@@ -108,7 +115,7 @@ class ExploreCategoriesTest {
         scenario!!.onActivity {
             assertFalse(AppConfig.showExploreCategories)
             assertFalse(it.ui.categoriesContainer.isVisible)
-            it.ui.titleBar.menu.performIdentifierAction(R.id.menu_show_explore_categories, 0)
+            toggleCategories(it)
         }
         awaitActivity { it.ui.categoriesContainer.childCount == 3 }
         scenario!!.onActivity {
@@ -127,7 +134,7 @@ class ExploreCategoriesTest {
         awaitActivity { it.ui.categoriesContainer.isVisible }
         scenario!!.onActivity {
             assertTrue(it.ui.titleBar.menu.findItem(R.id.menu_show_explore_categories).isChecked)
-            it.ui.titleBar.menu.performIdentifierAction(R.id.menu_show_explore_categories, 0)
+            toggleCategories(it)
             assertFalse(it.ui.categoriesContainer.isVisible)
         }
     }
@@ -158,9 +165,44 @@ class ExploreCategoriesTest {
     }
 
     @Test
+    fun prependingOverlappingPageRetainsVisibleBook() {
+        scenario!!.onActivity {
+            it.model.switchCategory(ExploreCategory("Category 2", categoryUrl(2)))
+            it.model.skipPage(3)
+            it.model.explore()
+        }
+        awaitActivity { it.model.pageLiveData.value == 3 && it.model.getLoadedBooks().size == 20 }
+        scenario!!.onActivity {
+            val manager = it.ui.recyclerView.layoutManager as LinearLayoutManager
+            manager.scrollToPositionWithOffset(1, 0)
+        }
+        instrumentation.waitForIdleSync()
+        var anchor: String? = null
+        var top = 0
+        scenario!!.onActivity {
+            val manager = it.ui.recyclerView.layoutManager as LinearLayoutManager
+            val position = manager.findFirstVisibleItemPosition()
+            val adapter = it.ui.recyclerView.adapter as ExploreShowAdapter
+            anchor = adapter.getItemByLayoutPosition(position)?.bookUrl
+            assertTrue(anchor!!.endsWith("/50"))
+            top = manager.findViewByPosition(position)!!.top
+            it.model.explore(2)
+        }
+        awaitActivity { it.model.pageLiveData.value == 2 && it.model.getLoadedBooks().size == 39 }
+        instrumentation.waitForIdleSync()
+        scenario!!.onActivity {
+            val manager = it.ui.recyclerView.layoutManager as LinearLayoutManager
+            val position = manager.findFirstVisibleItemPosition()
+            val adapter = it.ui.recyclerView.adapter as ExploreShowAdapter
+            assertEquals(anchor, adapter.getItemByLayoutPosition(position)?.bookUrl)
+            assertEquals(top, manager.findViewByPosition(position)!!.top)
+        }
+    }
+
+    @Test
     fun categorySwitchRejectsLateResponseAndRetainsPageAfterRecreation() {
         scenario!!.onActivity {
-            it.ui.titleBar.menu.performIdentifierAction(R.id.menu_show_explore_categories, 0)
+            toggleCategories(it)
         }
         awaitActivity { it.ui.categoriesContainer.childCount == 3 }
         scenario!!.onActivity { rows(it)[0].getTabAt(1)!!.select() }
@@ -199,6 +241,11 @@ class ExploreCategoriesTest {
     private fun rows(activity: ExploreShowActivity) =
         activity.ui.categoriesContainer.children.map { it as TabLayout }.toList()
 
+    private fun toggleCategories(activity: ExploreShowActivity) {
+        assertTrue("Category menu action is installed", activity.ui.titleBar.menu
+            .performIdentifierAction(R.id.menu_show_explore_categories, 0))
+    }
+
     private val ExploreShowActivity.ui: ActivityExploreShowBinding
         get() = ActivityExploreShowBinding.bind(findViewById<View>(R.id.title_bar).parent as View)
 
@@ -213,9 +260,13 @@ class ExploreCategoriesTest {
             if (satisfied) return
             SystemClock.sleep(50)
         } while (SystemClock.uptimeMillis() < deadline)
+        var state = ""
         scenario!!.onActivity {
-            assertTrue("Timed out: ${it.model.errorLiveData.value}", condition(it))
+            state = "error=${it.model.errorLiveData.value}, books=${it.model.getLoadedBooks().size}, " +
+                "page=${it.model.pageLiveData.value}, categories=${it.model.categoriesData.value?.size}, " +
+                "rows=${it.ui.categoriesContainer.childCount}, enabled=${AppConfig.showExploreCategories}"
         }
+        throw AssertionError("Timed out: $state")
     }
 
     private fun screenshot(name: String) {

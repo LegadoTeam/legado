@@ -43,8 +43,12 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
     private var isClearAll = false
     private val categoryTabs = arrayListOf<Pair<ExploreCategory, TabLayout.Tab>>()
     private var renderedCategories: List<ExploreCategory>? = null
-    private val menuCategories by lazy {
-        binding.titleBar.menu.add(Menu.NONE, R.id.menu_show_explore_categories, Menu.NONE,
+    private var menuCategories: MenuItem? = null
+    private var menuAddLoadedBooks: MenuItem? = null
+    private var menuPage: MenuItem? = null
+
+    override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
+        menuCategories = menu.add(Menu.NONE, R.id.menu_show_explore_categories, Menu.NONE,
             R.string.show_explore_categories).apply {
             isCheckable = true
             setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
@@ -54,18 +58,15 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
                 true
             }
         }
-    }
-    private val menuAddLoadedBooks by lazy {
-        binding.titleBar.menu.add(R.string.add_loaded_books_to_bookshelf).apply {
+        menuAddLoadedBooks = menu.add(R.string.add_loaded_books_to_bookshelf).apply {
+            isEnabled = viewModel.addBooksBusy.value != true
             setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
             setOnMenuItemClickListener {
                 alertAddLoadedBooksToShelf()
                 true
             }
         }
-    }
-    private val menuPage by lazy {
-        binding.titleBar.menu.add(getString(R.string.menu_page, 1)).apply {
+        menuPage = menu.add(getString(R.string.menu_page, viewModel.pageLiveData.value ?: 1)).apply {
             setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
             setOnMenuItemClickListener {
                 val page = viewModel.pageLiveData.value ?: 1
@@ -89,13 +90,13 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
                 true
             }
         }
+        updateCategories()
+        return true
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         binding.titleBar.title = intent.getStringExtra("exploreName")
         initRecyclerView()
-        menuCategories
-        menuAddLoadedBooks
         viewModel.booksData.observe(this) { upData(it) }
         viewModel.categoryData.observe(this) {
             binding.titleBar.title = it.title
@@ -115,10 +116,10 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
             })
         }
         viewModel.pageLiveData.observe(this) {
-            menuPage.title = getString(R.string.menu_page, it)
+            menuPage?.title = getString(R.string.menu_page, it)
         }
         viewModel.addBooksBusy.observe(this) {
-            menuAddLoadedBooks.isEnabled = !it
+            menuAddLoadedBooks?.isEnabled = !it
         }
     }
 
@@ -134,7 +135,7 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
 
     private fun updateCategories() {
         val show = AppConfig.showExploreCategories
-        menuCategories.isChecked = show
+        menuCategories?.isChecked = show
         if (show) viewModel.loadCategories()
         val categories = viewModel.categoriesData.value.orEmpty().map {
             ExploreCategory(it.title, it.url.orEmpty())
@@ -261,6 +262,7 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
         val layoutManager = binding.recyclerView.layoutManager as LinearLayoutManager
         val hadBooks = !adapter.isEmpty()
         val position = layoutManager.findFirstVisibleItemPosition()
+        val anchor = adapter.getItemByLayoutPosition(position)
         val offset = layoutManager.findViewByPosition(position)?.top ?: 0
         adapter.setItems(state.books)
         oldPage = state.firstPage
@@ -276,8 +278,10 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
             loadMoreView.hasMore()
             loadMoreView.stopLoad()
         }
-        if (hadBooks && state.prependCount > 0 && position >= 0) {
-            layoutManager.scrollToPositionWithOffset(position + state.prependCount, offset)
+        if (hadBooks && state.prependCount != null && position >= 0) {
+            val target = anchor?.let { state.books.indexOf(it) }?.takeIf { it >= 0 }
+                ?.plus(adapter.getHeaderCount()) ?: (position + state.prependCount)
+            layoutManager.scrollToPositionWithOffset(target, offset)
         } else if (!state.loading && isClearAll) {
             layoutManager.scrollToPositionWithOffset(adapter.getHeaderCount(), 0)
             isClearAll = false
