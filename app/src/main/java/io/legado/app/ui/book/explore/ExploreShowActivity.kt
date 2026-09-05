@@ -23,6 +23,7 @@ import io.legado.app.ui.widget.number.NumberPickerDialog
 import io.legado.app.ui.widget.recycler.LoadMoreView
 import io.legado.app.ui.widget.recycler.VerticalDivider
 import io.legado.app.utils.applyNavigationBarPadding
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.toastOnUi
@@ -149,6 +150,8 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
             val tabs = TabLayout(this).apply {
                 tabMode = TabLayout.MODE_SCROLLABLE
                 tabGravity = TabLayout.GRAVITY_START
+                minimumHeight = 40.dpToPx()
+                setPadding(0, 0, 0, 0)
                 setTabTextColors(getCompatColor(R.color.primaryText), accentColor)
                 setSelectedTabIndicatorColor(accentColor)
                 setTabIndicatorFullWidth(false)
@@ -157,6 +160,14 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
                 val tab = tabs.newTab().setText(category.title).setTag(category)
                 tabs.addTab(tab, false)
                 categoryTabs.add(category to tab)
+            }
+            (tabs.getChildAt(0) as? ViewGroup)?.let { tabStrip ->
+                for (index in 0 until tabStrip.childCount) {
+                    tabStrip.getChildAt(index).apply {
+                        setPadding(4.dpToPx(), 0, 4.dpToPx(), 0)
+                        minimumHeight = 40.dpToPx()
+                    }
+                }
             }
             tabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
                 override fun onTabSelected(tab: TabLayout.Tab) {
@@ -255,6 +266,8 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
         if ((oldPage > 1 && !loadMoreView.isLoading && !loadMoreViewTop.isLoading) || forceLoad) {
             loadMoreViewTop.hasMore()
             viewModel.explore(oldPage - 1)
+        } else if (oldPage <= 1) {
+            viewModel.showPage(1)
         }
     }
 

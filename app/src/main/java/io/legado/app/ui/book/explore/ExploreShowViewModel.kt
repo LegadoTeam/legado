@@ -185,6 +185,10 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
         }
     }
 
+    fun showPage(page: Int) {
+        if (page > 0) pageLiveData.value = page
+    }
+
     fun explore() {
         val source = bookSource
         val url = categoryData.value?.url
