@@ -16,10 +16,6 @@ import org.seimicrawler.xpath.JXNode
 @Keep
 class AnalyzeByJSoup(doc: Any) {
 
-    companion object {
-        private val nullSet = setOf(null)
-    }
-
     private var element: Element = parse(doc)
 
     private fun parse(doc: Any): Element {
@@ -385,9 +381,9 @@ class AnalyzeByJSoup(doc: Any) {
              * */
             if (split == '!') { //排除
 
-                for (pcInt in indexSet) elements[pcInt] = null
-
-                elements.removeAll(nullSet) //测试过，这样就行
+                // jsoup 1.23 no longer permits nullable Elements entries.
+                // Remove from the end so the remaining element order is unchanged.
+                for (pcInt in indexSet.sortedDescending()) elements.removeAt(pcInt)
 
             } else if (split == '.') { //选择
 
