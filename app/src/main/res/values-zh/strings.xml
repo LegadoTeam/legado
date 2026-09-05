@@ -847,6 +847,9 @@
     <string name="import_default_rule">导入默认规则</string>
     <string name="name">名称</string>
     <string name="regex">正则</string>
+    <string name="content_search_match_case">区分大小写</string>
+    <string name="content_search_invalid_regex">正则表达式无效</string>
+    <string name="content_edit_position">正文位置</string>
     <string name="more_menu">更多菜单</string>
     <string name="reduce">减</string>
     <string name="plus">加</string>

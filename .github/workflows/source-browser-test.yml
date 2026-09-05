@@ -16,6 +16,11 @@ on:
       - 'app/src/main/java/io/legado/app/ui/book/explore/**'
       - 'app/src/main/res/layout/activity_explore_show.xml'
       - 'app/src/androidTest/java/io/legado/app/ui/book/explore/**'
+      - 'app/src/main/java/io/legado/app/ui/book/read/ContentEditDialog.kt'
+      - 'app/src/main/java/io/legado/app/ui/book/read/ContentSearch.kt'
+      - 'app/src/main/res/layout/dialog_content_edit.xml'
+      - 'app/src/main/res/menu/content_edit.xml'
+      - 'app/src/androidTest/java/io/legado/app/ui/book/read/ContentEditSearchTest.kt'
   workflow_dispatch:
 
 permissions:
@@ -55,7 +60,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Verify source browser and discovery on Android 16
+      - name: Verify source browser, discovery and content editor on Android 16
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: 36
@@ -63,7 +68,7 @@ jobs:
           arch: x86_64
           disable-animations: true
           script: |
-            ./gradlew :app:connectedAppDebugAndroidTest --init-script .github/scripts/source-browser-test.init.gradle -Pandroid.testInstrumentationRunnerArguments.class=io.legado.app.ui.widget.dialog.BottomWebViewDialogShowTest,io.legado.app.ui.book.explore.ExploreCategoriesTest --build-cache --no-daemon --max-workers=2
+            ./gradlew :app:connectedAppDebugAndroidTest --init-script .github/scripts/source-browser-test.init.gradle -Pandroid.testInstrumentationRunnerArguments.class=io.legado.app.ui.widget.dialog.BottomWebViewDialogShowTest,io.legado.app.ui.book.explore.ExploreCategoriesTest,io.legado.app.ui.book.read.ContentEditSearchTest --build-cache --no-daemon --max-workers=2
             adb pull /sdcard/Android/data/com.legado.app.debug/files/ui-regression app/build/ui-regression
 
       - name: Upload test results

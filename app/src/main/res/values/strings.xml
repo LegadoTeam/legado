@@ -850,6 +850,9 @@
     <string name="import_default_rule">Import default rules</string>
     <string name="name">Name</string>
     <string name="regex">Regex</string>
+    <string name="content_search_match_case">Match case</string>
+    <string name="content_search_invalid_regex">Invalid regular expression</string>
+    <string name="content_edit_position">Text position</string>
     <string name="example">Example</string>
     <string name="more_menu">More menu</string>
     <string name="reduce">Minus</string>

@@ -16,14 +16,137 @@
         app:titleTextAppearance="@style/ToolbarTitle"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <LinearLayout
+        android:id="@+id/search_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="8dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/tool_bar">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical">
+
+            <io.legado.app.lib.theme.view.ThemeEditText
+                android:id="@+id/search_input"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="@string/search"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:minHeight="48dp"
+                android:paddingHorizontal="8dp"
+                android:saveEnabled="false"
+                android:singleLine="true" />
+
+            <ImageButton
+                android:id="@+id/btn_search_prev"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/help_search_prev"
+                android:enabled="false"
+                android:padding="12dp"
+                android:rotation="180"
+                android:src="@drawable/ic_arrow_down"
+                app:tint="@color/primaryText" />
+
+            <ImageButton
+                android:id="@+id/btn_search_next"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/help_search_next"
+                android:enabled="false"
+                android:padding="12dp"
+                android:src="@drawable/ic_arrow_down"
+                app:tint="@color/primaryText" />
+
+            <ImageButton
+                android:id="@+id/btn_close_search"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/close"
+                android:padding="12dp"
+                android:src="@drawable/ic_baseline_close"
+                app:tint="@color/primaryText" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical">
+
+            <androidx.appcompat.widget.AppCompatCheckBox
+                android:id="@+id/search_regex"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:minHeight="48dp"
+                android:saveEnabled="false"
+                android:text="@string/regex"
+                android:textSize="14sp" />
+
+            <androidx.appcompat.widget.AppCompatCheckBox
+                android:id="@+id/search_match_case"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:minHeight="48dp"
+                android:saveEnabled="false"
+                android:text="@string/content_search_match_case"
+                android:textSize="14sp" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/search_count"
+                android:layout_width="72dp"
+                android:layout_height="48dp"
+                android:accessibilityLiveRegion="polite"
+                android:gravity="center"
+                android:minWidth="48dp"
+                android:textColor="@color/secondaryText"
+                android:textSize="12sp"
+                app:autoSizeTextType="uniform"
+                app:autoSizeMinTextSize="8sp"
+                app:autoSizeMaxTextSize="12sp"
+                app:autoSizeStepGranularity="1sp" />
+        </LinearLayout>
+    </LinearLayout>
+
     <io.legado.app.lib.theme.view.ThemeEditText
         android:id="@+id/content_view"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="0dp"
+        android:gravity="top|start"
         android:padding="12dp"
         android:importantForAutofill="no"
-        app:layout_constraintTop_toBottomOf="@+id/tool_bar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/position_bar_container"
+        app:layout_constraintTop_toBottomOf="@id/search_bar"
         app:layout_constraintBottom_toBottomOf="parent" />
+
+    <io.legado.app.ui.widget.seekbar.VerticalSeekBarWrapper
+        android:id="@+id/position_bar_container"
+        android:layout_width="40dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toBottomOf="@id/search_bar"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <io.legado.app.lib.theme.view.ThemeSeekBar
+            android:id="@+id/position_bar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/content_edit_position"
+            android:max="10000"
+            android:rotation="90"
+            android:saveEnabled="false" />
+    </io.legado.app.ui.widget.seekbar.VerticalSeekBarWrapper>
 
     <io.legado.app.ui.widget.anima.RotateLoading
         android:id="@+id/rl_loading"

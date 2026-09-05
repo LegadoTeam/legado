@@ -697,6 +697,9 @@
     <string name="import_default_rule">導入默認規則</string>
     <string name="name">名稱</string>
     <string name="regex">正則</string>
+    <string name="content_search_match_case">區分大小寫</string>
+    <string name="content_search_invalid_regex">正則表達式無效</string>
+    <string name="content_edit_position">正文位置</string>
     <string name="more_menu">更多菜單</string>
     <string name="reduce">減</string>
     <string name="plus">加</string>
