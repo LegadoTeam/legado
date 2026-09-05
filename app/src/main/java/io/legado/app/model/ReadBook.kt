@@ -620,8 +620,8 @@ object ReadBook : CoroutineScope by MainScope() {
         if (!AppConfig.enableReadRecord) {
             return
         }
+        val author = book?.author.orEmpty()
         val currentBook = book ?: return
-        val author = currentBook.author
         executor.execute {
             readRecord.author = author
             readRecord.readTime = readRecord.readTime + System.currentTimeMillis() - readStartTime
