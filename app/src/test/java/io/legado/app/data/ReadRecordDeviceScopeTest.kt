@@ -26,14 +26,27 @@ class ReadRecordDeviceScopeTest {
 
         listOf(
             "src/main/java/io/legado/app/model/ReadBook.kt" to
-                "getReadTime(readRecord.deviceId, book.name)",
+                "readRecord.deviceId = AppConst.androidId",
             "src/main/java/io/legado/app/model/ReadManga.kt" to
-                "getReadTime(readRecord.deviceId, book.name)",
+                "readRecord.deviceId = AppConst.androidId",
             "src/main/java/io/legado/app/model/AudioPlay.kt" to
-                "getReadTime(record.deviceId, record.bookName)",
+                "ReadRecord(\n            deviceId = AppConst.androidId,",
         ).forEach { (path, call) ->
             assertTrue(path, projectFile(path).contains(call))
         }
+    }
+
+    @Test
+    fun `restore maps blank legacy device ids to the current device`() {
+        val restore = projectFile("src/main/java/io/legado/app/help/storage/Restore.kt")
+        assertTrue(restore.contains("readRecord.deviceId.isBlank()"))
+        assertTrue(restore.contains("readRecord.copy(deviceId = androidId)"))
+        assertTrue(restore.contains("normalizedRecord.deviceId != androidId"))
+        assertTrue(
+            restore.contains(
+                "getRecord(normalizedRecord.deviceId, normalizedRecord.bookName)"
+            )
+        )
     }
 
     @Test

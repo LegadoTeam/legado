@@ -362,16 +362,22 @@ object Restore {
         }
         fileToListT<ReadRecord>(path, "readRecord.json")?.let {
             it.forEach { readRecord ->
+                // Older backups omitted the device id; treat them as local records.
+                val normalizedRecord = if (readRecord.deviceId.isBlank()) {
+                    readRecord.copy(deviceId = androidId)
+                } else {
+                    readRecord
+                }
                 //判断是不是本机记录
-                if (readRecord.deviceId != androidId) {
-                    appDb.readRecordDao.insert(readRecord)
+                if (normalizedRecord.deviceId != androidId) {
+                    appDb.readRecordDao.insert(normalizedRecord)
                 } else {
                     val current = appDb.readRecordDao
-                        .getRecord(readRecord.deviceId, readRecord.bookName)
-                    if (current == null || current.readTime < readRecord.readTime) {
-                        appDb.readRecordDao.insert(readRecord)
-                    } else if (readRecord.author.isNotBlank()) {
-                        appDb.readRecordDao.insert(current.copy(author = readRecord.author))
+                        .getRecord(normalizedRecord.deviceId, normalizedRecord.bookName)
+                    if (current == null || current.readTime < normalizedRecord.readTime) {
+                        appDb.readRecordDao.insert(normalizedRecord)
+                    } else if (normalizedRecord.author.isNotBlank()) {
+                        appDb.readRecordDao.insert(current.copy(author = normalizedRecord.author))
                     }
                 }
             }

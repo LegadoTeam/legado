@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.SystemClock
 import io.legado.app.R
+import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.IntentAction
@@ -291,7 +292,11 @@ object AudioPlay : CoroutineScope by MainScope() {
         kotlin.runCatching { readTimeWrite?.get() }.onFailure {
             AppLog.put("保存听书时长失败\n${it.localizedMessage}", it)
         }
-        val record = ReadRecord(bookName = book.name, author = book.author)
+        val record = ReadRecord(
+            deviceId = AppConst.androidId,
+            bookName = book.name,
+            author = book.author,
+        )
         record.readTime = appDb.readRecordDao
             .getReadTime(record.deviceId, record.bookName) ?: 0
         readTimeTracker.setRecord(record)
