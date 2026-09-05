@@ -46,8 +46,8 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
     internal val booksData = MutableLiveData<ExploreListState>()
     internal val categoryData = MutableLiveData<ExploreCategory>()
     val categoriesData = MutableLiveData<List<ExploreKind>>()
-    val errorLiveData = MutableLiveData<String>()
-    val errorTopLiveData = MutableLiveData<String>()
+    val errorLiveData = MutableLiveData<String?>()
+    val errorTopLiveData = MutableLiveData<String?>()
     val pageLiveData = MutableLiveData<Int>()
     val addBooksBusy = MutableLiveData(false)
     private var bookSource: BookSource? = null
