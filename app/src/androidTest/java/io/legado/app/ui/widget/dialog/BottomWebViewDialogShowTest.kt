@@ -221,7 +221,9 @@ class BottomWebViewDialogShowTest {
         assertEquals(limited.toString(), 160, limited.top)
 
         scenario!!.onActivity { activity ->
-            chrome.onShowCustomView(View(activity), WebChromeClient.CustomViewCallback {})
+            chrome.onShowCustomView(View(activity), object : WebChromeClient.CustomViewCallback {
+                override fun onCustomViewHidden() = Unit
+            })
         }
         val full = awaitGeometry { it.height == it.parentHeight }
         assertTrue(full.toString(), abs(full.top) <= 2 && abs(full.bottomGap) <= 2)
@@ -240,7 +242,9 @@ class BottomWebViewDialogShowTest {
         }
         val initial = awaitGeometry { !it.fitToContents && it.height in 1 until it.parentHeight }
         scenario!!.onActivity { activity ->
-            chrome.onShowCustomView(View(activity), WebChromeClient.CustomViewCallback {})
+            chrome.onShowCustomView(View(activity), object : WebChromeClient.CustomViewCallback {
+                override fun onCustomViewHidden() = Unit
+            })
         }
         val full = awaitGeometry { it.height == it.parentHeight }
         assertTrue(full.toString(), abs(full.top) <= 2 && abs(full.bottomGap) <= 2)

@@ -312,6 +312,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     private var constrainedSheetHeight: Int? = null
     private var configuredExpandedOffset: Int? = null
     private var configuredHalfExpandedRatio: Float? = null
+    private var lastAppliedExpandedOffset: Int? = null
     private val sheetLayoutListener = View.OnLayoutChangeListener { sheet, _, _, _, _, _, _, _, _ ->
         updateExpandedOffset(sheet)
     }
@@ -645,7 +646,13 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             else -> 0
         }
         // During layout Material applies this offset after the sheet has been measured.
-        behavior.setExpandedOffset(offset)
+        if (lastAppliedExpandedOffset != offset) {
+            lastAppliedExpandedOffset = offset
+            behavior.setExpandedOffset(offset)
+            if (behavior.state == BottomSheetBehavior.STATE_EXPANDED) {
+                sheet.post { sheet.requestLayout() }
+            }
+        }
         val requestedRatio = configuredHalfExpandedRatio ?: behavior.halfExpandedRatio.also {
             configuredHalfExpandedRatio = it
         }
