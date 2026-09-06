@@ -48,6 +48,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import splitties.init.appCtx
 
 private const val HORIZONTAL_TITLE_MAX_LINES = 4
+private const val VERTICAL_TITLE_MAX_COLUMNS = 4
+private const val VERTICAL_TITLE_ELLIPSIS = "…"
 
 internal fun normalizeCoverText(value: String?, keepPunctuation: Boolean): String? =
     value?.let { text ->
@@ -91,11 +93,26 @@ internal fun coverTitleTextSize(
     viewWidth / 7
 }
 
-internal fun coverTitleColumnStartY(
-    top: Float,
-    maxColumnBottom: Float,
-    columnBottom: Float
-): Float = top + (maxColumnBottom - columnBottom).coerceAtLeast(0f)
+internal fun coverTitleColumnCapacity(
+    viewHeight: Float,
+    textHeight: Float
+): Int = if (viewHeight <= 0f || textHeight <= 0f) {
+    0
+} else {
+    (viewHeight * 0.7f / textHeight).toInt().coerceAtLeast(1)
+}
+
+internal fun coverTitleDisplayCharacters(
+    characters: List<String>,
+    viewHeight: Float,
+    textHeight: Float,
+    maxColumns: Int = VERTICAL_TITLE_MAX_COLUMNS
+): List<String> {
+    val capacity = coverTitleColumnCapacity(viewHeight, textHeight)
+    val maxCharacters = capacity * maxColumns.coerceAtLeast(1)
+    if (capacity == 0 || characters.size <= maxCharacters) return characters
+    return characters.take(maxCharacters - 1) + VERTICAL_TITLE_ELLIPSIS
+}
 
 internal fun coverTitleColumnOffsets(
     characterCount: Int,
@@ -103,37 +120,13 @@ internal fun coverTitleColumnOffsets(
     textHeight: Float
 ): List<List<Float>> {
     if (characterCount <= 0 || viewHeight <= 0f || textHeight <= 0f) return emptyList()
-    val columns = mutableListOf<List<Float>>()
-    var column = mutableListOf<Float>()
-    var columnOffset = 0f
-    var line = 0
-    var nextY = viewHeight * 0.2f
-    repeat(characterCount) { index ->
-        column += columnOffset
-        columnOffset += textHeight
-        nextY += textHeight
-        val remaining = characterCount - index - 1
-        if (nextY > viewHeight * 0.9f) {
-            if (remaining == 1) {
-                nextY -= textHeight / 5
-                columnOffset -= textHeight / 5
-            } else if (remaining > 0) {
-                columns += column.toList()
-                column = mutableListOf()
-                columnOffset = 0f
-                line++
-                nextY = viewHeight * 0.2f + textHeight * line
-            }
-        } else if (nextY > viewHeight * 0.8f && remaining > 2) {
-            columns += column.toList()
-            column = mutableListOf()
-            columnOffset = 0f
-            line++
-            nextY = viewHeight * 0.2f + textHeight * line
-        }
+    val capacity = coverTitleColumnCapacity(viewHeight, textHeight)
+    if (capacity == 0) return emptyList()
+    val displayedCount = characterCount.coerceAtMost(capacity * VERTICAL_TITLE_MAX_COLUMNS)
+    return (0 until ((displayedCount + capacity - 1) / capacity)).map { columnIndex ->
+        val columnSize = minOf(capacity, displayedCount - columnIndex * capacity)
+        List(columnSize) { it * textHeight }
     }
-    if (column.isNotEmpty()) columns += column.toList()
-    return columns
 }
 
 /**
@@ -372,22 +365,22 @@ class CoverImageView @JvmOverloads constructor(
                 namePaint.textHeight
             )
             namePaint.strokeWidth = namePaint.textSize / 6
-            val titleColumns = coverTitleColumnOffsets(
-                name.size,
+            val titleCharacters = coverTitleDisplayCharacters(
+                name.toList(),
                 viewHeight,
                 namePaint.textHeight
             )
-            val maxColumnBottom = titleColumns.maxOfOrNull { it.last() } ?: 0f
+            val titleColumns = coverTitleColumnOffsets(
+                titleCharacters.size,
+                viewHeight,
+                namePaint.textHeight
+            )
             var nameIndex = 0
             titleColumns.forEachIndexed { columnIndex, offsets ->
                 startX = renderWidth * 0.2f + namePaint.textSize * columnIndex
-                val startY = coverTitleColumnStartY(
-                    viewHeight * 0.2f,
-                    maxColumnBottom,
-                    offsets.last()
-                )
+                val startY = viewHeight * 0.2f
                 offsets.forEach { offsetY ->
-                    val char = name[nameIndex++]
+                    val char = titleCharacters[nameIndex++]
                     namePaint.color = backgroundColor
                     namePaint.style = Paint.Style.STROKE
                     bitmapCanvas.drawText(char, startX, startY + offsetY, namePaint)

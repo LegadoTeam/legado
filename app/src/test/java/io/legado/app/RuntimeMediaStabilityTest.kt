@@ -4,8 +4,9 @@ import io.legado.app.data.entities.Book
 import io.legado.app.service.buildHttpTtsCacheFileName
 import io.legado.app.ui.book.info.normalizeWebFileName
 import io.legado.app.ui.widget.image.coverBitmapCacheKey
+import io.legado.app.ui.widget.image.coverTitleColumnCapacity
 import io.legado.app.ui.widget.image.coverTitleColumnOffsets
-import io.legado.app.ui.widget.image.coverTitleColumnStartY
+import io.legado.app.ui.widget.image.coverTitleDisplayCharacters
 import io.legado.app.ui.widget.image.coverTitleTextSize
 import io.legado.app.ui.widget.image.normalizeCoverText
 import io.legado.app.utils.calculateSvgBitmapSize
@@ -146,30 +147,29 @@ class RuntimeMediaStabilityTest {
     }
 
     @Test
-    fun verticalCoverTitleColumnsShareTheLastBaseline() {
-        val top = 28f
+    fun verticalCoverTitleColumnsStayTopAlignedAndCapAtFourColumns() {
         val textHeight = 10f
         val columns = coverTitleColumnOffsets(20, 140f, textHeight)
-        assertEquals(listOf(9, 8, 3), columns.map { it.size })
-        val maxColumnBottom = columns.maxOf { it.last() }
-        val starts = columns.map {
-            coverTitleColumnStartY(top, maxColumnBottom, it.last())
-        }
-
-        assertEquals(listOf(top, top + textHeight, top + textHeight * 6), starts)
-        val bottoms = starts.zip(columns).map { (start, offsets) ->
-            start + offsets.last()
-        }
-        bottoms.forEach { assertEquals(bottoms.first(), it, 0.001f) }
+        assertEquals(9, coverTitleColumnCapacity(140f, textHeight))
+        assertEquals(listOf(9, 9, 2), columns.map { it.size })
+        assertTrue(columns.all { it.first() == 0f })
 
         assertEquals(listOf(9, 3), coverTitleColumnOffsets(12, 140f, textHeight).map { it.size })
-        val singleColumn = coverTitleColumnOffsets(11, 140f, textHeight).single()
-        assertEquals(11, singleColumn.size)
-        assertEquals(98f, singleColumn.last(), 0.001f)
+        assertEquals(listOf(9, 2), coverTitleColumnOffsets(11, 140f, textHeight).map { it.size })
+        assertEquals(listOf(9, 9, 9, 9), coverTitleColumnOffsets(100, 140f, textHeight).map { it.size })
         assertTrue(coverTitleColumnOffsets(0, 140f, textHeight).isEmpty())
         assertTrue(coverTitleColumnOffsets(3, 0f, textHeight).isEmpty())
         assertTrue(coverTitleColumnOffsets(3, 140f, 0f).isEmpty())
-        assertEquals(top, coverTitleColumnStartY(top, 80f, 90f), 0.001f)
+
+        val characters = (0 until 40).map(Int::toString)
+        val displayed = coverTitleDisplayCharacters(characters, 140f, textHeight)
+        assertEquals(36, displayed.size)
+        assertEquals("…", displayed.last())
+        assertEquals(characters.take(35), displayed.dropLast(1))
+        assertEquals(
+            characters.take(36),
+            coverTitleDisplayCharacters(characters.take(36), 140f, textHeight)
+        )
     }
 
     @Test
