@@ -310,6 +310,12 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     private var originOrientation: Int? = null
     private var needClearHistory = true
     private var constrainedSheetHeight: Int? = null
+    private var configuredExpandedOffset: Int? = null
+    private var configuredHalfExpandedRatio: Float? = null
+    private var lastAppliedExpandedOffset: Int? = null
+    private val sheetLayoutListener = View.OnLayoutChangeListener { sheet, _, _, _, _, _, _, _, _ ->
+        updateExpandedOffset(sheet)
+    }
     private var configuredHeight: BottomSheetHeightConfig? = null
     private var peekHeightTracksHeightMode = false
     private var maxHeightTracksHeightMode = false
@@ -344,6 +350,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         dismissed = false
         super.onStart()
         setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        bottomSheet?.addOnLayoutChangeListener(sheetLayoutListener)
     }
 
     override fun show(manager: FragmentManager, tag: String?) {
@@ -430,8 +437,14 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             behaviorSpec.peekHeight?.let { behavior.peekHeight = it }
             config.isHideable?.let { behavior.isHideable = it }
             behaviorSpec.skipCollapsed?.let { behavior.skipCollapsed = it }
-            config.setHalfExpandedRatio?.let { behavior.setHalfExpandedRatio(it) }
-            config.setExpandedOffset?.let { behavior.setExpandedOffset(it) }
+            config.setHalfExpandedRatio?.let {
+                behavior.setHalfExpandedRatio(it)
+                configuredHalfExpandedRatio = it
+            }
+            config.setExpandedOffset?.let {
+                behavior.setExpandedOffset(it)
+                configuredExpandedOffset = it
+            }
             behaviorSpec.fitToContents?.let { behavior.setFitToContents(it) }
             config.isDraggable?.let { behavior.isDraggable = it }
             behaviorSpec.draggableOnNestedScroll?.let {
@@ -589,6 +602,13 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             }
         }
 
+        bottomSheet?.let { sheet ->
+            updateExpandedOffset(sheet)
+            if (first || hasHeightUpdate || config.setFitToContents != null ||
+                config.setExpandedOffset != null || config.maxHeight != null) {
+                sheet.requestLayout()
+            }
+        }
         behaviorSpec.state?.let { behavior?.state = it }
 
         val scrollNoDraggable = config.scrollNoDraggable ?: if (first) true else null
@@ -612,6 +632,38 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                 currentWebView.setOnLongClickListener(null)
             }
         }
+    }
+
+    private fun updateExpandedOffset(sheet: View) {
+        val behavior = BottomSheetBehavior.from(sheet)
+        val parent = sheet.parent as? View ?: return
+        val automaticOffset = !isFullScreen && configuredExpandedOffset == null &&
+                constrainedSheetHeight != null && !behavior.isFitToContents
+        val offset = when {
+            isFullScreen -> 0
+            configuredExpandedOffset != null -> checkNotNull(configuredExpandedOffset)
+            automaticOffset -> (parent.height - sheet.height).coerceAtLeast(0)
+            else -> 0
+        }
+        // During layout Material applies this offset after the sheet has been measured.
+        if (lastAppliedExpandedOffset != offset) {
+            lastAppliedExpandedOffset = offset
+            behavior.setExpandedOffset(offset)
+            if (behavior.state == BottomSheetBehavior.STATE_EXPANDED) {
+                sheet.post { sheet.requestLayout() }
+            }
+        }
+        val requestedRatio = configuredHalfExpandedRatio ?: behavior.halfExpandedRatio.also {
+            configuredHalfExpandedRatio = it
+        }
+        val ratio = if (automaticOffset && parent.height > 0) {
+            // Half expansion must not exceed the measured fully expanded height.
+            minOf(requestedRatio, (sheet.height - 1).coerceAtLeast(0).toFloat() / parent.height)
+                .coerceAtLeast(Float.MIN_VALUE)
+        } else {
+            requestedRatio
+        }
+        behavior.setHalfExpandedRatio(ratio)
     }
 
     private fun reapplyConfiguredHeight() {
@@ -656,6 +708,10 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                 behavior?.maxHeight = -1
             }
         }
+        bottomSheet?.let { sheet ->
+            updateExpandedOffset(sheet)
+            sheet.requestLayout()
+        }
         behavior?.state = BottomSheetBehavior.STATE_EXPANDED
     }
 
@@ -674,6 +730,10 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         }
         sheetSizeBeforeFullScreen = null
         reapplyConfiguredHeight()
+        bottomSheet?.let { sheet ->
+            updateExpandedOffset(sheet)
+            sheet.requestLayout()
+        }
         snapshot?.state?.let { behavior?.state = it }
         while (pendingFullScreenConfigs.isNotEmpty()) {
             setConfig(pendingFullScreenConfigs.removeFirst())
@@ -924,6 +984,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     }
 
     override fun onDestroyView() {
+        bottomSheet?.removeOnLayoutChangeListener(sheetLayoutListener)
         customWebViewCallback?.onCustomViewHidden()
         pooledWebView?.let(WebViewPool::release)
         pooledWebView = null
