@@ -15,6 +15,7 @@ import android.util.Size
 import androidx.annotation.RequiresApi
 import com.google.android.renderscript.Toolkit
 import java.io.*
+import java.nio.ByteBuffer
 import kotlin.math.*
 
 
@@ -311,7 +312,7 @@ object BitmapUtils {
     private fun isImageWithImageDecoder(bytes: ByteArray): Boolean {
         return try {
             val bitmap = android.graphics.ImageDecoder.decodeBitmap(
-                android.graphics.ImageDecoder.createSource(bytes)
+                android.graphics.ImageDecoder.createSource(ByteBuffer.wrap(bytes))
             ) { decoder, _, _ ->
                 decoder.setAllocator(android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE)
                 decoder.setTargetSize(1, 1)
