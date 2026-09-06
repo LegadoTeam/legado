@@ -113,7 +113,7 @@ abstract class BaseActivity<VB : ViewBinding>(
         }
         onBackInvokedDispatcher.registerOnBackInvokedCallback(
             OnBackInvokedDispatcher.PRIORITY_DEFAULT,
-            OnBackInvokedCallback { finish() }
+            OnBackInvokedCallback { onBackPressedDispatcher.onBackPressed() }
         )
     }
 

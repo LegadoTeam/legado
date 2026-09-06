@@ -17,6 +17,8 @@ class PredictiveBackTest {
         )
 
         assertFalse(blanketFinishCallback.containsMatchIn(baseActivity))
+        assertTrue(baseActivity.contains("OnBackInvokedCallback { onBackPressedDispatcher.onBackPressed() }"))
+        assertFalse(baseActivity.contains("OnBackInvokedCallback { finish() }"))
 
         val manifest = File("src/main/AndroidManifest.xml").readText()
         assertTrue(manifest.contains("""android:enableOnBackInvokedCallback="true"""))
