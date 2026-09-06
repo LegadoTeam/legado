@@ -4,6 +4,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.os.SystemClock
 import android.view.View
+import android.view.ViewGroup
 import androidx.core.view.children
 import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
@@ -124,6 +125,11 @@ class ExploreCategoriesTest {
             assertEquals(listOf(8, 7, 7), rows(it).map { tabs -> tabs.tabCount })
             assertTrue(rows(it).all { tabs -> tabs.tabMode == TabLayout.MODE_SCROLLABLE })
             assertTrue(rows(it).all { tabs -> tabs.minimumHeight <= 40.dpToPx() })
+            assertTrue(rows(it).all { tabs ->
+                (tabs.getChildAt(0) as ViewGroup).children.all { tab ->
+                    tab.paddingLeft == 12.dpToPx() && tab.paddingRight == 12.dpToPx()
+                }
+            })
             val categoriesLocation = IntArray(2)
             val booksLocation = IntArray(2)
             it.ui.categoriesContainer.getLocationOnScreen(categoriesLocation)

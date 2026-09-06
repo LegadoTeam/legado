@@ -164,7 +164,7 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
             (tabs.getChildAt(0) as? ViewGroup)?.let { tabStrip ->
                 for (index in 0 until tabStrip.childCount) {
                     tabStrip.getChildAt(index).apply {
-                        setPadding(4.dpToPx(), 0, 4.dpToPx(), 0)
+                        setPadding(12.dpToPx(), 0, 12.dpToPx(), 0)
                         minimumHeight = 40.dpToPx()
                     }
                 }
