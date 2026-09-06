@@ -468,6 +468,18 @@ class JsSourceWebApiContractTest {
         assertTrue(toolbar.contains("store.updateSource(getSourceUniqueKey(source), data.data)"))
     }
 
+    @Test
+    fun `web debug routes JavaScript sources through the extraction endpoint`() {
+        val debug = readProjectFile("modules/web/src/components/SourceDebug.vue")
+        val jsIndex = debug.indexOf("isJsBookSource(source)")
+        val saveIndex = debug.indexOf("API.saveJsSource(source.mainJs!, source.bookSourceUrl)")
+        val debugApiIndex = debug.indexOf("await API.debug(")
+        assertTrue(jsIndex >= 0)
+        assertTrue(saveIndex > jsIndex)
+        assertTrue(debugApiIndex > saveIndex)
+        assertTrue(debug.contains("store.changeCurrentSource(data.data)"))
+    }
+
     private fun readProjectFile(path: String): String {
         val userDirectory = File(requireNotNull(System.getProperty("user.dir"))).absoluteFile
         val repositoryRoot = generateSequence(userDirectory) { it.parentFile }
