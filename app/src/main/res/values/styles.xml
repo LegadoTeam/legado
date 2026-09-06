@@ -38,6 +38,7 @@
     <!-- Keep the existing Design bottom-sheet behavior while opting this dialog into edge-to-edge. -->
     <style name="ThemeOverlay.Legado.BottomWebViewDialog"
         parent="Theme.Design.BottomSheetDialog">
+        <item name="android:windowIsFloating">false</item>
         <item name="enableEdgeToEdge">true</item>
         <item name="paddingBottomSystemWindowInsets">true</item>
         <item name="paddingLeftSystemWindowInsets">true</item>

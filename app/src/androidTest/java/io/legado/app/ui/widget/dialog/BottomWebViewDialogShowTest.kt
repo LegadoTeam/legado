@@ -1,10 +1,12 @@
 package io.legado.app.ui.widget.dialog
 
+import android.view.View
 import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.google.android.material.R as MaterialR
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
 import io.legado.app.ui.about.AboutActivity
@@ -92,6 +94,23 @@ class BottomWebViewDialogShowTest {
             assertTrue(manager.isDestroyed)
             newDialog().show(manager, "destroyed")
             assertEquals(0, visibleDialogs(manager))
+        }
+    }
+
+    @Test
+    fun bottomSheetWindowAlignsToBottom() {
+        scenario!!.onActivity { activity ->
+            val dialog = newDialog()
+            dialog.show(activity.supportFragmentManager, "bottom-alignment")
+        }
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        scenario!!.onActivity {
+            val dialog = it.supportFragmentManager.fragments
+                .filterIsInstance<BottomWebViewDialog>()
+                .single { fragment -> fragment.dialog?.isShowing == true }
+            val window = checkNotNull(dialog.dialog?.window)
+            val sheet = checkNotNull(dialog.dialog?.findViewById<View>(MaterialR.id.design_bottom_sheet))
+            assertTrue(window.decorView.height - sheet.bottom <= 2)
         }
     }
 

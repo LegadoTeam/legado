@@ -130,6 +130,7 @@ class BottomWebViewDialogLifecycleContractTest {
 
         assertTrue(theme.contains("R.style.ThemeOverlay_Legado_BottomWebViewDialog"))
         assertTrue(styles.contains("name=\"ThemeOverlay.Legado.BottomWebViewDialog\""))
+        assertTrue(styles.contains("<item name=\"android:windowIsFloating\">false</item>"))
         assertTrue(
             styles.contains(
                 "parent=\"Theme.Design.BottomSheetDialog\""
