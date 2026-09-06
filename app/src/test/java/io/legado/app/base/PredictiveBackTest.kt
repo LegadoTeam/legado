@@ -43,10 +43,21 @@ class PredictiveBackTest {
             "src/main/java/io/legado/app/ui/autoTask/AutoTaskEditActivity.kt",
             "src/main/java/io/legado/app/ui/book/audio/AudioPlayActivity.kt",
             "src/main/java/io/legado/app/ui/book/manga/ReadMangaActivity.kt",
+            "src/main/java/io/legado/app/ui/replace/edit/ReplaceEditActivity.kt",
         ).forEach { path ->
             val source = File(path).readText()
             assertTrue(source.contains("onBackPressedDispatcher.addCallback(this) { finish() }"))
             assertTrue(source.contains("override fun finish()"))
         }
+    }
+
+    @Test
+    fun `replace editor handles cursor only result after discarded code edit`() {
+        val source = File(
+            "src/main/java/io/legado/app/ui/replace/edit/ReplaceEditActivity.kt"
+        ).readText()
+
+        assertTrue(source.contains("it.hasExtra(\"cursorPosition\")"))
+        assertTrue(source.contains("else if (fieldId != null && cursorPosition != null)"))
     }
 }

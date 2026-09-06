@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.EditText
+import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
@@ -79,6 +80,7 @@ class ReplaceEditActivity :
     private var pendingFieldId: Int? = null
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        onBackPressedDispatcher.addCallback(this) { finish() }
         softKeyboardTool.attachToWindow(window)
         initView()
         viewModel.initData(intent) {
@@ -101,11 +103,21 @@ class ReplaceEditActivity :
                 ?: result.data?.getStringExtra("textFile")?.let { path ->
                     CodeTextTransfer.read(this, path).also { CodeTextTransfer.delete(this, path) }
                 }
+            val cursorPosition = result.data?.takeIf { it.hasExtra("cursorPosition") }
+                ?.getIntExtra("cursorPosition", -1)
             if (view != null && fieldId != null && text != null) {
                 rawFields[fieldId] = text
                 renderField(view, fieldId, text)
-                result.data?.getIntExtra("cursorPosition", -1)?.takeIf { it in 0 ..< view.text.length }?.let {
+                cursorPosition?.takeIf { it in 0 ..< view.text.length }?.let {
                     if (view.isFocusable) view.setSelection(it)
+                }
+                pendingFieldId = null
+            } else if (fieldId != null && cursorPosition != null) {
+                // CodeEditActivity returns only the cursor when the user discards edits.
+                cursorPosition.takeIf { it >= 0 }?.let {
+                    view?.takeIf { it.isFocusable }?.let { edit ->
+                        edit.setSelection(it.coerceAtMost(edit.text.length))
+                    }
                 }
                 pendingFieldId = null
             } else {
