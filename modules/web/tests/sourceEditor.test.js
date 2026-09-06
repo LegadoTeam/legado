@@ -46,6 +46,20 @@ test('keeps the JavaScript source toolbar balanced on narrow screens', () => {
   assert.match(editor, /grid-column: 1 \/ -1/)
 })
 
+test('starts new JavaScript sources from the App template', () => {
+  const editor = readSource('components/JsSourceEditor.vue')
+  const sourceUtils = readSource('utils/souce.ts')
+  const vite = readFileSync(
+    new URL('../vite.config.ts', import.meta.url),
+    'utf8',
+  )
+
+  assert.match(editor, /fetchJsSourceTemplate\(\)/)
+  assert.match(sourceUtils, /fetch\('js_source_template\.js'\)/)
+  assert.match(vite, /copy-js-source-template/)
+  assert.match(vite, /app\/src\/main\/assets\/js_source_template\.js/)
+})
+
 test('keeps source editor state and mobile controls reachable', () => {
   const editor = readSource('components/JsSourceEditor.vue')
   const view = readSource('views/SourceEditor.vue')

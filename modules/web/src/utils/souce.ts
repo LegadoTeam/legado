@@ -8,6 +8,14 @@ const isBookSource = (source: Source): source is BookSoure =>
 export const isJsBookSource = (source: Source): source is BookSoure =>
   'mainJs' in source && !isNullOrBlank(source.mainJs)
 
+export const fetchJsSourceTemplate = async (): Promise<string> => {
+  const response = await fetch('js_source_template.js')
+  if (!response.ok) throw new Error(`模板加载失败: HTTP ${response.status}`)
+  const template = await response.text()
+  if (!template.trim()) throw new Error('模板加载失败: 内容为空')
+  return template
+}
+
 export const isInvaildSource: (source: Source) => boolean = source => {
   if (isBookSource(source)) {
     return (
