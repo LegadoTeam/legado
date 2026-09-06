@@ -129,7 +129,7 @@ class WelcomeConfigFragment : PreferenceFragment(),
                         )
                     ) { _, i ->
                         if (i == 0) {
-                            deleteStoredImage(preference.key)
+                            deleteStoredImage(getPrefString(preference.key))
                             removePref(preference.key)
 //                            AppConfig.welcomeShowText = true
 //                            AppConfig.welcomeShowIcon = true
@@ -163,7 +163,7 @@ class WelcomeConfigFragment : PreferenceFragment(),
                         )
                     ) { _, i ->
                         if (i == 0) {
-                            deleteStoredImage(preference.key)
+                            deleteStoredImage(getPrefString(preference.key))
                             removePref(preference.key)
 //                            AppConfig.welcomeShowTextDark = true
 //                            AppConfig.welcomeShowIconDark = true

@@ -26,6 +26,7 @@ class WelcomeWindowContractTest {
         assertTrue(manifest.contains("android:theme=\"@style/AppTheme.Welcome\""))
         assertTrue(styles.contains("android:windowBackground\">@android:color/transparent"))
         assertTrue(config.contains("private fun deleteStoredImage(path: String?)"))
+        assertTrue(config.contains("deleteStoredImage(getPrefString(preference.key))"))
         assertTrue(config.contains("file.canonicalFile.parentFile == coversDir.canonicalFile"))
         assertTrue(config.contains("if (oldPath != file.absolutePath) deleteStoredImage(oldPath)"))
     }
