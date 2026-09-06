@@ -32,6 +32,7 @@ import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.launch
 import splitties.init.appCtx
+import java.io.File
 import java.io.FileOutputStream
 class WelcomeConfigFragment : PreferenceFragment(),
     SharedPreferences.OnSharedPreferenceChangeListener {
@@ -128,6 +129,7 @@ class WelcomeConfigFragment : PreferenceFragment(),
                         )
                     ) { _, i ->
                         if (i == 0) {
+                            deleteStoredImage(preference.key)
                             removePref(preference.key)
 //                            AppConfig.welcomeShowText = true
 //                            AppConfig.welcomeShowIcon = true
@@ -161,6 +163,7 @@ class WelcomeConfigFragment : PreferenceFragment(),
                         )
                     ) { _, i ->
                         if (i == 0) {
+                            deleteStoredImage(preference.key)
                             removePref(preference.key)
 //                            AppConfig.welcomeShowTextDark = true
 //                            AppConfig.welcomeShowIconDark = true
@@ -228,7 +231,9 @@ class WelcomeConfigFragment : PreferenceFragment(),
                             inputStream.copyTo(outputStream)
                         }
                     }
+                    val oldPath = getPrefString(preferenceKey)
                     putPrefString(preferenceKey, file.absolutePath)
+                    if (oldPath != file.absolutePath) deleteStoredImage(oldPath)
                 }.onSuccess {
                     appCtx.toastOnUi("设定成功")
                 }.onFailure {
@@ -252,11 +257,23 @@ class WelcomeConfigFragment : PreferenceFragment(),
                 FileOutputStream(file).use {
                     inputStream.copyTo(it)
                 }
+                val oldPath = getPrefString(preferenceKey)
                 putPrefString(preferenceKey, file.absolutePath)
+                if (oldPath != file.absolutePath) deleteStoredImage(oldPath)
             }.onFailure {
                 appCtx.toastOnUi(it.localizedMessage)
             }
         }
+    }
+
+    private fun deleteStoredImage(path: String?) {
+        if (path.isNullOrEmpty()) return
+        val file = File(path)
+        val coversDir = File(requireContext().externalFiles, "covers")
+        val isStoredImage = runCatching {
+            file.canonicalFile.parentFile == coversDir.canonicalFile
+        }.getOrDefault(false)
+        if (isStoredImage) FileUtils.delete(file)
     }
 
 }

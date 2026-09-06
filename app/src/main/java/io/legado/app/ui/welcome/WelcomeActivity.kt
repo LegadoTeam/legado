@@ -34,8 +34,23 @@ open class WelcomeActivity : BaseActivity<ActivityWelcomeBinding>() {
     override val binding by viewBinding(ActivityWelcomeBinding::inflate)
     private var startMainJob: Job? = null
 
+    private val broughtToFront: Boolean
+        get() = intent.flags and Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT != 0
+
+    override fun shouldShowWindowBackground(): Boolean =
+        getPrefInt(PreferKey.welcomeShowTime, 500) != 0 && !broughtToFront
+
+    override fun shouldCreateContentView(): Boolean {
+        if (broughtToFront || getPrefInt(PreferKey.welcomeShowTime, 500) == 0) {
+            if (!broughtToFront) startMainActivity()
+            finish()
+            return false
+        }
+        return true
+    }
+
     override fun onActivityCreated(savedInstanceState: Bundle?) {
-        if (intent.flags and Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT != 0) {
+        if (broughtToFront) {
             // 避免从桌面启动程序后，会重新实例化入口类的activity
             finish()
         } else {

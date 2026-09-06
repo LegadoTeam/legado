@@ -21,6 +21,7 @@
     <!-- Welcome主题 -->
     <style name="AppTheme.Welcome" parent="Base.AppTheme">
         <item name="android:windowNoTitle">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
     </style>
 
     <!-- Base application theme. -->
