@@ -114,4 +114,19 @@ class RssWebResourceProxyTest {
         assertTrue(source.contains("RssProxyResponseInputStream(response, body)"))
         assertTrue(source.contains("webResponse.setStatusCodeAndReasonPhrase"))
     }
+
+    @Test
+    fun activityDoesNotReadWebViewStateFromTheResourceInterceptorThread() {
+        val source = java.io.File(
+            "src/main/java/io/legado/app/ui/rss/read/ReadRssActivity.kt"
+        ).readText()
+        val interceptor = source.substringAfter(
+            "private suspend fun getProxiedResource",
+        ).substringBefore("private suspend fun getModifiedContentWithJs")
+
+        assertTrue(source.contains("@Volatile\n    private var currentPageUrl: String? = null"))
+        assertTrue(source.contains("currentPageUrl = url"))
+        assertTrue(interceptor.contains("currentPageUrl"))
+        assertFalse(interceptor.contains("currentWebView.url"))
+    }
 }
