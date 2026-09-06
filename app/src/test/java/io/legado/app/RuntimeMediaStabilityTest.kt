@@ -119,7 +119,7 @@ class RuntimeMediaStabilityTest {
             .first { it.isDirectory }
             .resolve("io/legado/app/ui/widget/image/CoverImageView.kt")
             .readText()
-        val titleLoop = source.substringAfter("name.forEachIndexed { index, char ->")
+        val titleLoop = source.substringAfter("var startY = viewHeight * 0.2f")
             .substringBefore("if (!drawAuthor)")
 
         assertTrue(titleLoop.contains("namePaint.textSize = viewWidth / 7"))
