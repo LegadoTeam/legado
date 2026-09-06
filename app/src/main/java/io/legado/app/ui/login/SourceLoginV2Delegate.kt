@@ -11,6 +11,8 @@ import com.script.rhino.runScriptWithContext
 import io.legado.app.R
 import io.legado.app.constant.AppLog
 import io.legado.app.data.entities.BaseSource
+import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.rule.RowUi
 import io.legado.app.databinding.DialogLoginBinding
 import io.legado.app.databinding.ItemFilletTextBinding
@@ -35,6 +37,8 @@ class SourceLoginV2Delegate(
     private val fragment: SourceLoginDialog,
     private val binding: DialogLoginBinding,
     private val source: BaseSource,
+    private val book: Book?,
+    private val chapter: BookChapter?,
 ) {
 
     private var stateJson = "{}"
@@ -82,7 +86,9 @@ class SourceLoginV2Delegate(
             val result = withContext(IO) {
                 runCatching {
                     runScriptWithContext {
-                        val rows = LoginUiV2.parseRender(source.evalLoginUiV2(candidateState))
+                        val rows = LoginUiV2.parseRender(
+                            source.evalLoginUiV2(candidateState, book, chapter)
+                        )
                         rows to source.getLoginInfoMap()
                     }
                 }.onFailure { ensureActive() }
@@ -279,7 +285,7 @@ class SourceLoginV2Delegate(
             val result = withContext(IO) {
                 runCatching {
                     runScriptWithContext {
-                        source.evalLoginActionV2(action, stateJson, formJson)
+                        source.evalLoginActionV2(action, stateJson, formJson, book, chapter)
                     }
                 }.onFailure { ensureActive() }
             }

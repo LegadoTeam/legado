@@ -711,7 +711,13 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
         val loginUiStr = source.loginUi ?: return
         isLoginUiV2 = source.isLoginUiV2()
         if (isLoginUiV2) {
-            v2Delegate = SourceLoginV2Delegate(this, binding, source)
+            v2Delegate = SourceLoginV2Delegate(
+                this,
+                binding,
+                source,
+                viewModel.book,
+                viewModel.chapter,
+            )
         } else {
             val codeStr = source.getLoginUiJs()
             if (codeStr != null) {

@@ -116,18 +116,30 @@ interface BaseSource : JsExtensions {
         return LoginUiV2.isV2(loginUi)
     }
 
-    fun evalLoginUiV2(stateJson: String): String? {
+    fun evalLoginUiV2(
+        stateJson: String,
+        book: Book? = null,
+        chapter: BookChapter? = null,
+    ): String? {
         val loginJs = getLoginJs()
             ?: throw NoStackTraceException("登录UI v2 缺少 loginUi/loginAction 脚本")
         val result = evalJS(
             "$loginJs\nloginUi(JSON.parse(String(__loginState)))"
         ) {
             put("__loginState", stateJson)
+            put("book", book)
+            put("chapter", chapter)
         }
         return JsSourceEngine.normalizeJsResult(result)
     }
 
-    fun evalLoginActionV2(action: String, stateJson: String, formJson: String): String? {
+    fun evalLoginActionV2(
+        action: String,
+        stateJson: String,
+        formJson: String,
+        book: Book? = null,
+        chapter: BookChapter? = null,
+    ): String? {
         val loginJs = getLoginJs()
             ?: throw NoStackTraceException("登录UI v2 缺少 loginUi/loginAction 脚本")
         val result = evalJS(
@@ -138,6 +150,8 @@ interface BaseSource : JsExtensions {
             put("__loginAction", action)
             put("__loginState", stateJson)
             put("__loginForm", formJson)
+            put("book", book)
+            put("chapter", chapter)
         }
         return JsSourceEngine.normalizeJsResult(result)
     }
