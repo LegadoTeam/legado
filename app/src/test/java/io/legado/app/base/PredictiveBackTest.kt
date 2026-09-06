@@ -50,4 +50,14 @@ class PredictiveBackTest {
             assertTrue(source.contains("override fun finish()"))
         }
     }
+
+    @Test
+    fun `replace editor handles cursor only result after discarded code edit`() {
+        val source = File(
+            "src/main/java/io/legado/app/ui/replace/edit/ReplaceEditActivity.kt"
+        ).readText()
+
+        assertTrue(source.contains("it.hasExtra(\"cursorPosition\")"))
+        assertTrue(source.contains("else if (fieldId != null && cursorPosition != null)"))
+    }
 }
