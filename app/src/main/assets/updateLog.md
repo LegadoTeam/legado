@@ -2,6 +2,9 @@
 
 ## cronet版本: 152.0.7977.54
 
+**2026/09/07**
+- 优化代码预览弹窗，增加垂直滚动定位条，长规则可快速定位
+
 **2026/09/06**
 - 修复正文接口返回字面量 `\n` 或 `\r\n` 时未换行导致的排版问题
 - 竖排默认封面书名恢复为原版错落布局，横排布局保持不变
@@ -843,4 +846,3 @@
 * [2023年日志](https://github.com/LegadoTeam/legado/blob/record2023/app/src/main/assets/updateLog.md)　
 * [2022年日志](https://github.com/LegadoTeam/legado/blob/record2022/app/src/main/assets/updateLog.md)　
 * [2021年日志](https://github.com/LegadoTeam/legado/blob/record2021/app/src/main/assets/updateLog.md)　
-- 优化代码预览弹窗，增加垂直滚动定位条，长规则可快速定位
