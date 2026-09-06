@@ -438,6 +438,10 @@
                 <data android:mimeType="text/plain" />
                 <!-- json -->
                 <data android:mimeType="application/json" />
+                <!-- javascript -->
+                <data android:mimeType="application/javascript" />
+                <data android:mimeType="text/javascript" />
+                <data android:mimeType="application/x-javascript" />
                 <!-- EPUB -->
                 <data android:mimeType="application/epub+zip" />
                 <!-- pdf -->
@@ -473,6 +477,10 @@
                 <data android:pathAdvancedPattern=".*\\.[jJ][sS][oO][nN]" />
                 <data android:pathPattern=".*\\.json" />
                 <data android:pathPattern=".*\\.JSON" />
+                <!--JS-->
+                <data android:pathAdvancedPattern=".*\\.[jJ][sS]" />
+                <data android:pathPattern=".*\\.js" />
+                <data android:pathPattern=".*\\.JS" />
                 <!-- EPUB -->
                 <data android:pathAdvancedPattern=".*\\.[eE][pP][uU][bB]" />
                 <data android:pathPattern=".*\\.epub" />
