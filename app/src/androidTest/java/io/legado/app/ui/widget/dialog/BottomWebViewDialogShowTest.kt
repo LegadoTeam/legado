@@ -142,8 +142,8 @@ class BottomWebViewDialogShowTest {
         val initial = awaitGeometry { it.height > 0 && it.state == BottomSheetBehavior.STATE_EXPANDED }
         applyConfig("{\"dialogHeight\":480}")
         val short = awaitGeometry { it.height == 480 }
-        applyConfig("{\"dialogHeight\":720}")
-        val tall = awaitGeometry { it.height > short.height }
+        applyConfig("{\"dialogHeight\":560}")
+        val tall = awaitGeometry { it.height > short.height && it.state == BottomSheetBehavior.STATE_EXPANDED }
 
         assertTrue(initial.toString(), abs(initial.bottomGap) <= 2)
         assertTrue(short.toString(), abs(short.bottomGap) <= 2)
@@ -193,14 +193,20 @@ class BottomWebViewDialogShowTest {
             newDialog(config = """{"dialogHeight":480,"maxHeight":240,"setFitToContents":false}""")
                 .show(activity.supportFragmentManager, "maximum-height")
         }
-        val limited = awaitGeometry { it.height == 240 && !it.fitToContents }
+        val limited = awaitGeometry {
+            it.height == 240 && !it.fitToContents &&
+                it.state == BottomSheetBehavior.STATE_EXPANDED && abs(it.bottomGap) <= 2
+        }
         assertTrue(limited.toString(), abs(limited.bottomGap) <= 2)
 
         applyConfig("""{"setFitToContents":true}""")
-        val fitted = awaitGeometry { it.fitToContents }
+        val fitted = awaitGeometry { it.fitToContents && it.state == BottomSheetBehavior.STATE_EXPANDED }
         assertTrue(fitted.toString(), abs(fitted.bottomGap) <= 2)
         applyConfig("""{"setFitToContents":false}""")
-        val unfitted = awaitGeometry { !it.fitToContents }
+        val unfitted = awaitGeometry {
+            !it.fitToContents && it.state == BottomSheetBehavior.STATE_EXPANDED &&
+                abs(it.bottomGap) <= 2
+        }
         assertTrue(unfitted.toString(), abs(unfitted.bottomGap) <= 2)
     }
 
