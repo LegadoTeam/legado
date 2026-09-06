@@ -23,9 +23,9 @@ object HtmlFormatter {
 
     private fun normalizeEscapedLineBreaks(text: String): String {
         return text
-            .replace("\\\\r\\\\n", "\n")
-            .replace("\\\\n", "\n")
-            .replace("\\\\r", "\n")
+            .replace("\\r\\n", "\n")
+            .replace("\\n", "\n")
+            .replace("\\r", "\n")
     }
 
     fun format(html: String?, otherRegex: Regex = otherHtmlRegex): String {
