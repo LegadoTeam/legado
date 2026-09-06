@@ -179,6 +179,7 @@ class AutoTaskEditActivity : BaseActivity<ActivityAutoTaskEditBinding>() {
             R.id.et_script -> binding.etScript to R.string.auto_task_script
             R.id.et_header -> binding.etHeader to R.string.auto_task_header
             R.id.et_js_lib -> binding.etJsLib to R.string.auto_task_js_lib
+            R.id.et_login_url -> binding.etLoginUrl to R.string.login_url
             R.id.et_login_ui -> binding.etLoginUi to R.string.login_ui
             R.id.et_login_check_js -> binding.etLoginCheckJs to R.string.login_check_js
             else -> null

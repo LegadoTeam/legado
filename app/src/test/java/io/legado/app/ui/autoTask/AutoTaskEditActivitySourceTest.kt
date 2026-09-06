@@ -45,11 +45,24 @@ class AutoTaskEditActivitySourceTest {
         assertTrue(source.contains("getStringExtra(\"text\")?.let { pendingEditText = it }"))
         assertTrue(source.contains("putExtra(\"returnUnchangedText\", true)"))
         assertTrue(source.contains("pendingEditCursor.coerceIn(0, text.length)"))
-        listOf("script", "header", "js_lib", "login_ui", "login_check_js").forEach { id ->
+        listOf("script", "header", "js_lib", "login_url", "login_ui", "login_check_js").forEach { id ->
             assertTrue(source.contains("R.id.et_$id ->"))
         }
         assertTrue(menu.contains("android:id=\"@+id/menu_fullscreen_edit\""))
         assertTrue(menu.contains("android:icon=\"@drawable/ic_code\""))
+    }
+
+    @Test
+    fun `login url uses the same multiline code input as login ui`() {
+        val layout = projectFile("src/main/res/layout/activity_auto_task_edit.xml")
+            .readText().replace("\r\n", "\n")
+        val loginUrl = layout.substringAfter("android:id=\"@+id/et_login_url\"")
+            .substringBefore("</io.legado.app.lib.theme.view.ThemeEditText>")
+
+        assertTrue(loginUrl.contains("android:fontFamily=\"monospace\""))
+        assertTrue(loginUrl.contains("android:gravity=\"top|start\""))
+        assertTrue(loginUrl.contains("android:inputType=\"textMultiLine\""))
+        assertTrue(loginUrl.contains("android:minLines=\"3\""))
     }
 
     @Test

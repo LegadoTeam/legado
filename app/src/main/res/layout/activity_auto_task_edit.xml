@@ -160,7 +160,10 @@
                     android:id="@+id/et_login_url"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="textUri" />
+                    android:fontFamily="monospace"
+                    android:gravity="top|start"
+                    android:inputType="textMultiLine"
+                    android:minLines="3" />
             </io.legado.app.ui.widget.text.TextInputLayout>
 
             <io.legado.app.ui.widget.text.TextInputLayout
