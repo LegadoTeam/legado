@@ -79,6 +79,7 @@ class ReplaceEditActivity :
     private var pendingFieldId: Int? = null
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        onBackPressedDispatcher.addCallback(this) { finish() }
         softKeyboardTool.attachToWindow(window)
         initView()
         viewModel.initData(intent) {

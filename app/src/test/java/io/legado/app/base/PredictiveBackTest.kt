@@ -43,6 +43,7 @@ class PredictiveBackTest {
             "src/main/java/io/legado/app/ui/autoTask/AutoTaskEditActivity.kt",
             "src/main/java/io/legado/app/ui/book/audio/AudioPlayActivity.kt",
             "src/main/java/io/legado/app/ui/book/manga/ReadMangaActivity.kt",
+            "src/main/java/io/legado/app/ui/replace/edit/ReplaceEditActivity.kt",
         ).forEach { path ->
             val source = File(path).readText()
             assertTrue(source.contains("onBackPressedDispatcher.addCallback(this) { finish() }"))
