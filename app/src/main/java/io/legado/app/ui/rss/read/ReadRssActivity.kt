@@ -75,6 +75,7 @@ import org.apache.commons.text.StringEscapeUtils
 import org.jsoup.Jsoup
 import splitties.views.bottomPadding
 import java.io.ByteArrayInputStream
+import java.net.URLConnection
 import java.util.regex.PatternSyntaxException
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.rss.article.ReadRecordDialog
@@ -684,7 +685,53 @@ class ReadRssActivity :
                     return createEmptyResource()
                 }
             }
-            return super.shouldInterceptRequest(view, request)
+            return runBlocking(IO) {
+                getCronetResource(url, request) ?: super@CustomWebViewClient.shouldInterceptRequest(view, request)
+            }
+        }
+
+        private suspend fun getCronetResource(
+            url: String,
+            request: WebResourceRequest,
+        ): WebResourceResponse? {
+            if (!AppConfig.isCronet || request.method != "GET" || !URLUtil.isNetworkUrl(url)) {
+                return null
+            }
+            return runCatching {
+                val sourceHeaders = viewModel.headerMap
+                    .toWebViewRequestConfig(AppConfig.userAgent)
+                    .additionalHeaders
+                val cookie = webCookieManager.getCookie(url)
+                val response = okHttpClient.newCallResponse {
+                    url(url)
+                    request.requestHeaders.forEach { (key, value) -> addHeader(key, value) }
+                    sourceHeaders.forEach { (key, value) ->
+                        if (request.requestHeaders[key] == null) addHeader(key, value)
+                    }
+                    if (!cookie.isNullOrBlank() && request.requestHeaders["Cookie"] == null) {
+                        addHeader("Cookie", cookie)
+                    }
+                }
+                response.headers("Set-Cookie").forEach { setCookie ->
+                    webCookieManager.setCookie(url, setCookie)
+                }
+                val body = response.body ?: return null
+                val mediaType = body.contentType()
+                val mimeType = mediaType?.let { "${it.type}/${it.subtype}" }
+                    ?: URLConnection.guessContentTypeFromName(url)
+                    ?: "application/octet-stream"
+                val charset = mediaType?.charset()?.name() ?: "utf-8"
+                val responseHeaders = response.headers.toMultimap()
+                    .mapValues { (_, values) -> values.joinToString(",") }
+                WebResourceResponse(
+                    mimeType,
+                    charset,
+                    response.code,
+                    response.message,
+                    responseHeaders,
+                    body.byteStream(),
+                )
+            }.getOrNull()
         }
 
         private suspend fun getModifiedContentWithJs(url: String, request: WebResourceRequest): WebResourceResponse? {
