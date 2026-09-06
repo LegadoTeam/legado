@@ -131,6 +131,9 @@ class ReadRssActivity :
     private var customWebViewCallback: WebChromeClient.CustomViewCallback? = null
     private var interfaceInjected: String? = null
     private var needClearHistory = true
+    // shouldInterceptRequest runs off the main thread; never read WebView state there.
+    @Volatile
+    private var currentPageUrl: String? = null
     private val selectImageDir = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
             ACache.get().put(imagePathKey, uri.toString())
@@ -407,6 +410,7 @@ class ReadRssActivity :
                 val html = viewModel.clHtml(content, rssSource?.style)
                 val url = NetworkUtils.getAbsoluteURL(it.origin, it.link).substringBefore("@js")
                 val baseUrl = if (rssSource?.loadWithBaseUrl == false) null else url
+                currentPageUrl = url
                 currentWebView.loadDataWithBaseURL(
                     baseUrl, html, "text/html", "utf-8", url
                 )
@@ -417,6 +421,7 @@ class ReadRssActivity :
             upWebviewSettings(requestConfig.userAgent)
             initJavascriptInterface()
             CookieManager.applyToWebView(urlState.url)
+            currentPageUrl = urlState.url
             currentWebView.loadUrl(urlState.url, requestConfig.additionalHeaders)
         }
         viewModel.htmlLiveData.observe(this) { html ->
@@ -424,6 +429,7 @@ class ReadRssActivity :
                 upWebviewSettings()
                 initJavascriptInterface()
                 val baseUrl = if (it.loadWithBaseUrl) it.sourceUrl else null
+                currentPageUrl = it.sourceUrl
                 currentWebView.loadDataWithBaseURL(
                     baseUrl, html, "text/html", "utf-8", it.sourceUrl
                 )
@@ -620,6 +626,7 @@ class ReadRssActivity :
         }
 
         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+            currentPageUrl = url
             if (needClearHistory) {
                 needClearHistory = false
                 currentWebView.clearHistory() //清除历史
@@ -770,7 +777,7 @@ class ReadRssActivity :
             val target = url.toUri()
             if (target.scheme !in setOf("http", "https") || target.host.isNullOrBlank()) return false
             val page = sequenceOf(
-                currentWebView.url,
+                currentPageUrl,
                 viewModel.rssArticle?.let { article ->
                     NetworkUtils.getAbsoluteURL(article.origin, article.link)
                 },
