@@ -47,6 +47,7 @@
 <script setup lang="ts">
 import API from '@api'
 import type { BookSoure, Source } from '@/source'
+import { fetchJsSourceTemplate } from '@utils/souce'
 import {
   Check,
   DocumentAdd,
@@ -140,7 +141,13 @@ const selectSource = async (
 
 const newSource = async () => {
   if (!(await confirmDiscard())) return
-  resetEditor()
+  try {
+    const template = await fetchJsSourceTemplate()
+    resetEditor()
+    script.value = template
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : 'JS 源模板加载失败')
+  }
 }
 
 const openFile = async () => {
