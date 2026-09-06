@@ -3,6 +3,8 @@ package io.legado.app.base
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.Configuration
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
 import android.util.AttributeSet
@@ -90,6 +92,7 @@ abstract class BaseActivity<VB : ViewBinding>(
         window.decorView.disableAutoFill()
         initTheme()
         super.onCreate(savedInstanceState)
+        if (!shouldCreateContentView()) return
         setupSystemBar()
         setupPredictiveBack()
         setContentView(binding.root)
@@ -133,6 +136,10 @@ abstract class BaseActivity<VB : ViewBinding>(
     }
 
     abstract fun onActivityCreated(savedInstanceState: Bundle?)
+
+    protected open fun shouldCreateContentView(): Boolean = true
+
+    protected open fun shouldShowWindowBackground(): Boolean = true
 
     final override fun onCreateOptionsMenu(menu: Menu): Boolean {
         val bool = onCompatCreateOptionsMenu(menu)
@@ -190,12 +197,12 @@ abstract class BaseActivity<VB : ViewBinding>(
             Theme.Transparent -> setTheme(R.style.AppTheme_Transparent)
             Theme.Dark -> {
                 setTheme(R.style.AppTheme_Dark)
-               window.decorView.applyBackgroundTint(backgroundColor)
+                applyWindowBackground()
             }
 
             Theme.Light -> {
                 setTheme(R.style.AppTheme_Light)
-               window.decorView.applyBackgroundTint(backgroundColor)
+                applyWindowBackground()
             }
 
             else -> {
@@ -204,8 +211,16 @@ abstract class BaseActivity<VB : ViewBinding>(
                 } else {
                     setTheme(R.style.AppTheme_Dark)
                 }
-               window.decorView.applyBackgroundTint(backgroundColor)
+                applyWindowBackground()
             }
+        }
+    }
+
+    private fun applyWindowBackground() {
+        if (shouldShowWindowBackground()) {
+            window.decorView.applyBackgroundTint(backgroundColor)
+        } else {
+            window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
         }
     }
 
