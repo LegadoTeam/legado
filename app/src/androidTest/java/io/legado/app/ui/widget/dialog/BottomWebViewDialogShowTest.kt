@@ -111,6 +111,18 @@ class BottomWebViewDialogShowTest {
             val window = checkNotNull(dialog.dialog?.window)
             val sheet = checkNotNull(dialog.dialog?.findViewById<View>(MaterialR.id.design_bottom_sheet))
             assertTrue(window.decorView.height - sheet.bottom <= 2)
+
+            dialog.upConfig("{\"dialogHeight\":240}")
+            dialog.upConfig("{\"dialogHeight\":480}")
+        }
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        scenario!!.onActivity {
+            val dialog = it.supportFragmentManager.fragments
+                .filterIsInstance<BottomWebViewDialog>()
+                .single { fragment -> fragment.dialog?.isShowing == true }
+            val window = checkNotNull(dialog.dialog?.window)
+            val sheet = checkNotNull(dialog.dialog?.findViewById<View>(MaterialR.id.design_bottom_sheet))
+            assertTrue(window.decorView.height - sheet.bottom <= 2)
         }
     }
 
