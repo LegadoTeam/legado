@@ -4,6 +4,8 @@ import android.os.Bundle
 import android.text.method.KeyListener
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
+import android.widget.SeekBar
 import androidx.appcompat.widget.SearchView
 import androidx.core.widget.doAfterTextChanged
 import io.legado.app.R
@@ -28,6 +30,15 @@ internal fun resolveCodeDialogOriginal(
     originalCode: String,
     displayedCode: String,
 ): String = if (showingAlternate) originalCode else displayedCode
+
+internal fun resolveCodeDialogPositionProgress(
+    scrollY: Int,
+    maxScrollY: Int,
+    progressMax: Int = 10000,
+): Int {
+    if (maxScrollY <= 0 || progressMax <= 0) return 0
+    return (scrollY.coerceIn(0, maxScrollY).toLong() * progressMax / maxScrollY).toInt()
+}
 
 class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
 
@@ -61,6 +72,8 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
     private var replaceRuleRefreshPending = false
     private var originalCodeStateKey: String? = null
     private var alternateCodeStateKey: String? = null
+    private val scrollListener = ViewTreeObserver.OnScrollChangedListener { updatePositionBar() }
+    private val layoutListener = ViewTreeObserver.OnGlobalLayoutListener { updatePositionBar() }
     val requestId: String?
         get() = arguments?.getString("requestId")
 
@@ -82,6 +95,22 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
         binding.codeView.addLegadoPattern()
         binding.codeView.addJsonPattern()
         binding.codeView.addJsPattern()
+        binding.codeView.viewTreeObserver.addOnScrollChangedListener(scrollListener)
+        binding.codeView.viewTreeObserver.addOnGlobalLayoutListener(layoutListener)
+        binding.positionBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    val max = maxScrollY()
+                    binding.codeView.scrollTo(
+                        0,
+                        (max * progress.toLong() / bar.max).toInt(),
+                    )
+                }
+            }
+
+            override fun onStartTrackingTouch(bar: SeekBar) = Unit
+            override fun onStopTrackingTouch(bar: SeekBar) = Unit
+        })
         originalCodeStateKey = savedInstanceState?.getString("originalCode")
             ?: arguments?.getString("code")
         originalCode = originalCodeStateKey
@@ -96,6 +125,7 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
         }
         editKeyListener = binding.codeView.keyListener
         binding.codeView.setText(originalCode)
+        binding.codeView.post { updatePositionBar() }
         val canPreviewReplacement = !disableEdit && alternateCode != null
         binding.cbSourceReplacementPreview.apply {
             isChecked = savedInstanceState?.getBoolean("showingAlternate")
@@ -134,6 +164,7 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
         binding.toolBar.menu.findItem(R.id.menu_save)?.isVisible =
             saveEnabled && !show && searchView.isIconified
         if (!searchView.isIconified) showCurrentMatch()
+        binding.codeView.post { updatePositionBar() }
     }
 
     private fun initMenu(canSave: Boolean) {
@@ -248,6 +279,22 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
     private fun setSearchActionsEnabled(enabled: Boolean) {
         binding.toolBar.menu.findItem(R.id.menu_search_previous).isEnabled = enabled
         binding.toolBar.menu.findItem(R.id.menu_search_next).isEnabled = enabled
+    }
+
+    private fun maxScrollY(): Int {
+        val codeView = binding.codeView
+        return ((codeView.layout?.height ?: 0) + codeView.totalPaddingTop +
+            codeView.totalPaddingBottom - codeView.height).coerceAtLeast(0)
+    }
+
+    private fun updatePositionBar() {
+        val max = maxScrollY()
+        binding.positionBar.isEnabled = max > 0
+        binding.positionBar.progress = resolveCodeDialogPositionProgress(
+            binding.codeView.scrollY,
+            max,
+            binding.positionBar.max,
+        )
     }
 
     fun refreshAlternateCode() {

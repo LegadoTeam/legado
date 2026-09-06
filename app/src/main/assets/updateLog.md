@@ -843,3 +843,4 @@
 * [2023年日志](https://github.com/LegadoTeam/legado/blob/record2023/app/src/main/assets/updateLog.md)　
 * [2022年日志](https://github.com/LegadoTeam/legado/blob/record2022/app/src/main/assets/updateLog.md)　
 * [2021年日志](https://github.com/LegadoTeam/legado/blob/record2021/app/src/main/assets/updateLog.md)　
+- 优化代码预览弹窗，增加垂直滚动定位条，长规则可快速定位
