@@ -9,8 +9,8 @@ class JsExtensionsRefreshContractTest {
 
     @Test
     fun `refresh callbacks live on the shared js extension`() {
-        val extensions = File("app/src/main/java/io/legado/app/help/JsExtensions.kt").readText()
-        val login = File("app/src/main/java/io/legado/app/ui/login/SourceLoginJsExtensions.kt").readText()
+        val extensions = readProjectFile("src/main/java/io/legado/app/help/JsExtensions.kt")
+        val login = readProjectFile("src/main/java/io/legado/app/ui/login/SourceLoginJsExtensions.kt")
 
         assertTrue(extensions.contains("fun refreshBookInfo()"))
         assertTrue(extensions.contains("fun refreshBookToc()"))
@@ -21,5 +21,12 @@ class JsExtensionsRefreshContractTest {
         assertFalse(login.contains("fun refreshBookInfo()"))
         assertFalse(login.contains("fun refreshBookToc()"))
         assertFalse(login.contains("fun refreshContent()"))
+    }
+
+    private fun readProjectFile(pathInApp: String): String {
+        val file = sequenceOf(File(pathInApp), File("app/$pathInApp"))
+            .firstOrNull(File::isFile)
+        requireNotNull(file) { "Project file not found: $pathInApp" }
+        return file.readText()
     }
 }
