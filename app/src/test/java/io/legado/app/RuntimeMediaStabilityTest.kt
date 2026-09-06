@@ -4,10 +4,6 @@ import io.legado.app.data.entities.Book
 import io.legado.app.service.buildHttpTtsCacheFileName
 import io.legado.app.ui.book.info.normalizeWebFileName
 import io.legado.app.ui.widget.image.coverBitmapCacheKey
-import io.legado.app.ui.widget.image.coverTitleColumnCapacity
-import io.legado.app.ui.widget.image.coverTitleColumnOffsets
-import io.legado.app.ui.widget.image.coverTitleDisplayCharacters
-import io.legado.app.ui.widget.image.coverTitleTextSize
 import io.legado.app.ui.widget.image.normalizeCoverText
 import io.legado.app.utils.calculateSvgBitmapSize
 import io.legado.app.utils.isForegroundServiceStartDenied
@@ -118,58 +114,19 @@ class RuntimeMediaStabilityTest {
     }
 
     @Test
-    fun textCoverKeepsOneTitleSizeAcrossColumns() {
-        val width = 105f
-        val height = 140f
-        val largeTextHeight = 18f
-
-        for (characterCount in 4..7) {
-            assertEquals(
-                width / 7,
-                coverTitleTextSize(width, height, characterCount, largeTextHeight),
-                0.001f
-            )
-        }
-        assertEquals(
-            width / 9,
-            coverTitleTextSize(width, height, 8, largeTextHeight),
-            0.001f
-        )
-
+    fun verticalTextCoverRestoresOriginalStaggeredLayout() {
         val source = listOf(File("src/main/java"), File("app/src/main/java"))
             .first { it.isDirectory }
             .resolve("io/legado/app/ui/widget/image/CoverImageView.kt")
             .readText()
-        val titleLoop = source.substringAfter("titleColumns.forEachIndexed")
+        val titleLoop = source.substringAfter("name.forEachIndexed { index, char ->")
             .substringBefore("if (!drawAuthor)")
 
-        assertFalse(titleLoop.contains("namePaint.textSize ="))
-    }
-
-    @Test
-    fun verticalCoverTitleColumnsStayTopAlignedAndCapAtFourColumns() {
-        val textHeight = 10f
-        val columns = coverTitleColumnOffsets(20, 140f, textHeight)
-        assertEquals(9, coverTitleColumnCapacity(140f, textHeight))
-        assertEquals(listOf(9, 9, 2), columns.map { it.size })
-        assertTrue(columns.all { it.first() == 0f })
-
-        assertEquals(listOf(9, 3), coverTitleColumnOffsets(12, 140f, textHeight).map { it.size })
-        assertEquals(listOf(9, 2), coverTitleColumnOffsets(11, 140f, textHeight).map { it.size })
-        assertEquals(listOf(9, 9, 9, 9), coverTitleColumnOffsets(100, 140f, textHeight).map { it.size })
-        assertTrue(coverTitleColumnOffsets(0, 140f, textHeight).isEmpty())
-        assertTrue(coverTitleColumnOffsets(3, 0f, textHeight).isEmpty())
-        assertTrue(coverTitleColumnOffsets(3, 140f, 0f).isEmpty())
-
-        val characters = (0 until 40).map(Int::toString)
-        val displayed = coverTitleDisplayCharacters(characters, 140f, textHeight)
-        assertEquals(36, displayed.size)
-        assertEquals("…", displayed.last())
-        assertEquals(characters.take(35), displayed.dropLast(1))
-        assertEquals(
-            characters.take(36),
-            coverTitleDisplayCharacters(characters.take(36), 140f, textHeight)
-        )
+        assertTrue(titleLoop.contains("namePaint.textSize = viewWidth / 7"))
+        assertTrue(titleLoop.contains("namePaint.textSize = viewWidth / 10"))
+        assertTrue(titleLoop.contains("namePaint.textSize = viewWidth / 9"))
+        assertTrue(titleLoop.contains("startX += namePaint.textSize"))
+        assertFalse(titleLoop.contains("titleColumns"))
     }
 
     @Test
