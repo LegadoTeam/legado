@@ -352,6 +352,12 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
         if (!searchView.isIconified) updateSearch(keepIndex = true)
     }
 
+    override fun onDestroyView() {
+        binding.codeView.viewTreeObserver.removeOnScrollChangedListener(scrollListener)
+        binding.codeView.viewTreeObserver.removeOnGlobalLayoutListener(layoutListener)
+        super.onDestroyView()
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putInt("searchIndex", searchIndex)
         originalCodeStateKey = saveStateData(originalCodeStateKey, currentOriginalCode())
