@@ -1,5 +1,6 @@
 package io.legado.app.ui.association
 
+import io.legado.app.constant.AppPattern.jsFileRegex
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -118,9 +119,34 @@ class SharedImportAssociationTest {
         assertTrue(viewModel.contains("sharedImportFile?.delete()"))
     }
 
+    @Test
+    fun `view association advertises and routes JavaScript source files`() {
+        val manifest = projectFile("src/main/AndroidManifest.xml")
+        val viewModel = projectFile(
+            "src/main/java/io/legado/app/ui/association/FileAssociationViewModel.kt"
+        )
+        val knownMimeFilter = manifest
+            .substringAfter("<!-- VIEW (Open with) action -->")
+            .substringBefore("<!-- Works when an app doesn't know")
+
+        assertTrue(knownMimeFilter.contains("android:mimeType=\"application/javascript\""))
+        assertTrue(knownMimeFilter.contains("android:mimeType=\"text/javascript\""))
+        assertTrue(knownMimeFilter.contains("android:mimeType=\"application/x-javascript\""))
+        assertTrue(jsFileRegex.matches("source.js"))
+        assertTrue(jsFileRegex.matches("SOURCE.JS"))
+        assertFalse(jsFileRegex.matches("source.js.bak"))
+        assertTrue(viewModel.contains("AppPattern.jsFileRegex"))
+        assertTrue(
+            viewModel.indexOf("fileDoc.name.matches(jsFileRegex)") <
+                viewModel.indexOf("fileDoc.name.matches(bookFileRegex)")
+        )
+        assertTrue(viewModel.contains("\"bookSource\" to fileDoc.uri.toString()"))
+    }
+
     private fun projectFile(pathInApp: String): String =
         sequenceOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull(File::isFile)
             ?.readText()
             ?: error("Missing project file: $pathInApp")
 }
+
