@@ -124,6 +124,20 @@ class BottomWebViewDialogLifecycleContractTest {
     }
 
     @Test
+    fun `browser dialog uses the edge to edge bottom sheet theme`() {
+        val theme = section("override fun getTheme", "@Suppress(\"DEPRECATION\")")
+        val styles = projectFile("src/main/res/values/styles.xml").readText()
+
+        assertTrue(theme.contains("R.style.ThemeOverlay_Legado_BottomWebViewDialog"))
+        assertTrue(styles.contains("name=\"ThemeOverlay.Legado.BottomWebViewDialog\""))
+        assertTrue(
+            styles.contains(
+                "parent=\"ThemeOverlay.MaterialComponents.BottomSheetDialog\""
+            )
+        )
+    }
+
+    @Test
     fun `sheet state follows size layout request`() {
         val setConfig = section("private fun setConfig", "private fun reapplyConfiguredHeight")
         val widthChange = setConfig.indexOf("params.width = width")

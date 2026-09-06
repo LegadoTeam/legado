@@ -328,6 +328,8 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             )
         }
 
+    override fun getTheme(): Int = R.style.ThemeOverlay_Legado_BottomWebViewDialog
+
     @Suppress("DEPRECATION")
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val dialog = super.onCreateDialog(savedInstanceState)

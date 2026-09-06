@@ -35,6 +35,9 @@
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
     </style>
 
+    <style name="ThemeOverlay.Legado.BottomWebViewDialog"
+        parent="ThemeOverlay.MaterialComponents.BottomSheetDialog" />
+
     <style name="AppTheme.AppBarOverlay.Light" parent="ThemeOverlay.AppCompat.Light">
         <item name="colorAccent">@color/md_grey_900</item>
     </style>
