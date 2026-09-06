@@ -35,8 +35,15 @@
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
     </style>
 
+    <!-- Keep the existing Design bottom-sheet behavior while opting this dialog into edge-to-edge. -->
     <style name="ThemeOverlay.Legado.BottomWebViewDialog"
-        parent="ThemeOverlay.MaterialComponents.BottomSheetDialog" />
+        parent="Theme.Design.BottomSheetDialog">
+        <item name="enableEdgeToEdge">true</item>
+        <item name="paddingBottomSystemWindowInsets">true</item>
+        <item name="paddingLeftSystemWindowInsets">true</item>
+        <item name="paddingRightSystemWindowInsets">true</item>
+        <item name="paddingTopSystemWindowInsets">true</item>
+    </style>
 
     <style name="AppTheme.AppBarOverlay.Light" parent="ThemeOverlay.AppCompat.Light">
         <item name="colorAccent">@color/md_grey_900</item>

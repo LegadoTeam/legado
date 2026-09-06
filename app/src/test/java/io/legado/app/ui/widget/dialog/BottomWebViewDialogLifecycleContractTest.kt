@@ -132,9 +132,14 @@ class BottomWebViewDialogLifecycleContractTest {
         assertTrue(styles.contains("name=\"ThemeOverlay.Legado.BottomWebViewDialog\""))
         assertTrue(
             styles.contains(
-                "parent=\"ThemeOverlay.MaterialComponents.BottomSheetDialog\""
+                "parent=\"Theme.Design.BottomSheetDialog\""
             )
         )
+        assertTrue(styles.contains("<item name=\"enableEdgeToEdge\">true</item>"))
+        assertTrue(styles.contains("<item name=\"paddingBottomSystemWindowInsets\">true</item>"))
+        assertTrue(styles.contains("<item name=\"paddingLeftSystemWindowInsets\">true</item>"))
+        assertTrue(styles.contains("<item name=\"paddingRightSystemWindowInsets\">true</item>"))
+        assertTrue(styles.contains("<item name=\"paddingTopSystemWindowInsets\">true</item>"))
     }
 
     @Test
