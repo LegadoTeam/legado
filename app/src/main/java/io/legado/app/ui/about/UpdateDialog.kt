@@ -82,13 +82,7 @@ class UpdateDialog() : BaseDialogFragment(R.layout.dialog_update) {
             if (isBetaUpdate) R.string.beta_update_now else R.string.action_download
         )
         binding.btnBetaUpdate.setOnClickListener {
-            val url = arguments?.getString("url")
-            if (isBetaUpdate) {
-                url?.takeIf(String::isNotBlank)?.let { requireContext().openUrl(it) }
-                dismiss()
-            } else {
-                startDownload(url)
-            }
+            startDownload(arguments?.getString("url"))
         }
         if (!isBetaUpdate) {
             binding.toolBar.inflateMenu(R.menu.app_update)
