@@ -453,6 +453,21 @@ class JsSourceWebApiContractTest {
         assertFalse(config.contains("id: 'reviewUrl'"))
     }
 
+    @Test
+    fun `batch push routes JavaScript sources through the extraction endpoint`() {
+        val toolbar = readProjectFile("modules/web/src/components/ToolBar.vue")
+        val sourceUtils = readProjectFile("modules/web/src/utils/souce.ts")
+
+        assertTrue(sourceUtils.contains("export const isJsBookSource"))
+        val splitIndex = toolbar.indexOf("const jsSources = sources.filter(isJsBookSource)")
+        val batchIndex = toolbar.indexOf("API.saveSources(declarativeSources)")
+        val singleIndex = toolbar.indexOf("API.saveJsSource(source.mainJs!, source.bookSourceUrl)")
+        assertTrue(splitIndex >= 0)
+        assertTrue(batchIndex > splitIndex)
+        assertTrue(singleIndex > batchIndex)
+        assertTrue(toolbar.contains("store.updateSource(getSourceUniqueKey(source), data.data)"))
+    }
+
     private fun readProjectFile(path: String): String {
         val userDirectory = File(requireNotNull(System.getProperty("user.dir"))).absoluteFile
         val repositoryRoot = generateSequence(userDirectory) { it.parentFile }

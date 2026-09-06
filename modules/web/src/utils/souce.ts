@@ -4,6 +4,10 @@ import { isNullOrBlank } from './utils'
 const isBookSource = (source: Source): source is BookSoure =>
   'bookSourceName' in source
 
+/** mainJs 非空白即为 JS 书源，与 App 端 BookSource.isJsSource() 保持一致。 */
+export const isJsBookSource = (source: Source): source is BookSoure =>
+  'mainJs' in source && !isNullOrBlank(source.mainJs)
+
 export const isInvaildSource: (source: Source) => boolean = source => {
   if (isBookSource(source)) {
     return (
