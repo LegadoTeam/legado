@@ -78,6 +78,14 @@ export const useSourceStore = defineStore('source', {
       map.set(getSourceUniqueKey(source), JSON.parse(JSON.stringify(source)))
       this.saveSources(Array.from(map.values()))
     },
+    updateSource(oldKey: string, source: Source) {
+      const list = this.sources
+      const index = list.findIndex(item => getSourceUniqueKey(item) === oldKey)
+      if (index === -1) return
+      const next = [...list]
+      next[index] = source
+      this.saveSources(next)
+    },
     saveJsSource(source: BookSoure, openedSourceUrl?: string) {
       const map = this.sourcesMap
       if (openedSourceUrl && openedSourceUrl !== source.bookSourceUrl) {
