@@ -43,7 +43,7 @@ class UpdateDialogLifecycleTest {
     }
 
     @Test
-    fun `update dialog keeps beta browser and formal download actions distinct`() {
+    fun `update dialog uses the system download action for beta and formal updates`() {
         val source = projectFile(
             "src/main/java/io/legado/app/ui/about/UpdateDialog.kt"
         ).readText()
@@ -52,8 +52,12 @@ class UpdateDialogLifecycleTest {
         assertTrue(source.contains("binding.betaActions.isVisible = true"))
         assertTrue(source.contains("setLayout(0.9f, 0.8f)"))
         assertTrue(source.contains("if (isBetaUpdate) R.string.beta_update_now else R.string.action_download"))
-        assertTrue(source.contains("url?.takeIf(String::isNotBlank)?.let { requireContext().openUrl(it) }"))
-        assertTrue(source.contains("startDownload(url)"))
+        assertTrue(source.contains("startDownload(arguments?.getString(\"url\"))"))
+        assertFalse(
+            source.substringAfter("binding.btnBetaUpdate.setOnClickListener")
+                .substringBefore("if (!isBetaUpdate)")
+                .contains("openUrl")
+        )
     }
 
     @Test
