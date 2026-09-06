@@ -84,7 +84,7 @@ abstract class HorizontalPageDelegate(readView: ReadView) : PageDelegate(readVie
             isMoved = distance > slopSquare
             if (isMoved) {
                 readView.markReadPositionChanged()
-                if (sumX - startX > 0) {
+                if (focusX - startX > 0) {
                     //如果上一页不存在
                     if (!hasPrev()) {
                         noNext = true
@@ -99,14 +99,32 @@ abstract class HorizontalPageDelegate(readView: ReadView) : PageDelegate(readVie
                     }
                     setDirection(PageDirection.NEXT)
                 }
-                readView.setStartPoint(event.x, event.y, false)
+                readView.setStartPoint(focusX, focusY, false)
             }
         }
         if (isMoved) {
-            isCancel = if (mDirection == PageDirection.NEXT) sumX > lastX else sumX < lastX
+            // Allow switching direction while keeping finger down: if user reverses
+            // across the start point we switch mDirection so the UI follows the finger.
+            val delta = focusX - startX
+            if (mDirection == PageDirection.NEXT && delta > 0) {
+                if (!hasPrev()) {
+                    noNext = true
+                    return
+                }
+                setDirection(PageDirection.PREV)
+                readView.setStartPoint(focusX, focusY, false)
+            } else if (mDirection == PageDirection.PREV && delta < 0) {
+                if (!hasNext()) {
+                    noNext = true
+                    return
+                }
+                setDirection(PageDirection.NEXT)
+                readView.setStartPoint(focusX, focusY, false)
+            }
+            isCancel = if (mDirection == PageDirection.NEXT) focusX > lastX else focusX < lastX
             isRunning = true
             //设置触摸点
-            readView.setTouchPoint(sumX, sumY)
+            readView.setTouchPoint(focusX, focusY)
         }
     }
 
