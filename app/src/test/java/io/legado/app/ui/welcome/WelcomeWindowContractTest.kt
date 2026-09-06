@@ -7,7 +7,7 @@ import java.io.File
 class WelcomeWindowContractTest {
 
     @Test
-    fun `welcome bypass skips content and uses transparent window background`() {
+    fun `welcome startup uses an opaque window background before content draws`() {
         val activity = projectFile(
             "src/main/java/io/legado/app/ui/welcome/WelcomeActivity.kt"
         )
@@ -24,7 +24,7 @@ class WelcomeWindowContractTest {
         assertTrue(base.contains("Color.TRANSPARENT"))
         assertTrue(manifest.contains("android:name=\".ui.welcome.WelcomeActivity\""))
         assertTrue(manifest.contains("android:theme=\"@style/AppTheme.Welcome\""))
-        assertTrue(styles.contains("android:windowBackground\">@android:color/transparent"))
+        assertTrue(styles.contains("android:windowBackground\">@color/background"))
         assertTrue(config.contains("private fun deleteStoredImage(path: String?)"))
         assertTrue(config.contains("deleteStoredImage(getPrefString(preference.key))"))
         assertTrue(config.contains("file.canonicalFile.parentFile == coversDir.canonicalFile"))
