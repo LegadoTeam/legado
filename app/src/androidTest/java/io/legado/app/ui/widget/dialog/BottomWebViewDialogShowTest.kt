@@ -114,12 +114,59 @@ class BottomWebViewDialogShowTest {
         }
     }
 
+    @Test
+    fun configuredHeightsStayAnchoredToBottom() {
+        scenario!!.onActivity { activity ->
+            newDialog().show(activity.supportFragmentManager, "configured-height")
+        }
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+
+        val initial = sheetGeometry()
+        applyConfig("{\"dialogHeight\":480}")
+        val short = sheetGeometry()
+        applyConfig("{\"dialogHeight\":720}")
+        val tall = sheetGeometry()
+
+        assertTrue(initial.bottomGap <= 2)
+        assertTrue(short.bottomGap <= 2)
+        assertTrue(tall.bottomGap <= 2)
+        assertTrue(tall.top < short.top)
+    }
+
     private fun newDialog(page: String = "comments") = BottomWebViewDialog(
         source.bookSourceUrl,
         0,
         "${source.bookSourceUrl}/$page",
         "<html><body>$page</body></html>",
     )
+
+    private fun applyConfig(config: String) {
+        scenario!!.onActivity { activity ->
+            activity.supportFragmentManager.fragments
+                .filterIsInstance<BottomWebViewDialog>()
+                .single { it.dialog?.isShowing == true }
+                .upConfig(config)
+        }
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+    }
+
+    private fun sheetGeometry(): SheetGeometry {
+        var geometry: SheetGeometry? = null
+        scenario!!.onActivity { activity ->
+            val dialog = activity.supportFragmentManager.fragments
+                .filterIsInstance<BottomWebViewDialog>()
+                .single { it.dialog?.isShowing == true }
+            val window = checkNotNull(dialog.dialog?.window)
+            val sheet = checkNotNull(dialog.dialog?.findViewById<View>(MaterialR.id.design_bottom_sheet))
+            geometry = SheetGeometry(
+                top = sheet.top,
+                bottomGap = window.decorView.height - sheet.bottom,
+            )
+        }
+        return checkNotNull(geometry)
+    }
+
+    private data class SheetGeometry(val top: Int, val bottomGap: Int)
 
     private fun visibleDialogs(manager: FragmentManager) = manager.fragments.count {
         it is BottomWebViewDialog && it.dialog?.isShowing == true
