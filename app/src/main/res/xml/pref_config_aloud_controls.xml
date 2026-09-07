@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <io.legado.app.lib.prefs.PreferenceCategory
+        android:title="@string/read_aloud_controls"
+        app:iconSpaceReserved="false" />
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:key="readAloudControlsPause"
+        android:defaultValue="false"
+        android:title="@string/read_aloud_controls_pause"
+        app:iconSpaceReserved="false" />
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:key="readAloudControlsAutoHide"
+        android:defaultValue="false"
+        android:title="@string/read_aloud_controls_auto_hide"
+        app:iconSpaceReserved="false" />
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:key="readAloudControlsDrag"
+        android:defaultValue="false"
+        android:title="@string/read_aloud_controls_drag"
+        app:iconSpaceReserved="false" />
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:key="readAloudControlsDock"
+        android:defaultValue="false"
+        android:title="@string/read_aloud_controls_dock"
+        app:iconSpaceReserved="false" />
+    <androidx.preference.SeekBarPreference
+        android:key="readAloudControlsSize"
+        android:defaultValue="48"
+        android:title="@string/read_aloud_controls_size"
+        android:summary="@string/read_aloud_controls_size_summary"
+        android:max="72"
+        app:min="48"
+        app:seekBarIncrement="1"
+        app:showSeekBarValue="true"
+        app:iconSpaceReserved="false" />
+    <androidx.preference.SeekBarPreference
+        android:key="readAloudControlsOpacity"
+        android:defaultValue="30"
+        android:title="@string/read_aloud_controls_opacity"
+        android:summary="@string/read_aloud_controls_opacity_summary"
+        android:max="100"
+        app:min="0"
+        app:seekBarIncrement="5"
+        app:showSeekBarValue="true"
+        app:iconSpaceReserved="false" />
+    <androidx.preference.SeekBarPreference
+        android:key="readAloudControlsThreshold"
+        android:defaultValue="100"
+        android:title="@string/read_aloud_controls_threshold"
+        android:summary="@string/read_aloud_controls_threshold_summary"
+        android:max="500"
+        app:min="10"
+        app:seekBarIncrement="10"
+        app:showSeekBarValue="true"
+        app:iconSpaceReserved="false" />
+    <io.legado.app.lib.prefs.Preference
+        android:key="readAloudControlsReveal"
+        android:title="@string/read_aloud_controls_reveal"
+        android:summary="@string/read_aloud_controls_reveal_summary"
+        app:iconSpaceReserved="false" />
+    <io.legado.app.lib.prefs.Preference
+        android:key="readAloudControlsReset"
+        android:title="@string/read_aloud_controls_reset"
+        android:summary="@string/read_aloud_controls_reset_summary"
+        app:iconSpaceReserved="false" />
+</androidx.preference.PreferenceScreen>

@@ -12,6 +12,18 @@
     android:orientation="horizontal"
     android:visibility="gone">
 
+    <androidx.appcompat.widget.AppCompatImageButton
+        android:id="@+id/iv_pause_aloud"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:minWidth="48dp"
+        android:minHeight="48dp"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/pause"
+        android:padding="12dp"
+        android:src="@drawable/ic_pause_24dp"
+        android:visibility="gone" />
+
     <LinearLayout
         android:id="@+id/ll_back_to_speech"
         android:layout_width="0dp"

@@ -188,6 +188,8 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
      * pageOffset + textPage.height 为 textPage 下方的高度
      */
     fun scroll(mOffset: Int) {
+        val previousOffset = pageOffset
+        val previousPage = textPage
         pageOffset += mOffset
         if (longScreenshot) {
             scrollY += -mOffset
@@ -218,6 +220,8 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                 pageDelegate?.abortAnim()
             }
         }
+        val moved = if (textPage === previousPage) pageOffset - previousOffset else mOffset
+        if (!longScreenshot && moved != 0) callBack.onReadScroll(moved)
         postInvalidateOnAnimation()
     }
 
@@ -1062,6 +1066,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         val pageFactory: TextPageFactory
         val pageDelegate: PageDelegate?
         val isScroll: Boolean
+        fun onReadScroll(offset: Int)
         var isSelectingSearchResult: Boolean
         fun upSelectedStart(x: Float, y: Float, top: Float)
         fun upSelectedEnd(x: Float, y: Float)
