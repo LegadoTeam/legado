@@ -141,7 +141,7 @@ const isBookSource = /bookSource/i.test(window.location.href)
 const outExport = () => {
   const exportFile = document.createElement('a')
   const sources =
-      sourceUrlSelect.value.length === 0
+      sourceSelect.value.length === 0
         ? sourcesFiltered.value
         : sourceSelect.value,
     sourceType = isBookSource ? 'BookSource' : 'RssSource'

@@ -1,6 +1,6 @@
 <template>
   <div class="source-check-controls">
-    <el-select v-model="store.checkStatusFilter" aria-label="检验状态">
+    <el-select v-model="store.checkStatusFilter" aria-label="检验状态" placeholder="全部检验状态">
       <el-option v-for="option in sourceCheckOptions" :key="option.value" v-bind="option" />
     </el-select>
     <el-button :disabled="!sources.length || !!store.checkSessionToken" :loading="starting" @click="start">检验选中</el-button>
