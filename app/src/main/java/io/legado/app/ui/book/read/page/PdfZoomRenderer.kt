@@ -21,6 +21,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import kotlin.math.ceil
 import kotlin.math.sqrt
 
@@ -41,6 +42,8 @@ internal class PdfZoomRenderer(private val view: ContentTextView) {
     private var bitmap: Bitmap? = null
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
     internal val renderedPixelCount: Int get() = bitmap?.let { it.width * it.height } ?: 0
+    internal val renderedPages: List<Int>
+        get() = rendered?.takeIf { it == requested }?.pages?.map { it.index }.orEmpty()
     internal var renderCount = 0
         private set
 
@@ -69,7 +72,9 @@ internal class PdfZoomRenderer(private val view: ContentTextView) {
                             )
                             if (clip.isEmpty) continue
                             canvas.drawRect(destination, white)
-                            PdfFile.renderRegion(work.book, page.index, result, destination, clip)
+                            if (!PdfFile.renderRegion(work.book, page.index, result, destination, clip)) {
+                                throw IOException("PDF page ${page.index + 1} is unavailable")
+                            }
                         }
                         result
                     } catch (error: Throwable) {

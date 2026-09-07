@@ -63,9 +63,9 @@ class PdfFile(var book: Book) : AutoCloseable {
 
         /** Render directly into a bounded viewport instead of allocating the enlarged full page. */
         @Synchronized
-        fun renderRegion(book: Book, index: Int, bitmap: Bitmap, destination: RectF, clip: Rect) {
-            val renderer = getPFile(book).pdfRenderer ?: return
-            if (index !in 0 until renderer.pageCount) return
+        fun renderRegion(book: Book, index: Int, bitmap: Bitmap, destination: RectF, clip: Rect): Boolean {
+            val renderer = getPFile(book).pdfRenderer ?: return false
+            if (index !in 0 until renderer.pageCount) return false
             renderer.openPage(index).use { page ->
                 val transform = Matrix().apply {
                     setScale(destination.width() / page.width, destination.height() / page.height)
@@ -73,6 +73,7 @@ class PdfFile(var book: Book) : AutoCloseable {
                 }
                 page.render(bitmap, clip, transform, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
             }
+            return true
         }
 
         @Synchronized

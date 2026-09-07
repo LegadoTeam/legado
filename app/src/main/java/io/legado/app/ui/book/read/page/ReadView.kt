@@ -543,6 +543,11 @@ class ReadView(context: Context, attrs: AttributeSet) :
     }
 
     fun cancelTouchGestures() {
+        pdfZoom.cancelGesture()
+        cancelNonPdfGestures()
+    }
+
+    internal fun cancelNonPdfGestures() {
         removeCallbacks(longPressRunnable)
         longPressed = false
         pressDown = false

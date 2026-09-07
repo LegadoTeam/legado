@@ -102,6 +102,14 @@ internal class PdfZoom(private val view: ReadView) {
         view.invalidate()
     }
 
+    fun cancelGesture() {
+        if (!owned) return
+        owned = false
+        multiplePointers = true
+        view.autoPager.resume()
+        redraw()
+    }
+
     /** At 1x, keep ordinary swipe navigation. Once zoomed, a drag pans but a tap still acts. */
     fun onTouch(event: MotionEvent, tap: (Float, Float) -> Unit): Boolean {
         if (!isEnabled()) return false
@@ -114,7 +122,7 @@ internal class PdfZoom(private val view: ReadView) {
             lastX = event.x
             lastY = event.y
             if (owned) {
-                view.cancelTouchGestures()
+                view.cancelNonPdfGestures()
                 view.pageDelegate?.apply { isCancel = true; abortAnim() }
                 view.autoPager.pause()
             }
@@ -122,7 +130,7 @@ internal class PdfZoom(private val view: ReadView) {
         if (event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
             owned = true
             multiplePointers = true
-            view.cancelTouchGestures()
+            view.cancelNonPdfGestures()
             view.pageDelegate?.apply { isCancel = true; abortAnim() }
             view.autoPager.pause()
         }

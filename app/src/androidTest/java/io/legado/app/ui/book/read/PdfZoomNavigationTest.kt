@@ -21,6 +21,7 @@ import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.model.ReadBook
 import io.legado.app.model.localBook.PdfFile
 import io.legado.app.ui.book.read.config.ClickActionConfigDialog
@@ -44,6 +45,8 @@ class PdfZoomNavigationTest {
     private val savedDoublePage = preferences.getString(PreferKey.doublePageHorizontal, null)
     private val savedActions = listOf(AppConfig.clickActionBR, AppConfig.clickActionBL, AppConfig.clickActionMC)
     private val savedOptimize = AppConfig.optimizeRender
+    private val savedTitleModes = ReadBookConfig.configList.map { it.titleMode }
+    private val savedSharedTitleMode = ReadBookConfig.shareConfig.titleMode
     private lateinit var book: Book
     private lateinit var file: File
     private var scenario: ActivityScenario<ReadBookActivity>? = null
@@ -89,6 +92,8 @@ class PdfZoomNavigationTest {
         appDb.bookChapterDao.insert(*PdfFile.getChapterList(book).toTypedArray())
         instrumentation.runOnMainSync {
             AppConfig.optimizeRender = false
+            ReadBookConfig.configList.forEach { it.titleMode = 2 }
+            ReadBookConfig.shareConfig.titleMode = 2
             AppConfig.clickActionBR = 1
             AppConfig.clickActionBL = 2
             AppConfig.clickActionMC = 0
@@ -107,6 +112,8 @@ class PdfZoomNavigationTest {
             AppConfig.clickActionBL = savedActions[1]
             AppConfig.clickActionMC = savedActions[2]
             AppConfig.optimizeRender = savedOptimize
+            ReadBookConfig.configList.forEachIndexed { index, config -> config.titleMode = savedTitleModes[index] }
+            ReadBookConfig.shareConfig.titleMode = savedSharedTitleMode
         }
     }
 
@@ -156,10 +163,10 @@ class PdfZoomNavigationTest {
             assertEquals(scale, zoomScale(), .001f)
         }
         assertTrue("Cross the ten-page PDF chapter boundary", ReadBook.durChapterIndex > 0)
-        await { it.reader.content.pdfRenderCount > 0 && it.reader.content.pdfRenderedPixelCount > 0 }
+        await { it.reader.content.pdfRenderedPages.contains(11) }
         screenshot("pdf-zoom-page-12")
         scenario!!.recreate()
-        await { it.reader.pdfZoom.scale == scale && it.reader.content.pdfRenderCount > 0 }
+        await { it.reader.pdfZoom.scale == scale && it.reader.content.pdfRenderedPages.contains(11) }
         assertTrue(images().contains(11))
     }
 
@@ -208,7 +215,7 @@ class PdfZoomNavigationTest {
         val scale = zoomScale()
         val previous = images()
         scenario!!.onActivity { tap(it.reader, .85f, .85f) }
-        await { images(it) != previous && it.reader.content.pdfRenderCount > 0 }
+        await { images(it) != previous && it.reader.content.pdfRenderedPages.any { index -> index in images(it) } }
         assertEquals(scale, zoomScale(), .001f)
         scenario!!.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
         await { it.reader.width > it.reader.height && images(it).size == 2 }

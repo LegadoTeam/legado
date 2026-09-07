@@ -77,6 +77,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
     private var pdfRenderer: PdfZoomRenderer? = null
     internal val pdfRenderedPixelCount: Int get() = pdfRenderer?.renderedPixelCount ?: 0
     internal val pdfRenderCount: Int get() = pdfRenderer?.renderCount ?: 0
+    internal val pdfRenderedPages: List<Int> get() = pdfRenderer?.renderedPages.orEmpty()
 
     internal fun closePdfRenderer() {
         pdfRenderer?.close()
