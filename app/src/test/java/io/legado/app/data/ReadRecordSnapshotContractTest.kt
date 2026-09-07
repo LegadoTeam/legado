@@ -15,8 +15,10 @@ class ReadRecordSnapshotContractTest {
         assertTrue(record.contains("var coverUrl: String? = null"))
 
         val database = projectFile("src/main/java/io/legado/app/data/AppDatabase.kt")
-        assertTrue(database.contains("version = 105"))
-        assertTrue(database.contains("AutoMigration(from = 104, to = 105)"))
+        assertTrue(Regex("version = (\\d+)").find(database)!!.groupValues[1].toInt() >= 105)
+        val migrations = projectFile("src/main/java/io/legado/app/data/DatabaseMigrations.kt")
+        assertTrue(migrations.contains("Migration(104, 105)"))
+        assertTrue(migrations.contains("ADD COLUMN lastChapterIndex INTEGER NOT NULL DEFAULT -1"))
     }
 
     @Test

@@ -6,6 +6,8 @@ import {
   convertSourcesToMap,
 } from '@utils/souce'
 import type { BookSoure, RssSource, Source } from '@/source'
+import { sourceCheckContent, sourceCheckStatus } from '@/utils/sourceCheckState'
+import type { SourceCheckState, SourceCheckSnapshot } from '@/utils/sourceCheckState'
 
 const isBookSource = /bookSource/i.test(location.href)
 const emptySource = isBookSource ? emptyBookSource : emptyRssSource
@@ -21,6 +23,10 @@ export const useSourceStore = defineStore('source', {
       currentTab: localStorage.getItem('tabName') || 'editTab',
       editTabSource: {} as Source, // 生成序列化的json数据
       isDebuging: false,
+      checkStatusFilter: '',
+      checkStates: {} as Record<string, SourceCheckState>,
+      checkSnapshots: {} as Record<string, SourceCheckSnapshot>,
+      checkSessionToken: null as string | null,
     }
   },
   getters: {
@@ -41,6 +47,31 @@ export const useSourceStore = defineStore('source', {
         : '',
   },
   actions: {
+    setCheckStates(states: SourceCheckState[], sessionToken: string | null = null) {
+      this.checkStates = Object.fromEntries(states.map(state => [state.bookSourceUrl, state]))
+      this.checkSessionToken = sessionToken
+    },
+    rememberDeviceSources(sources: Source[], states: SourceCheckState[]) {
+      this.setCheckStates(states)
+      this.checkSnapshots = Object.fromEntries(sources.map(source => {
+        const url = getSourceUniqueKey(source)
+        return [url, { content: sourceCheckContent(source), sourceRevision: this.checkStates[url]?.sourceRevision || '' }]
+      }))
+    },
+    rememberCheckStart(sources: Source[], revisions: Record<string, string>) {
+      sources.forEach(source => {
+        const url = getSourceUniqueKey(source)
+        this.checkSnapshots[url] = { content: sourceCheckContent(source), sourceRevision: revisions[url] }
+        this.checkStates[url] = { bookSourceUrl: url, sourceRevision: revisions[url], status: 'NEEDS_CHECK', detail: '' }
+      })
+    },
+    invalidateCheckSources(sources: Source[]) {
+      sources.forEach(source => { delete this.checkSnapshots[getSourceUniqueKey(source)] })
+    },
+    checkStatus(source: Source) {
+      const url = getSourceUniqueKey(source)
+      return sourceCheckStatus(source, this.checkSnapshots[url], this.checkStates[url])
+    },
     startDebug() {
       this.currentTab = 'editDebug'
       this.isDebuging = true

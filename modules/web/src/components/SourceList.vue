@@ -6,6 +6,7 @@
       :prefix-icon="Search"
       placeholder="筛选源"
     />
+    <SourceCheckControls v-if="isBookSource" :sources="sourceSelect" :active="store.sourceMode === 'json' && store.currentTab === 'editList'" />
     <div class="tool">
       <el-button @click="importSourceFile" :icon="Folder">打开</el-button>
       <el-button
@@ -51,6 +52,7 @@ import {
 } from '@utils/souce'
 import VirtualList from 'vue3-virtual-scroll-list'
 import SourceItem from './SourceItem.vue'
+import SourceCheckControls from './SourceCheckControls.vue'
 import type { Source } from '@/source'
 
 const store = useSourceStore()
@@ -61,17 +63,15 @@ const sources = computed(() => store.sources)
 /* 筛选源 */
 const sourcesFiltered = computed<Source[]>(() => {
   const key = searchKey.value
-  if (key === '') return sources.value
-  return sources.value.filter(source => isSourceMatches(source, key))
+  return sources.value.filter(source =>
+    (key === '' || isSourceMatches(source, key)) &&
+    (!isBookSource || !store.checkStatusFilter || store.checkStatus(source) === store.checkStatusFilter))
 })
 // 计算当前筛选关键词下的选中源
 const sourceSelect = computed<Source[]>(() => {
   const urls = sourceUrlSelect.value
   if (urls.length == 0) return []
-  const sourcesFilteredMap =
-    searchKey.value == ''
-      ? store.sourcesMap
-      : convertSourcesToMap(sourcesFiltered.value)
+  const sourcesFilteredMap = convertSourcesToMap(sourcesFiltered.value)
   return urls.reduce((sources, sourceUrl) => {
     const source = sourcesFilteredMap.get(sourceUrl)
     if (source) sources.push(source)

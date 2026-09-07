@@ -11,6 +11,7 @@
     <span class="source-name" :title="getSourceName(source)">
       {{ getSourceName(source) }}
     </span>
+    <span v-if="'bookSourceUrl' in source" class="check-status">{{ checkLabel }}</span>
     <el-button
       class="edit-source"
       text
@@ -26,12 +27,14 @@
 import { Edit } from '@element-plus/icons-vue'
 import { getSourceUniqueKey, getSourceName } from '@/utils/souce'
 import type { Source } from '@/source'
+import { sourceCheckOptions } from '@/utils/sourceCheckState'
 
 const props = defineProps<{
   source: Source
 }>()
 
 const store = useSourceStore()
+const checkLabel = computed(() => sourceCheckOptions.find(option => option.value === store.checkStatus(props.source))?.label)
 
 const currentSourceUrl = computed(() => store.currentSourceUrl)
 const sourceUrl = computed(() => getSourceUniqueKey(props.source))
@@ -63,6 +66,7 @@ const isSaveError = computed(() => {
 .edit-source {
   flex: none;
 }
+.check-status { flex: none; font-size: 12px; margin-left: 6px; }
 .error {
   border-color: var(--el-color-error) !important;
   color: var(--el-color-error) !important;
