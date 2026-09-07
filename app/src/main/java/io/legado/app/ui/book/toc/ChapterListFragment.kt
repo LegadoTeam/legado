@@ -150,8 +150,6 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
         pendingScrollItemKey = null
         pendingChapterScroll = null
         chapterListJob = viewLifecycleOwner.lifecycleScope.launch {
-            val chapters = queryChapterList(book)
-            chapterList = chapters
             if (book.isPdf) {
                 val outline = try {
                     withContext(IO) { PdfOutline.read(book) }
@@ -169,6 +167,8 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                     return@launch
                 }
             }
+            val chapters = queryChapterList(book)
+            chapterList = chapters
             tocListState.setFullChapters(
                 chapters = chapters,
                 reverseOrder = book.getReverseToc(),
