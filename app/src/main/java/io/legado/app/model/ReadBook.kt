@@ -640,6 +640,10 @@ object ReadBook : CoroutineScope by MainScope() {
         }
         val (record, currentBook) = synchronized(readRecordLock) {
             val currentBook = book?.copy() ?: return
+            // Book details may fill in an author on the existing Book instance.
+            if (readRecord.bookName != currentBook.name || readRecord.author != currentBook.author) {
+                resetReadRecord(currentBook)
+            }
             val now = System.currentTimeMillis()
             readRecord.readTime += (now - readStartTime).coerceAtLeast(0)
             readStartTime = now

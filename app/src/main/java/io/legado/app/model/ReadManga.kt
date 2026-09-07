@@ -146,6 +146,9 @@ object ReadManga : CoroutineScope by MainScope() {
     fun upReadTime() {
         val (record, snapshotBook) = synchronized(readRecordLock) {
             val currentBook = book?.copy() ?: return
+            if (readRecord.bookName != currentBook.name || readRecord.author != currentBook.author) {
+                resetReadRecord(currentBook)
+            }
             val now = System.currentTimeMillis()
             val elapsed = (now - readStartTime).coerceAtLeast(0)
             readStartTime = now

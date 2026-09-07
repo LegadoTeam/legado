@@ -244,6 +244,23 @@ class ReadRecordAuthorIdentityTest {
                         assertTrue("${type.simpleName}: author duration", written.readTime in (baseline.readTime + 1000)..(baseline.readTime + 10_000))
                         assertEquals(untouched, dao.all.filter { it.author != baseline.author || it.deviceId != AppConst.androidId }.toSet())
                     }
+                    // BookInfo fills missing identity fields in place, without calling upData.
+                    val unknownBook = Book(bookUrl = "identity:pending", name = name, author = "")
+                    bookField.set(model, unknownBook)
+                    type.getDeclaredMethod("resetReadRecord", Book::class.java).apply { isAccessible = true }.invoke(model, unknownBook)
+                    timeField.setLong(model, System.currentTimeMillis() - 1000)
+                    type.getDeclaredMethod("upReadTime").invoke(model)
+                    awaitWrites()
+                    val unknown = dao.getRecord(AppConst.androidId, name, "")!!
+                    unknownBook.author = "Resolved author"
+                    unknownBook.durChapterTitle = "Resolved chapter"
+                    timeField.setLong(model, System.currentTimeMillis() - 1000)
+                    type.getDeclaredMethod("upReadTime").invoke(model)
+                    awaitWrites()
+                    val resolved = dao.getRecord(AppConst.androidId, name, "Resolved author")!!
+                    assertTrue(resolved.readTime in 1000L..10_000L)
+                    assertEquals("Resolved chapter", resolved.lastChapterTitle)
+                    assertEquals(unknown, dao.getRecord(AppConst.androidId, name, ""))
                 } finally {
                     awaitWrites()
                     bookField.set(model, oldBook)
