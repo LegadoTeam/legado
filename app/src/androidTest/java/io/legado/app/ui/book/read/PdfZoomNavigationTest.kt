@@ -53,7 +53,8 @@ class PdfZoomNavigationTest {
     @Before
     fun setUp() {
         file = File.createTempFile("pdf-zoom-", ".pdf", context.cacheDir)
-        PdfDocument().use { document ->
+        val document = PdfDocument()
+        try {
             repeat(14) { index ->
                 val page = document.startPage(PdfDocument.PageInfo.Builder(600, 900, index + 1).create())
                 val canvas = page.canvas
@@ -77,6 +78,8 @@ class PdfZoomNavigationTest {
                 document.finishPage(page)
             }
             file.outputStream().use(document::writeTo)
+        } finally {
+            document.close()
         }
         book = Book(bookUrl = file.absolutePath, originName = file.name, name = file.name,
             type = BookType.local or BookType.text, totalChapterNum = 2)
@@ -189,7 +192,7 @@ class PdfZoomNavigationTest {
     fun reportersTextbookRendersSharpSingleAndDoublePageRegions() {
         PdfFile.clear(book.bookUrl)
         instrumentation.context.assets.open("pdf_zoom_textbook.pdf").use { input ->
-            file.outputStream().use(input::copyTo)
+            file.outputStream().use { output -> input.copyTo(output) }
         }
         val chapters = PdfFile.getChapterList(book)
         book.totalChapterNum = chapters.size
