@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.drawable.GradientDrawable
 import android.util.AttributeSet
 import android.view.LayoutInflater
+import android.view.View
 import android.view.animation.Animation
 import android.widget.FrameLayout
 import android.widget.SeekBar
@@ -232,6 +233,12 @@ class MangaMenu @JvmOverloads constructor(
             max = count.minus(1)
             progress = value
         }
+    }
+
+    fun setRightToLeft(enabled: Boolean) {
+        // Reverse the chapter buttons and progress track, keeping their logical actions unchanged.
+        (binding.seekReadPage.parent as View).layoutDirection =
+            if (enabled) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
     }
 
     interface CallBack {

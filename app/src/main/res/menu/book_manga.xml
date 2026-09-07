@@ -84,6 +84,13 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_manga_right_to_left"
+        android:checkable="true"
+        android:checked="false"
+        android:title="@string/manga_right_to_left"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_disable_horizontal_page_snap"
         android:checkable="true"
         android:checked="false"
