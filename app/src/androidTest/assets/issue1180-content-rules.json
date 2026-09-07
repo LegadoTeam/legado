@@ -1,0 +1,20 @@
+[
+  {
+    "bookSourceName": "⚡📂33文学",
+    "bookSourceUrl": "http://z.303wx.com/",
+    "ruleContent": {
+      "content": ".chapter_content@textNodes##",
+      "nextContentUrl": "text.下一页@href",
+      "replaceRegex": "##【请收藏 303文学 303wx.com】|.*www.303wx.com.*|您现在阅读的是##"
+    }
+  },
+  {
+    "bookSourceName": "⚡📂书荒小说",
+    "bookSourceUrl": "https://www.shuhuangxs.com",
+    "ruleContent": {
+      "content": "<js>\nvar bes = result.match(/PHA\\+[A-Za-z0-9+\\/]+={0,2}/g);\n//java.log(String(bes))\nif (!bes) {\n    var ml = java.webView(null,baseUrl,null);\n    var txt = java.getString(\"#txt@html\");\n    java.longToast(\"正文解密失败，转为webView动态加载。\");\n} else {\nvar result = [];\nfor (var i = 0; i < bes.length; i++) {\n    // 遍历数组，使用阅读内置Base64解码方法\n    var bsej = java.base64Decode(bes[i]);\n    var txtt = String(bsej);\n    result.push(txtt);\n      }\nvar txt = result.join('\\n');\n}\ntxt;\n</js>",
+      "nextContentUrl": "<js>\nvar u = result.match(/var hhekgsv='(\\/\\d+\\/\\d+\\/\\d+_\\d+\\.html)';/);\nu ? u[1] : \"\";\n</js>",
+      "replaceRegex": "##本小章还未完.*精彩内容！|(喜欢|请大家收藏.*){{book.name}}|小主.*后面更精彩！|这章没有.*继续阅读！"
+    }
+  }
+]
