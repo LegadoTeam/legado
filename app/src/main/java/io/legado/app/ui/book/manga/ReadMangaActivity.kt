@@ -302,7 +302,9 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     override fun upContent() {
         lifecycleScope.launch {
             setTitle(ReadManga.book?.name)
-            val data = withContext(IO) { ReadManga.mangaContents }
+            // This only snapshots the loaded chapters and clamps the reading position.
+            // Keep snapshots ordered; an older IO task must not overwrite a newer list.
+            val data = ReadManga.mangaContents
             val pos = data.pos
             val list = data.items
             val curFinish = data.curFinish

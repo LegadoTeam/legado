@@ -344,6 +344,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBundle("pdfZoom", binding.readView.pdfZoom.save())
         editingHighlight?.let { outState.putParcelable(STATE_EDITING_HIGHLIGHT, it) }
         super.onSaveInstanceState(outState)
     }
@@ -351,6 +352,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     @SuppressLint("ClickableViewAccessibility")
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
+        binding.readView.pdfZoom.restore(savedInstanceState?.getBundle("pdfZoom"))
         binding.cursorLeft.setColorFilter(accentColor)
         binding.cursorRight.setColorFilter(accentColor)
         binding.cursorLeft.setOnTouchListener(this)

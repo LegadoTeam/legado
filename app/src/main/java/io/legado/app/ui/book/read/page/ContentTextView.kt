@@ -72,6 +72,22 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
     private val renderRunnable by lazy { Runnable { preRenderPage() } }
     private var lastClickTime = 0L
     private var doubleClick = false
+    private val pdfZoom: PdfZoom?
+        get() = (parent?.parent?.parent as? ReadView)?.pdfZoom
+    private var pdfRenderer: PdfZoomRenderer? = null
+    internal val pdfRenderedPixelCount: Int get() = pdfRenderer?.renderedPixelCount ?: 0
+    internal val pdfRenderCount: Int get() = pdfRenderer?.renderCount ?: 0
+    internal val pdfRenderedPages: List<Int> get() = pdfRenderer?.renderedPages.orEmpty()
+
+    internal fun closePdfRenderer() {
+        pdfRenderer?.close()
+        pdfRenderer = null
+    }
+
+    override fun onDetachedFromWindow() {
+        closePdfRenderer()
+        super.onDetachedFromWindow()
+    }
 
     //绘制图片的paint
     val imagePaint by lazy {
@@ -113,7 +129,30 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         }
         check(!visibleRect.isEmpty) { "visibleRect 为空" }
         canvas.clipRect(visibleRect)
-        drawPage(canvas)
+        val zoom = pdfZoom?.takeIf { it.isEnabled() && !longScreenshot }
+        if (zoom != null) {
+            zoom.setBounds(visibleRect)
+            val saved = canvas.save()
+            zoom.transform(canvas)
+            drawPage(canvas)
+            canvas.restoreToCount(saved)
+            if (isMainView && zoom.scale > 1f) {
+                val pages = mutableListOf(textPage to relativeOffset(0))
+                if (callBack.isScroll && pageFactory.hasNext()) {
+                    pages.add(relativePage(1) to relativeOffset(1))
+                    if (pageFactory.hasNextPlus()) pages.add(relativePage(2) to relativeOffset(2))
+                }
+                if (!zoom.isInteracting) {
+                    val renderer = pdfRenderer ?: PdfZoomRenderer(this).also { pdfRenderer = it }
+                    ReadBook.book?.let { renderer.draw(canvas, it, zoom, pages) }
+                }
+            } else if (pdfRenderer != null) {
+                closePdfRenderer()
+            }
+        } else {
+            closePdfRenderer()
+            drawPage(canvas)
+        }
     }
 
     /**

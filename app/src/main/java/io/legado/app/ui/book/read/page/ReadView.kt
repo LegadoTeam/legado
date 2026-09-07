@@ -209,6 +209,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
     private val boundary by lazy { BreakIterator.getWordInstance(Locale.getDefault()) }
     private val upProgressThrottle = throttle(200) { post { upProgress() } }
     val autoPager = AutoPager(this)
+    internal val pdfZoom = PdfZoom(this)
     val isAutoPage get() = autoPager.isRunning
 
     init {
@@ -270,6 +271,11 @@ class ReadView(context: Context, attrs: AttributeSet) :
      */
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (pdfZoom.onTouch(event) { x, y ->
+                setStartPoint(x, y, false)
+                isAbortAnim = false
+                onSingleTapUp()
+            }) return true
         if (replacePreviewGestureState != ReplacePreviewGestureState.IDLE) {
             if (event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
                 finishReplacePreviewGesture(ReplacePreviewGestureState.CONSUMED)
@@ -537,6 +543,11 @@ class ReadView(context: Context, attrs: AttributeSet) :
     }
 
     fun cancelTouchGestures() {
+        pdfZoom.cancelGesture()
+        cancelNonPdfGestures()
+    }
+
+    internal fun cancelNonPdfGestures() {
         removeCallbacks(longPressRunnable)
         longPressed = false
         pressDown = false
@@ -856,6 +867,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
      * 销毁事件
      */
     fun onDestroy() {
+        curPage.closePdfRenderer()
         cancelTouchGestures()
         dismissTextMagnifier()
         pageDelegate?.onDestroy()
