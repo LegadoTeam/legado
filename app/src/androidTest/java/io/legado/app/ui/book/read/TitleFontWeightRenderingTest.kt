@@ -12,6 +12,7 @@ import android.view.View
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
@@ -31,6 +32,7 @@ import io.legado.app.help.config.parseReadConfigObject
 import io.legado.app.model.ReadBook
 import io.legado.app.model.localBook.TextFile
 import io.legado.app.ui.book.read.config.ClickActionConfigDialog
+import io.legado.app.ui.book.read.config.ReadStyleDialog
 import io.legado.app.ui.book.read.config.TipConfigDialog
 import io.legado.app.ui.book.read.page.ReadView
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
@@ -183,8 +185,11 @@ class TitleFontWeightRenderingTest {
         ReadBookConfig.textBold = 1
         launchReader()
         scenario!!.onActivity {
-            TipConfigDialog().showNow(it.supportFragmentManager, "title-weight-settings")
+            ReadStyleDialog().showNow(it.supportFragmentManager, "title-weight-style")
         }
+        onView(withId(R.id.tv_tip)).perform(scrollTo()).check(matches(isDisplayed()))
+        screenshot("title-weight-information-entry")
+        onView(withId(R.id.tv_tip)).perform(click())
         onView(withId(R.id.ll_title_font_weight)).check(matches(isDisplayed()))
         val weights = context.resources.getStringArray(R.array.text_font_weight)
         chooseTitleWeight(weights[0], 0, 400)
@@ -203,8 +208,9 @@ class TitleFontWeightRenderingTest {
             assertEquals(0, ReadBookConfig.titleBold)
             assertFontWeight(ChapterProvider.titlePaint.typeface, 400)
             assertFontWeight(ChapterProvider.contentPaint.typeface, 700)
-            TipConfigDialog().showNow(it.supportFragmentManager, "title-weight-settings")
+            ReadStyleDialog().showNow(it.supportFragmentManager, "title-weight-style")
         }
+        onView(withId(R.id.tv_tip)).perform(scrollTo(), click())
         onView(withId(R.id.tv_title_font_weight)).check(matches(withText(weights[0])))
         screenshot("title-weight-settings-restored")
         dismissSettings()
@@ -248,8 +254,9 @@ class TitleFontWeightRenderingTest {
 
     private fun dismissSettings() {
         scenario!!.onActivity { activity ->
-            (activity.supportFragmentManager.findFragmentByTag("title-weight-settings") as TipConfigDialog)
-                .dismissNow()
+            val style = activity.supportFragmentManager.findFragmentByTag("title-weight-style") as ReadStyleDialog
+            (style.childFragmentManager.findFragmentByTag("tipConfigDialog") as TipConfigDialog).dismissNow()
+            style.dismissNow()
         }
     }
 
