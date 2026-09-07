@@ -7,6 +7,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.LinearLayout
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
@@ -48,7 +49,7 @@ class BookMemoDialog : BaseDialogFragment(R.layout.dialog_book_memo) {
 
     override fun onStart() {
         super.onStart()
-        setLayout(ViewGroup.LayoutParams.MATCH_PARENT, 0.5f)
+        updatePanelLayout()
         dialog?.window?.apply {
             setGravity(Gravity.BOTTOM)
             setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
@@ -63,7 +64,22 @@ class BookMemoDialog : BaseDialogFragment(R.layout.dialog_book_memo) {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        view?.post { setLayout(ViewGroup.LayoutParams.MATCH_PARENT, 0.5f) }
+        view?.post { if (view != null) updatePanelLayout() }
+    }
+
+    private fun updatePanelLayout() {
+        val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val actions = binding.memoActions
+        val container = if (landscape) binding.memoToolbar else binding.root
+        if (actions.parent !== container) {
+            (actions.parent as ViewGroup).removeView(actions)
+            actions.layoutParams = LinearLayout.LayoutParams(
+                if (landscape) ViewGroup.LayoutParams.WRAP_CONTENT else ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+            container.addView(actions)
+        }
+        setLayout(ViewGroup.LayoutParams.MATCH_PARENT, 0.5f)
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {

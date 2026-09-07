@@ -154,6 +154,8 @@ class BookMemoDialogTest {
                 val screenHeight = context.resources.displayMetrics.heightPixels
                 height in (screenHeight * .4f).toInt()..(screenHeight * .6f).toInt()
             } == true &&
+            (memoDialog(it)?.view?.findViewById<View>(R.id.memo_scroll)?.height ?: 0) >=
+                (48 * context.resources.displayMetrics.density).toInt() &&
             memoDialog(it)?.view?.findViewById<TextView>(R.id.memo_content)?.text?.contains("重要内容") == true }
         onView(withId(R.id.memo_edit_save)).inRoot(isDialog()).check(matches(isCompletelyDisplayed()))
         onView(withId(R.id.memo_clear_cancel)).inRoot(isDialog()).check(matches(isCompletelyDisplayed()))

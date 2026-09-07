@@ -6,6 +6,7 @@
     android:paddingHorizontal="12dp">
 
     <LinearLayout
+        android:id="@+id/memo_toolbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical">
@@ -71,6 +72,7 @@
         android:visibility="gone" />
 
     <LinearLayout
+        android:id="@+id/memo_actions"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="end">
