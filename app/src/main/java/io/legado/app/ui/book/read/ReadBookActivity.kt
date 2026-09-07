@@ -1,10 +1,8 @@
 package io.legado.app.ui.book.read
 
-import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.res.Configuration
-import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Looper
@@ -305,6 +303,9 @@ class ReadBookActivity : BaseReadBookActivity(),
     private val prevPageDebounce by lazy { Debounce { keyPage(PageDirection.PREV) } }
     private var bookChanged = false
     private var pageChanged = false
+    private val aloudControls by lazy {
+        ReadAloudControls(binding.readAloudFloatBarContainer) { updateReadAloudFloatBar() }
+    }
     /** 最近一次朗读进度的章内字符位置; 供"回到朗读位置"在同章内即时跳转 */
     private var lastReadAloudChapterStart = -1
     private var lastReadAloudChapterIndex = -1
@@ -345,6 +346,7 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putBundle("pdfZoom", binding.readView.pdfZoom.save())
+        outState.putBundle("aloudControls", aloudControls.save())
         editingHighlight?.let { outState.putParcelable(STATE_EDITING_HIGHLIGHT, it) }
         super.onSaveInstanceState(outState)
     }
@@ -353,10 +355,14 @@ class ReadBookActivity : BaseReadBookActivity(),
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
         binding.readView.pdfZoom.restore(savedInstanceState?.getBundle("pdfZoom"))
+        aloudControls.restore(savedInstanceState?.getBundle("aloudControls"))
         binding.cursorLeft.setColorFilter(accentColor)
         binding.cursorRight.setColorFilter(accentColor)
         binding.cursorLeft.setOnTouchListener(this)
         binding.cursorRight.setOnTouchListener(this)
+        binding.readAloudFloatBarContainer.ivPauseAloud.setOnClickListener {
+            if (BaseReadAloudService.pause) ReadAloud.resume(this) else ReadAloud.pause(this)
+        }
         binding.readAloudFloatBarContainer.llBackToSpeech.setOnClickListener {
             backToSpeakingPosition()
         }
@@ -1540,6 +1546,7 @@ class ReadBookActivity : BaseReadBookActivity(),
      */
     override fun pageChanged() {
         pageChanged = true
+        if (!isScroll) aloudControls.onMovement(100f)
         binding.readView.onPageChange()
         highlightPopup?.dismiss()
         handler.post {
@@ -1549,6 +1556,17 @@ class ReadBookActivity : BaseReadBookActivity(),
         executor.execute {
             startBackupJob()
         }
+    }
+
+    override fun onReadScroll(offset: Int) {
+        if (BaseReadAloudService.isRun && !isAutoPage) {
+            ReadAloud.detachReadAloudFollow()
+            aloudControls.onMovement(-offset * 100f / ChapterProvider.visibleHeight.coerceAtLeast(1))
+        }
+    }
+
+    fun showReadAloudControls(resetPosition: Boolean = false) {
+        aloudControls.reveal(resetPosition)
     }
 
     private fun updateScrollReadPosition() {
@@ -2544,6 +2562,7 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     override fun onMenuHide() {
         binding.readView.autoPager.resume()
+        aloudControls.reveal()
         updateReadAloudFloatBar(menuHiding = true)
     }
 
@@ -2551,69 +2570,12 @@ class ReadBookActivity : BaseReadBookActivity(),
         menuShowing: Boolean = false,
         menuHiding: Boolean = false,
     ) {
-        val floatBarBinding = binding.readAloudFloatBarContainer
         val menuVisible = when {
             menuShowing -> true
             menuHiding -> bottomDialog > 0 || binding.searchMenu.bottomMenuVisible
             else -> menuLayoutIsVisible
         }
-        val shouldShow = ReadAloudBarVisibility.shouldShow(
-            isRun = BaseReadAloudService.isRun,
-            following = ReadAloud.followReadAloudPosition,
-            menuVisible = menuVisible,
-        )
-
-        if (shouldShow) {
-            val backgroundColor = bottomBackground
-            val foregroundColor = getPrimaryTextColor(ColorUtils.isColorLight(backgroundColor))
-            (floatBarBinding.readAloudFloatBar.background.mutate() as? GradientDrawable)?.apply {
-                setColor(backgroundColor)
-                val strokeColor = if (AppConfig.isEInkMode) {
-                    foregroundColor
-                } else {
-                    ColorUtils.withAlpha(foregroundColor, 0.25f)
-                }
-                setStroke(1.dpToPx(), strokeColor)
-            }
-            floatBarBinding.ivBackToSpeech.setColorFilter(foregroundColor)
-            floatBarBinding.tvBackToSpeech.setTextColor(foregroundColor)
-            floatBarBinding.ivReadFromHere.setColorFilter(foregroundColor)
-            floatBarBinding.tvReadFromHere.setTextColor(foregroundColor)
-            floatBarBinding.vBarDivider.setBackgroundColor(
-                ColorUtils.withAlpha(foregroundColor, 0.3f)
-            )
-        }
-
-        val floatBar = floatBarBinding.readAloudFloatBar
-        val settledShown = floatBar.isVisible && floatBar.alpha == 1f
-        if (shouldShow && settledShown) return
-        if (!shouldShow && floatBar.isGone) return
-        floatBar.animate().cancel()
-
-        val animationsEnabled = !AppConfig.isEInkMode &&
-            (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || ValueAnimator.areAnimatorsEnabled())
-        if (!animationsEnabled) {
-            floatBar.alpha = 1f
-            floatBar.isVisible = shouldShow
-        } else if (shouldShow) {
-            if (floatBar.isGone) {
-                floatBar.alpha = 0f
-                floatBar.isVisible = true
-            }
-            floatBar.animate()
-                .alpha(1f)
-                .setDuration(180)
-                .start()
-        } else {
-            floatBar.animate()
-                .alpha(0f)
-                .setDuration(180)
-                .withEndAction {
-                    floatBar.isGone = true
-                    floatBar.alpha = 1f
-                }
-                .start()
-        }
+        aloudControls.update(menuVisible)
     }
 
     override fun onLayoutPageCompleted(index: Int, page: TextPage) {
@@ -2882,6 +2844,7 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     override fun onDestroy() {
         super.onDestroy()
+        aloudControls.dispose()
         tts?.clearTts()
         textActionMenu.dismiss()
         popupAction.dismiss()

@@ -56,6 +56,11 @@
             app:iconSpaceReserved="false" />
 
         <io.legado.app.lib.prefs.Preference
+            android:key="readAloudControls"
+            android:title="@string/read_aloud_controls"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
             android:title="@string/speak_engine"
             android:summary="TTS"
             android:key="appTtsEngine"

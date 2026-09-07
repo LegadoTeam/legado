@@ -13,6 +13,9 @@ class ReadAloudFloatingBarTest {
         assertFalse(ReadAloudBarVisibility.shouldShow(false, false, false))
         assertFalse(ReadAloudBarVisibility.shouldShow(true, true, false))
         assertFalse(ReadAloudBarVisibility.shouldShow(true, false, true))
+        assertTrue(ReadAloudBarVisibility.shouldShow(true, true, false, true))
+        assertFalse(ReadAloudBarVisibility.shouldShow(true, true, true, true))
+        assertFalse(ReadAloudBarVisibility.shouldShow(false, true, false, true))
     }
 
     @Test
@@ -30,7 +33,8 @@ class ReadAloudFloatingBarTest {
         assertTrue(host.contains("@layout/view_read_aloud_float_bar"))
         assertTrue(activity.contains("backToSpeakingPosition()"))
         assertTrue(activity.contains("ReadBook.readAloud()"))
-        assertTrue(activity.contains("ReadAloudBarVisibility.shouldShow"))
+        val controls = projectFile("src/main/java/io/legado/app/ui/book/read/ReadAloudControls.kt").readText()
+        assertTrue(controls.contains("ReadAloudBarVisibility.shouldShow"))
     }
 
     @Test
