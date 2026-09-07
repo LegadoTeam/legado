@@ -24,7 +24,7 @@ print(f'APK size: {Path(sys.argv[1]).stat().st_size} bytes')
 PY
 adb install -r -t "${apks[0]}"
 adb logcat -c
-timeout 300 adb shell am instrument -w \
+timeout 300 adb shell am instrument -w -r \
   com.legado.app.release/io.legado.app.lib.cronet.CronetRuntimeInstrumentation \
   | tee app/build/cronet-runtime/result.txt
 grep -Fq 'CRONET_RUNTIME_PASSED' app/build/cronet-runtime/result.txt
