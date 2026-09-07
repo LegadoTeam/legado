@@ -4,6 +4,7 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
@@ -13,6 +14,7 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.SeekBar
 import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -65,7 +67,8 @@ class MangaReadingDirectionTest {
     @get:Rule
     val testName = TestName()
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
-    private val context = instrumentation.targetContext
+    private val context = instrumentation.targetContext.applicationContext
+    private val accessibilityFlags = instrumentation.uiAutomation.serviceInfo.flags
     private val preferences = context.defaultSharedPreferences
     private val savedPreferences = HashMap(preferences.all)
     private val source = BookSource(
@@ -91,6 +94,9 @@ class MangaReadingDirectionTest {
 
     @Before
     fun setUp() {
+        instrumentation.uiAutomation.serviceInfo = instrumentation.uiAutomation.serviceInfo.apply {
+            flags = flags or AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
+        }
         assertTrue(preferences.edit()
             .remove(PreferKey.mangaRightToLeft)
             .putBoolean(PreferKey.enableMangaHorizontalScroll, true)
@@ -152,6 +158,9 @@ class MangaReadingDirectionTest {
         assertTrue(preferences.edit().clear().apply {
             savedPreferences.forEach { (key, value) -> putValue(key, value) }
         }.commit())
+        instrumentation.uiAutomation.serviceInfo = instrumentation.uiAutomation.serviceInfo.apply {
+            flags = accessibilityFlags
+        }
     }
 
     @Test
@@ -540,6 +549,18 @@ class MangaReadingDirectionTest {
                 .filterIsInstance<MangaPage>().map { page -> page.chapterIndex }
                 .containsAll((chapter - 1..chapter + 1).filter { index -> index in 0..2 })
         }
+        // Android displays its first-use fullscreen confirmation after the reader has loaded.
+        // Acknowledge that real system UI before injecting page keys or gestures underneath it.
+        instrumentation.uiAutomation.waitForIdle(1_000, 10_000)
+        instrumentation.uiAutomation.rootInActiveWindow?.let { root ->
+            val confirmation = root.findAccessibilityNodeInfosByViewId("android:id/ok")
+                .firstOrNull { it.isClickable }
+                ?: root.findAccessibilityNodeInfosByText("Got it").firstOrNull { it.isClickable }
+            confirmation?.let {
+                assertTrue(it.performAction(AccessibilityNodeInfo.ACTION_CLICK))
+            }
+        }
+        awaitActivity("reader focused after fullscreen confirmation") { it.hasWindowFocus() }
     }
 
     private fun assertLogicalKeys() {
