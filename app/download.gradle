@@ -150,7 +150,7 @@ def bundledCronet = tasks.register('prepareCronetNative', Sync) {
             throw new GradleException('Cronet native metadata version does not match the Java bundle')
         }
         CRONET_ABIS.each { abi ->
-            def library = new File(soPath, "$abi.so")
+            def library = new File(soPath, "${abi}.so")
             if (!library.isFile() || generateMD5(library) != metadata[abi]) {
                 throw new GradleException("Cronet native library checksum mismatch: $abi")
             }
