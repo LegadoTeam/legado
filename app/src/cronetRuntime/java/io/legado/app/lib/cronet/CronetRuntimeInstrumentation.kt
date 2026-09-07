@@ -15,8 +15,12 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okio.buffer
 import okio.source
 import org.chromium.net.impl.CronetUrlRequestContext
+import org.json.JSONObject
+import java.io.File
+import java.math.BigInteger
 import java.net.InetAddress
 import java.net.ServerSocket
+import java.security.MessageDigest
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -47,6 +51,9 @@ class CronetRuntimeInstrumentation : Instrumentation() {
         val preferences = PreferenceManager.getDefaultSharedPreferences(targetContext)
         val hadPreference = preferences.contains(PreferKey.cronet)
         val previous = preferences.getBoolean(PreferKey.cronet, false)
+        val componentDir = targetContext.getDir("cronet", 0)
+        val nativeName = "libcronet.${BuildConfig.Cronet_Version}.so"
+        val cachedBefore = componentDir.walkTopDown().any { it.isFile && it.name == nativeName }
         val executor = Executors.newSingleThreadExecutor()
         val client = OkHttpClient.Builder()
             .addInterceptor(CronetInterceptor(CookieJar.NO_COOKIES))
@@ -102,7 +109,21 @@ class CronetRuntimeInstrumentation : Instrumentation() {
             val version = engine.versionString
             check(version.contains(BuildConfig.Cronet_Version)) { "Unexpected Cronet engine: $version" }
             check(preferences.getBoolean(PreferKey.cronet, false)) { "Cronet preference changed" }
-            return version
+            val native = componentDir.walkTopDown().filter { it.isFile && it.name.endsWith(".so") }.single()
+            check(native.name == nativeName) { "Unexpected cached native library: $native" }
+            val metadata = targetContext.assets.open("cronet.json").bufferedReader().use {
+                JSONObject(it.readText())
+            }
+            val digest = MessageDigest.getInstance("MD5").digest(native.readBytes())
+            assertEquals(metadata.getString(native.parentFile!!.name), "%032x".format(BigInteger(1, digest)))
+            check(File("/proc/self/maps").useLines { lines ->
+                lines.any { it.contains(nativeName) && File(it.substringAfterLast(' ')).canonicalFile == native.canonicalFile }
+            }) {
+                "The downloaded Cronet library is not mapped in this process"
+            }
+            val downloadCache = File(targetContext.cacheDir, "so_download")
+            check(downloadCache.walkTopDown().none { it.isFile }) { "The download left a duplicate native library" }
+            return "$version; cachedBefore=$cachedBefore; nativeBytes=${native.length()}; nativeFile=$native"
         } finally {
             preferences.edit().apply {
                 if (hadPreference) putBoolean(PreferKey.cronet, previous) else remove(PreferKey.cronet)
