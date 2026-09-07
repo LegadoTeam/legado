@@ -72,8 +72,7 @@ class BatchContentContext(
      *
      * 支持两种形式:
      * - 章节对象:直接取本批数组里的元素,重复 url 也不会认错;
-     * - url 字符串:唯一命中时直接返回;多章共用该 url 时按顺序返回第一个尚未回存的,
-     *   全部已回存说明书源多回存了一次,返回 null 由调用方报错。
+     * - url 字符串:仅接受唯一命中;多章共用该 url 时始终拒绝,必须传章节对象。
      *
      * 刻意不接受纯数字:书源循环里传数组下标和传 chapter.index 无法区分,认错即静默写错章节。
      */
@@ -88,14 +87,10 @@ class BatchContentContext(
     private fun resolveByUrl(url: String): BookChapter? {
         val trimmedUrl = url.trim()
         if (trimmedUrl.isEmpty()) return null
-        val candidates = chaptersByUrl[trimmedUrl]
-            ?: normalize(trimmedUrl)?.let { chaptersByUrl[it] }
-            ?: return null
-        //唯一命中时原样返回,书源重复回存同一章视为覆盖更新
-        candidates.singleOrNull()?.let { return it }
-        return synchronized(lock) {
-            candidates.firstOrNull { !savedIndexes.contains(it.index) }
-        }
+        val candidates = chaptersByUrl[trimmedUrl].orEmpty() +
+            normalize(trimmedUrl)?.let { chaptersByUrl[it] }.orEmpty()
+        //回调可能乱序,已保存状态不能消除 URL 的歧义。唯一 URL 仍允许重复回存。
+        return candidates.distinctBy { it.index }.singleOrNull()
     }
 
     private fun normalize(url: String?): String? {
@@ -128,7 +123,7 @@ class BatchContentContext(
         coroutineContext.ensureActive()
         if (closed) return false
         val chapter = resolveChapter(identifier)
-            ?: throw NoStackTraceException("java.cacheContent 未匹配到本批次章节: $identifier")
+            ?: throw NoStackTraceException("java.cacheContent 未唯一匹配到本批次章节,重复 URL 请传章节对象: $identifier")
         val replaced = applyContentReplace(chapter, content)
         if (replaced.isBlank()) return false
         val token = saveTokens[chapter.index]

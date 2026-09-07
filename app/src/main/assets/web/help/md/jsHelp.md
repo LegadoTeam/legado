@@ -384,8 +384,8 @@ java.cacheContent(chapterUrl: String, content: String): Boolean
 | `result` | 同 `chapters`,与其它规则的 `result` 惯例保持一致 |
 
 **优先传章节对象。** 目录允许多章共用同一 url(靠序号、标题或 tag 区分),
-传 url 时阅读只能按批内顺序猜是哪一章,同 url 的章节全部回存后再传该 url 会直接报错。
-传对象则始终精确对应。参数不接受数组下标等纯数字,避免和 `chapter.index` 混淆。
+传 url 字符串必须在本批内唯一,有歧义时会直接报错,其中一章已回存也不例外。
+重复 url 必须传章节对象才能精确对应。参数不接受数组下标等纯数字,避免和 `chapter.index` 混淆。
 
 书源自行决定怎么取(合并成一次请求、并发拉取、按站点接口一次拿多章都可以),
 每处理完一章就调用 `java.cacheContent` 回存,不必等整批结束。回存的正文会自动
@@ -927,7 +927,7 @@ function getContentBatch(chapters, book) {
 `chapters` 是本批需要缓存的章节数组,每项含 `url`、`title`、`index` 等字段。
 函数返回值会被忽略,正文一律通过 `java.cacheContent(chapter, content)` 回存,
 每回存一章即刻写入缓存,不必等整批结束。第一个参数也接受 url 字符串,但仅限该 url
-在本批内唯一;目录允许多章共用同一 url,传对象才能保证不写错章节。
+在本批内唯一;重复 url 字符串会报错,必须传章节对象才能保证不写错章节。
 
 回存的正文会自动套用书源的正文替换规则(`replaceRegex`)。没有回存的章节会自动
 退回 `getContent` 单章下载,所以部分章节失败不影响同批其它章节,也不需要在脚本里自己重试。

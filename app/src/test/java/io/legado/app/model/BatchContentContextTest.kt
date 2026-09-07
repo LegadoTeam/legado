@@ -42,17 +42,16 @@ class BatchContentContextTest {
         BatchContentContext(bookSource, book, chapters.toList())
 
     @Test
-    fun `same url chapters resolve to distinct chapters in order`() {
+    fun `same url strings are ambiguous even after one chapter is saved`() {
         val first = chapter(1, "/read/1.html", "第一章")
         val second = chapter(2, "/read/1.html", "第二章")
         val context = contextOf(first, second)
 
-        val resolvedFirst = context.resolveChapter("/read/1.html")
-        assertSame(first, resolvedFirst)
-
-        //第一章回存后,同一 url 必须让位给还没回存的第二章
-        context.markSaved(resolvedFirst!!)
-        assertSame(second, context.resolveChapter("/read/1.html"))
+        assertNull(context.resolveChapter("/read/1.html"))
+        assertNull(context.resolveChapter("https://example.com/read/1.html"))
+        context.markSaved(second)
+        assertNull(context.resolveChapter("/read/1.html"))
+        assertNull(context.resolveChapter("https://example.com/read/1.html"))
     }
 
     @Test
@@ -75,12 +74,26 @@ class BatchContentContextTest {
         val second = chapter(2, "/read/1.html", "第二章")
         val context = contextOf(first, second)
 
-        context.markSaved(context.resolveChapter("/read/1.html")!!)
-        context.markSaved(context.resolveChapter("/read/1.html")!!)
+        context.markSaved(first)
+        context.markSaved(second)
 
         assertEquals(2, context.savedCount())
         assertTrue(context.missingChapters().isEmpty())
         assertNull("多回存一次应报错而不是覆盖", context.resolveChapter("/read/1.html"))
+    }
+
+    @Test
+    fun `relative and absolute aliases cannot bypass ambiguity`() {
+        val relative = chapter(1, "/read/1.html", "第一章")
+        val absolute = chapter(2, "https://example.com/read/1.html", "第二章")
+        val context = contextOf(relative, absolute)
+
+        assertNull(context.resolveChapter("/read/1.html"))
+        assertNull(context.resolveChapter("https://example.com/read/1.html"))
+        context.markSaved(absolute)
+        assertNull(context.resolveChapter("/read/1.html"))
+        assertSame(relative, context.resolveChapter(relative))
+        assertSame(absolute, context.resolveChapter(absolute))
     }
 
     @Test
