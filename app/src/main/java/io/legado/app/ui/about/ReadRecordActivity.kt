@@ -23,9 +23,7 @@ import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.ReadRecordShow
-import io.legado.app.data.entities.updateSnapshot
-import io.legado.app.data.entities.saveWithCover
-import io.legado.app.constant.AppConst
+import io.legado.app.data.entities.saveReadRecordSnapshot
 import io.legado.app.databinding.ActivityReadRecordBinding
 import io.legado.app.databinding.ItemReadRecordDisplayBinding
 import io.legado.app.help.config.AppConfig
@@ -179,12 +177,7 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
             val (allRecords, readRecords, books) = withContext(IO) {
                 val bookshelf = appDb.bookDao.all.sortedBy { it.durChapterTime }
                     .associateBy { it.name }
-                appDb.readRecordDao.all.filter { it.deviceId == AppConst.androidId }.forEach { record ->
-                    bookshelf[record.bookName]?.let { book ->
-                        val refreshed = record.copy().apply { updateSnapshot(book) }
-                        if (refreshed != record) refreshed.saveWithCover(book)
-                    }
-                }
+                bookshelf.values.forEach { it.saveReadRecordSnapshot() }
                 val all = appDb.readRecordDao.allShow
                 val filtered = if (searchKey.isNullOrBlank()) all
                     else appDb.readRecordDao.search(searchKey)

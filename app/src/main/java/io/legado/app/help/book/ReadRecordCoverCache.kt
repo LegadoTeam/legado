@@ -7,7 +7,6 @@ import io.legado.app.data.entities.ReadRecord
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.glide.ImageLoader
 import io.legado.app.help.glide.OkHttpModelLoader
-import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.externalFiles
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -30,7 +29,6 @@ object ReadRecordCoverCache {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val permits = Semaphore(2)
     private val pending = ConcurrentHashMap<Triple<String, String, String>, Boolean>()
-    private val lock = Any()
 
     fun request(record: ReadRecord, sourceOrigin: String? = null): Job? {
         val path = record.coverUrl?.takeIf { it.isNotBlank() } ?: return null
@@ -40,11 +38,6 @@ object ReadRecordCoverCache {
         return scope.launch {
             try {
                 permits.withPermit {
-                    val targetFile = File(root, MD5Utils.md5Encode(path) + ".cover")
-                    if (targetFile.isFile) {
-                        synchronized(lock) { attach(record, path, targetFile) }
-                        return@withPermit
-                    }
                     var options = RequestOptions().set(
                         OkHttpModelLoader.loadOnlyWifiOption, AppConfig.loadCoverOnlyWifi,
                     )
@@ -58,10 +51,10 @@ object ReadRecordCoverCache {
                         } finally {
                             Glide.with(appCtx).clear(validation)
                         }
-                        synchronized(lock) {
+                        appDb.runInTransaction {
                             val current = appDb.readRecordDao.getRecord(record.deviceId, record.bookName)
                             if (current?.coverUrl == path) {
-                                install(downloaded, targetFile)
+                                val targetFile = installPersistentCover(downloaded, root)
                                 attach(record, path, targetFile)
                             }
                         }
@@ -79,19 +72,18 @@ object ReadRecordCoverCache {
         }
     }
 
-    fun retainLocal(path: String?): String? = synchronized(lock) {
-        if (path.isNullOrBlank()) return@synchronized path
-        if (ownedFile(path)?.isFile == true) return@synchronized path
+    // Called inside the snapshot transaction, so pruning cannot remove an uncommitted copy.
+    fun retainLocal(path: String?): String? {
+        if (path.isNullOrBlank()) return path
+        if (ownedFile(path)?.isFile == true) return path
         val source = File(path)
-        if (!source.isAbsolute || !source.isFile) return@synchronized path
-        runCatching {
-            val target = File(root, MD5Utils.md5Encode(path) + ".cover")
-            install(source, target)
-            target.absolutePath
+        if (!source.isAbsolute || !source.isFile) return path
+        return runCatching {
+            installPersistentCover(source, root).absolutePath
         }.getOrDefault(path)
     }
 
-    fun prune() = synchronized(lock) {
+    fun prune() = appDb.runInTransaction {
         val referenced = appDb.readRecordDao.all.mapNotNull { ownedFile(it.coverUrl)?.name }.toSet()
         root.listFiles()?.filter { it.isFile && it.name !in referenced }?.forEach(File::delete)
         Unit
@@ -110,15 +102,4 @@ object ReadRecordCoverCache {
         }
     }
 
-    private fun install(source: File, target: File) {
-        require(source.length() > 0L)
-        check(root.isDirectory || root.mkdirs())
-        val temporary = File.createTempFile(".history-", ".part", root)
-        try {
-            source.copyTo(temporary, overwrite = true)
-            if (!target.exists()) check(temporary.renameTo(target))
-        } finally {
-            temporary.delete()
-        }
-    }
 }

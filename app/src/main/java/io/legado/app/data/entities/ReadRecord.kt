@@ -44,6 +44,12 @@ fun ReadRecord.updateSnapshot(
 
 fun ReadRecord.saveWithCover(book: Book?) {
     val snapshotBook = book?.takeIf { it.name == bookName }
+    refreshChapterTitle(snapshotBook)
+    appDb.readRecordDao.insert(this)
+    ReadRecordCoverCache.request(copy(), snapshotBook?.getCoverSourceOrigin())
+}
+
+private fun ReadRecord.refreshChapterTitle(snapshotBook: Book?) {
     if (snapshotBook != null && lastChapterIndex >= 0) {
         appDb.bookChapterDao.getChapter(snapshotBook.bookUrl, lastChapterIndex)?.let { chapter ->
             lastChapterTitle = chapter.getDisplayTitle(
@@ -53,24 +59,24 @@ fun ReadRecord.saveWithCover(book: Book?) {
             )
         }
     }
-    appDb.readRecordDao.insert(this)
-    ReadRecordCoverCache.request(copy(), snapshotBook?.getCoverSourceOrigin())
 }
 
 /** Copy the bookshelf data before deleting it so the history row remains displayable. */
 fun Book.saveReadRecordSnapshot() {
-    val current = appDb.readRecordDao.getRecord(AppConst.androidId, name) ?: return
-    val record = current
-        .copy(
-            deviceId = AppConst.androidId,
-            bookName = name,
-            author = author.ifBlank { current.author },
-            lastChapterTitle = durChapterTitle ?: current.lastChapterTitle,
-            lastChapterIndex = durChapterIndex,
-            lastChapterPos = durChapterPos,
-            coverUrl = ReadRecordCoverCache.retainLocal(getDisplayCover() ?: current.coverUrl),
-        )
-    record.saveWithCover(this)
+    var snapshot: ReadRecord? = null
+    appDb.runInTransaction {
+        val current = appDb.readRecordDao.getRecord(AppConst.androidId, name) ?: return@runInTransaction
+        val record = current.copy(
+            author = ReadRecordAuthors.merge(current.author, author),
+        ).apply {
+            updateSnapshot(this@saveReadRecordSnapshot)
+            refreshChapterTitle(this@saveReadRecordSnapshot)
+            coverUrl = ReadRecordCoverCache.retainLocal(coverUrl)
+        }
+        if (record != current) appDb.readRecordDao.update(record)
+        snapshot = record
+    }
+    snapshot?.let { ReadRecordCoverCache.request(it, getCoverSourceOrigin()) }
 }
 
 /** 同设备同书名共用主键,复用 author 列保存作者集合,纯文本仍兼容旧记录. */

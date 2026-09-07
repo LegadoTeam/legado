@@ -41,6 +41,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 class ReadRecordHistoryTest {
@@ -159,6 +163,38 @@ class ReadRecordHistoryTest {
         assertEquals(12, saved.lastChapterIndex)
         assertEquals(33, saved.lastChapterPos)
         assertEquals("Chapter 13: Captured chapter", saved.lastChapterTitle)
+    }
+
+    @Test
+    fun refreshingSnapshotCannotUndoConcurrentDurationUpdatesOrDeletion() {
+        val executor = Executors.newSingleThreadExecutor()
+        fun refreshDuring(change: () -> Unit) {
+            lateinit var refresh: Future<*>
+            appDb.runInTransaction {
+                val started = CountDownLatch(1)
+                refresh = executor.submit {
+                    started.countDown()
+                    book.saveReadRecordSnapshot()
+                }
+                assertTrue(started.await(5, TimeUnit.SECONDS))
+                change()
+            }
+            refresh.get(10, TimeUnit.SECONDS)
+        }
+        try {
+            val latest = appDb.readRecordDao.getRecord(AppConst.androidId, book.name)!!
+                .copy(readTime = 30 * 3600_000L, lastRead = 5000)
+            refreshDuring { appDb.readRecordDao.insert(latest) }
+            val refreshed = appDb.readRecordDao.getRecord(AppConst.androidId, book.name)!!
+            assertEquals(latest.readTime, refreshed.readTime)
+            assertEquals(latest.lastRead, refreshed.lastRead)
+            assertEquals(book.durChapterTitle, refreshed.lastChapterTitle)
+
+            refreshDuring { appDb.readRecordDao.deleteByName(book.name) }
+            assertNull(appDb.readRecordDao.getRecord(AppConst.androidId, book.name))
+        } finally {
+            executor.shutdownNow()
+        }
     }
 
     @Test
