@@ -30,7 +30,7 @@ class ReadRecordMergeTest {
 
     @Test
     fun `legacy backups do not erase known metadata`() {
-        val merged = mergeRestoredReadRecord(current, ReadRecord(bookName = "Book", readTime = 200, lastRead = 30), true)
+        val merged = mergeRestoredReadRecord(current, ReadRecord(deviceId = "local", bookName = "Book", readTime = 200, lastRead = 30), true)
         assertEquals("Chapter 4", merged.lastChapterTitle)
         assertEquals(3, merged.lastChapterIndex)
         assertEquals("/cover.png", merged.coverUrl)
@@ -48,5 +48,24 @@ class ReadRecordMergeTest {
         val merged = mergeRestoredReadRecord(current, current.copy(readTime = 50, lastRead = 20), false)
         assertEquals(50L, merged.readTime)
         assertEquals(20L, merged.lastRead)
+    }
+
+    @Test
+    fun `a different author device or name cannot inherit the existing duration or snapshot`() {
+        listOf(
+            ReadRecord(deviceId = "local", bookName = "Book", author = "Another author"),
+            ReadRecord(deviceId = "remote", bookName = "Book"),
+            ReadRecord(deviceId = "local", bookName = "Another book"),
+        ).forEach { incoming ->
+            assertEquals(incoming, mergeRestoredReadRecord(current, incoming, true))
+        }
+    }
+
+    @Test
+    fun `a combined legacy bucket is never split into one authors record`() {
+        val legacy = current.copy(author = ReadRecordAuthors.merge("Author A", "Author B"))
+        val individual = current.copy(author = "Author A", readTime = 5, lastChapterTitle = "Only A")
+        assertEquals(individual, mergeRestoredReadRecord(legacy, individual, true))
+        assertEquals(legacy, mergeRestoredReadRecord(individual, legacy, true))
     }
 }

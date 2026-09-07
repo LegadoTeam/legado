@@ -67,7 +67,7 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
 
     private val adapter by lazy { RecordAdapter(this) }
     private var dataJob: Job? = null
-    private var booksByName: Map<String, Book> = emptyMap()
+    private var booksByIdentity: Map<Pair<String, String>, Book> = emptyMap()
     private var sortMode
         get() = LocalConfig.getInt("readRecordSort")
         set(value) {
@@ -176,7 +176,7 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
         dataJob = lifecycleScope.launch {
             val (allRecords, readRecords, books) = withContext(IO) {
                 val bookshelf = appDb.bookDao.all.sortedBy { it.durChapterTime }
-                    .associateBy { it.name }
+                    .associateBy { it.name to it.author }
                 bookshelf.values.forEach { it.saveReadRecordSnapshot() }
                 val all = appDb.readRecordDao.allShow
                 val filtered = if (searchKey.isNullOrBlank()) all
@@ -186,13 +186,14 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
                         1 -> records.sortedByDescending { it.readTime }
                         2 -> records.sortedByDescending { it.lastRead }
                         else -> records.sortedWith { o1, o2 ->
-                            o1.bookName.cnCompare(o2.bookName)
+                            o1.bookName.cnCompare(o2.bookName).takeIf { it != 0 }
+                                ?: o1.displayAuthor.cnCompare(o2.displayAuthor)
                         }
                     }
                 }
                 Triple(all, sorted, bookshelf)
             }
-            booksByName = books
+            booksByIdentity = books
             val simple = AppConfig.readRecordSimpleLayout
             binding.compactSummary.isVisible = simple
             binding.enhancedSummary.root.isVisible = !simple
@@ -230,7 +231,7 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
     }
 
     private fun loadCover(image: ImageView, record: ReadRecordShow) {
-        val book = booksByName[record.bookName]
+        val book = booksByIdentity[record.bookName to record.author]
         val cover = book?.getDisplayCover()?.takeIf { it.isNotBlank() } ?: record.coverUrl
         var options = RequestOptions().set(
             OkHttpModelLoader.loadOnlyWifiOption, AppConfig.loadCoverOnlyWifi,
@@ -280,16 +281,17 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
             item: ReadRecordShow,
             payloads: MutableList<Any>,
         ) {
+            val author = if (item.hasCombinedAuthors) {
+                getString(R.string.read_record_legacy_authors, item.displayAuthor)
+            } else {
+                item.displayAuthor.ifBlank { getString(R.string.read_record_no_author) }
+            }
             binding.compact.root.isVisible = AppConfig.readRecordSimpleLayout
             binding.enhanced.root.isVisible = !AppConfig.readRecordSimpleLayout
             binding.compact.apply {
                 tvBookName.text = item.bookName
-                tvAuthor.isVisible = item.displayAuthor.isNotBlank()
-                tvAuthor.text = if (tvAuthor.isVisible) {
-                    context.getString(R.string.author_show, item.displayAuthor)
-                } else {
-                    ""
-                }
+                tvAuthor.isVisible = true
+                tvAuthor.text = context.getString(R.string.author_show, author)
                 tvReadingTime.text = formatDuring(item.readTime, AppConfig.readRecordUseDays)
                 if (item.lastRead > 0) {
                     tvLastReadTime.text = dateFormat.format(item.lastRead)
@@ -300,12 +302,8 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
             if (!AppConfig.readRecordSimpleLayout) {
                 binding.enhanced.apply {
                     tvBookName.text = item.bookName
-                    tvAuthor.text = item.displayAuthor.ifBlank {
-                        booksByName[item.bookName]?.author.orEmpty().ifBlank {
-                            getString(R.string.read_record_no_author)
-                        }
-                    }
-                    tvChapter.text = booksByName[item.bookName]?.durChapterTitle
+                    tvAuthor.text = author
+                    tvChapter.text = booksByIdentity[item.bookName to item.author]?.durChapterTitle
                         ?.takeIf { it.isNotBlank() }
                         ?: item.lastChapterTitle?.takeIf { it.isNotBlank() }
                         ?: getString(R.string.read_record_no_chapter)
@@ -322,7 +320,9 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
                     val item = getItem(holder.layoutPosition) ?: return@setOnClickListener
                     lifecycleScope.launch {
                         val book = withContext(IO) {
-                            appDb.bookDao.findByName(item.bookName).maxByOrNull { it.durChapterTime }
+                            appDb.bookDao.findByName(item.bookName)
+                                .filter { it.author == item.author }
+                                .maxByOrNull { it.durChapterTime }
                         }
                         if (book == null) {
                             SearchActivity.start(this@ReadRecordActivity, item.bookName)
@@ -346,11 +346,12 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
 
         private fun sureDelAlert(item: ReadRecordShow) {
             alert(R.string.delete) {
-                setMessage(getString(R.string.sure_del_any, item.bookName))
+                val author = item.displayAuthor.ifBlank { getString(R.string.read_record_no_author) }
+                setMessage(getString(R.string.sure_del_any, "${item.bookName} · $author"))
                 yesButton {
                     lifecycleScope.launch {
                         withContext(IO) {
-                            appDb.readRecordDao.deleteByName(item.bookName)
+                            appDb.readRecordDao.deleteByBook(item.bookName, item.author)
                             ReadRecordCoverCache.prune()
                         }
                         initData()

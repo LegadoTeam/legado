@@ -58,7 +58,8 @@ object ReadManga : CoroutineScope by MainScope() {
     var nextMangaChapter: MangaChapter? = null
     var bookSource: BookSource? = null
     var readStartTime: Long = System.currentTimeMillis()
-    private val readRecord = ReadRecord()
+    private val readRecordLock = Any()
+    private var readRecord = ReadRecord()
     private val loadingChapters = arrayListOf<Int>()
     var simulatedChapterSize = 0
     var mCallback: Callback? = null
@@ -72,14 +73,9 @@ object ReadManga : CoroutineScope by MainScope() {
     val hasNextChapter get() = durChapterIndex < simulatedChapterSize - 1
 
     fun resetData(book: Book) {
-        readRecord.deviceId = AppConst.androidId
-        val readTime = appDb.readRecordDao
-            .getReadTime(readRecord.deviceId, book.name) ?: 0
-        synchronized(readRecord) {
+        synchronized(readRecordLock) {
             ReadManga.book = book
-            readRecord.bookName = book.name
-            readRecord.author = book.author
-            readRecord.readTime = readTime
+            resetReadRecord(book)
         }
         chapterSize = appDb.bookChapterDao.getChapterCount(book.bookUrl)
         simulatedChapterSize = if (book.readSimulating()) {
@@ -99,7 +95,13 @@ object ReadManga : CoroutineScope by MainScope() {
     }
 
     fun upData(book: Book) {
-        ReadManga.book = book
+        synchronized(readRecordLock) {
+            if (readRecord.bookName != book.name || readRecord.author != book.author) {
+                upReadTime()
+                resetReadRecord(book)
+            }
+            ReadManga.book = book
+        }
         chapterSize = appDb.bookChapterDao.getChapterCount(book.bookUrl)
         simulatedChapterSize = if (book.readSimulating()) {
             book.simulatedTotalChapterNum()
@@ -135,26 +137,31 @@ object ReadManga : CoroutineScope by MainScope() {
         nextMangaChapter = null
     }
 
+    private fun resetReadRecord(book: Book) {
+        readRecord = appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author)
+            ?: ReadRecord(deviceId = AppConst.androidId, bookName = book.name, author = book.author)
+    }
+
     //每次切换章节更新阅读记录
     fun upReadTime() {
-        val snapshotBook = book?.copy()
-        val record = synchronized(readRecord) {
-            val currentBook = book ?: return
-            val author = book?.author ?: return
+        val (record, snapshotBook, elapsed) = synchronized(readRecordLock) {
+            val currentBook = book?.copy() ?: return
+            if (readRecord.bookName != currentBook.name || readRecord.author != currentBook.author) {
+                resetReadRecord(currentBook)
+            }
             val now = System.currentTimeMillis()
-            val elapsed = now - readStartTime
+            val elapsed = (now - readStartTime).coerceAtLeast(0)
             readStartTime = now
-            readRecord.author = author
             readRecord.readTime += elapsed
             readRecord.lastRead = now
             readRecord.updateSnapshot(currentBook, durChapterIndex, durChapterPos)
-            readRecord.copy()
+            Triple(readRecord.copy(), currentBook, elapsed)
         }
         executor.execute {
             if (!AppConfig.enableReadRecord) {
                 return@execute
             }
-            record.saveWithCover(snapshotBook)
+            record.saveWithCover(snapshotBook, elapsed)
         }
     }
 

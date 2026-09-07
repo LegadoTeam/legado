@@ -374,7 +374,7 @@ object Restore {
                     File(path), appCtx.externalFiles,
                 ))
                 appDb.runInTransaction {
-                    val current = appDb.readRecordDao.getRecord(restoredRecord.deviceId, restoredRecord.bookName)
+                    val current = appDb.readRecordDao.getRecord(restoredRecord.deviceId, restoredRecord.bookName, restoredRecord.author)
                     appDb.readRecordDao.insert(mergeRestoredReadRecord(
                         current, restoredRecord, restoredRecord.deviceId == androidId,
                     ))
