@@ -13,6 +13,7 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.SeekBar
 import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -355,6 +356,27 @@ class MangaReadingDirectionTest {
     }
 
     @Test
+    fun progressTrackAndChapterButtonsFollowTheSelectedDirection() {
+        launchReader()
+        listOf(false, true).forEach { rightToLeft ->
+            if (AppConfig.mangaRightToLeft != rightToLeft) {
+                toggle(R.id.menu_manga_right_to_left)
+            }
+            scenario!!.onActivity { it.ui.mangaMenu.runMenuIn(false) }
+            awaitActivity("chapter buttons placed in the selected direction") { activity ->
+                val previous = activity.findViewById<View>(R.id.tv_pre)
+                val next = activity.findViewById<View>(R.id.tv_next)
+                if (rightToLeft) next.left < previous.left else previous.left < next.left
+            }
+            seekAtEdge(left = true)
+            awaitPage(1, if (rightToLeft) 3 else 0)
+            seekAtEdge(left = false)
+            awaitPage(1, if (rightToLeft) 0 else 3)
+            scenario!!.onActivity { it.ui.mangaMenu.runMenuOut(false) }
+        }
+    }
+
+    @Test
     fun rightToLeftBookBoundariesKeepFirstAndLastImageProgress() {
         AppConfig.mangaRightToLeft = true
         launchReader()
@@ -570,6 +592,29 @@ class MangaReadingDirectionTest {
     }
 
     private fun key(code: Int) = instrumentation.sendKeyDownUpSync(code)
+
+    private fun seekAtEdge(left: Boolean) {
+        val location = IntArray(2)
+        var x = 0f
+        var y = 0f
+        scenario!!.onActivity { activity ->
+            val seekBar = activity.findViewById<SeekBar>(R.id.seek_read_page)
+            seekBar.getLocationOnScreen(location)
+            val offset = if (left) seekBar.paddingLeft else seekBar.width - seekBar.paddingRight
+            x = location[0] + offset.coerceIn(1, seekBar.width - 1).toFloat()
+            y = location[1] + seekBar.height / 2f
+        }
+        val downTime = SystemClock.uptimeMillis()
+        listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP).forEach { action ->
+            val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action, x, y, 0)
+            try {
+                event.source = InputDevice.SOURCE_TOUCHSCREEN
+                instrumentation.sendPointerSync(event)
+            } finally {
+                event.recycle()
+            }
+        }
+    }
 
     private fun tap(x: Float, y: Float) = touch(x, y, x, y, steps = 0)
 
