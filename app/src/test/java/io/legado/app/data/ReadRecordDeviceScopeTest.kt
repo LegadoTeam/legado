@@ -18,9 +18,8 @@ class ReadRecordDeviceScopeTest {
         assertTrue(dao.contains("fun getReadTime(deviceId: String, bookName: String)"))
         assertTrue(
             normalizedDao.contains(
-                "select bookName, sum(readTime) as readTime, max(lastRead) as lastRead, " +
-                    "group_concat(author, char(31)) as author " +
-                    "from readRecord group by bookName"
+                "select history.bookName, sum(history.readTime) as readTime, " +
+                    "max(history.lastRead) as lastRead, group_concat(history.author, char(31)) as author"
             )
         )
 
@@ -41,10 +40,10 @@ class ReadRecordDeviceScopeTest {
         val restore = projectFile("src/main/java/io/legado/app/help/storage/Restore.kt")
         assertTrue(restore.contains("readRecord.deviceId.isBlank()"))
         assertTrue(restore.contains("readRecord.copy(deviceId = androidId)"))
-        assertTrue(restore.contains("normalizedRecord.deviceId != androidId"))
+        assertTrue(restore.contains("restoredRecord.deviceId == androidId"))
         assertTrue(
             restore.contains(
-                "getRecord(normalizedRecord.deviceId, normalizedRecord.bookName)"
+                "getRecord(restoredRecord.deviceId, restoredRecord.bookName)"
             )
         )
     }
@@ -66,7 +65,7 @@ class ReadRecordDeviceScopeTest {
         assertTrue(upReadTime.contains("val elapsed = now - readStartTime"))
         assertTrue(upReadTime.contains("readStartTime = now"))
         assertTrue(upReadTime.contains("readRecord.copy()"))
-        assertTrue(upReadTime.contains("appDb.readRecordDao.insert(record)"))
+        assertTrue(upReadTime.contains("record.saveWithCover(snapshotBook)"))
         assertTrue(upReadTime.indexOf("val elapsed = now - readStartTime") <
             upReadTime.indexOf("executor.execute"))
         assertTrue(upReadTime.indexOf("readStartTime = now") <

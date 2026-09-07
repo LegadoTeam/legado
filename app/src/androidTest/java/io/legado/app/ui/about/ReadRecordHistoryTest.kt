@@ -29,6 +29,7 @@ import io.legado.app.help.storage.BackupConfig
 import io.legado.app.help.storage.Restore
 import io.legado.app.help.storage.writePreferenceSnapshot
 import io.legado.app.utils.defaultSharedPreferences
+import io.legado.app.utils.GSON
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -173,9 +174,19 @@ class ReadRecordHistoryTest {
             AppConfig.readRecordSimpleLayout = false
             AppConfig.readRecordUseDays = true
             writePreferenceSnapshot(context, directory.absolutePath, "config") { putBoolean("enableReadRecord", true) }
+            File(directory, "readRecord.json").writeText(GSON.toJson(listOf(ReadRecord(
+                deviceId = "", bookName = book.name, readTime = 30 * 3600_000L, lastRead = 2000,
+                lastChapterTitle = "Restored chapter", lastChapterIndex = 12, lastChapterPos = 44,
+            ))))
             runBlocking(Dispatchers.IO) { Restore.restoreLocked(directory.absolutePath) }
             assertTrue(AppConfig.readRecordSimpleLayout)
             assertFalse(AppConfig.readRecordUseDays)
+            val restored = appDb.readRecordDao.getRecord(AppConst.androidId, book.name)!!
+            assertEquals(30 * 3600_000L, restored.readTime)
+            assertEquals("Restored chapter", restored.lastChapterTitle)
+            assertEquals(12, restored.lastChapterIndex)
+            assertEquals(44, restored.lastChapterPos)
+            assertNull(appDb.readRecordDao.getRecord("", book.name))
             val previous = BackupConfig.ignoreConfig.remove(BackupConfig.readRecordCoverContentKey)
             try {
                 assertFalse(BackupConfig.contentIsEnabled(BackupConfig.readRecordCoverContentKey))
