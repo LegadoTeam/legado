@@ -199,7 +199,10 @@ object JsSourceConfig {
      */
     private fun readMaxBatchSize(jsonObject: JsonObject, configName: String): Int? {
         val element = jsonObject.get("maxBatchSize") ?: return null
-        val size = runCatching { element.asInt }.getOrNull()
+        val size = runCatching {
+            require(element.isJsonPrimitive && element.asJsonPrimitive.isNumber)
+            element.asBigDecimal.intValueExact()
+        }.getOrNull()
             ?: throw NoStackTraceException("$configName.maxBatchSize 必须是整数")
         if (size <= 1) {
             throw NoStackTraceException("$configName.maxBatchSize 必须大于1,不启用批量时删除该字段")

@@ -31,6 +31,23 @@ class JsSourceConfigTest {
     """.trimIndent()
 
     @Test
+    fun `batch size requires a numeric exact int without truncation`() {
+        for (value in listOf("2.5", "2147483648", "4294967298", "1e100", "'2'", "null", "true")) {
+            assertExtractError(
+                validScript + "\nconfig.maxBatchSize = $value; function getContentBatch(chapters, book) {}",
+                "必须是整数",
+            )
+        }
+        assertEquals(2, JsSourceConfig.extract(
+            validScript + "\nconfig.maxBatchSize = 2.0; function getContentBatch(chapters, book) {}"
+        ).contentBatchSize())
+        assertEquals(io.legado.app.data.entities.BookSource.MAX_CONTENT_BATCH_SIZE,
+            JsSourceConfig.extract(
+                validScript + "\nconfig.maxBatchSize = 2147483647; function getContentBatch(chapters, book) {}"
+            ).contentBatchSize())
+    }
+
+    @Test
     fun `review capability ignores comments and requires both functions`() {
         assertFalse(
             JsSourceConfig.declaresReviewFunctions(
