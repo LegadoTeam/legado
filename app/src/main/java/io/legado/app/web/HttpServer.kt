@@ -136,7 +136,7 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
                         returnData = when (uri) {
                             "/getBookSource" -> BookSourceController.getSource(parameters)
                             "/getBookSources" -> BookSourceController.sources
-                            "/getBookSourcesForManagement" -> BookSourceCheckController.sources()
+                            "/getBookSourcesForManagement" -> BookSourceCheckController.sources(parameters)
                             "/getBookSourceCheckStates" -> BookSourceCheckController.states()
                             "/getJsSourceApiTokenRequired" ->
                                 BookSourceController.isJsSourceApiTokenRequired

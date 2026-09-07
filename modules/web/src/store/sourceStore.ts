@@ -6,7 +6,7 @@ import {
   convertSourcesToMap,
 } from '@utils/souce'
 import type { BookSoure, RssSource, Source } from '@/source'
-import { sourceCheckContent, sourceCheckStatus } from '@/utils/sourceCheckState'
+import { sourceCheckContent, sourceCheckStatus, sourceCheckSnapshots } from '@/utils/sourceCheckState'
 import type { SourceCheckState, SourceCheckSnapshot } from '@/utils/sourceCheckState'
 
 const isBookSource = /bookSource/i.test(location.href)
@@ -53,10 +53,7 @@ export const useSourceStore = defineStore('source', {
     },
     rememberDeviceSources(sources: Source[], states: SourceCheckState[]) {
       this.setCheckStates(states)
-      this.checkSnapshots = Object.fromEntries(sources.map(source => {
-        const url = getSourceUniqueKey(source)
-        return [url, { content: sourceCheckContent(source), sourceRevision: this.checkStates[url]?.sourceRevision || '' }]
-      }))
+      this.checkSnapshots = sourceCheckSnapshots(sources, states)
     },
     rememberCheckStart(sources: Source[], revisions: Record<string, string>) {
       sources.forEach(source => {
@@ -64,6 +61,10 @@ export const useSourceStore = defineStore('source', {
         this.checkSnapshots[url] = { content: sourceCheckContent(source), sourceRevision: revisions[url] }
         this.checkStates[url] = { bookSourceUrl: url, sourceRevision: revisions[url], status: 'NEEDS_CHECK', detail: '' }
       })
+    },
+    rememberSavedSources(sources: Source[], states: SourceCheckState[]) {
+      states.forEach(state => { this.checkStates[state.bookSourceUrl] = state })
+      Object.assign(this.checkSnapshots, sourceCheckSnapshots(sources, states))
     },
     invalidateCheckSources(sources: Source[]) {
       sources.forEach(source => { delete this.checkSnapshots[getSourceUniqueKey(source)] })

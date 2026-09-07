@@ -5,10 +5,12 @@ import androidx.annotation.Keep
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookSourcePart
+import io.legado.app.data.entities.BOOK_SOURCE_QUERY_CHUNK_SIZE
 import io.legado.app.model.CheckSource
 import io.legado.app.model.Debug
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
+import io.legado.app.utils.fromJsonArray
 import splitties.init.appCtx
 import java.util.UUID
 
@@ -23,12 +25,19 @@ object BookSourceCheckController {
     ))
 
     /** Sources and their local revision must be read from the same snapshot. */
-    fun sources(): ReturnData {
+    fun sources(parameters: Map<String, List<String>>): ReturnData {
+        val rawUrls = parameters["urls"]?.firstOrNull()
+        val urls = rawUrls?.let { GSON.fromJsonArray<String>(it).getOrNull() }
+        if (rawUrls != null && urls == null) return ReturnData().setErrorMsg("书源地址参数无效")
         var result = ReturnData()
         appDb.runInTransaction {
+            val sources = if (urls == null) appDb.bookSourceDao.all else urls.distinct()
+                .chunked(BOOK_SOURCE_QUERY_CHUNK_SIZE).flatMap { appDb.bookSourceDao.getBookSources(it) }
+            val states = if (urls == null) appDb.bookSourceDao.allCheckStates() else
+                sources.mapNotNull { appDb.bookSourceDao.getCheckState(it.bookSourceUrl) }
             result = ReturnData().setData(mapOf(
-                "sources" to appDb.bookSourceDao.all,
-                "states" to appDb.bookSourceDao.allCheckStates(),
+                "sources" to sources,
+                "states" to states,
             ))
         }
         return result

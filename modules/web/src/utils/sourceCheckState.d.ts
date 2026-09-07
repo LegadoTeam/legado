@@ -8,4 +8,5 @@ export type SourceCheckState = {
 export type SourceCheckSnapshot = { content: string; sourceRevision: string }
 export function sourceCheckContent(source: Source): string
 export function sourceCheckStatus(source: Source, snapshot?: SourceCheckSnapshot, state?: SourceCheckState): SourceCheckState['status']
+export function sourceCheckSnapshots(sources: Source[], states: SourceCheckState[]): Record<string, SourceCheckSnapshot>
 export const sourceCheckOptions: { value: string; label: string }[]

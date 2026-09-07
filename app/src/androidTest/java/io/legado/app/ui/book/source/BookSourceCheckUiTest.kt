@@ -1,7 +1,10 @@
 package io.legado.app.ui.book.source
 
 import android.graphics.Bitmap
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
+import android.view.PixelCopy
 import android.widget.Spinner
 import androidx.appcompat.widget.SearchView
 import androidx.test.core.app.ActivityScenario
@@ -10,6 +13,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.R
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
+import io.legado.app.databinding.ItemBookSourceBinding
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.model.CheckSource
 import io.legado.app.model.Debug
@@ -24,6 +28,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 class BookSourceCheckUiTest {
@@ -77,6 +83,7 @@ class BookSourceCheckUiTest {
         awaitItems(listOf(sources[0].bookSourceUrl))
         scenario!!.onActivity { it.findViewById<Spinner>(R.id.check_status_filter).setSelection(1) }
         awaitItems(listOf(sources[1].bookSourceUrl))
+        screenshot("source-check-filter-needed")
     }
 
     @Test fun realServicePersistsFailureAndSuccessWithoutChangingGroups() = runBlocking {
@@ -109,7 +116,15 @@ class BookSourceCheckUiTest {
             val adapter = recycler.adapter as BookSourceAdapter
             actual = adapter.getItems().map { source -> source.bookSourceUrl }
             rendered = !recycler.isComputingLayout && !recycler.hasPendingAdapterUpdates() &&
-                recycler.itemAnimator?.isRunning != true && recycler.childCount == expected.size
+                !recycler.isLayoutRequested && recycler.itemAnimator?.isRunning != true &&
+                recycler.childCount == expected.size && (0 until recycler.childCount).all { index ->
+                    val child = recycler.getChildAt(index)
+                    val position = recycler.getChildAdapterPosition(child)
+                    val source = adapter.getItem(position)
+                    source?.bookSourceUrl == expected.getOrNull(index) &&
+                        ItemBookSourceBinding.bind(child).cbBookSource.text.toString() ==
+                        source?.getDisPlayNameGroup()
+                }
         }
         actual == expected && rendered
     }
@@ -125,8 +140,30 @@ class BookSourceCheckUiTest {
 
     private fun screenshot(name: String) {
         instrumentation.waitForIdleSync()
+        val frameCommitted = CountDownLatch(1)
+        lateinit var bitmap: Bitmap
+        scenario!!.onActivity { activity ->
+            val decor = activity.window.decorView
+            assertTrue("Screenshot requires the hardware-rendered window", decor.isHardwareAccelerated)
+            bitmap = Bitmap.createBitmap(decor.width, decor.height, Bitmap.Config.ARGB_8888)
+            // A settled View hierarchy does not mean RenderThread has submitted its new frame.
+            decor.viewTreeObserver.registerFrameCommitCallback { frameCommitted.countDown() }
+            decor.postInvalidateOnAnimation()
+        }
+        assertTrue("Filtered frame was not committed", frameCommitted.await(5, TimeUnit.SECONDS))
+        val copied = CountDownLatch(1)
+        var copyResult = PixelCopy.ERROR_UNKNOWN
+        scenario!!.onActivity { activity ->
+            // Read the submitted window buffer, not a possibly older compositor screenshot.
+            PixelCopy.request(activity.window, bitmap, { result ->
+                copyResult = result
+                copied.countDown()
+            }, Handler(Looper.getMainLooper()))
+        }
         val directory = File(context.getExternalFilesDir(null), "ui-regression").apply { mkdirs() }
-        instrumentation.uiAutomation.takeScreenshot().useBitmap { bitmap ->
+        bitmap.useBitmap {
+            assertTrue("Filtered frame was not copied", copied.await(5, TimeUnit.SECONDS))
+            assertEquals("Unable to capture the rendered window", PixelCopy.SUCCESS, copyResult)
             File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
     }

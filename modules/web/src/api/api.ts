@@ -241,10 +241,22 @@ const startBookSourceCheck = (sources: Source[], keyword: string) =>
 const stopBookSourceCheck = (sessionToken: string) =>
   ajax.post<LeagdoApiResponse<string>>('stopBookSourceCheck', { sessionToken })
 
+const refreshSavedCheckStates = async (sources: Source[]) => {
+  const store = useSourceStore()
+  store.invalidateCheckSources(sources)
+  try {
+    const urls = sources.map(source => (source as BookSoure).bookSourceUrl)
+    const { data } = await ajax.get('getBookSourcesForManagement', { params: { urls: JSON.stringify(urls) } })
+    if (data.isSuccess) store.rememberSavedSources(data.data.sources, data.data.states)
+  } catch {
+    // A failed metadata refresh must not report an already committed source save as failed.
+  }
+}
+
 const saveSource = (data: Source) =>
   isBookSource
-    ? ajax.post<LeagdoApiResponse<string>>('saveBookSource', data).then(response => {
-      if (response.data.isSuccess) useSourceStore().invalidateCheckSources([data])
+    ? ajax.post<LeagdoApiResponse<string>>('saveBookSource', data).then(async response => {
+      if (response.data.isSuccess) await refreshSavedCheckStates([data])
       return response
     })
     : ajax.post<LeagdoApiResponse<string>>('saveRssSource', data)
@@ -253,15 +265,15 @@ const saveJsSource = (script: string, openedSourceUrl?: string) =>
   ajax.post<LeagdoApiResponse<BookSoure>>('saveJsSource', script, {
     params: { openedSourceUrl },
     headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-  }).then(response => {
-    if (response.data.isSuccess) useSourceStore().invalidateCheckSources([response.data.data])
+  }).then(async response => {
+    if (response.data.isSuccess) await refreshSavedCheckStates([response.data.data])
     return response
   })
 
 const saveSources = (data: Source[]) =>
   isBookSource
-    ? ajax.post<LeagdoApiResponse<Source[]>>('saveBookSources', data).then(response => {
-      if (response.data.isSuccess) useSourceStore().invalidateCheckSources(response.data.data)
+    ? ajax.post<LeagdoApiResponse<Source[]>>('saveBookSources', data).then(async response => {
+      if (response.data.isSuccess) await refreshSavedCheckStates(response.data.data)
       return response
     })
     : ajax.post<LeagdoApiResponse<Source[]>>('saveRssSources', data)
