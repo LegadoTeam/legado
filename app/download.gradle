@@ -1,6 +1,5 @@
 import java.security.MessageDigest
 import groovy.json.JsonOutput
-import groovy.json.JsonSlurper
 
 apply plugin: 'de.undercouch.download'
 
@@ -129,34 +128,3 @@ tasks.register('downloadCronet') {
         f1.setText(metadata, "UTF-8")
     }
 }
-
-// Cronet 153 no longer invokes Builder.setLibraryLoader. Android must be able
-// to resolve the versioned library through the APK's standard native paths.
-// The app's other native dependencies do not yet support RISC-V.
-def packagedCronetAbis = CRONET_ABIS.findAll { it != 'riscv64' }
-def bundledCronet = tasks.register('prepareCronetNative', Sync) {
-    dependsOn downloadARM64, downloadARMv7, downloadX86_64, downloadX86
-    inputs.property('cronetVersion', CronetVersion.toString())
-    inputs.file("$assetsDir/cronet.json")
-    from(soPath) {
-        include packagedCronetAbis.collect { "${it}.so" }
-        eachFile { entry ->
-            entry.path = "${entry.name - '.so'}/libcronet.${CronetVersion}.so"
-        }
-        includeEmptyDirs = false
-    }
-    into layout.buildDirectory.dir('generated/cronetJni')
-    doFirst {
-        def metadata = new JsonSlurper().parse(new File(assetsDir, 'cronet.json'))
-        if (metadata.version != CronetVersion.toString()) {
-            throw new GradleException('Cronet native metadata version does not match the Java bundle')
-        }
-        packagedCronetAbis.each { abi ->
-            def library = new File(soPath, "${abi}.so")
-            if (!library.isFile() || generateMD5(library) != metadata[abi]) {
-                throw new GradleException("Cronet native library checksum mismatch: $abi")
-            }
-        }
-    }
-}
-tasks.matching { it.name == 'preBuild' }.configureEach { dependsOn bundledCronet }
