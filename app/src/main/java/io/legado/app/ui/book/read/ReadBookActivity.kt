@@ -212,7 +212,8 @@ class ReadBookActivity : BaseReadBookActivity(),
                     it[1] as Int,
                     highlightLayoutTitleLength,
                     (it[TocActivityResult.HIGHLIGHT_ANCHOR_TEXT_INDEX] as String)
-                        .takeIf(String::isNotEmpty)
+                        .takeIf(String::isNotEmpty),
+                    pdfPageIndex = (it[TocActivityResult.PDF_PAGE_INDEX] as Int).takeIf { page -> page >= 0 }
                 )
             }
         }

@@ -16,6 +16,7 @@ import io.legado.app.base.VMBaseActivity
 import io.legado.app.data.entities.Book
 import io.legado.app.databinding.ActivityChapterListBinding
 import io.legado.app.help.book.isLocalTxt
+import io.legado.app.help.book.isPdf
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.primaryTextColor
@@ -170,7 +171,7 @@ class TocActivity : VMBaseActivity<ActivityChapterListBinding, TocViewModel>(),
                     resetCollapse = true,
                     replaceAll = true,
                 )
-                setResult(RESULT_OK, Intent().apply {
+                if (!it.isPdf) setResult(RESULT_OK, Intent().apply {
                     putExtra("index", it.durChapterIndex)
                     putExtra("chapterPos", 0)
                 })

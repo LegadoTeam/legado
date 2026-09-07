@@ -36,11 +36,13 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.databinding.ActivityMangaBinding
 import io.legado.app.databinding.ViewLoadMoreBinding
 import io.legado.app.help.book.isImage
+import io.legado.app.help.book.isPdf
 import io.legado.app.help.book.removeType
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.storage.Backup
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.model.ReadManga
+import io.legado.app.model.localBook.PdfFile
 import io.legado.app.receiver.NetworkChangedListener
 import io.legado.app.ui.book.changesource.ChangeBookSourceDialog
 import io.legado.app.ui.book.info.BookInfoActivity
@@ -137,7 +139,11 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     //打开目录返回选择章节返回结果
     private val tocActivity = registerForActivityResult(TocActivityResult()) {
         it?.let {
-            viewModel.openChapter(it[0] as Int, it[1] as Int)
+            val pdfPage = it[TocActivityResult.PDF_PAGE_INDEX] as Int
+            val position = if (ReadManga.book?.isPdf == true && pdfPage >= 0) {
+                pdfPage % PdfFile.PAGE_SIZE
+            } else it[1] as Int
+            viewModel.openChapter(it[0] as Int, position)
         }
     }
     private val bookInfoActivity =

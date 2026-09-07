@@ -26,6 +26,8 @@ import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.isImage
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isPdf
+import io.legado.app.model.localBook.PdfFile
+import io.legado.app.ui.book.read.page.findPdfPagePosition
 import io.legado.app.help.book.isSameNameAuthor
 import io.legado.app.help.book.readSimulating
 import io.legado.app.help.book.simulatedTotalChapterNum
@@ -39,6 +41,7 @@ import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.service.CacheBookService
 import io.legado.app.ui.book.read.page.entities.TextChapter
+import io.legado.app.ui.book.read.page.entities.TextPage
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.ui.book.read.page.provider.LayoutProgressListener
 import io.legado.app.utils.GSON
@@ -155,6 +158,8 @@ object ReadBook : CoroutineScope by MainScope() {
     private val nextChapterLoadingLock = Mutex()
     private var pendingHighlightJump: PendingHighlightJump? = null
     private var pendingHighlightAnchor: PendingHighlightAnchor? = null
+    private data class PendingPdfJump(val bookUrl: String, val chapterIndex: Int, val pageIndex: Int)
+    private var pendingPdfJump: PendingPdfJump? = null
     var readStartTime: Long = System.currentTimeMillis()
 
     /* 跳转进度前进度记录 */
@@ -553,6 +558,7 @@ object ReadBook : CoroutineScope by MainScope() {
         clearExpiredChapterLoadingJob(true)
         pendingHighlightJump = null
         pendingHighlightAnchor = null
+        pendingPdfJump = null
         invalidateHighlightRuleMatches()
         prevTextChapter = null
         curTextChapter = null
@@ -862,6 +868,7 @@ object ReadBook : CoroutineScope by MainScope() {
         upContent: Boolean = true,
         highlightLayoutTitleLength: Int? = null,
         highlightAnchorText: String? = null,
+        pdfPageIndex: Int? = null,
         success: (() -> Unit)? = null
     ) {
         if (BaseReadAloudService.isRun) {
@@ -892,6 +899,9 @@ object ReadBook : CoroutineScope by MainScope() {
                         it
                     )
                 }
+            }
+            pendingPdfJump = pdfPageIndex?.takeIf { it >= 0 && it / PdfFile.PAGE_SIZE == index }?.let { page ->
+                book?.takeIf { it.isPdf }?.let { PendingPdfJump(it.bookUrl, index, page) }
             }
             if (pendingHighlightJump == null) {
                 saveRead()
@@ -1312,7 +1322,8 @@ object ReadBook : CoroutineScope by MainScope() {
                     var available = false
                     for (page in textChapter.layoutChannel) {
                         val index = page.index
-                        val positionReady = resolvePendingHighlightJump(book, textChapter)
+                        val positionReady = resolvePendingPdfJump(book, textChapter, page) &&
+                            resolvePendingHighlightJump(book, textChapter)
                         if (positionReady && !available && page.containPos(durChapterPos)) {
                             if (upContent) {
                                 callBack?.upContent(
@@ -1330,6 +1341,7 @@ object ReadBook : CoroutineScope by MainScope() {
                         }
                         callBack?.onLayoutPageCompleted(index, page)
                     }
+                    finishPendingPdfJump(book, textChapter)
                     resolvePendingHighlightAnchor(book, textChapter)
                     if (upContent) {
                         callBack?.upContent(
@@ -1446,7 +1458,8 @@ object ReadBook : CoroutineScope by MainScope() {
                     var available = false
                     for (page in textChapter.layoutChannel) {
                         val index = page.index
-                        val positionReady = resolvePendingHighlightJump(book, textChapter)
+                        val positionReady = resolvePendingPdfJump(book, textChapter, page) &&
+                            resolvePendingHighlightJump(book, textChapter)
                         if (positionReady && !available && page.containPos(durChapterPos)) {
                             if (upContent) {
                                 callBack?.upContent(
@@ -1464,6 +1477,7 @@ object ReadBook : CoroutineScope by MainScope() {
                         }
                         callBack?.onLayoutPageCompleted(index, page)
                     }
+                    finishPendingPdfJump(book, textChapter)
                     resolvePendingHighlightAnchor(book, textChapter)
                     if (upContent) {
                         callBack?.upContent(
@@ -1565,6 +1579,7 @@ object ReadBook : CoroutineScope by MainScope() {
     }
 
     fun saveRead(pageChanged: Boolean = false) {
+        if (pendingPdfJump?.let { it.bookUrl == book?.bookUrl && it.chapterIndex == durChapterIndex } == true) return
         if (hasPendingHighlightJump()) return
         val book = book ?: return
         executor.execute {
@@ -1670,6 +1685,30 @@ object ReadBook : CoroutineScope by MainScope() {
                 job.cancel()
                 iterator.remove()
             }
+        }
+    }
+
+    private fun resolvePendingPdfJump(layoutBook: Book, textChapter: TextChapter, page: TextPage): Boolean {
+        val pending = pendingPdfJump ?: return true
+        if (curTextChapter !== textChapter) return false
+        if (pending.bookUrl != layoutBook.bookUrl || pending.chapterIndex != textChapter.chapter.index ||
+            pending.chapterIndex != durChapterIndex) {
+            pendingPdfJump = null
+            return true
+        }
+        val position = findPdfPagePosition(page, pending.pageIndex) ?: return false
+        durChapterPos = position
+        pendingPdfJump = null
+        saveRead()
+        return true
+    }
+
+    private fun finishPendingPdfJump(layoutBook: Book, textChapter: TextChapter) {
+        val pending = pendingPdfJump ?: return
+        if (curTextChapter === textChapter && pending.bookUrl == layoutBook.bookUrl &&
+            pending.chapterIndex == textChapter.chapter.index) {
+            pendingPdfJump = null
+            AppLog.put("PDF 目录目标页未能完成排版：${pending.pageIndex + 1}")
         }
     }
 
