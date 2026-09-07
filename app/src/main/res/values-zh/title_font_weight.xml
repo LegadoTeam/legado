@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="title_font_weight">标题字重</string>
+    <string name="title_font_weight_follow">跟随正文（原有标题效果）</string>
+</resources>

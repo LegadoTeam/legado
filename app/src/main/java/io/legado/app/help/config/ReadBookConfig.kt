@@ -460,6 +460,12 @@ object ReadBookConfig {
     val resolvedTitleFont: String
         get() = config.titleFont.ifEmpty { config.textFont }
 
+    var titleBold: Int
+        get() = config.titleBold.takeIf { it in -1..2 } ?: -1
+        set(value) {
+            config.titleBold = value.takeIf { it in -1..2 } ?: -1
+        }
+
     var textBold: Int
         get() = config.textBold
         set(value) {
@@ -725,6 +731,7 @@ object ReadBookConfig {
         if (shareLayout) {
             exportConfig.textFont = shareConfig.textFont
             exportConfig.titleFont = shareConfig.titleFont
+            exportConfig.titleBold = shareConfig.titleBold
             exportConfig.textBold = shareConfig.textBold
             exportConfig.textSize = shareConfig.textSize
             exportConfig.letterSpacing = shareConfig.letterSpacing
@@ -887,6 +894,7 @@ object ReadBookConfig {
         private var pageAnimEInk: Int = 4,
         var textFont: String = "",//字体
         var titleFont: String = "",//标题字体, 空值跟随正文字体
+        var titleBold: Int = -1,//标题字重 -1:保持原有随正文变化的效果, 0:正常, 1:粗体, 2:细体
         var textBold: Int = 0,//是否粗体字 0:正常, 1:粗体, 2:细体
         var textSize: Int = 20,//文字大小
         var letterSpacing: Float = 0.1f,//字间距
@@ -1219,6 +1227,7 @@ object ReadBookConfig {
             "pageAnimEInk" to pageAnimEInk,
             "textFont" to textFont,
             "titleFont" to titleFont,
+            "titleBold" to titleBold,
             "textBold" to textBold,
             "textSize" to textSize,
             "letterSpacing" to letterSpacing,
