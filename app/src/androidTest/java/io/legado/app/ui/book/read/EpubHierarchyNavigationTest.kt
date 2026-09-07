@@ -160,6 +160,7 @@ class EpubHierarchyNavigationTest {
                     reverse(scenario)
                     val reversedTitles = listOf(9, 8, 6, 7, 5, 3, 4, 0, 1, 2).map(titles::get)
                     await { rows()?.map { it.chapter.title } == reversedTitles }
+                    scrollToTop()
                     screenshot("epub-hierarchy-reversed")
                     scenario.recreate()
                     await { rows()?.map { it.chapter.title } == reversedTitles }
@@ -324,7 +325,16 @@ class EpubHierarchyNavigationTest {
     }
     private fun screenshot(name: String) {
         instrumentation.waitForIdleSync()
-        SystemClock.sleep(200)
+        await {
+            var settled = false
+            instrumentation.runOnMainSync {
+                val list = recycler()
+                settled = list == null || (!list.isComputingLayout && list.itemAnimator?.isRunning != true)
+            }
+            settled
+        }
+        SystemClock.sleep(100)
+        instrumentation.waitForIdleSync()
         val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
         try {
             File(context.getExternalFilesDir("ui-regression"), "$name.png").outputStream()
