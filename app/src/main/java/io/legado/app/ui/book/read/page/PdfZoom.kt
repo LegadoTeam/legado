@@ -142,7 +142,10 @@ internal class PdfZoom(private val view: ReadView) {
             }
             MotionEvent.ACTION_UP -> {
                 owned = false
-                if (!multiplePointers && !moved) tap(downX, downY)
+                if (!multiplePointers && !moved) {
+                    view.pageDelegate?.onDown()
+                    tap(downX, downY)
+                }
                 view.callBack.screenOffTimerStart()
                 view.autoPager.resume()
                 redraw()
