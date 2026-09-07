@@ -154,7 +154,23 @@ class PdfOutlineNavigationTest {
             val mangaScenario = ActivityScenario.launch<ReadMangaActivity>(Intent(context, ReadMangaActivity::class.java)
                 .putExtra("bookUrl", book.bookUrl))
             manga = mangaScenario
-            waitUntil { ReadManga.book?.bookUrl == book.bookUrl && ReadManga.curMangaChapter != null }
+            waitUntil {
+                var ready = false
+                mangaScenario.onActivity { activity ->
+                    val recycler = activity.findViewById<RecyclerView>(R.id.recycler_view)
+                    val adapter = recycler.adapter as? MangaAdapter
+                    ready = ReadManga.book?.bookUrl == book.bookUrl &&
+                        activity.findViewById<View>(R.id.fl_loading).visibility != View.VISIBLE &&
+                        recycler.isLaidOut && !recycler.hasPendingAdapterUpdates() &&
+                        (0 until recycler.childCount).any { index ->
+                            val child = recycler.getChildAt(index)
+                            val position = recycler.getChildAdapterPosition(child)
+                            (adapter?.getItem(position) as? MangaPage)?.chapterIndex == ReadManga.durChapterIndex &&
+                                child.width > 0 && child.height > 0
+                        }
+                }
+                ready
+            }
             mangaScenario.onActivity { activity ->
                 val menu = PopupMenu(activity, activity.window.decorView).menu
                 activity.onCompatOptionsItemSelected(menu.add(0, R.id.menu_catalog, 0, "目录"))
@@ -197,6 +213,11 @@ class PdfOutlineNavigationTest {
                 }
                 screenshot("pdf-outline-fallback")
             }
+        } catch (error: Throwable) {
+            manga?.let { scenario ->
+                runCatching { recordMangaFailure(scenario) }.onFailure(error::addSuppressed)
+            }
+            throw error
         } finally {
             manga?.close()
             reader?.close()
@@ -205,6 +226,30 @@ class PdfOutlineNavigationTest {
             appDb.bookDao.delete(book)
             file.delete()
         }
+    }
+
+    private fun recordMangaFailure(scenario: ActivityScenario<ReadMangaActivity>) {
+        val state = StringBuilder()
+        scenario.onActivity { activity ->
+            val recycler = activity.findViewById<RecyclerView>(R.id.recycler_view)
+            val adapter = recycler.adapter as? MangaAdapter
+            state.appendLine("chapter=${ReadManga.durChapterIndex}, position=${ReadManga.durChapterPos}")
+            state.appendLine("chapters=${listOf(ReadManga.prevMangaChapter, ReadManga.curMangaChapter,
+                ReadManga.nextMangaChapter).map { it?.chapter?.index }}")
+            state.appendLine("loading=${activity.findViewById<View>(R.id.fl_loading).visibility}, " +
+                "size=${recycler.width}x${recycler.height}, laidOut=${recycler.isLaidOut}, " +
+                "pendingUpdates=${recycler.hasPendingAdapterUpdates()}")
+            state.appendLine("items=${adapter?.getItems()}")
+            repeat(recycler.childCount) { index ->
+                val child = recycler.getChildAt(index)
+                val position = recycler.getChildAdapterPosition(child)
+                val page = adapter?.getItem(position) as? MangaPage
+                state.appendLine("attached=$position, page=${page?.chapterIndex}/${page?.index}/${page?.mImageUrl}, " +
+                    "bounds=${child.left},${child.top},${child.right},${child.bottom}")
+            }
+        }
+        File(context.getExternalFilesDir("ui-regression"), "pdf-manga-failure-state.txt").writeText(state.toString())
+        screenshot("pdf-manga-failure")
     }
 
     private fun clickOutline(title: String) {

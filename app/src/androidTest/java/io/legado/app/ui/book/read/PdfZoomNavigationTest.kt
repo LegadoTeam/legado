@@ -221,8 +221,14 @@ class PdfZoomNavigationTest {
         assertEquals(scale, zoomScale(), .001f)
         scenario!!.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
         await { it.reader.width > it.reader.height && images(it).size == 2 }
-        scenario!!.onActivity { drag(it.reader, -250f, 0f) }
-        await { it.reader.content.pdfRenderCount > 0 }
+        var rendersBeforePan = 0
+        scenario!!.onActivity { activity ->
+            rendersBeforePan = activity.reader.content.pdfRenderCount
+            repeat(3) { drag(activity.reader, -activity.reader.width * .4f, 0f) }
+        }
+        await { it.reader.content.pdfRenderCount > rendersBeforePan &&
+            it.reader.content.pdfRenderedPages.contains(images(it).last()) }
+        assertEquals(scale, zoomScale(), .001f)
         screenshot("pdf-zoom-reporter-textbook-spread-detail")
     }
 
@@ -239,7 +245,18 @@ class PdfZoomNavigationTest {
         assertEquals(initial, ReadBook.durChapterPos)
         await { it.reader.content.pdfRenderCount >= 2 }
         screenshot("pdf-zoom-scroll-detail")
-        scenario!!.onActivity { repeat(3) { _ -> pinch(it.reader, false) } }
+        scenario!!.onActivity { activity ->
+            // Android ends a pinch below its minimum finger span. Use further real gestures
+            // to reach fit, checking that each gesture makes progress instead of assuming a count.
+            repeat(8) {
+                val before = activity.reader.pdfZoom.scale
+                if (before > 1f) {
+                    pinch(activity.reader, false)
+                    assertTrue("Inward pinch must reduce $before on ${activity.reader.width}px reader",
+                        activity.reader.pdfZoom.scale < before)
+                }
+            }
+        }
         assertEquals(1f, zoomScale(), .001f)
         val offset = ContentTextView::class.java.getDeclaredField("pageOffset").apply { isAccessible = true }
         scenario!!.onActivity { activity ->
