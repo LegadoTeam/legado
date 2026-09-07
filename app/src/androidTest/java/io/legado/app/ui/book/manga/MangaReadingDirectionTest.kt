@@ -50,7 +50,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TestName
 import org.junit.runner.RunWith
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -60,6 +62,8 @@ import kotlin.math.abs
 
 @RunWith(AndroidJUnit4::class)
 class MangaReadingDirectionTest {
+    @get:Rule
+    val testName = TestName()
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
     private val preferences = context.defaultSharedPreferences
@@ -81,6 +85,7 @@ class MangaReadingDirectionTest {
         canUpdate = false,
     )
     private var scenario: ActivityScenario<ReadMangaActivity>? = null
+    private var lastInput = "launch"
     private val ReadMangaActivity.ui: ActivityMangaBinding
         get() = ActivityMangaBinding.bind(findViewById<ViewGroup>(android.R.id.content).getChildAt(0))
 
@@ -591,9 +596,15 @@ class MangaReadingDirectionTest {
         }
     }
 
-    private fun key(code: Int) = instrumentation.sendKeyDownUpSync(code)
+    private fun key(code: Int) {
+        awaitActivity("reader window focused before key") { it.hasWindowFocus() }
+        lastInput = KeyEvent.keyCodeToString(code)
+        instrumentation.sendKeyDownUpSync(code)
+    }
 
     private fun seekAtEdge(left: Boolean) {
+        awaitActivity("reader window focused before progress input") { it.hasWindowFocus() }
+        lastInput = "seek left=$left"
         val location = IntArray(2)
         var x = 0f
         var y = 0f
@@ -622,6 +633,8 @@ class MangaReadingDirectionTest {
         touch(fromX, fromY, toX, toY, steps = 20)
 
     private fun touch(fromX: Float, fromY: Float, toX: Float, toY: Float, steps: Int) {
+        awaitActivity("reader window focused before touch") { it.hasWindowFocus() }
+        lastInput = "touch $fromX,$fromY to $toX,$toY"
         val location = IntArray(2)
         var width = 0
         var height = 0
@@ -721,9 +734,21 @@ class MangaReadingDirectionTest {
             if (condition()) return
             SystemClock.sleep(100)
         }
-        if (scenario != null) screenshot("manga-direction-failure")
+        var state = "activity closed"
+        if (scenario != null) {
+            screenshot("manga-direction-failure-${testName.methodName}")
+            scenario!!.onActivity { activity ->
+                val recycler = activity.ui.recyclerView
+                val page = visiblePage(activity)
+                state = "visible=${page?.chapterIndex}/${page?.index}, " +
+                    "focus=${activity.hasWindowFocus()}, menu=${activity.ui.mangaMenu.visibility}, " +
+                    "loading=${activity.ui.flLoading.visibility}, " +
+                    "scroll=${recycler.scrollState}, size=${recycler.width}x${recycler.height}, " +
+                    "canScroll=${recycler.canScrollHorizontally(-1)}/${recycler.canScrollHorizontally(1)}"
+            }
+        }
         assertTrue("Manga direction did not reach $message; reader is " +
-            "${ReadManga.durChapterIndex}/${ReadManga.durChapterPos}", condition())
+            "${ReadManga.durChapterIndex}/${ReadManga.durChapterPos}; last=$lastInput; $state", condition())
     }
 
     private fun screenshot(name: String) {
