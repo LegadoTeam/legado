@@ -85,6 +85,7 @@ class PdfZoomNavigationTest {
         appDb.bookDao.insert(book)
         appDb.bookChapterDao.insert(*PdfFile.getChapterList(book).toTypedArray())
         instrumentation.runOnMainSync {
+            AppConfig.optimizeRender = false
             AppConfig.clickActionBR = 1
             AppConfig.clickActionBL = 2
             AppConfig.clickActionMC = 0
@@ -182,6 +183,35 @@ class PdfZoomNavigationTest {
         assertEquals(scale, zoomScale(), .001f)
         await { it.reader.content.pdfRenderCount > 0 }
         screenshot("pdf-zoom-rotation-keeps-scale")
+    }
+
+    @Test
+    fun reportersTextbookRendersSharpSingleAndDoublePageRegions() {
+        PdfFile.clear(book.bookUrl)
+        instrumentation.context.assets.open("pdf_zoom_textbook.pdf").use { input ->
+            file.outputStream().use(input::copyTo)
+        }
+        val chapters = PdfFile.getChapterList(book)
+        book.totalChapterNum = chapters.size
+        book.durChapterPos = 5
+        appDb.bookDao.update(book)
+        appDb.bookChapterDao.insert(*chapters.toTypedArray())
+        launch()
+        await { images(it).contains(5) }
+        screenshot("pdf-zoom-reporter-textbook-fit")
+        scenario!!.onActivity { pinch(it.reader, true) }
+        await { it.reader.content.pdfRenderCount > 0 }
+        screenshot("pdf-zoom-reporter-textbook-detail")
+        val scale = zoomScale()
+        val previous = images()
+        scenario!!.onActivity { tap(it.reader, .85f, .85f) }
+        await { images(it) != previous && it.reader.content.pdfRenderCount > 0 }
+        assertEquals(scale, zoomScale(), .001f)
+        scenario!!.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
+        await { it.reader.width > it.reader.height && images(it).size == 2 }
+        scenario!!.onActivity { drag(it.reader, -250f, 0f) }
+        await { it.reader.content.pdfRenderCount > 0 }
+        screenshot("pdf-zoom-reporter-textbook-spread-detail")
     }
 
     @Test
