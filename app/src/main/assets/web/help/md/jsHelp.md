@@ -392,12 +392,14 @@ java.cacheContent(chapterUrl: String, content: String): Boolean
 套用书源的正文替换规则(`replaceRegex`),与单章下载保持一致。没有回存的章节
 阅读会自动退回普通单章流程重新下载,因此单章失败不会影响同批其它章节。
 
+`contentBatch` 支持裸 JavaScript、`<js>...</js>` 和 `@js:`。回存返回 `false` 表示替换后的正文为空白、正文在下载期间已被编辑或换源，或者该批次已结束；不会覆盖较新的正文。
+
 批量下载在手动缓存和阅读时的自动预下载中都会启用。每批算一次书源并发率,
 批内书源自己发出的请求仍各自受并发率限制。
 
 ```js
-// 正文页 › 批量正文规则(contentBatch)示例
 <js>
+// 正文页 › 批量正文规则(contentBatch)示例
     for (var i = 0; i < chapters.length; i++) {
         var chapter = chapters[i];
         try {

@@ -153,18 +153,20 @@ object JsSourceBook {
         chapters: List<BookChapter>,
     ): List<BookChapter> {
         if (chapters.isEmpty()) return emptyList()
-        val batchContext = BatchContentContext(source, book, chapters, coroutineContext)
+        val batchContext = BatchContentContext(source, book, chapters, coroutineContext,
+            chapters.associate { it.index to BookHelp.contentSaveToken(book, it) })
         Debug.log(source.bookSourceUrl, "≡JS源开始批量下载,本批${chapters.size}章")
         coroutineContext.ensureActive()
         //每批算一次并发,批内书源自己发的请求由 AnalyzeUrl 各自限流
         ConcurrentRateLimiter(source).getConcurrentRecord()
-        val call = JsSourceEngine(source, coroutineContext).callContentBatch(
-            batchContext,
-            listOf(
-                "chapters" to chapters,
-                "book" to book,
-            ),
-        )
+        val call = try {
+            JsSourceEngine(source, coroutineContext).callContentBatch(
+                batchContext,
+                listOf("chapters" to chapters, "book" to book),
+            )
+        } finally {
+            batchContext.close()
+        }
         if (!call.exists) {
             Debug.log(source.bookSourceUrl, "⇒JS源缺少 getContentBatch 函数,退回单章下载")
             return chapters

@@ -4,7 +4,11 @@ import io.legado.app.constant.AppPattern
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
+import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.book.BookHelp
+import io.legado.app.help.book.ContentSaveToken
 import io.legado.app.help.book.isOnLineTxt
+import kotlinx.coroutines.ensureActive
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setChapter
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
@@ -28,10 +32,12 @@ class BatchContentContext(
     val bookSource: BookSource,
     val book: Book,
     val chapters: List<BookChapter>,
-    private val coroutineContext: CoroutineContext = EmptyCoroutineContext
+    private val coroutineContext: CoroutineContext = EmptyCoroutineContext,
+    private val saveTokens: Map<Int, ContentSaveToken> = emptyMap(),
 ) {
 
     private val lock = Any()
+    private var closed = false
 
     /** 已经通过 cacheContent 回存的章节序号 */
     private val savedIndexes = linkedSetOf<Int>()
@@ -108,7 +114,7 @@ class BatchContentContext(
         val analyzeRule = AnalyzeRule(book, bookSource)
         analyzeRule.setCoroutineContext(coroutineContext)
         analyzeRule.setChapter(chapter)
-        analyzeRule.setBaseUrl(baseUrl)
+        analyzeRule.setBaseUrl(chapter.getAbsoluteURL())
         var contentStr = content.split(AppPattern.LFRegex).joinToString("\n") { it.trim() }
         contentStr = analyzeRule.getString(replaceRegex, contentStr)
         if (book.isOnLineTxt) {
@@ -116,6 +122,24 @@ class BatchContentContext(
         }
         return contentStr
     }
+
+    /** Resolve, replace and save under one lock, including duplicate-URL callbacks. */
+    fun saveContent(identifier: Any?, content: String): Boolean = synchronized(lock) {
+        coroutineContext.ensureActive()
+        if (closed) return false
+        val chapter = resolveChapter(identifier)
+            ?: throw NoStackTraceException("java.cacheContent 未匹配到本批次章节: $identifier")
+        val replaced = applyContentReplace(chapter, content)
+        if (replaced.isBlank()) return false
+        val token = saveTokens[chapter.index]
+            ?: throw NoStackTraceException("批量正文缺少请求开始时的缓存版本")
+        coroutineContext.ensureActive()
+        val saved = BookHelp.saveContent(bookSource, book, chapter, replaced, token)
+        if (saved) savedIndexes.add(chapter.index)
+        saved
+    }
+
+    fun close() = synchronized(lock) { closed = true }
 
     fun markSaved(chapter: BookChapter) {
         synchronized(lock) {

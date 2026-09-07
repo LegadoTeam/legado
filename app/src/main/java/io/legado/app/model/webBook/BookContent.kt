@@ -1,7 +1,6 @@
 package io.legado.app.model.webBook
 
 import io.legado.app.R
-import io.legado.app.constant.AppPattern
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
@@ -294,7 +293,8 @@ object BookContent {
             return emptyList()
         }
         val batchContext =
-            BatchContentContext(bookSource, book, chapters, currentCoroutineContext())
+            BatchContentContext(bookSource, book, chapters, currentCoroutineContext(),
+                chapters.associate { it.index to BookHelp.contentSaveToken(book, it) })
         val analyzeRule = AnalyzeRule(book, bookSource)
         analyzeRule.setCoroutineContext(currentCoroutineContext())
         analyzeRule.setChapter(chapters.first())
@@ -304,8 +304,24 @@ object BookContent {
         currentCoroutineContext().ensureActive()
         //每批算一次并发,批内书源自己发的请求由 AnalyzeUrl 各自限流
         ConcurrentRateLimiter(bookSource).getConcurrentRecord()
-        analyzeRule.evalJS(contentBatch, chapters)
-        currentCoroutineContext().ensureActive()
+        try {
+            val script = contentBatch.trim()
+            if (script.startsWith("<js>", true) || script.startsWith("@js:", true)) {
+                // Reuse ordinary-rule wrappers, including consecutive <js> blocks.
+                for (rule in analyzeRule.splitSourceRule(script)) {
+                    if (rule.mode != AnalyzeRule.Mode.Js) {
+                        throw NoStackTraceException("批量正文规则只能包含 JavaScript")
+                    }
+                    analyzeRule.evalJS(rule.rule, chapters)
+                }
+            } else {
+                // Bare JS may itself contain a string such as "<js>"; do not parse its contents.
+                analyzeRule.evalJS(script, chapters)
+            }
+            currentCoroutineContext().ensureActive()
+        } finally {
+            batchContext.close()
+        }
         val missing = batchContext.missingChapters()
         Debug.log(
             bookSource.bookSourceUrl,

@@ -217,7 +217,7 @@ object BookHelp {
         }
     }
 
-    suspend fun saveContent(
+    fun saveContent(
         bookSource: BookSource,
         book: Book,
         bookChapter: BookChapter,

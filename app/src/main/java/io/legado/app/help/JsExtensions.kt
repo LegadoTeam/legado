@@ -149,20 +149,7 @@ interface JsExtensions : JsEncodeUtils {
         val batchContext = getBatchContext()
             ?: throw NoStackTraceException("java.cacheContent 只能在批量正文规则中调用")
         val identifier = if (chapter is Wrapper) chapter.unwrap() else chapter
-        val target = batchContext.resolveChapter(identifier)
-            ?: throw NoStackTraceException(
-                "java.cacheContent 未匹配到本批次章节: $identifier" +
-                    ",重复 url 的目录请直接传入章节对象"
-            )
-        if (content.isEmpty()) {
-            log("cacheContent 内容为空,跳过: ${target.title}")
-            return false
-        }
-        BookHelp.saveText(batchContext.book, target, batchContext.applyContentReplace(target, content))
-        batchContext.markSaved(target)
-        postEvent(EventBus.SAVE_CONTENT, Pair(batchContext.book, target))
-        log("批量缓存成功: ${target.title}")
-        return true
+        return batchContext.saveContent(identifier, content)
     }
 
     fun refreshBookInfo() {
