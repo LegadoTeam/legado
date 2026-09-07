@@ -164,6 +164,33 @@ class MangaReadingDirectionTest {
     }
 
     @Test
+    fun loadingOldPagesCannotOverwriteRequestedChapterAndPosition() {
+        launchReader()
+        for (horizontal in listOf(true, false)) {
+            if (!horizontal) {
+                toggle(R.id.menu_enable_horizontal_scroll)
+                awaitPage(2, 2)
+            }
+            val chapter = if (horizontal) 2 else 0
+            val page = if (horizontal) 2 else 1
+            scenario!!.onActivity { activity ->
+                val recycler = activity.ui.recyclerView
+                val oldPage = visiblePage(activity)
+                activity.viewModel.openChapter(chapter, page)
+                assertEquals(View.VISIBLE, activity.ui.flLoading.visibility)
+                // Force a real old-list scroll before the new content can commit on the main thread.
+                recycler.scrollBy(if (horizontal) recycler.width else 0,
+                    if (horizontal) 0 else recycler.height / 2)
+                assertTrue("The old visible page must actually move", oldPage != visiblePage(activity))
+                assertEquals("Old scroll must not replace the requested chapter", chapter, ReadManga.durChapterIndex)
+                assertEquals("Old scroll must not replace the requested page", page, ReadManga.durChapterPos)
+            }
+            awaitPage(chapter, page)
+        }
+        screenshot("manga-loading-preserves-requested-position")
+    }
+
+    @Test
     fun horizontalDefaultKeepsLeftToRightGesturesTapsAndKeys() {
         assertFalse(AppConfig.mangaRightToLeft)
         launchReader()
