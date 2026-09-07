@@ -119,6 +119,18 @@
         app:iconSpaceReserved="false"
         app:isBottomBackground="true" />
 
+    <androidx.preference.SeekBarPreference
+        android:defaultValue="100"
+        android:dependency="mouseWheelPage"
+        android:key="mouseWheelScrollSpeed"
+        android:max="400"
+        android:summary="@string/mouse_wheel_scroll_speed_summary"
+        android:title="@string/mouse_wheel_scroll_speed"
+        app:iconSpaceReserved="false"
+        app:min="10"
+        app:seekBarIncrement="10"
+        app:showSeekBarValue="true" />
+
     <io.legado.app.lib.prefs.SwitchPreference
         android:defaultValue="true"
         android:key="volumeKeyPage"

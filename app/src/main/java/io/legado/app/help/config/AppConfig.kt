@@ -769,6 +769,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val mouseWheelPage
         get() = appCtx.getPrefBoolean(PreferKey.mouseWheelPage, true)
 
+    val mouseWheelScrollSpeed
+        get() = appCtx.getPrefInt(PreferKey.mouseWheelScrollSpeed, 100).coerceIn(10, 400)
+
     val paddingDisplayCutouts
         get() = appCtx.getPrefBoolean(PreferKey.paddingDisplayCutouts, false)
 
