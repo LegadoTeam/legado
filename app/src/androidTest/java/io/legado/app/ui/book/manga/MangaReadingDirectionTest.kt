@@ -17,6 +17,7 @@ import android.view.ViewGroup
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.SeekBar
 import android.widget.TextView
+import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
@@ -176,7 +177,7 @@ class MangaReadingDirectionTest {
             scenario!!.onActivity { activity ->
                 val recycler = activity.ui.recyclerView
                 val oldPage = visiblePage(activity)
-                activity.viewModel.openChapter(chapter, page)
+                ViewModelProvider(activity)[ReadMangaViewModel::class.java].openChapter(chapter, page)
                 assertEquals(View.VISIBLE, activity.ui.flLoading.visibility)
                 // Force a real old-list scroll before the new content can commit on the main thread.
                 recycler.scrollBy(if (horizontal) recycler.width else 0,
