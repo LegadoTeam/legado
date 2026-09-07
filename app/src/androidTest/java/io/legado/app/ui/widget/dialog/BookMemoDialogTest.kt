@@ -150,6 +150,10 @@ class BookMemoDialogTest {
         screenshot("book-memo-markdown")
         scenario!!.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
         await { it.findViewById<ReadView>(R.id.read_view).width > it.findViewById<ReadView>(R.id.read_view).height &&
+            memoDialog(it)?.dialog?.window?.attributes?.height?.let { height ->
+                val screenHeight = context.resources.displayMetrics.heightPixels
+                height in (screenHeight * .4f).toInt()..(screenHeight * .6f).toInt()
+            } == true &&
             memoDialog(it)?.view?.findViewById<TextView>(R.id.memo_content)?.text?.contains("重要内容") == true }
         onView(withId(R.id.memo_edit_save)).inRoot(isDialog()).check(matches(isCompletelyDisplayed()))
         onView(withId(R.id.memo_clear_cancel)).inRoot(isDialog()).check(matches(isCompletelyDisplayed()))

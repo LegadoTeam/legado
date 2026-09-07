@@ -1,6 +1,7 @@
 package io.legado.app.ui.widget.dialog
 
 import android.content.DialogInterface
+import android.content.res.Configuration
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
@@ -58,6 +59,11 @@ class BookMemoDialog : BaseDialogFragment(R.layout.dialog_book_memo) {
         readerActivity?.let { it.bottomDialog-- }
         readerActivity = null
         super.onDismiss(dialog)
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        view?.post { setLayout(ViewGroup.LayoutParams.MATCH_PARENT, 0.5f) }
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
@@ -142,7 +148,8 @@ class BookMemoDialog : BaseDialogFragment(R.layout.dialog_book_memo) {
             if (restoredScroll > 0) {
                 val scroll = restoredScroll
                 restoredScroll = 0
-                binding.memoScroll.post { binding.memoScroll.scrollTo(0, scroll) }
+                val scrollView = binding.memoScroll
+                scrollView.post { scrollView.scrollTo(0, scroll) }
             }
         }
     }
