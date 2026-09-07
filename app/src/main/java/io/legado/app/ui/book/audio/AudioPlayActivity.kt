@@ -22,6 +22,7 @@ import io.legado.app.constant.Status
 import io.legado.app.constant.Theme
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.replaceBookAfterSourceChange
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.databinding.ActivityAudioPlayBinding
@@ -504,8 +505,7 @@ class AudioPlayActivity :
                 withContext(IO) {
                     AudioPlay.book?.migrateTo(book, toc)
                     book.removeType(BookType.updateError)
-                    AudioPlay.book?.delete()
-                    appDb.bookDao.insert(book)
+                    replaceBookAfterSourceChange(AudioPlay.book, book, toc)
                 }
                 onSuccess()
                 startActivityForBook(book)

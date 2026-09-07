@@ -1695,4 +1695,14 @@
     <string name="read_record_legacy_authors">旧版合并记录：%1$s</string>
     <string name="read_record_empty">暂无阅读记录</string>
     <string name="backup_content_read_record_covers">阅读记录封面快照</string>
+    <string name="book_memo">备忘</string>
+    <string name="show_book_memo">显示备忘入口</string>
+    <string name="show_book_memo_summary">在阅读底部菜单增加备忘按钮</string>
+    <string name="book_memo_hint">使用 Markdown 编写备忘</string>
+    <string name="book_memo_empty">暂无备忘，点击编辑添加。</string>
+    <string name="book_memo_updated">更新时间：%1$s</string>
+    <string name="book_memo_save">保存</string>
+    <string name="book_memo_clear_confirm">清空这本书的备忘？</string>
+    <string name="book_memo_discard">放弃未保存的修改并关闭？</string>
+    <string name="book_memo_save_failed">备忘保存失败：%1$s</string>
 </resources>

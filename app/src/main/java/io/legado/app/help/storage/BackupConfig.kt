@@ -122,6 +122,7 @@ object BackupConfig {
         PreferKey.readStyleSelect,
         PreferKey.comicStyleSelect,
         PreferKey.mangaRightToLeft,
+        PreferKey.showBookMemo,
         PreferKey.shareLayout,
         PreferKey.hideStatusBar,
         PreferKey.hideNavigationBar,

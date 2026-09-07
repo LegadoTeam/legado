@@ -15,6 +15,7 @@ import io.legado.app.constant.BookType
 import io.legado.app.constant.EventBus
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.replaceBookAfterSourceChange
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.exception.NoBooksDirException
@@ -471,9 +472,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             }
             if (inBookshelf) {
                 book.removeType(BookType.updateError)
-                bookData.value?.delete()
-                appDb.bookDao.insert(book)
-                appDb.bookChapterDao.insert(*toc.toTypedArray())
+                replaceBookAfterSourceChange(bookData.value, book, toc)
             }
             bookData.postValue(book)
             chapterListData.postValue(toc)

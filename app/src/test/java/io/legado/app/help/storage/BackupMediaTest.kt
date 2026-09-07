@@ -39,6 +39,7 @@ class BackupMediaTest {
             listOf(
                 "bookshelf.json",
                 "bookGroup.json",
+                "bookMemo.json",
                 "readRecord.json",
                 "searchHistory.json",
             ),
@@ -52,6 +53,7 @@ class BackupMediaTest {
             listOf(
                 "bookshelf.json",
                 "bookGroup.json",
+                "bookMemo.json",
                 "bookmark.json",
                 "highlight.json",
                 "highlightRule.json",

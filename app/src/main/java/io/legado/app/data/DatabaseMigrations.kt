@@ -24,7 +24,17 @@ object DatabaseMigrations {
             migration_35_36, migration_36_37, migration_37_38, migration_38_39,
             migration_39_40, migration_40_41, migration_41_42, migration_42_43,
             migration_100_101, migration_104_105, migration_105_106, migration_106_107,
+            migration_107_108,
         )
+    }
+
+    private val migration_107_108 = object : Migration(107, 108) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""CREATE TABLE book_memos (
+                bookUrl TEXT NOT NULL, content TEXT NOT NULL, updatedAt INTEGER NOT NULL,
+                PRIMARY KEY(bookUrl)
+            )""".trimIndent())
+        }
     }
 
     private val migration_106_107 = object : Migration(106, 107) {

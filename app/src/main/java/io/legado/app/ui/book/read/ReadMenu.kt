@@ -221,6 +221,8 @@ class ReadMenu @JvmOverloads constructor(
         tvFont.setTextColor(textColor)
         ivSetting.setColorFilter(textColor, PorterDuff.Mode.SRC_IN)
         tvSetting.setTextColor(textColor)
+        ivMemo.setColorFilter(textColor, PorterDuff.Mode.SRC_IN)
+        tvMemo.setTextColor(textColor)
         vwBrightnessPosAdjust.setColorFilter(textColor, PorterDuff.Mode.SRC_IN)
         seekBrightness.applyTint(context.accentColor)
         llBrightness.setOnClickListener(null)
@@ -365,6 +367,9 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     fun runMenuIn(anim: Boolean = !AppConfig.isEInkMode) {
+        val showMemo = context.getPrefBoolean(PreferKey.showBookMemo, false)
+        binding.llMemo.isVisible = showMemo
+        binding.memoSpacer.isVisible = showMemo
         callBack.onMenuShow()
         this.visible()
         binding.titleBar.visible()
@@ -613,6 +618,11 @@ class ReadMenu @JvmOverloads constructor(
                 callBack.showMoreSetting()
             }
         }
+        llMemo.setOnClickListener {
+            runMenuOut {
+                callBack.showBookMemo()
+            }
+        }
     }
 
     private fun initAnimation() {
@@ -733,6 +743,7 @@ class ReadMenu @JvmOverloads constructor(
         fun openBookInfoActivity()
         fun showReadStyle()
         fun showMoreSetting()
+        fun showBookMemo()
         fun showReadAloudDialog()
         fun upSystemUiVisibility()
         fun onClickReadAloud()

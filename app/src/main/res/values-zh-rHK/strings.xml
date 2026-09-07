@@ -1333,4 +1333,14 @@
     <string name="live_update_notifications">即時更新通知</string>
     <string name="live_update_notifications_summary">在 Android 16 上將系統允許的進度通知提升為即時更新</string>
     <string name="show_explore_categories">顯示全部分類</string>
+    <string name="book_memo">備忘</string>
+    <string name="show_book_memo">顯示備忘入口</string>
+    <string name="show_book_memo_summary">在閱讀底部選單增加備忘按鈕</string>
+    <string name="book_memo_hint">使用 Markdown 編寫備忘</string>
+    <string name="book_memo_empty">暫無備忘，點擊編輯新增。</string>
+    <string name="book_memo_updated">更新時間：%1$s</string>
+    <string name="book_memo_save">儲存</string>
+    <string name="book_memo_clear_confirm">清空這本書的備忘？</string>
+    <string name="book_memo_discard">放棄未儲存的修改並關閉？</string>
+    <string name="book_memo_save_failed">備忘儲存失敗：%1$s</string>
 </resources>

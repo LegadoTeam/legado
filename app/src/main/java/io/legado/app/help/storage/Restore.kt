@@ -15,6 +15,7 @@ import io.legado.app.data.entities.AutoTaskRule
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookHighlight
+import io.legado.app.data.entities.BookMemo
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.entities.Cache
@@ -258,6 +259,7 @@ object Restore {
             null
         }
         val restoredAutoTasks = fileToListT<AutoTaskRule>(path, "autoTask.json")
+        val restoredBookUrls = hashSetOf<String>()
         fileToListT<Book>(path, "bookshelf.json")?.let {
             it.forEach { book ->
                 if (lanTransfer) book.variable = null
@@ -280,6 +282,7 @@ object Restore {
                 if (ignoreLocalBook && book.isLocal) {
                     return@forEach
                 }
+                restoredBookUrls.add(book.bookUrl)
                 if (lanTransfer) {
                     appDb.bookDao.upsertPreservingVariable(book)
                     return@forEach
@@ -295,6 +298,9 @@ object Restore {
                 }
             }
             appDb.bookDao.insert(*newBooks.toTypedArray())
+        }
+        fileToListT<BookMemo>(path, "bookMemo.json")?.let { memos ->
+            appDb.bookMemoDao.restore(memos.filter { it.bookUrl in restoredBookUrls })
         }
         fileToListT<Bookmark>(path, "bookmark.json")?.let {
             appDb.bookmarkDao.insert(*it.toTypedArray())

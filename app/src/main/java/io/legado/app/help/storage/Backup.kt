@@ -52,7 +52,7 @@ import io.legado.app.model.VideoPlay.VIDEO_PREF_NAME
 internal fun selectedBackupFileNames(isEnabled: (String) -> Boolean): List<String> =
     buildList {
         if (isEnabled(BackupConfig.bookshelfContentKey)) {
-            addAll(listOf("bookshelf.json", "bookGroup.json"))
+            addAll(listOf("bookshelf.json", "bookGroup.json", "bookMemo.json"))
         }
         if (isEnabled(BackupConfig.annotationContentKey)) {
             addAll(listOf("bookmark.json", "highlight.json", "highlightRule.json"))
@@ -276,6 +276,7 @@ object Backup {
             "bookshelf.json",
             backupPath,
         )
+        writeListToJson(appDb.bookMemoDao.all(), "bookMemo.json", backupPath, writeEmpty = true)
         writeListToJson(appDb.bookmarkDao.all, "bookmark.json", backupPath)
         writeListToJson(appDb.bookHighlightDao.all, "highlight.json", backupPath)
         writeListToJson(

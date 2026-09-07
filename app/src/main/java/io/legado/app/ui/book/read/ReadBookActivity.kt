@@ -39,6 +39,7 @@ import io.legado.app.constant.Status
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BaseSource
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.replaceBookAfterSourceChange
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookHighlight
 import io.legado.app.data.entities.BookProgress
@@ -1639,8 +1640,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                 withContext(IO) {
                     ReadBook.book?.migrateTo(book, toc)
                     book.removeType(BookType.updateError)
-                    ReadBook.book?.delete()
-                    appDb.bookDao.insert(book)
+                    replaceBookAfterSourceChange(ReadBook.book, book, toc)
                 }
                 onSuccess()
                 startActivityForBook(book)
@@ -1772,6 +1772,14 @@ class ReadBookActivity : BaseReadBookActivity(),
      */
     override fun showMoreSetting() {
         showDialogFragment<MoreConfigDialog>()
+    }
+
+    override fun showBookMemo() {
+        ReadBook.book?.let { book ->
+            showDialogFragment<io.legado.app.ui.widget.dialog.BookMemoDialog> {
+                putString("bookUrl", book.bookUrl)
+            }
+        }
     }
 
     override fun showSearchSetting() {

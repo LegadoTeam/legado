@@ -8,6 +8,7 @@ import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppLog
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.replaceBookAfterSourceChange
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.exception.NoStackTraceException
@@ -106,8 +107,7 @@ class BookshelfViewModel(application: Application) : BaseViewModel(application) 
                     if (dbBook != null) {
                         val toc = WebBook.getChapterListAwait(bookSource, it).getOrThrow()
                         val migratedBook = migrateBookForUrlAdd(dbBook, it, toc, groupId)
-                        appDb.bookDao.insert(migratedBook)
-                        appDb.bookChapterDao.insert(*toc.toTypedArray())
+                        replaceBookAfterSourceChange(dbBook, migratedBook, toc, clearActiveReader = false)
                     } else {
                         it.group = mergeBookGroupForUrlAdd(it.group, groupId)
                         it.order = appDb.bookDao.minOrder - 1
