@@ -7,6 +7,12 @@
       placeholder="筛选源"
     />
     <SourceCheckControls v-if="isBookSource" :sources="sourceSelect" :active="store.sourceMode === 'json' && store.currentTab === 'editList'" />
+    <el-checkbox
+      :model-value="sourcesFiltered.length > 0 && sourceSelect.length === sourcesFiltered.length"
+      :indeterminate="sourceSelect.length > 0 && sourceSelect.length < sourcesFiltered.length"
+      :disabled="sourcesFiltered.length === 0"
+      @change="selectVisible"
+    >全选当前筛选</el-checkbox>
     <div class="tool">
       <el-button @click="importSourceFile" :icon="Folder">打开</el-button>
       <el-button
@@ -78,6 +84,16 @@ const sourceSelect = computed<Source[]>(() => {
     return sources
   }, [] as Source[])
 })
+
+const selectVisible = (selected: string | number | boolean) => {
+  const urls = new Set(sourceUrlSelect.value)
+  sourcesFiltered.value.forEach(source => {
+    const url = getSourceUniqueKey(source)
+    if (selected) urls.add(url)
+    else urls.delete(url)
+  })
+  sourceUrlSelect.value = Array.from(urls)
+}
 
 const deleteSelectSources = () => {
   const sourceSelectValue = sourceSelect.value

@@ -103,11 +103,15 @@ class BookSourceCheckUiTest {
 
     private fun awaitItems(expected: List<String>) = waitUntil {
         var actual = emptyList<String>()
+        var rendered = false
         scenario!!.onActivity {
-            val adapter = it.findViewById<FastScrollRecyclerView>(R.id.recycler_view).adapter as BookSourceAdapter
+            val recycler = it.findViewById<FastScrollRecyclerView>(R.id.recycler_view)
+            val adapter = recycler.adapter as BookSourceAdapter
             actual = adapter.getItems().map { source -> source.bookSourceUrl }
+            rendered = !recycler.isComputingLayout && !recycler.hasPendingAdapterUpdates() &&
+                recycler.itemAnimator?.isRunning != true && recycler.childCount == expected.size
         }
-        actual == expected
+        actual == expected && rendered
     }
 
     private fun waitUntil(predicate: () -> Boolean) {
@@ -120,6 +124,7 @@ class BookSourceCheckUiTest {
     }
 
     private fun screenshot(name: String) {
+        instrumentation.waitForIdleSync()
         val directory = File(context.getExternalFilesDir(null), "ui-regression").apply { mkdirs() }
         instrumentation.uiAutomation.takeScreenshot().useBitmap { bitmap ->
             File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }

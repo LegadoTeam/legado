@@ -11,7 +11,7 @@
     <span class="source-name" :title="getSourceName(source)">
       {{ getSourceName(source) }}
     </span>
-    <span v-if="'bookSourceUrl' in source" class="check-status">{{ checkLabel }}</span>
+    <span v-if="'bookSourceUrl' in source" class="check-status" :title="store.checkStates[sourceUrl]?.detail">{{ checkLabel }}</span>
     <el-button
       class="edit-source"
       text
