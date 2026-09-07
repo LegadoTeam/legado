@@ -2,10 +2,11 @@ gradle.beforeProject { project ->
     project.plugins.withId('com.android.application') {
         project.extensions.getByName('androidComponents').finalizeDsl { android ->
             // Exercise release shrinking with a CI-only key; production signing is unchanged.
-            android.testBuildType = 'release'
             android.buildTypes.getByName('release').signingConfig = android.signingConfigs.getByName('debug')
-            // Do not let unrelated UI test references keep otherwise-shrunk application code.
-            android.sourceSets.getByName('androidTest').java.setSrcDirs(['src/cronetAndroidTest/java'])
+            // A single APK avoids duplicate, independently shrunk j$ libraries in app/test APKs.
+            // Only this CI build includes the platform instrumentation entry point.
+            android.sourceSets.getByName('release').java.srcDir('src/cronetRuntime/java')
+            android.sourceSets.getByName('release').manifest.srcFile('src/cronetRuntime/AndroidManifest.xml')
         }
     }
 }

@@ -1,9 +1,10 @@
 package io.legado.app.lib.cronet
 
-import android.util.Log
+import android.app.Activity
+import android.app.Instrumentation
+import android.os.Bundle
+import androidx.annotation.Keep
 import androidx.preference.PreferenceManager
-import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.BuildConfig
 import io.legado.app.constant.PreferKey
 import okhttp3.CookieJar
@@ -13,24 +14,37 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okio.buffer
 import okio.source
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
-import org.junit.Test
-import org.junit.runner.RunWith
 import java.io.File
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-@RunWith(AndroidJUnit4::class)
-class CronetRuntimeTest {
-    @Test(timeout = 240_000)
-    fun selectedNativeReleaseEngineCompletesGetAndPost() {
-        assertFalse("This regression must exercise release shrinking", BuildConfig.DEBUG)
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val preferences = PreferenceManager.getDefaultSharedPreferences(context)
+@Keep
+class CronetRuntimeInstrumentation : Instrumentation() {
+    override fun onCreate(arguments: Bundle?) {
+        super.onCreate(arguments)
+        start()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        try {
+            waitForIdleSync()
+            val version = verifyNativeRequests()
+            finish(Activity.RESULT_OK, Bundle().apply {
+                putString("stream", "CRONET_RUNTIME_PASSED $version; native GET/POST verified\n")
+            })
+        } catch (error: Throwable) {
+            finish(Activity.RESULT_CANCELED, Bundle().apply {
+                putString("stream", error.stackTraceToString())
+            })
+        }
+    }
+
+    private fun verifyNativeRequests(): String {
+        check(!BuildConfig.DEBUG) { "This regression must exercise release shrinking" }
+        val preferences = PreferenceManager.getDefaultSharedPreferences(targetContext)
         val hadPreference = preferences.contains(PreferKey.cronet)
         val previous = preferences.getBoolean(PreferKey.cronet, false)
         val executor = Executors.newSingleThreadExecutor()
@@ -41,7 +55,7 @@ class CronetRuntimeTest {
             .readTimeout(30, TimeUnit.SECONDS)
             .build()
         try {
-            assertTrue(preferences.edit().putBoolean(PreferKey.cronet, true).commit())
+            check(preferences.edit().putBoolean(PreferKey.cronet, true).commit())
             ServerSocket(0, 2, InetAddress.getByName("127.0.0.1")).use { server ->
                 server.soTimeout = 180_000
                 val payload = "Cronet 上传\n\n验证"
@@ -74,22 +88,23 @@ class CronetRuntimeTest {
                 val request = Request.Builder().url("http://127.0.0.1:${server.localPort}/runtime")
                 client.newCall(request.build()).execute().use { response ->
                     assertEquals(200, response.code)
-                    assertEquals("GET:", response.body?.string())
+                    assertEquals("GET:", response.body.string())
                 }
                 client.newCall(request.post(payload.toRequestBody("text/plain; charset=utf-8".toMediaType()))
                     .build()).execute().use { response ->
                     assertEquals(200, response.code)
-                    assertEquals("POST:$payload", response.body?.string())
+                    assertEquals("POST:$payload", response.body.string())
                 }
                 served.get(30, TimeUnit.SECONDS)
             }
             val version = requireNotNull(cronetEngine).versionString
-            assertTrue("Unexpected Cronet engine: $version", version.contains(BuildConfig.Cronet_Version))
+            check(version.contains(BuildConfig.Cronet_Version)) { "Unexpected Cronet engine: $version" }
             val library = "libcronet.${BuildConfig.Cronet_Version}.so"
-            assertTrue("Native library was not mapped: $library",
-                File("/proc/self/maps").useLines { lines -> lines.any { it.contains(library) } })
-            assertTrue("Cronet preference changed", preferences.getBoolean(PreferKey.cronet, false))
-            Log.i("CronetRuntimeTest", "Verified $version with $library; GET/POST used native Cronet")
+            check(File("/proc/self/maps").useLines { lines -> lines.any { it.contains(library) } }) {
+                "Native library was not mapped: $library"
+            }
+            check(preferences.getBoolean(PreferKey.cronet, false)) { "Cronet preference changed" }
+            return version
         } finally {
             preferences.edit().apply {
                 if (hadPreference) putBoolean(PreferKey.cronet, previous) else remove(PreferKey.cronet)
@@ -98,5 +113,9 @@ class CronetRuntimeTest {
             client.dispatcher.executorService.shutdownNow()
             client.connectionPool.evictAll()
         }
+    }
+
+    private fun assertEquals(expected: Any?, actual: Any?) {
+        check(expected == actual) { "Expected <$expected>, got <$actual>" }
     }
 }

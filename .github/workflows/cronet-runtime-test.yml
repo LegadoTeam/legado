@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/cronet-runtime-test.yml'
       - '.github/scripts/cronet-runtime-test.init.gradle'
+      - '.github/scripts/run-cronet-runtime.sh'
       - 'app/cronetlib/**'
       - 'app/*proguard*'
       - 'app/build.gradle'
@@ -13,7 +14,7 @@ on:
       - 'app/src/main/assets/cronet.json'
       - 'app/src/main/java/io/legado/app/lib/cronet/**'
       - 'app/src/main/java/io/legado/app/help/http/Cronet.kt'
-      - 'app/src/cronetAndroidTest/**'
+      - 'app/src/cronetRuntime/**'
   workflow_dispatch:
 
 permissions:
@@ -40,10 +41,10 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v6.3.0
-      - name: Build minified release and focused test APKs
+      - name: Build minified release with platform instrumentation
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleAppRelease :app:assembleAppReleaseAndroidTest \
+          ./gradlew :app:assembleAppRelease \
             --init-script .github/scripts/cronet-runtime-test.init.gradle \
             --build-cache --no-daemon --max-workers=2
       - name: Enable KVM
@@ -59,13 +60,12 @@ jobs:
           target: google_apis
           arch: x86_64
           disable-animations: true
-          script: ./gradlew :app:connectedAppReleaseAndroidTest --init-script .github/scripts/cronet-runtime-test.init.gradle -Pandroid.testInstrumentationRunnerArguments.class=io.legado.app.lib.cronet.CronetRuntimeTest --build-cache --no-daemon --max-workers=2
+          script: bash .github/scripts/run-cronet-runtime.sh
       - name: Upload test results and release mapping
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: cronet-runtime-api-${{ matrix.api }}
           path: |
-            app/build/reports/androidTests/connected/
-            app/build/outputs/androidTest-results/connected/
+            app/build/cronet-runtime/
             app/build/outputs/mapping/appRelease/
