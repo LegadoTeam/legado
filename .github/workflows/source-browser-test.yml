@@ -50,6 +50,11 @@ on:
       - 'app/src/androidTest/java/io/legado/app/model/localBook/**'
       - 'app/src/androidTest/java/io/legado/app/ui/book/read/Pdf*'
       - 'app/src/androidTest/assets/pdf*'
+      - 'app/src/main/java/io/legado/app/model/analyzeRule/**'
+      - 'app/src/main/java/io/legado/app/model/webBook/**'
+      - 'app/src/main/java/io/legado/app/utils/HtmlFormatter.kt'
+      - 'app/src/androidTest/java/io/legado/app/model/webBook/**'
+      - 'app/src/androidTest/assets/issue1180*'
   workflow_dispatch:
 
 permissions:
