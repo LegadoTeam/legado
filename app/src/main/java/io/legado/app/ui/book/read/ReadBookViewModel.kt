@@ -304,6 +304,7 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
         changeSourceCoroutine?.cancel()
         changeSourceCoroutine = execute {
             ReadBook.upMsg(context.getString(R.string.loading))
+            ReadBook.upReadTime()
             ReadBook.book?.migrateTo(book, toc)
             book.removeType(BookType.updateError)
             ReadBook.book?.delete()

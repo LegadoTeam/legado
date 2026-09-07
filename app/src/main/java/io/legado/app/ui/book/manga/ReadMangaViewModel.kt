@@ -246,6 +246,7 @@ class ReadMangaViewModel(application: Application) : BaseViewModel(application) 
         changeSourceCoroutine?.cancel()
         changeSourceCoroutine = execute {
             //换源中
+            ReadManga.upReadTime()
             ReadManga.book?.migrateTo(book, toc)
             book.removeType(BookType.updateError)
             ReadManga.book?.delete()
