@@ -16,6 +16,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.updateSnapshot
+import io.legado.app.data.entities.saveWithCover
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.getBookSource
 import io.legado.app.help.book.readSimulating
@@ -336,7 +337,8 @@ object AudioPlay : CoroutineScope by MainScope() {
             now = SystemClock.elapsedRealtime(),
             lastRead = System.currentTimeMillis(),
         ) ?: return
-        readTimeWrite = executor.submit { appDb.readRecordDao.insert(record) }
+        val snapshotBook = book?.copy()
+        readTimeWrite = executor.submit { record.saveWithCover(snapshotBook) }
     }
 
     private fun addLoading(index: Int): Boolean {

@@ -32,6 +32,7 @@ object BackupConfig {
     internal const val sourceContentKey = "backupSources"
     internal const val ruleContentKey = "backupRules"
     internal const val historyContentKey = "backupHistory"
+    internal const val readRecordCoverContentKey = "backupReadRecordCovers"
     internal const val settingContentKey = "backupSettings"
     internal const val persistedCoverContentKey = "backupPersistedCovers"
     internal const val otherCoverContentKey = "backupOtherCovers"
@@ -47,6 +48,7 @@ object BackupConfig {
         sourceContentKey,
         ruleContentKey,
         historyContentKey,
+        readRecordCoverContentKey,
         settingContentKey,
         persistedCoverContentKey,
         otherCoverContentKey,
@@ -61,6 +63,7 @@ object BackupConfig {
         appCtx.getString(R.string.backup_content_sources),
         appCtx.getString(R.string.backup_content_rules),
         appCtx.getString(R.string.backup_content_history),
+        appCtx.getString(R.string.backup_content_read_record_covers),
         appCtx.getString(R.string.backup_content_settings),
         appCtx.getString(R.string.backup_content_persisted_covers),
         appCtx.getString(R.string.backup_content_other_covers),
@@ -200,7 +203,7 @@ object BackupConfig {
         get() = ignoreConfig[runtimeSourceCacheIgnoreKey] == true
 
     internal fun contentIsEnabled(key: String): Boolean {
-        if (key == cookieContentKey) {
+        if (key == cookieContentKey || key == readRecordCoverContentKey) {
             return ignoreConfig[key] == false
         }
         if (key == runtimeSourceCacheContentKey) {

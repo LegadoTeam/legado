@@ -4,6 +4,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import io.legado.app.constant.AppConst
 import io.legado.app.data.appDb
+import io.legado.app.help.book.ReadRecordCoverCache
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
 
@@ -40,25 +41,25 @@ fun ReadRecord.updateSnapshot(
     book.getDisplayCover()?.takeIf { it.isNotBlank() }?.let { coverUrl = it }
 }
 
+fun ReadRecord.saveWithCover(book: Book?) {
+    appDb.readRecordDao.insert(this)
+    ReadRecordCoverCache.request(copy(), book?.getCoverSourceOrigin())
+}
+
 /** Copy the bookshelf data before deleting it so the history row remains displayable. */
 fun Book.saveReadRecordSnapshot() {
-    val current = appDb.readRecordDao.getRecord(AppConst.androidId, name)
-    if (current == null && durChapterIndex == 0 && durChapterPos == 0 &&
-        durChapterTitle.isNullOrBlank()
-    ) {
-        return
-    }
-    val record = (current ?: ReadRecord(deviceId = AppConst.androidId, bookName = name))
+    val current = appDb.readRecordDao.getRecord(AppConst.androidId, name) ?: return
+    val record = current
         .copy(
             deviceId = AppConst.androidId,
             bookName = name,
-            author = author.ifBlank { current?.author.orEmpty() },
-            lastChapterTitle = durChapterTitle ?: current?.lastChapterTitle,
+            author = author.ifBlank { current.author },
+            lastChapterTitle = durChapterTitle ?: current.lastChapterTitle,
             lastChapterIndex = durChapterIndex,
             lastChapterPos = durChapterPos,
-            coverUrl = getDisplayCover() ?: current?.coverUrl,
+            coverUrl = ReadRecordCoverCache.retainLocal(getDisplayCover() ?: current.coverUrl),
         )
-    appDb.readRecordDao.insert(record)
+    record.saveWithCover(this)
 }
 
 /** 同设备同书名共用主键,复用 author 列保存作者集合,纯文本仍兼容旧记录. */

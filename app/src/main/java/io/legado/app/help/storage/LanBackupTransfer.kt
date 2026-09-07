@@ -308,7 +308,7 @@ internal object LanBackupTransfer {
         val directoryNames = if (includeBackgrounds) {
             backupMediaDirectoryNames
         } else {
-            listOf("covers")
+            listOf("covers", readRecordCoverDirectory)
         }
         val requiredBytes = requiredRestoreMediaBytes(
             backupRoot,

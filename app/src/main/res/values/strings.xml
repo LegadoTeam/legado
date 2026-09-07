@@ -1796,4 +1796,13 @@
     <string name="live_update_notifications">Live update notifications</string>
     <string name="live_update_notifications_summary">Promote supported progress notifications on Android 16 when allowed by the system</string>
     <string name="show_explore_categories">Show all categories</string>
+    <string name="read_record_simple_layout">Simple layout</string>
+    <string name="read_record_use_days">Show days</string>
+    <string name="read_record_achievement">Reading achievements</string>
+    <string name="read_record_book_count">Read %1$d books</string>
+    <string name="read_record_total_duration">Total %1$s</string>
+    <string name="read_record_no_chapter">No chapter data</string>
+    <string name="read_record_no_author">Unknown author</string>
+    <string name="read_record_empty">No reading records</string>
+    <string name="backup_content_read_record_covers">Reading history cover snapshots</string>
 </resources>

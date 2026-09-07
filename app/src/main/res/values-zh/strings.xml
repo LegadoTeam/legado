@@ -1685,4 +1685,13 @@
     <string name="live_update_notifications">实时更新通知</string>
     <string name="live_update_notifications_summary">在 Android 16 上将系统允许的进度通知提升为实时更新</string>
     <string name="show_explore_categories">显示全部分类</string>
+    <string name="read_record_simple_layout">简洁布局</string>
+    <string name="read_record_use_days">按天统计</string>
+    <string name="read_record_achievement">累计阅读成就</string>
+    <string name="read_record_book_count">已读 %1$d 本书</string>
+    <string name="read_record_total_duration">共阅读 %1$s</string>
+    <string name="read_record_no_chapter">暂无章节数据</string>
+    <string name="read_record_no_author">暂无作者数据</string>
+    <string name="read_record_empty">暂无阅读记录</string>
+    <string name="backup_content_read_record_covers">阅读记录封面快照</string>
 </resources>
