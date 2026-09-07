@@ -19,6 +19,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import io.legado.app.data.entities.Book
+import io.legado.app.constant.BookType
 
 @RunWith(AndroidJUnit4::class)
 class PdfOutlineTest {
@@ -28,7 +29,7 @@ class PdfOutlineTest {
             repeat(3) { document.addPage(PDPage()) }
             fun destination(index: Int) = COSArray().apply {
                 add(document.getPage(index).cosObject)
-                add(COSName.FIT)
+                add(COSName.getPDFName("Fit"))
             }
             document.documentCatalog.cosObject.setItem(COSName.DESTS, COSDictionary().apply {
                 setItem(COSName.getPDFName("legacy"), destination(0))
@@ -80,7 +81,7 @@ class PdfOutlineTest {
                 file.outputStream().use { input.copyTo(it) }
             }
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileProvider", file)
-            val book = Book(bookUrl = uri.toString(), originName = file.name,
+            val book = Book(bookUrl = uri.toString(), originName = file.name, type = BookType.local or BookType.text,
                 durChapterIndex = 2, durChapterPos = 17)
             val nodes = PdfOutline.read(book)
             assertEquals(listOf("Compressed outline"), nodes.map { it.title })

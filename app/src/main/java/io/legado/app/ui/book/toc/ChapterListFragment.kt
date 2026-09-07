@@ -321,7 +321,9 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     private suspend fun queryChapterList(book: Book): List<BookChapter> {
         return withContext(IO) {
             val end = book.simulatedTotalChapterNum() - 1
-            appDb.bookChapterDao.getChapterList(book.bookUrl, 0, end)
+            appDb.bookChapterDao.getChapterList(book.bookUrl, 0, end).let { chapters ->
+                if (book.isPdf && book.getReverseToc()) chapters.asReversed() else chapters
+            }
         }
     }
 
