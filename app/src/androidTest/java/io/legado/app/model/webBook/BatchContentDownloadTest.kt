@@ -50,7 +50,7 @@ class BatchContentDownloadTest {
             f.source.ruleContent!!.replaceRegex = "@js:result + ':' + baseUrl"
             assertTrue(WebBook.getContentBatchAwait(f.source, f.book, f.chapters).isEmpty())
             f.chapters.forEach {
-                assertEquals("batch-${it.index}:${it.getAbsoluteURL()}", BookHelp.getContent(f.book, it))
+                assertEquals("　　batch-${it.index}:${it.getAbsoluteURL()}", BookHelp.getContent(f.book, it))
             }
             BookHelp.clearCache(f.book)
             f.source.ruleContent!!.replaceRegex = "@js:' \\n\\t '"

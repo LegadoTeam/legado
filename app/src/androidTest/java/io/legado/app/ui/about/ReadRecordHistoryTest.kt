@@ -13,6 +13,7 @@ import androidx.core.view.isVisible
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -238,7 +239,7 @@ class ReadRecordHistoryTest {
             findRow(activity.views, book.name)!!.enhanced.ivRemove.performClick()
         }
         instrumentation.waitForIdleSync()
-        onView(withId(android.R.id.button1)).perform(click())
+        onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
         await { it.recyclerView.adapter?.itemCount == 2 }
         assertFalse(retained.exists())
         assertTrue(appDb.readRecordDao.all.any { it.bookName == "Archived second" })
