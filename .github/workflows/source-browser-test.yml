@@ -24,7 +24,6 @@ on:
       - 'app/src/main/res/menu/content_edit.xml'
       - 'app/src/androidTest/java/io/legado/app/ui/book/read/ContentEditSearchTest.kt'
       - 'app/src/androidTest/java/io/legado/app/ui/book/read/MouseWheelScrollTest.kt'
-      - 'app/src/androidTest/java/io/legado/app/ui/book/read/ReadAloudControlsTest.kt'
       - 'app/src/main/res/values*/read_aloud_controls.xml'
       - 'app/src/main/res/xml/pref_config_aloud*'
       - 'app/src/main/res/layout/view_read_aloud_float_bar.xml'
