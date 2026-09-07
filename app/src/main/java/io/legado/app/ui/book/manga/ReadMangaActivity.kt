@@ -117,6 +117,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     }
 
     private var justInitData: Boolean = false
+    private var contentUpdateId = 0
     private var syncDialog: AlertDialog? = null
     private val mScrollTimer by lazy {
         ScrollTimer(this, binding.recyclerView, lifecycleScope).apply {
@@ -227,7 +228,8 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             setDisableMangaScale(AppConfig.disableMangaScale)
             setRecyclerViewPreloader(AppConfig.mangaPreDownloadNum)
             setPreScrollListener { _, _, _, position ->
-                if (mAdapter.isNotEmpty()) {
+                // Until the requested page is laid out, callbacks still describe the old page.
+                if (!loadingViewVisible && mAdapter.isNotEmpty()) {
                     val item = mAdapter.getItem(position)
                     if (item is BaseMangaPage) {
                         // Capture the new chapter's page before its transition saves progress.
@@ -301,6 +303,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
 
     override fun upContent() {
         lifecycleScope.launch {
+            val updateId = ++contentUpdateId
             setTitle(ReadManga.book?.name)
             // This only snapshots the loaded chapters and clamps the reading position.
             // Keep snapshots ordered; an older IO task must not overwrite a newer list.
@@ -314,11 +317,15 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                     binding.infobar.isVisible = true
                     upInfoBar(list[pos])
                     mLayoutManager.scrollToPositionWithOffset(pos, 0)
-                    binding.flLoading.isGone = true
-                    loadMoreView.visible()
-                    binding.mangaMenu.upSeekBar(
-                        ReadManga.durChapterPos, ReadManga.curMangaChapter!!.imageCount
-                    )
+                    binding.recyclerView.doOnNextLayout {
+                        if (updateId == contentUpdateId) {
+                            binding.flLoading.isGone = true
+                            loadMoreView.visible()
+                            ReadManga.curMangaChapter?.let { chapter ->
+                                binding.mangaMenu.upSeekBar(ReadManga.durChapterPos, chapter.imageCount)
+                            }
+                        }
+                    }
                 }
 
                 if (curFinish) {
@@ -469,6 +476,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
 
     override fun showLoading() {
         lifecycleScope.launch {
+            contentUpdateId++
             binding.flLoading.isVisible = true
         }
     }
@@ -546,7 +554,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             }
 
             R.id.menu_refresh -> {
-                binding.flLoading.isVisible = true
+                showLoading()
                 ReadManga.book?.let {
                     viewModel.refreshContentDur(it)
                 }
