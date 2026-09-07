@@ -19,4 +19,12 @@ class ReadRecordDurationTest {
         assertEquals("59秒", formatDuring(59_000L))
         assertEquals("0秒", formatDuring(0L))
     }
+
+    @Test
+    fun `optional days retain hours minutes and seconds`() {
+        assertEquals("1天", formatDuring(24 * 60 * 60 * 1000L, true))
+        assertEquals("2天1小时2分钟3秒", formatDuring((49 * 3600 + 123) * 1000L, true))
+        assertEquals("59秒", formatDuring(59_000L, true))
+        assertEquals("0秒", formatDuring(0L, true))
+    }
 }

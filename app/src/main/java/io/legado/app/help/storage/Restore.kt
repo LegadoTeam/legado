@@ -24,6 +24,7 @@ import io.legado.app.data.entities.HttpTTS
 import io.legado.app.data.entities.HighlightRule
 import io.legado.app.data.entities.KeyboardAssist
 import io.legado.app.data.entities.ReadRecord
+import io.legado.app.data.entities.mergeRestoredReadRecord
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.data.entities.RssSource
 import io.legado.app.data.entities.RssStar
@@ -368,20 +369,15 @@ object Restore {
                 } else {
                     readRecord
                 }
-                //判断是不是本机记录
-                if (normalizedRecord.deviceId != androidId) {
-                    appDb.readRecordDao.insert(normalizedRecord)
-                } else {
-                    val current = appDb.readRecordDao
-                        .getRecord(normalizedRecord.deviceId, normalizedRecord.bookName)
-                    if (current == null || current.readTime < normalizedRecord.readTime ||
-                        (current.readTime == normalizedRecord.readTime &&
-                            current.lastRead < normalizedRecord.lastRead)
-                    ) {
-                        appDb.readRecordDao.insert(normalizedRecord)
-                    } else if (normalizedRecord.author.isNotBlank()) {
-                        appDb.readRecordDao.insert(current.copy(author = normalizedRecord.author))
-                    }
+                val restoredRecord = normalizedRecord.copy(coverUrl = remapReadRecordCover(
+                    normalizedRecord.coverUrl?.let { remapRestoredCoverPath(it, File(path), appCtx.externalFiles) },
+                    File(path), appCtx.externalFiles,
+                ))
+                appDb.runInTransaction {
+                    val current = appDb.readRecordDao.getRecord(restoredRecord.deviceId, restoredRecord.bookName)
+                    appDb.readRecordDao.insert(mergeRestoredReadRecord(
+                        current, restoredRecord, restoredRecord.deviceId == androidId,
+                    ))
                 }
             }
         }
@@ -521,6 +517,8 @@ object Restore {
             if (PreferKey.showExploreCategories !in map) {
                 edit.putBoolean(PreferKey.showExploreCategories, false)
             }
+            if ("readRecordSimpleLayout" !in map) edit.putBoolean("readRecordSimpleLayout", true)
+            if ("readRecordUseDays" !in map) edit.putBoolean("readRecordUseDays", false)
             edit.apply()
         }
         restoredVideoPreferences?.let { map ->
@@ -563,6 +561,7 @@ object Restore {
             null
         }
         coverRestoreResult.getOrThrow()
+        restoreBackupMediaDirectory(File(path), appCtx.externalFiles, readRecordCoverDirectory).getOrThrow()
         backgroundRestoreResult?.getOrThrow()
         if (!restoredAutoTasks.isNullOrEmpty()) {
             appDb.autoTaskRuleDao.upsert(*restoredAutoTasks.toTypedArray())

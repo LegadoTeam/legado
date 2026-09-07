@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="16dp"
+    app:cardBackgroundColor="@color/background_card"
+    app:cardCornerRadius="8dp"
+    app:cardElevation="1dp">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="144dp"
+        android:padding="16dp">
+
+        <TextView
+            android:id="@+id/tv_achievement"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:text="@string/read_record_achievement"
+            android:textColor="@color/secondaryText"
+            android:textSize="13sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/cover_stack"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/tv_book_count"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textColor="@color/primaryText"
+            android:textSize="18sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/cover_stack"
+            app:layout_constraintTop_toBottomOf="@id/tv_achievement" />
+
+        <TextView
+            android:id="@+id/tv_total_duration"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="@color/secondaryText"
+            android:textSize="13sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/cover_stack"
+            app:layout_constraintTop_toBottomOf="@id/tv_book_count"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintVertical_bias="0" />
+
+        <FrameLayout
+            android:id="@+id/cover_stack"
+            android:layout_width="112dp"
+            android:layout_height="108dp"
+            android:layout_marginStart="8dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent">
+
+            <ImageView
+                android:id="@+id/cover_third"
+                android:layout_width="48dp"
+                android:layout_height="64dp"
+                android:layout_marginStart="4dp"
+                android:layout_marginTop="30dp"
+                android:rotation="-10"
+                android:scaleType="centerCrop" />
+
+            <ImageView
+                android:id="@+id/cover_second"
+                android:layout_width="54dp"
+                android:layout_height="72dp"
+                android:layout_marginStart="28dp"
+                android:layout_marginTop="20dp"
+                android:rotation="-3"
+                android:scaleType="centerCrop" />
+
+            <ImageView
+                android:id="@+id/cover_first"
+                android:layout_width="60dp"
+                android:layout_height="80dp"
+                android:layout_marginStart="46dp"
+                android:layout_marginTop="8dp"
+                android:rotation="8"
+                android:scaleType="centerCrop" />
+        </FrameLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</androidx.cardview.widget.CardView>

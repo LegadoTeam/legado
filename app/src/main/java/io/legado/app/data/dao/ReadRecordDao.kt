@@ -21,11 +21,16 @@ interface ReadRecordDao {
 
     @get:Query(
         """
-        select bookName, sum(readTime) as readTime, max(lastRead) as lastRead,
-            group_concat(author, char(31)) as author
-        from readRecord 
-        group by bookName 
-        order by bookName collate localized"""
+        select history.bookName, sum(history.readTime) as readTime,
+            max(history.lastRead) as lastRead, group_concat(history.author, char(31)) as author,
+            snapshot.lastChapterTitle, snapshot.lastChapterIndex,
+            snapshot.lastChapterPos, snapshot.coverUrl
+        from readRecord history
+        join readRecord snapshot on snapshot.bookName = history.bookName
+            and snapshot.deviceId = (select deviceId from readRecord
+                where bookName = history.bookName order by lastRead desc, deviceId limit 1)
+        group by history.bookName
+        order by history.bookName collate localized"""
     )
     val allShow: List<ReadRecordShow>
 
@@ -34,13 +39,18 @@ interface ReadRecordDao {
 
     @Query(
         """
-        select bookName, sum(readTime) as readTime, max(lastRead) as lastRead,
-            group_concat(author, char(31)) as author
-        from readRecord 
-        group by bookName 
-        having bookName like '%' || :searchKey || '%'
-            or group_concat(author, char(31)) like '%' || :searchKey || '%'
-        order by bookName collate localized"""
+        select history.bookName, sum(history.readTime) as readTime,
+            max(history.lastRead) as lastRead, group_concat(history.author, char(31)) as author,
+            snapshot.lastChapterTitle, snapshot.lastChapterIndex,
+            snapshot.lastChapterPos, snapshot.coverUrl
+        from readRecord history
+        join readRecord snapshot on snapshot.bookName = history.bookName
+            and snapshot.deviceId = (select deviceId from readRecord
+                where bookName = history.bookName order by lastRead desc, deviceId limit 1)
+        group by history.bookName
+        having history.bookName like '%' || :searchKey || '%'
+            or group_concat(history.author, char(31)) like '%' || :searchKey || '%'
+        order by history.bookName collate localized"""
     )
     fun search(searchKey: String): List<ReadRecordShow>
 
@@ -49,6 +59,10 @@ interface ReadRecordDao {
 
     @Query("select * from readRecord where deviceId = :deviceId and bookName = :bookName")
     fun getRecord(deviceId: String, bookName: String): ReadRecord?
+
+    @Query("""update readRecord set coverUrl = :coverUrl
+        where deviceId = :deviceId and bookName = :bookName and coverUrl = :expected""")
+    fun updateCoverIfUnchanged(deviceId: String, bookName: String, expected: String, coverUrl: String): Int
 
     @Query("select author from readRecord where deviceId = :deviceId and bookName = :bookName")
     fun getAuthor(deviceId: String, bookName: String): String?

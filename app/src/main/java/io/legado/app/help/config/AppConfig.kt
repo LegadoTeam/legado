@@ -561,6 +561,14 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefBoolean(PreferKey.tocCountWords, value)
         }
 
+    var readRecordSimpleLayout: Boolean
+        get() = appCtx.getPrefBoolean("readRecordSimpleLayout", true)
+        set(value) { appCtx.putPrefBoolean("readRecordSimpleLayout", value) }
+
+    var readRecordUseDays: Boolean
+        get() = appCtx.getPrefBoolean("readRecordUseDays", false)
+        set(value) { appCtx.putPrefBoolean("readRecordUseDays", value) }
+
     var enableReadRecord: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.enableReadRecord, true)
         set(value) {

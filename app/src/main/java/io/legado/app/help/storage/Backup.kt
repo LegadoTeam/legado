@@ -293,7 +293,12 @@ object Backup {
             "replaceRule.json",
             backupPath
         )
-        writeListToJson(appDb.readRecordDao.all, "readRecord.json", backupPath)
+        val includeReadRecordCovers = BackupConfig.readRecordCoverContentKey in enabledContentKeys &&
+            BackupConfig.historyContentKey in enabledContentKeys
+        writeListToJson(
+            prepareReadRecordBackup(appDb.readRecordDao.all, appCtx.externalFiles, File(backupPath), includeReadRecordCovers),
+            "readRecord.json", backupPath,
+        )
         writeListToJson(appDb.searchKeywordDao.all, "searchHistory.json", backupPath)
         writeListToJson(appDb.ruleSubDao.all, "sourceSub.json", backupPath)
         writeListToJson(appDb.txtTocRuleDao.all, "txtTocRule.json", backupPath)
@@ -407,6 +412,11 @@ object Backup {
             ).map { it.absolutePath }
         )
         FileUtils.delete(workingZipFile.absolutePath)
+        if (includeReadRecordCovers) {
+            File(backupPath, readRecordCoverDirectory).takeIf { it.isDirectory }?.let {
+                paths.add(it.absolutePath)
+            }
+        }
         FileUtils.delete(workingZipFile.absolutePath.replace("tmp_", ""))
         val backupFileName = if (AppConfig.onlyLatestBackup) {
             "backup.zip"

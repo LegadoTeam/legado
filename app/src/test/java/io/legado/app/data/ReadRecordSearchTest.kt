@@ -14,8 +14,8 @@ class ReadRecordSearchTest {
         ).first(File::isFile).readText().replace(Regex("\\s+"), " ")
         assertTrue(
             source.contains(
-                "group by bookName having bookName like '%' || :searchKey || '%' " +
-                    "or group_concat(author, char(31)) like '%' || :searchKey || '%'"
+                "group by history.bookName having history.bookName like '%' || :searchKey || '%' " +
+                    "or group_concat(history.author, char(31)) like '%' || :searchKey || '%'"
             )
         )
     }

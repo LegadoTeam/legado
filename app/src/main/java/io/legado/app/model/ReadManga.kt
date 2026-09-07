@@ -9,6 +9,7 @@ import io.legado.app.data.entities.BookProgress
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.updateSnapshot
+import io.legado.app.data.entities.saveWithCover
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.ConcurrentRateLimiter
 import io.legado.app.help.book.BookHelp
@@ -136,6 +137,7 @@ object ReadManga : CoroutineScope by MainScope() {
 
     //每次切换章节更新阅读记录
     fun upReadTime() {
+        val snapshotBook = book?.copy()
         val record = synchronized(readRecord) {
             val currentBook = book ?: return
             val author = book?.author ?: return
@@ -152,7 +154,7 @@ object ReadManga : CoroutineScope by MainScope() {
             if (!AppConfig.enableReadRecord) {
                 return@execute
             }
-            appDb.readRecordDao.insert(record)
+            record.saveWithCover(snapshotBook)
         }
     }
 

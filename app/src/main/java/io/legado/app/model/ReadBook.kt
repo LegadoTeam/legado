@@ -15,6 +15,7 @@ import io.legado.app.data.entities.HighlightRule
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.updateSnapshot
+import io.legado.app.data.entities.saveWithCover
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.HighlightAnchor
 import io.legado.app.help.HighlightRuleMatcher
@@ -620,15 +621,18 @@ object ReadBook : CoroutineScope by MainScope() {
         if (!AppConfig.enableReadRecord) {
             return
         }
-        val author = book?.author.orEmpty()
-        val currentBook = book ?: return
-        executor.execute {
-            readRecord.author = author
-            readRecord.readTime = readRecord.readTime + System.currentTimeMillis() - readStartTime
-            readStartTime = System.currentTimeMillis()
-            readRecord.lastRead = System.currentTimeMillis()
+        val currentBook = book?.copy() ?: return
+        val record = synchronized(readRecord) {
+            val now = System.currentTimeMillis()
+            readRecord.author = currentBook.author
+            readRecord.readTime += (now - readStartTime).coerceAtLeast(0)
+            readStartTime = now
+            readRecord.lastRead = now
             readRecord.updateSnapshot(currentBook, durChapterIndex, durChapterPos)
-            appDb.readRecordDao.insert(readRecord)
+            readRecord.copy()
+        }
+        executor.execute {
+            record.saveWithCover(currentBook)
         }
     }
 

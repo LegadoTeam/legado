@@ -26,6 +26,14 @@ on:
       - 'app/src/main/java/io/legado/app/ui/book/toc/rule/**'
       - 'app/src/main/java/io/legado/app/ui/dict/rule/**'
       - 'app/src/androidTest/java/io/legado/app/ui/association/**'
+      - 'app/src/main/java/io/legado/app/ui/about/ReadRecordActivity.kt'
+      - 'app/src/main/java/io/legado/app/data/dao/ReadRecordDao.kt'
+      - 'app/src/main/java/io/legado/app/data/entities/ReadRecord*'
+      - 'app/src/main/java/io/legado/app/help/book/ReadRecordCoverCache.kt'
+      - 'app/src/main/java/io/legado/app/help/storage/ReadRecordBackup.kt'
+      - 'app/src/main/res/layout/*read_record*'
+      - 'app/src/main/res/menu/book_read_record.xml'
+      - 'app/src/androidTest/java/io/legado/app/ui/about/**'
   workflow_dispatch:
 
 permissions:

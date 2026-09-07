@@ -3,7 +3,7 @@ package io.legado.app.help.storage
 import io.legado.app.help.book.isLegacyPersistedCoverPath
 import java.io.File
 
-internal val backupMediaDirectoryNames = listOf("covers", "bg")
+internal val backupMediaDirectoryNames = listOf("covers", "bg", readRecordCoverDirectory)
 
 internal fun requiredRestoreMediaBytes(
     backupRoot: File,
