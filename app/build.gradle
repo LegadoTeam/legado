@@ -177,8 +177,6 @@ android {
         jniLibs {
             // These dependencies already ship stripped; skip redundant strip attempts.
             keepDebugSymbols += [
-                    // Preserve the upstream Cronet binaries verified against cronet.json.
-                    "**/libcronet.${CronetVersion}.so",
                     '**/libandroidx.graphics.path.so',
                     '**/libarchive-jni.so',
                     '**/libdatastore_shared_counter.so',
@@ -191,7 +189,6 @@ android {
     }
 
     sourceSets {
-        main.jniLibs.srcDir(layout.buildDirectory.dir('generated/cronetJni'))
         // Adds exported schema location as test app assets.
         androidTest.assets.srcDirs += files("$projectDir/schemas".toString())
     }
