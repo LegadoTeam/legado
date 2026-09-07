@@ -31,7 +31,6 @@ import io.legado.app.help.config.parseReadConfigObject
 import io.legado.app.model.ReadBook
 import io.legado.app.model.localBook.TextFile
 import io.legado.app.ui.book.read.config.ClickActionConfigDialog
-import io.legado.app.ui.book.read.config.ReadStyleDialog
 import io.legado.app.ui.book.read.config.TipConfigDialog
 import io.legado.app.ui.book.read.page.ReadView
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
@@ -125,9 +124,8 @@ class TitleFontWeightRenderingTest {
                 assertFalse("Normal and light system title glyphs must differ", titlePixels[0].contentEquals(titlePixels[2]))
             }
             // A separate installed title font follows the same independent weight selection.
-            val serif = checkNotNull(File("/system/fonts").listFiles()?.firstOrNull {
-                it.name.startsWith("NotoSerif") && it.extension == "ttf" && !it.name.contains("Italic")
-            }) { "The emulator must provide its Noto Serif font fixture" }
+            val serif = File("/system/fonts/NotoSerif-Regular.ttf")
+            assertTrue("The emulator must provide its regular Noto Serif font fixture", serif.isFile)
             ReadBookConfig.titleFont = serif.absolutePath
             ReadBookConfig.titleBold = 0
             ChapterProvider.upStyle()
@@ -185,9 +183,8 @@ class TitleFontWeightRenderingTest {
         ReadBookConfig.textBold = 1
         launchReader()
         scenario!!.onActivity {
-            ReadStyleDialog().showNow(it.supportFragmentManager, "title-weight-style")
+            TipConfigDialog().showNow(it.supportFragmentManager, "title-weight-settings")
         }
-        onView(withId(R.id.tv_tip)).perform(click())
         onView(withId(R.id.ll_title_font_weight)).check(matches(isDisplayed()))
         val weights = context.resources.getStringArray(R.array.text_font_weight)
         chooseTitleWeight(weights[0], 0, 400)
@@ -206,9 +203,8 @@ class TitleFontWeightRenderingTest {
             assertEquals(0, ReadBookConfig.titleBold)
             assertFontWeight(ChapterProvider.titlePaint.typeface, 400)
             assertFontWeight(ChapterProvider.contentPaint.typeface, 700)
-            ReadStyleDialog().showNow(it.supportFragmentManager, "title-weight-style")
+            TipConfigDialog().showNow(it.supportFragmentManager, "title-weight-settings")
         }
-        onView(withId(R.id.tv_tip)).perform(click())
         onView(withId(R.id.tv_title_font_weight)).check(matches(withText(weights[0])))
         screenshot("title-weight-settings-restored")
         dismissSettings()
@@ -252,9 +248,8 @@ class TitleFontWeightRenderingTest {
 
     private fun dismissSettings() {
         scenario!!.onActivity { activity ->
-            val style = activity.supportFragmentManager.findFragmentByTag("title-weight-style") as ReadStyleDialog
-            (style.childFragmentManager.findFragmentByTag("tipConfigDialog") as TipConfigDialog).dismissNow()
-            style.dismissNow()
+            (activity.supportFragmentManager.findFragmentByTag("title-weight-settings") as TipConfigDialog)
+                .dismissNow()
         }
     }
 
