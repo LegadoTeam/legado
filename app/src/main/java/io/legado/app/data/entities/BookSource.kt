@@ -238,6 +238,24 @@ data class BookSource(
 
     fun isJsSource(): Boolean = !mainJs.isNullOrBlank()
 
+    /**
+     * 是否支持批量下载正文。
+     * 常规源需要配置批量规则和大于1的最大批量数量;
+     * JS源的批量规则是 getContentBatch 函数,只看 config.maxBatchSize。
+     */
+    fun supportContentBatch(): Boolean {
+        val rule = ruleContent ?: return false
+        if ((rule.maxBatchSize ?: 0) <= 1) return false
+        return isJsSource() || !rule.contentBatch.isNullOrBlank()
+    }
+
+    /**
+     * 每批下载的章节数,未配置或不支持批量时返回1
+     */
+    fun contentBatchSize(): Int {
+        if (!supportContentBatch()) return 1
+        return (ruleContent?.maxBatchSize ?: 1).coerceIn(1, MAX_CONTENT_BATCH_SIZE)
+    }
     /** Ranking, timing and list toggles do not change the rules being checked. */
     fun checkContent(): String = GSON.toJson(copy(
         customOrder = 0, enabled = true, enabledExplore = true,
@@ -279,6 +297,11 @@ data class BookSource(
     }
 
     private fun equal(a: String?, b: String?) = a == b || (a.isNullOrEmpty() && b.isNullOrEmpty())
+
+    companion object {
+        /** 单批章节数上限,防止书源声明过大的批量导致内存和超时问题 */
+        const val MAX_CONTENT_BATCH_SIZE = 50
+    }
 
     class Converters {
 
