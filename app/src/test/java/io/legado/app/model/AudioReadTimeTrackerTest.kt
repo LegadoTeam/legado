@@ -1,6 +1,7 @@
 package io.legado.app.model
 
 import io.legado.app.data.entities.ReadRecord
+import io.legado.app.data.entities.Book
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -36,14 +37,33 @@ class AudioReadTimeTrackerTest {
     }
 
     @Test
-    fun `book info can update the author of an active interval`() {
+    fun `same title with another author starts a separate record without reassigning the active interval`() {
         val tracker = AudioReadTimeTracker()
-        tracker.setRecord(ReadRecord(bookName = "book"))
+        tracker.setRecord(ReadRecord(bookName = "book", author = "A", readTime = 100))
         tracker.start(100)
+        tracker.setRecord(ReadRecord(bookName = "book", author = "B", readTime = 500))
+        val a = tracker.stop(200, 1_000)!!
+        assertEquals("A", a.author)
+        assertEquals(200L, a.readTime)
+        tracker.start(300)
+        val b = tracker.stop(450, 2_000)!!
+        assertEquals("B", b.author)
+        assertEquals(650L, b.readTime)
+    }
 
-        tracker.updateAuthor("author")
-
-        assertEquals("author", tracker.stop(200, 1_000)?.author)
+    @Test
+    fun `switching book data cannot change the previous authors chapter or cover`() {
+        val tracker = AudioReadTimeTracker()
+        val original = ReadRecord(bookName = "book", author = "A", lastChapterTitle = "A chapter", coverUrl = "A cover")
+        tracker.setRecord(original)
+        tracker.start(100)
+        val other = Book(bookUrl = "B", name = "book", author = "B",
+            durChapterTitle = "B chapter", coverUrl = "B cover")
+        tracker.updateSnapshot(other, 9, 50)
+        val saved = tracker.stop(200, 1000)!!
+        assertEquals("A", saved.author)
+        assertEquals("A chapter", saved.lastChapterTitle)
+        assertEquals("A cover", saved.coverUrl)
     }
 
     @Test

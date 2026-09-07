@@ -23,8 +23,27 @@ object DatabaseMigrations {
             migration_31_32, migration_32_33, migration_33_34, migration_34_35,
             migration_35_36, migration_36_37, migration_37_38, migration_38_39,
             migration_39_40, migration_40_41, migration_41_42, migration_42_43,
-            migration_100_101, migration_104_105, migration_105_106,
+            migration_100_101, migration_104_105, migration_105_106, migration_106_107,
         )
+    }
+
+    private val migration_106_107 = object : Migration(106, 107) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""CREATE TABLE readRecord_by_author (
+                deviceId TEXT NOT NULL, bookName TEXT NOT NULL, author TEXT NOT NULL DEFAULT '',
+                readTime INTEGER NOT NULL DEFAULT 0, lastRead INTEGER NOT NULL DEFAULT 0,
+                lastChapterTitle TEXT, lastChapterIndex INTEGER NOT NULL DEFAULT -1,
+                lastChapterPos INTEGER NOT NULL DEFAULT 0, coverUrl TEXT,
+                PRIMARY KEY(deviceId, bookName, author))""")
+            // Keep legacy blank and combined authors intact: their time cannot be split truthfully.
+            db.execSQL("""INSERT INTO readRecord_by_author
+                (deviceId, bookName, author, readTime, lastRead, lastChapterTitle,
+                 lastChapterIndex, lastChapterPos, coverUrl)
+                SELECT deviceId, bookName, author, readTime, lastRead, lastChapterTitle,
+                       lastChapterIndex, lastChapterPos, coverUrl FROM readRecord""")
+            db.execSQL("DROP TABLE readRecord")
+            db.execSQL("ALTER TABLE readRecord_by_author RENAME TO readRecord")
+        }
     }
 
     // Version 105 was released without a checked-in schema export. Preserve its

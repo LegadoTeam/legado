@@ -122,10 +122,7 @@ internal class AudioReadTimeTracker {
     }
 
     @Synchronized
-    fun updateAuthor(author: String) {
-        record.author = author
-        activeRecord?.author = author
-    }
+    fun isForBook(book: Book): Boolean = record.bookName == book.name && record.author == book.author
 
     @Synchronized
     fun updateSnapshot(book: Book, chapterIndex: Int, chapterPos: Int) {
@@ -233,6 +230,9 @@ object AudioPlay : CoroutineScope by MainScope() {
             val changed = AudioPlay.book?.bookUrl != book.bookUrl ||
                     durChapterIndex != book.durChapterIndex
             if (changed) stopPlay()
+            if (!readTimeTracker.isForBook(book)) {
+                resetReadRecord(book, resumeIfPlaying = !changed)
+            }
             AudioPlay.book = book
             changed
         }
@@ -290,8 +290,8 @@ object AudioPlay : CoroutineScope by MainScope() {
 
     @Synchronized
     fun replaceBook(book: Book) {
-        AudioPlay.book = book
         resetReadRecord(book, resumeIfPlaying = true)
+        AudioPlay.book = book
     }
 
     @Synchronized
@@ -306,10 +306,13 @@ object AudioPlay : CoroutineScope by MainScope() {
             author = book.author,
         )
         record.readTime = appDb.readRecordDao
-            .getReadTime(record.deviceId, record.bookName) ?: 0
+            .getReadTime(record.deviceId, record.bookName, record.author) ?: 0
         readTimeTracker.setRecord(record)
         if (resumeIfPlaying && AudioPlayService.isPlaying) {
-            markReadTimeStart()
+            if (AppConfig.enableReadRecord) {
+                readTimeTracker.updateSnapshot(book, durChapterIndex, durChapterPos)
+                readTimeTracker.start(SystemClock.elapsedRealtime())
+            }
         }
     }
 
@@ -324,7 +327,7 @@ object AudioPlay : CoroutineScope by MainScope() {
     @Synchronized
     fun markReadTimeStart() {
         if (AppConfig.enableReadRecord) {
-            readTimeTracker.updateAuthor(book?.author.orEmpty())
+            book?.takeUnless(readTimeTracker::isForBook)?.let { resetReadRecord(it) }
             book?.let { readTimeTracker.updateSnapshot(it, durChapterIndex, durChapterPos) }
             readTimeTracker.start(SystemClock.elapsedRealtime())
         }

@@ -9,12 +9,12 @@ import io.legado.app.help.book.ContentProcessor
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
 
-@Entity(tableName = "readRecord", primaryKeys = ["deviceId", "bookName"])
+@Entity(tableName = "readRecord", primaryKeys = ["deviceId", "bookName", "author"])
 data class ReadRecord(
     var deviceId: String = "",
     var bookName: String = "",
     /**
-     * 书名相同的书籍共用一条记录,作者只用于辅助判断书籍身份,旧记录和旧备份为空
+     * 同设备按书名和作者分别记录；旧的未知作者及合并作者记录原样保留。
      */
     @ColumnInfo(defaultValue = "")
     var author: String = "",
@@ -36,6 +36,7 @@ fun ReadRecord.updateSnapshot(
     chapterIndex: Int = book.durChapterIndex,
     chapterPos: Int = book.durChapterPos,
 ) {
+    if (book.name != bookName || book.author != author) return
     lastChapterIndex = chapterIndex
     book.durChapterTitle?.takeIf { it.isNotBlank() }?.let { lastChapterTitle = it }
     lastChapterPos = chapterPos
@@ -43,7 +44,7 @@ fun ReadRecord.updateSnapshot(
 }
 
 fun ReadRecord.saveWithCover(book: Book?) {
-    val snapshotBook = book?.takeIf { it.name == bookName }
+    val snapshotBook = book?.takeIf { it.name == bookName && it.author == author }
     refreshChapterTitle(snapshotBook)
     appDb.readRecordDao.insert(this)
     ReadRecordCoverCache.request(copy(), snapshotBook?.getCoverSourceOrigin())
@@ -65,10 +66,8 @@ private fun ReadRecord.refreshChapterTitle(snapshotBook: Book?) {
 fun Book.saveReadRecordSnapshot() {
     var snapshot: ReadRecord? = null
     appDb.runInTransaction {
-        val current = appDb.readRecordDao.getRecord(AppConst.androidId, name) ?: return@runInTransaction
-        val record = current.copy(
-            author = ReadRecordAuthors.merge(current.author, author),
-        ).apply {
+        val current = appDb.readRecordDao.getRecord(AppConst.androidId, name, author) ?: return@runInTransaction
+        val record = current.copy().apply {
             updateSnapshot(this@saveReadRecordSnapshot)
             refreshChapterTitle(this@saveReadRecordSnapshot)
             coverUrl = ReadRecordCoverCache.retainLocal(coverUrl)
@@ -79,7 +78,7 @@ fun Book.saveReadRecordSnapshot() {
     snapshot?.let { ReadRecordCoverCache.request(it, getCoverSourceOrigin()) }
 }
 
-/** 同设备同书名共用主键,复用 author 列保存作者集合,纯文本仍兼容旧记录. */
+/** Decode historical combined-author rows without assigning their duration to one author. */
 internal object ReadRecordAuthors {
     private const val PREFIX = "\u001Eauthors:"
     const val AGGREGATE_SEPARATOR = "\u001F"
@@ -105,7 +104,9 @@ internal object ReadRecordAuthors {
         }
     }
 
-    /** Converts DAO aggregate values into a stable, human-readable author list. */
+    fun isCombined(value: String): Boolean = value.startsWith(PREFIX)
+
+    /** Converts legacy encodings into a stable, human-readable author list. */
     fun display(value: String): String {
         if (value.isBlank()) return ""
         return value.split(AGGREGATE_SEPARATOR)

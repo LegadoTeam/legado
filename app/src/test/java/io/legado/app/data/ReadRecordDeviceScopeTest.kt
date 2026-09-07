@@ -15,19 +15,19 @@ class ReadRecordDeviceScopeTest {
                 "select readTime from readRecord where deviceId = :deviceId and bookName = :bookName"
             )
         )
-        assertTrue(dao.contains("fun getReadTime(deviceId: String, bookName: String)"))
+        assertTrue(dao.contains("fun getReadTime(deviceId: String, bookName: String, author: String)"))
         assertTrue(
             normalizedDao.contains(
                 "select history.bookName, sum(history.readTime) as readTime, " +
-                    "max(history.lastRead) as lastRead, group_concat(history.author, char(31)) as author"
+                    "max(history.lastRead) as lastRead, history.author"
             )
         )
 
         listOf(
             "src/main/java/io/legado/app/model/ReadBook.kt" to
-                "readRecord.deviceId = AppConst.androidId",
+                "getRecord(AppConst.androidId, book.name, book.author)",
             "src/main/java/io/legado/app/model/ReadManga.kt" to
-                "readRecord.deviceId = AppConst.androidId",
+                "getRecord(AppConst.androidId, book.name, book.author)",
             "src/main/java/io/legado/app/model/AudioPlay.kt" to
                 "ReadRecord(\n            deviceId = AppConst.androidId,",
         ).forEach { (path, call) ->
@@ -43,7 +43,7 @@ class ReadRecordDeviceScopeTest {
         assertTrue(restore.contains("restoredRecord.deviceId == androidId"))
         assertTrue(
             restore.contains(
-                "getRecord(restoredRecord.deviceId, restoredRecord.bookName)"
+                "getRecord(restoredRecord.deviceId, restoredRecord.bookName, restoredRecord.author)"
             )
         )
     }
@@ -61,12 +61,12 @@ class ReadRecordDeviceScopeTest {
 
         val manga = projectFile("src/main/java/io/legado/app/model/ReadManga.kt")
         val upReadTime = methodBody(manga, "upReadTime")
-        assertTrue(upReadTime.contains("val author = book?.author ?: return"))
-        assertTrue(upReadTime.contains("val elapsed = now - readStartTime"))
+        assertTrue(upReadTime.contains("val currentBook = book?.copy() ?: return"))
+        assertTrue(upReadTime.contains("val elapsed = (now - readStartTime).coerceAtLeast(0)"))
         assertTrue(upReadTime.contains("readStartTime = now"))
         assertTrue(upReadTime.contains("readRecord.copy()"))
         assertTrue(upReadTime.contains("record.saveWithCover(snapshotBook)"))
-        assertTrue(upReadTime.indexOf("val elapsed = now - readStartTime") <
+        assertTrue(upReadTime.indexOf("val elapsed = (now - readStartTime).coerceAtLeast(0)") <
             upReadTime.indexOf("executor.execute"))
         assertTrue(upReadTime.indexOf("readStartTime = now") <
             upReadTime.indexOf("executor.execute"))

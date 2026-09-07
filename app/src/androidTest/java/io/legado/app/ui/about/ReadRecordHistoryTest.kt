@@ -1,13 +1,18 @@
 package io.legado.app.ui.about
 
+import android.app.Activity
+import android.app.Instrumentation
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Rect
+import android.graphics.drawable.BitmapDrawable
 import android.os.SystemClock
 import android.view.Menu
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import android.widget.ImageView
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.view.isVisible
 import androidx.test.core.app.ActivityScenario
@@ -33,6 +38,7 @@ import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.storage.BackupConfig
 import io.legado.app.help.storage.Restore
 import io.legado.app.help.storage.writePreferenceSnapshot
+import io.legado.app.ui.book.read.ReadBookActivity
 import io.legado.app.utils.defaultSharedPreferences
 import io.legado.app.utils.GSON
 import kotlinx.coroutines.Dispatchers
@@ -48,6 +54,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 @RunWith(AndroidJUnit4::class)
 class ReadRecordHistoryTest {
@@ -143,10 +150,12 @@ class ReadRecordHistoryTest {
     @Test
     fun newestDeviceSnapshotAndSearchKeepCorrectTotalDuration() {
         appDb.readRecordDao.insert(
-            ReadRecord(deviceId = "old", bookName = "Same", author = "Old author", readTime = 400, lastRead = 100,
+            ReadRecord(deviceId = "old", bookName = "Same", author = "New author", readTime = 400, lastRead = 100,
                 lastChapterTitle = "Old chapter", lastChapterIndex = 2),
             ReadRecord(deviceId = "new", bookName = "Same", author = "New author", readTime = 200, lastRead = 200,
                 lastChapterTitle = "New chapter", lastChapterIndex = 8, lastChapterPos = 33, coverUrl = "cover"),
+            ReadRecord(deviceId = "new", bookName = "Same", author = "Other author", readTime = 900, lastRead = 300,
+                lastChapterTitle = "Other chapter", lastChapterIndex = 19, coverUrl = "other-cover"),
         )
         val record = appDb.readRecordDao.search("New author").single()
         assertEquals(600L, record.readTime)
@@ -155,7 +164,109 @@ class ReadRecordHistoryTest {
         assertEquals(8, record.lastChapterIndex)
         assertEquals(33, record.lastChapterPos)
         assertEquals("cover", record.coverUrl)
-        assertEquals(record, appDb.readRecordDao.allShow.single { it.bookName == "Same" })
+        assertEquals(record, appDb.readRecordDao.allShow.single { it.bookName == "Same" && it.author == "New author" })
+        assertEquals(900L, appDb.readRecordDao.search("Other author").single().readTime)
+        assertEquals(2, appDb.readRecordDao.search("Same").size)
+    }
+
+    @Test
+    fun sameNameAuthorsKeepSeparateRowsCoversChaptersAndReaderRoutes() {
+        val otherColor = Color.rgb(190, 60, 40)
+        val otherCover = File(context.cacheDir, "history-other-$id.png")
+        Bitmap.createBitmap(48, 64, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(otherColor)
+            otherCover.outputStream().use { compress(Bitmap.CompressFormat.PNG, 100, it) }
+            recycle()
+        }
+        val other = book.copy(
+            bookUrl = "history-other:$id", author = "Other History Author", coverUrl = otherCover.absolutePath,
+            durChapterTitle = "Other author's chapter", durChapterIndex = 20,
+            durChapterTime = book.durChapterTime + 1,
+        )
+        val opened = AtomicReference<Intent?>()
+        val monitor = object : Instrumentation.ActivityMonitor() {
+            override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? {
+                if (intent.component?.className != ReadBookActivity::class.java.name) return null
+                opened.set(intent)
+                return Instrumentation.ActivityResult(Activity.RESULT_CANCELED, null)
+            }
+        }
+        instrumentation.addMonitor(monitor)
+        try {
+            appDb.bookDao.insert(other)
+            appDb.readRecordDao.clear()
+            appDb.readRecordDao.insert(
+                ReadRecord(deviceId = AppConst.androidId, bookName = book.name, author = book.author,
+                    readTime = 25 * 3600_000L, lastRead = 1000),
+                ReadRecord(deviceId = AppConst.androidId, bookName = other.name, author = other.author,
+                    readTime = 12 * 3600_000L, lastRead = 2000),
+            )
+            book.saveReadRecordSnapshot()
+            other.saveReadRecordSnapshot()
+            val firstStored = appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author)!!
+            val otherStored = appDb.readRecordDao.getRecord(AppConst.androidId, other.name, other.author)!!
+            val retained = File(firstStored.coverUrl!!)
+            val otherRetained = File(otherStored.coverUrl!!)
+            assertArrayEquals(cover.readBytes(), retained.readBytes())
+            assertArrayEquals(otherCover.readBytes(), otherRetained.readBytes())
+            assertNotEquals(retained.absolutePath, otherRetained.absolutePath)
+            assertEquals(book.durChapterTitle, firstStored.lastChapterTitle)
+            assertEquals(other.durChapterTitle, otherStored.lastChapterTitle)
+
+            AppConfig.readRecordSimpleLayout = false
+            launch()
+            await { binding ->
+                val first = findRow(binding, book.name, book.author)?.enhanced
+                val second = findRow(binding, other.name, other.author)?.enhanced
+                binding.recyclerView.adapter?.itemCount == 2 &&
+                    first?.tvChapter?.text == book.durChapterTitle &&
+                    second?.tvChapter?.text == other.durChapterTitle &&
+                    first?.ivCover?.let(::coverColor) == Color.rgb(35, 148, 115) &&
+                    second?.ivCover?.let(::coverColor) == otherColor
+            }
+            scenario!!.onActivity { activity ->
+                assertEquals("25小时", findRow(activity.views, book.name, book.author)!!.enhanced.tvReadingTime.text.toString())
+                assertEquals("12小时", findRow(activity.views, other.name, other.author)!!.enhanced.tvReadingTime.text.toString())
+            }
+            for (selected in listOf(book, other)) {
+                scenario!!.onActivity { activity ->
+                    assertTrue(findRow(activity.views, selected.name, selected.author)!!.root.performClick())
+                }
+                await { opened.get() != null }
+                assertEquals(selected.bookUrl, opened.getAndSet(null)!!.getStringExtra("bookUrl"))
+            }
+            screenshot("reading-history-same-name-authors")
+            scenario!!.onActivity { select(it, R.id.menu_simple_layout) }
+            await { findRow(it, book.name, book.author)?.compact?.root?.isVisible == true &&
+                findRow(it, other.name, other.author)?.compact?.root?.isVisible == true }
+            scenario!!.onActivity { activity ->
+                assertEquals(context.getString(R.string.author_show, book.author),
+                    findRow(activity.views, book.name, book.author)!!.compact.tvAuthor.text.toString())
+                assertEquals(context.getString(R.string.author_show, other.author),
+                    findRow(activity.views, other.name, other.author)!!.compact.tvAuthor.text.toString())
+                assertTrue(findRow(activity.views, other.name, other.author)!!.root.performClick())
+            }
+            await { opened.get() != null }
+            assertEquals(other.bookUrl, opened.getAndSet(null)!!.getStringExtra("bookUrl"))
+            scenario!!.onActivity { select(it, R.id.menu_simple_layout) }
+            await { findRow(it, book.name, book.author)?.enhanced?.root?.isVisible == true }
+            scenario!!.onActivity { activity ->
+                assertTrue(findRow(activity.views, book.name, book.author)!!.enhanced.ivRemove.performClick())
+            }
+            onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+            await { it.recyclerView.adapter?.itemCount == 1 && findRow(it, other.name, other.author) != null }
+            assertNull(appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author))
+            assertEquals(otherStored, appDb.readRecordDao.getRecord(AppConst.androidId, other.name, other.author))
+            assertFalse(retained.exists())
+            assertTrue(otherRetained.isFile)
+            assertArrayEquals(otherCover.readBytes(), otherRetained.readBytes())
+        } finally {
+            instrumentation.removeMonitor(monitor)
+            scenario?.close()
+            scenario = null
+            appDb.bookDao.delete(other)
+            otherCover.delete()
+        }
     }
 
     @Test
@@ -164,10 +275,10 @@ class ReadRecordHistoryTest {
             bookUrl = book.bookUrl, url = "chapter:$id", index = 12, title = "Chapter 13: Captured chapter",
         ))
         ReadRecord(
-            deviceId = AppConst.androidId, bookName = book.name, lastChapterIndex = 12,
+            deviceId = AppConst.androidId, bookName = book.name, author = book.author, lastChapterIndex = 12,
             lastChapterTitle = "Stale bookshelf title", lastChapterPos = 33,
         ).saveWithCover(book)
-        val saved = appDb.readRecordDao.getRecord(AppConst.androidId, book.name)!!
+        val saved = appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author)!!
         assertEquals(12, saved.lastChapterIndex)
         assertEquals(33, saved.lastChapterPos)
         assertEquals("Chapter 13: Captured chapter", saved.lastChapterTitle)
@@ -190,16 +301,16 @@ class ReadRecordHistoryTest {
             refresh.get(10, TimeUnit.SECONDS)
         }
         try {
-            val latest = appDb.readRecordDao.getRecord(AppConst.androidId, book.name)!!
+            val latest = appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author)!!
                 .copy(readTime = 30 * 3600_000L, lastRead = 5000)
             refreshDuring { appDb.readRecordDao.insert(latest) }
-            val refreshed = appDb.readRecordDao.getRecord(AppConst.androidId, book.name)!!
+            val refreshed = appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author)!!
             assertEquals(latest.readTime, refreshed.readTime)
             assertEquals(latest.lastRead, refreshed.lastRead)
             assertEquals(book.durChapterTitle, refreshed.lastChapterTitle)
 
-            refreshDuring { appDb.readRecordDao.deleteByName(book.name) }
-            assertNull(appDb.readRecordDao.getRecord(AppConst.androidId, book.name))
+            refreshDuring { appDb.readRecordDao.deleteByBook(book.name, book.author) }
+            assertNull(appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author))
         } finally {
             executor.shutdownNow()
         }
@@ -209,14 +320,15 @@ class ReadRecordHistoryTest {
     fun coverDownloadMustDecodeBeforeItReplacesTheOriginalAddress() {
         val invalid = File(context.cacheDir, "invalid-cover-$id.html").apply { writeText("<html>not an image</html>") }
         try {
-            val record = ReadRecord(deviceId = AppConst.androidId, bookName = book.name, coverUrl = invalid.absolutePath)
+            val record = ReadRecord(deviceId = AppConst.androidId, bookName = book.name, author = book.author,
+                coverUrl = invalid.absolutePath)
             appDb.readRecordDao.insert(record)
             runBlocking { ReadRecordCoverCache.request(record)!!.join() }
-            assertEquals(invalid.absolutePath, appDb.readRecordDao.getRecord(AppConst.androidId, book.name)!!.coverUrl)
+            assertEquals(invalid.absolutePath, appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author)!!.coverUrl)
             record.coverUrl = cover.absolutePath
             appDb.readRecordDao.insert(record)
             runBlocking { ReadRecordCoverCache.request(record)!!.join() }
-            val saved = appDb.readRecordDao.getRecord(AppConst.androidId, book.name)!!
+            val saved = appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author)!!
             assertNotEquals(cover.absolutePath, saved.coverUrl)
             assertArrayEquals(cover.readBytes(), File(saved.coverUrl!!).readBytes())
         } finally { invalid.delete() }
@@ -225,7 +337,7 @@ class ReadRecordHistoryTest {
     @Test
     fun deletingBookRetainsOwnedCoverAndDeletingHistoryRemovesOnlyItsCopy() {
         book.saveReadRecordSnapshot()
-        val stored = appDb.readRecordDao.getRecord(AppConst.androidId, book.name)!!
+        val stored = appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author)!!
         val retained = File(stored.coverUrl!!)
         assertNotEquals(cover.absolutePath, retained.absolutePath)
         assertArrayEquals(cover.readBytes(), retained.readBytes())
@@ -259,12 +371,17 @@ class ReadRecordHistoryTest {
             runBlocking(Dispatchers.IO) { Restore.restoreLocked(directory.absolutePath) }
             assertTrue(AppConfig.readRecordSimpleLayout)
             assertFalse(AppConfig.readRecordUseDays)
-            val restored = appDb.readRecordDao.getRecord(AppConst.androidId, book.name)!!
+            val restored = appDb.readRecordDao.getRecord(AppConst.androidId, book.name, "")!!
             assertEquals(30 * 3600_000L, restored.readTime)
             assertEquals("Restored chapter", restored.lastChapterTitle)
             assertEquals(12, restored.lastChapterIndex)
             assertEquals(44, restored.lastChapterPos)
-            assertNull(appDb.readRecordDao.getRecord("", book.name))
+            assertNull(appDb.readRecordDao.getRecord("", book.name, ""))
+            val knownAuthor = appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author)!!
+            assertEquals(25 * 3600_000L, knownAuthor.readTime)
+            assertEquals(1000L, knownAuthor.lastRead)
+            assertEquals(setOf("", book.author), appDb.readRecordDao.allShow
+                .filter { it.bookName == book.name }.map { it.author }.toSet())
             val previous = BackupConfig.ignoreConfig.remove(BackupConfig.readRecordCoverContentKey)
             try {
                 assertFalse(BackupConfig.contentIsEnabled(BackupConfig.readRecordCoverContentKey))
@@ -317,12 +434,21 @@ class ReadRecordHistoryTest {
         activity.onCompatOptionsItemSelected(menu.findItem(id))
     }
 
-    private fun findRow(binding: ActivityReadRecordBinding, name: String): ItemReadRecordDisplayBinding? {
+    private fun findRow(binding: ActivityReadRecordBinding, name: String, author: String? = null): ItemReadRecordDisplayBinding? {
         for (index in 0 until binding.recyclerView.childCount) {
             val row = ItemReadRecordDisplayBinding.bind(binding.recyclerView.getChildAt(index))
-            if (row.enhanced.tvBookName.text.toString() == name || row.compact.tvBookName.text.toString() == name) return row
+            val sameName = row.enhanced.tvBookName.text.toString() == name || row.compact.tvBookName.text.toString() == name
+            val sameAuthor = author == null || row.enhanced.tvAuthor.text.toString() == author ||
+                row.compact.tvAuthor.text.toString() == context.getString(R.string.author_show, author)
+            if (sameName && sameAuthor) return row
         }
         return null
+    }
+
+    private fun coverColor(image: ImageView): Int? {
+        val bitmap = (image.drawable as? BitmapDrawable)?.bitmap ?: return null
+        val readable = bitmap.copy(Bitmap.Config.ARGB_8888, false) ?: return null
+        return try { readable.getPixel(readable.width / 2, readable.height / 2) } finally { readable.recycle() }
     }
 
     private fun await(predicate: (ActivityReadRecordBinding) -> Boolean) {

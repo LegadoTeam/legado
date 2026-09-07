@@ -152,7 +152,8 @@ object ReadBook : CoroutineScope by MainScope() {
     var bookSource: BookSource? = null
     var msg: String? = null
     private val loadingChapters = arrayListOf<Int>()
-    private val readRecord = ReadRecord()
+    private val readRecordLock = Any()
+    private var readRecord = ReadRecord()
     private val chapterLoadingJobs = ConcurrentHashMap<Int, Coroutine<*>>()
     private val prevChapterLoadingLock = Mutex()
     private val curChapterLoadingLock = Mutex()
@@ -180,14 +181,12 @@ object ReadBook : CoroutineScope by MainScope() {
     fun resetData(book: Book) {
         val positionAnchor = pendingHighlightAnchor
         releaseAndCancel()
-        ReadBook.book = book
-        readRecord.deviceId = AppConst.androidId
+        synchronized(readRecordLock) {
+            ReadBook.book = book
+            resetReadRecord(book)
+        }
         loadHighlights(book)
         loadHighlightRules(book)
-        readRecord.bookName = book.name
-        readRecord.author = book.author
-        readRecord.readTime = appDb.readRecordDao
-            .getReadTime(readRecord.deviceId, book.name) ?: 0
         chapterSize = appDb.bookChapterDao.getChapterCount(book.bookUrl)
         simulatedChapterSize = if (book.readSimulating()) {
             book.simulatedTotalChapterNum()
@@ -456,7 +455,13 @@ object ReadBook : CoroutineScope by MainScope() {
 
     fun upData(book: Book) {
         releaseAndCancel()
-        ReadBook.book = book
+        synchronized(readRecordLock) {
+            if (readRecord.bookName != book.name || readRecord.author != book.author) {
+                upReadTime()
+                resetReadRecord(book)
+            }
+            ReadBook.book = book
+        }
         loadHighlights(book)
         loadHighlightRules(book)
         chapterSize = appDb.bookChapterDao.getChapterCount(book.bookUrl)
@@ -624,19 +629,23 @@ object ReadBook : CoroutineScope by MainScope() {
         }
     }
 
+    private fun resetReadRecord(book: Book) {
+        readRecord = appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author)
+            ?: ReadRecord(deviceId = AppConst.androidId, bookName = book.name, author = book.author)
+    }
+
     fun upReadTime() {
         if (!AppConfig.enableReadRecord) {
             return
         }
-        val currentBook = book?.copy() ?: return
-        val record = synchronized(readRecord) {
+        val (record, currentBook) = synchronized(readRecordLock) {
+            val currentBook = book?.copy() ?: return
             val now = System.currentTimeMillis()
-            readRecord.author = currentBook.author
             readRecord.readTime += (now - readStartTime).coerceAtLeast(0)
             readStartTime = now
             readRecord.lastRead = now
             readRecord.updateSnapshot(currentBook, durChapterIndex, durChapterPos)
-            readRecord.copy()
+            readRecord.copy() to currentBook
         }
         executor.execute {
             record.saveWithCover(currentBook)

@@ -1805,6 +1805,7 @@
     <string name="read_record_total_duration">Total %1$s</string>
     <string name="read_record_no_chapter">No chapter data</string>
     <string name="read_record_no_author">Unknown author</string>
+    <string name="read_record_legacy_authors">Legacy combined record: %1$s</string>
     <string name="read_record_empty">No reading records</string>
     <string name="backup_content_read_record_covers">Reading history cover snapshots</string>
 </resources>
