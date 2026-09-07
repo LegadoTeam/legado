@@ -28,11 +28,7 @@ private var cronetEngineFailure: Throwable? = null
 
 val cronetEngine: ExperimentalCronetEngine? by lazy {
     try {
-        CronetLoader.preDownload()
         val builder = ExperimentalCronetEngine.Builder(appCtx).apply {
-            if (CronetLoader.install()) {
-                setLibraryLoader(CronetLoader)//设置自定义so库加载
-            }
             setStoragePath(appCtx.externalCache.absolutePath)//设置缓存路径
             enableHttpCache(HTTP_CACHE_DISK, (1024 * 1024 * 50).toLong())//设置50M的磁盘缓存
             enableQuic(true)//设置支持http/3
@@ -52,10 +48,8 @@ val cronetEngine: ExperimentalCronetEngine? by lazy {
 }
 
 internal fun getCronetEngineOrNull(): ExperimentalCronetEngine? {
-    // Cronet remains the preferred transport when it initializes successfully.
-    // This guard only protects users carrying a broken pre-fix build from a crash.
     return try {
-        if (!CronetLoader.installWithRetry()) null else cronetEngine
+        cronetEngine
     } catch (e: Throwable) {
         cronetEngineFailure = e
         AppLog.put("初始化cronetEngine出错", e)

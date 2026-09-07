@@ -14,7 +14,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okio.buffer
 import okio.source
-import java.io.File
+import org.chromium.net.impl.CronetUrlRequestContext
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.util.concurrent.Executors
@@ -97,12 +97,10 @@ class CronetRuntimeInstrumentation : Instrumentation() {
                 }
                 served.get(30, TimeUnit.SECONDS)
             }
-            val version = requireNotNull(cronetEngine).versionString
+            val engine = requireNotNull(cronetEngine)
+            check(engine is CronetUrlRequestContext) { "Cronet selected a non-native engine: ${engine.javaClass}" }
+            val version = engine.versionString
             check(version.contains(BuildConfig.Cronet_Version)) { "Unexpected Cronet engine: $version" }
-            val library = "libcronet.${BuildConfig.Cronet_Version}.so"
-            check(File("/proc/self/maps").useLines { lines -> lines.any { it.contains(library) } }) {
-                "Native library was not mapped: $library"
-            }
             check(preferences.getBoolean(PreferKey.cronet, false)) { "Cronet preference changed" }
             return version
         } finally {

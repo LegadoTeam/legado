@@ -189,6 +189,7 @@ android {
     }
 
     sourceSets {
+        main.jniLibs.srcDir(layout.buildDirectory.dir('generated/cronetJni'))
         // Adds exported schema location as test app assets.
         androidTest.assets.srcDirs += files("$projectDir/schemas".toString())
     }

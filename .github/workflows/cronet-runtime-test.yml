@@ -9,11 +9,14 @@ on:
       - 'app/cronetlib/**'
       - 'app/*proguard*'
       - 'app/build.gradle'
+      - 'app/download.gradle'
       - 'gradle.properties'
       - 'gradle/libs.versions.toml'
       - 'app/src/main/assets/cronet.json'
       - 'app/src/main/java/io/legado/app/lib/cronet/**'
       - 'app/src/main/java/io/legado/app/help/http/Cronet.kt'
+      - 'app/src/main/java/io/legado/app/App.kt'
+      - 'app/src/main/java/io/legado/app/ui/config/OtherConfigFragment.kt'
       - 'app/src/cronetRuntime/**'
   workflow_dispatch:
 

@@ -5,6 +5,23 @@ mkdir -p app/build/cronet-runtime
 trap 'adb logcat -d > app/build/cronet-runtime/logcat.txt || true' EXIT
 apks=(app/build/outputs/apk/app/release/*.apk)
 [[ ${#apks[@]} -eq 1 && -f "${apks[0]}" ]]
+python3 - "${apks[0]}" <<'PY' | tee app/build/cronet-runtime/apk-checksums.txt
+import hashlib
+import json
+from pathlib import Path
+import sys
+import zipfile
+
+metadata = json.loads(Path('app/src/main/assets/cronet.json').read_text())
+version = metadata.pop('version')
+with zipfile.ZipFile(sys.argv[1]) as apk:
+    for abi, expected in sorted(metadata.items()):
+        entry = f'lib/{abi}/libcronet.{version}.so'
+        actual = hashlib.md5(apk.read(entry)).hexdigest()
+        assert actual == expected, f'{entry}: checksum mismatch'
+        print(f'{entry}: {actual}')
+print(f'APK size: {Path(sys.argv[1]).stat().st_size} bytes')
+PY
 adb install -r -t "${apks[0]}"
 adb logcat -c
 timeout 300 adb shell am instrument -w \
