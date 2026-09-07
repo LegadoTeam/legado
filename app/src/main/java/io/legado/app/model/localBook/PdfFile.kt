@@ -2,6 +2,9 @@ package io.legado.app.model.localBook
 
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Matrix
+import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
 import androidx.core.graphics.createBitmap
@@ -56,6 +59,21 @@ class PdfFile(var book: Book) : AutoCloseable {
         @Synchronized
         override fun getImage(book: Book, href: String): InputStream? {
             return getPFile(book).getImage(href)
+        }
+
+        /** Render directly into a bounded viewport instead of allocating the enlarged full page. */
+        @Synchronized
+        fun renderRegion(book: Book, index: Int, bitmap: Bitmap, destination: RectF, clip: Rect): Boolean {
+            val renderer = getPFile(book).pdfRenderer ?: return false
+            if (index !in 0 until renderer.pageCount) return false
+            renderer.openPage(index).use { page ->
+                val transform = Matrix().apply {
+                    setScale(destination.width() / page.width, destination.height() / page.height)
+                    postTranslate(destination.left, destination.top)
+                }
+                page.render(bitmap, clip, transform, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+            }
+            return true
         }
 
         @Synchronized

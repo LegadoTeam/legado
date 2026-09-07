@@ -6,6 +6,7 @@ on:
       - '.github/workflows/source-browser-test.yml'
       - '.github/scripts/source-browser-test.init.gradle'
       - '.github/scripts/run-ui-regression.sh'
+      - '.github/scripts/prepare-pdf-zoom-fixture.py'
       - 'app/build.gradle'
       - 'gradle.properties'
       - 'gradle/libs.versions.toml'
@@ -109,6 +110,7 @@ jobs:
 
       - name: Build instrumented test APKs
         run: |
+          python3 .github/scripts/prepare-pdf-zoom-fixture.py
           chmod +x gradlew
           ./gradlew :app:assembleAppDebug :app:assembleAppDebugAndroidTest \
             --init-script .github/scripts/source-browser-test.init.gradle \
