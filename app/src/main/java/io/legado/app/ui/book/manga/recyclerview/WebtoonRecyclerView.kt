@@ -56,6 +56,7 @@ class WebtoonRecyclerView @JvmOverloads constructor(
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(e: MotionEvent): Boolean {
+        if (e.actionMasked == MotionEvent.ACTION_DOWN) requestFocus()
         return detector.onTouchEvent(e) || super.onTouchEvent(e)
     }
 

@@ -701,6 +701,10 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
 
     override fun upSystemUiVisibility(menuIsVisible: Boolean) {
         toggleSystemBar(menuIsVisible)
+        if (!menuIsVisible) {
+            // Keep focus in touch mode so Android delivers the first page key after a gesture.
+            binding.recyclerView.requestFocus()
+        }
         if (enableAutoScroll) {
             mScrollTimer.isEnabled = !menuIsVisible
         }
