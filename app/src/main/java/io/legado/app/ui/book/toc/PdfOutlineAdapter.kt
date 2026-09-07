@@ -13,6 +13,7 @@ import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.databinding.ItemChapterListBinding
 import io.legado.app.model.localBook.PdfOutlineNode
 import io.legado.app.utils.dpToPx
+import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.gone
 import io.legado.app.utils.longToastOnUi
 import io.legado.app.utils.visible
@@ -35,6 +36,7 @@ internal class PdfOutlineAdapter(
         val node = item.node
         tvChapterItem.updatePaddingRelative(start = (12 + minOf(node.depth, 8) * 10).dpToPx())
         tvChapterName.text = title(node)
+        tvChapterName.setTextColor(context.getCompatColor(R.color.primaryText))
         tvChapterName.isSingleLine = false
         tvChapterName.maxLines = 2
         tvChapterName.ellipsize = TextUtils.TruncateAt.END
