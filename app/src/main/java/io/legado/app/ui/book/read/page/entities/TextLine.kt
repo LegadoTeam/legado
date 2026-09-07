@@ -291,6 +291,9 @@ data class TextLine(
         if (fillColumnCount > 0) {
             drawHighlightFills(canvas)
         }
+        if (styledColumnCount > 0) {
+            drawHighlightRuns(canvas, underlineBeforeText = true)
+        }
         if (checkFastDraw()) {
             fastDrawTextLine(view, canvas)
         } else {
@@ -504,7 +507,7 @@ data class TextLine(
         }
     }
 
-    private fun drawHighlightRuns(canvas: Canvas) {
+    private fun drawHighlightRuns(canvas: Canvas, underlineBeforeText: Boolean = false) {
         val baseline = lineBase - lineTop
         val baseTextSize = textPaint.textSize
         val fontMetrics = textFontMetrics
@@ -555,9 +558,9 @@ data class TextLine(
                 height,
                 fontMetrics.ascent * metricScale,
                 fontMetrics.descent * metricScale,
-                underline,
-                strike,
-                box,
+                underline.takeIf { underlineBeforeText },
+                strike.takeIf { !underlineBeforeText },
+                box.takeIf { !underlineBeforeText },
                 fallbackColor
             )
             index = endIndex
