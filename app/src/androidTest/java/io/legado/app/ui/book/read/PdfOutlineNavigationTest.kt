@@ -102,16 +102,22 @@ class PdfOutlineNavigationTest {
                 waitUntil { outlineRows() == listOf("第一部分", "前言") }
                 screenshot("pdf-outline-collapsed")
                 tocScenario.onActivity { activity ->
-                    val search = activity.findViewById<TitleBar>(R.id.title_bar).menu.findItem(R.id.menu_search)
-                    search.expandActionView()
-                    (search.actionView as SearchView).setQuery("同页", false)
+                    val search = activity.findViewById<TitleBar>(R.id.title_bar).menu
+                        .findItem(R.id.menu_search).actionView as SearchView
+                    assertTrue(search.findViewById<View>(androidx.appcompat.R.id.search_button).performClick())
+                    search.setQuery("同页", false)
+                    val input = search.findViewById<SearchView.SearchAutoComplete>(androidx.appcompat.R.id.search_src_text)
+                    assertTrue(input.isShown)
+                    assertEquals("同页", input.text.toString())
                 }
                 waitUntil { outlineRows() == listOf("第一部分", "目标十三页", "同页小节") }
                 screenshot("pdf-outline-search")
                 tocScenario.onActivity { activity ->
-                    val search = activity.findViewById<TitleBar>(R.id.title_bar).menu.findItem(R.id.menu_search)
-                    (search.actionView as SearchView).setQuery("", false)
-                    search.collapseActionView()
+                    val search = activity.findViewById<TitleBar>(R.id.title_bar).menu
+                        .findItem(R.id.menu_search).actionView as SearchView
+                    search.setQuery("", false)
+                    assertTrue(search.findViewById<View>(androidx.appcompat.R.id.search_close_btn).performClick())
+                    assertTrue(search.isIconified)
                 }
                 waitUntil { outlineRows() == listOf("第一部分", "前言") }
                 clickOutline("第一部分")
