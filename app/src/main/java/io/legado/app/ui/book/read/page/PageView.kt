@@ -63,6 +63,10 @@ class PageView(context: Context) : FrameLayout(context) {
     private var isMainView = false
     private var bookmarkIndicatorVisible = false
     var isScroll = false
+    internal val contentViewTop: Float
+        get() = binding.vwRoot.top + binding.contentTextView.top.toFloat()
+
+    internal fun closePdfRenderer() = binding.contentTextView.closePdfRenderer()
 
     val headerHeight: Int
         get() {
