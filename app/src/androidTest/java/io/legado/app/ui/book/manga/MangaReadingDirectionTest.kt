@@ -765,7 +765,12 @@ class MangaReadingDirectionTest {
                     "focus=${activity.hasWindowFocus()}, menu=${activity.ui.mangaMenu.visibility}, " +
                     "loading=${activity.ui.flLoading.visibility}, " +
                     "scroll=${recycler.scrollState}, size=${recycler.width}x${recycler.height}, " +
-                    "canScroll=${recycler.canScrollHorizontally(-1)}/${recycler.canScrollHorizontally(1)}"
+                    "canScroll=${recycler.canScrollHorizontally(-1)}/${recycler.canScrollHorizontally(1)}, " +
+                    "loaded=${listOf(ReadManga.prevMangaChapter, ReadManga.curMangaChapter,
+                        ReadManga.nextMangaChapter).map { it?.chapter?.let { chapter -> "${chapter.bookUrl}/${chapter.index}" } }}, " +
+                    "adapterChapters=${(recycler.adapter as MangaAdapter).getItems()
+                        .filterIsInstance<MangaPage>().map { it.chapterIndex }.distinct()}, " +
+                    "pendingUpdates=${recycler.hasPendingAdapterUpdates()}"
             }
         }
         assertTrue("Manga direction did not reach $message; reader is " +
