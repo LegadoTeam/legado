@@ -19,6 +19,7 @@ import type {
   SeachBook,
 } from '@/book'
 import type { BookSoure, Source } from '@/source'
+import type { SourceCheckState } from '@/utils/sourceCheckState'
 
 export type LeagdoApiResponse<T> = {
   isSuccess: boolean
@@ -220,23 +221,61 @@ const isBookSource = /bookSource/i.test(location.href)
 
 // 源编辑API
 // Http
-const getSources = () =>
-  isBookSource ? ajax.get('getBookSources') : ajax.get('getRssSources')
+const getSources = async () => {
+  if (!isBookSource) return ajax.get('getRssSources')
+  const response = await ajax.get('getBookSourcesForManagement')
+  if (response.data.isSuccess) {
+    const { sources, states } = response.data.data
+    useSourceStore().rememberDeviceSources(sources, states)
+    response.data.data = sources
+  }
+  return response
+}
+
+const getBookSourceCheckStates = () => ajax.get<LeagdoApiResponse<{
+  states: SourceCheckState[]; sessionToken: string | null
+}>>('getBookSourceCheckStates')
+const startBookSourceCheck = (sources: Source[], keyword: string) =>
+  ajax.post<LeagdoApiResponse<{sessionToken: string; sourceRevisions: Record<string, string>}>>(
+    'startBookSourceCheck', { sources, keyword })
+const stopBookSourceCheck = (sessionToken: string) =>
+  ajax.post<LeagdoApiResponse<string>>('stopBookSourceCheck', { sessionToken })
+
+const refreshSavedCheckStates = async (sources: Source[]) => {
+  const store = useSourceStore()
+  store.invalidateCheckSources(sources)
+  try {
+    const urls = sources.map(source => (source as BookSoure).bookSourceUrl)
+    const { data } = await ajax.get('getBookSourcesForManagement', { params: { urls: JSON.stringify(urls) } })
+    if (data.isSuccess) store.rememberSavedSources(data.data.sources, data.data.states)
+  } catch {
+    // A failed metadata refresh must not report an already committed source save as failed.
+  }
+}
 
 const saveSource = (data: Source) =>
   isBookSource
-    ? ajax.post<LeagdoApiResponse<string>>('saveBookSource', data)
+    ? ajax.post<LeagdoApiResponse<string>>('saveBookSource', data).then(async response => {
+      if (response.data.isSuccess) await refreshSavedCheckStates([data])
+      return response
+    })
     : ajax.post<LeagdoApiResponse<string>>('saveRssSource', data)
 
 const saveJsSource = (script: string, openedSourceUrl?: string) =>
   ajax.post<LeagdoApiResponse<BookSoure>>('saveJsSource', script, {
     params: { openedSourceUrl },
     headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+  }).then(async response => {
+    if (response.data.isSuccess) await refreshSavedCheckStates([response.data.data])
+    return response
   })
 
 const saveSources = (data: Source[]) =>
   isBookSource
-    ? ajax.post<LeagdoApiResponse<Source[]>>('saveBookSources', data)
+    ? ajax.post<LeagdoApiResponse<Source[]>>('saveBookSources', data).then(async response => {
+      if (response.data.isSuccess) await refreshSavedCheckStates(response.data.data)
+      return response
+    })
     : ajax.post<LeagdoApiResponse<Source[]>>('saveRssSources', data)
 
 const deleteSource = (data: Source[]) =>
@@ -332,6 +371,9 @@ export default {
   deleteBook,
 
   getSources,
+  getBookSourceCheckStates,
+  startBookSourceCheck,
+  stopBookSourceCheck,
   saveSources,
   saveSource,
   saveJsSource,

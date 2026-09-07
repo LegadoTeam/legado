@@ -39,6 +39,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookHighlight
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.BookSourceCheckState
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.entities.AutoTaskRule
@@ -74,14 +75,14 @@ val appDb by lazy {
 }
 
 @Database(
-    version = 105,
+    version = 106,
     exportSchema = true,
     entities = [Book::class, BookGroup::class, BookSource::class, BookChapter::class,
         ReplaceRule::class, SearchBook::class, SearchKeyword::class, Cookie::class,
         RssSource::class, Bookmark::class, RssArticle::class, RssReadRecord::class,
         RssStar::class, TxtTocRule::class, ReadRecord::class, HttpTTS::class, Cache::class,
         RuleSub::class, DictRule::class, KeyboardAssist::class, Server::class,
-        AutoTaskRule::class, BookHighlight::class, HighlightRule::class],
+        AutoTaskRule::class, BookHighlight::class, HighlightRule::class, BookSourceCheckState::class],
     views = [BookSourcePart::class],
     autoMigrations = [
         AutoMigration(from = 43, to = 44),
@@ -143,8 +144,7 @@ val appDb by lazy {
         AutoMigration(from = 99, to = 100),
         AutoMigration(from = 101, to = 102, spec = DatabaseMigrations.Migration_101_102::class),
         AutoMigration(from = 102, to = 103),
-        AutoMigration(from = 103, to = 104),
-        AutoMigration(from = 104, to = 105)
+        AutoMigration(from = 103, to = 104)
     ]
 )
 abstract class AppDatabase : RoomDatabase() {

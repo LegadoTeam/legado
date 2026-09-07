@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="source_check_status">Check status</string>
+    <string name="source_check_detail">Save detailed check errors</string>
+    <string name="source_check_all">All check statuses</string>
+    <string name="source_check_needed">Needs checking</string>
+    <string name="source_check_passed">Check passed</string>
+    <string name="source_check_failed">Check failed</string>
+</resources>

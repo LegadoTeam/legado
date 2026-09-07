@@ -320,7 +320,7 @@ const saveHotKeys = () => {
   hotkeysDialogVisible.value = false
 }
 
-const bindHotKeys = () => {
+function bindHotKeys() {
   // hotkeys默认过滤INPUT SELECT TEXTAREA
   hotkeys.filter = () => true
   buttons.value.forEach(({ hotKeys, action }) => {
@@ -332,7 +332,7 @@ const bindHotKeys = () => {
     })
   })
 }
-const saveHotkeysConfig = (config: string[][]) => {
+function saveHotkeysConfig(config: string[][]) {
   localStorage.setItem('legado_web_hotkeys', JSON.stringify(config))
 }
 

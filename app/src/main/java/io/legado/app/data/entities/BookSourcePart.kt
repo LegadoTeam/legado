@@ -8,8 +8,8 @@ import io.legado.app.utils.splitNotBlank
 // Keep enough headroom below SQLite's host parameter limit.
 internal const val BOOK_SOURCE_QUERY_CHUNK_SIZE = 900
 
-@DatabaseView(
-    """select bookSourceUrl, bookSourceName, bookSourceGroup, customOrder, enabled, enabledExplore, 
+internal const val BOOK_SOURCE_PART_VIEW =
+    """select b.bookSourceUrl, bookSourceName, bookSourceGroup, customOrder, enabled, enabledExplore,
     (loginUrl is not null and trim(loginUrl) <> ''
      or (mainJs is not null and trim(mainJs) <> ''
          and loginUi is not null
@@ -17,8 +17,16 @@ internal const val BOOK_SOURCE_QUERY_CHUNK_SIZE = 900
     lastUpdateTime, respondTime, weight,
     (exploreUrl is not null and trim(exploreUrl) <> '') hasExploreUrl,
     eventListener, bookSourceType,
-    (mainJs is not null and trim(mainJs) <> '') hasJs
-    from book_sources""",
+    (mainJs is not null and trim(mainJs) <> '') hasJs,
+    coalesce(c.status, 'NEEDS_CHECK') checkStatus,
+    coalesce(c.revision, '') checkRevision,
+    coalesce(c.sourceRevision, '') sourceRevision,
+    coalesce(c.checkedAt, 0) checkedAt,
+    coalesce(c.detail, '') checkDetail
+    from book_sources b left join book_source_check_states c on b.bookSourceUrl = c.bookSourceUrl"""
+
+@DatabaseView(
+    BOOK_SOURCE_PART_VIEW,
     viewName = "book_sources_part"
 )
 data class BookSourcePart(
@@ -49,7 +57,12 @@ data class BookSourcePart(
     // 书源类型
     var bookSourceType: Int = 0,
     // 是否为纯 JS 单文件源
-    var hasJs: Boolean = false
+    var hasJs: Boolean = false,
+    var checkStatus: String = BookSourceCheckState.NEEDS_CHECK,
+    var checkRevision: String = "",
+    var sourceRevision: String = "",
+    var checkedAt: Long = 0,
+    var checkDetail: String = "",
 ) {
 
     override fun hashCode(): Int {

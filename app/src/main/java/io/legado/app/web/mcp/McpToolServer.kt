@@ -719,7 +719,7 @@ object McpToolServer {
 
         server.addTool(
             name = "check_source",
-            description = "按应用当前校验配置批量校验书源并写回分组、错误备注和响应时间。" +
+            description = "按应用当前校验配置批量校验书源，独立保存本地检验状态、错误详情和响应时间，不修改书源分组或备注。" +
                 "单批最多 50 个；校验期间书源调试不可用，客户端取消请求不会中止应用内校验。",
             inputSchema = ToolSchema(
                 properties = buildJsonObject {

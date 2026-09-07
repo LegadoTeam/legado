@@ -9,6 +9,10 @@ import {
 export const baseURL_localStorage_key = 'remoteUrl'
 const SECOND = 1000
 const protectedSourcePaths = new Set([
+  'getBookSourcesForManagement',
+  'getBookSourceCheckStates',
+  'startBookSourceCheck',
+  'stopBookSourceCheck',
   'saveJsSource',
   'saveBookSource',
   'saveBookSources',

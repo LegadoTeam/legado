@@ -7,6 +7,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.BookSourceType
 import io.legado.app.constant.BookType
+import io.legado.app.data.entities.BOOK_SOURCE_PART_VIEW
 import io.legado.app.help.book.isLegacyPersistedCoverPath
 import java.util.UUID
 
@@ -22,8 +23,35 @@ object DatabaseMigrations {
             migration_31_32, migration_32_33, migration_33_34, migration_34_35,
             migration_35_36, migration_36_37, migration_37_38, migration_38_39,
             migration_39_40, migration_40_41, migration_41_42, migration_42_43,
-            migration_100_101,
+            migration_100_101, migration_104_105, migration_105_106,
         )
+    }
+
+    // Version 105 was released without a checked-in schema export. Preserve its
+    // exact additive migration explicitly so older installs can still upgrade.
+    private val migration_104_105 = object : Migration(104, 105) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE readRecord ADD COLUMN lastChapterTitle TEXT")
+            db.execSQL("ALTER TABLE readRecord ADD COLUMN lastChapterIndex INTEGER NOT NULL DEFAULT -1")
+            db.execSQL("ALTER TABLE readRecord ADD COLUMN lastChapterPos INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE readRecord ADD COLUMN coverUrl TEXT")
+        }
+    }
+
+    private val migration_105_106 = object : Migration(105, 106) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""CREATE TABLE IF NOT EXISTS book_source_check_states (
+                bookSourceUrl TEXT NOT NULL, revision TEXT NOT NULL, sourceRevision TEXT NOT NULL, status TEXT NOT NULL,
+                checkedAt INTEGER NOT NULL, detail TEXT NOT NULL, PRIMARY KEY(bookSourceUrl),
+                FOREIGN KEY(bookSourceUrl) REFERENCES book_sources(bookSourceUrl)
+                ON UPDATE NO ACTION ON DELETE CASCADE)""")
+            // Old group labels cannot establish that today's rules were checked.
+            db.execSQL("""INSERT INTO book_source_check_states
+                SELECT bookSourceUrl, lower(hex(randomblob(16))), lower(hex(randomblob(16))), 'NEEDS_CHECK', 0, ''
+                FROM book_sources""")
+            db.execSQL("DROP VIEW IF EXISTS book_sources_part")
+            db.execSQL("CREATE VIEW `book_sources_part` AS $BOOK_SOURCE_PART_VIEW")
+        }
     }
 
     private val migration_10_11 = object : Migration(10, 11) {
