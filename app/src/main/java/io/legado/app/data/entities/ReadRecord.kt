@@ -5,6 +5,7 @@ import androidx.room.Entity
 import io.legado.app.constant.AppConst
 import io.legado.app.data.appDb
 import io.legado.app.help.book.ReadRecordCoverCache
+import io.legado.app.help.book.ContentProcessor
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
 
@@ -42,8 +43,18 @@ fun ReadRecord.updateSnapshot(
 }
 
 fun ReadRecord.saveWithCover(book: Book?) {
+    val snapshotBook = book?.takeIf { it.name == bookName }
+    if (snapshotBook != null && lastChapterIndex >= 0) {
+        appDb.bookChapterDao.getChapter(snapshotBook.bookUrl, lastChapterIndex)?.let { chapter ->
+            lastChapterTitle = chapter.getDisplayTitle(
+                ContentProcessor.get(snapshotBook.name, snapshotBook.origin).getTitleReplaceRules(),
+                snapshotBook.getUseReplaceRule(),
+                replaceBook = snapshotBook.toReplaceBook(),
+            )
+        }
+    }
     appDb.readRecordDao.insert(this)
-    ReadRecordCoverCache.request(copy(), book?.getCoverSourceOrigin())
+    ReadRecordCoverCache.request(copy(), snapshotBook?.getCoverSourceOrigin())
 }
 
 /** Copy the bookshelf data before deleting it so the history row remains displayable. */

@@ -19,8 +19,10 @@ import io.legado.app.R
 import io.legado.app.constant.AppConst
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.saveReadRecordSnapshot
+import io.legado.app.data.entities.saveWithCover
 import io.legado.app.databinding.ActivityReadRecordBinding
 import io.legado.app.databinding.ItemReadRecordDisplayBinding
 import io.legado.app.help.book.ReadRecordCoverCache
@@ -142,6 +144,21 @@ class ReadRecordHistoryTest {
         assertEquals(33, record.lastChapterPos)
         assertEquals("cover", record.coverUrl)
         assertEquals(record, appDb.readRecordDao.allShow.single { it.bookName == "Same" })
+    }
+
+    @Test
+    fun snapshotUsesTheCapturedChapterIndexBeforeBookshelfTitleCatchesUp() {
+        appDb.bookChapterDao.insert(BookChapter(
+            bookUrl = book.bookUrl, url = "chapter:$id", index = 12, title = "Chapter 13: Captured chapter",
+        ))
+        ReadRecord(
+            deviceId = AppConst.androidId, bookName = book.name, lastChapterIndex = 12,
+            lastChapterTitle = "Stale bookshelf title", lastChapterPos = 33,
+        ).saveWithCover(book)
+        val saved = appDb.readRecordDao.getRecord(AppConst.androidId, book.name)!!
+        assertEquals(12, saved.lastChapterIndex)
+        assertEquals(33, saved.lastChapterPos)
+        assertEquals("Chapter 13: Captured chapter", saved.lastChapterTitle)
     }
 
     @Test
