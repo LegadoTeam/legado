@@ -29,6 +29,7 @@ import io.legado.app.model.localBook.TextFile
 import io.legado.app.ui.book.read.config.ClickActionConfigDialog
 import io.legado.app.ui.book.read.config.MoreConfigDialog
 import io.legado.app.ui.book.read.page.ContentTextView
+import io.legado.app.ui.book.read.page.ReadView
 import io.legado.app.utils.defaultSharedPreferences
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -137,9 +138,9 @@ class MouseWheelScrollTest {
             scenario!!.onActivity { activity ->
                 repeat(3) { dispatchScroll(activity, -1f) }
                 assertEquals("Wheel paging remains delayed", before,
-                    activity.binding.readView.curPage.textPage.index)
+                    activity.readerView.curPage.textPage.index)
             }
-            awaitReader { it.binding.readView.curPage.textPage.index == before + 1 }
+            awaitReader { it.readerView.curPage.textPage.index == before + 1 }
             SystemClock.sleep(350)
             assertEquals("Speed $speed must not multiply page turns", before + 1, currentPage())
         }
@@ -152,7 +153,7 @@ class MouseWheelScrollTest {
         SystemClock.sleep(350)
         assertEquals("Ignored axes must not accidentally turn backwards", before, currentPage())
         scenario!!.onActivity { dispatchScroll(it, 1f) }
-        awaitReader { it.binding.readView.curPage.textPage.index == before - 1 }
+        awaitReader { it.readerView.curPage.textPage.index == before - 1 }
     }
 
     @Test
@@ -201,7 +202,7 @@ class MouseWheelScrollTest {
             (activity.supportFragmentManager.findFragmentByTag("mouse-wheel-settings")
                 as MoreConfigDialog).dismissNow()
         }
-        awaitReader { it.bottomDialog == 0 && !it.binding.readView.curPage.textPage.isMsgPage }
+        awaitReader { it.bottomDialog == 0 && !it.readerView.curPage.textPage.isMsgPage }
         assertScrollDelta(-100) { dispatchScroll(it, -1f) }
     }
 
@@ -215,12 +216,15 @@ class MouseWheelScrollTest {
                 .forEach { it.view?.findViewById<View>(R.id.iv_close)?.performClick() }
         }
         awaitReader {
-            val page = it.binding.readView.curPage.textPage
+            val page = it.readerView.curPage.textPage
             ReadBook.book?.bookUrl == book.bookUrl && ReadBook.curTextChapter?.isCompleted == true &&
                 !page.isMsgPage && page.lineSize > 0 && page.height > 400 && it.bottomDialog == 0
         }
         scenario!!.onActivity { assertEquals(pageAnim == PageAnim.scrollPageAnim, it.isScroll) }
     }
+
+    private val ReadBookActivity.readerView: ReadView
+        get() = findViewById(R.id.read_view)
 
     private fun setSpeed(speed: Int) {
         assertTrue(preferences.edit().putInt(PreferKey.mouseWheelScrollSpeed, speed).commit())
@@ -228,7 +232,7 @@ class MouseWheelScrollTest {
 
     private fun assertScrollDelta(expected: Int, input: (ReadBookActivity) -> Unit) {
         scenario!!.onActivity { activity ->
-            val page = activity.binding.readView.curPage
+            val page = activity.readerView.curPage
             val text = page.findViewById<ContentTextView>(R.id.content_text_view)
             val beforeOffset = pageOffset.getInt(text)
             val beforePage = page.textPage.index
@@ -245,8 +249,8 @@ class MouseWheelScrollTest {
             toolType = MotionEvent.TOOL_TYPE_MOUSE
         }
         val coordinates = MotionEvent.PointerCoords().apply {
-            x = activity.binding.readView.width / 2f
-            y = activity.binding.readView.height / 2f
+            x = activity.readerView.width / 2f
+            y = activity.readerView.height / 2f
             setAxisValue(axis, value)
         }
         val now = SystemClock.uptimeMillis()
@@ -258,7 +262,7 @@ class MouseWheelScrollTest {
 
     private fun currentPage(): Int {
         var index = -1
-        scenario!!.onActivity { index = it.binding.readView.curPage.textPage.index }
+        scenario!!.onActivity { index = it.readerView.curPage.textPage.index }
         return index
     }
 
