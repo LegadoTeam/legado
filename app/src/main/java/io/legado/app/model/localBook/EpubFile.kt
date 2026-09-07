@@ -60,6 +60,10 @@ class EpubFile(var book: Book) : AutoCloseable {
         }
 
         @Synchronized
+        fun repairCachedContent(book: Book, chapter: BookChapter, content: String): String =
+            getEFile(book).repairCachedContent(chapter, content)
+
+        @Synchronized
         override fun getImage(
             book: Book,
             href: String
@@ -92,6 +96,8 @@ class EpubFile(var book: Book) : AutoCloseable {
      */
     private var fileDescriptor: ParcelFileDescriptor? = null
     private var zipFile: AndroidZipFile? = null
+    private var readingBoundaries: Map<String, BookChapter>? = null
+    private val checkedContentCaches = HashSet<String>()
     private var epubBook: EpubBook? = null
         get() {
             if (field == null || fileDescriptor == null) {
@@ -135,14 +141,34 @@ class EpubFile(var book: Book) : AutoCloseable {
         }.getOrThrow()
     }
 
-    private fun getContent(chapter: BookChapter): String? {
+    private fun readingBoundary(chapter: BookChapter): BookChapter {
+        if (readingBoundaries == null) getChapterList()
+        return readingBoundaries?.get(chapter.url) ?: chapter
+    }
+
+    private fun repairCachedContent(chapter: BookChapter, content: String): String {
+        val boundary = readingBoundary(chapter)
+        if (!checkedContentCaches.add(chapter.url)) return content
+        val changedBoundary = boundary.startFragmentId != chapter.startFragmentId ||
+            boundary.endFragmentId != chapter.endFragmentId ||
+            boundary.getVariable("nextUrl") != chapter.getVariable("nextUrl")
+        val crossResourceFragment = !chapter.endFragmentId.isNullOrBlank() &&
+            chapter.url.substringBeforeLast("#") != chapter.getVariable("nextUrl").substringBeforeLast("#")
+        if (!changedBoundary && !crossResourceFragment) return content
+        // Only replace an unchanged output of the old reader. A user's edited text wins.
+        if (content != getContent(chapter, legacyBoundary = true)) return content
+        return getContent(chapter) ?: content
+    }
+
+    private fun getContent(chapter: BookChapter, legacyBoundary: Boolean = false): String? {
         /*获取当前章节文本*/
         val contents = epubBookContents ?: return null
-        val nextChapterFirstResourceHref = chapter.getVariable("nextUrl").substringBeforeLast("#")
+        val boundary = if (legacyBoundary) chapter else readingBoundary(chapter)
+        val nextChapterFirstResourceHref = boundary.getVariable("nextUrl").substringBeforeLast("#")
         val currentChapterFirstResourceHref = chapter.url.substringBeforeLast("#")
         val isLastChapter = nextChapterFirstResourceHref.isBlank()
-        val startFragmentId = chapter.startFragmentId
-        val endFragmentId = chapter.endFragmentId
+        val startFragmentId = boundary.startFragmentId
+        val endFragmentId = boundary.endFragmentId
         val elements = Elements()
         var findChapterFirstSource = false
         val includeNextChapterResource = !endFragmentId.isNullOrBlank()
@@ -155,7 +181,7 @@ class EpubFile(var book: Book) : AutoCloseable {
                 // 第一个xhtml文件
                 elements.add(
                     getBody(res, startFragmentId,
-                        endFragmentId.takeIf { currentChapterFirstResourceHref == nextChapterFirstResourceHref })
+                        endFragmentId.takeIf { legacyBoundary || currentChapterFirstResourceHref == nextChapterFirstResourceHref })
                 )
                 // 不是最后章节 且 已经遍历到下一章节的内容时停止
                 if (!isLastChapter && res.href == nextChapterFirstResourceHref) break
@@ -375,6 +401,7 @@ class EpubFile(var book: Book) : AutoCloseable {
             chapter.putVariable("nextUrl", next?.url)
         }
         getWordCount(readingChapters, book)
+        readingBoundaries = readingChapters.associate { it.url to it.copy() }
         return readingChapters
     }
 
@@ -448,6 +475,8 @@ class EpubFile(var book: Book) : AutoCloseable {
 
 
     override fun close() {
+        readingBoundaries = null
+        checkedContentCaches.clear()
         epubBookContents = null
         epubBook = null
         val openedZip = zipFile

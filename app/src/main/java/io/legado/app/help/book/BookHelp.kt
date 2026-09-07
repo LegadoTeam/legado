@@ -14,6 +14,7 @@ import io.legado.app.data.entities.getFolderName
 import io.legado.app.data.entities.isEpub
 import io.legado.app.help.config.AppConfig
 import io.legado.app.model.analyzeRule.AnalyzeUrl
+import io.legado.app.model.localBook.EpubFile
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.utils.ArchiveUtils
 import io.legado.app.utils.FileUtils
@@ -553,9 +554,21 @@ object BookHelp {
             fileName,
         )
         if (file.exists()) {
+            val token = contentSaveToken(book, bookChapter)
             val string = file.readText()
             if (string.isEmpty()) {
                 return null
+            }
+            if (book.isEpub) {
+                val repaired = runCatching {
+                    EpubFile.repairCachedContent(book, bookChapter, string)
+                }.getOrDefault(string)
+                if (repaired != string) {
+                    contentSaveFence.writeIfCurrent(token.key, token.version, fileName) {
+                        file.writeText(repaired)
+                    }
+                }
+                return repaired
             }
             return string
         }

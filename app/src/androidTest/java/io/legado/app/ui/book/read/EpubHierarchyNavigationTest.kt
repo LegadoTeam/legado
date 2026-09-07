@@ -19,6 +19,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.Bookmark
+import io.legado.app.help.book.BookHelp
 import io.legado.app.model.ReadBook
 import io.legado.app.model.localBook.EpubFile
 import io.legado.app.ui.book.read.config.ClickActionConfigDialog
@@ -28,6 +29,7 @@ import io.legado.app.ui.book.toc.TocActivity
 import io.legado.app.ui.book.toc.TocListItem
 import io.legado.app.ui.widget.TitleBar
 import io.legado.app.utils.dpToPx
+import io.legado.app.utils.HtmlFormatter
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -48,7 +50,7 @@ class EpubHierarchyNavigationTest {
             assertEquals(titles, toc.map { it.title })
             assertEquals(depths, toc.map { it.depth })
             assertEquals(listOf(null, 0, 1, null, 3, null, null, 6, null, null), toc.map { it.parentId })
-            val urls = (1..10).map { "Text/${it.toString().padStart(2, '0')}.html" }
+            val urls = (1..10).map { "OEBPS/Text/${it.toString().padStart(2, '0')}.html" }
             assertEquals(urls, toc.map { it.href })
             assertEquals(urls, fixture.chapters.map { it.url })
             fixture.chapters.forEachIndexed { index, chapter ->
@@ -67,10 +69,10 @@ class EpubHierarchyNavigationTest {
                 assertEquals(asset, listOf("Container", "First", "Alias", "Second", "Next"), toc.map { it.title })
                 assertEquals(listOf(0, 1, 2, 2, 0), toc.map { it.depth })
                 assertNull(toc.first().href)
-                assertEquals(listOf("a.xhtml#start", "a.xhtml#cut", "b.xhtml#collision"), fixture.chapters.map { it.url })
-                assertEquals("a.xhtml#cut", fixture.chapters[0].getVariable("nextUrl"))
+                assertEquals(listOf("OEBPS/a.xhtml#start", "OEBPS/a.xhtml#cut", "OEBPS/b.xhtml#collision"), fixture.chapters.map { it.url })
+                assertEquals("OEBPS/a.xhtml#cut", fixture.chapters[0].getVariable("nextUrl"))
                 assertEquals("cut", fixture.chapters[0].endFragmentId)
-                assertEquals("b.xhtml#collision", fixture.chapters[1].getVariable("nextUrl"))
+                assertEquals("OEBPS/b.xhtml#collision", fixture.chapters[1].getVariable("nextUrl"))
                 val first = EpubFile.getContent(fixture.book, fixture.chapters[0]).orEmpty()
                 val second = EpubFile.getContent(fixture.book, fixture.chapters[1]).orEmpty()
                 val next = EpubFile.getContent(fixture.book, fixture.chapters[2]).orEmpty()
@@ -81,6 +83,44 @@ class EpubHierarchyNavigationTest {
                 assertTrue(next.contains("NEXT_RESOURCE_ONLY"))
                 assertFalse(next.contains("BEFORE_NEXT"))
             }
+        }
+    }
+
+    @Test
+    fun oldFragmentMetadataAndGeneratedCachesRepairWithoutChangingEditsOrChapterIdentity() {
+        fixture("issue1074-containers-fragments.epub").use { fixture ->
+            val first = fixture.chapters[0].copy().apply {
+                // Old imports linked the first alias back to the same href before deduplication.
+                putVariable("nextUrl", url)
+                endFragmentId = startFragmentId
+            }
+            appDb.bookChapterDao.update(first)
+            val identities = identities(fixture.book)
+            EpubFile.clear(fixture.book.bookUrl)
+            val corrected = EpubFile.getContent(fixture.book, first).orEmpty()
+            assertTrue(corrected.contains("ALPHA_ONLY"))
+            assertFalse(corrected.contains("SECOND_ONLY") || corrected.contains("BEFORE_START"))
+            val legacy = HtmlFormatter.formatKeepImg("<p>ALPHA_ONLY</p><p>SECOND_ONLY</p><p>TAIL_AFTER_SHARED_ID</p>")
+            BookHelp.saveText(fixture.book, first, legacy)
+            assertEquals(corrected, BookHelp.getContent(fixture.book, first))
+            EpubFile.clear(fixture.book.bookUrl)
+            assertEquals(corrected, BookHelp.getContent(fixture.book, first))
+
+            val second = fixture.chapters[1]
+            val correctedSecond = EpubFile.getContent(fixture.book, second).orEmpty()
+            // The old reader cut this resource at the next resource's colliding fragment ID.
+            BookHelp.saveText(fixture.book, second,
+                HtmlFormatter.formatKeepImg("<p>SECOND_ONLY</p><p>BEFORE_NEXT</p>"))
+            assertEquals(correctedSecond, BookHelp.getContent(fixture.book, second))
+            assertTrue(correctedSecond.contains("TAIL_AFTER_SHARED_ID"))
+
+            BookHelp.saveText(fixture.book, first, "My preserved chapter edit")
+            EpubFile.clear(fixture.book.bookUrl)
+            assertEquals("My preserved chapter edit", BookHelp.getContent(fixture.book, first))
+            assertEquals(identities, identities(fixture.book))
+            EpubFile.clear(fixture.book.bookUrl)
+            assertTrue(fixture.file.delete())
+            assertEquals("My preserved chapter edit", BookHelp.getContent(fixture.book, first))
         }
     }
 
@@ -134,7 +174,7 @@ class EpubHierarchyNavigationTest {
                     reader.onActivity { it.openChapterList() }
                     await { rows()?.size == 10 }
                     clickNode(-9)
-                    await { ReadBook.durChapterIndex == 8 && ReadBook.curTextChapter?.chapter?.url == "Text/09.html" }
+                    await { ReadBook.durChapterIndex == 8 && ReadBook.curTextChapter?.chapter?.url == "OEBPS/Text/09.html" }
                     screenshot("epub-hierarchy-reader-extra")
                     assertEquals(identities, identities(book))
                     assertEquals(listOf(bookmark), appDb.bookmarkDao.getByBook(book.name, book.author))
@@ -175,7 +215,7 @@ class EpubHierarchyNavigationTest {
                 reader.onActivity { it.openChapterList() }
                 await { rows()?.size == 5 }
                 clickNode(-4)
-                await { ReadBook.durChapterIndex == 1 && ReadBook.curTextChapter?.chapter?.url == "a.xhtml#cut" }
+                await { ReadBook.durChapterIndex == 1 && ReadBook.curTextChapter?.chapter?.url == "OEBPS/a.xhtml#cut" }
                 val chapter = ReadBook.curTextChapter!!.chapter
                 val content = EpubFile.getContent(book, chapter).orEmpty()
                 assertTrue(content.contains("SECOND_ONLY") && content.contains("TAIL_AFTER_SHARED_ID"))
@@ -205,6 +245,7 @@ class EpubHierarchyNavigationTest {
 
     private class Fixture(val file: File, val book: Book, val chapters: List<BookChapter>) : AutoCloseable {
         override fun close() {
+            BookHelp.clearCache(book)
             EpubFile.clear(book.bookUrl)
             appDb.bookDao.delete(book)
             book.coverUrl?.let { File(it).delete() }

@@ -153,7 +153,10 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
         displayTitleMap: ConcurrentHashMap<String, String>,
     ) {
         val item = items[index]
-        val chapter = item.chapter
+        val chapter = item.readingChapter?.let { reading ->
+            if (reading.index == item.chapter.index) item.chapter
+            else item.chapter.copy(index = reading.index)
+        } ?: item.chapter
         if (displayTitleMap[item.key] != null) return
         currentCoroutineContext().ensureActive()
         val displayTitle = chapter.getDisplayTitle(
