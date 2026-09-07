@@ -1,5 +1,6 @@
 package io.legado.app.ui.widget.dialog
 
+import android.content.DialogInterface
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
@@ -46,8 +47,6 @@ class BookMemoDialog : BaseDialogFragment(R.layout.dialog_book_memo) {
 
     override fun onStart() {
         super.onStart()
-        readerActivity = activity as? ReadBookActivity
-        readerActivity?.let { it.bottomDialog++ }
         setLayout(ViewGroup.LayoutParams.MATCH_PARENT, 0.5f)
         dialog?.window?.apply {
             setGravity(Gravity.BOTTOM)
@@ -55,13 +54,15 @@ class BookMemoDialog : BaseDialogFragment(R.layout.dialog_book_memo) {
         }
     }
 
-    override fun onStop() {
+    override fun onDismiss(dialog: DialogInterface) {
         readerActivity?.let { it.bottomDialog-- }
         readerActivity = null
-        super.onStop()
+        super.onDismiss(dialog)
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
+        readerActivity = activity as? ReadBookActivity
+        readerActivity?.let { it.bottomDialog++ }
         val textColor = ThemeStore.textColorPrimary(requireContext())
         binding.memoTitle.setTextColor(textColor)
         binding.memoContent.setTextColor(textColor)

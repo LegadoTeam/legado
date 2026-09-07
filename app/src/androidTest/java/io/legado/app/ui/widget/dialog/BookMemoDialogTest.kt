@@ -5,7 +5,7 @@ import android.content.pm.ActivityInfo
 import android.graphics.Bitmap
 import android.os.SystemClock
 import android.text.Spanned
-import android.text.style.StyleSpan
+import android.text.TextPaint
 import android.view.View
 import android.widget.EditText
 import android.widget.TextView
@@ -44,6 +44,7 @@ import io.legado.app.ui.book.read.page.ReadView
 import io.legado.app.utils.GSON
 import io.legado.app.utils.defaultSharedPreferences
 import io.legado.app.utils.fromJsonArray
+import io.noties.markwon.core.spans.StrongEmphasisSpan
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.*
@@ -83,6 +84,7 @@ class BookMemoDialogTest {
     @After fun cleanUp() {
         scenario?.close()
         appDb.bookDao.delete(book)
+        appDb.bookDao.delete(book.copy(bookUrl = book.bookUrl + "-changed"))
         file.delete()
         archive?.parentFile?.deleteRecursively()
         TextFile.clear()
@@ -138,7 +140,12 @@ class BookMemoDialogTest {
         scenario!!.onActivity {
             val rendered = memoDialog(it)!!.requireView().findViewById<TextView>(R.id.memo_content).text
             assertTrue(rendered is Spanned)
-            assertTrue((rendered as Spanned).getSpans(0, rendered.length, StyleSpan::class.java).isNotEmpty())
+            val styled = rendered as Spanned
+            val bold = styled.getSpans(0, styled.length, StrongEmphasisSpan::class.java).single()
+            assertEquals("重要内容", styled.subSequence(styled.getSpanStart(bold), styled.getSpanEnd(bold)).toString())
+            val paint = TextPaint()
+            bold.updateDrawState(paint)
+            assertTrue("Markdown bold must affect actual text drawing", paint.isFakeBoldText)
         }
         screenshot("book-memo-markdown")
         scenario!!.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
@@ -167,7 +174,14 @@ class BookMemoDialogTest {
         appDb.bookDao.delete(book)
         Restore.restoreOrThrow(context, backup.toUri(), lanTransfer = true)
         assertEquals("# Saved in the archive", appDb.bookMemoDao.get(book.bookUrl)!!.content)
-        appDb.bookMemoDao.save(book.bookUrl, "", 101)
+        val changed = book.copy(bookUrl = book.bookUrl + "-changed")
+        appDb.bookDao.replace(book, changed)
+        appDb.bookMemoDao.save(changed.bookUrl, "New memo after changing source", 101)
+        // Restoring the old shelf URL also replaces the row through its name/author index.
+        Restore.restoreOrThrow(context, backup.toUri(), lanTransfer = true)
+        assertNull(appDb.bookMemoDao.get(changed.bookUrl))
+        assertEquals("New memo after changing source", appDb.bookMemoDao.get(book.bookUrl)!!.content)
+        appDb.bookMemoDao.save(book.bookUrl, "", 102)
         Restore.restoreOrThrow(context, backup.toUri(), lanTransfer = true)
         assertEquals("", appDb.bookMemoDao.get(book.bookUrl)!!.content)
     }

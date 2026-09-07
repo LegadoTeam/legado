@@ -215,7 +215,24 @@ interface BookDao {
     fun hasFile(fileName: String): Boolean
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insert(vararg book: Book)
+    fun insertRows(vararg book: Book)
+
+    @Query("""select books.bookUrl from books inner join book_memos using (bookUrl)
+        where books.name = :name and books.author = :author and books.bookUrl != :newBookUrl""")
+    fun getReplacedMemoBookUrl(name: String, author: String, newBookUrl: String): String?
+
+    @Transaction
+    fun insert(vararg book: Book) {
+        book.forEach { item ->
+            // The existing name/author unique index can replace a different URL on import.
+            val previousMemoOwner = getReplacedMemoBookUrl(item.name, item.author, item.bookUrl)
+            insertRows(item)
+            if (previousMemoOwner != null) {
+                copyNewerMemo(previousMemoOwner, item.bookUrl)
+                deleteMemo(previousMemoOwner)
+            }
+        }
+    }
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     fun insertIgnore(book: Book): Long
