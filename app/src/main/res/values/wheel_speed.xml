@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mouse_wheel_scroll_speed" formatted="false">Wheel / crown scroll speed (%)</string>
+    <string name="mouse_wheel_scroll_speed_summary" formatted="false">100% is the default speed. Applies to scrolling mode; page mode still turns one page at a time.</string>
+</resources>

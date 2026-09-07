@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mouse_wheel_scroll_speed" formatted="false">滾輪／旋鈕捲動速度（%）</string>
+    <string name="mouse_wheel_scroll_speed_summary" formatted="false">100% 為預設速度，僅影響捲動模式；分頁模式仍一次翻一頁。</string>
+</resources>

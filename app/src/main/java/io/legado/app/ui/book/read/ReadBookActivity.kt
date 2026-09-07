@@ -954,21 +954,27 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 鼠标滚轮事件
+     * 鼠标滚轮和手表旋钮事件
      */
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {
-        if (0 != (event.source and InputDevice.SOURCE_CLASS_POINTER)) {
-            if (event.action == MotionEvent.ACTION_SCROLL) {
-                val axisValue = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
-                LogUtils.d("onGenericMotionEvent", "axisValue = $axisValue")
-                // 获得垂直坐标上的滚动方向
-                if (axisValue < 0.0f) { // 滚轮向下滚
-                    mouseWheelPage(PageDirection.NEXT, axisValue)
-                } else { // 滚轮向上滚
-                    mouseWheelPage(PageDirection.PREV, axisValue)
-                }
-                return true
+        if (event.action == MotionEvent.ACTION_SCROLL) {
+            val axisValue = when {
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                    event.isFromSource(InputDevice.SOURCE_ROTARY_ENCODER) ->
+                    event.getAxisValue(MotionEvent.AXIS_SCROLL)
+
+                event.source and InputDevice.SOURCE_CLASS_POINTER != 0 ->
+                    event.getAxisValue(MotionEvent.AXIS_VSCROLL)
+
+                else -> return super.onGenericMotionEvent(event)
             }
+            if (!axisValue.isFinite() || axisValue == 0f) {
+                return super.onGenericMotionEvent(event)
+            }
+            LogUtils.d("onGenericMotionEvent", "axisValue = $axisValue")
+            val direction = if (axisValue < 0f) PageDirection.NEXT else PageDirection.PREV
+            mouseWheelPage(direction, axisValue)
+            return true
         }
         return super.onGenericMotionEvent(event)
     }
@@ -1366,7 +1372,8 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
         if (binding.readView.isScroll) {
             // 滚动视图时滚动,否则翻页
-            (binding.readView.pageDelegate as? ScrollPageDelegate)?.curPage?.scroll((distance * 50).toInt())
+            val scrollDistance = (distance * (AppConfig.mouseWheelScrollSpeed / 2f)).toInt()
+            (binding.readView.pageDelegate as? ScrollPageDelegate)?.curPage?.scroll(scrollDistance)
         } else {
             keyPageDebounce(direction, mouseWheel = true, longPress = false)
         }
