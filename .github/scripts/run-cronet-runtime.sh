@@ -14,8 +14,13 @@ import zipfile
 
 metadata = json.loads(Path('app/src/main/assets/cronet.json').read_text())
 version = metadata.pop('version')
+expected_abis = {'arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64'}
 with zipfile.ZipFile(sys.argv[1]) as apk:
-    for abi, expected in sorted(metadata.items()):
+    actual_abis = {name.split('/')[1] for name in apk.namelist()
+                   if name.startswith('lib/') and name.endswith('.so')}
+    assert actual_abis == expected_abis, f'Unexpected native ABI set: {actual_abis}'
+    for abi in sorted(expected_abis):
+        expected = metadata[abi]
         entry = f'lib/{abi}/libcronet.{version}.so'
         actual = hashlib.md5(apk.read(entry)).hexdigest()
         assert actual == expected, f'{entry}: checksum mismatch'
