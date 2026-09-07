@@ -20,6 +20,7 @@ import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isLocalModified
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.simulatedTotalChapterNum
+import io.legado.app.help.book.update
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.ReadManga
@@ -127,7 +128,7 @@ class ReadMangaViewModel(application: Application) : BaseViewModel(application) 
         val oldBook = book.copy()
         WebBook.getChapterListAwait(bookSource, book, true).onSuccess { cList ->
             if (oldBook.bookUrl == book.bookUrl) {
-                appDb.bookDao.update(book)
+                book.update()
             } else {
                 appDb.bookDao.replace(oldBook, book)
                 BookHelp.updateCacheFolder(oldBook, book)
@@ -241,7 +242,7 @@ class ReadMangaViewModel(application: Application) : BaseViewModel(application) 
     /**
      * 换源
      */
-    fun changeTo(book: Book, toc: List<BookChapter>) {
+    fun changeTo(book: Book, toc: List<BookChapter>, onSuccess: () -> Unit = {}) {
         changeSourceCoroutine?.cancel()
         changeSourceCoroutine = execute {
             //换源中
@@ -252,6 +253,8 @@ class ReadMangaViewModel(application: Application) : BaseViewModel(application) 
             appDb.bookChapterDao.insert(*toc.toTypedArray())
             ReadManga.resetData(book)
             ReadManga.loadContent()
+        }.onSuccess {
+            onSuccess()
         }.onError {
             AppLog.put("换源失败\n$it", it, true)
         }.onFinally {

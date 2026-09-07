@@ -59,6 +59,41 @@ class CachePopupActionMigrationTest {
         assertContains(all, "CacheBook.stop(this@CacheActivity)")
     }
 
+    @Test
+    fun `cache toolbar download state updates the action view accessibility label`() {
+        val source = readProjectFile(CACHE_ACTIVITY)
+        val prepare = section(
+            source,
+            "override fun onPrepareOptionsMenu",
+            "private fun showDownloadMenu"
+        )
+        val state = section(
+            source,
+            "private fun updateDownloadMenuState()",
+            "override fun observeLiveBus"
+        )
+        val observer = section(
+            source,
+            "observeEvent<String>(EventBus.UP_DOWNLOAD_STATE)",
+            "observeEvent<Pair<Book, BookChapter>>(EventBus.SAVE_CONTENT)"
+        )
+
+        assertContains(prepare, "updateDownloadMenuState()")
+        assertContains(observer, "updateDownloadMenuState()")
+        assertOrdered(
+            state,
+            "item.setTitle(R.string.stop)",
+            "item.setIconCompat(R.drawable.ic_stop_black_24dp)",
+            "item.actionView?.contentDescription = item.title"
+        )
+        assertOrdered(
+            state,
+            "item.setTitle(R.string.download_start)",
+            "item.setIconCompat(R.drawable.ic_play_24dp)",
+            "item.actionView?.contentDescription = item.title"
+        )
+    }
+
     private fun section(source: String, start: String, end: String): String {
         val startIndex = source.indexOf(start)
         val endIndex = source.indexOf(end, startIndex + start.length)

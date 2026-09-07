@@ -9,13 +9,36 @@ import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.NinePatchDrawable
+import android.os.Build
+import android.util.LruCache
+import android.util.Size
+import androidx.annotation.RequiresApi
 import com.google.android.renderscript.Toolkit
 import java.io.*
+import java.nio.ByteBuffer
 import kotlin.math.*
 
 
 @Suppress("WeakerAccess", "MemberVisibilityCanBePrivate")
 object BitmapUtils {
+
+    private data class ImageSizeCacheEntry(
+        val exists: Boolean,
+        val length: Long,
+        val lastModified: Long,
+        val size: Size?,
+    ) {
+        fun matches(file: File): Boolean =
+            exists == file.exists() &&
+                length == file.length() &&
+                lastModified == file.lastModified()
+    }
+
+    private val imageSizeCache = LruCache<String, ImageSizeCacheEntry>(128)
+    private const val HEIF_HEADER_SCAN_BYTES = 1024 * 1024
+    private val heifBrands = setOf(
+        "heic", "heif", "heix", "hevc", "hevx", "heim", "heis", "hevm", "hevs", "mif1", "msf1"
+    )
 
     /**
      * 从path中获取图片信息,在通过BitmapFactory.decodeFile(String path)方法将突破转成Bitmap时，
@@ -28,8 +51,12 @@ object BitmapUtils {
      */
     @Throws(IOException::class)
     fun decodeBitmap(path: String, width: Int, height: Int? = null): Bitmap? {
+        val isHeif = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && isHeifPath(path)
+        if (isHeif) {
+            decodeBitmapWithImageDecoder(File(path), width, height)?.let { return it }
+        }
         val fis = FileInputStream(path)
-        return fis.use {
+        val bitmap = fis.use {
             val op = BitmapFactory.Options()
             // inJustDecodeBounds如果设置为true,仅仅返回图片实际的宽和高,宽和高是赋值给opts.outWidth,opts.outHeight;
             op.inJustDecodeBounds = true
@@ -37,6 +64,55 @@ object BitmapUtils {
             op.inSampleSize = calculateInSampleSize(op, width, height)
             op.inJustDecodeBounds = false
             BitmapFactory.decodeFileDescriptor(fis.fd, null, op)
+        }
+        return bitmap ?: if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && !isHeif) {
+            decodeBitmapWithImageDecoder(File(path), width, height)
+        } else {
+            null
+        }
+    }
+
+    /**
+     * 获取图片尺寸。BitmapFactory 不认识的格式（例如 HEIF/HEIC）交给系统解码器探测。
+     */
+    fun getImageSize(path: String): Size? {
+        val file = File(path)
+        imageSizeCache.get(path)?.takeIf { it.matches(file) }?.let { return it.size }
+        val size = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && isHeifPath(path)) {
+            readHeifImageSize(file)
+                ?: decodeImageSizeWithImageDecoder(file)
+                ?: readImageSizeWithBitmapFactory(file)
+        } else {
+            readImageSizeWithBitmapFactory(file)
+                ?: if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    decodeImageSizeWithImageDecoder(file)
+                } else {
+                    null
+                }
+        }
+        imageSizeCache.put(
+            path,
+            ImageSizeCacheEntry(file.exists(), file.length(), file.lastModified(), size)
+        )
+        return size
+    }
+
+    fun clearImageSizeCache() {
+        imageSizeCache.evictAll()
+    }
+
+    /** 检测网络返回的图片字节，保留 SVG 的调用方回退。 */
+    fun isImage(bytes: ByteArray): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && hasHeifFileSignature(bytes)) {
+            return true
+        }
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+        if (options.outWidth > 0 && options.outHeight > 0) return true
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            isImageWithImageDecoder(bytes)
+        } else {
+            false
         }
     }
 
@@ -62,16 +138,191 @@ object BitmapUtils {
         options: BitmapFactory.Options,
         width: Int? = null,
         height: Int? = null
+    ): Int = calculateInSampleSize(options.outWidth, options.outHeight, width, height)
+
+    private fun calculateInSampleSize(
+        imageWidth: Int,
+        imageHeight: Int,
+        width: Int? = null,
+        height: Int? = null
     ): Int {
         //获取比例大小
-        val wRatio = width?.let { options.outWidth / it } ?: -1
-        val hRatio = height?.let { options.outHeight / it } ?: -1
+        val wRatio = width?.takeIf { it > 0 }?.let { imageWidth / it } ?: -1
+        val hRatio = height?.takeIf { it > 0 }?.let { imageHeight / it } ?: -1
         //如果超出指定大小，则缩小相应的比例
         return when {
             wRatio > 1 && hRatio > 1 -> max(wRatio, hRatio)
             wRatio > 1 -> wRatio
             hRatio > 1 -> hRatio
             else -> 1
+        }
+    }
+
+    private fun readImageSizeWithBitmapFactory(file: File): Size? {
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.absolutePath, options)
+        return if (options.outWidth > 0 && options.outHeight > 0) {
+            Size(options.outWidth, options.outHeight)
+        } else {
+            null
+        }
+    }
+
+    internal fun isHeifPath(path: String): Boolean {
+        val cleanPath = path.substringBefore('?').substringBefore('#')
+        return cleanPath.endsWith(".heic", ignoreCase = true) ||
+            cleanPath.endsWith(".heif", ignoreCase = true)
+    }
+
+    /**
+     * HEIF uses an ISO-BMFF `ftyp` header. Recognizing its brand is enough for
+     * download validation and avoids decoding the same image just to inspect it.
+     */
+    internal fun hasHeifFileSignature(bytes: ByteArray): Boolean {
+        if (bytes.size < 12) return false
+        val lastTypeOffset = (bytes.size - 4).coerceAtMost(64)
+        for (typeOffset in 0..lastTypeOffset) {
+            if (!asciiEquals(bytes, typeOffset, "ftyp")) continue
+            val majorBrandOffset = typeOffset + 4
+            if (asciiBrand(bytes, majorBrandOffset)) return true
+            var compatibleBrandOffset = typeOffset + 12
+            while (compatibleBrandOffset + 4 <= bytes.size &&
+                compatibleBrandOffset < typeOffset + 4 + 4 * 32
+            ) {
+                if (asciiBrand(bytes, compatibleBrandOffset)) return true
+                compatibleBrandOffset += 4
+            }
+        }
+        return false
+    }
+
+    private fun readHeifImageSize(file: File): Size? {
+        if (!file.isFile || file.length() < 24) return null
+        val length = min(file.length(), HEIF_HEADER_SCAN_BYTES.toLong()).toInt()
+        val bytes = ByteArray(length)
+        return try {
+            FileInputStream(file).use { input ->
+                var offset = 0
+                while (offset < bytes.size) {
+                    val count = input.read(bytes, offset, bytes.size - offset)
+                    if (count <= 0) break
+                    offset += count
+                }
+                findHeifImageDimensions(bytes, offset)?.let { (width, height) ->
+                    Size(width, height)
+                }
+            }
+        } catch (_: IOException) {
+            null
+        }
+    }
+
+    internal fun findHeifImageDimensions(
+        bytes: ByteArray,
+        length: Int = bytes.size,
+    ): Pair<Int, Int>? {
+        // An ispe FullBox stores size/type, version+flags, width and height.
+        val limit = length.coerceIn(0, bytes.size)
+        if (limit < 20) return null
+        var best: Pair<Int, Int>? = null
+        for (typeOffset in 4..(limit - 20)) {
+            if (!asciiEquals(bytes, typeOffset, "ispe")) continue
+            val boxStart = typeOffset - 4
+            val boxSize = readUInt32(bytes, boxStart, limit)
+            if (boxSize < 20L || boxSize == 1L || boxStart.toLong() + boxSize > limit) continue
+            val width = readUInt32(bytes, typeOffset + 8, limit)
+            val height = readUInt32(bytes, typeOffset + 12, limit)
+            if (width <= 0L || height <= 0L || width > Int.MAX_VALUE || height > Int.MAX_VALUE) {
+                continue
+            }
+            val candidate = width.toInt() to height.toInt()
+            val candidateArea = candidate.first.toLong() * candidate.second
+            val bestArea = best?.let { it.first.toLong() * it.second } ?: -1L
+            if (candidateArea > bestArea) {
+                best = candidate
+            }
+        }
+        return best
+    }
+
+    private fun readUInt32(bytes: ByteArray, offset: Int, limit: Int): Long {
+        if (offset < 0 || offset + 4 > limit) return -1L
+        return ((bytes[offset].toLong() and 0xff) shl 24) or
+            ((bytes[offset + 1].toLong() and 0xff) shl 16) or
+            ((bytes[offset + 2].toLong() and 0xff) shl 8) or
+            (bytes[offset + 3].toLong() and 0xff)
+    }
+
+    private fun asciiBrand(bytes: ByteArray, offset: Int): Boolean {
+        if (offset < 0 || offset + 4 > bytes.size) return false
+        return heifBrands.any { asciiEquals(bytes, offset, it) }
+    }
+
+    private fun asciiEquals(bytes: ByteArray, offset: Int, value: String): Boolean {
+        if (offset < 0 || offset + value.length > bytes.size) return false
+        value.indices.forEach { index ->
+            if (bytes[offset + index].toInt() != value[index].code) return false
+        }
+        return true
+    }
+
+    @RequiresApi(Build.VERSION_CODES.P)
+    private fun decodeBitmapWithImageDecoder(file: File, width: Int, height: Int?): Bitmap? {
+        return try {
+            android.graphics.ImageDecoder.decodeBitmap(
+                android.graphics.ImageDecoder.createSource(file)
+            ) { decoder, info, _ ->
+                decoder.setAllocator(android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE)
+                val sampleSize = calculateInSampleSize(
+                    info.size.width,
+                    info.size.height,
+                    width,
+                    height,
+                )
+                if (sampleSize > 1) decoder.setTargetSampleSize(sampleSize)
+            }
+        } catch (_: IOException) {
+            null
+        } catch (_: RuntimeException) {
+            null
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.P)
+    private fun decodeImageSizeWithImageDecoder(file: File): Size? {
+        var imageSize: Size? = null
+        return try {
+            val bitmap = android.graphics.ImageDecoder.decodeBitmap(
+                android.graphics.ImageDecoder.createSource(file)
+            ) { decoder, info, _ ->
+                imageSize = info.size
+                decoder.setAllocator(android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE)
+                decoder.setTargetSize(1, 1)
+            }
+            bitmap.recycle()
+            imageSize
+        } catch (_: IOException) {
+            null
+        } catch (_: RuntimeException) {
+            null
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.P)
+    private fun isImageWithImageDecoder(bytes: ByteArray): Boolean {
+        return try {
+            val bitmap = android.graphics.ImageDecoder.decodeBitmap(
+                android.graphics.ImageDecoder.createSource(ByteBuffer.wrap(bytes))
+            ) { decoder, _, _ ->
+                decoder.setAllocator(android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE)
+                decoder.setTargetSize(1, 1)
+            }
+            bitmap.recycle()
+            true
+        } catch (_: IOException) {
+            false
+        } catch (_: RuntimeException) {
+            false
         }
     }
 

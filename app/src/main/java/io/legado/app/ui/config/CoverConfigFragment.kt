@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.view.View
 import androidx.preference.Preference
 import io.legado.app.R
+import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.prefs.SwitchPreference
@@ -21,6 +22,7 @@ import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.inputStream
 import io.legado.app.utils.putPrefString
+import io.legado.app.utils.postEvent
 import io.legado.app.utils.readUri
 import io.legado.app.utils.removePref
 import io.legado.app.utils.setEdgeEffectColor
@@ -81,17 +83,22 @@ class CoverConfigFragment : PreferenceFragment(),
                 findPreference<SwitchPreference>(PreferKey.coverShowAuthor)
                     ?.isEnabled = getPrefBoolean(key)
                 BookCover.upDefaultCover()
+                postEvent(EventBus.BOOKSHELF_REFRESH, "")
             }
 
             PreferKey.coverShowNameN -> {
                 findPreference<SwitchPreference>(PreferKey.coverShowAuthorN)
                     ?.isEnabled = getPrefBoolean(key)
                 BookCover.upDefaultCover()
+                postEvent(EventBus.BOOKSHELF_REFRESH, "")
             }
 
             PreferKey.coverShowAuthor,
-            PreferKey.coverShowAuthorN -> {
+            PreferKey.coverShowAuthorN,
+            PreferKey.coverHorizontal,
+            PreferKey.coverKeepPunctuation -> {
                 BookCover.upDefaultCover()
+                postEvent(EventBus.BOOKSHELF_REFRESH, "")
             }
         }
     }

@@ -90,4 +90,12 @@ date_count="$(printf '%s\n' "$actual_notes" | awk '/^\*\*[0-9]{4}\/[0-9]{2}\/[0-
 notes_body="${actual_notes#*$'\n'}"
 [[ "$notes_body" =~ [^[:space:]] ]] || fail "release notes body is empty"
 
+latest_source_commit="$(git -C "$ROOT_DIR" log --no-merges -1 --format=%cI -- \
+  app/src/main ':(exclude)app/src/main/assets/updateLog.md' \
+  ':(glob)modules/*/src/main/**')"
+latest_source_date="$(TZ=Asia/Shanghai date -d "$latest_source_commit" +%Y/%m/%d)"
+latest_log_date="$(printf '%s\n' "$latest_date" | sed 's/^\*\*//; s/\*\*$//')"
+[[ "$latest_log_date" < "$latest_source_date" ]] &&
+  fail "latest release notes date $latest_log_date is older than production code $latest_source_date"
+
 echo "Beta release notes verified: $first_output_line"

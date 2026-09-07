@@ -1,5 +1,6 @@
 <template>
   <div class="js-source-editor">
+    <SourceCheckControls :sources="checkSelection" :active="active" />
     <div class="js-source-toolbar">
       <el-select
         v-model="selectedSourceUrl"
@@ -46,7 +47,9 @@
 
 <script setup lang="ts">
 import API from '@api'
+import SourceCheckControls from './SourceCheckControls.vue'
 import type { BookSoure, Source } from '@/source'
+import { fetchJsSourceTemplate } from '@utils/souce'
 import {
   Check,
   DocumentAdd,
@@ -67,8 +70,13 @@ let sourcesLoaded = false
 let restoringCurrentSource = false
 
 const jsSources = computed(() =>
-  store.bookSources.filter(source => source.mainJs?.trim()),
+  store.bookSources.filter(source => source.mainJs?.trim() &&
+    (!store.checkStatusFilter || store.checkStatus(source) === store.checkStatusFilter)),
 )
+const checkSelection = computed<Source[]>(() => {
+  const source = jsSources.value.find(item => item.bookSourceUrl === openedSourceUrl.value)
+  return source && script.value === savedScript.value ? [source] : []
+})
 const dirty = computed(() => script.value !== savedScript.value)
 
 const isJsSource = (source: Source): source is BookSoure =>
@@ -140,7 +148,13 @@ const selectSource = async (
 
 const newSource = async () => {
   if (!(await confirmDiscard())) return
-  resetEditor()
+  try {
+    const template = await fetchJsSourceTemplate()
+    resetEditor()
+    script.value = template
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : 'JS 源模板加载失败')
+  }
 }
 
 const openFile = async () => {

@@ -32,16 +32,17 @@ class AutoTaskPersistenceContractTest {
         assertTrue(dao.contains("ORDER BY customOrder"))
         assertTrue(dao.contains("@Upsert"))
         assertFalse(dao.contains("deleteAll"))
+        assertTrue(autoTask.contains("fun reorder("))
         assertMutationChecksLegacyFirst(
             autoTask.substringAfter("fun upsert(").substringBefore("fun delete("),
             "appDb.autoTaskRuleDao.upsert"
         )
         assertMutationChecksLegacyFirst(
-            autoTask.substringAfter("fun delete(").substringBefore("fun move("),
+            autoTask.substringAfter("fun delete(").substringBefore("fun reorder("),
             "appDb.autoTaskRuleDao.deleteByIds"
         )
         assertMutationChecksLegacyFirst(
-            autoTask.substringAfter("fun move(").substringBefore("fun updateRunState("),
+            autoTask.substringAfter("fun reorder(").substringBefore("fun updateEnabled("),
             "appDb.autoTaskRuleDao.update"
         )
         assertMutationChecksLegacyFirst(
@@ -184,6 +185,12 @@ class AutoTaskPersistenceContractTest {
         assertTrue(service.contains("return AutoTaskScheduler.shouldRetry(this)"))
         assertTrue(service.contains("start = CoroutineStart.LAZY"))
         assertTrue(service.contains("jobs.remove(jobId, currentJob)"))
+        val scheduleNext = service.indexOf(
+            "val nextScheduled = AutoTaskScheduler.refresh(this, afterBatch = true)"
+        )
+        val runDueTasks = service.indexOf("AutoTaskRunner.runDueTasks(this@AutoTaskJobService)")
+        assertTrue(scheduleNext >= 0)
+        assertTrue(runDueTasks > scheduleNext)
         val saveJob = service.indexOf("jobs[jobId] = currentJob")
         val startJob = service.indexOf("currentJob.start()")
         assertTrue(saveJob >= 0)
@@ -244,7 +251,8 @@ class AutoTaskPersistenceContractTest {
         assertTrue(backup.contains("appDb.autoTaskRuleDao.all()"))
         assertTrue(restore.contains("fileToListT<AutoTaskRule>(path, \"autoTask.json\")"))
         assertTrue(restore.contains("appDb.autoTaskRuleDao.upsert"))
-        val preferenceRestore = restore.indexOf("appCtx.getSharedPreferences(path, \"config\")")
+        val preferenceRestore =
+            restore.indexOf("readPreferenceSnapshot(appCtx, path, \"config\")")
         val taskUpsert = restore.indexOf("appDb.autoTaskRuleDao.upsert")
         val scheduleRefresh = restore.indexOf("AutoTaskScheduler.refresh(appCtx)")
         assertTrue(preferenceRestore >= 0)

@@ -1,5 +1,6 @@
 package io.legado.app.ci
 
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -28,5 +29,15 @@ class ReleaseWorkflowTest {
 
         assertTrue(checkoutStep.contains("- uses: actions/checkout@"))
         assertTrue(checkoutStep.contains("fetch-depth: 0"))
+    }
+
+    @Test
+    fun `release matrix only builds existing product flavors`() {
+        val matrix = workflowText
+            .substringAfter("    strategy:\n")
+            .substringBefore("      fail-fast:")
+
+        assertTrue(matrix.contains("product: [ app ]"))
+        assertFalse(matrix.contains("google"))
     }
 }

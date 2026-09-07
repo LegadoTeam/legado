@@ -1,5 +1,6 @@
 package io.legado.app.data.entities
 
+import com.script.ScriptBindings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -17,6 +18,22 @@ class BaseSourceHeaderTest {
         assertTrue(source.logs.isEmpty())
     }
 
+    @Test
+    fun `wrapped header scripts allow surrounding whitespace and mixed case`() {
+        val source = TestSource()
+
+        source.header = "\n <JS>({ 'X-Test': 'tag' })</JS>\t"
+        assertEquals("tag", source.getHeaderMap()["X-Test"])
+
+        source.header = " \t@JS:({ 'X-Test': 'prefix' })\n"
+        assertEquals("prefix", source.getHeaderMap()["X-Test"])
+        assertEquals(
+            listOf("({ 'X-Test': 'tag' })", "({ 'X-Test': 'prefix' })"),
+            source.evaluatedScripts,
+        )
+        assertTrue(source.logs.isEmpty())
+    }
+
     private class TestSource : BaseSource {
         override var concurrentRate: String? = null
         override var loginUrl: String? = null
@@ -26,6 +43,7 @@ class BaseSourceHeaderTest {
         override var jsLib: String? = null
 
         val logs = mutableListOf<String>()
+        val evaluatedScripts = mutableListOf<String>()
 
         override fun getTag() = "test"
 
@@ -34,6 +52,15 @@ class BaseSourceHeaderTest {
         override fun getLoginInfo(): String? = null
 
         override fun putLoginInfo(info: String) = true
+
+        override fun evalJS(
+            jsStr: String,
+            bindingsConfig: ScriptBindings.() -> Unit,
+        ): Any? {
+            evaluatedScripts.add(jsStr)
+            val value = if ("tag" in jsStr) "tag" else "prefix"
+            return """{"X-Test":"$value","User-Agent":"test"}"""
+        }
 
         override fun log(msg: Any?): Any? {
             logs.add(msg.toString())

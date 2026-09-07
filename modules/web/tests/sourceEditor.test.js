@@ -21,10 +21,21 @@ test('uses bounded labels and stable source list rows', () => {
   const form = readSource('components/SourceTabForm.vue')
   const list = readSource('components/SourceList.vue')
 
-  assert.match(form, /label-width="220px"/)
+  assert.match(form, /label-width="140px"/)
   assert.match(list, /:data-key="getSourceUniqueKey"/)
   assert.match(list, /class="source-list-panel"/)
   assert.doesNotMatch(list, /calc\(100% - 75px\)/)
+})
+
+test('measures source textareas only while their tab is visible', () => {
+  const form = readSource('components/SourceTabForm.vue')
+  const editor = readSource('views/SourceEditor.vue')
+
+  assert.match(form, /<el-tabs id="source-edit" v-model="activeTab">/)
+  assert.match(form, /:name="name"/)
+  assert.match(form, /v-if="activeTab === name"/)
+  assert.match(editor, /\.right \{\s*flex: 1/)
+  assert.doesNotMatch(editor, /flex: 0 0 360px/)
 })
 
 test('keeps the JavaScript source toolbar balanced on narrow screens', () => {
@@ -33,6 +44,20 @@ test('keeps the JavaScript source toolbar balanced on narrow screens', () => {
   assert.match(editor, /max-width: 600px/)
   assert.match(editor, /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/)
   assert.match(editor, /grid-column: 1 \/ -1/)
+})
+
+test('starts new JavaScript sources from the App template', () => {
+  const editor = readSource('components/JsSourceEditor.vue')
+  const sourceUtils = readSource('utils/souce.ts')
+  const vite = readFileSync(
+    new URL('../vite.config.ts', import.meta.url),
+    'utf8',
+  )
+
+  assert.match(editor, /fetchJsSourceTemplate\(\)/)
+  assert.match(sourceUtils, /fetch\('js_source_template\.js'\)/)
+  assert.match(vite, /copy-js-source-template/)
+  assert.match(vite, /app\/src\/main\/assets\/js_source_template\.js/)
 })
 
 test('keeps source editor state and mobile controls reachable', () => {
@@ -57,6 +82,10 @@ test('keeps source editor state and mobile controls reachable', () => {
   assert.match(tools, /set: val => store\.changeTabName\(val\)/)
   assert.doesNotMatch(json, /margin-bottom: 4px/)
   assert.match(config, /返回 -1 表示章评，1 开始表示正文段落/)
+  assert.match(
+    config,
+    /id: 'replyContentRule',[\s\S]*hint: 'text\/replyToName\/img\/audio\/time\/likeCount'/,
+  )
 })
 
 test('keeps a validated source token after debug transport errors', () => {
@@ -75,4 +104,23 @@ test('keeps a validated source token after debug transport errors', () => {
     axios,
     /errorMsg\.includes\('访问令牌'\)[\s\S]*clearSourceApiToken\(\)/,
   )
+})
+
+test('skips source tokens only when the server disables protection', () => {
+  const token = readSource('api/sourceToken.ts')
+  const api = readSource('api/api.ts')
+  const axios = readSource('api/axios.ts')
+
+  assert.match(token, /getJsSourceApiTokenRequired/)
+  assert.match(token, /cache: 'no-store'/)
+  assert.match(token, /if \(!response\.ok\) return true/)
+  assert.match(token, /catch \{\s*return true\s*\}/)
+  assert.match(token, /if \(!\(await isSourceApiTokenRequired\(\)\)\) return undefined/)
+  assert.match(
+    token,
+    /token \? \['legado', sourceApiTokenWebSocketProtocol\(token\)\] : \['legado'\]/,
+  )
+  assert.match(axios, /if \(token\) config\.headers\.set\('X-Legado-Token', token\)/)
+  assert.match(api, /token: string \| undefined/)
+  assert.match(api, /sourceApiTokenWebSocketProtocols\(token\)/)
 })

@@ -1,0 +1,115 @@
+name: Android UI Regression
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/source-browser-test.yml'
+      - '.github/scripts/source-browser-test.init.gradle'
+      - '.github/scripts/run-ui-regression.sh'
+      - 'app/build.gradle'
+      - 'gradle.properties'
+      - 'gradle/libs.versions.toml'
+      - 'app/src/main/java/io/legado/app/ui/widget/dialog/BottomWebViewDialog.kt'
+      - 'app/src/main/java/io/legado/app/ui/login/SourceLoginJsExtensions.kt'
+      - 'app/src/main/java/io/legado/app/help/JsExtensions.kt'
+      - 'app/src/main/java/io/legado/app/utils/HandlerUtils.kt'
+      - 'app/src/androidTest/java/io/legado/app/ui/widget/dialog/**'
+      - 'app/src/main/java/io/legado/app/ui/book/explore/**'
+      - 'app/src/main/res/layout/activity_explore_show.xml'
+      - 'app/src/androidTest/java/io/legado/app/ui/book/explore/**'
+      - 'app/src/main/java/io/legado/app/ui/book/read/ContentEditDialog.kt'
+      - 'app/src/main/java/io/legado/app/ui/book/read/ContentSearch.kt'
+      - 'app/src/main/res/layout/dialog_content_edit.xml'
+      - 'app/src/main/res/menu/content_edit.xml'
+      - 'app/src/androidTest/java/io/legado/app/ui/book/read/ContentEditSearchTest.kt'
+      - 'app/src/main/java/io/legado/app/ui/replace/**'
+      - 'app/src/main/java/io/legado/app/ui/book/toc/rule/**'
+      - 'app/src/main/java/io/legado/app/ui/dict/rule/**'
+      - 'app/src/androidTest/java/io/legado/app/ui/association/**'
+      - 'app/src/main/java/io/legado/app/ui/about/ReadRecordActivity.kt'
+      - 'app/src/main/java/io/legado/app/data/dao/ReadRecordDao.kt'
+      - 'app/src/main/java/io/legado/app/data/entities/ReadRecord*'
+      - 'app/src/main/java/io/legado/app/help/book/ReadRecordCoverCache.kt'
+      - 'app/src/main/java/io/legado/app/help/storage/ReadRecordBackup.kt'
+      - 'app/src/main/res/layout/*read_record*'
+      - 'app/src/main/res/menu/book_read_record.xml'
+      - 'app/src/androidTest/java/io/legado/app/ui/about/**'
+      - 'app/src/main/java/io/legado/app/data/**'
+      - 'app/src/main/java/io/legado/app/model/CheckSource.kt'
+      - 'app/src/main/java/io/legado/app/service/CheckSourceService.kt'
+      - 'app/src/main/java/io/legado/app/ui/book/source/manage/**'
+      - 'app/src/main/java/io/legado/app/api/controller/BookSourceCheckController.kt'
+      - 'app/src/androidTest/java/io/legado/app/data/**'
+      - 'app/src/androidTest/java/io/legado/app/ui/book/source/**'
+      - 'app/src/main/java/io/legado/app/model/localBook/PdfOutline.kt'
+      - 'app/src/main/java/io/legado/app/model/ReadBook.kt'
+      - 'app/src/main/java/io/legado/app/ui/book/toc/**'
+      - 'app/src/main/java/io/legado/app/ui/book/read/**'
+      - 'app/src/main/java/io/legado/app/ui/book/manga/**'
+      - 'app/src/main/res/values*/pdf_outline.xml'
+      - 'app/src/androidTest/java/io/legado/app/model/localBook/**'
+      - 'app/src/androidTest/java/io/legado/app/ui/book/read/Pdf*'
+      - 'app/src/androidTest/assets/pdf*'
+      - 'app/src/main/java/io/legado/app/model/analyzeRule/**'
+      - 'app/src/main/java/io/legado/app/model/webBook/**'
+      - 'app/src/main/java/io/legado/app/utils/HtmlFormatter.kt'
+      - 'app/src/androidTest/java/io/legado/app/model/webBook/**'
+      - 'app/src/androidTest/assets/issue1180*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: source-browser-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dialog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v6.3.0
+
+      - name: Build instrumented test APKs
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleAppDebug :app:assembleAppDebugAndroidTest \
+            --init-script .github/scripts/source-browser-test.init.gradle \
+            --build-cache --no-daemon --max-workers=2
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Verify source browser, discovery and content editor on Android 16
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: bash .github/scripts/run-ui-regression.sh
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: source-browser-test-results
+          path: |
+            app/build/reports/androidTests/connected/
+            app/build/outputs/androidTest-results/connected/
+            app/build/ui-regression/
+            app/schemas/

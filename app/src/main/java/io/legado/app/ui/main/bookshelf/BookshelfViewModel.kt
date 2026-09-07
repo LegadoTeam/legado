@@ -11,6 +11,8 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.book.savePreservingCustomCoverUrl
+import io.legado.app.help.book.update
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.http.decompressed
@@ -53,7 +55,7 @@ class BookshelfViewModel(application: Application) : BaseViewModel(application) 
                     val mergedGroup = mergeBookGroupForUrlAdd(existedBook.group, groupId)
                     if (mergedGroup != existedBook.group) {
                         existedBook.group = mergedGroup
-                        appDb.bookDao.update(existedBook)
+                        existedBook.update()
                     }
                     successCount++
                     continue
@@ -109,7 +111,7 @@ class BookshelfViewModel(application: Application) : BaseViewModel(application) 
                     } else {
                         it.group = mergeBookGroupForUrlAdd(it.group, groupId)
                         it.order = appDb.bookDao.minOrder - 1
-                        it.save()
+                        it.savePreservingCustomCoverUrl()
                     }
                     successCount++
                     addBookProgressLiveData.postValue(successCount)
@@ -201,7 +203,7 @@ class BookshelfViewModel(application: Application) : BaseViewModel(application) 
                         if (groupId > 0) {
                             book.group = groupId
                         }
-                        book.save()
+                        book.savePreservingCustomCoverUrl()
                     }.onError { e ->
                         context.toastOnUi(e.localizedMessage)
                     }

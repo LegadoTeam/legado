@@ -17,7 +17,7 @@ object BottomBarSkinFormat {
     val MAPPED_SLOTS = listOf("bookshelf", "home", "notes", "settings")
 
     /** 允许的图片后缀(小写,不含点) */
-    val IMAGE_EXTS = listOf("png", "jpg", "jpeg", "webp", "bmp", "gif")
+    val IMAGE_EXTS = listOf("png", "jpg", "jpeg", "webp", "bmp", "gif", "svg")
 
     /** 文件名是否是允许的图片(按后缀,大小写不敏感;先取 basename 再判扩展名) */
     fun isImageName(name: String): Boolean {

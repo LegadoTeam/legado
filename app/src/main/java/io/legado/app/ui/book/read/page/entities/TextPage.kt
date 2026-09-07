@@ -107,7 +107,13 @@ data class TextPage(
             val lastLine = textLines[leftLineSize - 1]
             if (lastLine.isImage) return@run
             val lastLineHeight = with(lastLine) { lineBottom - lineTop }
-            val pageHeight = lastLine.lineBottom + contentPaintTextHeight * lineSpacingExtra
+            val lineHeight = if (lastLine.isTitle && !lastLine.isTitleNumber) {
+                lastLine.height
+            } else {
+                contentPaintTextHeight
+            }
+            val pageHeight = lastLine.lineBottom +
+                    lineHeight * ChapterProvider.lineSpacingFor(lastLine)
             if (visibleHeight - pageHeight >= lastLineHeight) return@run
             val surplus = (visibleBottom - lastLine.lineBottom)
             if (surplus == 0f) return@run
@@ -125,7 +131,13 @@ data class TextPage(
             val lastLine = textLines.last()
             if (lastLine.isImage) return@run
             val lastLineHeight = with(lastLine) { lineBottom - lineTop }
-            val pageHeight = lastLine.lineBottom + contentPaintTextHeight * lineSpacingExtra
+            val lineHeight = if (lastLine.isTitle && !lastLine.isTitleNumber) {
+                lastLine.height
+            } else {
+                contentPaintTextHeight
+            }
+            val pageHeight = lastLine.lineBottom +
+                    lineHeight * ChapterProvider.lineSpacingFor(lastLine)
             if (visibleHeight - pageHeight >= lastLineHeight) return@run
             val surplus = (visibleBottom - lastLine.lineBottom)
             if (surplus == 0f) return@run
@@ -333,11 +345,12 @@ data class TextPage(
         val overflow = 10.dpToPx().toFloat()
         for (i in lines.indices) {
             val line = lines[i]
+            val renderBottom = line.renderBottom()
             if (line.onlyTextColumn && !line.hasOverflowTextStyle && canvas.quickReject(
                     0f,
                     line.lineTop - overflow,
                     view.width.toFloat(),
-                    line.lineBottom + overflow,
+                    renderBottom + overflow,
                     Canvas.EdgeType.AA
                 )
             ) {
@@ -388,10 +401,6 @@ data class TextPage(
     }
 
     fun upRenderHeight() {
-        renderHeight = ceil(lines.last().lineBottom).toInt()
-        if (leftLineSize > 0 && leftLineSize != lines.size) {
-            val leftHeight = ceil(lines[leftLineSize - 1].lineBottom).toInt()
-            renderHeight = max(renderHeight, leftHeight)
-        }
+        renderHeight = ceil(lines.maxOf { it.renderBottom() }).toInt()
     }
 }

@@ -44,6 +44,7 @@ class HighlightRuleUiContractTest {
 
         assertTrue(editor.contains("HighlightStyleDialog.StyleHost"))
         assertTrue(editor.contains("setColorPickerDialogListener(this)"))
+        assertEquals(1, layout.elementsWithAndroidId("@+id/cb_apply_to_body"))
         assertEquals(1, layout.elementsWithAndroidId("@+id/cb_apply_to_title"))
     }
 
@@ -51,11 +52,16 @@ class HighlightRuleUiContractTest {
     fun `rule list has empty state and row actions`() {
         val activity = parseXml("src/main/res/layout/activity_highlight_rule.xml")
         val item = parseXml("src/main/res/layout/item_highlight_rule.xml")
+        val menu = parseXml("src/main/res/menu/highlight_rule.xml")
 
         assertEquals(1, activity.elementsWithAndroidId("@+id/tv_empty_msg"))
+        assertEquals(1, activity.elementsWithAndroidId("@+id/select_action_bar"))
+        assertEquals(1, item.elementsWithAndroidId("@+id/cb_name"))
         assertEquals(1, item.elementsWithAndroidId("@+id/swt_enabled"))
         assertEquals(1, item.elementsWithAndroidId("@+id/iv_edit"))
         assertEquals(1, item.elementsWithAndroidId("@+id/iv_menu_more"))
+        assertEquals(1, menu.elementsWithAndroidId("@+id/menu_import_local"))
+        assertEquals(1, menu.elementsWithAndroidId("@+id/menu_export_all"))
     }
 
     private fun parseXml(pathInApp: String): Element =

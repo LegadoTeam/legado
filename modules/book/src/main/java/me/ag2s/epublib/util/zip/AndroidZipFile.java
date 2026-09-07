@@ -292,13 +292,11 @@ public class AndroidZipFile implements ZipConstants {
 
     /**
      * Returns an enumeration of all Zip entries in this Zip file.
+     *
+     * @throws IOException if the central directory cannot be read
      */
-    public Enumeration<AndroidZipEntry> entries() {
-        try {
-            return new ZipEntryEnumeration(getEntries().values().iterator());
-        } catch (IOException ioe) {
-            return null;
-        }
+    public Enumeration<AndroidZipEntry> entries() throws IOException {
+        return new ZipEntryEnumeration(getEntries().values().iterator());
     }
 
     /**

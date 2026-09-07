@@ -36,6 +36,7 @@ import io.modelcontextprotocol.kotlin.sdk.types.RequestId
 import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import io.modelcontextprotocol.kotlin.sdk.types.TextResourceContents
+import io.modelcontextprotocol.kotlin.sdk.types.ToolAnnotations
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -68,6 +69,22 @@ object McpToolServer {
     private const val NOTIFICATION_TIMEOUT_MS = 500L
     private val debugScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val debugMutex = Mutex()
+    private val localReadToolAnnotations = ToolAnnotations(
+        readOnlyHint = true,
+        openWorldHint = false,
+    )
+    private val localWriteToolAnnotations = ToolAnnotations(
+        readOnlyHint = false,
+        destructiveHint = true,
+        idempotentHint = true,
+        openWorldHint = false,
+    )
+    private val openWorldWriteToolAnnotations = ToolAnnotations(
+        readOnlyHint = false,
+        destructiveHint = true,
+        idempotentHint = false,
+        openWorldHint = true,
+    )
 
     fun create(): Server {
         return Server(
@@ -164,6 +181,7 @@ object McpToolServer {
         line: String,
         progress: Int,
         progressToken: RequestId?,
+        total: Int? = null,
         logger: String = "legado.debug_source",
     ) {
         sendBestEffort {
@@ -184,6 +202,7 @@ object McpToolServer {
                         ProgressNotificationParams(
                             progressToken = progressToken,
                             progress = progress.toDouble(),
+                            total = total?.toDouble(),
                             message = line,
                         )
                     )
@@ -208,6 +227,7 @@ object McpToolServer {
                     line,
                     reportedUrls.size,
                     progressToken,
+                    total = total,
                     logger = "legado.check_source",
                 )
             }
@@ -226,6 +246,7 @@ object McpToolServer {
                 },
                 required = listOf("source"),
             ),
+            toolAnnotations = openWorldWriteToolAnnotations,
         ) { request ->
             try {
                 val source = request.arguments.str("source")
@@ -265,6 +286,7 @@ object McpToolServer {
                 },
                 required = listOf("url", "key"),
             ),
+            toolAnnotations = openWorldWriteToolAnnotations,
         ) { request ->
             try {
                 val url = request.arguments.str("url")
@@ -330,6 +352,7 @@ object McpToolServer {
                 },
                 required = emptyList(),
             ),
+            toolAnnotations = localReadToolAnnotations,
         ) { request ->
             try {
                 val summaries = McpFormat.summarizeSources(
@@ -353,6 +376,7 @@ object McpToolServer {
                 },
                 required = listOf("url"),
             ),
+            toolAnnotations = localReadToolAnnotations,
         ) { request ->
             try {
                 val url = request.arguments.str("url")
@@ -380,6 +404,7 @@ object McpToolServer {
                 },
                 required = listOf("urls"),
             ),
+            toolAnnotations = localWriteToolAnnotations,
         ) { request ->
             try {
                 val urls = (request.arguments?.get("urls") as? JsonArray)
@@ -417,6 +442,7 @@ object McpToolServer {
                 },
                 required = emptyList(),
             ),
+            toolAnnotations = localReadToolAnnotations,
         ) { request ->
             try {
                 val limit = request.arguments.int("limit") ?: 50
@@ -456,6 +482,7 @@ object McpToolServer {
                 },
                 required = listOf("id"),
             ),
+            toolAnnotations = localReadToolAnnotations,
         ) { request ->
             try {
                 val id = request.arguments.int("id")
@@ -482,6 +509,7 @@ object McpToolServer {
                 },
                 required = listOf("enabled"),
             ),
+            toolAnnotations = localWriteToolAnnotations,
         ) { request ->
             try {
                 val enabled = request.arguments.bool("enabled")
@@ -504,6 +532,7 @@ object McpToolServer {
                 },
                 required = listOf("url"),
             ),
+            toolAnnotations = localReadToolAnnotations,
         ) { request ->
             try {
                 val url = request.arguments.str("url")
@@ -534,6 +563,7 @@ object McpToolServer {
                 },
                 required = listOf("url", "cookie"),
             ),
+            toolAnnotations = localWriteToolAnnotations,
         ) { request ->
             try {
                 val url = request.arguments.str("url")
@@ -566,6 +596,7 @@ object McpToolServer {
                 },
                 required = listOf("url"),
             ),
+            toolAnnotations = localWriteToolAnnotations,
         ) { request ->
             try {
                 val url = request.arguments.str("url")
@@ -597,6 +628,7 @@ object McpToolServer {
                 },
                 required = listOf("js"),
             ),
+            toolAnnotations = openWorldWriteToolAnnotations,
         ) { request ->
             try {
                 val js = request.arguments.str("js")
@@ -687,7 +719,7 @@ object McpToolServer {
 
         server.addTool(
             name = "check_source",
-            description = "按应用当前校验配置批量校验书源并写回分组、错误备注和响应时间。" +
+            description = "按应用当前校验配置批量校验书源，独立保存本地检验状态、错误详情和响应时间，不修改书源分组或备注。" +
                 "单批最多 50 个；校验期间书源调试不可用，客户端取消请求不会中止应用内校验。",
             inputSchema = ToolSchema(
                 properties = buildJsonObject {
@@ -699,6 +731,7 @@ object McpToolServer {
                 },
                 required = listOf("urls"),
             ),
+            toolAnnotations = openWorldWriteToolAnnotations,
         ) { request ->
             val urls = (request.arguments?.get("urls") as? JsonArray)
                 ?.mapNotNull { runCatching { it.jsonPrimitive.contentOrNull }.getOrNull() }

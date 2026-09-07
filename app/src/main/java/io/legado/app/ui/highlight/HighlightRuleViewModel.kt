@@ -11,17 +11,25 @@ class HighlightRuleViewModel(application: Application) : BaseViewModel(applicati
         appDb.highlightRuleDao.update(*rule)
     }
 
-    fun delete(rule: HighlightRule) = execute {
-        appDb.highlightRuleDao.delete(rule)
+    fun delete(vararg rule: HighlightRule) = execute {
+        appDb.highlightRuleDao.delete(*rule)
     }
 
     fun toTop(rule: HighlightRule) = execute {
-        rule.order = appDb.highlightRuleDao.minOrder - 1
-        appDb.highlightRuleDao.update(rule)
+        appDb.highlightRuleDao.move(setOf(rule.uuid), true)
     }
 
     fun toBottom(rule: HighlightRule) = execute {
-        rule.order = appDb.highlightRuleDao.maxOrder + 1
-        appDb.highlightRuleDao.update(rule)
+        appDb.highlightRuleDao.move(setOf(rule.uuid), false)
+    }
+
+    fun enableSelection(rules: List<HighlightRule>, enabled: Boolean) = execute {
+        appDb.highlightRuleDao.update(
+            *rules.map { it.copy(isEnabled = enabled) }.toTypedArray()
+        )
+    }
+
+    fun moveSelection(rules: List<HighlightRule>, toTop: Boolean) = execute {
+        appDb.highlightRuleDao.move(rules.mapTo(linkedSetOf()) { it.uuid }, toTop)
     }
 }

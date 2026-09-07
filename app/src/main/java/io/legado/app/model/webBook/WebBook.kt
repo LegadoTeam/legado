@@ -422,14 +422,14 @@ object WebBook {
             }
             return content
         }
+        if (bookChapter.isVolume && bookChapter.url.startsWith(bookChapter.title)) {
+            Debug.log(bookSource.bookSourceUrl, "⇒一级目录正文不解析规则")
+            return ""
+        }
         val contentRule = bookSource.getContentRule()
         if (contentRule.content.isNullOrEmpty()) {
             Debug.log(bookSource.bookSourceUrl, "⇒正文规则为空,使用章节链接:${bookChapter.url}")
             return bookChapter.url
-        }
-        if (bookChapter.isVolume && bookChapter.url.startsWith(bookChapter.title)) {
-            Debug.log(bookSource.bookSourceUrl, "⇒一级目录正文不解析规则")
-            return ""
         }
         val content = if (bookChapter.url == book.bookUrl && !book.tocHtml.isNullOrEmpty()) {
             BookContent.analyzeContent(

@@ -32,6 +32,12 @@
 		<item>Folder</item>
 	</string-array>
 
+	<string-array name="bookshelf_read_progress">
+		<item>@string/read_progress_hidden</item>
+		<item>@string/read_progress_standard</item>
+		<item>@string/read_progress_enhanced</item>
+	</string-array>
+
 	<string-array name="book_sort">
 		<item>@string/text_default</item>
 		<item>@string/bookshelf_px_0</item>
@@ -104,6 +110,7 @@
     <string-array name="highlight_action_trigger_title">
         <item>@string/highlight_action_trigger_click</item>
         <item>@string/highlight_action_trigger_long_press</item>
+        <item>@string/highlight_action_trigger_off</item>
     </string-array>
 
 	<string-array name="double_page_title">

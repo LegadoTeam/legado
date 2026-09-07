@@ -65,6 +65,50 @@ class ReviewDetailMediaSourceTest {
     }
 
     @Test
+    fun `reply target keeps the commenter header and prefixes the body`() {
+        val binding = dialogSource()
+            .substringAfter("binding.llBadges.visibility")
+            .substringBefore("val hasText")
+
+        assertTrue(binding.contains("binding.tvName.text = item.name.orEmpty()"))
+        assertTrue(binding.contains("val replyToName = item.replyToName.orEmpty().trim()"))
+        assertTrue(binding.contains("val prefix = \"\u56de\u590d \$replyToName\uff1a\""))
+        assertFalse(binding.contains("binding.tvName.gone()"))
+    }
+
+    @Test
+    fun `reply likes are shown only for positive counts`() {
+        val binding = dialogSource()
+            .substringAfter("binding.tvTime.text = item.time.orEmpty()")
+            .substringBefore("private fun bindReviewImage")
+
+        assertTrue(
+            binding.contains(
+                "val showLikeArea = !item.isReply || (likeCount != null && likeCount > 0)"
+            )
+        )
+        assertTrue(binding.contains("if (showLikeArea)"))
+        assertTrue(binding.contains("binding.llLikeArea.visible()"))
+        assertTrue(binding.contains("binding.llLikeArea.gone()"))
+    }
+
+    @Test
+    fun `embedded replies are expanded without loading paged replies`() {
+        val source = dialogSource()
+        val flatten = source.substringAfter("private fun flattenItems(")
+            .substringBefore("private fun renderUiItems()")
+
+        assertTrue(flatten.contains("val isExpanded = loadedReplyCount > 0 ||"))
+        assertTrue(flatten.contains("expandedReplyParentKeys.contains(parentKey)"))
+        assertTrue(flatten.contains("val canLoadMore = hasReplyUrl"))
+
+        val listener = source.substringAfter("override fun registerListener(")
+            .substringBefore("private fun bindAudioState")
+        assertTrue(listener.contains("loadReplies(parentKey)"))
+        assertFalse(listener.contains("detail.replies.isNotEmpty()"))
+    }
+
+    @Test
     fun `review image restores its cached aspect ratio before reloading`() {
         val binding = dialogSource()
             .substringAfter("private fun bindReviewImage(")

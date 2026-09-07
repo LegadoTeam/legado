@@ -60,6 +60,44 @@
             app:max="20"
             app:title="@string/title_font_size" />
 
+        <io.legado.app.ui.widget.DetailSeekBar
+            android:id="@+id/dsb_title_line_spacing"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="3dp"
+            app:max="50"
+            app:title="@string/title_line_spacing" />
+
+        <LinearLayout
+            android:id="@+id/ll_title_font"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:gravity="center_vertical"
+            android:minHeight="48dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:padding="6dp"
+                android:text="@string/title_font"
+                android:textColor="@color/primaryText" />
+
+            <TextView
+                android:id="@+id/tv_title_font"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="middle"
+                android:maxWidth="180dp"
+                android:maxLines="1"
+                android:padding="6dp"
+                android:text="@string/follow_text_font"
+                android:textColor="@color/primaryText" />
+
+        </LinearLayout>
+
         <LinearLayout
             android:id="@+id/ll_title_color"
             android:layout_width="match_parent"
@@ -115,7 +153,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:padding="3dp"
-                app:max="100"
+                app:max="150"
                 app:title="@string/title_number_spacing" />
 
             <LinearLayout
@@ -213,8 +251,12 @@
 
             <TextView
                 android:id="@+id/tv_header_left"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:gravity="end"
+                android:maxLines="1"
                 android:padding="6dp"
                 android:textColor="@color/primaryText"
                 tools:text="@string/title" />
@@ -239,8 +281,12 @@
 
             <TextView
                 android:id="@+id/tv_header_middle"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:gravity="end"
+                android:maxLines="1"
                 android:padding="6dp"
                 android:textColor="@color/primaryText"
                 tools:text="@string/title" />
@@ -265,8 +311,12 @@
 
             <TextView
                 android:id="@+id/tv_header_right"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:gravity="end"
+                android:maxLines="1"
                 android:padding="6dp"
                 android:textColor="@color/primaryText"
                 tools:text="@string/title" />
@@ -323,8 +373,12 @@
 
             <TextView
                 android:id="@+id/tv_footer_left"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:gravity="end"
+                android:maxLines="1"
                 android:padding="6dp"
                 android:textColor="@color/primaryText"
                 tools:text="@string/title" />
@@ -349,8 +403,12 @@
 
             <TextView
                 android:id="@+id/tv_footer_middle"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:gravity="end"
+                android:maxLines="1"
                 android:padding="6dp"
                 android:textColor="@color/primaryText"
                 tools:text="@string/title" />
@@ -375,8 +433,12 @@
 
             <TextView
                 android:id="@+id/tv_footer_right"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:gravity="end"
+                android:maxLines="1"
                 android:padding="6dp"
                 android:textColor="@color/primaryText"
                 tools:text="@string/title" />
@@ -388,6 +450,14 @@
             android:layout_height="wrap_content"
             android:text="@string/header_footer"
             android:textSize="18sp" />
+
+        <io.legado.app.ui.widget.DetailSeekBar
+            android:id="@+id/dsb_tip_text_size"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="3dp"
+            app:max="45"
+            app:title="@string/text_size" />
 
         <LinearLayout
             android:id="@+id/ll_tip_color"

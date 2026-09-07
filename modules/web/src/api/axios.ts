@@ -9,6 +9,10 @@ import {
 export const baseURL_localStorage_key = 'remoteUrl'
 const SECOND = 1000
 const protectedSourcePaths = new Set([
+  'getBookSourcesForManagement',
+  'getBookSourceCheckStates',
+  'startBookSourceCheck',
+  'stopBookSourceCheck',
   'saveJsSource',
   'saveBookSource',
   'saveBookSources',
@@ -39,7 +43,7 @@ ajax.interceptors.request.use(async config => {
   const endpoint = path.split('/').filter(Boolean).pop() || ''
   if (protectedSourcePaths.has(endpoint)) {
     const token = getSourceApiToken() || (await requestSourceApiToken())
-    config.headers.set('X-Legado-Token', token)
+    if (token) config.headers.set('X-Legado-Token', token)
   }
   return config
 })

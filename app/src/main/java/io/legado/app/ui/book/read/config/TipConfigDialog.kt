@@ -1,5 +1,6 @@
 package io.legado.app.ui.book.read.config
 
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
@@ -15,15 +16,18 @@ import io.legado.app.help.config.ReadTipConfig
 import io.legado.app.help.config.ReaderInfoTemplate
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
+import io.legado.app.ui.font.FontSelectDialog
 import io.legado.app.ui.widget.text.AccentBgTextView
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.hexString
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.setLayout
+import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 
-class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
+class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config),
+    FontSelectDialog.CallBack {
 
     companion object {
         const val TIP_COLOR = 7897
@@ -63,10 +67,18 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
             }
         )
         binding.dsbTitleSize.progress = ReadBookConfig.titleSize
+        binding.dsbTitleLineSpacing.valueFormat = ::titleLineSpacingDisplayValue
+        binding.dsbTitleLineSpacing.progress =
+            titleLineSpacingToProgress(ReadBookConfig.titleLineSpacingExtra)
+        upTitleFont()
         upTitleColor()
         binding.swSplitChapterTitle.isChecked = ReadBookConfig.splitChapterTitle
         binding.dsbTitleNumberSize.progress = ReadBookConfig.titleNumberSize
-        binding.dsbTitleNumberSpacing.progress = ReadBookConfig.titleNumberSpacing
+        binding.dsbTitleNumberSpacing.valueFormat = {
+            titleNumberSpacingFromProgress(it).toString()
+        }
+        binding.dsbTitleNumberSpacing.progress =
+            titleNumberSpacingToProgress(ReadBookConfig.titleNumberSpacing)
         upTitleNumberOptions()
         upTitleNumberColor()
         binding.dsbTitleTop.progress = ReadBookConfig.titleTopSpacing
@@ -76,6 +88,11 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
             ReadTipConfig.getHeaderModes(requireContext())[ReadTipConfig.headerMode]
         binding.tvFooterShow.text =
             ReadTipConfig.getFooterModes(requireContext())[ReadTipConfig.footerMode]
+        binding.dsbTipTextSize.valueFormat = {
+            tipTextSizeFromProgress(it).toString()
+        }
+        binding.dsbTipTextSize.progress =
+            tipTextSizeToProgress(ReadTipConfig.tipTextSize)
 
         initTipValues()
         upTvTipColor()
@@ -125,6 +142,17 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
         }
     }
 
+    private fun upTitleFont() {
+        binding.tvTitleFont.text = ReadBookConfig.titleFont.takeIf { it.isNotEmpty() }
+            ?.let { path ->
+                Uri.decode(path)
+                    .substringAfterLast('/')
+                    .substringAfterLast('\\')
+                    .ifBlank { path }
+            }
+            ?: getString(R.string.follow_text_font)
+    }
+
     private fun upTitleNumberColor() {
         val color = ReadBookConfig.titleNumberColor
         binding.tvTitleNumberColor.text = if (color == 0) {
@@ -147,6 +175,13 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
         dsbTitleSize.onChanged = {
             ReadBookConfig.titleSize = it
             postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
+        }
+        dsbTitleLineSpacing.onChanged = {
+            ReadBookConfig.titleLineSpacingExtra = titleLineSpacingFromProgress(it)
+            postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
+        }
+        llTitleFont.setOnClickListener {
+            showDialogFragment<FontSelectDialog>()
         }
         llTitleColor.setOnClickListener {
             context?.selector(items = ReadTipConfig.tipColorNames) { _, i ->
@@ -176,7 +211,7 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
             postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
         }
         dsbTitleNumberSpacing.onChanged = {
-            ReadBookConfig.titleNumberSpacing = it
+            ReadBookConfig.titleNumberSpacing = titleNumberSpacingFromProgress(it)
             postEvent(EventBus.UP_CONFIG, arrayListOf(5))
         }
         llTitleNumberColor.setOnClickListener {
@@ -269,6 +304,10 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
                 ) { tipFooterRightTemplate = it }
             }
         }
+        dsbTipTextSize.onChanged = {
+            ReadTipConfig.tipTextSize = tipTextSizeFromProgress(it)
+            postEvent(EventBus.UP_CONFIG, arrayListOf(2))
+        }
         llTipColor.setOnClickListener {
             context?.selector(items = ReadTipConfig.tipColorNames) { _, i ->
                 when (i) {
@@ -302,6 +341,19 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
                         .show(requireActivity())
                 }
             }
+        }
+    }
+
+    override val curFontPath: String
+        get() = ReadBookConfig.titleFont
+
+    override val selectSystemTypefaceOnDefault = false
+
+    override fun selectFont(path: String) {
+        if (path != ReadBookConfig.titleFont || path.isEmpty()) {
+            ReadBookConfig.titleFont = path
+            upTitleFont()
+            postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
         }
     }
 
@@ -342,4 +394,44 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config) {
         }
     }
 
+}
+
+private const val TITLE_LINE_SPACING_MIN = -20
+private const val TITLE_LINE_SPACING_MAX = 30
+
+internal fun titleLineSpacingToProgress(spacing: Int): Int {
+    return (spacing.coerceIn(TITLE_LINE_SPACING_MIN, TITLE_LINE_SPACING_MAX) -
+        TITLE_LINE_SPACING_MIN)
+}
+
+internal fun titleLineSpacingFromProgress(progress: Int): Int {
+    return (progress + TITLE_LINE_SPACING_MIN)
+        .coerceIn(TITLE_LINE_SPACING_MIN, TITLE_LINE_SPACING_MAX)
+}
+
+internal fun titleLineSpacingDisplayValue(progress: Int): String {
+    return (titleLineSpacingFromProgress(progress) / 10f).toString()
+}
+
+private const val TITLE_NUMBER_SPACING_MIN = -50
+private const val TITLE_NUMBER_SPACING_MAX = 100
+
+internal fun titleNumberSpacingToProgress(spacing: Int): Int {
+    return spacing.coerceIn(TITLE_NUMBER_SPACING_MIN, TITLE_NUMBER_SPACING_MAX) -
+        TITLE_NUMBER_SPACING_MIN
+}
+
+internal fun titleNumberSpacingFromProgress(progress: Int): Int {
+    return (progress + TITLE_NUMBER_SPACING_MIN)
+        .coerceIn(TITLE_NUMBER_SPACING_MIN, TITLE_NUMBER_SPACING_MAX)
+}
+
+internal fun tipTextSizeToProgress(textSize: Int): Int {
+    return textSize.coerceIn(ReadTipConfig.minTextSize, ReadTipConfig.maxTextSize) -
+        ReadTipConfig.minTextSize
+}
+
+internal fun tipTextSizeFromProgress(progress: Int): Int {
+    return (progress + ReadTipConfig.minTextSize)
+        .coerceIn(ReadTipConfig.minTextSize, ReadTipConfig.maxTextSize)
 }

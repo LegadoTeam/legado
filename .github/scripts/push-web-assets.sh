@@ -11,6 +11,11 @@ if ! [[ "$max_attempts" =~ ^[1-9][0-9]*$ ]]; then
   exit 1
 fi
 
+if [[ -n "$(git status --porcelain)" ]]; then
+  echo "Stashing uncommitted build byproducts before web asset push"
+  git stash push --include-untracked --message "web asset build byproducts" >/dev/null
+fi
+
 for ((attempt = 1; attempt <= max_attempts; attempt++)); do
   echo "Syncing $branch before web asset push (attempt $attempt/$max_attempts)"
   git fetch "$remote" "$branch"

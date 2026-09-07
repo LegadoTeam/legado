@@ -43,7 +43,7 @@ android {
     namespace = 'io.legado.app'
     kotlin {
         jvmToolchain {
-            languageVersion.set(JavaLanguageVersion.of(17))
+            languageVersion.set(JavaLanguageVersion.of(21))
         }
     }
 
@@ -76,6 +76,8 @@ android {
                 'pt-rBR',
                 'vi',
                 'zh',
+                // AndroidX stores Simplified Chinese switch labels under zh-rCN.
+                'zh-rCN',
                 'zh-rHK',
                 'zh-rTW'
         ]
@@ -157,8 +159,8 @@ android {
         // Flag to enable support for the new language APIs
         coreLibraryDesugaringEnabled = true
         // Sets Java compatibility
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
     }
     packaging {
         resources.excludes.add('META-INF/*')
@@ -175,6 +177,8 @@ android {
         jniLibs {
             // These dependencies already ship stripped; skip redundant strip attempts.
             keepDebugSymbols += [
+                    // Preserve the upstream Cronet binaries verified against cronet.json.
+                    "**/libcronet.${CronetVersion}.so",
                     '**/libandroidx.graphics.path.so',
                     '**/libarchive-jni.so',
                     '**/libdatastore_shared_counter.so',
@@ -187,6 +191,7 @@ android {
     }
 
     sourceSets {
+        main.jniLibs.srcDir(layout.buildDirectory.dir('generated/cronetJni'))
         // Adds exported schema location as test app assets.
         androidTest.assets.srcDirs += files("$projectDir/schemas".toString())
     }
@@ -348,6 +353,12 @@ dependencies {
     //加解密类库,有些书源使用
     //noinspection GradleDependency,GradlePackageUpdate
     implementation(libs.hutool.crypto)
+    implementation(libs.bouncycastle.provider)
+    implementation(libs.bouncycastle.pkix)
+    implementation(libs.pdfbox.android) {
+        // PDFBox's older jdk15to18 artifacts duplicate the project's jdk18on classes.
+        exclude group: 'org.bouncycastle'
+    }
 
     //firebase, 崩溃统计和性能统计
     implementation platform(libs.firebase.bom)

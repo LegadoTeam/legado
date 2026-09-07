@@ -11,6 +11,7 @@ import io.legado.app.utils.GSON
 import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.fromJsonArray
 import io.legado.app.utils.fromJsonObject
+import io.legado.app.utils.mergeFilteredOrder
 import splitties.init.appCtx
 
 object AutoTask {
@@ -187,17 +188,16 @@ object AutoTask {
         AutoTaskScheduler.refresh(context)
     }
 
-    fun move(id: String, offset: Int, context: Context = appCtx) {
+    fun reorder(orderedIds: List<String>, context: Context = appCtx) {
         val changed = synchronized(this) {
             all()
-            val rules = appDb.autoTaskRuleDao.all().toMutableList()
-            val from = rules.indexOfFirst { it.id == id }
-            if (from < 0) return@synchronized false
-            val to = (from + offset).coerceIn(rules.indices)
-            if (from == to) return@synchronized false
-            rules.add(to, rules.removeAt(from))
-            rules.forEachIndexed { index, rule -> rule.customOrder = index }
-            appDb.autoTaskRuleDao.update(*rules.toTypedArray())
+            val rules = appDb.autoTaskRuleDao.all()
+            val reordered = mergeAutoTaskOrder(rules, orderedIds)
+            if (rules.indices.all { rules[it].id == reordered[it].id }) {
+                return@synchronized false
+            }
+            reordered.forEachIndexed { index, rule -> rule.customOrder = index }
+            appDb.autoTaskRuleDao.update(*reordered.toTypedArray())
             true
         }
         if (changed) AutoTaskScheduler.refresh(context)
@@ -237,6 +237,15 @@ object AutoTask {
         appDb.autoTaskRuleDao.updateRunState(id, lastRunAt, lastResult, lastError, lastLog)
     }
 
+}
+
+internal fun mergeAutoTaskOrder(
+    allRules: List<AutoTaskRule>,
+    orderedIds: List<String>
+): List<AutoTaskRule> {
+    val rulesById = allRules.associateBy { it.id }
+    val orderedRules = orderedIds.mapNotNull(rulesById::get)
+    return mergeFilteredOrder(allRules, orderedRules) { it.id }
 }
 
 internal fun prepareImportedAutoTasks(

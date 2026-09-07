@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
+import io.legado.app.R
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
@@ -13,6 +14,7 @@ import io.legado.app.help.DirectLinkUpload
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
+import io.legado.app.help.config.ReplacePreviewConfig
 import io.legado.app.help.config.ThemeConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.BookCover
@@ -24,7 +26,6 @@ import io.legado.app.utils.createFolderIfNotExist
 import io.legado.app.utils.defaultSharedPreferences
 import io.legado.app.utils.externalFiles
 import io.legado.app.utils.getFile
-import io.legado.app.utils.getSharedPreferences
 import io.legado.app.utils.isContentScheme
 import io.legado.app.utils.normalizeFileName
 import io.legado.app.utils.openOutputStream
@@ -33,6 +34,7 @@ import io.legado.app.utils.writeToOutputStream
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -43,9 +45,65 @@ import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 import java.util.concurrent.TimeUnit
-import androidx.core.content.edit
 import io.legado.app.model.VideoPlay.VIDEO_PREF_NAME
+
+internal fun selectedBackupFileNames(isEnabled: (String) -> Boolean): List<String> =
+    buildList {
+        if (isEnabled(BackupConfig.bookshelfContentKey)) {
+            addAll(listOf("bookshelf.json", "bookGroup.json"))
+        }
+        if (isEnabled(BackupConfig.annotationContentKey)) {
+            addAll(listOf("bookmark.json", "highlight.json", "highlightRule.json"))
+        }
+        if (isEnabled(BackupConfig.sourceContentKey)) {
+            addAll(listOf("bookSource.json", "rssSources.json", "rssStar.json", "sourceSub.json"))
+        }
+        if (isEnabled(BackupConfig.cookieContentKey)) {
+            add(BackupConfig.cookieFileName)
+        }
+        if (isEnabled(BackupConfig.runtimeSourceCacheContentKey)) {
+            add(BackupConfig.runtimeSourceCacheFileName)
+        }
+        if (isEnabled(BackupConfig.ruleContentKey)) {
+            addAll(
+                listOf(
+                    "replaceRule.json",
+                    "txtTocRule.json",
+                    "httpTTS.json",
+                    "keyboardAssists.json",
+                    "dictRule.json",
+                    "autoTask.json",
+                    "servers.json",
+                    DirectLinkUpload.ruleFileName,
+                    BookCover.configFileName,
+                )
+            )
+        }
+        if (isEnabled(BackupConfig.historyContentKey)) {
+            addAll(listOf("readRecord.json", "searchHistory.json"))
+        }
+        if (isEnabled(BackupConfig.settingContentKey)) {
+            addAll(
+                listOf(
+                    ReadBookConfig.configFileName,
+                    ReadBookConfig.shareConfigFileName,
+                    ThemeConfig.configFileName,
+                    "config.xml",
+                    "videoConfig.xml",
+                )
+            )
+        }
+    }
+
+internal val lanTransferIgnoredPrefKeys = setOf(
+    PreferKey.remoteServerId,
+    PreferKey.webDavUrl,
+    PreferKey.webDavAccount,
+    PreferKey.webDavPassword,
+    PreferKey.webDavDir,
+)
 
 /**
  * 备份
@@ -60,36 +118,6 @@ object Backup {
     private const val TAG = "Backup"
 
     private val mutex = Mutex()
-
-    private val backupFileNames by lazy {
-        arrayOf(
-            "bookshelf.json",
-            "bookmark.json",
-            "highlight.json",
-            "highlightRule.json",
-            "bookGroup.json",
-            "bookSource.json",
-            "rssSources.json",
-            "rssStar.json",
-            "replaceRule.json",
-            "readRecord.json",
-            "searchHistory.json",
-            "sourceSub.json",
-            "txtTocRule.json",
-            "httpTTS.json",
-            "keyboardAssists.json",
-            "dictRule.json",
-            "autoTask.json",
-            "servers.json",
-            DirectLinkUpload.ruleFileName,
-            ReadBookConfig.configFileName,
-            ReadBookConfig.shareConfigFileName,
-            ThemeConfig.configFileName,
-            BookCover.configFileName,
-            "config.xml",
-            "videoConfig.xml"
-        )
-    }
 
     private fun getNowZipFileName(): String {
         val backupDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
@@ -135,12 +163,119 @@ object Backup {
         }
     }
 
-    private suspend fun backup(context: Context, path: String?) {
+    suspend fun backupForLanTransferLocked(context: Context): File {
+        return mutex.withLock {
+            withContext(IO) {
+                val directory = File(
+                    context.cacheDir,
+                    "lan_backup/send/${UUID.randomUUID()}",
+                ).apply {
+                    check(mkdirs() || isDirectory) { "无法创建传输目录" }
+                }
+                val workingZipFile = File(directory, "tmp_backup.zip")
+                try {
+                    backup(
+                        context,
+                        directory.absolutePath,
+                        lanTransfer = true,
+                        workingZipFile = workingZipFile,
+                    )
+                    directory.listFiles()
+                        ?.singleOrNull { it.isFile && it.extension.equals("zip", true) }
+                        ?: throw NoStackTraceException("生成局域网备份失败")
+                } catch (error: Throwable) {
+                    directory.deleteRecursively()
+                    FileUtils.delete(backupPath)
+                    throw error
+                }
+            }
+        }
+    }
+
+    suspend fun backupBeforeLanRestoreLocked(context: Context) {
+        mutex.withLock {
+            withContext(IO) {
+                check(
+                    backup(
+                        context,
+                        AppConfig.backupPath,
+                        uploadWebDav = false,
+                        contentKeys = BackupConfig.contentKeys
+                            .filterNotTo(hashSetOf()) {
+                                it == BackupConfig.cookieContentKey ||
+                                    it == BackupConfig.runtimeSourceCacheContentKey
+                            },
+                    )
+                ) { "生成恢复前备份失败" }
+            }
+        }
+    }
+
+    private suspend fun backup(
+        context: Context,
+        path: String?,
+        lanTransfer: Boolean = false,
+        uploadWebDav: Boolean = !lanTransfer,
+        contentKeys: Set<String>? = null,
+        workingZipFile: File = File(zipFilePath),
+    ): Boolean {
         LogUtils.d(TAG, "开始备份 path:$path")
-        LocalConfig.lastBackup = System.currentTimeMillis()
-        val aes = BackupAES()
+        val enabledContentKeys = contentKeys?.toMutableSet()
+            ?: BackupConfig.contentKeys.filterTo(hashSetOf()) {
+                BackupConfig.contentIsEnabled(it)
+            }
+        if (lanTransfer) {
+            enabledContentKeys.remove(BackupConfig.cookieContentKey)
+            enabledContentKeys.remove(BackupConfig.runtimeSourceCacheContentKey)
+        }
+        val password = LocalConfig.password
+        if (password.isNullOrBlank()) {
+            when {
+                BackupConfig.cookieContentKey in enabledContentKeys -> {
+                    throw NoStackTraceException(
+                        appCtx.getString(R.string.cookie_backup_password_required)
+                    )
+                }
+
+                BackupConfig.runtimeSourceCacheContentKey in enabledContentKeys -> {
+                    throw NoStackTraceException(
+                        appCtx.getString(R.string.source_variables_backup_password_required)
+                    )
+                }
+            }
+        }
+        if (!lanTransfer) {
+            LocalConfig.lastBackup = System.currentTimeMillis()
+        }
+        val aes = BackupAES(password)
         FileUtils.delete(backupPath)
-        writeListToJson(appDb.bookDao.all, "bookshelf.json", backupPath)
+        val backupPersistedCovers = BackupConfig.persistedCoverContentKey in enabledContentKeys
+        val backupOtherCovers = BackupConfig.otherCoverContentKey in enabledContentKeys
+        val backupBackgrounds = BackupConfig.backgroundContentKey in enabledContentKeys
+        val readConfigSnapshot = ReadBookConfig.configList.map { it.copy() }
+        val shareReadConfigSnapshot = ReadBookConfig.shareConfig.copy()
+        val backgroundPaths = if (backupBackgrounds) {
+            arrayListOf<String>().apply {
+                (readConfigSnapshot + shareReadConfigSnapshot).forEach { config ->
+                    if (config.bgType == 2) add(config.bgStr)
+                    if (config.bgTypeNight == 2) add(config.bgStrNight)
+                    if (config.bgTypeEInk == 2) add(config.bgStrEInk)
+                }
+            }
+        } else {
+            emptyList()
+        }
+        writeListToJson(
+            appDb.bookDao.all.map { book ->
+                book.copy(
+                    persistedCoverUrl = book.persistedCoverUrl
+                        .takeIf { backupPersistedCovers },
+                    variable = book.variable.takeUnless { lanTransfer },
+                )
+            },
+            "bookshelf.json",
+            backupPath,
+        )
         writeListToJson(appDb.bookmarkDao.all, "bookmark.json", backupPath)
         writeListToJson(appDb.bookHighlightDao.all, "highlight.json", backupPath)
         writeListToJson(
@@ -153,8 +288,17 @@ object Backup {
         writeListToJson(appDb.bookSourceDao.all, "bookSource.json", backupPath)
         writeListToJson(appDb.rssSourceDao.all, "rssSources.json", backupPath)
         writeListToJson(appDb.rssStarDao.all, "rssStar.json", backupPath)
-        writeListToJson(appDb.replaceRuleDao.all, "replaceRule.json", backupPath)
-        writeListToJson(appDb.readRecordDao.all, "readRecord.json", backupPath)
+        writeListToJson(
+            ReplacePreviewConfig.withSamples(appDb.replaceRuleDao.all),
+            "replaceRule.json",
+            backupPath
+        )
+        val includeReadRecordCovers = BackupConfig.readRecordCoverContentKey in enabledContentKeys &&
+            BackupConfig.historyContentKey in enabledContentKeys
+        writeListToJson(
+            prepareReadRecordBackup(appDb.readRecordDao.all, appCtx.externalFiles, File(backupPath), includeReadRecordCovers),
+            "readRecord.json", backupPath,
+        )
         writeListToJson(appDb.searchKeywordDao.all, "searchHistory.json", backupPath)
         writeListToJson(appDb.ruleSubDao.all, "sourceSub.json", backupPath)
         writeListToJson(appDb.txtTocRuleDao.all, "txtTocRule.json", backupPath)
@@ -170,12 +314,25 @@ object Backup {
                     .writeText(it)
             }
         }
+        if (BackupConfig.cookieContentKey in enabledContentKeys) {
+            val encryptedCookies = aes.encryptBase64(GSON.toJson(appDb.cookieDao.all))
+            FileUtils.createFileIfNotExist(
+                backupPath + File.separator + BackupConfig.cookieFileName
+            ).writeText(encryptedCookies)
+        }
+        if (BackupConfig.runtimeSourceCacheContentKey in enabledContentKeys) {
+            val runtimeCaches = appDb.cacheDao.getRuntimeSourceCaches(System.currentTimeMillis())
+            val encryptedRuntimeCaches = aes.encryptBase64(GSON.toJson(runtimeCaches))
+            FileUtils.createFileIfNotExist(
+                backupPath + File.separator + BackupConfig.runtimeSourceCacheFileName
+            ).writeText(encryptedRuntimeCaches)
+        }
         currentCoroutineContext().ensureActive()
-        GSON.toJson(ReadBookConfig.configList).let {
+        GSON.toJson(readConfigSnapshot).let {
             FileUtils.createFileIfNotExist(backupPath + File.separator + ReadBookConfig.configFileName)
                 .writeText(it)
         }
-        GSON.toJson(ReadBookConfig.shareConfig).let {
+        GSON.toJson(shareReadConfigSnapshot).let {
             FileUtils.createFileIfNotExist(backupPath + File.separator + ReadBookConfig.shareConfigFileName)
                 .writeText(it)
         }
@@ -183,7 +340,7 @@ object Backup {
             FileUtils.createFileIfNotExist(backupPath + File.separator + ThemeConfig.configFileName)
                 .writeText(it)
         }
-        DirectLinkUpload.getConfig()?.let {
+        DirectLinkUpload.getConfig()?.takeUnless { lanTransfer }?.let {
             FileUtils.createFileIfNotExist(backupPath + File.separator + DirectLinkUpload.ruleFileName)
                 .writeText(GSON.toJson(it))
         }
@@ -192,46 +349,55 @@ object Backup {
                 .writeText(GSON.toJson(it))
         }
         currentCoroutineContext().ensureActive()
-        appCtx.getSharedPreferences(backupPath, "config")?.let { sp ->
-            val edit = sp.edit()
+        writePreferenceSnapshot(appCtx, backupPath, "config") {
             appCtx.defaultSharedPreferences.all.forEach { (key, value) ->
-                if (BackupConfig.keyIsNotIgnore(key)) {
+                if (BackupConfig.keyIsNotIgnore(key) &&
+                    (!lanTransfer || key !in lanTransferIgnoredPrefKeys)
+                ) {
                     when (key) {
                         PreferKey.webDavPassword -> {
-                            edit.putString(key, aes.runCatching {
+                            putString(key, aes.runCatching {
                                 encryptBase64(value.toString())
                             }.getOrDefault(value.toString()))
                         }
 
                         else -> when (value) {
-                            is Int -> edit.putInt(key, value)
-                            is Boolean -> edit.putBoolean(key, value)
-                            is Long -> edit.putLong(key, value)
-                            is Float -> edit.putFloat(key, value)
-                            is String -> edit.putString(key, value)
+                            is Int -> putInt(key, value)
+                            is Boolean -> putBoolean(key, value)
+                            is Long -> putLong(key, value)
+                            is Float -> putFloat(key, value)
+                            is String -> putString(key, value)
+                            is Set<*> -> {
+                                @Suppress("UNCHECKED_CAST")
+                                putStringSet(key, value as Set<String>)
+                            }
                         }
                     }
                 }
             }
-            edit.commit()
         }
         currentCoroutineContext().ensureActive()
-        appCtx.getSharedPreferences(backupPath, "videoConfig")?.let { sp ->
-            sp.edit(commit = true) {
-                appCtx.getSharedPreferences(VIDEO_PREF_NAME, Context.MODE_PRIVATE).all.forEach { (key, value) ->
-                    when (value) {
-                        is Int -> putInt(key, value)
-                        is Boolean -> putBoolean(key, value)
-                        is Long -> putLong(key, value)
-                        is Float -> putFloat(key, value)
-                        is String -> putString(key, value)
+        writePreferenceSnapshot(appCtx, backupPath, "videoConfig") {
+            appCtx.getSharedPreferences(VIDEO_PREF_NAME, Context.MODE_PRIVATE).all.forEach { (key, value) ->
+                when (value) {
+                    is Int -> putInt(key, value)
+                    is Boolean -> putBoolean(key, value)
+                    is Long -> putLong(key, value)
+                    is Float -> putFloat(key, value)
+                    is String -> putString(key, value)
+                    is Set<*> -> {
+                        @Suppress("UNCHECKED_CAST")
+                        putStringSet(key, value as Set<String>)
                     }
                 }
             }
         }
         currentCoroutineContext().ensureActive()
         val zipFileName = getNowZipFileName()
-        val paths = arrayListOf(*backupFileNames)
+        val paths = ArrayList(selectedBackupFileNames(enabledContentKeys::contains))
+        if (lanTransfer) {
+            paths.removeAll(listOf("servers.json", DirectLinkUpload.ruleFileName))
+        }
         for (i in 0 until paths.size) {
             paths[i] = backupPath + File.separator + paths[i]
         }
@@ -239,48 +405,64 @@ object Backup {
             prepareBackupMediaDirectories(
                 appCtx.externalFiles,
                 File(backupPath),
-                ReadBookConfig.getAllPicBgStr(),
+                backgroundPaths,
+                backupPersistedCovers,
+                backupOtherCovers,
+                backupBackgrounds,
             ).map { it.absolutePath }
         )
-        FileUtils.delete(zipFilePath)
-        FileUtils.delete(zipFilePath.replace("tmp_", ""))
+        FileUtils.delete(workingZipFile.absolutePath)
+        if (includeReadRecordCovers) {
+            File(backupPath, readRecordCoverDirectory).takeIf { it.isDirectory }?.let {
+                paths.add(it.absolutePath)
+            }
+        }
+        FileUtils.delete(workingZipFile.absolutePath.replace("tmp_", ""))
         val backupFileName = if (AppConfig.onlyLatestBackup) {
             "backup.zip"
         } else {
             zipFileName
         }
-        if (ZipUtils.zipFiles(paths, zipFilePath)) {
+        val backupCreated = ZipUtils.zipFiles(paths, workingZipFile.absolutePath)
+        if (backupCreated) {
             when {
                 path.isNullOrBlank() -> {
-                    copyBackup(context.getExternalFilesDir(null)!!, backupFileName)
+                    copyBackup(workingZipFile, context.getExternalFilesDir(null)!!, backupFileName)
                 }
 
                 path.isContentScheme() -> {
-                    copyBackup(context, path.toUri(), backupFileName)
+                    copyBackup(workingZipFile, context, path.toUri(), backupFileName)
                 }
 
                 else -> {
-                    copyBackup(File(path), backupFileName)
+                    copyBackup(workingZipFile, File(path), backupFileName)
                 }
             }
-            try {
-                AppWebDav.backUpWebDav(zipFileName)
-            } catch (e: Exception) {
-                AppLog.put("上传备份至webdav失败\n$e", e)
+            if (uploadWebDav) {
+                try {
+                    AppWebDav.backUpWebDav(zipFileName)
+                } catch (e: Exception) {
+                    if (currentCoroutineContext().isActive) {
+                        AppLog.put("上传备份至webdav失败\n$e", e)
+                    }
+                }
             }
         }
         FileUtils.delete(backupPath)
-        FileUtils.delete(zipFilePath)
+        FileUtils.delete(workingZipFile.absolutePath)
         currentCoroutineContext().ensureActive()
-        ReadBookConfig.getAllPicBgStr().map {
-            if (it.contains(File.separator)) {
-                File(it)
-            } else {
-                appCtx.externalFiles.getFile("bg", it)
+        if (backupBackgrounds && uploadWebDav) {
+            backgroundPaths.map {
+                if (it.contains(File.separator)) {
+                    File(it)
+                } else {
+                    appCtx.externalFiles.getFile("bg", it)
+                }
+            }.let {
+                AppWebDav.upBgs(it.toTypedArray())
             }
-        }.let {
-            AppWebDav.upBgs(it.toTypedArray())
         }
+        return backupCreated
     }
 
     private suspend fun writeListToJson(
@@ -306,7 +488,7 @@ object Backup {
 
     @Throws(Exception::class)
     @Suppress("SameParameterValue")
-    private fun copyBackup(context: Context, uri: Uri, fileName: String) {
+    private fun copyBackup(source: File, context: Context, uri: Uri, fileName: String) {
         val treeDoc = DocumentFile.fromTreeUri(context, uri)!!
         treeDoc.findFile(fileName)?.delete()
         val fileDoc = treeDoc.createFile("", fileName)
@@ -314,7 +496,7 @@ object Backup {
         val outputS = fileDoc.openOutputStream()
             ?: throw NoStackTraceException("打开OutputStream失败")
         outputS.use {
-            FileInputStream(zipFilePath).use { inputS ->
+            FileInputStream(source).use { inputS ->
                 inputS.copyTo(outputS)
             }
         }
@@ -322,8 +504,8 @@ object Backup {
 
     @Throws(Exception::class)
     @Suppress("SameParameterValue")
-    private fun copyBackup(rootFile: File, fileName: String) {
-        FileInputStream(File(zipFilePath)).use { inputS ->
+    private fun copyBackup(source: File, rootFile: File, fileName: String) {
+        FileInputStream(source).use { inputS ->
             val file = FileUtils.createFileIfNotExist(rootFile, fileName)
             FileOutputStream(file).use { outputS ->
                 inputS.copyTo(outputS)
@@ -334,5 +516,6 @@ object Backup {
     fun clearCache() {
         FileUtils.delete(backupPath)
         FileUtils.delete(zipFilePath)
+        File(appCtx.cacheDir, "lan_backup").deleteRecursively()
     }
 }

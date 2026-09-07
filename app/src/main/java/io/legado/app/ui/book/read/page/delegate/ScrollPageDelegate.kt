@@ -87,6 +87,7 @@ class ScrollPageDelegate(readView: ReadView) : PageDelegate(readView) {
             val distance = deltaX * deltaX + deltaY * deltaY
             isMoved = distance > slopSquare
             if (isMoved) {
+                readView.markReadPositionChanged()
                 readView.setStartPoint(event.x, event.y, false)
             }
         }

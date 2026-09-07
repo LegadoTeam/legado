@@ -7,6 +7,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.BookSourceType
 import io.legado.app.constant.BookType
+import io.legado.app.data.entities.BOOK_SOURCE_PART_VIEW
+import io.legado.app.help.book.isLegacyPersistedCoverPath
+import java.util.UUID
 
 object DatabaseMigrations {
 
@@ -20,7 +23,35 @@ object DatabaseMigrations {
             migration_31_32, migration_32_33, migration_33_34, migration_34_35,
             migration_35_36, migration_36_37, migration_37_38, migration_38_39,
             migration_39_40, migration_40_41, migration_41_42, migration_42_43,
+            migration_100_101, migration_104_105, migration_105_106,
         )
+    }
+
+    // Version 105 was released without a checked-in schema export. Preserve its
+    // exact additive migration explicitly so older installs can still upgrade.
+    private val migration_104_105 = object : Migration(104, 105) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE readRecord ADD COLUMN lastChapterTitle TEXT")
+            db.execSQL("ALTER TABLE readRecord ADD COLUMN lastChapterIndex INTEGER NOT NULL DEFAULT -1")
+            db.execSQL("ALTER TABLE readRecord ADD COLUMN lastChapterPos INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE readRecord ADD COLUMN coverUrl TEXT")
+        }
+    }
+
+    private val migration_105_106 = object : Migration(105, 106) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""CREATE TABLE IF NOT EXISTS book_source_check_states (
+                bookSourceUrl TEXT NOT NULL, revision TEXT NOT NULL, sourceRevision TEXT NOT NULL, status TEXT NOT NULL,
+                checkedAt INTEGER NOT NULL, detail TEXT NOT NULL, PRIMARY KEY(bookSourceUrl),
+                FOREIGN KEY(bookSourceUrl) REFERENCES book_sources(bookSourceUrl)
+                ON UPDATE NO ACTION ON DELETE CASCADE)""")
+            // Old group labels cannot establish that today's rules were checked.
+            db.execSQL("""INSERT INTO book_source_check_states
+                SELECT bookSourceUrl, lower(hex(randomblob(16))), lower(hex(randomblob(16))), 'NEEDS_CHECK', 0, ''
+                FROM book_sources""")
+            db.execSQL("DROP VIEW IF EXISTS book_sources_part")
+            db.execSQL("CREATE VIEW `book_sources_part` AS $BOOK_SOURCE_PART_VIEW")
+        }
     }
 
     private val migration_10_11 = object : Migration(10, 11) {
@@ -37,6 +68,30 @@ object DatabaseMigrations {
     private val migration_11_12 = object : Migration(11, 12) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE rssSources ADD style TEXT ")
+        }
+    }
+
+    private val migration_100_101 = object : Migration(100, 101) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE highlightRules ADD COLUMN uuid TEXT NOT NULL DEFAULT ''"
+            )
+            val statement = db.compileStatement(
+                "UPDATE highlightRules SET uuid = ? WHERE id = ?"
+            )
+            db.query("SELECT id FROM highlightRules").use { cursor ->
+                while (cursor.moveToNext()) {
+                    statement.clearBindings()
+                    statement.bindString(1, UUID.randomUUID().toString())
+                    statement.bindLong(2, cursor.getLong(0))
+                    statement.executeUpdateDelete()
+                }
+            }
+            statement.close()
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS index_highlightRules_uuid " +
+                    "ON highlightRules(uuid)"
+            )
         }
     }
 
@@ -462,6 +517,31 @@ object DatabaseMigrations {
                 ) = 1
                 """.trimIndent()
             )
+        }
+    }
+
+    @Suppress("ClassName")
+    class Migration_101_102 : AutoMigrationSpec {
+        override fun onPostMigrate(db: SupportSQLiteDatabase) {
+            val update = db.compileStatement(
+                """update books set persistedCoverUrl = ?, customCoverUrl = null
+                where bookUrl = ? and customCoverUrl is ? and persistedCoverUrl is null"""
+            )
+            db.query(
+                "select bookUrl, customCoverUrl from books where customCoverUrl is not null"
+            ).use { cursor ->
+                while (cursor.moveToNext()) {
+                    val bookUrl = cursor.getString(0)
+                    val customCoverUrl = cursor.getString(1)
+                    if (!isLegacyPersistedCoverPath(customCoverUrl)) continue
+                    update.clearBindings()
+                    update.bindString(1, customCoverUrl)
+                    update.bindString(2, bookUrl)
+                    update.bindString(3, customCoverUrl)
+                    update.executeUpdateDelete()
+                }
+            }
+            update.close()
         }
     }
 

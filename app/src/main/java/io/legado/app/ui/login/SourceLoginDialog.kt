@@ -27,6 +27,7 @@ import io.legado.app.lib.theme.primaryColor
 import io.legado.app.model.jsSource.JsSourceEngine
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.utils.GSON
+import io.legado.app.utils.applyOpenTint
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.fromJsonArray
@@ -61,6 +62,7 @@ import io.legado.app.data.entities.rule.RowUi.Type
 import io.legado.app.ui.widget.text.TextInputLayout
 import io.legado.app.utils.buildMainHandler
 import io.legado.app.utils.indexOf
+import io.legado.app.utils.installMd3OverflowMenu
 import io.legado.app.utils.setSelectionSafely
 
 class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
@@ -397,6 +399,8 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
                     }
                     editText.inputType =
                         InputType.TYPE_TEXT_VARIATION_PASSWORD or InputType.TYPE_CLASS_TEXT
+                    it.textInputLayout.endIconMode =
+                        com.google.android.material.textfield.TextInputLayout.END_ICON_PASSWORD_TOGGLE
                     editText.setText(loginInfo[name] ?: default)
                     action?.let { jsStr ->
                         val watcher = object : TextWatcher {
@@ -671,12 +675,12 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
 
                 R.id.menu_show_login_header -> alert {
                     setTitle(R.string.login_header)
-                    source.getLoginHeader()?.let { loginHeader ->
+                    source.getLoginHeader()?.takeIf { it.isNotBlank() }?.let { loginHeader ->
                         setMessage(loginHeader)
                         positiveButton(R.string.copy_text) {
                             appCtx.sendToClip(loginHeader)
                         }
-                    }
+                    } ?: setMessage(R.string.empty)
                 }
 
                 R.id.menu_del_login_header -> source.removeLoginHeader()
@@ -707,7 +711,13 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
         val loginUiStr = source.loginUi ?: return
         isLoginUiV2 = source.isLoginUiV2()
         if (isLoginUiV2) {
-            v2Delegate = SourceLoginV2Delegate(this, binding, source)
+            v2Delegate = SourceLoginV2Delegate(
+                this,
+                binding,
+                source,
+                viewModel.book,
+                viewModel.chapter,
+            )
         } else {
             val codeStr = source.getLoginUiJs()
             if (codeStr != null) {
@@ -722,6 +732,10 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
         binding.toolBar.inflateMenu(R.menu.source_login)
         binding.toolBar.menu.applyTint(requireContext())
         binding.toolBar.menu.findItem(R.id.menu_ok)?.isVisible = !isLoginUiV2
+        binding.toolBar.installMd3OverflowMenu(
+            showIcons = true,
+            onOpenCustomMenu = { it.applyOpenTint(requireContext()) }
+        )
         installToolbarActions(source)
         v2Delegate?.start()
     }

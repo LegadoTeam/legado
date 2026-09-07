@@ -68,6 +68,12 @@
                     android:text="@string/use_regex" />
 
                 <io.legado.app.lib.theme.view.ThemeCheckBox
+                    android:id="@+id/cb_apply_to_body"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/scope_content" />
+
+                <io.legado.app.lib.theme.view.ThemeCheckBox
                     android:id="@+id/cb_apply_to_title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"

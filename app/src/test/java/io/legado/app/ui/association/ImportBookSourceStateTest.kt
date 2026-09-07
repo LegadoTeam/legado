@@ -1,5 +1,6 @@
 package io.legado.app.ui.association
 
+import io.legado.app.ui.widget.dialog.resolveCodeDialogOriginal
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -7,6 +8,18 @@ import org.junit.Test
 import java.io.File
 
 class ImportBookSourceStateTest {
+
+    @Test
+    fun `replace manager refresh keeps the editable source draft`() {
+        assertEquals(
+            "edited original",
+            resolveCodeDialogOriginal(true, "edited original", "replacement preview"),
+        )
+        assertEquals(
+            "visible edit",
+            resolveCodeDialogOriginal(false, "older original", "visible edit"),
+        )
+    }
 
     @Test
     fun `classifies new updated and existing sources`() {
@@ -97,7 +110,7 @@ class ImportBookSourceStateTest {
             "src/main/java/io/legado/app/ui/association/ImportTxtTocRuleDialog.kt",
         ).forEach { path ->
             val source = readProjectFile(path)
-            val textIndex = source.indexOf("showComment.text = it")
+            val textIndex = source.indexOf("showComment.text =")
             val resetIndex = source.indexOf("showComment.maxLines = 3", textIndex)
             val visibleIndex = source.indexOf("showComment.visible()", textIndex)
             assertTrue(textIndex >= 0 && resetIndex > textIndex && visibleIndex > resetIndex)
@@ -105,6 +118,172 @@ class ImportBookSourceStateTest {
 
         val layout = readProjectFile("src/main/res/layout/item_source_import.xml")
         assertTrue(layout.contains("android:maxLines=\"3\""))
+    }
+
+    @Test
+    fun `association import status labels use localized resources`() {
+        val importDialogs = listOf(
+            "ImportBookSourceDialog.kt",
+            "ImportDictRuleDialog.kt",
+            "ImportHttpTtsDialog.kt",
+            "ImportReplaceRuleDialog.kt",
+            "ImportRssSourceDialog.kt",
+            "ImportThemeDialog.kt",
+            "ImportTxtTocRuleDialog.kt",
+        )
+
+        importDialogs.forEach { fileName ->
+            val source = readProjectFile(
+                "src/main/java/io/legado/app/ui/association/$fileName"
+            )
+            assertTrue(source.contains("R.string.import_status_new"))
+            assertTrue(source.contains("R.string.import_status_exist"))
+            assertFalse(source.contains("\"新增\""))
+            assertFalse(source.contains("\"更新\""))
+            assertFalse(source.contains("\"已有\""))
+        }
+
+        importDialogs
+            .filterNot { it == "ImportDictRuleDialog.kt" }
+            .forEach { fileName ->
+                val source = readProjectFile(
+                    "src/main/java/io/legado/app/ui/association/$fileName"
+                )
+                assertTrue(source.contains("R.string.import_status_update"))
+            }
+    }
+
+    @Test
+    fun `book source replacement preview is isolated from other import dialogs`() {
+        val dialog = readProjectFile(
+            "src/main/java/io/legado/app/ui/association/ImportBookSourceDialog.kt"
+        )
+        assertTrue(dialog.contains("viewModel.setUseSourceReplacement(item.isChecked)"))
+        assertTrue(dialog.contains("viewModel.originalSourceJson(position)"))
+        assertTrue(dialog.contains("alternateCode = viewModel.replacedSourceJson(position)"))
+        assertTrue(dialog.contains("showReplaceRules = true"))
+        assertTrue(dialog.contains("override fun onOpenReplaceRules"))
+        assertTrue(dialog.contains("ReplaceRuleActivity::class.java"))
+        assertTrue(dialog.contains("dialog.currentOriginalCode() to dialog.requestId"))
+        assertTrue(dialog.contains("viewModel.refreshSourceReplacements(index, source)"))
+        assertTrue(dialog.contains("pendingReplacementRefresh"))
+        assertTrue(dialog.contains("startPendingReplacementRefresh()"))
+        assertTrue(
+            dialog.contains(
+                "if (!startPendingReplacementRefresh() && pendingReplacementRefresh == null)"
+            )
+        )
+        assertTrue(dialog.contains("dialog.clearAlternateCode()"))
+        assertTrue(dialog.contains("override fun isReplaceRuleRefreshPending"))
+        assertTrue(dialog.contains("parseBookSourceJson(code, allowSourceUrls = false)"))
+        assertTrue(dialog.contains("viewModel.replacedSourceJson(index)"))
+        assertTrue(dialog.contains("refreshAlternateCode()"))
+        val syncOpenCodeDialog = dialog.substringAfter("private fun syncOpenCodeDialog()")
+            .substringBefore("private fun parseDraftSource")
+        assertTrue(syncOpenCodeDialog.contains("dialog.setReplaceRuleRefreshPending(false)"))
+        val interactionState = dialog.substringAfter("private fun updateInteractionState()")
+            .substringBefore("override fun onCodeSave")
+        assertTrue(interactionState.contains("menu_select_new_source)?.isEnabled = importEnabled"))
+        assertTrue(interactionState.contains("menu_select_update_source)?.isEnabled = importEnabled"))
+
+        val viewModel = readProjectFile(
+            "src/main/java/io/legado/app/ui/association/ImportBookSourceViewModel.kt"
+        )
+        val setReplacement = viewModel.substringAfter("fun setUseSourceReplacement")
+            .substringBefore("private suspend fun importSourceUrl")
+        assertTrue(setReplacement.contains("useSourceReplacement = previousMode"))
+        assertTrue(setReplacement.contains("AppConfig.importReplaceSource = previousMode"))
+        assertTrue(setReplacement.contains("applyCandidateSources()"))
+        val setSelection = viewModel.substringAfter("fun setSelection")
+            .substringBefore("fun updateSource")
+        assertTrue(
+            setSelection.contains(
+                "if (sourceUpdatePending.value == true || !canImportSource(index)) return"
+            )
+        )
+
+        val codeDialog = readProjectFile(
+            "src/main/java/io/legado/app/ui/widget/dialog/CodeDialog.kt"
+        )
+        assertTrue(codeDialog.contains("binding.codeView.keyListener = null"))
+        assertFalse(codeDialog.contains("ReplaceRuleActivity"))
+        assertTrue(codeDialog.contains("callback()?.onOpenReplaceRules()"))
+        assertTrue(codeDialog.contains("fun setReplaceRuleRefreshPending"))
+        assertTrue(codeDialog.contains("if (!replaceRuleRefreshPending)"))
+        assertTrue(codeDialog.contains("binding.codeView.keyListener = if (pending"))
+        assertTrue(codeDialog.contains("isCancelable = !pending"))
+        assertTrue(codeDialog.contains("fun clearAlternateCode()"))
+        assertTrue(codeDialog.contains("callback()?.isReplaceRuleRefreshPending()"))
+        val replaceMenu = codeDialog.substringAfter("R.id.menu_replace_rule ->")
+            .substringBefore("R.id.menu_save ->")
+        assertTrue(replaceMenu.contains("onOpenReplaceRules"))
+        assertFalse(replaceMenu.contains("dismiss"))
+        assertTrue(codeDialog.contains("fun refreshAlternateCode()"))
+        assertTrue(codeDialog.contains("callback()?.getCodeAlternate(requestId)"))
+        assertTrue(codeDialog.contains("!replaceRuleRefreshPending"))
+        assertTrue(
+            codeDialog.indexOf("setOnCheckedChangeListener") >
+                codeDialog.indexOf("val canPreviewReplacement")
+        )
+        assertTrue(codeDialog.contains("initMenu(!disableEdit)"))
+        assertTrue(codeDialog.contains("saveEnabled && !show && searchView.isIconified"))
+        assertTrue(codeDialog.contains("findTextRanges("))
+        assertTrue(codeDialog.contains("right - left - navigationWidth"))
+        assertTrue(
+            codeDialog.contains(
+                "binding.toolBar.contentInsetStart - binding.toolBar.contentInsetEnd"
+            )
+        )
+        assertTrue(
+            codeDialog.contains("binding.toolBar.paddingStart - binding.toolBar.paddingEnd")
+        )
+        assertTrue(
+            codeDialog.contains("updateSearch(keepIndex = true, selectMatch = false)")
+        )
+        assertTrue(codeDialog.contains("if (selectMatch) showCurrentMatch()"))
+        val alternatePreview = codeDialog.substringAfter("private fun showAlternate")
+            .substringBefore("private fun initMenu")
+        assertTrue(
+            alternatePreview.contains("if (!searchView.isIconified) showCurrentMatch()")
+        )
+        assertTrue(
+            codeDialog.contains("R.id.menu_search_previous -> moveToMatch(searchIndex - 1)")
+        )
+        assertTrue(
+            codeDialog.contains("R.id.menu_search_next -> moveToMatch(searchIndex + 1)")
+        )
+        assertTrue(codeDialog.contains("codeView.setSelection(range.first, range.last + 1)"))
+        assertTrue(codeDialog.contains("codeView.bringPointIntoView(range.first)"))
+        assertTrue(codeDialog.contains("searchRanges.getOrNull(searchIndex) != range"))
+        assertTrue(codeDialog.contains("override fun onViewStateRestored"))
+        assertTrue(codeDialog.contains("savedInstanceState?.getString(\"originalCode\")"))
+        assertTrue(codeDialog.contains("saveStateData(originalCodeStateKey, currentOriginalCode())"))
+        assertTrue(codeDialog.contains("key?.also { IntentData.put(it, data) }"))
+        assertTrue(codeDialog.contains("originalCodeStateKey?.let { IntentData.get<Any>(it) }"))
+        assertTrue(codeDialog.contains("outState.putBoolean(\"showingAlternate\""))
+        assertTrue(
+            codeDialog.contains(
+                "if (!searchView.isIconified) updateSearch(keepIndex = true)"
+            )
+        )
+
+        val codeMenu = readProjectFile("src/main/res/menu/code_edit.xml")
+        assertTrue(codeMenu.contains("@+id/menu_search"))
+        assertTrue(codeMenu.contains("@+id/menu_search_previous"))
+        assertTrue(codeMenu.contains("@+id/menu_search_next"))
+        assertTrue(codeMenu.contains("@+id/menu_replace_rule"))
+
+        val rssDialog = readProjectFile(
+            "src/main/java/io/legado/app/ui/association/ImportRssSourceDialog.kt"
+        )
+        assertTrue(rssDialog.contains("viewModel.setUseSourceReplacement(item.isChecked)"))
+        assertTrue(rssDialog.contains("viewModel.originalSourceJson(position)"))
+        assertTrue(rssDialog.contains("alternateCode = viewModel.replacedSourceJson(position)"))
+        assertTrue(rssDialog.contains("showReplaceRules = true"))
+        assertTrue(rssDialog.contains("override fun onOpenReplaceRules"))
+        assertTrue(rssDialog.contains("pendingReplacementRefresh"))
+        assertTrue(rssDialog.contains("viewModel.refreshSourceReplacements(index, source)"))
+        assertFalse(rssDialog.contains("menu_replace_source)?.isVisible = false"))
     }
 
     private fun readProjectFile(pathInApp: String): String {

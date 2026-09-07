@@ -57,6 +57,7 @@ import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.launch
 import splitties.init.appCtx
 import java.io.FileOutputStream
+import kotlin.math.roundToInt
 
 
 @Suppress("SameParameterValue")
@@ -181,8 +182,9 @@ class ThemeConfigFragment : PreferenceFragment(),
             PreferKey.wallpaperColorFollow ->
                 findPreference<SwitchPreference>(PreferKey.wallpaperColorFollow)?.isChecked =
                     getPrefBoolean(PreferKey.wallpaperColorFollow)
-            PreferKey.transparentStatusBar -> recreateActivities()
-            PreferKey.immNavigationBar -> recreateActivities()
+            PreferKey.transparentStatusBar,
+            PreferKey.immNavigationBar,
+            PreferKey.disablePredictiveBack -> recreateActivities()
             PreferKey.cPrimary,
             PreferKey.cAccent,
             PreferKey.cBackground,
@@ -236,7 +238,11 @@ class ThemeConfigFragment : PreferenceFragment(),
                 .setTitle(getString(R.string.font_scale))
                 .setMaxValue(16)
                 .setMinValue(8)
-                .setValue(10)
+                .setValue(
+                    (AppContextWrapper.getFontScale(requireContext()) * 10)
+                        .roundToInt()
+                        .coerceIn(8, 16)
+                )
                 .setCustomButton((R.string.btn_default_s)) {
                     putPrefInt(PreferKey.fontScale, 0)
                     recreateActivities()

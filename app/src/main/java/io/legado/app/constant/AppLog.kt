@@ -35,8 +35,10 @@ object AppLog {
         mLogs.add(0, Triple(System.currentTimeMillis(), message, throwable))
         runCatching { postEvent(EventBus.APP_LOG_UPDATED, true) }
         if (BuildConfig.DEBUG) {
-            val stackTrace = Thread.currentThread().stackTrace
-            Log.e(stackTrace[3].className, message, throwable)
+            runCatching {
+                val stackTrace = Thread.currentThread().stackTrace
+                Log.e(stackTrace[3].className, message, throwable)
+            }
         }
     }
 
@@ -52,8 +54,10 @@ object AppLog {
         mLogs.add(0, Triple(System.currentTimeMillis(), message, throwable))
         runCatching { postEvent(EventBus.APP_LOG_UPDATED, true) }
         if (BuildConfig.DEBUG) {
-            val stackTrace = Thread.currentThread().stackTrace
-            Log.e(stackTrace[3].className, message, throwable)
+            runCatching {
+                val stackTrace = Thread.currentThread().stackTrace
+                Log.e(stackTrace[3].className, message, throwable)
+            }
         }
     }
 

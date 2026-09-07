@@ -14,6 +14,28 @@ class BottomWebViewDialogLifecycleContractTest {
     }
 
     @Test
+    fun `duplicate check and synchronous show share the UI dispatch`() {
+        val show = section("override fun show(manager:", "override fun onDismiss")
+        val ui = show.indexOf("runOnUI {")
+        val state = show.indexOf("manager.isDestroyed || manager.isStateSaved || isAdded")
+        val duplicates = show.indexOf("manager.fragments.any")
+        val display = show.indexOf("super.showNow(manager, tag)")
+
+        assertTrue(ui >= 0)
+        assertTrue(state > ui)
+        assertTrue(duplicates > state)
+        assertTrue(display > duplicates)
+        assertTrue(show.contains("!it.dismissed && !it.isRemoving"))
+        assertTrue(show.contains("it.browserRequest == request"))
+        assertFalse(show.contains("remove(this)"))
+        assertFalse(show.contains("super.show(manager, tag)"))
+
+        val dismiss = section("override fun onDismiss", "private fun setConfig")
+        assertTrue(dismiss.indexOf("dismissed = true") < dismiss.indexOf("super.onDismiss(dialog)"))
+        assertTrue(section("override fun onStart", "override fun show").contains("dismissed = false"))
+    }
+
+    @Test
     fun `pooled webview follows the view lifecycle`() {
         val fields = section("private var pooledWebView", "private var source")
         val onViewCreated = section("override fun onViewCreated", "private fun initWebView")
@@ -74,6 +96,18 @@ class BottomWebViewDialogLifecycleContractTest {
     }
 
     @Test
+    fun `source is loaded before the initial request`() {
+        val onViewCreated = section("override fun onViewCreated", "private fun initWebView")
+
+        val loadSource = onViewCreated.indexOf("appDb.bookSourceDao.getBookSource(sourceKey)")
+        val analyzeUrl = onViewCreated.indexOf("AnalyzeUrl(url, source = source")
+        val request = onViewCreated.indexOf("analyzeUrl.getStrResponseAwait()")
+        assertTrue(loadSource >= 0)
+        assertTrue(analyzeUrl > loadSource)
+        assertTrue(request > analyzeUrl)
+    }
+
+    @Test
     fun `bottom sheet references follow the current dialog`() {
         val fields = section("private val binding", "private val displayMetrics")
 
@@ -87,6 +121,40 @@ class BottomWebViewDialogLifecycleContractTest {
         assertTrue(fields.contains("BottomSheetBehavior.from(sheet)"))
         assertFalse(fields.contains("private val bottomSheet by lazy"))
         assertFalse(fields.contains("private val behavior by lazy"))
+    }
+
+    @Test
+    fun `browser dialog uses the edge to edge bottom sheet theme`() {
+        val theme = section("override fun getTheme", "@Suppress(\"DEPRECATION\")")
+        val styles = projectFile("src/main/res/values/styles.xml").readText()
+
+        assertTrue(theme.contains("R.style.ThemeOverlay_Legado_BottomWebViewDialog"))
+        assertTrue(styles.contains("name=\"ThemeOverlay.Legado.BottomWebViewDialog\""))
+        assertTrue(styles.contains("<item name=\"android:windowIsFloating\">false</item>"))
+        assertTrue(
+            styles.contains(
+                "parent=\"Theme.Design.BottomSheetDialog\""
+            )
+        )
+        assertTrue(styles.contains("<item name=\"enableEdgeToEdge\">true</item>"))
+        assertTrue(styles.contains("<item name=\"paddingBottomSystemWindowInsets\">true</item>"))
+        assertTrue(styles.contains("<item name=\"paddingLeftSystemWindowInsets\">true</item>"))
+        assertTrue(styles.contains("<item name=\"paddingRightSystemWindowInsets\">true</item>"))
+        assertTrue(styles.contains("<item name=\"paddingTopSystemWindowInsets\">true</item>"))
+    }
+
+    @Test
+    fun `sheet state follows size layout request`() {
+        val setConfig = section("private fun setConfig", "private fun reapplyConfiguredHeight")
+        val widthChange = setConfig.indexOf("params.width = width")
+        val heightChange = setConfig.indexOf("params.height = height")
+        val requestLayout = setConfig.indexOf("sheet.layoutParams = params")
+        val applyState = setConfig.indexOf("behaviorSpec.state?.let { behavior?.state = it }")
+
+        assertTrue(widthChange >= 0)
+        assertTrue(heightChange >= 0)
+        assertTrue(requestLayout > heightChange)
+        assertTrue(applyState > requestLayout)
     }
 
     private fun section(startMarker: String, endMarker: String): String {

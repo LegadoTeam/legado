@@ -16,6 +16,7 @@ import io.legado.app.base.VMBaseActivity
 import io.legado.app.data.entities.Book
 import io.legado.app.databinding.ActivityChapterListBinding
 import io.legado.app.help.book.isLocalTxt
+import io.legado.app.help.book.isPdf
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.primaryTextColor
@@ -139,6 +140,8 @@ class TocActivity : VMBaseActivity<ActivityChapterListBinding, TocViewModel>(),
             AppConfig.tocCountWords
         menu.findItem(R.id.menu_split_long_chapter)?.isChecked =
             viewModel.bookData.value?.getSplitLongChapter() == true
+        menu.findItem(R.id.menu_expand_toc)?.isChecked =
+            viewModel.bookData.value?.getTocExpanded() != false
         return super.onMenuOpened(featureId, menu)
     }
 
@@ -156,13 +159,19 @@ class TocActivity : VMBaseActivity<ActivityChapterListBinding, TocViewModel>(),
                 }
             }
 
+            R.id.menu_expand_toc -> {
+                val expanded = !item.isChecked
+                item.isChecked = expanded
+                viewModel.setTocExpanded(expanded)
+            }
+
             R.id.menu_reverse_toc -> viewModel.reverseToc {
                 viewModel.chapterListCallBack?.upChapterList(
                     searchView?.query?.toString(),
                     resetCollapse = true,
                     replaceAll = true,
                 )
-                setResult(RESULT_OK, Intent().apply {
+                if (!it.isPdf) setResult(RESULT_OK, Intent().apply {
                     putExtra("index", it.durChapterIndex)
                     putExtra("chapterPos", 0)
                 })

@@ -96,7 +96,9 @@ class HighlightTocIntegrationTest {
         ).readText()
 
         assertTrue(fragment.contains("viewModel.searchKey?.takeIf { it.isNotBlank() }"))
-        assertTrue(fragment.contains("queryChapterIndexes(book, normalizedSearchKey)"))
+        assertTrue(fragment.contains("currentSearchKey = normalizedSearchKey"))
+        assertTrue(fragment.contains("val searchKey = currentSearchKey"))
+        assertTrue(fragment.contains("queryChapterIndexes(book, searchKey)"))
     }
 
     @Test

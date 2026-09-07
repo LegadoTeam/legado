@@ -8,6 +8,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookProgress
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.book.update
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.storage.Backup
 import io.legado.app.help.storage.Restore
@@ -329,7 +330,7 @@ object AppWebDav {
                     book.durChapterTitle = bookProgress.durChapterTitle
                     book.durChapterTime = bookProgress.durChapterTime
                     book.syncTime = System.currentTimeMillis()
-                    appDb.bookDao.update(book)
+                    book.update()
                 }
             }
         }

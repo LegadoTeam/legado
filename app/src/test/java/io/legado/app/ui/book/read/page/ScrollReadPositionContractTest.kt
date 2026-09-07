@@ -7,6 +7,20 @@ import java.io.File
 class ScrollReadPositionContractTest {
 
     @Test
+    fun `initial content waits for the reader layout`() {
+        val activity = source("app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
+        val onPostCreate = activity.substringAfter("override fun onPostCreate")
+            .substringBefore("override fun onNewIntent")
+        val layout = onPostCreate.indexOf("binding.readView.doOnLayout")
+        val idle = onPostCreate.indexOf("Looper.myQueue().addIdleHandler")
+        val init = onPostCreate.indexOf("viewModel.initData(intent)")
+
+        assertTrue(layout >= 0)
+        assertTrue(layout < idle)
+        assertTrue(idle < init)
+    }
+
+    @Test
     fun `scroll reading saves and restores the first visible line`() {
         val activity = source("app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
         val onPause = activity.substringAfter("override fun onPause()")
@@ -29,9 +43,15 @@ class ScrollReadPositionContractTest {
             configUpdate.indexOf("updateScrollReadPosition()") <
                 configUpdate.indexOf("values.forEach")
         )
+        assertTrue(
+            configUpdate.contains(
+                "readPositionVersion = readView.getReadPositionVersion()"
+            )
+        )
 
         val pageView = source("app/src/main/java/io/legado/app/ui/book/read/page/PageView.kt")
-        assertTrue(pageView.contains("restorePageOffset(ReadBook.durChapterPos)"))
+        assertTrue(pageView.contains("chapterPosition: Int = ReadBook.durChapterPos"))
+        assertTrue(pageView.contains("restorePageOffset(chapterPosition)"))
 
         val contentView = source(
             "app/src/main/java/io/legado/app/ui/book/read/page/ContentTextView.kt"

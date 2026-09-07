@@ -9,6 +9,7 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.AdapterView
 import android.widget.EditText
+import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
@@ -44,7 +45,9 @@ import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.qrcode.QrCodeResult
 import io.legado.app.ui.widget.bindFieldNavigation
+import io.legado.app.ui.widget.code.CodeView
 import io.legado.app.ui.widget.code.EditSafety
+import io.legado.app.ui.widget.code.resolveSelectionHandleClearance
 import io.legado.app.ui.widget.dialog.UrlOptionDialog
 import io.legado.app.ui.widget.dialog.VariableDialog
 import io.legado.app.ui.widget.keyboard.KeyboardToolPop
@@ -145,6 +148,7 @@ class BookSourceEditActivity :
             }
             return
         }
+        onBackPressedDispatcher.addCallback(this) { finish() }
         softKeyboardTool.attachToWindow(window)
         initView()
         viewModel.initData(intent) {
@@ -327,15 +331,15 @@ class BookSourceEditActivity :
             setText(R.string.source_tab_review)
         })
         binding.recyclerView.setEdgeEffectColor(primaryColor)
-        if (adapter.editEntityMaxLine < 999) {
-            binding.recyclerView.layoutManager = NoChildScrollLinearLayoutManager(this) //启用后会阻止RecyclerView跟随光标滚动,行数少时,用的TextView跟随
-        }
+        binding.recyclerView.layoutManager = NoChildScrollLinearLayoutManager(this)
         binding.recyclerView.adapter = adapter
         binding.fieldNav.bindFieldNavigation(binding.recyclerView)
-        binding.recyclerView.viewTreeObserver.addOnGlobalFocusChangeListener { _, newFocus ->
-            if (newFocus is EditText) {
-                newFocus.postDelayed({ sendText("") }, 120)
-            }
+        binding.recyclerView.viewTreeObserver.addOnGlobalFocusChangeListener { oldFocus, newFocus ->
+            (oldFocus as? CodeView)?.keepSelectionVisible = false
+            (newFocus as? CodeView)?.keepSelectionVisible = true
+        }
+        binding.recyclerView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            (binding.recyclerView.findFocus() as? CodeView)?.requestSelectionVisible()
         }
         val transparentBar = transparentNavBar && !AppConfig.isEInkMode
         listOf(binding.tabLayout, binding.fieldNav).forEach { tabs ->
@@ -356,10 +360,12 @@ class BookSourceEditActivity :
                 setEditEntities(tab?.position)
             }
         })
+        val selectionHandleClearance = resolveSelectionHandleClearance(this)
         binding.recyclerView.setOnApplyWindowInsetsListenerCompat { view, windowInsets ->
             val navigationBarHeight = windowInsets.navigationBarHeight
             val imeHeight = windowInsets.imeHeight
-            view.bottomPadding = if (imeHeight == 0) navigationBarHeight else 0
+            view.bottomPadding = if (imeHeight == 0) navigationBarHeight
+            else selectionHandleClearance
             softKeyboardTool.initialPadding = imeHeight
             windowInsets
         }
@@ -904,31 +910,6 @@ class BookSourceEditActivity :
                     edit.append(text)
                 } else {
                     edit.replace(start, end, text)//光标所在位置插入文字
-                }
-            }
-            if (adapter.editEntityMaxLine >= 999) {
-                view.post {
-                    val editTextLocation = IntArray(2)
-                    view.getLocationOnScreen(editTextLocation)
-                    val recyclerViewLocation = IntArray(2)
-                    binding.recyclerView.getLocationOnScreen(recyclerViewLocation)
-                    val layout = view.layout
-                    if (layout != null) {
-                        val line = layout.getLineForOffset(end)
-                        val cursorYInEditText = layout.getLineTop(line)
-                        // 光标相对于屏幕的位置
-                        val cursorYOnScreen = editTextLocation[1] + cursorYInEditText
-                        // 光标相对于RecyclerView的位置
-                        val cursorYInRecyclerView = cursorYOnScreen - recyclerViewLocation[1]
-                        val recyclerViewBottom = binding.recyclerView.height - 120 //考虑键盘的经验值
-                        // 如果光标不在可见范围内，则滚动到光标位置
-                        if (cursorYInRecyclerView !in 0..recyclerViewBottom) {
-                            val scrollDistance = cursorYInRecyclerView - recyclerViewBottom / 3
-                            if (scrollDistance > 0 && binding.recyclerView.canScrollVertically(1) || scrollDistance < 0 && binding.recyclerView.canScrollVertically(-1)) {
-                                binding.recyclerView.smoothScrollBy(0, scrollDistance)
-                            }
-                        }
-                    }
                 }
             }
         }

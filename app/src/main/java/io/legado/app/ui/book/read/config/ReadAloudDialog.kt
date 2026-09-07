@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.SeekBar
+import androidx.appcompat.widget.TooltipCompat
 import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.constant.EventBus
@@ -203,6 +204,10 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud),
             binding.ivPlayPause.setImageResource(R.drawable.ic_play_24dp)
             binding.ivPlayPause.contentDescription = getString(R.string.audio_play)
         }
+        TooltipCompat.setTooltipText(
+            binding.ivPlayPause,
+            binding.ivPlayPause.contentDescription,
+        )
         val bg = requireContext().bottomBackground
         val isLight = ColorUtils.isColorLight(bg)
         val textColor = requireContext().getPrimaryTextColor(isLight)

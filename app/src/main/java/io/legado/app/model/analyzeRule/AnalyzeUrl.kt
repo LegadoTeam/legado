@@ -137,7 +137,7 @@ class AnalyzeUrl(
         val urlMatcher = paramPattern.matcher(baseUrl)
         if (urlMatcher.find()) baseUrl = baseUrl.substring(0, urlMatcher.start())
         (headerMapF ?: runScriptWithContext(coroutineContext) {
-            source?.getHeaderMap(hasLoginHeader)
+            source?.getHeaderMap(hasLoginHeader && isLoginHeaderSite(mUrl))
         })?.let {
             headerMap.putAll(it)
             if (it.containsKey("proxy")) {
@@ -149,6 +149,24 @@ class AnalyzeUrl(
         val sourceKey = source?.getKey()
         domain = sourceKey?.takeIf { NetworkUtils.getBaseUrl(it) == null }
             ?: NetworkUtils.getSubDomain(url)
+    }
+
+    /**
+     * 登录头(token/Authorization 等认证信息)只发送给书源同站请求。
+     * 封面等资源常托管在第三方 CDN,跨域携带认证头会被对方风控拦截;
+     * 与 cookie 的域处理保持同一粒度(按二级域名对齐)。
+     * 相对链接按 baseUrl 判定;无法判定域名时保持原有行为(仍附加登录头)。
+     * 注意:此处以初始 URL 判定,@js 重写后的跨域跳转不在此保护范围内,
+     * 需要跨域携带认证头的场景可经 urlOption headers 显式指定。
+     */
+    private fun isLoginHeaderSite(url: String): Boolean {
+        val source = this.source ?: return true
+        val sourceDomain = NetworkUtils.getSubDomainOrNull(source.getKey()) ?: return true
+        val target = url.takeIf { it.startsWith("http", true) }
+            ?: baseUrl.takeIf { it.isNotBlank() }
+            ?: return true
+        val targetDomain = NetworkUtils.getSubDomainOrNull(target) ?: return true
+        return targetDomain.equals(sourceDomain, ignoreCase = true)
     }
 
     /**

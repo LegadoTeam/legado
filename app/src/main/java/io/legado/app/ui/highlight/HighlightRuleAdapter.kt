@@ -12,15 +12,21 @@ import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.data.entities.HighlightRule
 import io.legado.app.databinding.ItemHighlightRuleBinding
 import io.legado.app.ui.widget.popupActionMenu
+import io.legado.app.ui.widget.recycler.DragSelectTouchHelper
 import io.legado.app.ui.widget.recycler.ItemTouchCallback
 
 class HighlightRuleAdapter(context: Context, private val callBack: CallBack) :
     RecyclerAdapter<HighlightRule, ItemHighlightRuleBinding>(context),
     ItemTouchCallback.Callback {
 
+    private val selected = linkedSetOf<String>()
+
+    val selection: List<HighlightRule>
+        get() = getItems().filter { it.uuid in selected }
+
     val diffItemCallBack = object : DiffUtil.ItemCallback<HighlightRule>() {
         override fun areItemsTheSame(oldItem: HighlightRule, newItem: HighlightRule) =
-            oldItem.id == newItem.id
+            oldItem.uuid == newItem.uuid
 
         override fun areContentsTheSame(oldItem: HighlightRule, newItem: HighlightRule) =
             oldItem.getDisplayName() == newItem.getDisplayName() &&
@@ -41,6 +47,23 @@ class HighlightRuleAdapter(context: Context, private val callBack: CallBack) :
     override fun getViewBinding(parent: ViewGroup): ItemHighlightRuleBinding =
         ItemHighlightRuleBinding.inflate(inflater, parent, false)
 
+    fun selectAll() {
+        selected.addAll(getItems().map(HighlightRule::uuid))
+        notifySelectionChanged()
+    }
+
+    fun revertSelection() {
+        getItems().forEach { rule ->
+            if (!selected.add(rule.uuid)) selected.remove(rule.uuid)
+        }
+        notifySelectionChanged()
+    }
+
+    override fun onCurrentListChanged() {
+        selected.retainAll(getItems().mapTo(hashSetOf(), HighlightRule::uuid))
+        callBack.upCountView()
+    }
+
     override fun convert(
         holder: ItemViewHolder,
         binding: ItemHighlightRuleBinding,
@@ -48,12 +71,18 @@ class HighlightRuleAdapter(context: Context, private val callBack: CallBack) :
         payloads: MutableList<Any>
     ) {
         if (payloads.isEmpty()) {
-            binding.tvName.text = item.getDisplayName()
+            binding.cbName.text = item.getDisplayName()
+            binding.cbName.isChecked = item.uuid in selected
             binding.swtEnabled.isChecked = item.isEnabled
             return
         }
         payloads.filterIsInstance<Bundle>().forEach { payload ->
-            if (payload.getBoolean(PAYLOAD_NAME)) binding.tvName.text = item.getDisplayName()
+            if (payload.containsKey(PAYLOAD_SELECTED)) {
+                binding.cbName.isChecked = item.uuid in selected
+            }
+            if (payload.getBoolean(PAYLOAD_NAME)) {
+                binding.cbName.text = item.getDisplayName()
+            }
             if (payload.containsKey(PAYLOAD_ENABLED)) {
                 binding.swtEnabled.isChecked = payload.getBoolean(PAYLOAD_ENABLED)
             }
@@ -61,6 +90,16 @@ class HighlightRuleAdapter(context: Context, private val callBack: CallBack) :
     }
 
     override fun registerListener(holder: ItemViewHolder, binding: ItemHighlightRuleBinding) {
+        binding.root.setOnClickListener {
+            binding.cbName.performClick()
+        }
+        binding.cbName.setOnClickListener {
+            getItem(holder.layoutPosition)?.let { rule ->
+                if (binding.cbName.isChecked) selected.add(rule.uuid)
+                else selected.remove(rule.uuid)
+                callBack.upCountView()
+            }
+        }
         binding.swtEnabled.setOnUserCheckedChangeListener { isChecked ->
             getItem(holder.layoutPosition)?.let { rule ->
                 rule.isEnabled = isChecked
@@ -68,9 +107,6 @@ class HighlightRuleAdapter(context: Context, private val callBack: CallBack) :
             }
         }
         binding.ivEdit.setOnClickListener {
-            getItem(holder.layoutPosition)?.let(callBack::edit)
-        }
-        binding.contentLayout.setOnClickListener {
             getItem(holder.layoutPosition)?.let(callBack::edit)
         }
         binding.ivMenuMore.setOnClickListener {
@@ -121,17 +157,43 @@ class HighlightRuleAdapter(context: Context, private val callBack: CallBack) :
         }
     }
 
+    val dragSelectCallback: DragSelectTouchHelper.Callback =
+        object : DragSelectTouchHelper.AdvanceCallback<String>(Mode.ToggleAndReverse) {
+            override fun currentSelectedId(): MutableSet<String> = selected
+
+            override fun getItemId(position: Int): String = getItem(position)!!.uuid
+
+            override fun updateSelectState(position: Int, isSelected: Boolean): Boolean {
+                val rule = getItem(position) ?: return false
+                if (isSelected) selected.add(rule.uuid) else selected.remove(rule.uuid)
+                notifyItemChanged(position, selectionPayload())
+                callBack.upCountView()
+                return true
+            }
+        }
+
+    private fun notifySelectionChanged() {
+        notifyItemRangeChanged(0, itemCount, selectionPayload())
+        callBack.upCountView()
+    }
+
+    private fun selectionPayload() = Bundle().apply {
+        putBoolean(PAYLOAD_SELECTED, true)
+    }
+
     interface CallBack {
         fun update(vararg rule: HighlightRule)
         fun delete(rule: HighlightRule)
         fun edit(rule: HighlightRule)
         fun toTop(rule: HighlightRule)
         fun toBottom(rule: HighlightRule)
+        fun upCountView()
     }
 
     private companion object {
         const val PAYLOAD_NAME = "name"
         const val PAYLOAD_ENABLED = "enabled"
+        const val PAYLOAD_SELECTED = "selected"
         const val ACTION_TOP = "top"
         const val ACTION_BOTTOM = "bottom"
         const val ACTION_DELETE = "delete"

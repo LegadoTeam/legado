@@ -7,6 +7,8 @@ interface DataSource {
 
     val pageIndex: Int get() = ReadBook.durPageIndex
 
+    val allowPageMove: Boolean get() = true
+
     val currentChapter: TextChapter?
 
     val nextChapter: TextChapter?

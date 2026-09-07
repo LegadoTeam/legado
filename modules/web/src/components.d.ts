@@ -36,6 +36,7 @@ declare module 'vue' {
     ReviewDialog: typeof import('./components/ReviewDialog.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SourceCheckControls: typeof import('./components/SourceCheckControls.vue')['default']
     SourceDebug: typeof import('./components/SourceDebug.vue')['default']
     SourceHelp: typeof import('./components/SourceHelp.vue')['default']
     SourceItem: typeof import('./components/SourceItem.vue')['default']

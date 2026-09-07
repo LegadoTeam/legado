@@ -171,7 +171,7 @@ function loginAction(action, state, form) {
 }
 ```
 
-`loginUi` 返回 `{rows:[...]}`；行类型支持 `text`、`password`、`label`、`select` 和 `button`。`loginAction` 可返回 `state` 重新渲染、`error` 显示字段错误、`login` 保存登录信息、`close` 关闭界面。
+`loginUi` 返回 `{rows:[...]}`；行类型支持 `text`、`password`、`label`、`select`、`button` 和 `toggle`。`loginAction` 可返回 `state` 重新渲染、`error` 显示字段错误、`login` 保存登录信息、`close` 关闭界面。
 
 ## 发现
 
@@ -323,26 +323,32 @@ let options = {
 ## 回调事件
 
 * 回调操作
-> 先启用事件监听按钮，然后软件触发事件时会执行回调规则的js代码。  
-可空字符串变量`result`的值为事件对应内容。  
-字符串变量`event`的值对应事件名称，目前的事件有
+> 先启用事件监听按钮，然后软件触发事件时会执行回调规则的 JS 代码。
+>
+> 所有事件都会显式绑定 `event`、`result`、`book` 和 `chapter`，其中后三项可能为 `null`。回调也保留书源脚本的通用变量：通知事件中的 `java` 是当前书源，交互事件中的 `java` 则为 `SourceLoginJsExtensions`。
+>
+> 对存在默认操作的交互事件，回调结果为假时执行默认操作，为真时跳过默认操作。`clickCustomButton`、`longClickCustomButton` 和 `longClickBookLabel` 没有默认操作，回调结果不影响后续行为。脚本执行失败时只记录错误，也不会执行默认操作。
+>
+> 回调结果会转为字符串并按通用的 `isTrue()` 规则判断；空白、`null`、`false`、`no`、`not`、`0` 和 `0.0` 都会被视为假。
+>
+> `event` 的值对应事件名称，目前有：
 ```js
 "clickBookName" //点击详情页书名
 "longClickBookName" //长按详情页书名
 "clickAuthor" //点击详情页作者
 "longClickAuthor" //长按详情页作者
-"clickCustomButton" //点击书源自定义按钮
-"longClickCustomButton" //长按书源自定义按钮（只存在小说的正文界面）
+"clickCustomButton" //点击书源自定义按钮；无默认操作
+"longClickCustomButton" //长按书源自定义按钮（只存在小说的正文界面）；无默认操作
 "clickShareBook" //点击详情页分享按钮
 "clickClearCache" //点击详情页清理缓存按钮
 "clickCopyBookUrl" //点击详情页拷贝书籍URl按钮
 "clickCopyTocUrl" //点击详情页拷贝目录URl按钮
 "clickCopyPlayUrl" //音频、视频界面点击拷贝播放URL按钮
 "clickBookLabel" //点击详情页标签
-"longClickBookLabel" //长按详情页标签
-//上面的事件回调执行结果返回true会消费事件，原本的软件操作不会再执行
+"longClickBookLabel" //长按详情页标签；无默认操作
+// 上面的交互事件中，提供默认操作的事件可由回调结果控制
 
-//下面的事件无法被回调结果消费
+// 下面的通知事件忽略回调结果，无法消费
 "addBookShelf" //添加到书架
 "delBookShelf" //移除书架
 "saveRead" //保存阅读进度
@@ -432,10 +438,15 @@ result = `<img src = "${url}">`;
 > 目前支持"text"、"full"、"single"、"left"、"right"  
 > 在书源正文样式为大写"TEXT"时，占1.5个字符位(text样式宽度与汉字保持一致，不受width控制)  
 
+> "reviewCount"键用于兼容旧书源的图片段评
+> 仅"style"为"text"或"TEXT"、数量为正整数且同时存在非空"click"时，在原行内图片位置按当前阅读样式的原生段评SVG绘制
+> 原始图片地址和点击脚本保持不变，字段缺失或非法时仍显示原图
+
 ```
 <img src = "https://du.com/result.png,{'style': 'center','width':'50%'}">
 <img src = "https://du.com/result.png,{'style': 'right','width':'300'}">
 <img src = "data:image/svg+xml;base64,QQ,{'style': 'left','width':'100%'}">
+<img src = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxIDEiLz4=,{'style':'TEXT','reviewCount':'37','click':'getDP(1,37)'}">
 ```
 
 * 详情页html

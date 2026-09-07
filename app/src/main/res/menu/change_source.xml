@@ -24,6 +24,12 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_chapter_source_automation"
+        android:title="@string/chapter_source_automation"
+        android:visible="false"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_refresh_list"
         android:title="@string/refresh_list"
         app:showAsAction="never" />

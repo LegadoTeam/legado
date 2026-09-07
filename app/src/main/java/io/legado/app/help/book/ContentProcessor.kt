@@ -22,6 +22,15 @@ import java.lang.ref.WeakReference
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.regex.Pattern
 
+internal fun sameTitleLineMatcher(
+    content: String,
+    namePattern: String,
+    titlePattern: String
+) = Pattern.compile(
+    "^(\\s|\\p{P}|$namePattern)*$titlePattern" +
+        "[\\t\\x0B\\f\\p{Zs}]*(?:(?:\\r\\n|\\r|\\n)\\s*|$)"
+).matcher(content)
+
 class ContentProcessor private constructor(
     private val bookName: String,
     private val bookOrigin: String
@@ -96,11 +105,19 @@ class ContentProcessor private constructor(
         includeTitle: Boolean = true,
         useReplace: Boolean = true,
         chineseConvert: Boolean = true,
-        reSegment: Boolean = true
+        reSegment: Boolean = true,
+        replaceEnabledOverride: Boolean? = null,
+        titleReplaceRulesOverride: List<ReplaceRule>? = null,
+        contentReplaceRulesOverride: List<ReplaceRule>? = null,
     ): BookContent {
         var mContent = content
         var sameTitleRemoved = false
         var effectiveReplaceRules: ArrayList<ReplaceRule>? = null
+        val replaceEnabled = replaceEnabledOverride ?: (useReplace && book.getUseReplaceRule())
+        val titleRules = titleReplaceRulesOverride ?: titleReplaceRules
+        val contentRules = contentReplaceRulesOverride ?: contentReplaceRules
+        val contentReplaceEnabled = replaceEnabled &&
+            (contentReplaceRulesOverride == null || contentRules.isNotEmpty())
         val replaceBook by lazy { book.toReplaceBook() }
         if (content != "null") {
             //去除重复标题
@@ -108,21 +125,19 @@ class ContentProcessor private constructor(
             if (!removeSameTitleCache.contains(fileName)) try {
                 val name = Pattern.quote(book.name)
                 var title = chapter.title.escapeRegex().replace(spaceRegex, "\\\\s*")
-                var matcher = Pattern.compile("^(\\s|\\p{P}|${name})*${title}(\\s)*")
-                    .matcher(mContent)
+                var matcher = sameTitleLineMatcher(mContent, name, title)
                 if (matcher.find()) {
                     mContent = mContent.substring(matcher.end())
                     sameTitleRemoved = true
-                } else if (useReplace && book.getUseReplaceRule()) {
+                } else if (replaceEnabled) {
                     title = Pattern.quote(
                         chapter.getDisplayTitle(
-                            titleReplaceRules,
+                            titleRules,
                             chineseConvert = false,
                             replaceBook = replaceBook
                         )
                     )
-                    matcher = Pattern.compile("^(\\s|\\p{P}|${name})*${title}(\\s)*")
-                        .matcher(mContent)
+                    matcher = sameTitleLineMatcher(mContent, name, title)
                     if (matcher.find()) {
                         mContent = mContent.substring(matcher.end())
                         sameTitleRemoved = true
@@ -154,11 +169,11 @@ class ContentProcessor private constructor(
                     placeholder
                 }
             }
-            if (useReplace && book.getUseReplaceRule()) {
+            if (contentReplaceEnabled) {
                 //替换
                 effectiveReplaceRules = arrayListOf()
                 mContent = mContent.lines().joinToString("\n") { it.trim() }
-                getContentReplaceRules().forEach { item ->
+                contentRules.forEach { item ->
                     if (item.pattern.isEmpty()) {
                         return@forEach
                     }
@@ -197,8 +212,8 @@ class ContentProcessor private constructor(
         if (includeTitle) {
             //重新添加标题
             mContent = chapter.getDisplayTitle(
-                getTitleReplaceRules(),
-                useReplace = useReplace && book.getUseReplaceRule(),
+                titleRules,
+                useReplace = replaceEnabled,
                 replaceBook = replaceBook
             ) + "\n" + mContent
         }
@@ -206,7 +221,7 @@ class ContentProcessor private constructor(
             mContent = mContent.replace('\u00A0', ' ')
         }
         val contents = arrayListOf<String>()
-        mContent.split("\n").forEach { str ->
+        mContent.lineSequence().forEach { str ->
             val paragraph = str.trim {
                 it.code <= 0x20 || it == '　'
             }

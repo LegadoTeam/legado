@@ -1,5 +1,6 @@
 package com.script.rhino
 
+import androidx.collection.LruCache
 import com.script.CompiledScript
 import com.script.ScriptBindings
 import com.script.ScriptException
@@ -22,6 +23,7 @@ import org.htmlunit.corejs.javascript.Wrapper
 import java.io.IOException
 import java.io.Reader
 import java.io.StringReader
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -31,7 +33,10 @@ import kotlin.coroutines.CoroutineContext
  */
 object RhinoScriptEngine {
 
-    private const val SOURCE_NAME = "<Unknown source>"
+    private const val UNKNOWN_SOURCE_NAME = "<Unknown source>"
+    private val sourceId = AtomicLong()
+    // ponytail: 256 recent scripts; use size-weighted eviction if large sources cause pressure.
+    private val sourceCache = LruCache<String, String>(256)
 
     fun initialize() = Unit
 
@@ -71,25 +76,15 @@ object RhinoScriptEngine {
         cx.recursiveCount++
         val ret: Any?
         var source = ""
+        var sourceName = UNKNOWN_SOURCE_NAME
         try {
             cx.checkRecursive()
             source = reader.readText()
-            val script = cx.compileWithCompatibility(source, SOURCE_NAME, 1, scope)
+            sourceName = registerSource(source)
+            val script = cx.compileWithCompatibility(source, sourceName, 1, scope)
             ret = script.exec(cx, scope, topLevelThis(scope))
         } catch (re: RhinoException) {
-            val line = if (re.lineNumber() == 0) -1 else re.lineNumber()
-            val baseMsg: String = if (re is JavaScriptException) {
-                re.value.toString()
-            } else {
-                re.toString()
-            }
-            val se = ScriptException(
-                buildErrorMessage(baseMsg, source, line, re.columnNumber()),
-                re.sourceName(),
-                line,
-            )
-            se.initCause(re)
-            throw se
+            throw createScriptException(re, source, sourceName)
         } catch (var14: IOException) {
             throw ScriptException(var14)
         } finally {
@@ -115,10 +110,12 @@ object RhinoScriptEngine {
             cx.allowScriptRun = true
             cx.recursiveCount++
             var source = ""
+            var sourceName = UNKNOWN_SOURCE_NAME
             try {
                 cx.checkRecursive()
                 source = reader.readText()
-                val script = cx.compileWithCompatibility(source, SOURCE_NAME, 1, scope)
+                sourceName = registerSource(source)
+                val script = cx.compileWithCompatibility(source, sourceName, 1, scope)
                 try {
                     ret = cx.executeScriptWithContinuations(script, scope)
                 } catch (e: ContinuationPending) {
@@ -136,19 +133,7 @@ object RhinoScriptEngine {
                     }
                 }
             } catch (re: RhinoException) {
-                val line = if (re.lineNumber() == 0) -1 else re.lineNumber()
-                val baseMsg: String = if (re is JavaScriptException) {
-                    re.value.toString()
-                } else {
-                    re.toString()
-                }
-                val se = ScriptException(
-                    buildErrorMessage(baseMsg, source, line, re.columnNumber()),
-                    re.sourceName(),
-                    line,
-                )
-                se.initCause(re)
-                throw se
+                throw createScriptException(re, source, sourceName)
             } catch (var14: IOException) {
                 throw ScriptException(var14)
             } finally {
@@ -185,32 +170,66 @@ object RhinoScriptEngine {
         val cx = Context.enter()
         val ret: RhinoCompiledScript
         var source = ""
+        var sourceName = UNKNOWN_SOURCE_NAME
         try {
             source = script.readText()
-            val scr = (cx as RhinoContext).compileWithCompatibility(source, SOURCE_NAME, 1)
-            ret = RhinoCompiledScript(scr)
+            sourceName = registerSource(source)
+            val scr = (cx as RhinoContext).compileWithCompatibility(source, sourceName, 1)
+            ret = RhinoCompiledScript(scr, source, sourceName)
         } catch (error: RhinoException) {
-            val line = error.lineNumber().takeIf { it > 0 } ?: -1
-            val column = error.columnNumber().takeIf { it > 0 } ?: -1
             val message = if (error is JavaScriptException) {
                 error.value.toString()
             } else {
                 error.details()
             }
-            val scriptError = ScriptException(
-                buildErrorMessage(message, source, line, column),
-                error.sourceName(),
-                line,
-                column,
+            throw createScriptException(
+                error,
+                source,
+                sourceName,
+                message,
+                includeColumn = true,
             )
-            scriptError.initCause(error)
-            throw scriptError
         } catch (var9: Exception) {
             throw ScriptException(var9)
         } finally {
             Context.exit()
         }
         return ret
+    }
+
+    private fun registerSource(source: String): String {
+        val sourceName = "<script-${sourceId.incrementAndGet()}>"
+        sourceCache.put(sourceName, source)
+        return sourceName
+    }
+
+    internal fun createScriptException(
+        exception: RhinoException,
+        fallbackSource: String,
+        fallbackSourceName: String,
+        baseMessage: String = if (exception is JavaScriptException) {
+            exception.value.toString()
+        } else {
+            exception.toString()
+        },
+        includeColumn: Boolean = false,
+    ): ScriptException {
+        val line = exception.lineNumber().takeIf { it > 0 } ?: -1
+        val column = exception.columnNumber().takeIf { it > 0 } ?: -1
+        val sourceName = exception.sourceName()
+        val source = sourceName?.let { sourceCache[it] }
+            ?: fallbackSource.takeIf { sourceName == fallbackSourceName }
+        val message = source?.let {
+            buildErrorMessage(baseMessage, it, line, column)
+        } ?: baseMessage
+        val scriptException = if (includeColumn) {
+            ScriptException(message, sourceName, line, column)
+        } else {
+            ScriptException(message, sourceName, line)
+        }
+        return scriptException.also {
+            it.initCause(exception)
+        }
     }
 
     fun unwrapReturnValue(result: Any?): Any? {

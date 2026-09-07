@@ -87,7 +87,7 @@ class ReviewRuleParserTest {
                           "avatar": "/reply.png",
                           "name": "Bob",
                           "badges": "reader|top",
-                          "content": "Reply"
+                          "content": "{\"text\":\"Reply\",\"replyToName\":\"Alice\",\"likeCount\":3}"
                         }
                       ]
                     },
@@ -141,13 +141,37 @@ class ReviewRuleParserTest {
                 assertEquals("r1", id)
                 assertEquals("https://example.com/reply.png", avatar)
                 assertEquals("Bob", name)
+                assertEquals("Alice", replyToName)
                 assertEquals(listOf("reader", "top"), badges)
                 assertEquals("Reply", content)
-                assertEquals(null, likeCount)
+                assertEquals(3, likeCount)
                 assertEquals(null, replyCount)
             }
         }
         assertEquals("{\"other\":\"kept\"}", result.items[1].content)
+    }
+
+    @Test
+    fun `declarative detail preserves 64-bit numeric ids`() {
+        val result = ReviewRuleParser.parseDetailPage(
+            body = """{"items":[{"id":1051979893439332353,"content":"评论"}]}""",
+            rule = ReviewRule(
+                detailListRule = "$.items",
+                detailIdRule = "$.id",
+                detailContentRule = "$.content",
+            ),
+            nextPageRule = null,
+            baseUrl = chapter.url,
+            source = source,
+            book = book,
+            chapter = chapter,
+            context = EmptyCoroutineContext,
+            paraIndex = "1",
+            paraData = "",
+            page = "1",
+        )
+
+        assertEquals("1051979893439332353", result.items.single().id)
     }
 
     @Test
@@ -162,7 +186,7 @@ class ReviewRuleParserTest {
                         "avatar": "/reply.png",
                         "name": "Bob",
                         "badges": ["reader", "top"],
-                        "content": "{\"text\":\"Reply\",\"img\":\"/reply.jpg\",\"time\":\"now\"}"
+                        "content": "{\"text\":\"Reply\",\"replyToName\":\"Alice\",\"img\":\"/reply.jpg\",\"time\":\"now\",\"likeCount\":4}"
                       }
                     ]
                   }
@@ -190,10 +214,12 @@ class ReviewRuleParserTest {
             assertEquals("r1", id)
             assertEquals("https://example.com/reply.png", avatar)
             assertEquals("Bob", name)
+            assertEquals("Alice", replyToName)
             assertEquals(listOf("reader", "top"), badges)
             assertEquals("Reply", content)
             assertEquals("https://example.com/reply.jpg", imageUrl)
             assertEquals("now", time)
+            assertEquals(4, likeCount)
             assertTrue(this.replies.isEmpty())
         }
     }

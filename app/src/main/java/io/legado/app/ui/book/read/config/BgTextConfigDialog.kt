@@ -13,9 +13,12 @@ import android.view.WindowManager
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.SeekBar
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.TooltipCompat
 import androidx.core.graphics.toColorInt
 import androidx.core.view.isGone
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.jaredrummler.android.colorpicker.ColorPickerDialog
 import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
@@ -51,6 +54,7 @@ import io.legado.app.utils.createFileIfNotExist
 import io.legado.app.utils.createFileReplace
 import io.legado.app.utils.createFolderReplace
 import io.legado.app.utils.delete
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.externalCache
 import io.legado.app.utils.externalFiles
 import io.legado.app.utils.find
@@ -76,6 +80,7 @@ import io.legado.app.help.http.newCallResponse
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.utils.setSelectionSafely
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
 
@@ -84,6 +89,7 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
         const val BG_COLOR = 122
         const val TEXT_ACCENT_COLOR = 123
         const val REVIEW_ICON_COLOR = 124
+        const val UNDERLINE_COLOR = 125
     }
 
     private val binding by viewBinding(DialogReadBgTextBinding::bind)
@@ -155,10 +161,27 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
         ivDelete.setColorFilter(primaryTextColor, PorterDuff.Mode.SRC_IN)
         tvBgAlpha.setTextColor(primaryTextColor)
         tvBgImage.setTextColor(primaryTextColor)
+        tvUnderlineColor.setTextColor(primaryTextColor)
+        swUnderlineBody.setTextColor(primaryTextColor)
+        swUnderlineTitle.setTextColor(primaryTextColor)
+        dsbUnderlineWidth.valueFormat = { "${it / 2f}dp" }
+        dsbUnderlineDistance.valueFormat = { "${(it / 2f)}dp" }
         if (ReadBook.book?.isImage == true) {
+            underlineStyleRow.isGone = true
+            underlineActionsRow.isGone = true
+            dsbUnderlineWidth.isGone = true
+            dsbUnderlineDistance.isGone = true
             spUnderline.isGone = true
         } else {
-            val textStyles = arrayOf("关闭", "实线", "虚线")
+            val textStyles = arrayOf(
+                getString(R.string.highlight_action_trigger_off),
+                getString(R.string.highlight_underline_solid),
+                getString(R.string.highlight_underline_dashed),
+                getString(R.string.highlight_underline_dotted),
+                getString(R.string.highlight_underline_double),
+                getString(R.string.highlight_underline_wavy),
+                getString(R.string.underline_double_dashed)
+            )
             val adapter = object : ArrayAdapter<String>(requireContext(), R.layout.item_text_common, textStyles) {
                 override fun getDropDownView(
                     position: Int,
@@ -182,7 +205,7 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
                         isInitializing = false
                         return
                     }
-                    ReadBookConfig.durConfig.underlineMode = position
+                    ReadBookConfig.underlineMode = position
                     postEvent(EventBus.UP_CONFIG, arrayListOf(6, 9, 11))
                 }
                 override fun onNothingSelected(parent: AdapterView<*>) { }
@@ -211,7 +234,20 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
     private fun initData() = with(ReadBookConfig.durConfig) {
         binding.tvName.text = name.ifBlank { "文字" }
         binding.swDarkStatusIcon.isChecked = curStatusIconDark()
-        binding.spUnderline.setSelectionSafely(underlineMode)
+        binding.spUnderline.setSelectionSafely(ReadBookConfig.underlineMode)
+        binding.dsbUnderlineWidth.progress =
+            (ReadBookConfig.underlineWidth * 2f).roundToInt().coerceIn(0, 20)
+        binding.dsbUnderlineDistance.progress =
+            (ReadBookConfig.underlineDistance * 2f).roundToInt().coerceIn(0, 60)
+        binding.swUnderlineBody.isChecked = ReadBookConfig.underlineBodyEnabled
+        binding.swUnderlineTitle.isChecked = ReadBookConfig.underlineTitleEnabled
+        binding.tvUnderlineColor.setTextColor(
+            if (ReadBookConfig.underlineColorSet) {
+                ReadBookConfig.underlineColor
+            } else {
+                ReadBookConfig.textColor
+            }
+        )
         binding.sbBgAlpha.progress = bgAlpha
     }
 
@@ -256,6 +292,17 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
                 .setDialogId(TEXT_COLOR)
                 .show(requireActivity())
         }
+        binding.tvUnderlineColor.setOnClickListener {
+            ColorPickerDialog.newBuilder()
+                .setColor(
+                    ReadBookConfig.underlineColor.takeIf { ReadBookConfig.underlineColorSet }
+                        ?: ReadBookConfig.textColor
+                )
+                .setShowAlphaSlider(true)
+                .setDialogType(ColorPickerDialog.TYPE_CUSTOM)
+                .setDialogId(UNDERLINE_COLOR)
+                .show(requireActivity())
+        }
         binding.tvTextAccentColor.setOnClickListener {
             ColorPickerDialog.newBuilder()
                 .setColor(curTextAccentColor())
@@ -265,30 +312,7 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
                 .show(requireActivity())
         }
         binding.tvReviewIconSvg.setOnClickListener {
-            val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
-                editView.hint = getString(R.string.review_icon_svg_hint)
-                editView.setSingleLine(false)
-                editView.maxLines = 8
-                editView.setText(ReadBookConfig.reviewIconSvg)
-                editView.setSelection(editView.text?.length ?: 0)
-            }
-            val dialog = alert(R.string.review_icon_svg_title) {
-                customView { alertBinding.root }
-                okButton()
-                cancelButton()
-            }
-            dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
-                val newSvg = alertBinding.editView.text?.toString().orEmpty().trim()
-                if (newSvg.isNotBlank() && !isValidReviewIconSvg(newSvg)) {
-                    toastOnUi(R.string.review_icon_svg_invalid)
-                    return@setOnClickListener
-                }
-                if (newSvg != ReadBookConfig.reviewIconSvg) {
-                    ReadBookConfig.reviewIconSvg = newSvg
-                    notifyReviewIconStyleChanged()
-                }
-                dialog.dismiss()
-            }
+            showReviewIconTemplates()
         }
         binding.tvReviewIconSize.setOnClickListener {
             val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
@@ -380,6 +404,167 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
                 postEvent(EventBus.UP_CONFIG, arrayListOf(3))
             }
         })
+        binding.dsbUnderlineWidth.onChanged = { progress ->
+            ReadBookConfig.underlineWidth = progress / 2f
+            postEvent(EventBus.UP_CONFIG, arrayListOf(6, 9, 11))
+        }
+        binding.dsbUnderlineDistance.onChanged = { progress ->
+            ReadBookConfig.underlineDistance = progress / 2f
+            postEvent(EventBus.UP_CONFIG, arrayListOf(6, 9, 11))
+        }
+        binding.swUnderlineBody.setOnUserCheckedChangeListener { checked ->
+            ReadBookConfig.underlineBodyEnabled = checked
+            postEvent(EventBus.UP_CONFIG, arrayListOf(6, 9, 11))
+        }
+        binding.swUnderlineTitle.setOnUserCheckedChangeListener { checked ->
+            ReadBookConfig.underlineTitleEnabled = checked
+            postEvent(EventBus.UP_CONFIG, arrayListOf(6, 9, 11))
+        }
+    }
+
+    private fun showReviewIconTemplates() {
+        val templates = ReadBookConfig.durConfig.reviewIconSvgTemplates
+        val templateAdapter = ReviewIconSvgTemplateAdapter(
+            requireContext(),
+            secondaryTextColor
+        ).apply {
+            setItems(templates)
+        }
+        val visibleRows = ((templates.size.coerceAtLeast(1) + 2) / 3).coerceAtMost(2)
+        val recyclerView = RecyclerView(requireContext()).apply {
+            layoutManager = GridLayoutManager(requireContext(), 3)
+            adapter = templateAdapter
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                (visibleRows * 88).dpToPx()
+            )
+            setHasFixedSize(true)
+        }
+        lateinit var dialog: AlertDialog
+        templateAdapter.setOnItemClickListener { _, template ->
+            if (applyReviewIconTemplate(template)) dialog.dismiss()
+        }
+        templateAdapter.setOnItemLongClickListener { _, template ->
+            dialog.dismiss()
+            confirmDeleteReviewIconTemplate(template)
+            true
+        }
+        dialog = alert(R.string.review_icon_templates_title) {
+            customView { recyclerView }
+            positiveButton(R.string.review_icon_template_save)
+            neutralButton(R.string.review_icon_svg_edit)
+            cancelButton()
+        }
+        dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+            dialog.dismiss()
+            showReviewIconTemplateNameEditor()
+        }
+        dialog.getButton(DialogInterface.BUTTON_NEUTRAL).setOnClickListener {
+            dialog.dismiss()
+            showReviewIconSvgEditor()
+        }
+    }
+
+    private fun showReviewIconSvgEditor() {
+        val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
+            editView.hint = getString(R.string.review_icon_svg_hint)
+            editView.setSingleLine(false)
+            editView.maxLines = 8
+            editView.setText(ReadBookConfig.reviewIconSvg)
+            editView.setSelection(editView.text?.length ?: 0)
+        }
+        val dialog = alert(R.string.review_icon_svg_title) {
+            customView { alertBinding.root }
+            okButton()
+            cancelButton()
+        }
+        dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+            val newSvg = alertBinding.editView.text?.toString().orEmpty().trim()
+            if (newSvg.isNotBlank() && !isValidReviewIconSvg(newSvg)) {
+                toastOnUi(R.string.review_icon_svg_invalid)
+                return@setOnClickListener
+            }
+            if (newSvg != ReadBookConfig.reviewIconSvg) {
+                ReadBookConfig.reviewIconSvg = newSvg
+                notifyReviewIconStyleChanged()
+            }
+            dialog.dismiss()
+        }
+    }
+
+    private fun showReviewIconTemplateNameEditor(
+        template: ReadBookConfig.ReviewIconSvgTemplate? = null
+    ) {
+        val svg = template?.svg?.trim() ?: ReadBookConfig.reviewIconSvg.trim()
+        if (svg.isBlank() || (template == null && !isValidReviewIconSvg(svg))) {
+            toastOnUi(R.string.review_icon_template_no_svg)
+            return
+        }
+        val existing = template ?: ReadBookConfig.durConfig.reviewIconSvgTemplates
+            .firstOrNull { it.svg.trim() == svg }
+        val defaultName = existing?.name ?: getString(
+            R.string.review_icon_template_default_name,
+            ReadBookConfig.durConfig.reviewIconSvgTemplates.size + 1
+        )
+        val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
+            editView.setHint(R.string.review_icon_template_name)
+            editView.setSingleLine(true)
+            editView.setText(defaultName)
+            editView.setSelection(editView.text?.length ?: 0)
+        }
+        val dialog = alert(R.string.review_icon_template_name) {
+            customView { alertBinding.root }
+            okButton()
+            cancelButton()
+        }
+        dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+            val name = alertBinding.editView.text?.toString().orEmpty().trim()
+            if (name.isEmpty()) {
+                toastOnUi(R.string.review_icon_template_name_empty)
+                return@setOnClickListener
+            }
+            ReadBookConfig.durConfig.putReviewIconSvgTemplate(name, svg)
+            toastOnUi(
+                if (template == null) R.string.review_icon_template_saved
+                else R.string.review_icon_template_renamed
+            )
+            dialog.dismiss()
+            showReviewIconTemplates()
+        }
+    }
+
+    private fun applyReviewIconTemplate(
+        template: ReadBookConfig.ReviewIconSvgTemplate
+    ): Boolean {
+        val svg = template.svg.trim()
+        if (!isValidReviewIconSvg(svg)) {
+            toastOnUi(R.string.review_icon_svg_invalid)
+            return false
+        }
+        if (svg != ReadBookConfig.reviewIconSvg) {
+            ReadBookConfig.reviewIconSvg = svg
+            notifyReviewIconStyleChanged()
+        }
+        return true
+    }
+
+    private fun confirmDeleteReviewIconTemplate(
+        template: ReadBookConfig.ReviewIconSvgTemplate
+    ) {
+        val name = template.name.ifBlank { getString(R.string.review_icon_template_unnamed) }
+        alert(name, getString(R.string.sure_del)) {
+            yesButton { dialog ->
+                dialog.dismiss()
+                ReadBookConfig.durConfig.removeReviewIconSvgTemplate(template.svg)
+                toastOnUi(R.string.review_icon_template_deleted)
+                showReviewIconTemplates()
+            }
+            neutralButton(R.string.edit) { dialog ->
+                dialog.dismiss()
+                showReviewIconTemplateNameEditor(template)
+            }
+            noButton()
+        }
     }
 
     private fun notifyReviewIconStyleChanged() {
@@ -413,20 +598,34 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
             val configFile = configDir.getFile("readConfig.json")
             configFile.createFileReplace()
             val config = ReadBookConfig.getExportConfig()
-            val fontPath = ReadBookConfig.textFont
-            if (fontPath.isNotEmpty()) {
+            fun exportFont(fontPath: String, archiveName: String? = null): String? {
+                if (fontPath.isEmpty()) return null
                 val fontDoc = FileDoc.fromFile(fontPath)
-                val fontName = fontDoc.name
+                val fontName = archiveName ?: fontDoc.name
                 val fontInputStream = fontDoc.openInputStream().getOrNull()
-                fontInputStream?.use {
+                return fontInputStream?.use {
                     val fontExportFile = FileUtils.createFileIfNotExist(configDir, fontName)
                     fontExportFile.outputStream().use { out ->
                         it.copyTo(out)
                     }
-                    config.textFont = fontName
                     exportFiles.add(fontExportFile)
+                    fontName
                 }
             }
+
+            val textFontPath = ReadBookConfig.textFont
+            val exportedTextFont = exportFont(textFontPath)
+            config.textFont = exportedTextFont.orEmpty()
+
+            val titleFontPath = ReadBookConfig.titleFont
+            config.titleFont = if (titleFontPath == textFontPath && exportedTextFont != null) {
+                exportedTextFont
+            } else if (titleFontPath.isNotEmpty()) {
+                val titleFontName = FileDoc.fromFile(titleFontPath).name.let {
+                    if (it == exportedTextFont) "title_$it" else it
+                }
+                exportFont(titleFontPath, titleFontName).orEmpty()
+            } else ""
             configFile.writeText(GSON.toJson(config))
             exportFiles.add(configFile)
             repeat(3) {

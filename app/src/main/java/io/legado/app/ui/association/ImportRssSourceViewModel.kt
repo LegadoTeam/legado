@@ -34,15 +34,20 @@ class ImportRssSourceViewModel(app: Application) : BaseViewModel(app) {
     var groupName: String? = null
     val errorLiveData = MutableLiveData<String>()
     val successLiveData = MutableLiveData<Int>()
+    val sourceUpdatePending = MutableLiveData(false)
 
     val allSources = arrayListOf<RssSource>()
     val checkSources = arrayListOf<RssSource?>()
     val selectStatus = arrayListOf<Boolean>()
+    private val sourceCandidates = arrayListOf<RssSourceImportCandidate>()
+    private val manualSelections = arrayListOf<Boolean?>()
+    var useSourceReplacement = AppConfig.importReplaceSource
+        private set
 
     val isSelectAll: Boolean
         get() {
-            selectStatus.forEach {
-                if (!it) {
+            selectStatus.forEachIndexed { index, selected ->
+                if (canImportSource(index) && !selected) {
                     return false
                 }
             }
@@ -68,7 +73,7 @@ class ImportRssSourceViewModel(app: Application) : BaseViewModel(app) {
             val keepEnable = AppConfig.importKeepEnable
             val selectSource = arrayListOf<RssSource>()
             selectStatus.forEachIndexed { index, b ->
-                if (b) {
+                if (b && canImportSource(index)) {
                     val source = allSources[index]
                     checkSources[index]?.let {
                         if (keepName) {
@@ -111,7 +116,46 @@ class ImportRssSourceViewModel(app: Application) : BaseViewModel(app) {
             errorLiveData.postValue("ImportError:${it.localizedMessage}")
             AppLog.put("ImportError:${it.localizedMessage}", it)
         }.onSuccess {
+            prepareSourceCandidates()
+        }
+    }
+
+    private fun prepareSourceCandidates() {
+        executeLazy {
+            val rules = appDb.replaceRuleDao.findEnabledBySourceScope()
+            allSources.map { prepareRssSourceImportCandidate(it, rules) }
+        }.onSuccess { candidates ->
+            sourceCandidates.clear()
+            sourceCandidates.addAll(candidates)
+            applyCandidateSources()
             comparisonSource()
+        }.onError {
+            errorLiveData.value = "ImportError:${it.localizedMessage}"
+            AppLog.put("ImportError:${it.localizedMessage}", it)
+        }.start()
+    }
+
+    private fun applyCandidateSources() {
+        allSources.clear()
+        allSources.addAll(sourceCandidates.map { it.source(useSourceReplacement) })
+    }
+
+    fun setUseSourceReplacement(enabled: Boolean) {
+        if (enabled == useSourceReplacement || sourceUpdatePending.value == true) return
+        val previousMode = useSourceReplacement
+        useSourceReplacement = enabled
+        AppConfig.importReplaceSource = enabled
+        applyCandidateSources()
+        sourceUpdatePending.value = true
+        comparisonSource(
+            preserveManualSelections = true,
+            onError = {
+                useSourceReplacement = previousMode
+                AppConfig.importReplaceSource = previousMode
+                applyCandidateSources()
+            },
+        ) {
+            sourceUpdatePending.value = false
         }
     }
 
@@ -159,17 +203,98 @@ class ImportRssSourceViewModel(app: Application) : BaseViewModel(app) {
         }
     }
 
-    private fun comparisonSource() {
+    private fun comparisonSource(
+        preserveManualSelections: Boolean = false,
+        onError: () -> Unit = {},
+        finally: () -> Unit = {},
+    ) {
+        val savedManualSelections = manualSelections.toList()
         execute {
+            lateinit var comparison: RssSourceImportComparison
             appDb.runInTransaction {
-                val comparison = compareImportedRssSources(allSources) { sourceUrls ->
+                comparison = compareImportedRssSources(allSources) { sourceUrls ->
                     appDb.rssSourceDao.getRssSources(*sourceUrls.toTypedArray())
                 }
-                checkSources.addAll(comparison.existingSources)
-                selectStatus.addAll(comparison.selectStatus)
+            }
+            comparison
+        }.onSuccess { comparison ->
+            checkSources.clear()
+            selectStatus.clear()
+            manualSelections.clear()
+            comparison.existingSources.forEachIndexed { index, existingSource ->
+                val manualSelection = if (preserveManualSelections) {
+                    savedManualSelections.getOrNull(index)
+                } else {
+                    null
+                }
+                checkSources.add(existingSource)
+                selectStatus.add(
+                    canImportSource(index) &&
+                        (manualSelection ?: comparison.selectStatus[index])
+                )
+                manualSelections.add(manualSelection)
             }
             successLiveData.postValue(allSources.size)
+        }.onError {
+            onError()
+            errorLiveData.value = "ImportError:${it.localizedMessage}"
+            AppLog.put("ImportError:${it.localizedMessage}", it)
+        }.onFinally {
+            finally()
         }
     }
+
+    fun setSelection(index: Int, selected: Boolean) {
+        if (index !in selectStatus.indices || sourceUpdatePending.value == true ||
+            !canImportSource(index)
+        ) return
+        selectStatus[index] = selected
+        if (index in manualSelections.indices) manualSelections[index] = selected
+    }
+
+    fun refreshSourceReplacements(index: Int, source: RssSource?): Boolean {
+        if (sourceUpdatePending.value == true || index !in sourceCandidates.indices) return false
+        val previousCandidates = sourceCandidates.toList()
+        sourceUpdatePending.value = true
+        executeLazy {
+            refreshRssSourceImportCandidates(
+                previousCandidates,
+                index,
+                source,
+                appDb.replaceRuleDao.findEnabledBySourceScope(),
+            )
+        }.onSuccess { candidates ->
+            sourceCandidates.clear()
+            sourceCandidates.addAll(candidates)
+            applyCandidateSources()
+            comparisonSource(
+                preserveManualSelections = true,
+                onError = {
+                    sourceCandidates.clear()
+                    sourceCandidates.addAll(previousCandidates)
+                    applyCandidateSources()
+                },
+            ) {
+                sourceUpdatePending.value = false
+            }
+        }.onError {
+            errorLiveData.value = "ImportError:${it.localizedMessage}"
+            AppLog.put("ImportError:${it.localizedMessage}", it)
+            sourceUpdatePending.value = false
+        }.start()
+        return true
+    }
+
+    fun canImportSource(index: Int): Boolean =
+        sourceCandidates.getOrNull(index)?.canImport(useSourceReplacement) != false
+
+    fun originalSourceJson(index: Int): String? =
+        sourceCandidates.getOrNull(index)?.originalJson
+
+    fun replacedSourceJson(index: Int): String? =
+        sourceCandidates.getOrNull(index)?.replacedJson
+
+    fun sourceReplacementError(index: Int): String? =
+        sourceCandidates.getOrNull(index)?.replacementError
 
 }

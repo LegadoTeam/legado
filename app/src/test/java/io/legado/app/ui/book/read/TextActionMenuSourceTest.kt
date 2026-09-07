@@ -1,5 +1,6 @@
 package io.legado.app.ui.book.read
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -20,6 +21,21 @@ class TextActionMenuSourceTest {
         assertFalse(show.contains("moreMenuItems.isEmpty()"))
         assertFalse(show.contains("contentView.measure("))
         assertFalse(show.contains("contentView.measuredHeight"))
+    }
+
+    @Test
+    fun `reader popups use the popup window coordinate height`() {
+        val source = projectFile(
+            "src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt"
+        ).readText()
+
+        assertEquals(
+            2,
+            Regex("binding\\.root\\.rootView\\.height")
+                .findAll(source).count()
+        )
+        assertFalse(source.contains("binding.navigationBar.height"))
+        assertFalse(source.contains("binding.root.height +"))
     }
 
     private fun projectFile(pathInApp: String): File {

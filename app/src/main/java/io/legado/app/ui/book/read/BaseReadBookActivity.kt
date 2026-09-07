@@ -25,6 +25,7 @@ import io.legado.app.databinding.DialogDownloadChoiceBinding
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.databinding.DialogSimulatedReadingBinding
 import io.legado.app.help.book.cacheLocalUri
+import io.legado.app.help.book.savePreservingCustomCoverUrl
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
@@ -311,7 +312,9 @@ abstract class BaseReadBookActivity :
             startDate.isCursorVisible = false // 不显示光标
             startDate.setOnClickListener {
                 // 获取当前日期
-                val localStartDate = LocalDate.parse(startDate.text)
+                val localStartDate = runCatching {
+                    LocalDate.parse(startDate.text)
+                }.getOrDefault(LocalDate.now())
                 // 创建 DatePickerDialog
                 val datePickerDialog = DatePickerDialog(
                     root.context,
@@ -331,22 +334,20 @@ abstract class BaseReadBookActivity :
             customView { alertBinding.root }
             okButton {
                 alertBinding.run {
-                    val start = editStart.text!!.toString().let {
-                        if (it.isEmpty()) 0 else it.toInt()
-                    }
-                    val num = editNum.text!!.toString().let {
-                        if (it.isEmpty()) book.totalChapterNum else it.toInt()
-                    }
+                    val start = editStart.text.toString().toIntOrNull()?.coerceAtLeast(0) ?: 0
+                    val num = editNum.text.toString().toIntOrNull()?.coerceAtLeast(1)
+                        ?: book.totalChapterNum.coerceAtLeast(1)
                     val enabled = srEnabled.isChecked
-                    val date = startDate.text!!.toString().let {
+                    val date = startDate.text.toString().let {
                         if (it.isEmpty()) LocalDate.now()
-                        else LocalDate.parse(it, dateFormatter)
+                        else runCatching { LocalDate.parse(it, dateFormatter) }
+                            .getOrDefault(LocalDate.now())
                     }
                     book.setStartDate(date)
                     book.setDailyChapters(num)
                     book.setStartChapter(start)
                     book.setReadSimulating(enabled)
-                    book.save()
+                    book.savePreservingCustomCoverUrl()
                     ReadBook.clearTextChapter()
                     viewModel.initData(intent)
                 }

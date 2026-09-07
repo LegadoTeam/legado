@@ -21,16 +21,37 @@ export const bindSourceApiTokenEndpoint = (endpoint: string) => {
   sessionStorage.setItem(sourceApiEndpointKey, endpoint)
 }
 
+const isSourceApiTokenRequired = async () => {
+  try {
+    const response = await fetch(
+      new URL(
+        'getJsSourceApiTokenRequired',
+        sourceApiEndpoint || location.origin,
+      ),
+      { cache: 'no-store' },
+    )
+    if (!response.ok) return true
+    const result = (await response.json()) as {
+      isSuccess?: boolean
+      data?: boolean
+    }
+    return result.isSuccess !== true || result.data !== false
+  } catch {
+    return true
+  }
+}
+
 export const requestSourceApiToken = async (
   options: { force?: boolean; remember?: boolean } = {},
 ) => {
+  if (!(await isSourceApiTokenRequired())) return undefined
   const remember = options.remember ?? true
   const currentToken = remember ? sourceApiToken : undefined
   if (!options.force && currentToken) return currentToken
 
   const { value } = await ElMessageBox.prompt(
-    '请输入阅读 Web 服务中配置的访问令牌',
-    'Web 书源访问令牌',
+    '请输入阅读应用中配置的访问令牌',
+    'Web 与 MCP 访问令牌',
     {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
@@ -58,3 +79,6 @@ export const sourceApiTokenWebSocketProtocol = (token: string) => {
     .replace(/=+$/, '')
   return `legado.token.${encoded}`
 }
+
+export const sourceApiTokenWebSocketProtocols = (token?: string) =>
+  token ? ['legado', sourceApiTokenWebSocketProtocol(token)] : ['legado']

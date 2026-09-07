@@ -108,24 +108,31 @@ class ManualHighlightRenderTest {
     }
 
     @Test
-    fun `highlight actions move to long press only when explicitly configured`() {
+    fun `highlight actions support click long press and off modes`() {
         val content = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/ContentTextView.kt")
         val appConfig = readProjectFile("src/main/java/io/legado/app/help/config/AppConfig.kt")
         val preferences = readProjectFile("src/main/res/xml/pref_config_read.xml")
         val values = readProjectFile("src/main/res/values/array_values.xml")
         val longPress = content.substringAfter("fun longPress(").substringBefore("fun click(")
         val click = content.substringAfter("fun click(").substringBefore("fun selectText(")
+        val notify = content.substringAfter("private fun notifyHighlightClick(")
+            .substringBefore("private fun highlightAt(")
         val clickValue = values.indexOf("<item>click</item>")
         val longPressValue = values.indexOf("<item>longPress</item>")
+        val offValue = values.indexOf("<item>off</item>")
 
         assertTrue(appConfig.contains("getPrefString(PreferKey.highlightActionTrigger, \"click\")"))
-        assertTrue(appConfig.contains("== \"longPress\""))
         assertTrue(preferences.contains("android:defaultValue=\"click\""))
         assertTrue(preferences.contains("android:key=\"highlightActionTrigger\""))
         assertTrue(clickValue in 0 until longPressValue)
-        assertTrue(longPress.contains("highlightActionByLongPress && column.highlightStyle != null &&"))
-        assertTrue(longPress.contains("highlightActionByLongPress || column.linkUrl != null"))
-        assertTrue(click.contains("!highlightActionByLongPress && column.highlightStyle != null"))
+        assertTrue(longPressValue in 0 until offValue)
+        assertTrue(longPress.contains("highlightActionTrigger == \"longPress\""))
+        assertTrue(click.contains("highlightActionTrigger != \"longPress\""))
+        val offGate = notify.indexOf("if (AppConfig.highlightActionTrigger == \"off\") return false")
+        val manual = notify.indexOf("highlightAt(column, textPos, page)?.let")
+        val automatic = notify.indexOf("highlightRuleIdAt(column, textPos, page)?.let")
+        assertTrue(offGate in 0 until manual)
+        assertTrue(manual in 0 until automatic)
     }
 
     @Test
@@ -176,13 +183,14 @@ class ManualHighlightRenderTest {
     fun `automatic click match respects title gate and last rule priority`() {
         val style = HighlightStyle(fill = 1)
         val matches = listOf(
-            RuleMatch(1, 2, 1, style, applyToTitle = false),
-            RuleMatch(1, 2, 2, style, applyToTitle = true)
+            RuleMatch(1, 2, 1, style, applyToTitle = false, applyToBody = true),
+            RuleMatch(1, 2, 2, style, applyToTitle = true, applyToBody = false)
         )
 
-        assertEquals(2L, highlightRuleIdAtColumn(matches, 0, 2, isTitle = false))
+        assertEquals(1L, highlightRuleIdAtColumn(matches, 0, 2, isTitle = false))
         assertEquals(2L, highlightRuleIdAtColumn(matches, 0, 2, isTitle = true))
         assertNull(highlightRuleIdAtColumn(matches.take(1), 0, 2, isTitle = true))
+        assertNull(highlightRuleIdAtColumn(matches.drop(1), 0, 2, isTitle = false))
         assertNull(highlightRuleIdAtColumn(matches, 2, 3, isTitle = false))
     }
 
@@ -246,11 +254,13 @@ class ManualHighlightRenderTest {
     }
 
     @Test
-    fun `underline variants do not depend on clipped or path-effect drawing`() {
+    fun `underline variants use configurable baseline geometry`() {
         val draw = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/HighlightDraw.kt")
 
         assertFalse(draw.contains("DashPathEffect"))
-        assertTrue(draw.contains("height - 3.5f.dpToPx()"))
+        assertTrue(draw.contains("underline?.normalized()?.takeIf { it.width > 0f }"))
+        assertTrue(draw.contains("val width = it.width.dpToPx()"))
+        assertTrue(draw.contains("val y = baseline + it.distance.dpToPx()"))
         assertTrue(draw.contains("while (start < x1)"))
         assertTrue(draw.contains("canvas.drawCircle(center, y, radius, fillPaint)"))
     }

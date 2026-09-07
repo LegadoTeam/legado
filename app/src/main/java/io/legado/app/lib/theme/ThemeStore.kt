@@ -18,152 +18,152 @@ import androidx.core.content.edit
  */
 @Suppress("unused")
 class ThemeStore @SuppressLint("CommitPrefEdits")
-private constructor(private val mContext: Context) : ThemeStoreInterface {
+private constructor(private val mContext: Context) {
 
     private val mEditor = prefs(mContext).edit()
 
-    override fun primaryColor(@ColorInt color: Int): ThemeStore {
+    fun primaryColor(@ColorInt color: Int): ThemeStore {
         mEditor.putInt(ThemeStorePrefKeys.KEY_PRIMARY_COLOR, color)
         if (autoGeneratePrimaryDark(mContext))
             primaryColorDark(ColorUtils.darkenColor(color))
         return this
     }
 
-    override fun primaryColorRes(@ColorRes colorRes: Int): ThemeStore {
+    fun primaryColorRes(@ColorRes colorRes: Int): ThemeStore {
         return primaryColor(ContextCompat.getColor(mContext, colorRes))
     }
 
-    override fun primaryColorAttr(@AttrRes colorAttr: Int): ThemeStore {
+    fun primaryColorAttr(@AttrRes colorAttr: Int): ThemeStore {
         return primaryColor(ThemeUtils.resolveColor(mContext, colorAttr))
     }
 
-    override fun primaryColorDark(@ColorInt color: Int): ThemeStore {
+    fun primaryColorDark(@ColorInt color: Int): ThemeStore {
         mEditor.putInt(ThemeStorePrefKeys.KEY_PRIMARY_COLOR_DARK, color)
         return this
     }
 
-    override fun primaryColorDarkRes(@ColorRes colorRes: Int): ThemeStore {
+    fun primaryColorDarkRes(@ColorRes colorRes: Int): ThemeStore {
         return primaryColorDark(ContextCompat.getColor(mContext, colorRes))
     }
 
-    override fun primaryColorDarkAttr(@AttrRes colorAttr: Int): ThemeStore {
+    fun primaryColorDarkAttr(@AttrRes colorAttr: Int): ThemeStore {
         return primaryColorDark(ThemeUtils.resolveColor(mContext, colorAttr))
     }
 
-    override fun accentColor(@ColorInt color: Int): ThemeStore {
+    fun accentColor(@ColorInt color: Int): ThemeStore {
         mEditor.putInt(ThemeStorePrefKeys.KEY_ACCENT_COLOR, color)
         return this
     }
 
-    override fun accentColorRes(@ColorRes colorRes: Int): ThemeStore {
+    fun accentColorRes(@ColorRes colorRes: Int): ThemeStore {
         return accentColor(ContextCompat.getColor(mContext, colorRes))
     }
 
-    override fun accentColorAttr(@AttrRes colorAttr: Int): ThemeStore {
+    fun accentColorAttr(@AttrRes colorAttr: Int): ThemeStore {
         return accentColor(ThemeUtils.resolveColor(mContext, colorAttr))
     }
 
-    override fun statusBarColor(@ColorInt color: Int): ThemeStore {
+    fun statusBarColor(@ColorInt color: Int): ThemeStore {
         mEditor.putInt(ThemeStorePrefKeys.KEY_STATUS_BAR_COLOR, color)
         return this
     }
 
-    override fun statusBarColorRes(@ColorRes colorRes: Int): ThemeStore {
+    fun statusBarColorRes(@ColorRes colorRes: Int): ThemeStore {
         return statusBarColor(ContextCompat.getColor(mContext, colorRes))
     }
 
-    override fun statusBarColorAttr(@AttrRes colorAttr: Int): ThemeStore {
+    fun statusBarColorAttr(@AttrRes colorAttr: Int): ThemeStore {
         return statusBarColor(ThemeUtils.resolveColor(mContext, colorAttr))
     }
 
-    override fun navigationBarColor(@ColorInt color: Int): ThemeStore {
+    fun navigationBarColor(@ColorInt color: Int): ThemeStore {
         mEditor.putInt(ThemeStorePrefKeys.KEY_NAVIGATION_BAR_COLOR, color)
         return this
     }
 
-    override fun navigationBarColorRes(@ColorRes colorRes: Int): ThemeStore {
+    fun navigationBarColorRes(@ColorRes colorRes: Int): ThemeStore {
         return navigationBarColor(ContextCompat.getColor(mContext, colorRes))
     }
 
-    override fun navigationBarColorAttr(@AttrRes colorAttr: Int): ThemeStore {
+    fun navigationBarColorAttr(@AttrRes colorAttr: Int): ThemeStore {
         return navigationBarColor(ThemeUtils.resolveColor(mContext, colorAttr))
     }
 
-    override fun textColorPrimary(@ColorInt color: Int): ThemeStore {
+    fun textColorPrimary(@ColorInt color: Int): ThemeStore {
         mEditor.putInt(ThemeStorePrefKeys.KEY_TEXT_COLOR_PRIMARY, color)
         return this
     }
 
-    override fun textColorPrimaryRes(@ColorRes colorRes: Int): ThemeStore {
+    fun textColorPrimaryRes(@ColorRes colorRes: Int): ThemeStore {
         return textColorPrimary(ContextCompat.getColor(mContext, colorRes))
     }
 
-    override fun textColorPrimaryAttr(@AttrRes colorAttr: Int): ThemeStore {
+    fun textColorPrimaryAttr(@AttrRes colorAttr: Int): ThemeStore {
         return textColorPrimary(ThemeUtils.resolveColor(mContext, colorAttr))
     }
 
-    override fun textColorPrimaryInverse(@ColorInt color: Int): ThemeStore {
+    fun textColorPrimaryInverse(@ColorInt color: Int): ThemeStore {
         mEditor.putInt(ThemeStorePrefKeys.KEY_TEXT_COLOR_PRIMARY_INVERSE, color)
         return this
     }
 
-    override fun textColorPrimaryInverseRes(@ColorRes colorRes: Int): ThemeStore {
+    fun textColorPrimaryInverseRes(@ColorRes colorRes: Int): ThemeStore {
         return textColorPrimaryInverse(ContextCompat.getColor(mContext, colorRes))
     }
 
-    override fun textColorPrimaryInverseAttr(@AttrRes colorAttr: Int): ThemeStore {
+    fun textColorPrimaryInverseAttr(@AttrRes colorAttr: Int): ThemeStore {
         return textColorPrimaryInverse(ThemeUtils.resolveColor(mContext, colorAttr))
     }
 
-    override fun textColorSecondary(@ColorInt color: Int): ThemeStore {
+    fun textColorSecondary(@ColorInt color: Int): ThemeStore {
         mEditor.putInt(ThemeStorePrefKeys.KEY_TEXT_COLOR_SECONDARY, color)
         return this
     }
 
-    override fun textColorSecondaryRes(@ColorRes colorRes: Int): ThemeStore {
+    fun textColorSecondaryRes(@ColorRes colorRes: Int): ThemeStore {
         return textColorSecondary(ContextCompat.getColor(mContext, colorRes))
     }
 
-    override fun textColorSecondaryAttr(@AttrRes colorAttr: Int): ThemeStore {
+    fun textColorSecondaryAttr(@AttrRes colorAttr: Int): ThemeStore {
         return textColorSecondary(ThemeUtils.resolveColor(mContext, colorAttr))
     }
 
-    override fun textColorSecondaryInverse(@ColorInt color: Int): ThemeStore {
+    fun textColorSecondaryInverse(@ColorInt color: Int): ThemeStore {
         mEditor.putInt(ThemeStorePrefKeys.KEY_TEXT_COLOR_SECONDARY_INVERSE, color)
         return this
     }
 
-    override fun textColorSecondaryInverseRes(@ColorRes colorRes: Int): ThemeStore {
+    fun textColorSecondaryInverseRes(@ColorRes colorRes: Int): ThemeStore {
         return textColorSecondaryInverse(ContextCompat.getColor(mContext, colorRes))
     }
 
-    override fun textColorSecondaryInverseAttr(@AttrRes colorAttr: Int): ThemeStore {
+    fun textColorSecondaryInverseAttr(@AttrRes colorAttr: Int): ThemeStore {
         return textColorSecondaryInverse(ThemeUtils.resolveColor(mContext, colorAttr))
     }
 
-    override fun backgroundColor(color: Int): ThemeStore {
+    fun backgroundColor(@ColorInt color: Int): ThemeStore {
         mEditor.putInt(ThemeStorePrefKeys.KEY_BACKGROUND_COLOR, color)
         return this
     }
 
-    override fun bottomBackground(color: Int): ThemeStore {
+    fun bottomBackground(@ColorInt color: Int): ThemeStore {
         mEditor.putInt(ThemeStorePrefKeys.KEY_BOTTOM_BACKGROUND, color)
         return this
     }
 
-    override fun transparentNavBar(transparent: Boolean): ThemeStore {
+    fun transparentNavBar(transparent: Boolean): ThemeStore {
         mEditor.putBoolean(ThemeStorePrefKeys.KEY_TRANSPARENT_NAV_BAR, transparent)
         return this
     }
 
-    override fun autoGeneratePrimaryDark(autoGenerate: Boolean): ThemeStore {
+    fun autoGeneratePrimaryDark(autoGenerate: Boolean): ThemeStore {
         mEditor.putBoolean(ThemeStorePrefKeys.KEY_AUTO_GENERATE_PRIMARYDARK, autoGenerate)
         return this
     }
 
     // Commit method
 
-    override fun apply() {
+    fun apply() {
         mEditor.putLong(ThemeStorePrefKeys.VALUES_CHANGED, System.currentTimeMillis())
             .putBoolean(ThemeStorePrefKeys.IS_CONFIGURED_KEY, true)
             .apply()

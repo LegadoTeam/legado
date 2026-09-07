@@ -3,6 +3,7 @@ package io.legado.app.help.book
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -24,6 +25,30 @@ class ContentSaveFenceTest {
         )
         assertEquals("replacement", content)
         assertEquals("replacement.nb", fence.state(key).fileName)
+    }
+
+    @Test
+    fun `failed authoritative replacement still rejects an older network write`() {
+        val fence = ContentSaveFence()
+        val key = ContentSaveKey("book", 3)
+        val requestVersion = fence.state(key).version
+        var content = ""
+
+        assertThrows(IllegalStateException::class.java) {
+            fence.replace(key, "replacement.nb") {
+                content = "replacement"
+                error("metadata update failed")
+            }
+        }
+
+        assertFalse(
+            fence.writeIfCurrent(key, requestVersion, "stale.nb") {
+                content = "stale network content"
+            }
+        )
+        assertEquals("replacement", content)
+        assertEquals(requestVersion + 1L, fence.state(key).version)
+        assertEquals(null, fence.state(key).fileName)
     }
 
     @Test

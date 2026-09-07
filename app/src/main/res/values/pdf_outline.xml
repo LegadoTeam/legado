@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pdf_outline_page">第 %1$d 页</string>
+    <string name="pdf_outline_untitled">未命名目录</string>
+    <string name="pdf_outline_expand">展开目录</string>
+    <string name="pdf_outline_collapse">收起目录</string>
+</resources>

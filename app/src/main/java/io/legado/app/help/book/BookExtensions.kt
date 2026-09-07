@@ -252,7 +252,15 @@ fun Book.sync(currentBook: Book, toc: List<BookChapter>) {
 }
 
 fun Book.update() {
-    appDb.bookDao.update(this)
+    appDb.bookDao.updatePreservingCustomCoverUrl(this)
+}
+
+fun Book.savePreservingCustomCoverUrl() {
+    if (appDb.bookDao.has(bookUrl)) {
+        appDb.bookDao.updatePreservingCustomCoverUrl(this)
+    } else {
+        appDb.bookDao.insert(this)
+    }
 }
 
 fun Book.primaryStr(): String {
@@ -269,6 +277,7 @@ fun Book.updateTo(newBook: Book): Book {
     newBook.group = group
     newBook.order = order
     newBook.customCoverUrl = customCoverUrl
+    newBook.persistedCoverUrl = persistedCoverUrl
     newBook.customIntro = customIntro
     newBook.customTag = customTag
     newBook.canUpdate = canUpdate
@@ -377,7 +386,7 @@ fun Book.getExportFileName(
 fun Book.simulatedTotalChapterNum(): Int {
     return if (readSimulating()) {
         val currentDate = LocalDate.now()
-        val daysPassed = between(config.startDate, currentDate).days + 1
+        val daysPassed = between(config.startDate ?: currentDate, currentDate).days + 1
         // 计算当前应该解锁到哪一章
         val chaptersToUnlock =
             max(0, (config.startChapter ?: 0) + (daysPassed * config.dailyChapters))

@@ -6,6 +6,12 @@ import org.junit.Test
 class ReviewColumnGeometryTest {
 
     @Test
+    fun `custom icons stay centered when they overflow a text line`() {
+        assertEquals(10f, ReviewColumnGeometry.centeredTop(40f, 20f), 0f)
+        assertEquals(-10f, ReviewColumnGeometry.centeredTop(40f, 60f), 0f)
+    }
+
+    @Test
     fun `right aligned titles reserve only icon overflow`() {
         assertEquals(31f, ReviewColumnGeometry.trailingInset(60f, 30f, 1f), 0f)
         assertEquals(0f, ReviewColumnGeometry.trailingInset(20f, 30f, 1f), 0f)

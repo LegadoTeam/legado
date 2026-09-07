@@ -34,14 +34,18 @@ import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.launch
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setEdgeEffectColor
+import io.legado.app.utils.share
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.showHelp
 import io.legado.app.utils.splitNotBlank
+import io.legado.app.utils.stackTraceStr
+import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
+import java.io.File
 
 class DictRuleActivity : VMBaseActivity<ActivityDictRuleBinding, DictRuleViewModel>(),
     PopupMenu.OnMenuItemClickListener,
@@ -167,6 +171,7 @@ class DictRuleActivity : VMBaseActivity<ActivityDictRuleBinding, DictRuleViewMod
                 viewModel.disableSelection(*adapter.selection.toTypedArray())
             }
 
+            R.id.menu_share_source -> shareSelection()
             R.id.menu_export_selection -> exportResult.launch {
                 mode = HandleFileContract.EXPORT
                 fileData = HandleFileContract.FileData(
@@ -177,6 +182,20 @@ class DictRuleActivity : VMBaseActivity<ActivityDictRuleBinding, DictRuleViewMod
             }
         }
         return true
+    }
+
+    private fun shareSelection() {
+        val rules = adapter.selection.toList()
+        if (rules.isEmpty()) return
+        viewModel.execute(scope = lifecycleScope) {
+            File.createTempFile("dictRule_", ".json", cacheDir).apply {
+                writeText(GSON.toJson(rules))
+            }
+        }.onSuccess {
+            share(it)
+        }.onError {
+            toastOnUi(it.stackTraceStr)
+        }
     }
 
     override fun onClickSelectBarMainAction() {

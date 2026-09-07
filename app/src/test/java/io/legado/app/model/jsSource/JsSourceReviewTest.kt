@@ -113,6 +113,24 @@ class JsSourceReviewTest {
     }
 
     @Test
+    fun `detail preserves string ids outside the JavaScript safe integer range`() = runBlocking {
+        val source = source(
+            """
+            function getReviewSummary() { return []; }
+            function getReviewDetail() {
+                return JSON.parse('{"items":[{"id":"1051979893439332353","content":"评论"}]}');
+            }
+            """.trimIndent(),
+        )
+
+        val item = JsSourceReview.getReviewDetailAwait(
+            source, book, chapter, 1, "", 1,
+        )!!.items.single()
+
+        assertEquals("1051979893439332353", item.id)
+    }
+
+    @Test
     fun `detail parses structured content and badge arrays`() = runBlocking {
         val source = source(
             """
@@ -131,7 +149,7 @@ class JsSourceReviewTest {
                     },
                     replies: [{
                         badge: ["读者"],
-                        content: { img: "/reply.png" }
+                        content: { replyToName: "用户", img: "/reply.png" }
                     }]
                 }] };
             }
@@ -151,6 +169,7 @@ class JsSourceReviewTest {
         assertEquals(3, item.replyCount)
         val reply = item.replies.single()
         assertEquals(listOf("读者"), reply.badges)
+        assertEquals("用户", reply.replyToName)
         assertEquals("", reply.content)
         assertEquals("https://example.com/reply.png", reply.imageUrl)
     }
@@ -234,6 +253,72 @@ class JsSourceReviewTest {
         assertEquals(1, items.size)
         assertEquals("ok", items.single().id)
         assertTrue(items.single().replies.isEmpty())
+    }
+
+    @Test
+    fun `paged replies receive context and flatten nested items`() = runBlocking {
+        val source = source(
+            """
+            function getReviewSummary() { return []; }
+            function getReviewDetail() { return { items: [] }; }
+            function getReviewReplies(chapter, book, paraIndex, paraData, reviewId, page) {
+                return { items: [{
+                    id: "r1",
+                    content: paraData + ":" + reviewId + ":" + page,
+                    avatar: "/reply.png",
+                    replies: [{ id: "r2", content: book.name + ":" + paraIndex }]
+                }] };
+            }
+            """.trimIndent(),
+        )
+
+        val replies = JsSourceReview.getReviewRepliesAwait(
+            source, book, chapter, 2, "token", "comment-1", 3,
+        )!!
+
+        assertEquals(listOf("r1", "r2"), replies.map { it.id })
+        assertEquals("token:comment-1:3", replies[0].content)
+        assertEquals("https://example.com/reply.png", replies[0].avatar)
+        assertEquals("测试书:2", replies[1].content)
+        assertTrue(replies.all { it.replies.isEmpty() })
+    }
+
+    @Test
+    fun `missing paged replies capability returns no result`() = runBlocking {
+        val source = source(
+            """
+            function getReviewSummary() { return []; }
+            function getReviewDetail() { return { items: [] }; }
+            """.trimIndent(),
+        )
+
+        assertNull(
+            JsSourceReview.getReviewRepliesAwait(
+                source, book, chapter, 1, "", "comment-1", 1,
+            )
+        )
+        assertEquals(false, JsSourceReview.hasReviewRepliesCapability(source))
+    }
+
+    @Test
+    fun `paged replies reject malformed result`() {
+        val source = source(
+            """
+            function getReviewSummary() { return []; }
+            function getReviewDetail() { return { items: [] }; }
+            function getReviewReplies() { return { nextPage: 2 }; }
+            """.trimIndent(),
+        )
+
+        val error = assertThrows(NoStackTraceException::class.java) {
+            runBlocking {
+                JsSourceReview.getReviewRepliesAwait(
+                    source, book, chapter, 1, "", "comment-1", 1,
+                )
+            }
+        }
+
+        assertTrue(error.message.orEmpty().contains("items"))
     }
 
     @Test

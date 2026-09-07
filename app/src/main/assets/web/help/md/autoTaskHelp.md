@@ -30,6 +30,8 @@
 {"type":"notify","title":"任务完成","content":"{task} 已于 {time} 完成"}
 ```
 
+`notify` 还可设置 `level`（`high`、`error`、`fail`、`failed` 或 `low`）和整数 `id`；相同 `id` 会复用同一通知位置。
+
 ## 更新书籍目录
 
 `refreshToc` 按书籍地址刷新目录，可在新增章节达到指定数量时通知，并缓存新增正文：
@@ -37,6 +39,8 @@
 ```js
 {"type":"refreshToc","bookUrl":"BOOK_URL","notify":{"enable":true,"minCount":1},"cache":{"enable":true}}
 ```
+
+`respectCanUpdate` 默认为 `false`；设为 `true` 时，已关闭目录更新的书籍会跳过刷新。`notify` 对象还支持自定义 `title` 和 `content`，其中可使用 `{book}`、`{author}`、`{newCount}`、`{chapter}` 和 `{time}` 占位符。
 
 `cache.enable` 为 `true` 时，自动任务会在当前任务中顺序缓存新增的非卷章节。每章最多尝试 3 次，全部新增章尝试完成后仍有失败会将本次任务标记为失败。
 

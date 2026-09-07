@@ -5,6 +5,8 @@ import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import androidx.annotation.Keep
 import androidx.core.graphics.toColorInt
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import io.legado.app.R
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.PageAnim
@@ -36,6 +38,102 @@ import splitties.init.appCtx
 import java.io.File
 import androidx.core.graphics.drawable.toDrawable
 
+internal const val UNDERLINE_MODE_OFF = 0
+internal const val UNDERLINE_MODE_SOLID = 1
+internal const val UNDERLINE_MODE_DASHED = 2
+internal const val UNDERLINE_MODE_DOTTED = 3
+internal const val UNDERLINE_MODE_DOUBLE = 4
+internal const val UNDERLINE_MODE_WAVY = 5
+internal const val UNDERLINE_MODE_DOUBLE_DASHED = 6
+internal const val DEFAULT_UNDERLINE_WIDTH = 1f
+internal const val MIN_UNDERLINE_WIDTH = 0f
+internal const val MAX_UNDERLINE_WIDTH = 10f
+internal const val DEFAULT_UNDERLINE_DISTANCE = 4f
+internal const val MIN_UNDERLINE_DISTANCE = 0f
+internal const val MAX_UNDERLINE_DISTANCE = 30f
+private const val UNDERLINE_CONFIG_VERSION = 1
+
+internal fun underlineConfigReferencesChanged(
+    previous: List<ReadBookConfig.Config>,
+    current: List<ReadBookConfig.Config>,
+): Boolean {
+    if (previous.size != current.size) return true
+    return previous.indices.any { previous[it] !== current[it] }
+}
+
+private fun migrateLegacyUnderline(
+    config: ReadBookConfig.Config,
+    raw: JsonObject,
+): ReadBookConfig.Config {
+    if (config.underlineConfigVersion == 0 && raw.get("underline")?.isJsonPrimitive == true) {
+        val value = raw.getAsJsonPrimitive("underline")
+        if (value.isBoolean) {
+            config.underlineMode = if (value.asBoolean) UNDERLINE_MODE_SOLID else UNDERLINE_MODE_OFF
+        }
+    }
+    return config
+}
+
+internal fun parseReadConfigArray(json: String): Result<List<ReadBookConfig.Config>> = runCatching {
+    val configs = GSON.fromJsonArray<ReadBookConfig.Config>(json).getOrThrow()
+    val raw = JsonParser.parseString(json).asJsonArray
+    configs.mapIndexed { index, config ->
+        raw.get(index).takeIf { it.isJsonObject }?.asJsonObject
+            ?.let { migrateLegacyUnderline(config, it) }
+            ?: config
+    }
+}
+
+internal fun parseReadConfigObject(json: String): Result<ReadBookConfig.Config> = runCatching {
+    val config = GSON.fromJsonObject<ReadBookConfig.Config>(json).getOrThrow()
+    val raw = JsonParser.parseString(json).asJsonObject
+    migrateLegacyUnderline(config, raw)
+}
+
+/**
+ * Converts the old per-style underline field into one shared, backup-friendly value.
+ * New fields live on every Config so existing readConfig.json archives remain readable.
+ */
+internal fun normalizeUnderlineConfigs(
+    configs: List<ReadBookConfig.Config>,
+    legacyIndex: Int = 0,
+) {
+    if (configs.isEmpty()) return
+    val preferred = configs.getOrNull(legacyIndex)
+    val source = preferred?.takeIf {
+        it.underlineConfigVersion >= UNDERLINE_CONFIG_VERSION
+    } ?: configs.firstOrNull { it.underlineConfigVersion >= UNDERLINE_CONFIG_VERSION }
+        ?: preferred?.takeIf { it.underlineMode != UNDERLINE_MODE_OFF }
+        ?: configs.firstOrNull { it.underlineMode != UNDERLINE_MODE_OFF }
+        ?: configs.first()
+    val hasNewConfig = source.underlineConfigVersion >= UNDERLINE_CONFIG_VERSION
+    val mode = source.underlineMode.coerceIn(UNDERLINE_MODE_OFF, UNDERLINE_MODE_DOUBLE_DASHED)
+    val color = if (hasNewConfig) source.underlineColor else 0
+    val colorSet = hasNewConfig && source.underlineColorSet
+    val width = if (hasNewConfig) {
+        source.underlineWidth.coerceIn(MIN_UNDERLINE_WIDTH, MAX_UNDERLINE_WIDTH)
+    } else {
+        DEFAULT_UNDERLINE_WIDTH
+    }
+    val distance = if (hasNewConfig) {
+        source.underlineDistance.coerceIn(MIN_UNDERLINE_DISTANCE, MAX_UNDERLINE_DISTANCE)
+    } else {
+        DEFAULT_UNDERLINE_DISTANCE
+    }
+    val bodyEnabled = if (hasNewConfig) source.underlineBodyEnabled else true
+    val titleEnabled = if (hasNewConfig) source.underlineTitleEnabled else true
+    configs.forEach {
+        it.underlineMode = mode
+        it.underlineColor = color
+        it.underlineColorSet = colorSet
+        it.underlineWidth = width
+        it.underlineDistance = distance
+        it.underlineBodyEnabled = bodyEnabled
+        it.underlineTitleEnabled = titleEnabled
+        it.underlineConfigVersion = UNDERLINE_CONFIG_VERSION
+    }
+}
+
 /**
  * 阅读界面配置
  */
@@ -48,10 +146,69 @@ object ReadBookConfig {
     val shareConfigFilePath = FileUtils.getPath(appCtx.filesDir, shareConfigFileName)
     val configList: ArrayList<Config> = arrayListOf()
     lateinit var shareConfig: Config
+    private var underlineConfigInitialized = false
+    private var normalizedUnderlineConfigRefs: List<Config> = emptyList()
+    private var normalizedShareConfig: Config? = null
+
+    private fun underlineConfigs(): List<Config> {
+        val configs = configList.toMutableList()
+        if (::shareConfig.isInitialized && configs.none { it === shareConfig }) {
+            configs += shareConfig
+        }
+        return configs
+    }
+
+    private fun underlineConfigSourcesChanged(): Boolean {
+        if (underlineConfigReferencesChanged(normalizedUnderlineConfigRefs, configList)) {
+            return true
+        }
+        val share = if (::shareConfig.isInitialized && configList.none { it === shareConfig }) {
+            shareConfig
+        } else {
+            null
+        }
+        return share !== normalizedShareConfig
+    }
+
+    private fun normalizeUnderlineConfig() {
+        val shareNeedsInit = ::shareConfig.isInitialized &&
+            shareConfig.underlineConfigVersion < UNDERLINE_CONFIG_VERSION
+        if (underlineConfigInitialized &&
+            !configList.any { it.underlineConfigVersion < UNDERLINE_CONFIG_VERSION } &&
+            !shareNeedsInit &&
+            !underlineConfigSourcesChanged()
+        ) {
+            return
+        }
+        normalizeUnderlineConfigs(
+            underlineConfigs(),
+            appCtx.getPrefInt(PreferKey.readStyleSelect)
+        )
+        underlineConfigInitialized = true
+        normalizedUnderlineConfigRefs = configList.toList()
+        normalizedShareConfig = if (::shareConfig.isInitialized && configList.none { it === shareConfig }) {
+            shareConfig
+        } else {
+            null
+        }
+    }
+
+    private inline fun updateUnderlineConfig(update: Config.() -> Unit) {
+        normalizeUnderlineConfig()
+        underlineConfigs().forEach(update)
+    }
+
+    private fun underlineConfig(): Config? {
+        normalizeUnderlineConfig()
+        return configList.firstOrNull()
+            ?: if (::shareConfig.isInitialized) shareConfig else null
+    }
+
     var durConfig
         get() = getConfig(styleSelect)
         set(value) {
             configList[styleSelect] = value
+            underlineConfigInitialized = false
             if (shareLayout) {
                 shareConfig = value
             }
@@ -78,12 +235,16 @@ object ReadBookConfig {
     }
 
     fun initConfigs() {
+        // A restored/imported config can contain the legacy per-style underline value.
+        underlineConfigInitialized = false
+        normalizedUnderlineConfigRefs = emptyList()
+        normalizedShareConfig = null
         val configFile = File(configFilePath)
         var configs: List<Config>? = null
         if (configFile.exists()) {
             try {
                 val json = configFile.readText()
-                configs = GSON.fromJsonArray<Config>(json).getOrThrow()
+                configs = parseReadConfigArray(json).getOrThrow()
             } catch (e: Exception) {
                 AppLog.put("读取排版配置文件出错", e)
             }
@@ -95,17 +256,21 @@ object ReadBookConfig {
     }
 
     fun initShareConfig() {
+        underlineConfigInitialized = false
+        normalizedUnderlineConfigRefs = emptyList()
+        normalizedShareConfig = null
         val configFile = File(shareConfigFilePath)
         var c: Config? = null
         if (configFile.exists()) {
             try {
                 val json = configFile.readText()
-                c = GSON.fromJsonObject<Config>(json).getOrThrow()
+                c = parseReadConfigObject(json).getOrThrow()
             } catch (e: Exception) {
                 e.printOnDebug()
             }
         }
         shareConfig = c ?: configList.getOrNull(5) ?: Config()
+        normalizeUnderlineConfig()
     }
 
     fun upBg(width: Int, height: Int) {
@@ -132,6 +297,7 @@ object ReadBookConfig {
 
     @Synchronized
     internal fun saveNow() {
+        normalizeUnderlineConfig()
         GSON.toJson(configList).let {
             FileUtils.delete(configFilePath)
             FileUtils.createFileIfNotExist(configFilePath).writeText(it)
@@ -285,6 +451,15 @@ object ReadBookConfig {
             config.textFont = value
         }
 
+    var titleFont: String
+        get() = config.titleFont
+        set(value) {
+            config.titleFont = value
+        }
+
+    val resolvedTitleFont: String
+        get() = config.titleFont.ifEmpty { config.textFont }
+
     var textBold: Int
         get() = config.textBold
         set(value) {
@@ -307,6 +482,12 @@ object ReadBookConfig {
         get() = config.lineSpacingExtra
         set(value) {
             config.lineSpacingExtra = value
+        }
+
+    var titleLineSpacingExtra: Int
+        get() = config.titleLineSpacingExtra
+        set(value) {
+            config.titleLineSpacingExtra = value
         }
 
     var paragraphSpacing: Int
@@ -391,9 +572,49 @@ object ReadBookConfig {
         }
 
     var underlineMode: Int
-        get() = config.underlineMode
+        get() = underlineConfig()?.underlineMode ?: 0
         set(value) {
-            config.underlineMode = value
+            updateUnderlineConfig { underlineMode = value.coerceIn(UNDERLINE_MODE_OFF, UNDERLINE_MODE_DOUBLE_DASHED) }
+        }
+
+    var underlineColor: Int
+        get() = underlineConfig()?.underlineColor ?: 0
+        set(value) {
+            updateUnderlineConfig {
+                underlineColor = value
+                underlineColorSet = true
+            }
+        }
+
+    val underlineColorSet: Boolean
+        get() = underlineConfig()?.underlineColorSet == true
+
+    var underlineWidth: Float
+        get() = underlineConfig()?.underlineWidth ?: DEFAULT_UNDERLINE_WIDTH
+        set(value) {
+            updateUnderlineConfig {
+                underlineWidth = value.coerceIn(MIN_UNDERLINE_WIDTH, MAX_UNDERLINE_WIDTH)
+            }
+        }
+
+    var underlineDistance: Float
+        get() = underlineConfig()?.underlineDistance ?: DEFAULT_UNDERLINE_DISTANCE
+        set(value) {
+            updateUnderlineConfig {
+                underlineDistance = value.coerceIn(MIN_UNDERLINE_DISTANCE, MAX_UNDERLINE_DISTANCE)
+            }
+        }
+
+    var underlineBodyEnabled: Boolean
+        get() = underlineConfig()?.underlineBodyEnabled ?: true
+        set(value) {
+            updateUnderlineConfig { underlineBodyEnabled = value }
+        }
+
+    var underlineTitleEnabled: Boolean
+        get() = underlineConfig()?.underlineTitleEnabled ?: true
+        set(value) {
+            updateUnderlineConfig { underlineTitleEnabled = value }
         }
 
     var reviewIconColor: Int
@@ -499,13 +720,16 @@ object ReadBookConfig {
         }
 
     fun getExportConfig(): Config {
+        normalizeUnderlineConfig()
         val exportConfig = durConfig.copy()
         if (shareLayout) {
             exportConfig.textFont = shareConfig.textFont
+            exportConfig.titleFont = shareConfig.titleFont
             exportConfig.textBold = shareConfig.textBold
             exportConfig.textSize = shareConfig.textSize
             exportConfig.letterSpacing = shareConfig.letterSpacing
             exportConfig.lineSpacingExtra = shareConfig.lineSpacingExtra
+            exportConfig.titleLineSpacingExtra = shareConfig.titleLineSpacingExtra
             exportConfig.paragraphSpacing = shareConfig.paragraphSpacing
             exportConfig.titleMode = shareConfig.titleMode
             exportConfig.titleSize = shareConfig.titleSize
@@ -516,6 +740,14 @@ object ReadBookConfig {
             exportConfig.titleNumberSpacing = shareConfig.titleNumberSpacing
             exportConfig.titleTopSpacing = shareConfig.titleTopSpacing
             exportConfig.titleBottomSpacing = shareConfig.titleBottomSpacing
+            exportConfig.underlineMode = shareConfig.underlineMode
+            exportConfig.underlineColor = shareConfig.underlineColor
+            exportConfig.underlineColorSet = shareConfig.underlineColorSet
+            exportConfig.underlineWidth = shareConfig.underlineWidth
+            exportConfig.underlineDistance = shareConfig.underlineDistance
+            exportConfig.underlineBodyEnabled = shareConfig.underlineBodyEnabled
+            exportConfig.underlineTitleEnabled = shareConfig.underlineTitleEnabled
+            exportConfig.underlineConfigVersion = shareConfig.underlineConfigVersion
             exportConfig.paddingBottom = shareConfig.paddingBottom
             exportConfig.paddingLeft = shareConfig.paddingLeft
             exportConfig.paddingRight = shareConfig.paddingRight
@@ -542,6 +774,7 @@ object ReadBookConfig {
             exportConfig.tipFooterLeftTemplate = shareConfig.tipFooterLeftTemplate
             exportConfig.tipFooterMiddleTemplate = shareConfig.tipFooterMiddleTemplate
             exportConfig.tipFooterRightTemplate = shareConfig.tipFooterRightTemplate
+            exportConfig.tipTextSize = shareConfig.tipTextSize
             exportConfig.tipColor = shareConfig.tipColor
             exportConfig.headerMode = shareConfig.headerMode
             exportConfig.footerMode = shareConfig.footerMode
@@ -561,21 +794,23 @@ object ReadBookConfig {
         configDir.createFolderReplace()
         ZipUtils.unZipToPath(zipFile, configDir)
         val configFile = configDir.getFile(configFileName)
-        val config: Config = GSON.fromJsonObject<Config>(configFile.readText()).getOrThrow()
-        if (config.textFont.isNotEmpty()) {
-            val fontName = config.textFont
+        val config: Config = parseReadConfigObject(configFile.readText()).getOrThrow()
+        fun importFont(fontName: String): String {
+            if (fontName.isEmpty()) return ""
             val fontPath =
                 FileUtils.getPath(appCtx.externalFiles, "font", fontName)
             val fontFile = configDir.getFile(fontName)
-            if (fontFile.exists()) {
+            return if (fontFile.exists()) {
                 if (!FileUtils.exist(fontPath)) {
                     fontFile.copyTo(File(fontPath))
                 }
-                config.textFont = fontPath
+                fontPath
             } else {
-                config.textFont = ""
+                ""
             }
         }
+        config.textFont = importFont(config.textFont)
+        config.titleFont = importFont(config.titleFont)
         if (config.bgType == 2) {
             val bgName = FileUtils.getName(config.bgStr)
             config.bgStr = bgName
@@ -624,6 +859,12 @@ object ReadBookConfig {
     }
 
     @Keep
+    data class ReviewIconSvgTemplate(
+        val name: String = "",
+        val svg: String = "",
+    )
+
+    @Keep
     data class Config(
         var name: String = "",
         var bgStr: String = "#EEEEEE",//白天背景
@@ -645,10 +886,12 @@ object ReadBookConfig {
         private var pageAnim: Int = 0,//翻页动画
         private var pageAnimEInk: Int = 4,
         var textFont: String = "",//字体
+        var titleFont: String = "",//标题字体, 空值跟随正文字体
         var textBold: Int = 0,//是否粗体字 0:正常, 1:粗体, 2:细体
         var textSize: Int = 20,//文字大小
         var letterSpacing: Float = 0.1f,//字间距
         var lineSpacingExtra: Int = 12,//行间距
+        var titleLineSpacingExtra: Int = 0,//章节名行距相对字体行高的偏移，单位0.1
         var paragraphSpacing: Int = 2,//段距
         var titleMode: Int = 0,//标题位置 0:居左 1:居中 2:隐藏 3:居右
         var titleSize: Int = 0,
@@ -660,9 +903,17 @@ object ReadBookConfig {
         var titleTopSpacing: Int = 0,
         var titleBottomSpacing: Int = 0,
         var paragraphIndent: String = "　　",//段落缩进
-        var underlineMode: Int = 0, //下划线
+        var underlineMode: Int = 0, //下划线（旧字段，保留兼容）
+        var underlineColor: Int = 0,
+        var underlineColorSet: Boolean = false,
+        var underlineWidth: Float = DEFAULT_UNDERLINE_WIDTH,
+        var underlineDistance: Float = DEFAULT_UNDERLINE_DISTANCE,
+        var underlineBodyEnabled: Boolean = true,
+        var underlineTitleEnabled: Boolean = true,
+        var underlineConfigVersion: Int = 0,
         var reviewIconColor: Int = 0, //段评内置图标颜色(0=跟随主题)
         var reviewIconSvg: String = "",
+        var reviewIconSvgTemplates: List<ReviewIconSvgTemplate> = emptyList(),
         var reviewIconScale: Int = 100,
         var paddingBottom: Int = 6,
         var paddingLeft: Int = 16,
@@ -690,6 +941,7 @@ object ReadBookConfig {
         var tipFooterLeftTemplate: String? = null,
         var tipFooterMiddleTemplate: String? = null,
         var tipFooterRightTemplate: String? = null,
+        var tipTextSize: Int = 12,
         var tipColor: Int = 0,
         var tipDividerColor: Int = -1,
         var headerMode: Int = 0,
@@ -921,6 +1173,24 @@ object ReadBookConfig {
             return path
         }
 
+        fun putReviewIconSvgTemplate(name: String, svg: String) {
+            val normalizedName = name.trim()
+            val normalizedSvg = svg.trim()
+            if (normalizedName.isEmpty() || normalizedSvg.isEmpty()) return
+            val templates = reviewIconSvgTemplates.associateByTo(
+                linkedMapOf<String, ReviewIconSvgTemplate>()
+            ) { it.svg.trim() }
+            templates[normalizedSvg] = ReviewIconSvgTemplate(normalizedName, normalizedSvg)
+            reviewIconSvgTemplates = templates.values.toList()
+        }
+
+        fun removeReviewIconSvgTemplate(svg: String) {
+            val normalizedSvg = svg.trim()
+            reviewIconSvgTemplates = reviewIconSvgTemplates.filterNot {
+                it.svg.trim() == normalizedSvg
+            }
+        }
+
         fun toMap() = mapOf(
             "name" to name,
             "bgStr" to bgStr,
@@ -948,10 +1218,12 @@ object ReadBookConfig {
             "pageAnim" to pageAnim,
             "pageAnimEInk" to pageAnimEInk,
             "textFont" to textFont,
+            "titleFont" to titleFont,
             "textBold" to textBold,
             "textSize" to textSize,
             "letterSpacing" to letterSpacing,
             "lineSpacingExtra" to lineSpacingExtra,
+            "titleLineSpacingExtra" to titleLineSpacingExtra,
             "paragraphSpacing" to paragraphSpacing,
             "titleMode" to titleMode,
             "titleSize" to titleSize,
@@ -964,8 +1236,16 @@ object ReadBookConfig {
             "titleBottomSpacing" to titleBottomSpacing,
             "paragraphIndent" to paragraphIndent,
             "underlineMode" to underlineMode,
+            "underlineColor" to underlineColor,
+            "underlineColorSet" to underlineColorSet,
+            "underlineWidth" to underlineWidth,
+            "underlineDistance" to underlineDistance,
+            "underlineBodyEnabled" to underlineBodyEnabled,
+            "underlineTitleEnabled" to underlineTitleEnabled,
+            "underlineConfigVersion" to underlineConfigVersion,
             "reviewIconColor" to reviewIconColor,
             "reviewIconSvg" to reviewIconSvg,
+            "reviewIconSvgTemplates" to reviewIconSvgTemplates,
             "reviewIconScale" to reviewIconScale,
             "paddingBottom" to paddingBottom,
             "paddingLeft" to paddingLeft,
@@ -987,6 +1267,7 @@ object ReadBookConfig {
             "tipFooterLeft" to tipFooterLeft,
             "tipFooterMiddle" to tipFooterMiddle,
             "tipFooterRight" to tipFooterRight,
+            "tipTextSize" to tipTextSize,
             "tipColor" to tipColor,
             "tipDividerColor" to tipDividerColor,
             "headerMode" to headerMode,

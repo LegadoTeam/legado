@@ -67,6 +67,8 @@ validate_candidate() {
   done
 
   for rules in \
+    cronet_shared_proguard.cfg \
+    cronet_impl_common_proguard.cfg \
     cronet_impl_native_proguard.cfg \
     cronet_impl_platform_proguard.cfg \
     httpengine_native_provider_proguard.cfg; do
@@ -120,15 +122,14 @@ sync_proguard_rules() {
   local temporary
   temporary="$(mktemp)"
 
-  if ! curl --ipv4 --fail --silent --show-error --location \
-    --retry 3 --retry-all-errors --connect-timeout 15 --max-time 90 \
-    "$source_base/cronet_impl_native_proguard.cfg" > "$temporary"; then
-    rm -f "$temporary"
-    return 1
-  fi
-
-  for rules in cronet_impl_platform_proguard.cfg httpengine_native_provider_proguard.cfg; do
-    printf '\n# -------- Config Path: components/cronet/android/%s --------\n' "$rules" >> "$temporary"
+  : > "$temporary"
+  for rules in \
+    cronet_shared_proguard.cfg \
+    cronet_impl_common_proguard.cfg \
+    cronet_impl_native_proguard.cfg \
+    cronet_impl_platform_proguard.cfg \
+    httpengine_native_provider_proguard.cfg; do
+    printf '\n' >> "$temporary"
     if ! curl --ipv4 --fail --silent --show-error --location \
       --retry 3 --retry-all-errors --connect-timeout 15 --max-time 90 \
       "$source_base/$rules" >> "$temporary"; then

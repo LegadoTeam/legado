@@ -1,9 +1,12 @@
 package io.legado.app.ui.book.read.config
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.w3c.dom.Element
 import java.io.File
+import javax.xml.parsers.DocumentBuilderFactory
 
 class TipConfigDialogTemplateWiringTest {
 
@@ -45,6 +48,34 @@ class TipConfigDialogTemplateWiringTest {
         }
         assertFalse(source.contains("tipTemplatePreview"))
         assertFalse(source.contains("TIP_TEMPLATE_PREVIEW_LIMIT"))
+    }
+
+    @Test
+    fun `template summaries keep labels visible when values are long`() {
+        val document = DocumentBuilderFactory.newInstance()
+            .newDocumentBuilder()
+            .parse(readProjectFile("src/main/res/layout/dialog_tip_config.xml").byteInputStream())
+        val textViews = document.getElementsByTagName("TextView")
+        val elements = (0 until textViews.length)
+            .map { textViews.item(it) as Element }
+            .associateBy { it.getAttribute("android:id") }
+        val summaryIds = listOf(
+            "tv_header_left",
+            "tv_header_middle",
+            "tv_header_right",
+            "tv_footer_left",
+            "tv_footer_middle",
+            "tv_footer_right",
+        )
+
+        summaryIds.forEach { id ->
+            val element = elements.getValue("@+id/$id")
+            assertEquals("0dp", element.getAttribute("android:layout_width"))
+            assertEquals("1", element.getAttribute("android:layout_weight"))
+            assertEquals("end", element.getAttribute("android:ellipsize"))
+            assertEquals("end", element.getAttribute("android:gravity"))
+            assertEquals("1", element.getAttribute("android:maxLines"))
+        }
     }
 
     @Test

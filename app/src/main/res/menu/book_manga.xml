@@ -43,6 +43,13 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_manga_long_click_save_image"
+        android:checkable="true"
+        android:checked="true"
+        android:title="@string/manga_long_click_save_image"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_disable_click_scroll"
         android:checkable="true"
         android:checked="false"

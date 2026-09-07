@@ -9,6 +9,7 @@ class PooledWebView(
     val id: String // 唯一标识
 ) {
     var isInUse: Boolean = false // 是否正在被使用
+    var recycleGeneration: Long = 0
     var lastUseTime: Long = 0 // 最后一次被使用的时间戳
 
     fun upContext(context: Context): PooledWebView {

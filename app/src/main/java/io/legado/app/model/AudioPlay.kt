@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.SystemClock
 import io.legado.app.R
+import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.IntentAction
@@ -14,6 +15,8 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.ReadRecord
+import io.legado.app.data.entities.updateSnapshot
+import io.legado.app.data.entities.saveWithCover
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.getBookSource
 import io.legado.app.help.book.readSimulating
@@ -122,6 +125,12 @@ internal class AudioReadTimeTracker {
     fun updateAuthor(author: String) {
         record.author = author
         activeRecord?.author = author
+    }
+
+    @Synchronized
+    fun updateSnapshot(book: Book, chapterIndex: Int, chapterPos: Int) {
+        record.updateSnapshot(book, chapterIndex, chapterPos)
+        activeRecord?.updateSnapshot(book, chapterIndex, chapterPos)
     }
 
     @Synchronized
@@ -291,13 +300,14 @@ object AudioPlay : CoroutineScope by MainScope() {
         kotlin.runCatching { readTimeWrite?.get() }.onFailure {
             AppLog.put("保存听书时长失败\n${it.localizedMessage}", it)
         }
-        readTimeTracker.setRecord(
-            ReadRecord(
-                bookName = book.name,
-                author = book.author,
-                readTime = appDb.readRecordDao.getReadTime(book.name) ?: 0,
-            )
+        val record = ReadRecord(
+            deviceId = AppConst.androidId,
+            bookName = book.name,
+            author = book.author,
         )
+        record.readTime = appDb.readRecordDao
+            .getReadTime(record.deviceId, record.bookName) ?: 0
+        readTimeTracker.setRecord(record)
         if (resumeIfPlaying && AudioPlayService.isPlaying) {
             markReadTimeStart()
         }
@@ -315,17 +325,20 @@ object AudioPlay : CoroutineScope by MainScope() {
     fun markReadTimeStart() {
         if (AppConfig.enableReadRecord) {
             readTimeTracker.updateAuthor(book?.author.orEmpty())
+            book?.let { readTimeTracker.updateSnapshot(it, durChapterIndex, durChapterPos) }
             readTimeTracker.start(SystemClock.elapsedRealtime())
         }
     }
 
     @Synchronized
     fun upReadTime() {
+        book?.let { readTimeTracker.updateSnapshot(it, durChapterIndex, durChapterPos) }
         val record = readTimeTracker.stop(
             now = SystemClock.elapsedRealtime(),
             lastRead = System.currentTimeMillis(),
         ) ?: return
-        readTimeWrite = executor.submit { appDb.readRecordDao.insert(record) }
+        val snapshotBook = book?.copy()
+        readTimeWrite = executor.submit { record.saveWithCover(snapshotBook) }
     }
 
     private fun addLoading(index: Int): Boolean {

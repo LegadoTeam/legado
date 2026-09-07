@@ -16,6 +16,7 @@ import com.script.rhino.ReadOnlyJavaObject
 import com.script.rhino.RhinoScriptEngine
 import com.script.rhino.RhinoWrapFactory
 import io.legado.app.base.AppContextWrapper
+import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppConst.channelIdDownload
 import io.legado.app.constant.AppConst.channelIdReadAloud
 import io.legado.app.constant.AppConst.channelIdWeb
@@ -86,9 +87,10 @@ class App : Application() {
             LogUtils.init(this@App)
             LogUtils.d("App", "onCreate")
             LogUtils.logDeviceInfo()
-            //预下载Cronet so
+            //预初始化 APK 内的 Cronet 原生库
             if (AppConfig.isCronet) {
-                Cronet.preDownload()
+                runCatching { Cronet.warmUp() }
+                    .onFailure { AppLog.put("预初始化Cronet失败", it) }
             }
             createNotificationChannels()
             LiveEventBus.config()

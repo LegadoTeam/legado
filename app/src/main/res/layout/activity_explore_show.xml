@@ -14,12 +14,20 @@
         app:layout_constraintTop_toTopOf="parent"
         app:title="@string/discovery" />
 
+    <LinearLayout
+        android:id="@+id/categories_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/title_bar" />
+
     <io.legado.app.ui.widget.dynamiclayout.DynamicFrameLayout
         android:id="@+id/content_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/title_bar">
+        app:layout_constraintTop_toBottomOf="@id/categories_container">
 
 
         <androidx.recyclerview.widget.RecyclerView

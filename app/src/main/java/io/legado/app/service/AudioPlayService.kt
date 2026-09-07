@@ -222,6 +222,8 @@ class AudioPlayService : BaseService(),
                 }
 
                 IntentAction.stopPlay -> {
+                    isPlaying = false
+                    AudioPlay.upReadTime()
                     exoPlayer.stop()
                     upPlayProgressJob?.cancel()
                     AudioPlay.status = Status.STOP

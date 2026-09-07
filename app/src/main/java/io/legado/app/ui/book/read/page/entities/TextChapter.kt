@@ -34,6 +34,7 @@ data class TextChapter(
     //起效的替换规则
     val effectiveReplaceRules: List<ReplaceRule>?,
     val hasBodyContent: Boolean = true,
+    val isTransient: Boolean = false,
 ) : LayoutProgressListener {
 
     // Layout appends from IO while reading, navigation and progress query from the main thread.
@@ -308,7 +309,12 @@ data class TextChapter(
         }
     }
 
-    fun createLayout(scope: CoroutineScope, book: Book, bookContent: BookContent) {
+    fun createLayout(
+        scope: CoroutineScope,
+        book: Book,
+        bookContent: BookContent,
+        saveChapterData: Boolean = true,
+    ) {
         if (layout != null) {
             throw IllegalStateException("已经排版过了")
         }
@@ -318,6 +324,7 @@ data class TextChapter(
             textPages,
             book,
             bookContent,
+            saveChapterData,
         )
     }
 

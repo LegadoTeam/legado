@@ -125,13 +125,15 @@ class ReadRssTitleTest {
     }
 
     @Test
-    fun `description only source preserves the article when refreshing`() {
-        assertTrue(shouldPreserveRssArticleOnRefresh(null))
-        assertTrue(shouldPreserveRssArticleOnRefresh("  "))
+    fun `description source preserves the article when refreshing`() {
+        assertTrue(shouldPreserveRssArticleOnRefresh("description rule", "article rule"))
+        assertTrue(shouldPreserveRssArticleOnRefresh("description rule", null))
+        assertTrue(shouldPreserveRssArticleOnRefresh(null, null))
     }
 
     @Test
     fun `content source refreshes through its content rule`() {
-        assertFalse(shouldPreserveRssArticleOnRefresh("article rule"))
+        assertFalse(shouldPreserveRssArticleOnRefresh(null, "article rule"))
+        assertFalse(shouldPreserveRssArticleOnRefresh("  ", "article rule"))
     }
 }

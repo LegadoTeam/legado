@@ -19,6 +19,7 @@ class CanvasRecorderApi23Impl : BaseCanvasRecorder() {
     }
 
     override fun beginRecording(width: Int, height: Int): Canvas {
+        markRecordingStarted()
         initPicture()
         return picture!!.beginRecording(width, height)
     }

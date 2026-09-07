@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/menu_reader_select_all"
+        android:title="@string/reader_menu_select_all"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_reader_select_none"
+        android:title="@string/reader_menu_select_none"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_reader_reset"
+        android:title="@string/restore_default"
+        app:showAsAction="never" />
+
+</menu>

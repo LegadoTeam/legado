@@ -3,6 +3,7 @@
     <string name="app_name">閲讀</string>
     <string name="app_name_a">閲讀·A</string>
     <string name="receiving_shared_label">閲讀·搜尋</string>
+    <string name="receiving_shared_import_label">閲讀·導入</string>
     <string name="tip_perm_request_storage">閲讀需要訪問存儲卡權限，請前往「設定」—「應用程式權限」—開啟所需要的權限</string>
 
     <!--Other-->
@@ -14,7 +15,7 @@
     <string name="backup_path">備份路徑</string>
     <string name="menu_import_old_version">導入舊版數據</string>
     <string name="menu_import_github">導入 Github 數據</string>
-    <string name="menu_replace_rule">淨化替換</string>
+    <string name="menu_replace_rule">替換管理</string>
     <string name="menu_send">Send</string>
 
     <string name="dialog_title">提示</string>
@@ -85,8 +86,8 @@
     <string name="web_service">Web 服務</string>
     <string name="web_service_desc">瀏覽器寫源,看書</string>
     <string name="mcp_service">MCP 服務</string>
-    <string name="mcp_service_desc">受權杖保護的書源開發工具</string>
-    <string name="mcp_service_token_required">請先設定 Web 書源存取權杖</string>
+    <string name="mcp_service_desc">書源開發工具</string>
+    <string name="mcp_service_token_required">請先設定 Web 與 MCP 存取權杖</string>
     <string name="mcp_service_token_invalid">MCP 存取權杖未設定或不正確</string>
     <string name="mcp_service_start_failed">MCP 服務啟動失敗</string>
     <string name="web_edit_source">web 編輯書源</string>
@@ -177,6 +178,15 @@
     <string name="aloud_stop">朗讀停止</string>
     <string name="clear_cache">清理緩存</string>
     <string name="clear_cache_success">成功清理緩存</string>
+    <string name="persist_network_covers">保存網絡封面到本地</string>
+    <string name="restore_network_covers">恢復網絡封面</string>
+    <string name="restore_network_covers_confirm">清除所選書籍保存在本地的封面並重新顯示網絡封面？</string>
+    <string name="restore_source_covers">恢復書源封面</string>
+    <string name="restore_source_covers_confirm">清除所選書籍保存在本地的封面和自訂封面並重新顯示書源封面？</string>
+    <string name="persist_cover_progress">正在保存封面 %1$d/%2$d</string>
+    <string name="persist_cover_result">已保存 %1$d，本地跳過 %2$d，失敗 %3$d</string>
+    <string name="restore_network_cover_result">已恢復 %1$d 本書的網絡封面</string>
+    <string name="restore_source_cover_result">已恢復 %1$d 本書的書源封面</string>
     <string name="action_save">保存</string>
     <string name="edit_source">編輯源</string>
     <string name="edit_book_source">編輯書源</string>
@@ -199,7 +209,7 @@
     <string name="import_book_source">導入書源</string>
     <string name="import_local">本地導入</string>
     <string name="import_on_line">網絡導入</string>
-    <string name="replace_rule_title">替換淨化</string>
+    <string name="replace_rule_title">替換管理</string>
     <string name="replace_rule_edit">替換規則編輯</string>
     <string name="replace_rule">替換規則</string>
     <string name="replace_to">替換為</string>
@@ -321,6 +331,8 @@
     <string name="fonts_folder">請將字體文件放到 SD 根目錄 Fonts 文件夾下重新選擇</string>
     <string name="default_font">默認字體</string>
     <string name="select_font">選擇字體</string>
+    <string name="font_item_external">%1$s · 外部目錄</string>
+    <string name="font_item_private">%1$s · 應用目錄</string>
     <string name="text_size">字號</string>
     <string name="line_size">行距</string>
     <string name="paragraph_size">段距</string>
@@ -560,8 +572,10 @@
     <string name="web_port_summary">當前端口 %s</string>
     <string name="mcp_port_title">MCP 端口</string>
     <string name="mcp_port_summary">當前端口 %s</string>
-    <string name="js_source_api_token_title">Web 書源存取權杖</string>
-    <string name="js_source_api_token_summary">MCP、純 JS、書源寫入、搜尋和偵錯介面均需要</string>
+    <string name="js_source_api_token_required_title">存取權杖保護</string>
+    <string name="js_source_api_token_required_summary">開啟時 Web 書源與 MCP 介面必須提供權杖；僅在可信網絡中關閉</string>
+    <string name="js_source_api_token_title">Web 與 MCP 存取權杖</string>
+    <string name="js_source_api_token_summary">開啟存取權杖保護時使用</string>
     <string name="js_source_api_token_configured">已設定</string>
     <string name="qr_share">二維碼分享</string>
     <string name="str_share">字符串分享</string>
@@ -669,6 +683,10 @@
     <string name="aloud_config">朗讀設置</string>
     <string name="main_activity">主界面</string>
     <string name="selectText">長按選擇文本</string>
+    <string name="long_press_select_paragraph">長按選擇整段</string>
+    <string name="long_press_select_paragraph_summary">長按時選擇目前頁面內可見的段落片段</string>
+    <string name="two_finger_replace_preview">雙指長按預覽替換淨化</string>
+    <string name="two_finger_replace_preview_summary">雙指按住時暫時切換目前章節的替換效果，鬆開後恢復</string>
     <string name="header">頁眉</string>
     <string name="main_body">正文</string>
     <string name="footer">頁腳</string>
@@ -679,6 +697,9 @@
     <string name="import_default_rule">導入默認規則</string>
     <string name="name">名稱</string>
     <string name="regex">正則</string>
+    <string name="content_search_match_case">區分大小寫</string>
+    <string name="content_search_invalid_regex">正則表達式無效</string>
+    <string name="content_edit_position">正文位置</string>
     <string name="more_menu">更多菜單</string>
     <string name="reduce">減</string>
     <string name="plus">加</string>
@@ -779,6 +800,18 @@
     <string name="default_cover">默認封面</string>
     <string name="restore_ignore">恢復忽略列表</string>
     <string name="restore_ignore_summary">恢復時忽略一些內容不恢復,方便不同手機配置不同</string>
+    <string name="backup_content">備份內容</string>
+    <string name="backup_content_summary">選擇本機與 WebDAV 備份中包含的資料和媒體</string>
+    <string name="backup_content_bookshelf">書架與分組</string>
+    <string name="backup_content_annotations">書籤與標註</string>
+    <string name="backup_content_sources">書源與訂閱</string>
+    <string name="backup_content_rules">規則與工具</string>
+    <string name="backup_content_history">閱讀記錄與搜尋歷史</string>
+    <string name="backup_content_settings">閱讀、主題與應用設置</string>
+    <string name="backup_content_persisted_covers">書籍固化封面</string>
+    <string name="backup_content_other_covers">其他封面文件</string>
+    <string name="backup_content_backgrounds">閱讀背景</string>
+    <string name="backup_content_source_variables">來源變數</string>
     <string name="read_config">閱讀界面設置</string>
     <string name="rule_image_style">圖片樣式 (imageStyle)</string>
     <string name="rule_replace_regex">替換規則 (replaceRegex)</string>
@@ -816,6 +849,8 @@
     <string name="save_night_theme_summary">儲存夜間主題配置以供使用同埋分享</string>
     <string name="theme_list">主題列表</string>
     <string name="theme_list_summary">使用儲存主題,匯入,分享主題</string>
+    <string name="disable_predictive_back">禁用預測性返回動畫</string>
+    <string name="disable_predictive_back_summary">開啟後全域禁用預測性返回動畫</string>
     <string name="wallpaper_color_follow">跟隨牆紙配色</string>
     <string name="wallpaper_color_follow_summary">使用系統牆紙色盤產生日間和夜間主題（Android 12+）</string>
     <string name="wallpaper_color_auto_update">牆紙變更時自動更新</string>
@@ -892,9 +927,14 @@
     <string name="complete">完成</string>
     <string name="show_unread">顯示未讀標誌</string>
     <string name="show_read_progress">顯示閱讀進度</string>
+    <string name="read_progress">閱讀進度</string>
+    <string name="read_progress_hidden">隱藏</string>
+    <string name="read_progress_standard">標準（2dp）</string>
+    <string name="read_progress_enhanced">增強（4dp）</string>
     <string name="use_default_cover">總是使用默認封面</string>
     <string name="use_default_cover_s">總是使用默認封面,唔顯示網路封面</string>
     <string name="title_font_size">字號</string>
+    <string name="title_line_spacing">標題行距</string>
     <string name="title_margin_top">上邊距</string>
     <string name="title_margin_bottom">下邊距</string>
     <string name="show">顯示</string>
@@ -903,6 +943,7 @@
     <string name="diy_source_group">自訂源分組</string>
     <string name="diy_edit_source_group">輸入自訂源分組名稱</string>
     <string name="reverse_toc">反轉目錄</string>
+    <string name="expand_toc">目錄展開</string>
     <string name="show_discovery">顯示發現</string>
     <string name="style">樣式</string>
     <string name="group_style">分組樣式</string>
@@ -1064,6 +1105,9 @@
     <string name="reading_time_tag">阅读时长:</string>
     <string name="last_read_time_tag">最后阅读时间:</string>
     <string name="page_touch_slop_title">滑动翻页阈值</string>
+    <string name="pull_bookmark_distance_title">下拉書籤閾值</string>
+    <string name="pull_bookmark_distance_dialog_title">下拉書籤閾值（0 = 預設值）</string>
+    <string name="pull_bookmark_distance_summary">下拉多遠距離才會切換書籤（預設值 %s px）</string>
     <string name="page_touch_slop_dialog_title">滑动翻页阈值（0 = 系统默认值）</string>
     <string name="page_touch_slop_summary">滑动多长距离才会触发滑动翻页（系统默认值 %s px）</string>
     <string name="example">示例</string>
@@ -1084,6 +1128,7 @@
     <string name="tag_explore_enabled">标志:发现已启用</string>
     <string name="tag_explore_disabled">标志:发现已禁用</string>
     <string name="show_read_title_addition">展示顶部工具栏附加区域</string>
+    <string name="show_read_title_chapter_name_only">附加区域仅显示章节名</string>
     <string name="read_bar_style_follow_page">工具栏样式跟随页面</string>
     <string name="rule_image_decode">图片解密（imageDecode）</string>
     <string name="like_source">赞</string>
@@ -1157,6 +1202,7 @@
     <string name="select_update_source">选中更新源</string>
     <string name="set_local_password">设置本地密码</string>
     <string name="set_local_password_summary">本地密码用来对备份的敏感信息加密和解密,如需在不同设备之间同步,本地密码需一致.</string>
+    <string name="source_variables_backup_password_required">備份或恢復來源變數前，請先設定非空的本地密碼。</string>
     <string name="only_latest_backup_t">仅保留最新备份</string>
     <string name="only_latest_backup_s">本地备份仅保留最新备份文件</string>
     <string name="webdav_application_authorization_error">webDav应用验证失败</string>
@@ -1276,4 +1322,15 @@
     <string name="drag_to_reorder">拖曳排序</string>
     <string name="move_to_more">移至更多</string>
     <string name="move_to_floating_bar">移至浮動列</string>
+    <string name="reader_menu_config">自訂閱讀菜單</string>
+    <string name="reader_menu_config_summary">選擇和調整閱讀頁右上角菜單中的操作</string>
+    <string name="reader_menu_more">更多</string>
+    <string name="reader_menu_all_features">全部功能</string>
+    <string name="reader_menu_select_all">全部顯示</string>
+    <string name="reader_menu_select_none">全部移至更多</string>
+    <string name="reader_menu_zone_primary">第一層選單</string>
+    <string name="reader_menu_zone_more">更多選單</string>
+    <string name="live_update_notifications">即時更新通知</string>
+    <string name="live_update_notifications_summary">在 Android 16 上將系統允許的進度通知提升為即時更新</string>
+    <string name="show_explore_categories">顯示全部分類</string>
 </resources>

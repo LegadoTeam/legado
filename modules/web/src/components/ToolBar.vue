@@ -85,7 +85,14 @@ import {
 } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
 import hotkeys from 'hotkeys-js'
-import { getSourceName, isInvaildSource, normalizeSource } from '../utils/souce'
+import {
+  getSourceName,
+  getSourceUniqueKey,
+  isInvaildSource,
+  isJsBookSource,
+  normalizeSource,
+} from '../utils/souce'
+import type { Source } from '@/source'
 
 const store = useSourceStore()
 const pull = () => {
@@ -113,8 +120,8 @@ const pull = () => {
     .finally(() => loadingMsg.close())
 }
 
-const push = () => {
-  const sources = store.sources
+const push = async () => {
+  const sources = [...store.sources]
   store.changeTabName('editList')
   if (sources.length === 0) {
     return ElMessage({
@@ -126,30 +133,41 @@ const push = () => {
     message: '正在推送中',
     type: 'info',
   })
-  API.saveSources(sources).then(({ data }) => {
-    if (data.isSuccess) {
-      const okData = data.data
-      if (Array.isArray(okData)) {
-        let failMsg = ``
-        if (sources.length > okData.length) {
-          failMsg = '\n推送失败的源将用红色字体标注!'
-          store.setPushReturnSources(okData)
-        }
-        ElMessage({
-          message: `批量推送源到「阅读3.0APP」\n共计: ${
-            sources.length
-          } 条\n成功: ${okData.length} 条\n失败: ${
-            sources.length - okData.length
-          } 条${failMsg}`,
-          type: 'success',
-        })
-      }
+  const jsSources = sources.filter(isJsBookSource)
+  const declarativeSources = sources.filter(source => !isJsBookSource(source))
+  const okSources: Source[] = []
+  let failCount = 0
+
+  if (declarativeSources.length > 0) {
+    const { data } = await API.saveSources(declarativeSources)
+    if (data.isSuccess && Array.isArray(data.data)) {
+      okSources.push(...data.data)
+      failCount += declarativeSources.length - data.data.length
     } else {
-      ElMessage({
-        message: `批量推送源失败!\nErrorMsg: ${data.errorMsg}`,
-        type: 'error',
-      })
+      failCount += declarativeSources.length
     }
+  }
+
+  for (const source of jsSources) {
+    try {
+      const { data } = await API.saveJsSource(source.mainJs!, source.bookSourceUrl)
+      if (data.isSuccess) {
+        okSources.push(data.data)
+        store.updateSource(getSourceUniqueKey(source), data.data)
+      } else {
+        failCount++
+      }
+    } catch {
+      failCount++
+    }
+  }
+
+  if (failCount > 0) store.setPushReturnSources(okSources)
+  ElMessage({
+    message: `批量推送源到「阅读3.0APP」\n共计: ${sources.length} 条\n成功: ${okSources.length} 条\n失败: ${failCount} 条${
+      failCount > 0 ? '\n推送失败的源将用红色字体标注!' : ''
+    }`,
+    type: failCount > 0 ? 'warning' : 'success',
   })
 }
 
@@ -302,7 +320,7 @@ const saveHotKeys = () => {
   hotkeysDialogVisible.value = false
 }
 
-const bindHotKeys = () => {
+function bindHotKeys() {
   // hotkeys默认过滤INPUT SELECT TEXTAREA
   hotkeys.filter = () => true
   buttons.value.forEach(({ hotKeys, action }) => {
@@ -314,7 +332,7 @@ const bindHotKeys = () => {
     })
   })
 }
-const saveHotkeysConfig = (config: string[][]) => {
+function saveHotkeysConfig(config: string[][]) {
   localStorage.setItem('legado_web_hotkeys', JSON.stringify(config))
 }
 

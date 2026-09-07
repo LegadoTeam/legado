@@ -1,5 +1,6 @@
 package io.legado.app.model
 
+import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
@@ -7,6 +8,8 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookProgress
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.ReadRecord
+import io.legado.app.data.entities.updateSnapshot
+import io.legado.app.data.entities.saveWithCover
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.ConcurrentRateLimiter
 import io.legado.app.help.book.BookHelp
@@ -69,10 +72,15 @@ object ReadManga : CoroutineScope by MainScope() {
     val hasNextChapter get() = durChapterIndex < simulatedChapterSize - 1
 
     fun resetData(book: Book) {
-        ReadManga.book = book
-        readRecord.bookName = book.name
-        readRecord.author = book.author
-        readRecord.readTime = appDb.readRecordDao.getReadTime(book.name) ?: 0
+        readRecord.deviceId = AppConst.androidId
+        val readTime = appDb.readRecordDao
+            .getReadTime(readRecord.deviceId, book.name) ?: 0
+        synchronized(readRecord) {
+            ReadManga.book = book
+            readRecord.bookName = book.name
+            readRecord.author = book.author
+            readRecord.readTime = readTime
+        }
         chapterSize = appDb.bookChapterDao.getChapterCount(book.bookUrl)
         simulatedChapterSize = if (book.readSimulating()) {
             book.simulatedTotalChapterNum()
@@ -129,16 +137,24 @@ object ReadManga : CoroutineScope by MainScope() {
 
     //每次切换章节更新阅读记录
     fun upReadTime() {
-        val author = book?.author.orEmpty()
+        val snapshotBook = book?.copy()
+        val record = synchronized(readRecord) {
+            val currentBook = book ?: return
+            val author = book?.author ?: return
+            val now = System.currentTimeMillis()
+            val elapsed = now - readStartTime
+            readStartTime = now
+            readRecord.author = author
+            readRecord.readTime += elapsed
+            readRecord.lastRead = now
+            readRecord.updateSnapshot(currentBook, durChapterIndex, durChapterPos)
+            readRecord.copy()
+        }
         executor.execute {
             if (!AppConfig.enableReadRecord) {
                 return@execute
             }
-            readRecord.author = author
-            readRecord.readTime = readRecord.readTime + System.currentTimeMillis() - readStartTime
-            readStartTime = System.currentTimeMillis()
-            readRecord.lastRead = System.currentTimeMillis()
-            appDb.readRecordDao.insert(readRecord)
+            record.saveWithCover(snapshotBook)
         }
     }
 
@@ -346,7 +362,7 @@ object ReadManga : CoroutineScope by MainScope() {
                         )
                     }
                 }
-                appDb.bookDao.update(book)
+                book.update()
             }.onFailure {
                 AppLog.put("保存漫画阅读进度信息出错\n$it", it)
             }
@@ -476,7 +492,7 @@ object ReadManga : CoroutineScope by MainScope() {
             ensureActive()
             if (cList.size > chapterSize) {
                 if (oldBook.bookUrl == book.bookUrl) {
-                    appDb.bookDao.update(book)
+                    book.update()
                 } else {
                     appDb.bookDao.replace(oldBook, book)
                     BookHelp.updateCacheFolder(oldBook, book)

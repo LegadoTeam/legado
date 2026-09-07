@@ -34,6 +34,7 @@ class CanvasRecorderApi29Impl : BaseCanvasRecorder() {
     }
 
     override fun beginRecording(width: Int, height: Int): Canvas {
+        markRecordingStarted()
         init()
         renderNode!!.setPosition(0, 0, width, height)
         return picture!!.beginRecording(width, height)

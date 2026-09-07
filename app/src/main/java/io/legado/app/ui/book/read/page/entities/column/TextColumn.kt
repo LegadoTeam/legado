@@ -48,7 +48,6 @@ data class TextColumn(
         set(value) {
             val normalized = value?.normalized()
             if (field != normalized) {
-                textLine.invalidate()
                 val beforeFill = field?.fill?.let { it != 0 } == true
                 val afterFill = normalized?.fill?.let { it != 0 } == true
                 if (!beforeFill && afterFill) textLine.fillColumnCount++
@@ -57,8 +56,9 @@ data class TextColumn(
                 val after = normalized?.needsPerColumnDraw == true
                 if (!before && after) textLine.styledColumnCount++
                 else if (before && !after) textLine.styledColumnCount--
+                field = normalized
+                textLine.invalidate()
             }
-            field = normalized
         }
 
     override fun draw(view: ContentTextView, canvas: Canvas) {

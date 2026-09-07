@@ -179,6 +179,13 @@ class PdfExportTest {
         assertTrue(installPdf.contains("renameExportFile(staging, filename)"))
         assertTrue(installPdf.contains("renameExportFile(it, filename)"))
         assertFalse(service.contains("private fun copyExportFile"))
+
+        val renameExport = service.substringAfter("private fun renameExportFile(")
+            .substringBefore("private fun installPdfExport")
+        assertTrue(renameExport.contains("runCatching"))
+        assertTrue(renameExport.contains("DocumentsContract.renameDocument("))
+        assertTrue(renameExport.contains("FileDoc.fromUri(renamedUri, false)"))
+        assertFalse(renameExport.contains("asDocumentFile()"))
     }
 
     private fun projectFile(pathInApp: String): File {

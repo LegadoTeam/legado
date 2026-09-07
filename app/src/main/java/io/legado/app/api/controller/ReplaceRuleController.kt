@@ -3,6 +3,7 @@ package io.legado.app.api.controller
 import io.legado.app.api.ReturnData
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.ReplaceRule
+import io.legado.app.help.config.ReplacePreviewConfig
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.replace
@@ -12,7 +13,7 @@ object ReplaceRuleController {
 
     val allRules: ReturnData
         get() {
-            val rules = appDb.replaceRuleDao.all
+            val rules = ReplacePreviewConfig.withSamples(appDb.replaceRuleDao.all)
             val returnData = ReturnData()
             returnData.setData(GSON.toJson(rules))
             return returnData
@@ -26,10 +27,19 @@ object ReplaceRuleController {
         if (rule == null) {
             returnData.setErrorMsg("格式不对")
         } else {
+            val oldRule = appDb.replaceRuleDao.findById(rule.id)
             if (rule.order == Int.MIN_VALUE) {
                 rule.order = appDb.replaceRuleDao.maxOrder + 1
             }
-            appDb.replaceRuleDao.insert(rule)
+            val insertedId = appDb.replaceRuleDao.insert(rule).firstOrNull()
+            if (insertedId != null) {
+                ReplacePreviewConfig.saveImportedSamples(
+                    listOf(rule),
+                    listOf(insertedId),
+                    clearMissing = oldRule != null &&
+                        (oldRule.pattern != rule.pattern || oldRule.replacement != rule.replacement)
+                )
+            }
         }
         return returnData
     }
@@ -43,6 +53,7 @@ object ReplaceRuleController {
             returnData.setErrorMsg("格式不对")
         } else {
             appDb.replaceRuleDao.delete(rule)
+            ReplacePreviewConfig.removeSample(rule.id)
         }
         return returnData
     }

@@ -7,9 +7,12 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
 import android.widget.SeekBar
+import androidx.activity.addCallback
 import androidx.activity.viewModels
 import androidx.core.view.doOnLayout
+import androidx.core.view.doOnNextLayout
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
@@ -59,6 +62,7 @@ import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.legado.app.utils.visible
 import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.Dispatchers.Default
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import splitties.views.onLongClick
@@ -66,6 +70,7 @@ import java.util.Locale
 import io.legado.app.ui.book.audio.config.AudioSkipCredits
 import io.legado.app.ui.widget.dialog.SleepTimerDialog
 import com.dirror.lyricviewx.OnPlayClickListener
+import com.dirror.lyricviewx.LyricUtil
 import io.legado.app.lib.theme.ThemeStore.Companion.accentColor
 import io.legado.app.ui.book.audio.SliderPopup.Companion.SPEED
 import io.legado.app.model.SourceCallBack
@@ -134,6 +139,7 @@ class AudioPlayActivity :
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        onBackPressedDispatcher.addCallback(this) { finish() }
         binding.titleBar.setBackgroundResource(R.color.transparent)
         AudioPlay.register(this)
         viewModel.titleData.observe(this) { name ->
@@ -422,40 +428,44 @@ class AudioPlayActivity :
     override fun upLyric(lyric: String?) {
         if (oldLyric == lyric) return
         oldLyric = lyric
-        if(lyric.isNullOrBlank()) {
-            binding.lyricViewX.gone()
-            return
-        }
-        val firstLyric = !lyricOn
-        if (firstLyric) {
-            lyricOn = true
-            lyricViewX.apply {
-                setNormalTextSize(50F)
-                setCurrentTextSize(60F)
-                setTimelineTextColor(accentColor)
-                setDraggable(true, object : OnPlayClickListener {
-                    override fun onPlayClick(time: Long): Boolean {
-                        AudioPlay.adjustProgress(time.toInt())
-                        playButton(false)
-                        return true
-                    }
-                })
+        binding.lyricViewX.gone()
+        if (lyric.isNullOrBlank()) return
+        lifecycleScope.launch {
+            // Sources may return only LRC metadata when no subtitles are available.
+            val lyricEntries = withContext(Default) {
+                LyricUtil.parseLrc(arrayOf(lyric, null))
             }
-        }
-        // Keep the lyric view out of the draw pass until ConstraintLayout has assigned its width.
-        lyricViewX.invisible()
-        lyricViewX.doOnLayout {
-            if (oldLyric == lyric) {
-                lyricViewX.loadLyric(lyric)
-                lyricViewX.visible()
+            if (oldLyric != lyric || lyricEntries.isNullOrEmpty()) return@launch
+            if (!lyricOn) {
+                lyricOn = true
+                lyricViewX.apply {
+                    setLabel("")
+                    setNormalTextSize(50F)
+                    setCurrentTextSize(60F)
+                    setTimelineTextColor(accentColor)
+                    setDraggable(true, object : OnPlayClickListener {
+                        override fun onPlayClick(time: Long): Boolean {
+                            AudioPlay.adjustProgress(time.toInt())
+                            playButton(false)
+                            return true
+                        }
+                    })
+                }
             }
-        }
-        if (firstLyric) {
-            lyricViewX.postDelayed({
-                upLyricP(AudioPlay.durChapterPos)
-            }, 100)
-        } else {
-            upLyricP(AudioPlay.durChapterPos)
+            // Keep lyrics out of the draw pass until ConstraintLayout has assigned their width.
+            lyricViewX.invisible()
+            fun loadLyricWhenWide(view: View) {
+                if (oldLyric != lyric) return
+                // LyricViewX subtracts 16dp padding on both sides before building StaticLayout.
+                if (view.width <= 32.dpToPx()) {
+                    view.doOnNextLayout(::loadLyricWhenWide)
+                } else {
+                    lyricViewX.loadLyric(lyricEntries)
+                    lyricViewX.visible()
+                    upLyricP(AudioPlay.durChapterPos)
+                }
+            }
+            lyricViewX.doOnLayout(::loadLyricWhenWide)
         }
     }
     override fun upLyricP(position: Int) {
@@ -480,9 +490,14 @@ class AudioPlayActivity :
     override val oldBook: Book?
         get() = AudioPlay.book
 
-    override fun changeTo(source: BookSource, book: Book, toc: List<BookChapter>) {
+    override fun changeTo(
+        source: BookSource,
+        book: Book,
+        toc: List<BookChapter>,
+        onSuccess: () -> Unit,
+    ) {
         if (book.isAudio) {
-            viewModel.changeTo(source, book, toc)
+            viewModel.changeTo(source, book, toc, onSuccess)
         } else {
             AudioPlay.stop()
             lifecycleScope.launch {
@@ -492,6 +507,7 @@ class AudioPlayActivity :
                     AudioPlay.book?.delete()
                     appDb.bookDao.insert(book)
                 }
+                onSuccess()
                 startActivityForBook(book)
                 finish()
             }

@@ -1,7 +1,7 @@
 # js变量和函数
-> 阅读使用 [HtmlUnit Core JS 5.3.0-legado.3](https://github.com/skybbk1001/htmlunit-core-js/tree/e31799f290b50f99fe2cef1f14acd9725f69653c) 提供的 Rhino 兼容 JavaScript 引擎，以便于[调用Java类和方法](https://m.jb51.net/article/92138.htm)
+> 阅读使用 [HtmlUnit Core JS 5.3.0-legado.4](https://github.com/mgz0227/htmlunit-core-js/tree/3eb5071cdca4a357119d1063a53d5f2d47984ed2) 提供的 Rhino 兼容 JavaScript 引擎，以便于[调用Java类和方法](https://m.jb51.net/article/92138.htm)
 
-> [JavaScript运行时](https://github.com/skybbk1001/htmlunit-core-js/blob/e31799f290b50f99fe2cef1f14acd9725f69653c/src/repackaged-rhino/java/org/htmlunit/corejs/javascript/ScriptRuntime.java)懒加载导入的Java类和方法
+> [JavaScript运行时](https://github.com/mgz0227/htmlunit-rhino-fork/blob/76460c0312bfd351df6f2bb11168102cdb54170a/rhino/src/main/java/org/mozilla/javascript/ScriptRuntime.java)懒加载导入的Java类和方法
 
 |构造函数|函数|对象|调用类|简要说明|
 |------|-----|------|----|------|
@@ -355,18 +355,18 @@ java.htmlFormat(str: String, redirectUrl: String): String
 >  所有对于文件的读写删操作都是相对路径,只能操作阅读缓存/android/data/{package}/cache/内的文件
 ```js
 //文件下载 url用于生成文件名，返回文件路径
-downloadFile(url: String): String
+java.downloadFile(url: String): String
 //文件解压,zipPath为压缩文件路径，返回解压路径
-unArchiveFile(zipPath: String): String
-unzipFile(zipPath: String): String
-unrarFile(zipPath: String): String
-un7zFile(zipPath: String): String
+java.unArchiveFile(zipPath: String): String
+java.unzipFile(zipPath: String): String
+java.unrarFile(zipPath: String): String
+java.un7zFile(zipPath: String): String
 //文件夹内所有文件读取
-getTxtInFolder(unzipPath: String): String
+java.getTxtInFolder(path: String): String
 //读取文本文件
-readTxtFile(path: String): String
+java.readTxtFile(path: String): String
 //删除文件
-deleteFile(path: String) 
+java.deleteFile(path: String): Boolean
 ```
 * 批量正文
 > 只能在书源正文页的 `contentBatch` 规则里调用,其它场景调用会抛错。
@@ -411,6 +411,8 @@ java.cacheContent(chapterUrl: String, content: String): Boolean
 ```
 
 ### [js加解密类](https://github.com/LegadoTeam/legado/blob/master/app/src/main/java/io/legado/app/help/JsEncodeUtils.kt) 部分函数
+
+> 规则和 JavaScript 书源中可直接使用内置的 `CryptoJS`，例如 `CryptoJS.MD5("text").toString()`。
 
 > 提供在JavaScript环境中快捷调用crypto算法的函数，由[hutool-crypto](https://www.hutool.cn/docs/#/crypto/概述)实现  
 > 由于兼容性问题，hutool-crypto当前版本为5.8.22  
@@ -499,6 +501,7 @@ kind // 分类信息(书源获取)
 customTag // 分类信息(用户修改)
 coverUrl // 封面Url(书源获取)
 customCoverUrl // 封面Url(用户修改)
+persistedCoverUrl // 保存到本地的网络封面
 intro // 简介内容(书源获取)
 customIntro // 简介内容(用户修改)
 charset // 自定义字符集名称(仅适用于本地书籍)
@@ -794,6 +797,7 @@ function loginUi(state) {
         { name: "验证码已发送至 " + state.phone, type: "label" },
         { key: "code", name: "验证码", type: "text" },
         { key: "line", name: "线路", type: "select", options: ["主线路", "备用线路"] },
+        { key: "remember", name: "记住登录", type: "toggle", value: "true" },
         { name: "登录", type: "button", action: "verify" }
     ] };
 }
@@ -822,6 +826,7 @@ function loginAction(action, state, form) {
 |`text`、`password`|`key`、`name`|文本或密码输入，可加 `hint`、`value`|
 |`label`|`name`|只读提示文字|
 |`select`|`key`、`name`、`options`|单选，值为选项字符串|
+|`toggle`|`key`、`name`|开关，值为字符串 `"true"`/`"false"`；可加 `value`、`action`|
 |`button`|`name`、`action`|派发动作，可加 `countdown` 秒数|
 
 `loginAction` 可以返回以下命令；未知键会被忽略并写入日志，非法命令对象会提示错误：
@@ -942,7 +947,8 @@ function getContentBatch(chapters, book) {
 ### 段评
 
 段评由两个成对的顶层函数提供。只有同时声明 `getReviewSummary` 和 `getReviewDetail` 才会启用，缺少任意一个
-函数时导入/保存会提示配对错误。章节加载后先调用统计函数，点击正文段评图标时再调用详情函数。
+函数时导入/保存会提示配对错误。可选声明 `getReviewReplies` 后，评论中的“查看更多回复”会按页调用它。
+章节加载后先调用统计函数，点击正文段评图标时再调用详情函数。
 
 ```js
 function getReviewSummary(chapter, book) {
@@ -967,11 +973,22 @@ function getReviewDetail(chapter, book, paraIndex, paraData, page) {
                 name: item.name,
                 avatar: item.avatar,
                 badge: item.badge,
-                content: item.content,
-                replies: item.replies || []
+                content: {
+                    text: item.content,
+                    replyCount: item.replyCount
+                }
             };
         }),
         nextPageUrl: json.hasNext ? "more" : null
+    };
+}
+
+function getReviewReplies(chapter, book, paraIndex, paraData, reviewId, page) {
+    var json = JSON.parse(java.ajax(
+        config.bookSourceUrl + "/review/replies?id=" + reviewId + "&page=" + page
+    ));
+    return {
+        items: json.items || []
     };
 }
 ```
@@ -979,10 +996,16 @@ function getReviewDetail(chapter, book, paraIndex, paraData, page) {
 - `getReviewSummary(chapter, book)` 返回数组，每项包含 `paraIndex`（正文段落序号，`-1` 表示章节标题）、`count`（评论数）和可选的
   `paraData`。`count` 小于等于 0 的条目不会显示图标；缺少 `paraData` 时默认使用段落序号字符串。
 - `getReviewDetail(chapter, book, paraIndex, paraData, page)` 返回 `{items, nextPageUrl}`。每项的 `content` 必填，
-  可返回文本或 `{text, img, audio, time, likeCount, replyCount}`；`badge` 可返回字符串或字符串数组。其他可选字段包括
+  可返回文本或 `{text, replyToName, img, audio, time, likeCount, replyCount}`；`badge` 可返回字符串或字符串数组。其他可选字段包括
   `id`、`name`、`avatar` 和递归 `replies`；缺少可显示内容的条目会被忽略，递归回复会在界面中按顺序展示。
 - `nextPageUrl` 只是是否继续请求的信号，不会作为 URL 使用。返回任意非空值表示还有下一页，返回 `null` 或省略表示结束；
   下一次调用会把 `page` 加一。
+- `getReviewReplies(chapter, book, paraIndex, paraData, reviewId, page)` 是可选的回复分页函数，返回 `{items}`；
+  `reviewId` 是主评论的非空 `id`，且详情项需要提供正数 `replyCount` 才会显示加载入口。页面从 `1` 开始，
+  返回首批回复，空数组表示没有更多回复。声明该函数时详情项不要内嵌 `replies`；未声明时仍可使用内嵌回复。
+  它必须与上述两个段评函数一起声明。
+- `id` 和 `reviewId` 是不透明字符串。超过 JavaScript 安全整数范围的数字 ID 必须在 `JSON.parse` 前保留为字符串；
+  一旦被 `JSON.parse` 舍入，应用无法恢复原值。
 - 段评函数异常会记录到日志，详情加载错误同时显示在弹窗中；返回空数组表示没有内容。
 
 ### 运行环境与并发

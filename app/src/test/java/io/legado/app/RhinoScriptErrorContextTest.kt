@@ -26,6 +26,7 @@ class RhinoScriptErrorContextTest {
         }
 
         assertEquals(2, exception.lineNumber)
+        assertEquals(-1, exception.columnNumber)
         assertTrue(exception.message.contains("> 2: throw 'boom';"))
         assertTrue(exception.message.contains("  1: var prefix = 'ok';"))
     }
@@ -65,5 +66,31 @@ class RhinoScriptErrorContextTest {
         assertEquals(2, exception.lineNumber)
         assertTrue(exception.columnNumber > 0)
         assertTrue(exception.message.contains("> 2: var broken = ;"))
+    }
+
+    @Test
+    fun compiledScriptErrorUsesDefiningSourceContext() {
+        val definitions = """
+            function inner() {
+                var value = null;
+                return value.missing();
+            }
+            function outer() {
+                return inner();
+            }
+        """.trimIndent()
+        val scope = RhinoScriptEngine.getRuntimeScope(ScriptBindings())
+        RhinoScriptEngine.compile(definitions).eval(scope)
+
+        val exception = try {
+            RhinoScriptEngine.compile("outer();").eval(scope)
+            error("Expected nested JavaScript evaluation to fail")
+        } catch (error: ScriptException) {
+            error
+        }
+
+        assertEquals(3, exception.lineNumber)
+        assertTrue(exception.message.contains("> 3:     return value.missing();"))
+        assertTrue(exception.message.contains("  2:     var value = null;"))
     }
 }

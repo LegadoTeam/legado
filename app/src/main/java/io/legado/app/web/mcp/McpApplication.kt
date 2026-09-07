@@ -13,6 +13,7 @@ import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.mcpStreamableHttp
 
 fun Application.configureMcp(
+    tokenRequiredProvider: () -> Boolean,
     tokenProvider: () -> String?,
     unauthorizedMessage: () -> String,
     allowedHosts: List<String>,
@@ -21,7 +22,9 @@ fun Application.configureMcp(
 ) {
     intercept(ApplicationCallPipeline.Plugins) {
         context.response.header(HttpHeaders.CacheControl, "no-store")
-        if (!BookSourceController.matchesJsSourceApiToken(
+        if (
+            tokenRequiredProvider() &&
+            !BookSourceController.matchesJsSourceApiToken(
                 tokenProvider(),
                 context.request.header(McpAccess.TOKEN_HEADER),
             )

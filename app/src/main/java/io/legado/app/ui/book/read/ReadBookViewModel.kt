@@ -22,6 +22,7 @@ import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isLocalModified
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.simulatedTotalChapterNum
+import io.legado.app.help.book.update
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.ImageProvider
@@ -148,7 +149,10 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
         }
         ReadBook.upMsg(null)
         if (!isSameBook) {
-            ReadBook.loadContent(resetPageOffset = true) {
+            ReadBook.loadContent(
+                resetPageOffset = true,
+                readPositionVersion = ReadBook.callBack?.readPositionVersion(),
+            ) {
                 ReadBook.bookSource?.let {
                     SourceCallBack.callBackBook(SourceCallBack.START_READ, it, book, ReadBook.curTextChapter?.chapter)
                 }
@@ -221,7 +225,7 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
                 LocalBook.getChapterList(book).let {
                     appDb.bookChapterDao.delByBook(book.bookUrl)
                     appDb.bookChapterDao.insert(*it.toTypedArray())
-                    appDb.bookDao.update(book)
+                    book.update()
                     ReadBook.onChapterListUpdated(book)
                 }
                 return true
@@ -244,7 +248,7 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
                 WebBook.getChapterListAwait(it, book, true)
                     .onSuccess { cList ->
                         if (oldBook.bookUrl == book.bookUrl) {
-                            appDb.bookDao.update(book)
+                            book.update()
                         } else {
                             appDb.bookDao.replace(oldBook, book)
                             BookHelp.updateCacheFolder(oldBook, book)
@@ -296,7 +300,7 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
     /**
      * 换源
      */
-    fun changeTo(book: Book, toc: List<BookChapter>) {
+    fun changeTo(book: Book, toc: List<BookChapter>, onSuccess: () -> Unit = {}) {
         changeSourceCoroutine?.cancel()
         changeSourceCoroutine = execute {
             ReadBook.upMsg(context.getString(R.string.loading))
@@ -308,6 +312,8 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
             ReadBook.resetData(book)
             ReadBook.upMsg(null)
             ReadBook.loadContent(resetPageOffset = true)
+        }.onSuccess {
+            onSuccess()
         }.onError {
             AppLog.put("换源失败\n$it", it, true)
             ReadBook.upMsg(null)
@@ -368,6 +374,7 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
         durChapterPos: Int = 0,
         highlightLayoutTitleLength: Int? = null,
         highlightAnchorText: String? = null,
+        pdfPageIndex: Int? = null,
         success: (() -> Unit)? = null
     ) {
         ReadBook.openChapter(
@@ -375,6 +382,7 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
             durChapterPos,
             highlightLayoutTitleLength = highlightLayoutTitleLength,
             highlightAnchorText = highlightAnchorText,
+            pdfPageIndex = pdfPageIndex,
             success = success
         )
     }
@@ -595,6 +603,7 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
         execute {
             ReadBook.book?.let {
                 ContentProcessor.get(it.name, it.origin).upReplaceRules()
+                ReadBook.clearTextChapter()
                 ReadBook.loadContent(resetPageOffset = false)
             }
         }

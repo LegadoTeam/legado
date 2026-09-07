@@ -18,6 +18,16 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_download_mirror"
+        android:title="@string/download_from_backup_cdn"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_download_alternate_mirror"
+        android:title="@string/download_from_second_cdn"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_ignore_version"
         android:title="@string/ignore_this_version"
         app:showAsAction="never" />

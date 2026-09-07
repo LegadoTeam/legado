@@ -15,11 +15,45 @@
         app:popupTheme="@style/AppTheme.PopupOverlay"
         app:titleTextAppearance="@style/ToolbarTitle" />
 
-    <io.legado.app.ui.widget.code.CodeView
-        android:id="@+id/code_view"
+    <io.legado.app.lib.theme.view.ThemeCheckBox
+        android:id="@+id/cb_source_replacement_preview"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:minHeight="48dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:text="@string/show_source_replacement"
+        android:visibility="gone" />
+
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:padding="12dp" />
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <io.legado.app.ui.widget.code.CodeView
+            android:id="@+id/code_view"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:padding="12dp" />
+
+        <io.legado.app.ui.widget.seekbar.VerticalSeekBarWrapper
+            android:id="@+id/position_bar_container"
+            android:layout_width="40dp"
+            android:layout_height="match_parent">
+
+            <io.legado.app.lib.theme.view.ThemeSeekBar
+                android:id="@+id/position_bar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/content_edit_position"
+                android:max="10000"
+                android:rotation="90"
+                android:saveEnabled="false" />
+        </io.legado.app.ui.widget.seekbar.VerticalSeekBarWrapper>
+    </LinearLayout>
 
 </LinearLayout>
 

@@ -12,11 +12,13 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.saveReadRecordSnapshot
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.getBookSource
 import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.simulatedTotalChapterNum
+import io.legado.app.help.book.update
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.AudioPlay
 import io.legado.app.model.webBook.WebBook
@@ -132,7 +134,7 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
             val cList = WebBook.getChapterListAwait(bookSource, book).getOrThrow()
             if (cList.isEmpty()) return false
             if (oldBook.bookUrl == book.bookUrl) {
-                appDb.bookDao.update(book)
+                book.update()
             } else {
                 appDb.bookDao.replace(oldBook, book)
             }
@@ -156,7 +158,12 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
         }
     }
 
-    fun changeTo(source: BookSource, book: Book, toc: List<BookChapter>) {
+    fun changeTo(
+        source: BookSource,
+        book: Book,
+        toc: List<BookChapter>,
+        onSuccess: () -> Unit = {},
+    ) {
         execute {
             val oldBook = AudioPlay.book
             val wasNotShelf = oldBook?.let {
@@ -173,6 +180,8 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
             appDb.bookChapterDao.insert(*toc.toTypedArray())
             AudioPlay.upData(book, preserveProgress = false)
             AudioPlayService.updateNotification(context)
+        }.onSuccess {
+            onSuccess()
         }.onFinally {
             postEvent(EventBus.SOURCE_CHANGED, book.bookUrl)
         }
@@ -181,6 +190,7 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
     fun removeFromBookshelf(success: (() -> Unit)?) {
         execute {
             AudioPlay.book?.let {
+                it.saveReadRecordSnapshot()
                 appDb.bookDao.delete(it)
             }
         }.onSuccess {

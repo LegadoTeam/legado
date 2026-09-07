@@ -31,6 +31,20 @@ class ChangeSourceResultOptionsWiringTest {
     }
 
     @Test
+    fun `only chapter source results pin the current book`() {
+        val bookViewModel = projectFile(VIEW_MODEL).readText()
+        val chapterViewModel = projectFile(CHAPTER_VIEW_MODEL).readText()
+
+        assertTrue(bookViewModel.contains("protected open val pinCurrentSource = false"))
+        assertTrue(
+            bookViewModel.contains(
+                "pinnedBookUrl = if (pinCurrentSource) oldBook?.bookUrl else null"
+            )
+        )
+        assertTrue(chapterViewModel.contains("protected override val pinCurrentSource = true"))
+    }
+
+    @Test
     fun `both adapters refresh measured result fields`() {
         ADAPTERS.forEach { path ->
             val source = projectFile(path).readText()
@@ -66,6 +80,8 @@ class ChangeSourceResultOptionsWiringTest {
     companion object {
         private const val VIEW_MODEL =
             "src/main/java/io/legado/app/ui/book/changesource/ChangeBookSourceViewModel.kt"
+        private const val CHAPTER_VIEW_MODEL =
+            "src/main/java/io/legado/app/ui/book/changesource/ChangeChapterSourceViewModel.kt"
         private const val APP_CONFIG = "src/main/java/io/legado/app/help/config/AppConfig.kt"
         private val DIALOGS = listOf(
             "src/main/java/io/legado/app/ui/book/changesource/ChangeBookSourceDialog.kt",

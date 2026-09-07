@@ -23,29 +23,42 @@ import splitties.init.appCtx
 
 internal const val BUFFER_SIZE = 32 * 1024
 
+@Volatile
+private var cronetEngineFailure: Throwable? = null
+
 val cronetEngine: ExperimentalCronetEngine? by lazy {
-    CronetLoader.preDownload()
-    val builder = ExperimentalCronetEngine.Builder(appCtx).apply {
-        if (CronetLoader.install()) {
-            setLibraryLoader(CronetLoader)//设置自定义so库加载
-        }
-        setStoragePath(appCtx.externalCache.absolutePath)//设置缓存路径
-        enableHttpCache(HTTP_CACHE_DISK, (1024 * 1024 * 50).toLong())//设置50M的磁盘缓存
-        enableQuic(true)//设置支持http/3
-        enableHttp2(true)  //设置支持http/2
-        enablePublicKeyPinningBypassForLocalTrustAnchors(true)
-        enableBrotli(true)//Brotli压缩
-        setExperimentalOptions(options)
-    }
     try {
+        val builder = ExperimentalCronetEngine.Builder(appCtx).apply {
+            setStoragePath(appCtx.externalCache.absolutePath)//设置缓存路径
+            enableHttpCache(HTTP_CACHE_DISK, (1024 * 1024 * 50).toLong())//设置50M的磁盘缓存
+            enableQuic(true)//设置支持http/3
+            enableHttp2(true)  //设置支持http/2
+            enablePublicKeyPinningBypassForLocalTrustAnchors(true)
+            enableBrotli(true)//Brotli压缩
+            setExperimentalOptions(options)
+        }
         val engine = builder.build()
         DebugLog.d("Cronet Version:", engine.versionString)
-        return@lazy engine
+        engine
     } catch (e: Throwable) {
+        cronetEngineFailure = e
         AppLog.put("初始化cronetEngine出错", e)
-        return@lazy null
+        null
     }
 }
+
+internal fun getCronetEngineOrNull(): ExperimentalCronetEngine? {
+    return try {
+        cronetEngine
+    } catch (e: Throwable) {
+        cronetEngineFailure = e
+        AppLog.put("初始化cronetEngine出错", e)
+        null
+    }
+}
+
+internal fun cronetUnavailableException(message: String): CronetUnavailableException =
+    CronetUnavailableException(message, cronetEngineFailure)
 
 val options by lazy {
     val options = JSONObject()
@@ -73,7 +86,7 @@ fun buildRequest(request: Request, callback: UrlRequest.Callback): UrlRequest? {
     val url = request.url.toString()
     val headers: Headers = request.headers
     val requestBody = request.body
-    return cronetEngine?.newUrlRequestBuilder(
+    return getCronetEngineOrNull()?.newUrlRequestBuilder(
         customHost(url),
         callback,
         okHttpClient.dispatcher.executorService

@@ -31,6 +31,11 @@ class ChangeChapterTocAdapter(context: Context, val callback: Callback) :
     val selectedChapters: List<Pair<BookChapter, String?>>
         get() = selectedChapterSourceItems(getItems(), selectedIndices)
 
+    val selectedPositions: List<Int>
+        get() = getItems().mapIndexedNotNull { position, chapter ->
+            position.takeIf { chapter.index in selectedIndices }
+        }
+
     val selectionCount: Int
         get() = selectedIndices.size
 
@@ -106,6 +111,23 @@ class ChangeChapterTocAdapter(context: Context, val callback: Callback) :
         }
         selectedIndices.clear()
         positions.forEach(::notifyItemChanged)
+        callback.selectionChanged()
+    }
+
+    fun selectPositions(positions: Collection<Int>) {
+        val items = getItems()
+        val nextSelection = positions.mapNotNullTo(hashSetOf()) { position ->
+            items.getOrNull(position)?.takeUnless { it.isVolume }?.index
+        }
+        if (nextSelection == selectedIndices) return
+        val changedPositions = items.mapIndexedNotNull { position, chapter ->
+            position.takeIf {
+                (chapter.index in selectedIndices) != (chapter.index in nextSelection)
+            }
+        }
+        selectedIndices.clear()
+        selectedIndices.addAll(nextSelection)
+        changedPositions.forEach(::notifyItemChanged)
         callback.selectionChanged()
     }
 

@@ -7,7 +7,10 @@ import android.graphics.Outline
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
+import android.text.Layout
+import android.text.StaticLayout
 import android.text.TextPaint
+import android.text.TextUtils
 import android.util.AttributeSet
 import android.view.View
 import android.view.ViewGroup
@@ -44,6 +47,36 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import splitties.init.appCtx
 
+private const val HORIZONTAL_TITLE_MAX_LINES = 4
+
+internal fun normalizeCoverText(value: String?, keepPunctuation: Boolean): String? =
+    value?.let { text ->
+        if (keepPunctuation) text.trim() else text.replace(AppPattern.bdRegex, "").trim()
+    }
+
+internal fun coverBitmapCacheKey(
+    name: String,
+    author: String?,
+    width: Int,
+    height: Int,
+    horizontal: Boolean,
+    drawAuthor: Boolean,
+    backgroundColor: Int,
+    accentColor: Int
+): String = buildString {
+    append(name.length).append(':').append(name)
+    append('|')
+    if (author == null) {
+        append("-1:")
+    } else {
+        append(author.length).append(':').append(author)
+    }
+    append('|').append(width).append('x').append(height)
+    append('|').append(if (horizontal) 'h' else 'v')
+    append('|').append(if (drawAuthor) 'a' else 'n')
+    append('|').append(backgroundColor).append(',').append(accentColor)
+}
+
 /**
  * 封面
  */
@@ -56,19 +89,19 @@ class CoverImageView @JvmOverloads constructor(
         private val nameBitmapCache by lazy { LruCache<String, Bitmap>(33) }
         private val needNameBitmap by lazy { LruCache<String, Boolean>(99) }
     }
-    private var viewWidth: Float = 0f
-    private var viewHeight: Float = 0f
     private var currentJob: Job? = null
+    @Volatile
+    private var currentNameBitmap: Pair<String, Bitmap>? = null
     private val triggerChannel = Channel<Unit>(Channel.CONFLATED)
     var bitmapPath: String? = null
         private set
     private var name: String? = null
     private var author: String? = null
+    private var sourceName: String? = null
+    private var sourceAuthor: String? = null
+    private var normalizedKeepPunctuation = BookCover.keepPunctuation
     private var nameHeight = 0f
     private var authorHeight = 0f
-    private val drawBookName = BookCover.drawBookName
-    private val drawBookAuthor by lazy { BookCover.drawBookAuthor }
-
     override fun setLayoutParams(params: ViewGroup.LayoutParams?) {
         if (params != null) {
             val width = params.width
@@ -92,6 +125,10 @@ class CoverImageView @JvmOverloads constructor(
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
+        if (w != oldw || h != oldh) {
+            currentJob?.cancel()
+            currentNameBitmap = null
+        }
         outlineProvider = object : ViewOutlineProvider() {
             override fun getOutline(view: View, outline: Outline) {
                 outline.setRoundRect(0, 0, w, h, 12f)
@@ -102,29 +139,83 @@ class CoverImageView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        updateNormalizedText()
+        val drawBookName = BookCover.drawBookName
+        val drawBookAuthor = BookCover.drawBookAuthor
         if (!drawBookName) return
         val currentName = this.name ?: return
         if (AppConfig.useDefaultCover || needNameBitmap[bitmapPath.toString()] == true) {
             val currentAuthor = this.author
-            val pathName = if (drawBookAuthor){
-                currentName + currentAuthor
-            } else {
-                currentName
-            }
-            val cacheBitmap =  nameBitmapCache[pathName + width]
+            val backgroundColor = appCtx.backgroundColor
+            val accentColor = appCtx.accentColor
+            val cacheKey = coverBitmapCacheKey(
+                currentName,
+                currentAuthor,
+                width,
+                height,
+                BookCover.drawBookNameHorizontal,
+                drawBookAuthor,
+                backgroundColor,
+                accentColor
+            )
+            val cacheBitmap = getNameBitmap(cacheKey)
             if (cacheBitmap != null) {
                 canvas.drawBitmap(cacheBitmap, 0f, 0f, null)
                 return
             }
-            drawNameAuthor(pathName, currentName, currentAuthor, false)
+            drawNameAuthor(currentName, currentAuthor, backgroundColor, accentColor, false)
         }
     }
 
-    private fun drawNameAuthor(pathName: String, name: String, author: String?, asyncAwait: Boolean = true) {
-        generateCoverAsync(pathName, name, author, asyncAwait)
+    private fun getNameBitmap(cacheKey: String): Bitmap? {
+        val currentBitmap = currentNameBitmap
+        if (currentBitmap?.first == cacheKey) return currentBitmap.second
+        return nameBitmapCache[cacheKey]?.also {
+            currentNameBitmap = cacheKey to it
+        }
     }
-    private fun generateCoverAsync(pathName: String, name: String, author: String?, asyncAwait: Boolean) {
+
+    private fun updateNormalizedText() {
+        val keepPunctuation = BookCover.keepPunctuation
+        if (keepPunctuation == normalizedKeepPunctuation) return
+        val currentName = normalizeCoverText(sourceName, keepPunctuation)
+        val currentAuthor = normalizeCoverText(sourceAuthor, keepPunctuation)
+        if (name != currentName || author != currentAuthor) {
+            currentNameBitmap = null
+        }
+        name = currentName
+        author = currentAuthor
+        normalizedKeepPunctuation = keepPunctuation
+    }
+
+    private fun drawNameAuthor(
+        name: String,
+        author: String?,
+        backgroundColor: Int = appCtx.backgroundColor,
+        accentColor: Int = appCtx.accentColor,
+        asyncAwait: Boolean = true
+    ) {
+        generateCoverAsync(
+            name,
+            author,
+            backgroundColor,
+            accentColor,
+            BookCover.drawBookNameHorizontal,
+            BookCover.drawBookAuthor,
+            asyncAwait
+        )
+    }
+    private fun generateCoverAsync(
+        name: String,
+        author: String?,
+        backgroundColor: Int,
+        accentColor: Int,
+        horizontal: Boolean,
+        drawAuthor: Boolean,
+        asyncAwait: Boolean
+    ) {
         currentJob?.cancel()
+        val requestedBitmapPath = bitmapPath
         currentJob = CoroutineScope(Dispatchers.Default).launch {
             try {
                 if (asyncAwait) {
@@ -141,11 +232,38 @@ class CoverImageView @JvmOverloads constructor(
                     } while (width == 0 && attempts < 2000)
                 }
                 ensureActive()
-                val bitmap = generateCoverBitmap(name, author)
+                val renderWidth = width
+                val renderHeight = height
+                if (renderWidth <= 0 || renderHeight <= 0) return@launch
+                val cacheKey = coverBitmapCacheKey(
+                    name,
+                    author,
+                    renderWidth,
+                    renderHeight,
+                    horizontal,
+                    drawAuthor,
+                    backgroundColor,
+                    accentColor
+                )
+                if (getNameBitmap(cacheKey) != null) {
+                    postInvalidate()
+                    return@launch
+                }
+                val bitmap = generateCoverBitmap(
+                    name,
+                    author,
+                    renderWidth,
+                    renderHeight,
+                    horizontal,
+                    drawAuthor,
+                    backgroundColor,
+                    accentColor
+                )
                 ensureActive()
-                needNameBitmap.put(bitmapPath.toString(), true)
-                nameBitmapCache.put(pathName + width, bitmap)
-                invalidate()
+                needNameBitmap.put(requestedBitmapPath.toString(), true)
+                nameBitmapCache.put(cacheKey, bitmap)
+                currentNameBitmap = cacheKey to bitmap
+                postInvalidate()
             } catch (_: CancellationException) {
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -153,15 +271,35 @@ class CoverImageView @JvmOverloads constructor(
         }
     }
 
-    private fun generateCoverBitmap(name: String?, author: String?): Bitmap {
-        viewWidth = width.toFloat()
-        viewHeight = height.toFloat()
-        val bitmap = createBitmap(width, height)
+    private fun generateCoverBitmap(
+        name: String?,
+        author: String?,
+        renderWidth: Int,
+        renderHeight: Int,
+        horizontal: Boolean,
+        drawAuthor: Boolean,
+        backgroundColor: Int,
+        accentColor: Int
+    ): Bitmap {
+        val viewWidth = renderWidth.toFloat()
+        val viewHeight = renderHeight.toFloat()
+        val bitmap = createBitmap(renderWidth, renderHeight)
         val bitmapCanvas = Canvas(bitmap)
-        var startX = width * 0.2f
+        var startX = renderWidth * 0.2f
         var startY = viewHeight * 0.2f
-        val backgroundColor = appCtx.backgroundColor
-        val accentColor = appCtx.accentColor
+        if (horizontal) {
+            drawHorizontalTextCover(
+                bitmapCanvas,
+                name,
+                author,
+                backgroundColor,
+                accentColor,
+                drawAuthor,
+                viewWidth,
+                viewHeight
+            )
+            return bitmap
+        }
         val namePaint = TextPaint().apply {
             typeface = Typeface.DEFAULT_BOLD
             isAntiAlias = true
@@ -180,7 +318,7 @@ class CoverImageView @JvmOverloads constructor(
                 bitmapCanvas.drawText(char, startX, startY, namePaint)
                 startY += namePaint.textHeight
                 if (startY > viewHeight * 0.9) {
-                    if ((name.size - index - 1) == 1) { //只剩一个字
+                    if ((name.size - index - 1) == 1) {
                         startY -= namePaint.textHeight / 5
                         namePaint.textSize = viewWidth / 9
                         return@forEachIndexed
@@ -189,8 +327,7 @@ class CoverImageView @JvmOverloads constructor(
                     line++
                     namePaint.textSize = viewWidth / 10
                     startY = viewHeight * 0.2f + namePaint.textHeight * line
-                }
-                else if (startY > viewHeight * 0.8 && (name.size - index - 1) > 2) { //剩余字数大于2
+                } else if (startY > viewHeight * 0.8 && (name.size - index - 1) > 2) {
                     startX += namePaint.textSize
                     line++
                     namePaint.textSize = viewWidth / 10
@@ -198,7 +335,7 @@ class CoverImageView @JvmOverloads constructor(
                 }
             }
         }
-        if (!drawBookAuthor){
+        if (!drawAuthor){
             return bitmap
         }
         val authorPaint = TextPaint(namePaint).apply {
@@ -207,8 +344,8 @@ class CoverImageView @JvmOverloads constructor(
         author?.toStringArray()?.let { author ->
             authorPaint.textSize = viewWidth / 10
             authorPaint.strokeWidth = authorPaint.textSize / 5
-            startX = width * 0.8f
-            startY = viewHeight * 0.95f - author.size * authorPaint.textHeight
+            startX = renderWidth * 0.8f
+            var startY = viewHeight * 0.95f - author.size * authorPaint.textHeight
             startY = maxOf(startY, viewHeight * 0.3f)
             author.forEach {
                 authorPaint.color = backgroundColor
@@ -225,6 +362,90 @@ class CoverImageView @JvmOverloads constructor(
         }
         return bitmap
     }
+
+    private fun drawHorizontalTextCover(
+        canvas: Canvas,
+        name: String?,
+        author: String?,
+        backgroundColor: Int,
+        accentColor: Int,
+        drawAuthor: Boolean,
+        viewWidth: Float,
+        viewHeight: Float
+    ) {
+        val basePaint = TextPaint().apply {
+            isAntiAlias = true
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        name?.takeIf { it.isNotEmpty() }?.let { title ->
+            val titleWidth = (viewWidth * 0.78f).toInt().coerceAtLeast(1)
+            val titlePaint = TextPaint(basePaint).apply {
+                textAlign = Paint.Align.LEFT
+                textSize = viewWidth / 7
+                strokeWidth = textSize / 6
+            }
+            var titleLayout = horizontalTitleLayout(title, titlePaint, titleWidth)
+            if (titleLayout.lineCount > 1 || titlePaint.measureText(title) > titleWidth) {
+                titlePaint.textSize = viewWidth / 9
+                titlePaint.strokeWidth = titlePaint.textSize / 6
+                titleLayout = horizontalTitleLayout(title, titlePaint, titleWidth)
+            }
+            val titleX = (viewWidth - titleWidth) / 2f
+            val titleY = viewHeight * 0.1f
+            canvas.save()
+            canvas.translate(titleX, titleY)
+            titlePaint.color = backgroundColor
+            titlePaint.style = Paint.Style.STROKE
+            titleLayout.draw(canvas)
+            titlePaint.color = accentColor
+            titlePaint.style = Paint.Style.FILL
+            titleLayout.draw(canvas)
+            canvas.restore()
+        }
+
+        if (!drawAuthor) return
+        author?.takeIf { it.isNotEmpty() }?.let { authorText ->
+            val authorWidth = viewWidth * 0.65f
+            val authorPaint = TextPaint(basePaint).apply {
+                typeface = Typeface.DEFAULT
+                textAlign = Paint.Align.RIGHT
+                textSize = viewWidth / 10
+                strokeWidth = textSize / 5
+            }
+            while (authorPaint.textSize > viewWidth / 16 &&
+                authorPaint.measureText(authorText) > authorWidth
+            ) {
+                authorPaint.textSize -= 0.5f
+                authorPaint.strokeWidth = authorPaint.textSize / 5
+            }
+            val displayAuthor = TextUtils.ellipsize(
+                authorText,
+                authorPaint,
+                authorWidth,
+                TextUtils.TruncateAt.END
+            ).toString()
+            val authorX = viewWidth * 0.9f
+            val authorY = viewHeight * 0.92f
+            authorPaint.color = backgroundColor
+            authorPaint.style = Paint.Style.STROKE
+            canvas.drawText(displayAuthor, authorX, authorY, authorPaint)
+            authorPaint.color = accentColor
+            authorPaint.style = Paint.Style.FILL
+            canvas.drawText(displayAuthor, authorX, authorY, authorPaint)
+        }
+    }
+
+    private fun horizontalTitleLayout(
+        title: String,
+        paint: TextPaint,
+        width: Int
+    ): StaticLayout = StaticLayout.Builder
+        .obtain(title, 0, title.length, paint, width)
+        .setAlignment(Layout.Alignment.ALIGN_CENTER)
+        .setIncludePad(false)
+        .setMaxLines(HORIZONTAL_TITLE_MAX_LINES)
+        .setEllipsize(TextUtils.TruncateAt.END)
+        .build()
 
     fun setHeight(height: Int) {
         val width = height * 3 / 4
@@ -300,34 +521,46 @@ class CoverImageView @JvmOverloads constructor(
         lifecycle: Lifecycle? = null,
         onLoadFinish: (() -> Unit)? = null
     ) {
-        val currentAuthor = author?.replace(AppPattern.bdRegex, "")?.trim()?.also {
-            this.author = it
+        currentJob?.cancel()
+        currentJob = null
+        triggerChannel.tryReceive()
+        sourceName = name
+        sourceAuthor = author
+        normalizedKeepPunctuation = BookCover.keepPunctuation
+        val currentAuthor = normalizeCoverText(author, BookCover.keepPunctuation)
+        val currentName = normalizeCoverText(name, BookCover.keepPunctuation)
+        val currentPath = path?.takeIf { it.isNotBlank() }
+        if (this.name != currentName || this.author != currentAuthor) {
+            currentNameBitmap = null
         }
-        val currentName = name?.replace(AppPattern.bdRegex, "")?.trim()?.also {
-            this.name = it
-        }
-        this.bitmapPath = path
+        this.author = currentAuthor
+        this.name = currentName
+        this.bitmapPath = currentPath
         if (AppConfig.useDefaultCover) {
             ImageLoader.load(context, BookCover.defaultDrawable)
                 .centerCrop()
                 .into(this)
         } else {
-            if (drawBookName && currentName != null) {
-                val pathName = if (drawBookAuthor){
-                    currentName + currentAuthor
-                } else {
-                    currentName
-                }
-                drawNameAuthor(pathName, currentName, currentAuthor, true)
+            if (currentPath == null) {
+                needNameBitmap.put(currentPath.toString(), true)
+                ImageLoader.load(context, BookCover.defaultDrawable)
+                    .centerCrop()
+                    .into(this)
+                invalidate()
+                onLoadFinish?.invoke()
+                return
+            }
+            if (BookCover.drawBookName && currentName != null) {
+                drawNameAuthor(currentName, currentAuthor, asyncAwait = true)
             }
             var options = RequestOptions().set(OkHttpModelLoader.loadOnlyWifiOption, loadOnlyWifi)
             if (sourceOrigin != null) {
                 options = options.set(OkHttpModelLoader.sourceOriginOption, sourceOrigin)
             }
             var builder = if (fragment != null && lifecycle != null) {
-                ImageLoader.load(fragment, lifecycle, path)
+                ImageLoader.load(fragment, lifecycle, currentPath)
             } else {
-                ImageLoader.load(context, path)//Glide自动识别http://,content://和file://
+                ImageLoader.load(context, currentPath)//Glide自动识别http://,content://和file://
             }
             builder = builder.apply(options)
                 .placeholder(BookCover.defaultDrawable)

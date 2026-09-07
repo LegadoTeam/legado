@@ -51,10 +51,13 @@ import io.legado.app.utils.activityPendingIntent
 import io.legado.app.utils.broadcastPendingIntent
 import io.legado.app.utils.printOnDebug
 import io.legado.app.utils.servicePendingIntent
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import splitties.init.appCtx
 import splitties.systemservices.notificationManager
 import kotlin.math.abs
@@ -79,6 +82,7 @@ class VideoPlayService : BaseService() {
     }
     private val playerView by lazy { floatingView.findViewById<FloatingPlayer>(R.id.floatingPlayerView) }
     private var isNew = true
+    private var mediaNotificationReady = false
     private var upNotificationJob: Coroutine<*>? = null
     private var animator: SpringAnimation? = null
     private var cover: Bitmap =
@@ -197,6 +201,8 @@ class VideoPlayService : BaseService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val startResult = super.onStartCommand(intent, flags, startId)
+        if (startResult == START_NOT_STICKY) return startResult
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
                 checkFloatPermission()
@@ -204,7 +210,10 @@ class VideoPlayService : BaseService() {
                 return START_NOT_STICKY
             }
         }
-        if (intent == null) return START_NOT_STICKY
+        if (intent == null) {
+            stopSelfResult(startId)
+            return START_NOT_STICKY
+        }
         intent.action?.let { action ->
             when (action) {
                 IntentAction.pause -> pause()
@@ -213,24 +222,26 @@ class VideoPlayService : BaseService() {
                 IntentAction.next -> VideoPlay.upDurIndex(1, playerView)
                 IntentAction.stop -> stop()
             }
-            return super.onStartCommand(intent, flags, startId)
+            return startResult
         }
         isNew = intent.getBooleanExtra("isNew", true)
+        upNotificationJob?.cancel()
         if (isNew) {
-            intent.getStringExtra("videoUrl")?.let {
-                VideoPlay.videoUrl = it
-                VideoPlay.singleUrl = true
-            }
-            intent.getStringExtra("videoTitle")?.let {
-                VideoPlay.videoTitle = it
-            }
+            mediaNotificationReady = false
+            VideoPlay.stopLoading()
+            VideoPlay.releaseAllVideos()
+            startForegroundNotification()
+            val videoUrl = intent.getStringExtra("videoUrl")
+            VideoPlay.videoUrl = videoUrl
+            VideoPlay.singleUrl = videoUrl != null
+            VideoPlay.videoTitle = intent.getStringExtra("videoTitle")
             val sourceKey = intent.getStringExtra("sourceKey")
             val sourceType = intent.getIntExtra("sourceType", 0)
             val bookUrl = intent.getStringExtra("bookUrl")
             val record = intent.getStringExtra("record")
             VideoPlay.inBookshelf = intent.getBooleanExtra("inBookshelf", true)
             if (!VideoPlay.initSource(sourceKey, sourceType, bookUrl, record)) {
-                stopSelf()
+                stopSelfResult(startId)
                 return START_NOT_STICKY
             }
             VideoPlay.startPlay(playerView)
@@ -244,7 +255,11 @@ class VideoPlayService : BaseService() {
         if (floatingView.parent == null) {
             createFloatingWindow()
         }
-        return super.onStartCommand(intent, flags, startId)
+        if (!isNew) {
+            mediaNotificationReady = true
+            upVideoPlayNotification()
+        }
+        return startResult
     }
 
     @SuppressLint("UnspecifiedImmutableFlag")
@@ -279,10 +294,21 @@ class VideoPlayService : BaseService() {
     }
 
     private fun upVideoPlayNotification() {
+        if (!mediaNotificationReady) return
+        upNotificationJob?.cancel()
         upNotificationJob = execute {
             try {
                 val notification = createNotification()
-                notificationManager.notify(NotificationId.VideoPlayService, notification.build())
+                withContext(Main) {
+                    if (mediaNotificationReady) {
+                        notificationManager.notify(
+                            NotificationId.VideoPlayService,
+                            notification.build()
+                        )
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 AppLog.put("创建视频播放通知出错,${e.localizedMessage}", e, true)
             }
@@ -290,14 +316,15 @@ class VideoPlayService : BaseService() {
     }
 
     override fun startForegroundNotification() {
-        try {
-            val notification = createNotification()
-            startForeground(NotificationId.VideoPlayService, notification.build())
-        } catch (e: Exception) {
-            AppLog.put("创建视频播放通知出错,${e.localizedMessage}", e, true)
-            //创建通知出错不结束服务就会崩溃,服务必须绑定通知
-            stopSelf()
-        }
+        val notification = NotificationCompat.Builder(this, AppConst.channelIdReadAloud)
+            .setSmallIcon(R.drawable.ic_volume_up)
+            .setSubText(getString(R.string.video))
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setContentTitle(getString(R.string.video))
+            .setContentIntent(activityPendingIntent<VideoPlayerActivity>("activity"))
+            .build()
+        startForeground(NotificationId.VideoPlayService, notification)
     }
 
     /**
@@ -379,7 +406,8 @@ class VideoPlayService : BaseService() {
     }
 
     private fun createNotification(): NotificationCompat.Builder {
-        val nTitle = getString(R.string.audio_play_t) + ": $VideoPlay.videoTitle"
+        val videoTitle = VideoPlay.videoTitle ?: getString(R.string.video)
+        val nTitle = getString(R.string.audio_play_t) + ": $videoTitle"
         val nSubtitle = getString(R.string.audio_play_s)
         val builder = NotificationCompat.Builder(this@VideoPlayService, AppConst.channelIdReadAloud)
             .setSmallIcon(R.drawable.ic_volume_up)
@@ -524,6 +552,7 @@ class VideoPlayService : BaseService() {
         }
         playerView.setVideoAllCallBack(object : GSYSampleCallBack() {
             override fun onPrepared(url: String?, vararg objects: Any?) {
+                mediaNotificationReady = true
                 upMediaMetadata()
                 upPlayProgress()
                 upVideoPlayNotification()

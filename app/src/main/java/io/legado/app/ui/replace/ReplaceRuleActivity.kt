@@ -22,6 +22,8 @@ import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.DirectLinkUpload
 import io.legado.app.help.SourceSharePassphrase
 import io.legado.app.help.book.ContentProcessor
+import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.ReplacePreviewConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.sourceSharePassphraseButton
@@ -38,13 +40,17 @@ import io.legado.app.ui.widget.recycler.VerticalDivider
 import io.legado.app.utils.ACache
 import io.legado.app.utils.GSON
 import io.legado.app.utils.applyTint
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.launch
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setEdgeEffectColor
+import io.legado.app.utils.share
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.showHelp
 import io.legado.app.utils.splitNotBlank
+import io.legado.app.utils.stackTraceStr
+import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.transaction
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
@@ -54,6 +60,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
+import java.io.File
 
 /**
  * 替换规则管理
@@ -128,6 +135,7 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
         groupMenu = menu.findItem(R.id.menu_group)?.subMenu
+        menu.findItem(R.id.menu_manual_replace_rule)?.isChecked = AppConfig.manualReplaceRule
         upGroupMenu()
         return super.onPrepareOptionsMenu(menu)
     }
@@ -249,6 +257,12 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
                 editActivity.launch(ReplaceEditActivity.startIntent(this))
 
             R.id.menu_group_manage -> showDialogFragment<GroupManageDialog>()
+            R.id.menu_manual_replace_rule -> {
+                AppConfig.manualReplaceRule = !AppConfig.manualReplaceRule
+                item.isChecked = AppConfig.manualReplaceRule
+                setResult(RESULT_OK)
+                invalidateOptionsMenu()
+            }
             R.id.menu_enabled_group -> {
                 searchView.setQuery(getString(R.string.enabled), true)
             }
@@ -280,18 +294,75 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
         when (item?.itemId) {
             R.id.menu_enable_selection -> viewModel.enableSelection(adapter.selection)
             R.id.menu_disable_selection -> viewModel.disableSelection(adapter.selection)
+            R.id.menu_add_group -> selectionAddToGroups()
+            R.id.menu_remove_group -> selectionRemoveFromGroups()
             R.id.menu_top_sel -> viewModel.topSelect(adapter.selection)
             R.id.menu_bottom_sel -> viewModel.bottomSelect(adapter.selection)
+            R.id.menu_share_source -> shareSelection()
             R.id.menu_export_selection -> exportResult.launch {
                 mode = HandleFileContract.EXPORT
                 fileData = HandleFileContract.FileData(
                     "exportReplaceRule.json",
-                    GSON.toJson(adapter.selection).toByteArray(),
+                    GSON.toJson(ReplacePreviewConfig.withSamples(adapter.selection)).toByteArray(),
                     "application/json"
                 )
             }
         }
         return false
+    }
+
+    private fun shareSelection() {
+        val rules = adapter.selection.toList()
+        if (rules.isEmpty()) return
+        viewModel.execute(scope = lifecycleScope) {
+            File.createTempFile("replaceRule_", ".json", cacheDir).apply {
+                writeText(GSON.toJson(ReplacePreviewConfig.withSamples(rules)))
+            }
+        }.onSuccess {
+            share(it)
+        }.onError {
+            toastOnUi(it.stackTraceStr)
+        }
+    }
+
+    @SuppressLint("InflateParams")
+    private fun selectionAddToGroups() {
+        alert(titleResource = R.string.add_group) {
+            val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
+                editView.setHint(R.string.group_name)
+                editView.setFilterValues(groups.toList())
+                editView.dropDownHeight = 180.dpToPx()
+            }
+            customView { alertBinding.root }
+            okButton {
+                alertBinding.editView.text?.toString()?.let {
+                    if (it.isNotEmpty()) {
+                        viewModel.selectionAddToGroups(adapter.selection, it)
+                    }
+                }
+            }
+            cancelButton()
+        }
+    }
+
+    @SuppressLint("InflateParams")
+    private fun selectionRemoveFromGroups() {
+        alert(titleResource = R.string.remove_group) {
+            val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
+                editView.setHint(R.string.group_name)
+                editView.setFilterValues(groups.toList())
+                editView.dropDownHeight = 180.dpToPx()
+            }
+            customView { alertBinding.root }
+            okButton {
+                alertBinding.editView.text?.toString()?.let {
+                    if (it.isNotEmpty()) {
+                        viewModel.selectionRemoveFromGroups(adapter.selection, it)
+                    }
+                }
+            }
+            cancelButton()
+        }
     }
 
     private fun upGroupMenu() = groupMenu?.transaction { menu ->

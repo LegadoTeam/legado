@@ -25,13 +25,17 @@ object CookieStore : CookieManagerInterface {
      */
     override fun setCookie(url: String, cookie: String?) {
         try {
-            val domain = NetworkUtils.getSubDomain(url)
-            CacheManager.putMemory("${domain}_cookie", cookie ?: "")
-            val cookieBean = Cookie(domain, cookie ?: "")
-            appDb.cookieDao.insert(cookieBean)
+            saveCookie(url, cookie)
         } catch (e: Exception) {
             AppLog.put("保存Cookie失败\n$e", e)
         }
+    }
+
+    private fun saveCookie(url: String, cookie: String?) {
+        val domain = NetworkUtils.getSubDomain(url)
+        val cookieValue = cookie ?: ""
+        appDb.cookieDao.insert(Cookie(domain, cookieValue))
+        CacheManager.putMemory("${domain}_cookie", cookieValue)
     }
 
     fun setWebCookie(url: String, cookie: String) {
@@ -52,15 +56,27 @@ object CookieStore : CookieManagerInterface {
         if (TextUtils.isEmpty(url) || TextUtils.isEmpty(cookie)) {
             return
         }
-        val oldCookie = getCookieNoSession(url)
-        if (TextUtils.isEmpty(oldCookie)) {
-            setCookie(url, cookie)
-        } else {
-            val cookieMap = cookieToMap(oldCookie)
-            cookieMap.putAll(cookieToMap(cookie))
-            val newCookie = mapToCookie(cookieMap)
-            setCookie(url, newCookie)
+        setCookie(url, mergeCookie(url, cookie))
+    }
+
+    internal fun restoreCookie(url: String, cookie: String) {
+        if (TextUtils.isEmpty(url) || TextUtils.isEmpty(cookie)) {
+            return
         }
+        saveCookie(url, mergeCookie(url, cookie))
+    }
+
+    private fun mergeCookie(url: String, cookie: String): String {
+        return mergeCookieValues(getCookieNoSession(url), cookie)
+    }
+
+    internal fun mergeCookieValues(oldCookie: String, cookie: String): String {
+        if (oldCookie.isEmpty()) {
+            return cookie
+        }
+        val cookieMap = cookieToMap(oldCookie)
+        cookieMap.putAll(cookieToMap(cookie))
+        return mapToCookie(cookieMap).orEmpty()
     }
 
     /**

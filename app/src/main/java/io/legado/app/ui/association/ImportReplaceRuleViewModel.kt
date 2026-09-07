@@ -11,6 +11,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.ReplaceAnalyzer
+import io.legado.app.help.config.ReplacePreviewConfig
 import io.legado.app.help.http.decompressed
 import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
@@ -77,7 +78,8 @@ class ImportReplaceRuleViewModel(app: Application) : BaseViewModel(app) {
                     selectRules.add(rule)
                 }
             }
-            appDb.replaceRuleDao.insert(*selectRules.toTypedArray())
+            val insertedIds = appDb.replaceRuleDao.insert(*selectRules.toTypedArray())
+            ReplacePreviewConfig.saveImportedSamples(selectRules, insertedIds)
         }.onFinally {
             finally.invoke()
         }

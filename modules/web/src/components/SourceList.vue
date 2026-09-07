@@ -6,6 +6,13 @@
       :prefix-icon="Search"
       placeholder="筛选源"
     />
+    <SourceCheckControls v-if="isBookSource" :sources="sourceSelect" :active="store.sourceMode === 'json' && store.currentTab === 'editList'" />
+    <el-checkbox
+      :model-value="sourcesFiltered.length > 0 && sourceSelect.length === sourcesFiltered.length"
+      :indeterminate="sourceSelect.length > 0 && sourceSelect.length < sourcesFiltered.length"
+      :disabled="sourcesFiltered.length === 0"
+      @change="selectVisible"
+    >全选当前筛选</el-checkbox>
     <div class="tool">
       <el-button @click="importSourceFile" :icon="Folder">打开</el-button>
       <el-button
@@ -51,6 +58,7 @@ import {
 } from '@utils/souce'
 import VirtualList from 'vue3-virtual-scroll-list'
 import SourceItem from './SourceItem.vue'
+import SourceCheckControls from './SourceCheckControls.vue'
 import type { Source } from '@/source'
 
 const store = useSourceStore()
@@ -61,23 +69,31 @@ const sources = computed(() => store.sources)
 /* 筛选源 */
 const sourcesFiltered = computed<Source[]>(() => {
   const key = searchKey.value
-  if (key === '') return sources.value
-  return sources.value.filter(source => isSourceMatches(source, key))
+  return sources.value.filter(source =>
+    (key === '' || isSourceMatches(source, key)) &&
+    (!isBookSource || !store.checkStatusFilter || store.checkStatus(source) === store.checkStatusFilter))
 })
 // 计算当前筛选关键词下的选中源
 const sourceSelect = computed<Source[]>(() => {
   const urls = sourceUrlSelect.value
   if (urls.length == 0) return []
-  const sourcesFilteredMap =
-    searchKey.value == ''
-      ? store.sourcesMap
-      : convertSourcesToMap(sourcesFiltered.value)
+  const sourcesFilteredMap = convertSourcesToMap(sourcesFiltered.value)
   return urls.reduce((sources, sourceUrl) => {
     const source = sourcesFilteredMap.get(sourceUrl)
     if (source) sources.push(source)
     return sources
   }, [] as Source[])
 })
+
+const selectVisible = (selected: string | number | boolean) => {
+  const urls = new Set(sourceUrlSelect.value)
+  sourcesFiltered.value.forEach(source => {
+    const url = getSourceUniqueKey(source)
+    if (selected) urls.add(url)
+    else urls.delete(url)
+  })
+  sourceUrlSelect.value = Array.from(urls)
+}
 
 const deleteSelectSources = () => {
   const sourceSelectValue = sourceSelect.value
@@ -125,7 +141,7 @@ const isBookSource = /bookSource/i.test(window.location.href)
 const outExport = () => {
   const exportFile = document.createElement('a')
   const sources =
-      sourceUrlSelect.value.length === 0
+      sourceSelect.value.length === 0
         ? sourcesFiltered.value
         : sourceSelect.value,
     sourceType = isBookSource ? 'BookSource' : 'RssSource'

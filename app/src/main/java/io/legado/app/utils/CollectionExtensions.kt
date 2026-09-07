@@ -1,5 +1,24 @@
 package io.legado.app.utils
 
+internal fun <T, K> mergeFilteredOrder(
+    allItems: List<T>,
+    orderedItems: List<T>,
+    keySelector: (T) -> K,
+): List<T> {
+    val allByKey = allItems.associateBy(keySelector)
+    val orderedKeys = orderedItems.mapTo(linkedSetOf(), keySelector)
+        .filter(allByKey::containsKey)
+    val orderedKeySet = orderedKeys.toHashSet()
+    val orderedIterator = orderedKeys.iterator()
+    return allItems.map { item ->
+        if (keySelector(item) in orderedKeySet) {
+            allByKey.getValue(orderedIterator.next())
+        } else {
+            item
+        }
+    }
+}
+
 fun List<Float>.fastSum(): Float {
     var sum = 0f
     for (i in indices) {

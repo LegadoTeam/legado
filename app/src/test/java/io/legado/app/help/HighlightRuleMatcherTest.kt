@@ -32,6 +32,37 @@ class HighlightRuleMatcherTest {
     }
 
     @Test
+    fun `title and body scopes preserve local anchors and chapter offsets`() {
+        val matches = HighlightRuleMatcher.match(
+            "Title\nBody",
+            listOf(
+                Rule(
+                    1,
+                    "^Title$",
+                    true,
+                    style,
+                    applyToTitle = true,
+                    applyToBody = false
+                ),
+                Rule(2, "^Body$", true, style),
+                Rule(3, "Title\nBody", false, style, applyToTitle = true),
+                Rule(4, "Body", false, style, applyToBody = false)
+            ),
+            titleLength = 6
+        )
+
+        assertEquals(
+            listOf(1L to (0 to 5), 2L to (6 to 10), 3L to (0 to 10)),
+            matches.map { it.ruleId to (it.start to it.end) }
+        )
+        assertTrue(matches.first().applyToTitle)
+        assertFalse(matches.first().applyToBody)
+        assertTrue(matches[1].applyToBody)
+        assertFalse(matches[1].applyToTitle)
+        assertTrue(matches.last().applyToTitle && matches.last().applyToBody)
+    }
+
+    @Test
     fun `zero width and invalid regexes are skipped`() {
         assertTrue(
             HighlightRuleMatcher.match("bbb", listOf(Rule(1, "a*", true, style))).isEmpty()

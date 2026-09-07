@@ -149,6 +149,13 @@
         app:isBottomBackground="true" />
 
     <io.legado.app.lib.prefs.Preference
+        android:key="pullBookmarkDistance"
+        android:summary="@string/pull_bookmark_distance_summary"
+        android:title="@string/pull_bookmark_distance_title"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
+    <io.legado.app.lib.prefs.Preference
         android:key="pageTouchSlop"
         android:summary="@string/page_touch_slop_summary"
         android:title="@string/page_touch_slop_title"
@@ -173,6 +180,22 @@
         android:defaultValue="true"
         android:key="selectText"
         android:title="@string/selectText"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:defaultValue="false"
+        android:key="longPressSelectParagraph"
+        android:summary="@string/long_press_select_paragraph_summary"
+        android:title="@string/long_press_select_paragraph"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:defaultValue="false"
+        android:key="twoFingerReplacePreview"
+        android:summary="@string/two_finger_replace_preview_summary"
+        android:title="@string/two_finger_replace_preview"
         app:iconSpaceReserved="false"
         app:isBottomBackground="true" />
 
@@ -241,10 +264,22 @@
         app:iconSpaceReserved="false"
         app:isBottomBackground="true" />
 
+    <io.legado.app.lib.prefs.Preference
+        android:key="customReaderMenu"
+        android:summary="@string/reader_menu_config_summary"
+        android:title="@string/reader_menu_config"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
     <io.legado.app.lib.prefs.SwitchPreference
         android:defaultValue="true"
         android:key="showReadTitleAddition"
         android:title="@string/show_read_title_addition" />
+
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:defaultValue="false"
+        android:key="showReadTitleChapterNameOnly"
+        android:title="@string/show_read_title_chapter_name_only" />
 
     <io.legado.app.lib.prefs.SwitchPreference
         android:defaultValue="false"

@@ -27,4 +27,26 @@ class TtsPageFollowTest {
         assertTrue(service.contains("AppConfig.recordLog && !rangeCallbackLogged"))
         assertTrue(service.contains("AppLog.putDebug(\"\$TAG \$msg\")"))
     }
+
+    @Test
+    fun `stale tts callbacks cannot mutate a newer playback session`() {
+        val service = listOf(
+            File("src/main/java/io/legado/app/service/TTSReadAloudService.kt"),
+            File("app/src/main/java/io/legado/app/service/TTSReadAloudService.kt")
+        ).first(File::isFile).readText()
+
+        assertTrue(service.contains("private val playbackSessionId = AtomicLong()"))
+        assertTrue(service.contains("speakCurrent("))
+        assertTrue(service.contains("TextToSpeech.QUEUE_FLUSH"))
+        assertTrue(service.contains("utteranceId(sessionId, index)"))
+        assertTrue(service.contains("callbackHandler.post"))
+        assertTrue(service.contains("if (sessionId != playbackSessionId.get()) return"))
+        assertTrue(service.contains("if (sessionId == playbackSessionId.get()) block()"))
+        assertTrue(
+            service.substringAfter("private fun dispatchCurrentCallback")
+                .contains("synchronized(this)")
+        )
+        assertTrue(service.contains("private fun speakCurrent("))
+        assertTrue(service.contains("synchronized(this)"))
+    }
 }

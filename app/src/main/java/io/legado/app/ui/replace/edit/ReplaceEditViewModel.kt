@@ -6,6 +6,7 @@ import io.legado.app.base.BaseViewModel
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.config.ReplacePreviewConfig
 import io.legado.app.utils.*
 import kotlinx.coroutines.Dispatchers
 
@@ -52,13 +53,21 @@ class ReplaceEditViewModel(application: Application) : BaseViewModel(application
         }
     }
 
+    fun sampleFor(ruleId: Long): String = ReplacePreviewConfig.sample(ruleId)
+
+    fun saveSample(ruleId: Long, sample: String) {
+        ReplacePreviewConfig.saveSample(ruleId, ReplacePreview.normalizeSample(sample))
+    }
+
     fun save(replaceRule: ReplaceRule, success: () -> Unit) {
         execute {
             replaceRule.checkValid()
             if (replaceRule.order == Int.MIN_VALUE) {
                 replaceRule.order = appDb.replaceRuleDao.maxOrder + 1
             }
-            appDb.replaceRuleDao.insert(replaceRule)
+            appDb.replaceRuleDao.insert(replaceRule).firstOrNull()?.let {
+                replaceRule.id = it
+            }
         }.onSuccess {
             success()
         }.onError {

@@ -3,13 +3,17 @@ package io.legado.app.ui.book.read.page
 import android.content.Context
 import android.graphics.drawable.LayerDrawable
 import android.view.LayoutInflater
+import android.view.View
 import android.widget.FrameLayout
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.doOnLayout
 import androidx.core.view.isGone
 import androidx.core.view.isInvisible
+import androidx.core.view.isVisible
+import androidx.core.view.updateLayoutParams
 import io.legado.app.R
 import io.legado.app.constant.AppConst.timeFormat
 import io.legado.app.data.entities.BookHighlight
@@ -20,6 +24,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ReadTipConfig
 import io.legado.app.help.config.ReaderInfoValues
+import io.legado.app.lib.theme.accentColor
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.ReadBookActivity
 import io.legado.app.ui.book.read.page.entities.TextLine
@@ -37,6 +42,14 @@ import io.legado.app.utils.setTextIfNotEqual
 import splitties.views.backgroundColor
 import java.util.Date
 
+internal object BookmarkIndicatorGeometry {
+    fun marginRight(rootPaddingRight: Int, headerPaddingRight: Int, indicatorPaddingRight: Int): Int =
+        rootPaddingRight + headerPaddingRight - indicatorPaddingRight
+
+    fun top(baseline: Int, height: Int, paddingBottom: Int, minTop: Int): Int =
+        (baseline - height + paddingBottom).coerceAtLeast(minTop)
+}
+
 /**
  * 页面视图
  */
@@ -48,6 +61,7 @@ class PageView(context: Context) : FrameLayout(context) {
     private var readerInfoValues = ReaderInfoValues(battery = 100)
     private var readerInfoViews = emptyArray<ReaderInfoView>()
     private var isMainView = false
+    private var bookmarkIndicatorVisible = false
     var isScroll = false
 
     val headerHeight: Int
@@ -60,9 +74,27 @@ class PageView(context: Context) : FrameLayout(context) {
         get() {
             return binding.vwRoot.paddingStart
         }
+    fun bookmarkIndicatorMarginRight(indicatorPaddingRight: Int): Int =
+        BookmarkIndicatorGeometry.marginRight(
+            binding.vwRoot.paddingRight,
+            binding.llHeader.paddingRight,
+            indicatorPaddingRight,
+        )
+
+    fun bookmarkIndicatorTop(height: Int, paddingBottom: Int): Int {
+        val baseline = binding.llHeader.top + binding.tvHeaderRight.top +
+                binding.tvHeaderRight.baseline
+        return BookmarkIndicatorGeometry.top(
+            baseline,
+            height,
+            paddingBottom,
+            binding.vwRoot.paddingTop,
+        )
+    }
 
     init {
         if (!isInEditMode) {
+            binding.pageBookmarkIndicator.setColorFilter(context.accentColor)
             upStyle()
             binding.vwStatusBar.applyStatusBarPadding()
             binding.vwNavigationBar.applyNavigationBarPadding()
@@ -147,6 +179,9 @@ class PageView(context: Context) : FrameLayout(context) {
                     insets.right,
                     insets.bottom
                 )
+                if (isMainView) {
+                    readBookActivity?.upBookmarkIndicator()
+                }
                 windowInsets
             }
         } else {
@@ -200,7 +235,7 @@ class PageView(context: Context) : FrameLayout(context) {
             readerInfoView.view.apply {
                 isBattery = false
                 typeface = ChapterProvider.typeface
-                textSize = 12f
+                textSize = ReadTipConfig.tipTextSize.toFloat()
             }
         }
     }
@@ -209,6 +244,17 @@ class PageView(context: Context) : FrameLayout(context) {
         readerInfoViews.forEach { readerInfoView ->
             val view = readerInfoView.view
             val template = readerInfoView.template
+            if (view === binding.tvHeaderRight) {
+                view.minimumWidth = 0
+                if (bookmarkIndicatorVisible) {
+                    view.minimumWidth = 32.dpToPx()
+                    view.setTextIfNotEqual(" ")
+                    view.contentDescription = context.getString(R.string.bookmark)
+                    view.isGone = false
+                    return@forEach
+                }
+                view.contentDescription = null
+            }
             if (view === binding.tvFooterLeft) {
                 view.isInvisible = template.isEmpty()
             } else {
@@ -218,6 +264,56 @@ class PageView(context: Context) : FrameLayout(context) {
                 view.setTextIfNotEqual(
                     ReaderInfoTemplateRenderer.render(template, readerInfoValues)
                 )
+            }
+        }
+    }
+
+    fun showBookmarkIndicator(show: Boolean) {
+        val showInHeader = show && !binding.llHeader.isGone
+        if (bookmarkIndicatorVisible != showInHeader) {
+            bookmarkIndicatorVisible = showInHeader
+            renderReaderInfo()
+        }
+        binding.pageBookmarkIndicator.isVisible = show
+        if (show) {
+            binding.pageBookmarkIndicator.run {
+                val width = if (showInHeader) 32 else 20
+                val height = if (showInHeader) 32 else 40
+                updateLayoutParams {
+                    this.width = width.dpToPx()
+                    this.height = height.dpToPx()
+                }
+                val padding = if (showInHeader) 4.dpToPx() else 0
+                setPadding(padding, padding, padding, padding)
+                setImageResource(
+                    if (showInHeader) R.drawable.ic_bookmark_filled
+                    else R.drawable.ic_bookmark_long
+                )
+                importantForAccessibility = if (showInHeader) {
+                    View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                } else {
+                    View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+                }
+            }
+            doOnLayout {
+                if (binding.pageBookmarkIndicator.isVisible) {
+                    binding.pageBookmarkIndicator.run {
+                        if (showInHeader) {
+                            translationX = (
+                                this@PageView.width -
+                                    bookmarkIndicatorMarginRight(paddingRight) - right
+                                ).toFloat()
+                            translationY = (
+                                bookmarkIndicatorTop(layoutParams.height, paddingBottom) - top
+                                ).toFloat()
+                        } else {
+                            translationX = (
+                                this@PageView.width - binding.vwRoot.paddingRight - right
+                                ).toFloat()
+                            translationY = (headerHeight - top).toFloat()
+                        }
+                    }
+                }
             }
         }
     }
@@ -270,7 +366,11 @@ class PageView(context: Context) : FrameLayout(context) {
     /**
      * 设置内容
      */
-    fun setContent(textPage: TextPage, resetPageOffset: Boolean = true) {
+    fun setContent(
+        textPage: TextPage,
+        resetPageOffset: Boolean = true,
+        chapterPosition: Int = ReadBook.durChapterPos,
+    ) {
         if (isMainView && !isScroll) {
             setProgress(textPage)
         } else {
@@ -283,7 +383,7 @@ class PageView(context: Context) : FrameLayout(context) {
         }
         binding.contentTextView.setContent(textPage)
         if (resetPageOffset && isMainView && isScroll) {
-            binding.contentTextView.restorePageOffset(ReadBook.durChapterPos)
+            binding.contentTextView.restorePageOffset(chapterPosition)
         }
     }
 

@@ -21,4 +21,32 @@
         android:textColor="@color/secondaryText"
         android:textIsSelectable="true" />
 
+    <LinearLayout
+        android:id="@+id/beta_actions"
+        style="?android:attr/buttonBarStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <Button
+            android:id="@+id/btn_beta_cancel"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/text_return"
+            android:textColor="@color/primaryText" />
+
+        <Button
+            android:id="@+id/btn_beta_update"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/beta_update_now"
+            android:textColor="@color/primaryText" />
+
+    </LinearLayout>
+
 </LinearLayout>

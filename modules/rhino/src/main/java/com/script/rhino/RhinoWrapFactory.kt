@@ -75,6 +75,7 @@ object RhinoWrapFactory : WrapFactory() {
                         javaObject = javaObject,
                         staticType = resolvedType,
                         declaredElementType = if (useRuntimeListType) declaredType.param(0) else null,
+                        preserveIndexOverrides = useRuntimeListType,
                     )
 
                 Map::class.java.isAssignableFrom(resolvedType.asClass()) ->

@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import androidx.recyclerview.widget.RecyclerView.RecycledViewPool
+import io.legado.app.R
 import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
@@ -12,6 +13,7 @@ import io.legado.app.constant.EventBus
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.saveReadRecordSnapshot
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.DefaultData
 import io.legado.app.help.book.BookHelp
@@ -19,13 +21,16 @@ import io.legado.app.help.book.addType
 import io.legado.app.help.book.isUpError
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.sync
+import io.legado.app.help.book.update
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.LocalConfig
 import io.legado.app.model.CacheBook
 import io.legado.app.model.ReadBook
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.CacheBookService
 import io.legado.app.utils.onEachParallel
 import io.legado.app.utils.postEvent
+import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -207,7 +212,7 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
             if (source == null) {
                 if (!book.isUpError) {
                     book.addType(BookType.updateError)
-                    appDb.bookDao.update(book)
+                    book.update()
                 }
                 return
             }
@@ -255,7 +260,7 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
                         replacedBook = currentBook
                         appDb.bookDao.replace(currentBook, book)
                     } else {
-                        appDb.bookDao.update(book)
+                        book.update()
                     }
                     appDb.bookChapterDao.delByBook(bookUrl)
                     appDb.bookChapterDao.insert(*toc.toTypedArray())
@@ -277,7 +282,7 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
                 //这里可能因为时间太长书籍信息已经更改,所以重新获取
                 appDb.bookDao.getBook(persistedBookUrl)?.let { book ->
                     book.addType(BookType.updateError)
-                    appDb.bookDao.update(book)
+                    book.update()
                 }
             }
         } finally {
@@ -345,14 +350,20 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
-    fun restoreWebDav(name: String) {
-        execute {
+    fun restoreWebDav(name: String, restoredLastBackup: Long) {
+        executeLazy {
             AppWebDav.restoreWebDav(name)
-        }
+        }.onSuccess {
+            LocalConfig.lastBackup = maxOf(LocalConfig.lastBackup, restoredLastBackup)
+        }.onError {
+            AppLog.put("WebDav恢复出错\n${it.localizedMessage}", it)
+            context.toastOnUi("${context.getString(R.string.restore_fail)}\n${it.localizedMessage}")
+        }.start()
     }
 
     private fun deleteNotShelfBook() {
         execute {
+            appDb.bookDao.getNotShelfBooks().forEach { it.saveReadRecordSnapshot() }
             appDb.bookDao.deleteNotShelfBook()
         }
     }

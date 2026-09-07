@@ -7,6 +7,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.EditText
+import androidx.activity.addCallback
 import androidx.core.view.children
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
@@ -75,6 +76,7 @@ class AutoTaskEditActivity : BaseActivity<ActivityAutoTaskEditBinding>() {
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        onBackPressedDispatcher.addCallback(this) { finish() }
         initFieldNavigation()
         val id = intent.getStringExtra(EXTRA_ID)
         if (id == null) {
@@ -111,7 +113,7 @@ class AutoTaskEditActivity : BaseActivity<ActivityAutoTaskEditBinding>() {
                 startActivity(AutoTaskDebugActivity.intent(this, saved.id))
             }
             R.id.menu_login -> save { saved ->
-                if (saved.loginUrl.isNullOrBlank()) {
+                if (!AutoTask.buildSource(saved).hasLogin()) {
                     toastOnUi(R.string.source_no_login)
                 } else {
                     startActivity<SourceLoginActivity> {
@@ -177,6 +179,7 @@ class AutoTaskEditActivity : BaseActivity<ActivityAutoTaskEditBinding>() {
             R.id.et_script -> binding.etScript to R.string.auto_task_script
             R.id.et_header -> binding.etHeader to R.string.auto_task_header
             R.id.et_js_lib -> binding.etJsLib to R.string.auto_task_js_lib
+            R.id.et_login_url -> binding.etLoginUrl to R.string.login_url
             R.id.et_login_ui -> binding.etLoginUi to R.string.login_ui
             R.id.et_login_check_js -> binding.etLoginCheckJs to R.string.login_check_js
             else -> null

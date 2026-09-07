@@ -74,11 +74,11 @@ jobs:
         if: ${{ matrix.type == 'release' }}
         run: node .github/scripts/test-help-highlight.js
 
-      - name: Setup JDK 17
-        uses: actions/setup-java@v5
+      - name: Setup JDK 21
+        uses: actions/setup-java@v6
         with:
           distribution: 'temurin'
-          java-version: 17
+          java-version: 21
 
       - name: Verify Cronet Bundle
         if: ${{ matrix.type == 'release' }}
@@ -95,7 +95,7 @@ jobs:
         run: bash .github/scripts/test-push-web-assets.sh
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6.2.0
+        uses: gradle/actions/setup-gradle@v6.3.0
 
       - name: Prepare Assets
         run: |
@@ -230,7 +230,7 @@ jobs:
             )
             for asset in "${required_license_assets[@]}"; do
               if ! unzip -Z1 "$apk" | grep -qx \
-                "assets/licenses/htmlunit-core-js/5.3.0-legado.3/$asset"; then
+                "assets/licenses/htmlunit-core-js/5.3.0-legado.4/$asset"; then
                 echo "$package_kind APK is missing htmlunit-core-js asset: $asset"
                 exit 1
               fi

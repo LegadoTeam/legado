@@ -46,6 +46,7 @@
     <string-array name="highlight_action_trigger_value">
         <item>click</item>
         <item>longPress</item>
+        <item>off</item>
     </string-array>
 
     <string-array name="double_page_value">

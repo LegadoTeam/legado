@@ -36,7 +36,7 @@ jobs:
       contents: write
     strategy:
       matrix:
-        product: [ app, google ]
+        product: [ app ]
       fail-fast: false
     runs-on: ubuntu-latest
     env:
@@ -48,11 +48,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v5
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
         with:
           distribution: 'temurin'
-          java-version: 17
+          java-version: 21
 
       - name: Release Apk Sign
         run: |
@@ -71,7 +71,7 @@ jobs:
           sed "/def version/c def version = \"${{ env.VERSION }}\"" $GITHUB_WORKSPACE/app/build.gradle  -i
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6.2.0
+        uses: gradle/actions/setup-gradle@v6.3.0
 
       - name: Build With Gradle
         run: |

@@ -115,6 +115,9 @@ class SelectActionBarPopupActionMigrationTest {
                 "@+id/menu_remove_to_group",
                 "@+id/menu_change_source",
                 "@+id/menu_clear_cache",
+                "@+id/menu_persist_covers",
+                "@+id/menu_restore_network_covers",
+                "@+id/menu_restore_source_covers",
                 "@+id/menu_check_selected_interval",
                 "@+id/menu_update_toc",
                 "@+id/menu_create_book_update_tasks"
@@ -136,19 +139,24 @@ class SelectActionBarPopupActionMigrationTest {
             "txt_toc_rule_sel.xml" to listOf(
                 "@+id/menu_enable_selection",
                 "@+id/menu_disable_selection",
-                "@+id/menu_export_selection"
+                "@+id/menu_export_selection",
+                "@+id/menu_share_source"
             ),
             "dict_rule_sel.xml" to listOf(
                 "@+id/menu_enable_selection",
                 "@+id/menu_disable_selection",
-                "@+id/menu_export_selection"
+                "@+id/menu_export_selection",
+                "@+id/menu_share_source"
             ),
             "replace_rule_sel.xml" to listOf(
                 "@+id/menu_enable_selection",
                 "@+id/menu_disable_selection",
+                "@+id/menu_add_group",
+                "@+id/menu_remove_group",
                 "@+id/menu_top_sel",
                 "@+id/menu_bottom_sel",
-                "@+id/menu_export_selection"
+                "@+id/menu_export_selection",
+                "@+id/menu_share_source"
             ),
             "rss_source_sel.xml" to listOf(
                 "@+id/menu_enable_selection",

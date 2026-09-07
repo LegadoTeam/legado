@@ -165,6 +165,18 @@ interface JsExtensions : JsEncodeUtils {
         return true
     }
 
+    fun refreshBookInfo() {
+        postEvent(EventBus.REFRESH_BOOK_INFO, true)
+    }
+
+    fun refreshBookToc() {
+        postEvent(EventBus.REFRESH_BOOK_TOC, true)
+    }
+
+    fun refreshContent() {
+        postEvent(EventBus.REFRESH_BOOK_CONTENT, true)
+    }
+
     private val context: CoroutineContext
         get() = rhinoContextOrNull?.coroutineContext ?: EmptyCoroutineContext
 

@@ -11,6 +11,7 @@ import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.base.VMBaseFragment
 import io.legado.app.constant.EventBus
+import io.legado.app.constant.AppLog
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
@@ -19,6 +20,7 @@ import io.legado.app.help.audio.AudioCacheManager
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.isAudio
 import io.legado.app.help.book.isLocal
+import io.legado.app.help.book.isPdf
 import io.legado.app.help.book.isVideo
 import io.legado.app.help.book.simulatedTotalChapterNum
 import io.legado.app.help.config.AppConfig
@@ -26,6 +28,9 @@ import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.model.AudioCacheKey
 import io.legado.app.model.AudioCacheStateChanged
+import io.legado.app.model.localBook.PdfFile
+import io.legado.app.model.localBook.PdfOutline
+import io.legado.app.model.localBook.PdfOutlineNode
 import io.legado.app.ui.widget.recycler.UpLinearLayoutManager
 import io.legado.app.ui.widget.recycler.VerticalDivider
 import io.legado.app.utils.ColorUtils
@@ -36,6 +41,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -49,6 +55,14 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     private val layoutManager by lazy { UpLinearLayoutManager(requireContext()) }
     private val adapter by lazy { ChapterListAdapter(requireContext(), this) }
     private val tocListState = TocListState()
+    private var pdfOutlineState: PdfOutlineListState? = null
+    private var pdfOutlineLoading = false
+    private val pdfOutlineAdapter by lazy {
+        PdfOutlineAdapter(requireContext(), ::openPdfOutline) { id ->
+            pdfOutlineState?.toggle(id)
+            showPdfOutline()
+        }
+    }
     private var durChapterIndex = 0
     private var chapterList: List<BookChapter> = emptyList()
     private var currentSearchKey: String? = null
@@ -77,6 +91,7 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     override fun onDestroyView() {
         chapterListJob?.cancel()
         cacheFileJob?.cancel()
+        pdfOutlineLoading = false
         pendingScrollItemKey = null
         pendingChapterScroll = null
         binding.recyclerView.adapter = null
@@ -101,8 +116,9 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
             layoutManager.scrollToPositionWithOffset(0, 0)
         }
         ivChapterBottom.setOnClickListener {
-            if (adapter.itemCount > 0) {
-                layoutManager.scrollToPositionWithOffset(adapter.itemCount - 1, 0)
+            val count = binding.recyclerView.adapter?.itemCount ?: 0
+            if (count > 0) {
+                layoutManager.scrollToPositionWithOffset(count - 1, 0)
             }
         }
         tvCurrentChapterInfo.setOnClickListener {
@@ -115,6 +131,9 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     private fun initBook(book: Book) {
         chapterListJob?.cancel()
         cacheFileJob?.cancel()
+        pdfOutlineState = null
+        pdfOutlineLoading = book.isPdf
+        binding.recyclerView.adapter = adapter
         durChapterIndex = book.durChapterIndex
         binding.tvCurrentChapterInfo.text =
             "${book.durChapterTitle}(${book.durChapterIndex + 1}/${book.simulatedTotalChapterNum()})"
@@ -124,31 +143,53 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
         pendingAudioCacheChanges.clear()
         tocListState.clear()
         chapterList = emptyList()
+        adapter.clearDisplayTitle()
         adapter.setItems(emptyList())
         val normalizedSearchKey = viewModel.searchKey?.takeIf { it.isNotBlank() }
         currentSearchKey = normalizedSearchKey
         pendingScrollItemKey = null
         pendingChapterScroll = null
         chapterListJob = viewLifecycleOwner.lifecycleScope.launch {
+            if (book.isPdf) {
+                val outline = try {
+                    withContext(IO) { PdfOutline.read(book) }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    AppLog.put("读取 PDF 目录失败", e)
+                    emptyList()
+                }
+                pdfOutlineLoading = false
+                if (outline.any { it.pageIndex != null }) {
+                    pdfOutlineState = PdfOutlineListState(outline, book.getTocExpanded())
+                    binding.recyclerView.adapter = pdfOutlineAdapter
+                    showPdfOutline()
+                    return@launch
+                }
+            }
             val chapters = queryChapterList(book)
             chapterList = chapters
             tocListState.setFullChapters(
                 chapters = chapters,
                 reverseOrder = book.getReverseToc(),
                 resetCollapse = true,
+                defaultExpanded = book.getTocExpanded(),
+                currentChapterIndex = durChapterIndex,
             )
+            val searchKey = currentSearchKey
             adapter.setItems(
-                if (normalizedSearchKey == null) {
+                if (searchKey == null) {
                     tocListState.showNormal(durChapterIndex)
                 } else {
                     tocListState.showSearch(
-                        searchResultIndexes = queryChapterIndexes(book, normalizedSearchKey),
+                        searchResultIndexes = queryChapterIndexes(book, searchKey),
                         currentChapterIndex = durChapterIndex,
                     )
                 }
             )
         }
         cacheFileJob = viewLifecycleOwner.lifecycleScope.launch {
+            if (book.isPdf) return@launch
             if (book.isAudio) {
                 var treeUri = AppConfig.audioCacheTreeUri
                 var cachedKeys: Set<AudioCacheKey>
@@ -210,6 +251,14 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
         resetCollapse: Boolean,
         replaceAll: Boolean,
     ) {
+        currentSearchKey = searchKey?.takeIf { it.isNotBlank() }
+        // Keep parsing the document when the user searches before the outline is ready.
+        if (pdfOutlineLoading) return
+        pdfOutlineState?.let { state ->
+            if (resetCollapse) state.setExpanded(book?.getTocExpanded() != false)
+            showPdfOutline()
+            return
+        }
         chapterListJob?.cancel()
         chapterListJob = viewLifecycleOwner.lifecycleScope.launch {
             val normalizedSearchKey = searchKey?.takeIf { it.isNotBlank() }
@@ -226,6 +275,8 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                         chapters = chapters,
                         reverseOrder = reverseOrder,
                         resetCollapse = resetCollapse,
+                        defaultExpanded = currentBook.getTocExpanded(),
+                        currentChapterIndex = durChapterIndex,
                     )
                 }
                 submitChapterItems(
@@ -241,6 +292,8 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                         chapters = chapters,
                         reverseOrder = reverseOrder,
                         resetCollapse = resetCollapse,
+                        defaultExpanded = currentBook.getTocExpanded(),
+                        currentChapterIndex = durChapterIndex,
                     )
                 }
                 submitChapterItems(
@@ -268,7 +321,9 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     private suspend fun queryChapterList(book: Book): List<BookChapter> {
         return withContext(IO) {
             val end = book.simulatedTotalChapterNum() - 1
-            appDb.bookChapterDao.getChapterList(book.bookUrl, 0, end)
+            appDb.bookChapterDao.getChapterList(book.bookUrl, 0, end).let { chapters ->
+                if (book.isPdf && book.getReverseToc()) chapters.asReversed() else chapters
+            }
         }
     }
 
@@ -287,6 +342,17 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     }
 
     private fun scrollToChapterIndex(chapterIndex: Int, expandVolume: Boolean) {
+        pdfOutlineState?.let { state ->
+            if (expandVolume) state.setExpanded(true)
+            showPdfOutline()
+            val rows = state.items(currentSearchKey, book?.getReverseToc() == true)
+            val closest = rows.withIndex().filter { it.value.node.pageIndex != null }
+                .minByOrNull { kotlin.math.abs(it.value.node.pageIndex!! - chapterIndex * PdfFile.PAGE_SIZE) }
+            binding.recyclerView.post {
+                layoutManager.scrollToPositionWithOffset(closest?.index ?: 0, 0)
+            }
+            return
+        }
         if (expandVolume && currentSearchKey == null &&
             tocListState.expandVolumeContainingChapter(chapterIndex)
         ) {
@@ -308,8 +374,10 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     }
 
     override fun onListChanged() {
+        if (pdfOutlineState != null) return
         if (pendingScrollItemKey != null || pendingChapterScroll != null) return
         viewLifecycleOwner.lifecycleScope.launch(Main) {
+            if (pdfOutlineState != null) return@launch
             val scrollPosition = if (currentSearchKey == null) {
                 tocListState.findFallbackVisiblePositionForChapterIndex(durChapterIndex)
                     .coerceAtLeast(0)
@@ -341,6 +409,7 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     }
 
     override fun onItemsUpdated() {
+        if (pdfOutlineState != null) return
         pendingChapterScroll?.let { chapterIndex ->
             pendingChapterScroll = null
             scrollToResolvedChapterPosition(chapterIndex)
@@ -365,7 +434,29 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     }
 
     override fun upAdapter() {
-        adapter.notifyItemRangeChanged(0, adapter.itemCount)
+        if (pdfOutlineState != null) showPdfOutline()
+        else adapter.notifyItemRangeChanged(0, adapter.itemCount)
+    }
+
+    private fun showPdfOutline() {
+        pdfOutlineState?.let { state ->
+            pdfOutlineAdapter.setItems(state.items(currentSearchKey, book?.getReverseToc() == true))
+        }
+    }
+
+    private fun openPdfOutline(node: PdfOutlineNode) {
+        val page = node.pageIndex ?: return
+        val currentBook = book ?: return
+        // The outline is navigation only; retain the persisted ten-page reading segments.
+        val index = page / PdfFile.PAGE_SIZE
+        if (index !in 0 until currentBook.totalChapterNum) return
+        activity?.run {
+            setResult(RESULT_OK, Intent()
+                .putExtra("index", index)
+                .putExtra(TocActivityResult.EXTRA_PDF_PAGE_INDEX, page)
+                .putExtra("chapterChanged", index != durChapterIndex))
+            finish()
+        }
     }
 
     override val scope: CoroutineScope

@@ -103,6 +103,81 @@ class BookSourceEditLayoutTest {
     }
 
     @Test
+    fun `edit adapters replay current safety state after holder reuse`() {
+        listOf(BOOK_SOURCE_ADAPTER_PATH, RSS_SOURCE_ADAPTER_PATH).forEach { path ->
+            val source = File(repositoryRoot, path).readText()
+            val bind = source.section(
+                "fun bind(editEntity: EditEntity)",
+                "private fun applyInteractionState()"
+            )
+            val stateUpdate = Regex(
+                "(?m)^\\s*isUnsafeText\\s*=\\s*!presentation\\.isInlineEditable\\s*$"
+            ).find(bind)?.range?.first ?: -1
+            val stateReplay = Regex(
+                "(?m)^\\s*applyInteractionState\\(\\)\\s*$"
+            ).find(bind)?.range?.first ?: -1
+
+            assertTrue(
+                "$path must keep safety state on the holder",
+                Regex("private\\s+var\\s+isUnsafeText\\s*=\\s*false").containsMatchIn(source)
+            )
+            assertTrue(
+                "$path must replay safety state when attached",
+                Regex(
+                    "onViewAttachedToWindow\\([^)]*\\)\\s*\\{\\s*" +
+                        "applyInteractionState\\(\\)"
+                ).containsMatchIn(source)
+            )
+            assertTrue("$path must update holder safety state while binding", stateUpdate >= 0)
+            assertTrue(
+                "$path must replay safety state after updating it",
+                stateReplay > stateUpdate
+            )
+            assertTrue(Regex("isFocusable\\s*=\\s*!isUnsafeText").containsMatchIn(source))
+            assertTrue(Regex("isFocusableInTouchMode\\s*=\\s*!isUnsafeText")
+                .containsMatchIn(source))
+        }
+    }
+
+    @Test
+    fun `source editor keeps the caret visible after selection and layout changes`() {
+        val source = File(repositoryRoot, ACTIVITY_PATH).readText()
+        val initView = source.section("private fun initView()", "private fun initOptionPanel()")
+        val sendText = source.section("override fun sendText(text: String)", "private fun setSourceVariable()")
+        val layoutManager = File(repositoryRoot, LAYOUT_MANAGER_PATH).readText()
+        val codeView = File(repositoryRoot, CODE_VIEW_PATH).readText()
+
+        assertTrue(initView.contains("binding.recyclerView.layoutManager = NoChildScrollLinearLayoutManager(this)"))
+        assertFalse(initView.contains("adapter.editEntityMaxLine < 999"))
+        assertTrue(layoutManager.contains("override fun onRequestChildFocus("))
+        assertTrue(layoutManager.contains("return true"))
+        assertFalse(layoutManager.contains("requestChildRectangleOnScreen"))
+        assertTrue(initView.contains("(oldFocus as? CodeView)?.keepSelectionVisible = false"))
+        assertTrue(initView.contains("(newFocus as? CodeView)?.keepSelectionVisible = true"))
+        assertTrue(initView.contains("binding.recyclerView.addOnLayoutChangeListener"))
+        assertTrue(initView.contains("(binding.recyclerView.findFocus() as? CodeView)?.requestSelectionVisible()"))
+        assertTrue(codeView.contains("override fun onSelectionChanged("))
+        assertTrue(codeView.contains("super.onSelectionChanged(selStart, selEnd)"))
+        assertTrue(codeView.contains("override fun performClick(): Boolean"))
+        assertTrue(codeView.contains("val handled = super.performClick()"))
+        assertTrue(codeView.contains("removeCallbacks(selectionVisibilityRunnable)"))
+        assertTrue(codeView.contains("post(selectionVisibilityRunnable)"))
+        assertTrue(codeView.contains("!keepSelectionVisible || !isFocused"))
+        assertTrue(codeView.contains("selectionVisibilityOffset("))
+        assertTrue(codeView.contains("activeSelectionOffset"))
+        assertTrue(codeView.contains("requestSelectionHandleVisible(offset)"))
+        assertTrue(codeView.contains("textSelectHandle"))
+        assertTrue(codeView.contains("bringPointIntoView(offset)"))
+        assertTrue(codeView.contains(".coerceIn(0, text.length)"))
+        assertFalse(codeView.contains("selectionStart == selectionEnd && selectionEnd >= 0"))
+        assertTrue(initView.contains("resolveSelectionHandleClearance(this)"))
+        assertFalse(codeView.contains("MotionEvent.ACTION_UP"))
+        assertFalse(initView.contains("setOnClickListener { sendText(\"\") }"))
+        assertFalse(sendText.contains("smoothScrollBy"))
+        assertFalse(sendText.contains("editEntityMaxLine"))
+    }
+
+    @Test
     fun `ported panel stays independent from legadoT theme stack`() {
         val source = listOf(LAYOUT_PATH, ACTIVITY_PATH)
             .joinToString("\n") { File(repositoryRoot, it).readText() }
@@ -195,6 +270,10 @@ class BookSourceEditLayoutTest {
         const val LAYOUT_PATH = "app/src/main/res/layout/activity_book_source_edit.xml"
         const val ACTIVITY_PATH =
             "app/src/main/java/io/legado/app/ui/book/source/edit/BookSourceEditActivity.kt"
+        const val BOOK_SOURCE_ADAPTER_PATH =
+            "app/src/main/java/io/legado/app/ui/book/source/edit/BookSourceEditAdapter.kt"
+        const val RSS_SOURCE_ADAPTER_PATH =
+            "app/src/main/java/io/legado/app/ui/rss/source/edit/RssSourceEditAdapter.kt"
         const val CARD_VIEW = "androidx.cardview.widget.CardView"
         const val FLEXBOX = "com.google.android.flexbox.FlexboxLayout"
         const val TAB_LAYOUT = "com.google.android.material.tabs.TabLayout"
@@ -208,6 +287,10 @@ class BookSourceEditLayoutTest {
             "app/src/main/java/io/legado/app/ui/autoTask/AutoTaskEditActivity.kt"
         const val FIELD_NAVIGATION_PATH =
             "app/src/main/java/io/legado/app/ui/widget/FieldNavigationExtensions.kt"
+        const val LAYOUT_MANAGER_PATH =
+            "app/src/main/java/io/legado/app/ui/widget/recycler/NoChildScrollLinearLayoutManager.kt"
+        const val CODE_VIEW_PATH =
+            "app/src/main/java/io/legado/app/ui/widget/code/CodeView.kt"
         const val ANDROID_NAMESPACE = "http://schemas.android.com/apk/res/android"
         const val APP_NAMESPACE = "http://schemas.android.com/apk/res-auto"
         val CHECK_BOX_IDS = listOf(

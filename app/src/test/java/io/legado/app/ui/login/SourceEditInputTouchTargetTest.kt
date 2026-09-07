@@ -27,6 +27,23 @@ class SourceEditInputTouchTargetTest {
         assertTrue(source.contains("ItemSourceEditBinding.inflate("))
     }
 
+    @Test
+    fun `legacy and v2 password fields expose visibility toggles`() {
+        val legacy = readProjectFile(
+            "src/main/java/io/legado/app/ui/login/SourceLoginDialog.kt"
+        )
+        val legacyPassword = legacy.substringAfter(
+            "Type.password -> ItemSourceEditBinding.inflate(",
+            missingDelimiterValue = ""
+        ).substringBefore("\n                Type.")
+        val v2 = readProjectFile(
+            "src/main/java/io/legado/app/ui/login/SourceLoginV2Delegate.kt"
+        )
+
+        assertTrue(legacyPassword.contains("TextInputLayout.END_ICON_PASSWORD_TOGGLE"))
+        assertTrue(v2.contains("TextInputLayout.END_ICON_PASSWORD_TOGGLE"))
+    }
+
     private fun readProjectFile(pathInApp: String): String {
         val file = sequenceOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull(File::isFile)

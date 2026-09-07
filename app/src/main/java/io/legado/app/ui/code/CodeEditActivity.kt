@@ -14,6 +14,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import androidx.activity.addCallback
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
 import androidx.core.view.isGone
@@ -102,6 +103,7 @@ class CodeEditActivity :
     private var themeIndex = -1
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        onBackPressedDispatcher.addCallback(this) { finish() }
         softKeyboardTool.attachToWindow(window)
         editor.colorScheme = TextMateColorScheme2.create(ThemeRegistry.getInstance()) //先设置颜色,避免一开始的白屏
         viewModel.initData(intent) {
@@ -133,6 +135,7 @@ class CodeEditActivity :
             nonPrintablePaintingFlags = AppConfig.editNonPrintable
             setEditorLanguage(viewModel.language)
             upEdit(AppConfig.editFontScale, null, AppConfig.editAutoWrap)
+            props.maxIPCTextLength = 64 * 1024
             setText(text)
             editable = viewModel.writable
             requestFocus()
@@ -526,9 +529,7 @@ class CodeEditActivity :
                     intent.getBooleanExtra("returnUnchangedText", false)
                 if (returnText || cursorPos > 0) {
                     val result = Intent().apply {
-                        if (returnText) {
-                            putExtra("text", text)
-                        }
+                        if (returnText) putEditorText(this, text)
                         putExtra("cursorPosition", cursorPos)
                     }
                     setResult(RESULT_OK, result)
@@ -552,12 +553,22 @@ class CodeEditActivity :
             }
             else -> {
                 val result = Intent().apply {
-                    putExtra("text", text)
+                    putEditorText(this, text)
                     putExtra("cursorPosition", cursorPos)
                 }
                 setResult(RESULT_OK, result)
                 super.finish()
             }
+        }
+    }
+
+    private fun putEditorText(intent: Intent, text: String) {
+        if (intent.getBooleanExtra("useTextFile", false) &&
+            text.length > io.legado.app.ui.widget.code.EditSafety.MAX_INLINE_TEXT_LENGTH
+        ) {
+            intent.putExtra("textFile", CodeTextTransfer.write(this, text))
+        } else {
+            intent.putExtra("text", text)
         }
     }
 
@@ -580,7 +591,7 @@ class CodeEditActivity :
 
     private fun returnText(action: String, text: String, cursorPosition: Int) {
         val result = Intent().apply {
-            putExtra("text", text)
+            putEditorText(this, text)
             putExtra("cursorPosition", cursorPosition)
             putExtra(EXTRA_RESULT_ACTION, action)
         }
@@ -658,6 +669,7 @@ class CodeEditActivity :
                 (safeEditorStatus == SafeEditorStatus.READY && !safeEditorReadPending))
         menu.findItem(R.id.menu_search)?.isVisible = showSoraActions
         menu.findItem(R.id.menu_change_theme)?.isVisible = showSoraActions
+        menu.findItem(R.id.menu_select_all)?.isVisible = showSoraActions
         menu.findItem(R.id.menu_format_code)?.isVisible = showSoraActions
         menu.findItem(R.id.menu_check_javascript_syntax)?.isVisible =
             shouldShowJavaScriptSyntaxAction(useSafeEditor, viewModel.canCheckJavaScriptSyntax)
@@ -815,6 +827,7 @@ class CodeEditActivity :
             R.id.menu_save -> save(false)
             R.id.menu_debug_source -> returnText(RESULT_ACTION_DEBUG_SOURCE)
             R.id.menu_login -> returnText(RESULT_ACTION_LOGIN_SOURCE)
+            R.id.menu_select_all -> if (!useSafeEditor) editor.selectAll()
             R.id.menu_format_code -> if (!useSafeEditor) viewModel.formatCode(editor)
             R.id.menu_check_javascript_syntax -> if (!useSafeEditor) {
                 viewModel.checkJavaScriptSyntax(editor)

@@ -21,7 +21,7 @@ class WebWorkflowTest {
         assertTrue(workflowText.contains("- '.github/workflows/web.yml'"))
         assertTrue(workflowText.contains("- '.github/scripts/push-web-assets.sh'"))
         assertTrue(workflowText.contains("group: build-web-" + "$" + "{{ github.ref }}"))
-        assertTrue(workflowText.contains("cancel-in-progress: true"))
+        assertTrue(workflowText.contains("cancel-in-progress: ${'$'}{{ github.event_name == 'pull_request' }}"))
         assertTrue(workflowText.contains("fetch-depth: 0"))
     }
 
@@ -35,5 +35,8 @@ class WebWorkflowTest {
         assertTrue(workflowText.contains("skip_push: true"))
         assertTrue(workflowText.contains("file_pattern: app/src/main/assets/web/vue/ modules/web/src/components.d.ts"))
         assertTrue(workflowText.contains("bash .github/scripts/push-web-assets.sh"))
+        assertTrue(workflowText.contains("actions: write"))
+        assertTrue(workflowText.contains("gh workflow run TestRelease.yml --ref master"))
+        assertTrue(workflowText.contains("-f commit_sha=\"${'$'}(git rev-parse HEAD)\""))
     }
 }

@@ -1,6 +1,9 @@
 package io.legado.app.help.webView
 
+import okhttp3.MediaType.Companion.toMediaType
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WebViewRequestConfigTest {
@@ -48,6 +51,7 @@ class WebViewRequestConfigTest {
         val headers = linkedMapOf(
             "User-Agent" to "source-agent",
             "cookiejar" to "enabled",
+            "PrOxY" to "socks5://127.0.0.1:1080",
             "Cookie" to "session=one",
             "Authorization" to "Bearer token",
             "X-Requested-With" to "source-client",
@@ -67,5 +71,25 @@ class WebViewRequestConfigTest {
             config.additionalHeaders
         )
         assertEquals(original, headers)
+    }
+
+    @Test
+    fun skipsPreloadJsForKnownNonHtmlDownloads() {
+        assertTrue(shouldInjectPreloadJs("text/html; charset=utf-8".toMediaType(), null))
+        assertTrue(shouldInjectPreloadJs("application/xhtml+xml".toMediaType(), null))
+        assertTrue(shouldInjectPreloadJs(null, null))
+        assertTrue(
+            shouldInjectPreloadJs(
+                "text/html".toMediaType(),
+                "inline; filename=attachment.html"
+            )
+        )
+        assertFalse(shouldInjectPreloadJs("application/octet-stream".toMediaType(), null))
+        assertFalse(
+            shouldInjectPreloadJs(
+                "text/html".toMediaType(),
+                "attachment; filename=page.html"
+            )
+        )
     }
 }

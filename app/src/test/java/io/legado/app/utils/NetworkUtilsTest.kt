@@ -56,6 +56,16 @@ class NetworkUtilsTest {
     }
 
     @Test
+    fun `base url accepts source js wrapper`() {
+        assertEquals(
+            "https://api.example.com",
+            NetworkUtils.getBaseUrl(
+                "https://api.example.com@js:'data:bookinfo;base64,SGVsbG8=,{\"type\":\"2\"}'"
+            )
+        )
+    }
+
+    @Test
     fun `invalid and unsupported urls are rejected`() {
         assertNull(NetworkUtils.getBaseUrl(null))
         assertNull(NetworkUtils.getBaseUrl(""))

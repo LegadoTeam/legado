@@ -5,6 +5,7 @@ import fi.iki.elonen.NanoHTTPD
 import io.legado.app.api.ReturnData
 import io.legado.app.api.controller.BookController
 import io.legado.app.api.controller.BookSourceController
+import io.legado.app.api.controller.BookSourceCheckController
 import io.legado.app.api.controller.HttpLogController
 import io.legado.app.api.controller.ReplaceRuleController
 import io.legado.app.api.controller.ReviewController
@@ -79,6 +80,8 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
                         returnData = runBlocking {
                             when (uri) {
                                 "/saveBookSource" -> BookSourceController.saveSource(postData)
+                                "/startBookSourceCheck" -> BookSourceCheckController.start(postData)
+                                "/stopBookSourceCheck" -> BookSourceCheckController.stop(postData)
                                 "/saveBookSources" -> BookSourceController.saveSources(postData)
                                 "/saveJsSource" -> BookSourceController.saveJsSource(
                                     postData,
@@ -133,6 +136,10 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
                         returnData = when (uri) {
                             "/getBookSource" -> BookSourceController.getSource(parameters)
                             "/getBookSources" -> BookSourceController.sources
+                            "/getBookSourcesForManagement" -> BookSourceCheckController.sources(parameters)
+                            "/getBookSourceCheckStates" -> BookSourceCheckController.states()
+                            "/getJsSourceApiTokenRequired" ->
+                                BookSourceController.isJsSourceApiTokenRequired
                             "/getHttpLogs" -> HttpLogController.getLogs(parameters)
                             "/getHttpLog" -> HttpLogController.getLog(parameters)
                             "/getBookshelf" -> BookController.bookshelf
@@ -242,6 +249,8 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
                 "connect-src 'none'; object-src 'none'; base-uri http: https:; " +
                 "form-action 'none'"
         private val PROTECTED_SOURCE_WRITE_ROUTES = setOf(
+            "/startBookSourceCheck",
+            "/stopBookSourceCheck",
             "/saveBookSource",
             "/saveBookSources",
             "/deleteBookSources",
@@ -255,6 +264,8 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
             "/runLegacyReview",
         )
         private val PROTECTED_HTTP_LOG_READ_ROUTES = setOf(
+            "/getBookSourceCheckStates",
+            "/getBookSourcesForManagement",
             "/getHttpLogs",
             "/getHttpLog",
         )
@@ -263,7 +274,10 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
     private fun Response.addWebHeaders(origin: String?, uri: String) {
         addHeader("X-Content-Type-Options", "nosniff")
         origin?.let { addHeader("Access-Control-Allow-Origin", it) }
-        if (uri in PROTECTED_HTTP_LOG_READ_ROUTES) {
+        if (
+            uri in PROTECTED_HTTP_LOG_READ_ROUTES ||
+            uri == "/getJsSourceApiTokenRequired"
+        ) {
             addHeader("Cache-Control", "no-store")
         }
         if (uri.startsWith("/vue/") && uri.endsWith(".html")) {

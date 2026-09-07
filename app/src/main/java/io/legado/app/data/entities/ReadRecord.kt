@@ -2,6 +2,10 @@ package io.legado.app.data.entities
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import io.legado.app.constant.AppConst
+import io.legado.app.data.appDb
+import io.legado.app.help.book.ReadRecordCoverCache
+import io.legado.app.help.book.ContentProcessor
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
 
@@ -17,12 +21,68 @@ data class ReadRecord(
     @ColumnInfo(defaultValue = "0")
     var readTime: Long = 0L,
     @ColumnInfo(defaultValue = "0")
-    var lastRead: Long = System.currentTimeMillis()
+    var lastRead: Long = System.currentTimeMillis(),
+    /** Snapshot fields keep the record useful after its bookshelf row is removed. */
+    var lastChapterTitle: String? = null,
+    @ColumnInfo(defaultValue = "-1")
+    var lastChapterIndex: Int = -1,
+    @ColumnInfo(defaultValue = "0")
+    var lastChapterPos: Int = 0,
+    var coverUrl: String? = null,
 )
+
+fun ReadRecord.updateSnapshot(
+    book: Book,
+    chapterIndex: Int = book.durChapterIndex,
+    chapterPos: Int = book.durChapterPos,
+) {
+    lastChapterIndex = chapterIndex
+    book.durChapterTitle?.takeIf { it.isNotBlank() }?.let { lastChapterTitle = it }
+    lastChapterPos = chapterPos
+    book.getDisplayCover()?.takeIf { it.isNotBlank() }?.let { coverUrl = it }
+}
+
+fun ReadRecord.saveWithCover(book: Book?) {
+    val snapshotBook = book?.takeIf { it.name == bookName }
+    refreshChapterTitle(snapshotBook)
+    appDb.readRecordDao.insert(this)
+    ReadRecordCoverCache.request(copy(), snapshotBook?.getCoverSourceOrigin())
+}
+
+private fun ReadRecord.refreshChapterTitle(snapshotBook: Book?) {
+    if (snapshotBook != null && lastChapterIndex >= 0) {
+        appDb.bookChapterDao.getChapter(snapshotBook.bookUrl, lastChapterIndex)?.let { chapter ->
+            lastChapterTitle = chapter.getDisplayTitle(
+                ContentProcessor.get(snapshotBook.name, snapshotBook.origin).getTitleReplaceRules(),
+                snapshotBook.getUseReplaceRule(),
+                replaceBook = snapshotBook.toReplaceBook(),
+            )
+        }
+    }
+}
+
+/** Copy the bookshelf data before deleting it so the history row remains displayable. */
+fun Book.saveReadRecordSnapshot() {
+    var snapshot: ReadRecord? = null
+    appDb.runInTransaction {
+        val current = appDb.readRecordDao.getRecord(AppConst.androidId, name) ?: return@runInTransaction
+        val record = current.copy(
+            author = ReadRecordAuthors.merge(current.author, author),
+        ).apply {
+            updateSnapshot(this@saveReadRecordSnapshot)
+            refreshChapterTitle(this@saveReadRecordSnapshot)
+            coverUrl = ReadRecordCoverCache.retainLocal(coverUrl)
+        }
+        if (record != current) appDb.readRecordDao.update(record)
+        snapshot = record
+    }
+    snapshot?.let { ReadRecordCoverCache.request(it, getCoverSourceOrigin()) }
+}
 
 /** 同设备同书名共用主键,复用 author 列保存作者集合,纯文本仍兼容旧记录. */
 internal object ReadRecordAuthors {
     private const val PREFIX = "\u001Eauthors:"
+    const val AGGREGATE_SEPARATOR = "\u001F"
 
     fun decode(value: String): Set<String> {
         if (value.isBlank()) return setOf("")
@@ -43,5 +103,16 @@ internal object ReadRecordAuthors {
             1 -> authors.first()
             else -> PREFIX + GSON.toJsonTree(authors).toString()
         }
+    }
+
+    /** Converts DAO aggregate values into a stable, human-readable author list. */
+    fun display(value: String): String {
+        if (value.isBlank()) return ""
+        return value.split(AGGREGATE_SEPARATOR)
+            .flatMap(::decode)
+            .filter(String::isNotBlank)
+            .distinct()
+            .sorted()
+            .joinToString("、")
     }
 }

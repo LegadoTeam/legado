@@ -212,15 +212,17 @@ class ImportReplaceRuleDialog() : BaseDialogFragment(R.layout.dialog_recycler_vi
                     "${item.name}(${item.group})"
                 }
                 val localRule = viewModel.checkRules[holder.layoutPosition]
-                tvSourceState.text = when {
-                    localRule == null -> "新增"
-                    item.pattern != localRule.pattern
-                            || item.replacement != localRule.replacement
-                            || item.isRegex != localRule.isRegex
-                            || item.scope != localRule.scope -> "更新"
+                tvSourceState.setText(
+                    when {
+                        localRule == null -> R.string.import_status_new
+                        item.pattern != localRule.pattern
+                                || item.replacement != localRule.replacement
+                                || item.isRegex != localRule.isRegex
+                                || item.scope != localRule.scope -> R.string.import_status_update
 
-                    else -> "已有"
-                }
+                        else -> R.string.import_status_exist
+                    }
+                )
             }
         }
 

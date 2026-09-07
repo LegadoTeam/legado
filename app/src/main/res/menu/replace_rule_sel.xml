@@ -13,6 +13,16 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_add_group"
+        android:title="@string/add_group"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_remove_group"
+        android:title="@string/remove_group"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_top_sel"
         android:title="@string/selection_to_top"
         app:showAsAction="never" />
@@ -25,6 +35,11 @@
     <item
         android:id="@+id/menu_export_selection"
         android:title="@string/export_selection"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_share_source"
+        android:title="@string/share_selected_source"
         app:showAsAction="never" />
 
 </menu>

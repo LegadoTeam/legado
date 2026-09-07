@@ -52,6 +52,27 @@ class ReadAloudFollowPositionRegressionTest {
         assertTrue(serviceKt.contains("loadSpeechChapterOnly(speechChapterIndex() + 1)"))
     }
 
+    @Test
+    fun rapidPageRestartsCancelStaleReadAloudPreparation() {
+        val serviceKt = readProjectFile("src/main/java/io/legado/app/service/BaseReadAloudService.kt")
+        val preparation = serviceKt.substringAfter("private fun newReadAloud(")
+            .substringBefore("    @SuppressLint")
+
+        assertTrue(preparation.contains("readAloudJob?.cancel()"))
+        assertTrue(preparation.contains("readAloudJob = execute(executeContext = IO)"))
+        assertTrue(serviceKt.contains("private val readAloudGeneration = AtomicLong()"))
+        assertTrue(preparation.contains("val prepared = PreparedReadAloud("))
+        assertTrue(preparation.contains("withContext(Main.immediate)"))
+        val generationGate = preparation.indexOf(
+            "if (generation != readAloudGeneration.get()) return@withContext"
+        )
+        val firstCommit = preparation.indexOf("this@BaseReadAloudService.pageIndex")
+        assertTrue(generationGate >= 0 && generationGate < firstCommit)
+        assertTrue(
+            preparation.indexOf("readAloudJob?.cancel()") < preparation.indexOf("playStop()")
+        )
+    }
+
     private fun readProjectFile(pathInApp: String): String {
         val candidates = listOf(
             File(pathInApp),

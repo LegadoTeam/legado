@@ -1,7 +1,7 @@
 [versions]
 
 kotlin = "2.4.10"
-ksp = "2.3.10"
+ksp = "2.3.11"
 agp = "8.13.2"
 appcompat = "1.7.1"
 colorpicker = "1.1.0"
@@ -44,6 +44,8 @@ zxingLite = "3.5.0"
 #不要更新版本
 #noinspection NewerVersionAvailable
 hutool = "5.8.22"
+bouncycastle = "1.85.2"
+pdfbox-android = "2.0.27.0"
 
 #noinspection NewerVersionAvailable
 protobufJavalite = "3.25.9"
@@ -51,19 +53,19 @@ protobufJavalite = "3.25.9"
 # issue #3811，不要更新版本，新版引入了一个破坏性变更（详见https://github.com/jhy/jsoup/pull/2017）
 # 若要升级请确保相关代码不会受此变更影响（如AnalyzeByJSoup.kt、JsoupXpath库等）
 #noinspection NewerVersionAvailable
-jsoup = "1.16.2"
+jsoup = "1.23.2"
 
 # 新版本使用了 Android 6 以下缺少的 Arrays.setAll 方法，导致进入阅读界面会崩溃
 #noinspection GradleDependency,NewerVersionAvailable
 commonsText = "1.13.1"
 
 # HtmlUnit fork of Rhino
-htmlunitCoreJs = "5.3.0-legado.3"
+htmlunitCoreJs = "5.3.0-legado.4"
 
 #noinspection GradleDependency,NewerVersionAvailable
 media3 = "1.10.1"
 #noinspection GradleDependency
-gsyvideoplayer = "13.1.0"
+gsyvideoplayer = "13.2.1"
 
 #noinspection GradleDependency
 webkit = "1.14.0"
@@ -111,6 +113,10 @@ fragment-testing = { module = "androidx.fragment:fragment-testing", version.ref 
 androidx-junit = { module = "androidx.test.ext:junit", version = "1.3.0" }
 
 hutool-crypto = { module = "cn.hutool:hutool-crypto", version.ref = "hutool" }
+bouncycastle-provider = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
+# PKIX's latest 1.85 release is separate from the provider's 1.85.2 patch.
+bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-jdk18on", version = "1.85" }
+pdfbox-android = { module = "com.tom-roush:pdfbox-android", version.ref = "pdfbox-android" }
 
 libarchive = { module = "me.zhanghai.android.libarchive:library", version.ref = "libarchive" }
 lifecycle-common-java8 = { module = "androidx.lifecycle:lifecycle-common-java8", version.ref = "lifecycle" }

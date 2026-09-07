@@ -135,8 +135,15 @@ class LoginUiScriptEvaluatorTest {
         assertTrue(loadingView.contains("android:id=\"@+id/rotate_loading\""))
         assertTrue(loadingView.contains("android:visibility=\"gone\""))
         assertTrue(source.contains("viewLifecycleOwner.lifecycleScope.launch"))
-        assertTrue(source.contains("binding.rotateLoading.visible()"))
-        assertTrue(source.contains("binding.rotateLoading.gone()"))
+        val delegate = readProjectFile(
+            "src/main/java/io/legado/app/ui/login/SourceLoginV2Delegate.kt"
+        )
+        assertTrue(delegate.contains("private var firstRender = true"))
+        assertTrue(delegate.contains("val showLoading = firstRender"))
+        assertTrue(delegate.contains("if (showLoading) binding.rotateLoading.visible()"))
+        assertTrue(delegate.contains("if (showLoading) {"))
+        assertTrue(delegate.contains("firstRender = false"))
+        assertTrue(delegate.contains("binding.rotateLoading.gone()"))
         val decision = source.indexOf(
             "val renderDecision = resolveLoginUiRender(rowUis, renderedRowsResult)"
         )
@@ -228,6 +235,21 @@ class LoginUiScriptEvaluatorTest {
         assertTrue(viewBuild > stateCommit)
         assertTrue(delegate.contains("if (!saved)"))
         assertTrue(delegate.indexOf("if (!saved)") < delegate.indexOf("if (command.close)"))
+        val dispatchStart = delegate.indexOf("private fun dispatch")
+        val actionResult = delegate.substring(
+            dispatchStart,
+            delegate.indexOf("private fun setActionEnabled", dispatchStart),
+        )
+        val resultReady = actionResult.indexOf("ensureActive()")
+        val resultError = actionResult.indexOf("val error = result.exceptionOrNull()")
+        val firstRestore = actionResult.indexOf("setActionEnabled(action, true)")
+        assertTrue(resultReady >= 0)
+        assertTrue(resultError > resultReady)
+        assertTrue(firstRestore > resultError)
+        assertTrue(actionResult.contains("render(nextState, errors, action)"))
+        assertTrue(delegate.contains("restoreActionOnFailure?.let { setActionEnabled(it, true) }"))
+        assertTrue(delegate.contains("setOnCheckedChangeListener { _, _ -> dispatch(action, null) }"))
+        assertFalse(delegate.contains("setOnUserCheckedChangeListener"))
 
         val destroyDelegate = dialog.indexOf("v2Delegate?.destroy()")
         val destroyView = dialog.indexOf("super.onDestroyView()", destroyDelegate)

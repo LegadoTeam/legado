@@ -19,6 +19,18 @@ class ReadControlVisualStateTest {
     }
 
     @Test
+    fun runningReadAloudOpensControlsInsteadOfTogglingPlayback() {
+        val source = readProjectFile("src/main/java/io/legado/app/ui/book/read/ReadMenu.kt")
+        val clickBlock = source.substringAfter("llReadAloud.setOnClickListener")
+            .substringBefore("llReadAloud.onLongClick")
+
+        assertTrue(clickBlock.contains("if (BaseReadAloudService.isRun)"))
+        assertTrue(clickBlock.contains("callBack.showReadAloudDialog()"))
+        assertTrue(clickBlock.contains("else"))
+        assertTrue(clickBlock.contains("callBack.onClickReadAloud()"))
+    }
+
+    @Test
     fun httpTtsDeleteActionIsVerticallyCentered() {
         val layout = parseXml("src/main/res/layout/item_http_tts.xml")
         val delete = layout.getElementsByTagName("*").asSequence()

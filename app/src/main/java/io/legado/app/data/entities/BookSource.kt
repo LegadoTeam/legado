@@ -1,7 +1,6 @@
 package io.legado.app.data.entities
 
 import android.os.Parcelable
-import android.text.TextUtils
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
@@ -171,18 +170,20 @@ data class BookSource(
     }
 
     fun addGroup(groups: String): BookSource {
-        bookSourceGroup?.splitNotBlank(AppPattern.splitGroupRegex)?.toHashSet()?.let {
+        bookSourceGroup?.splitNotBlank(AppPattern.splitGroupRegex)
+            ?.toCollection(linkedSetOf())?.let {
             it.addAll(groups.splitNotBlank(AppPattern.splitGroupRegex))
-            bookSourceGroup = TextUtils.join(",", it)
+            bookSourceGroup = it.joinToString(",")
         }
         if (bookSourceGroup.isNullOrBlank()) bookSourceGroup = groups
         return this
     }
 
     fun removeGroup(groups: String): BookSource {
-        bookSourceGroup?.splitNotBlank(AppPattern.splitGroupRegex)?.toHashSet()?.let {
+        bookSourceGroup?.splitNotBlank(AppPattern.splitGroupRegex)
+            ?.toCollection(linkedSetOf())?.let {
             it.removeAll(groups.splitNotBlank(AppPattern.splitGroupRegex).toSet())
-            bookSourceGroup = TextUtils.join(",", it)
+            bookSourceGroup = it.joinToString(",")
         }
         return this
     }
@@ -255,6 +256,11 @@ data class BookSource(
         if (!supportContentBatch()) return 1
         return (ruleContent?.maxBatchSize ?: 1).coerceIn(1, MAX_CONTENT_BATCH_SIZE)
     }
+    /** Ranking, timing and list toggles do not change the rules being checked. */
+    fun checkContent(): String = GSON.toJson(copy(
+        customOrder = 0, enabled = true, enabledExplore = true,
+        lastUpdateTime = 0, respondTime = 0, weight = 0,
+    ))
 
     override fun getLoginJs(): String? {
         return if (isJsSource()) mainJs else super.getLoginJs()

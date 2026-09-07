@@ -1,3 +1,4 @@
+
 # -------- Config Path: base/android/proguard/shared_with_cronet.flags --------
 # Copyright 2016 The Chromium Authors
 # Use of this source code is governed by a BSD-style license that can be
@@ -46,69 +47,108 @@
 -keepattributes AnnotationDefault
 
 # Keeps for class level annotations.
--keep,allowaccessmodification @org.chromium.build.annotations.UsedByReflection class ** {}
+-keep,allowaccessmodification @internal.org.chromium.build.annotations.UsedByReflection class ** {}
 
 # Keeps for method level annotations.
 -keepclasseswithmembers,allowaccessmodification class ** {
-  @org.chromium.build.annotations.UsedByReflection <methods>;
+  @internal.org.chromium.build.annotations.UsedByReflection <methods>;
 }
 -keepclasseswithmembers,allowaccessmodification class ** {
-  @org.chromium.build.annotations.UsedByReflection <fields>;
+  @internal.org.chromium.build.annotations.UsedByReflection <fields>;
 }
 
 # Never inline classes, methods, or fields with this annotation, but allow
 # shrinking and obfuscation.
 # Relevant to fields when they are needed to store strong references to objects
 # that are held as weak references by native code.
--if @org.chromium.build.annotations.DoNotInline class * {
+-if @internal.org.chromium.build.annotations.DoNotInline class * {
     *** *(...);
 }
 -keep,allowobfuscation,allowaccessmodification class <1> {
     *** <2>(...);
 }
 -keepclassmembers,allowobfuscation,allowaccessmodification class * {
-   @org.chromium.build.annotations.DoNotInline <methods>;
+   @internal.org.chromium.build.annotations.DoNotInline <methods>;
 }
 -keepclassmembers,allowobfuscation,allowaccessmodification class * {
-   @org.chromium.build.annotations.DoNotInline <fields>;
+   @internal.org.chromium.build.annotations.DoNotInline <fields>;
 }
 
 -alwaysinline class * {
-    @org.chromium.build.annotations.AlwaysInline *;
+    @internal.org.chromium.build.annotations.AlwaysInline *;
 }
 
 # Keep all logs (Log.VERBOSE = 2). R8 does not allow setting to 0.
 -maximumremovedandroidloglevel 1 class ** {
-   @org.chromium.build.annotations.DoNotStripLogs <methods>;
+   @internal.org.chromium.build.annotations.DoNotStripLogs <methods>;
 }
--maximumremovedandroidloglevel 1 @org.chromium.build.annotations.DoNotStripLogs class ** {
+-maximumremovedandroidloglevel 1 @internal.org.chromium.build.annotations.DoNotStripLogs class ** {
    <methods>;
 }
 
 # Never merge classes horizontally or vertically with this annotation.
 # Relevant to classes being used as a key in maps or sets.
--keep,allowaccessmodification,allowobfuscation,allowshrinking @org.chromium.build.annotations.DoNotClassMerge class *
+-keep,allowaccessmodification,allowobfuscation,allowshrinking @internal.org.chromium.build.annotations.DoNotClassMerge class *
 
 # Mark members annotated with IdentifierNameString as identifier name strings
 -identifiernamestring class * {
-    @org.chromium.build.annotations.IdentifierNameString *;
+    @internal.org.chromium.build.annotations.IdentifierNameString *;
 }
 
 # Mark fields with this to help R8 figure out that they cannot be null.
 # Use assumevalues in addition to assumenosideeffects block because Google3 proguard cannot parse
 # assumenosideeffects blocks which overwrite return value.
 -assumevalues class ** {
-  @org.chromium.build.annotations.OptimizeAsNonNull *** *(...) return _NONNULL_;
+  @internal.org.chromium.build.annotations.OptimizeAsNonNull *** *(...) return _NONNULL_;
 }
 -assumenosideeffects class ** {
-  @org.chromium.build.annotations.OptimizeAsNonNull *** *(...);
+  @internal.org.chromium.build.annotations.OptimizeAsNonNull *** *(...);
 }
 -assumevalues class ** {
-  @org.chromium.build.annotations.OptimizeAsNonNull *** * return _NONNULL_;
+  @internal.org.chromium.build.annotations.OptimizeAsNonNull *** * return _NONNULL_;
 }
 -assumenosideeffects class ** {
-  @org.chromium.build.annotations.OptimizeAsNonNull *** *;
+  @internal.org.chromium.build.annotations.OptimizeAsNonNull *** *;
 }
+# -------- Config Path: components/cronet/android/cronet_shared_proguard.cfg --------
+# Proguard config for apps that depend on cronet_shared_java.jar (which should
+# be all apps that depend on any part of Cronet)
+
+# Part of the Android System SDK, so ProGuard won't be able to resolve it if
+# running against the standard SDK.
+-dontwarn android.util.StatsEvent
+-dontwarn android.util.StatsEvent$*
+# There is also an undefined reference to android.util.StatsLog.write(), which
+# R8 appears to be fine with but other processors (e.g. internal Google
+# ProGuard) may not be. See b/315269496.
+-dontwarn android.util.StatsLog
+
+# These annotations are only used by the jni_zero code generator, and are not
+# needed at runtime. There are cases where we can end up shipping classes that
+# have @CalledByNative methods, but we don't ship jni_zero because there is no
+# native code; for example, CronetMetrics when called by the Java/fallback
+# Cronet impl (as opposed to the native impl). See also
+# https://crbug.com/445372626.
+-dontwarn internal.org.jni_zero.CalledByNative
+-dontwarn internal.org.jni_zero.JNINamespace
+
+# Sadly missing from //third_party/android_deps:protobuf_lite_runtime_java. See
+# https://crbug.com/40704600.
+# Note: this won't affect the user's protobuf because we rename our protobuf
+# classes before shipping them (and these rules are automatically renamed too).
+# See _cronet_repackage_rules in BUILD.gn.
+-dontwarn org.chromium.net.internal.com.google.protobuf.Any
+-dontwarn org.chromium.net.internal.com.google.protobuf.Any$Builder
+# -------- Config Path: third_party/protobuf/java/lite/proguard.pgcfg --------
+
+# Skip runtime check for isOnAndroidDevice().
+# One line to make it easy to remove with sed.
+-assumevalues class org.chromium.net.internal.com.google.protobuf.Android { static boolean ASSUME_ANDROID return true; }
+
+-keepclassmembers class * extends org.chromium.net.internal.com.google.protobuf.GeneratedMessageLite {
+  <fields>;
+}
+
 # -------- Config Path: components/cronet/android/cronet_impl_common_proguard.cfg --------
 # Proguard config for apps that depend on cronet_impl_common_java.jar.
 
@@ -119,6 +159,7 @@
 }
 
 -dontwarn com.google.errorprone.annotations.DoNotMock
+
 # -------- Config Path: components/cronet/android/cronet_impl_native_proguard.cfg --------
 # Proguard config for apps that depend on cronet_impl_native_java.jar.
 
@@ -133,9 +174,9 @@
 # While Chrome doesn't need to keep these with their version of R8, some cronet
 # users may be on other optimizers which still require the annotation to be
 # kept in order for the keep rules to work.
--keep @interface org.chromium.build.annotations.DoNotInline
--keep @interface org.chromium.build.annotations.UsedByReflection
--keep @interface org.chromium.build.annotations.IdentifierNameString
+-keep @interface internal.org.chromium.build.annotations.DoNotInline
+-keep @interface internal.org.chromium.build.annotations.UsedByReflection
+-keep @interface internal.org.chromium.build.annotations.IdentifierNameString
 # ** prefixed since JNI Zero classes included in cronet are jarjared to prevent
 # clashes with the real JNI Zero. See https://crbug.com/353534209
 -keep @interface **org.jni_zero.AccessedByNative
@@ -159,12 +200,6 @@
 # https://android.googlesource.com/platform/sdk/+/marshmallow-mr1-release/files/proguard-android.txt#54
 -dontwarn android.support.**
 
-# Skip protobuf runtime check for isOnAndroidDevice().
-# A nice-to-have optimization shamelessly stolen from //third_party/protobuf/java/lite/proguard.pgcfg.
--assumevalues class com.google.protobuf.Android {
-    static boolean ASSUME_ANDROID return true;
-}
-
 # See crbug.com/1440987. We must keep every native that we are manually
 # registering. If Cronet bumps its min-sdk past 21, we may be able to move to
 # automatic JNI registration.
@@ -172,16 +207,6 @@
 # clashes with the real JNI Zero. See https://crbug.com/353534209
 -keepclasseswithmembers,includedescriptorclasses,allowaccessmodification class org.chromium.**,**J.N {
   native <methods>;
-}
-
-# Protobuf builder uses reflection so make sure ProGuard leaves it alone. See
-# https://crbug.com/1395764.
-# Note that we can't simply use the rule from
-# //third_party/protobuf/java/lite/proguard.pgcfg, because some users who
-# consume our ProGuard rules do not want all their protos to be kept. Instead,
-# use a more specific rule that covers Chromium protos only.
--keepclassmembers class org.chromium.** extends com.google.protobuf.GeneratedMessageLite {
-  <fields>;
 }
 
 # Part of the Android System SDK; false positive when pointing ProGuard to the
@@ -196,42 +221,6 @@
 # them.
 -dontwarn internal.org.chromium.build.NativeLibraries
 -dontwarn org.chromium.base.version_info.VersionConstantsBridgeJni
-# -------- Config Path: components/cronet/android/cronet_shared_proguard.cfg --------
-# Proguard config for apps that depend on cronet_shared_java.jar (which should
-# be all apps that depend on any part of Cronet)
-
-# Part of the Android System SDK, so ProGuard won't be able to resolve it if
-# running against the standard SDK.
--dontwarn android.util.StatsEvent
--dontwarn android.util.StatsEvent$*
-# There is also an undefined reference to android.util.StatsLog.write(), which
-# R8 appears to be fine with but other processors (e.g. internal Google
-# ProGuard) may not be. See b/315269496.
--dontwarn android.util.StatsLog
-
-# These annotations are only used by the jni_zero code generator, and are not
-# needed at runtime. There are cases where we can end up shipping classes that
-# have @CalledByNative methods, but we don't ship jni_zero because there is no
-# native code; for example, CronetMetrics when called by the Java/fallback
-# Cronet impl (as opposed to the native impl). See also
-# https://crbug.com/445372626.
-#
-# The `internal.` prefix is due to renaming rules - see repackage_jars in
-# BUILD.gn.
--dontwarn internal.org.jni_zero.CalledByNative
--dontwarn internal.org.jni_zero.JNINamespace
-# -------- Config Path: third_party/androidx/androidx_annotations.flags --------
-# Copyright 2023 The Chromium Authors
-# Use of this source code is governed by a BSD-style license that can be
-# found in the LICENSE file.
-
--keep @androidx.annotation.Keep class *
--keepclasseswithmembers,allowaccessmodification class * {
-  @androidx.annotation.Keep <fields>;
-}
--keepclasseswithmembers,allowaccessmodification class * {
-  @androidx.annotation.Keep <methods>;
-}
 # -------- Config Path: third_party/jni_zero/proguard.flags --------
 # Copyright 2023 The Chromium Authors
 # Use of this source code is governed by a BSD-style license that can be

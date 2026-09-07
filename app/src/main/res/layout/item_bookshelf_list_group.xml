@@ -9,7 +9,7 @@
     android:focusable="true"
     tools:ignore="UnusedAttribute">
 
-    <io.legado.app.ui.widget.image.CoverImageView
+    <io.legado.app.ui.widget.image.GroupCoverView
         android:id="@+id/iv_cover"
         android:layout_width="66dp"
         android:layout_height="90dp"
@@ -17,8 +17,6 @@
         android:layout_marginTop="8dp"
         android:layout_marginBottom="12dp"
         android:contentDescription="@string/img_cover"
-        android:scaleType="centerCrop"
-        android:src="@drawable/image_cover_default"
         android:transitionName="img_cover"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"

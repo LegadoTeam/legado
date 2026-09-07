@@ -12,6 +12,9 @@ interface CookieDao {
     @Query("select * from cookies where url like '%|%'")
     fun getOkHttpCookies(): List<Cookie>
 
+    @get:Query("select * from cookies order by url")
+    val all: List<Cookie>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insert(vararg cookie: Cookie)
 

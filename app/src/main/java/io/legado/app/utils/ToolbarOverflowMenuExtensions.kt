@@ -18,12 +18,14 @@ private class OverflowMenuState {
     var showIcons = true
     var onPrepareMenu: (Menu) -> Unit = {}
     var onOpenCustomMenu: (Menu) -> Unit = {}
+    var onShowCustomMenu: ((View, Menu) -> Boolean)? = null
 }
 
 fun Toolbar.installMd3OverflowMenu(
     showIcons: Boolean = true,
     onPrepareMenu: (Menu) -> Unit = {},
-    onOpenCustomMenu: (Menu) -> Unit = {}
+    onOpenCustomMenu: (Menu) -> Unit = {},
+    onShowCustomMenu: ((View, Menu) -> Boolean)? = null
 ) {
     val state = (getTag(R.id.toolbar_overflow_menu_state) as? OverflowMenuState)
         ?: OverflowMenuState().also { newState ->
@@ -35,6 +37,7 @@ fun Toolbar.installMd3OverflowMenu(
     state.showIcons = showIcons
     state.onPrepareMenu = onPrepareMenu
     state.onOpenCustomMenu = onOpenCustomMenu
+    state.onShowCustomMenu = onShowCustomMenu
     updateMd3OverflowMenu(state)
 }
 
@@ -60,6 +63,9 @@ private fun Toolbar.showMd3OverflowMenu(anchor: View, state: OverflowMenuState) 
     }
 
     state.onOpenCustomMenu(menu)
+    if (state.onShowCustomMenu?.invoke(anchor, menu) == true) {
+        return
+    }
     actionItems = menu.visibleOverflowItems()
     if (actionItems.isEmpty()) return
     if (actionItems.hasUnsupportedItems()) {

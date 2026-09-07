@@ -2,6 +2,7 @@ package io.legado.app.ui.widget.dialog
 
 import android.annotation.SuppressLint
 import android.app.Dialog
+import android.content.DialogInterface
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.graphics.Bitmap
@@ -10,6 +11,7 @@ import android.net.http.SslError
 import android.os.Build
 import android.os.Bundle
 import android.util.Base64
+import android.util.LruCache
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.KeyEvent
@@ -31,6 +33,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.net.toUri
 import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.lifecycleScope
+import com.bumptech.glide.Glide
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import io.legado.app.R
@@ -41,6 +44,7 @@ import io.legado.app.data.entities.BaseSource
 import io.legado.app.databinding.DialogWebViewBinding
 import io.legado.app.help.WebCacheManager
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.glide.ImageLoader
 import io.legado.app.help.webView.PooledWebView
 import io.legado.app.help.webView.WebJsExtensions
 import io.legado.app.help.webView.WebJsExtensions.Companion.JS_INJECTION
@@ -50,12 +54,14 @@ import io.legado.app.help.webView.WebJsExtensions.Companion.nameCache
 import io.legado.app.help.webView.WebJsExtensions.Companion.nameJava
 import io.legado.app.help.webView.WebJsExtensions.Companion.nameSource
 import io.legado.app.help.webView.WebViewPool
+import io.legado.app.help.webView.shouldInjectPreloadJs
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.ui.association.OnLineImportActivity
 import io.legado.app.utils.invisible
 import io.legado.app.utils.keepScreenOn
 import io.legado.app.utils.longSnackbar
 import io.legado.app.utils.openUrl
+import io.legado.app.utils.runOnUI
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.toastOnUi
@@ -89,11 +95,14 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.lang.ref.WeakReference
 import java.net.URLDecoder
 import java.util.ArrayDeque
 import java.util.Date
+import java.util.concurrent.TimeUnit
 import androidx.core.graphics.createBitmap
+import splitties.init.appCtx
 
 internal data class BottomSheetHeightConfig(
     val dialogHeight: Int?,
@@ -243,6 +252,15 @@ internal fun resolveBottomSheetBehaviorSpec(
     }
 }
 
+internal data class BrowserDialogRequest(
+    val sourceKey: String?,
+    val bookType: Int,
+    val url: String?,
+    val html: String?,
+    val preloadJs: String?,
+    val config: String?,
+)
+
 class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view), WebJsExtensions.Callback {
 
     private data class SheetSizeSnapshot(
@@ -292,11 +310,31 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     private var originOrientation: Int? = null
     private var needClearHistory = true
     private var constrainedSheetHeight: Int? = null
+    private var configuredExpandedOffset: Int? = null
+    private var configuredHalfExpandedRatio: Float? = null
+    private var lastAppliedExpandedOffset: Int? = null
+    private val sheetLayoutListener = View.OnLayoutChangeListener { sheet, _, _, _, _, _, _, _, _ ->
+        updateExpandedOffset(sheet)
+    }
     private var configuredHeight: BottomSheetHeightConfig? = null
     private var peekHeightTracksHeightMode = false
     private var maxHeightTracksHeightMode = false
     private var sheetSizeBeforeFullScreen: SheetSizeSnapshot? = null
     private val pendingFullScreenConfigs = ArrayDeque<Config>()
+    private var dismissed = false
+    private val browserRequest: BrowserDialogRequest?
+        get() = arguments?.let {
+            BrowserDialogRequest(
+                it.getString("sourceKey"),
+                it.getInt("bookType", 0),
+                it.getString("url"),
+                it.getString("html"),
+                it.getString("preloadJs"),
+                it.getString("config"),
+            )
+        }
+
+    override fun getTheme(): Int = R.style.ThemeOverlay_Legado_BottomWebViewDialog
 
     @Suppress("DEPRECATION")
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
@@ -309,17 +347,34 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     }
 
     override fun onStart() {
+        dismissed = false
         super.onStart()
         setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        bottomSheet?.addOnLayoutChangeListener(sheetLayoutListener)
     }
 
     override fun show(manager: FragmentManager, tag: String?) {
-        kotlin.runCatching {
-            manager.beginTransaction().remove(this).commit()
-            super.show(manager, tag)
-        }.onFailure {
-            AppLog.put("显示对话框失败 tag:$tag", it)
+        runOnUI {
+            kotlin.runCatching {
+                if (manager.isDestroyed || manager.isStateSaved || isAdded) return@runCatching
+                val request = browserRequest
+                if (request != null && manager.fragments.any {
+                    it is BottomWebViewDialog && !it.dismissed && !it.isRemoving &&
+                            it.browserRequest == request
+                }) return@runCatching
+                // Register synchronously so another queued script cannot add the same request.
+                dismissed = false
+                super.showNow(manager, tag)
+            }.onFailure {
+                AppLog.put("显示对话框失败 tag:$tag", it)
+            }
         }
+    }
+
+    override fun onDismiss(dialog: DialogInterface) {
+        // DialogFragment removes the fragment asynchronously after dismissing its window.
+        dismissed = true
+        super.onDismiss(dialog)
     }
 
     private fun setConfig(config: Config, first: Boolean = false) {
@@ -379,12 +434,17 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             expandedHeight = heightSpec.expandedHeight,
         )
         behavior?.let { behavior ->
-            behaviorSpec.state?.let { behavior.state = it }
             behaviorSpec.peekHeight?.let { behavior.peekHeight = it }
             config.isHideable?.let { behavior.isHideable = it }
             behaviorSpec.skipCollapsed?.let { behavior.skipCollapsed = it }
-            config.setHalfExpandedRatio?.let { behavior.setHalfExpandedRatio(it) }
-            config.setExpandedOffset?.let { behavior.setExpandedOffset(it) }
+            config.setHalfExpandedRatio?.let {
+                behavior.setHalfExpandedRatio(it)
+                configuredHalfExpandedRatio = it
+            }
+            config.setExpandedOffset?.let {
+                behavior.setExpandedOffset(it)
+                configuredExpandedOffset = it
+            }
             behaviorSpec.fitToContents?.let { behavior.setFitToContents(it) }
             config.isDraggable?.let { behavior.isDraggable = it }
             behaviorSpec.draggableOnNestedScroll?.let {
@@ -542,6 +602,15 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             }
         }
 
+        bottomSheet?.let { sheet ->
+            updateExpandedOffset(sheet)
+            if (first || hasHeightUpdate || config.setFitToContents != null ||
+                config.setExpandedOffset != null || config.maxHeight != null) {
+                sheet.requestLayout()
+            }
+        }
+        behaviorSpec.state?.let { behavior?.state = it }
+
         val scrollNoDraggable = config.scrollNoDraggable ?: if (first) true else null
         scrollNoDraggable?.let {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -563,6 +632,38 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                 currentWebView.setOnLongClickListener(null)
             }
         }
+    }
+
+    private fun updateExpandedOffset(sheet: View) {
+        val behavior = BottomSheetBehavior.from(sheet)
+        val parent = sheet.parent as? View ?: return
+        val automaticOffset = !isFullScreen && configuredExpandedOffset == null &&
+                constrainedSheetHeight != null && !behavior.isFitToContents
+        val offset = when {
+            isFullScreen -> 0
+            configuredExpandedOffset != null -> checkNotNull(configuredExpandedOffset)
+            automaticOffset -> (parent.height - sheet.height).coerceAtLeast(0)
+            else -> 0
+        }
+        // During layout Material applies this offset after the sheet has been measured.
+        if (lastAppliedExpandedOffset != offset) {
+            lastAppliedExpandedOffset = offset
+            behavior.setExpandedOffset(offset)
+            if (behavior.state == BottomSheetBehavior.STATE_EXPANDED) {
+                sheet.post { sheet.requestLayout() }
+            }
+        }
+        val requestedRatio = configuredHalfExpandedRatio ?: behavior.halfExpandedRatio.also {
+            configuredHalfExpandedRatio = it
+        }
+        val ratio = if (automaticOffset && parent.height > 0) {
+            // Half expansion must not exceed the measured fully expanded height.
+            minOf(requestedRatio, (sheet.height - 1).coerceAtLeast(0).toFloat() / parent.height)
+                .coerceAtLeast(Float.MIN_VALUE)
+        } else {
+            requestedRatio
+        }
+        behavior.setHalfExpandedRatio(ratio)
     }
 
     private fun reapplyConfiguredHeight() {
@@ -607,6 +708,10 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                 behavior?.maxHeight = -1
             }
         }
+        bottomSheet?.let { sheet ->
+            updateExpandedOffset(sheet)
+            sheet.requestLayout()
+        }
         behavior?.state = BottomSheetBehavior.STATE_EXPANDED
     }
 
@@ -625,6 +730,10 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         }
         sheetSizeBeforeFullScreen = null
         reapplyConfiguredHeight()
+        bottomSheet?.let { sheet ->
+            updateExpandedOffset(sheet)
+            sheet.requestLayout()
+        }
         snapshot?.state?.let { behavior?.state = it }
         while (pendingFullScreenConfigs.isNotEmpty()) {
             setConfig(pendingFullScreenConfigs.removeFirst())
@@ -706,6 +815,16 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                         }
                     }
                 }
+                appDb.bookSourceDao.getBookSource(sourceKey).let {
+                    if (it == null) {
+                        withContext(Dispatchers.Main) {
+                            activity?.toastOnUi("no find bookSource")
+                            dismiss()
+                        }
+                        return@launch
+                    }
+                    source = it
+                }
                 val analyzeUrl =
                     AnalyzeUrl(url, source = source, coroutineContext = coroutineContext)
                 val html = args.getString("html") ?: analyzeUrl.getStrResponseAwait().body
@@ -729,16 +848,6 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                         JS_URL + html
                     }
                 }
-                appDb.bookSourceDao.getBookSource(sourceKey).let {
-                    if (it == null) {
-                        withContext(Dispatchers.Main) {
-                            activity?.toastOnUi("no find bookSource")
-                            dismiss()
-                        }
-                        return@launch
-                    }
-                    source = it
-                }
                 val bookType = args.getInt("bookType", 0)
                 withContext(Dispatchers.Main) {
                     currentWebView.onResume() //缓存库拿的需要激活
@@ -748,7 +857,6 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             }.onFailure { error ->
                 if (error is CancellationException) throw error
                 withContext(Dispatchers.Main) {
-                    currentWebView.resumeTimers()
                     currentWebView.onResume()
                     currentWebView.loadDataWithBaseURL(
                         url,
@@ -876,6 +984,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     }
 
     override fun onDestroyView() {
+        bottomSheet?.removeOnLayoutChangeListener(sheetLayoutListener)
         customWebViewCallback?.onCustomViewHidden()
         pooledWebView?.let(WebViewPool::release)
         pooledWebView = null
@@ -1047,6 +1156,10 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     }
 
     inner class CustomWebViewClient : WebViewClient() {
+        private val heifResponseCache = object : LruCache<String, ByteArray>(8 * 1024 * 1024) {
+            override fun sizeOf(key: String, value: ByteArray): Int = value.size
+        }
+
         override fun shouldOverrideUrlLoading(
             view: WebView?, request: WebResourceRequest?
         ): Boolean {
@@ -1104,6 +1217,52 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             view: WebView, request: WebResourceRequest
         ): WebResourceResponse? {
             val url = request.url.toString()
+            if (!request.isForMainFrame && request.method.equals("GET", ignoreCase = true) &&
+                request.url.path?.let { path ->
+                    path.endsWith(".heic", ignoreCase = true) ||
+                        path.endsWith(".heif", ignoreCase = true)
+                } == true
+            ) {
+                val sourceOrigin = source?.getKey()
+                val cacheKey = "${sourceOrigin.orEmpty()}\u0000$url"
+                val cached = heifResponseCache.get(cacheKey)
+                val converted = if (cached != null) {
+                    WebResourceResponse(
+                        "image/png",
+                        null,
+                        ByteArrayInputStream(cached)
+                    )
+                } else {
+                    runBlocking(IO) {
+                        val target = runCatching {
+                            ImageLoader.loadBitmap(appCtx, url, sourceOrigin)
+                                .disallowHardwareConfig()
+                                .submit(2048, 2048)
+                        }.getOrNull() ?: return@runBlocking null
+                        try {
+                            val bitmap = target.get(10, TimeUnit.SECONDS)
+                            ByteArrayOutputStream().use { output ->
+                                if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
+                                    null
+                                } else {
+                                    val bytes = output.toByteArray()
+                                    heifResponseCache.put(cacheKey, bytes)
+                                    WebResourceResponse(
+                                        "image/png",
+                                        null,
+                                        ByteArrayInputStream(bytes)
+                                    )
+                                }
+                            }
+                        } catch (_: Exception) {
+                            null
+                        } finally {
+                            Glide.with(appCtx).clear(target)
+                        }
+                    }
+                }
+                if (converted != null) return converted
+            }
             if (request.isForMainFrame) {
                 if (!preloadJs.isNullOrEmpty()) {
                     jsInjected = false
@@ -1144,6 +1303,10 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                 }
                 val body = res.body
                 val contentType = body.contentType()
+                if (!shouldInjectPreloadJs(contentType, res.header("Content-Disposition"))) {
+                    res.close()
+                    return null
+                }
                 val mimeType = contentType?.toString()?.substringBefore(";") ?: "text/html"
                 val charset = contentType?.charset() ?: Charsets.UTF_8
                 val charsetSre = charset.name()

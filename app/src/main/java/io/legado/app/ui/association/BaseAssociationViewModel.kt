@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.MutableLiveData
 import io.legado.app.base.BaseViewModel
+import io.legado.app.data.entities.HighlightRuleFile
 import io.legado.app.utils.inputStream
 import io.legado.app.utils.jsonPath
 
@@ -20,6 +21,9 @@ abstract class BaseAssociationViewModel(application: Application) : BaseViewMode
         }
 
         when {
+            map["type"] == HighlightRuleFile.TYPE ->
+                successLive.postValue("highlightRule" to uri.toString())
+
             map.containsKey("bookSourceUrl") ->
                 successLive.postValue("bookSource" to uri.toString())
 

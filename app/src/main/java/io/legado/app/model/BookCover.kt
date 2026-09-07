@@ -50,6 +50,10 @@ object BookCover {
         private set
     var drawBookAuthor = true
         private set
+    var drawBookNameHorizontal = false
+        private set
+    var keepPunctuation = false
+        private set
     lateinit var defaultDrawable: Drawable
         private set
 
@@ -71,6 +75,8 @@ object BookCover {
             drawBookAuthor = appCtx.getPrefBoolean(PreferKey.coverShowAuthor, true)
             path = appCtx.getPrefString(PreferKey.defaultCover)
         }
+        drawBookNameHorizontal = appCtx.getPrefBoolean(PreferKey.coverHorizontal, false)
+        keepPunctuation = appCtx.getPrefBoolean(PreferKey.coverKeepPunctuation, false)
         defaultDrawable = runCatching {
             BitmapUtils.decodeBitmap(path!!, 600, 900)!!.toDrawable(appCtx.resources)
         }.getOrDefault(appCtx.resources.getDrawable(R.drawable.image_cover_default, null))

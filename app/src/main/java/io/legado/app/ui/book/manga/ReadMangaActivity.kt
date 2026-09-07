@@ -9,6 +9,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.WindowManager
 import android.view.animation.LinearInterpolator
+import androidx.activity.addCallback
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.core.net.toUri
@@ -35,11 +36,13 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.databinding.ActivityMangaBinding
 import io.legado.app.databinding.ViewLoadMoreBinding
 import io.legado.app.help.book.isImage
+import io.legado.app.help.book.isPdf
 import io.legado.app.help.book.removeType
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.storage.Backup
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.model.ReadManga
+import io.legado.app.model.localBook.PdfFile
 import io.legado.app.receiver.NetworkChangedListener
 import io.legado.app.ui.book.changesource.ChangeBookSourceDialog
 import io.legado.app.ui.book.info.BookInfoActivity
@@ -136,7 +139,11 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     //打开目录返回选择章节返回结果
     private val tocActivity = registerForActivityResult(TocActivityResult()) {
         it?.let {
-            viewModel.openChapter(it[0] as Int, it[1] as Int)
+            val pdfPage = it[TocActivityResult.PDF_PAGE_INDEX] as Int
+            val position = if (ReadManga.book?.isPdf == true && pdfPage >= 0) {
+                pdfPage % PdfFile.PAGE_SIZE
+            } else it[1] as Int
+            viewModel.openChapter(it[0] as Int, position)
         }
     }
     private val bookInfoActivity =
@@ -167,6 +174,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        onBackPressedDispatcher.addCallback(this) { finish() }
         ReadManga.register(this)
         upSystemUiVisibility(false)
         initRecyclerView()
@@ -237,13 +245,17 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                 }
             }
             longTapListener = { event ->
-                val position = findChildViewUnder(event.x, event.y)
-                    ?.let { getChildAdapterPosition(it) }
-                    ?: RecyclerView.NO_POSITION
-                (mAdapter.getItem(position) as? MangaPage)?.let {
-                    saveImage(it.mImageUrl)
-                    true
-                } ?: false
+                if (!AppConfig.mangaLongClickSaveImage) {
+                    false
+                } else {
+                    val position = findChildViewUnder(event.x, event.y)
+                        ?.let { getChildAdapterPosition(it) }
+                        ?: RecyclerView.NO_POSITION
+                    (mAdapter.getItem(position) as? MangaPage)?.let {
+                        saveImage(it.mImageUrl)
+                        true
+                    } ?: false
+                }
             }
         }
         binding.webtoonFrame.run {
@@ -375,6 +387,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
 
     override fun onResume() {
         super.onResume()
+        ReadManga.readStartTime = System.currentTimeMillis()
         networkChangedListener.register()
         networkChangedListener.onNetworkChanged = {
             // 当网络是可用状态且无需初始化时同步进度（初始化中已有同步进度逻辑）
@@ -392,6 +405,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
 
     override fun onPause() {
         super.onPause()
+        ReadManga.upReadTime()
         if (ReadManga.inBookshelf) {
             ReadManga.saveRead()
             if (!BuildConfig.DEBUG) {
@@ -472,10 +486,15 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     override val oldBook: Book?
         get() = ReadManga.book
 
-    override fun changeTo(source: BookSource, book: Book, toc: List<BookChapter>) {
+    override fun changeTo(
+        source: BookSource,
+        book: Book,
+        toc: List<BookChapter>,
+        onSuccess: () -> Unit,
+    ) {
         if (book.isImage) {
             binding.flLoading.isVisible = true
-            viewModel.changeTo(book, toc)
+            viewModel.changeTo(book, toc, onSuccess)
         } else {
             toastOnUi("所选择的源不是漫画源")
         }
@@ -539,6 +558,11 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                 item.isChecked = !item.isChecked
                 AppConfig.disableMangaScale = item.isChecked
                 setDisableMangaScale(item.isChecked)
+            }
+
+            R.id.menu_manga_long_click_save_image -> {
+                item.isChecked = !item.isChecked
+                AppConfig.mangaLongClickSaveImage = item.isChecked
             }
 
             R.id.menu_disable_click_scroll -> {
@@ -728,6 +752,8 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         menu.findItem(R.id.menu_pre_manga_number).title =
             getString(R.string.pre_download_m, AppConfig.mangaPreDownloadNum)
         menu.findItem(R.id.menu_disable_manga_scale).isChecked = AppConfig.disableMangaScale
+        menu.findItem(R.id.menu_manga_long_click_save_image).isChecked =
+            AppConfig.mangaLongClickSaveImage
         menu.findItem(R.id.menu_disable_click_scroll).isChecked = AppConfig.disableClickScroll
         menu.findItem(R.id.menu_manga_auto_page_speed).title =
             getString(R.string.manga_auto_page_speed, AppConfig.mangaAutoPageSpeed)

@@ -360,6 +360,7 @@ class WebJsExtensions(
                 const callBack = JSBridgeCallbacks[id];
                 if (callBack) {
                     const result = cache.getFromMemory(id);
+                    cache.deleteMemory(id);
                     if (success) {
                         callBack.resolve(result);
                     } else {
@@ -388,6 +389,7 @@ class WebJsExtensions(
                 const callBack = JSBridgeCallbacks[id];
                 if (callBack) {
                     const result = cache.getFromMemory(id);
+                    cache.deleteMemory(id);
                     if (success) {
                         callBack.resolve(result);
                     } else {

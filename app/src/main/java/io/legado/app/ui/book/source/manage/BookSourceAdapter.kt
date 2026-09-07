@@ -13,6 +13,7 @@ import io.legado.app.R
 import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.data.entities.BookSourcePart
+import io.legado.app.data.entities.BookSourceCheckState
 import io.legado.app.databinding.ItemBookSourceBinding
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.model.Debug
@@ -61,6 +62,8 @@ class BookSourceAdapter(
                     && oldItem.enabledExplore == newItem.enabledExplore
                     && oldItem.hasExploreUrl == newItem.hasExploreUrl
                     && oldItem.hasJs == newItem.hasJs
+                    && oldItem.checkStatus == newItem.checkStatus
+                    && oldItem.checkDetail == newItem.checkDetail
         }
 
         override fun getChangePayload(oldItem: BookSourcePart, newItem: BookSourcePart): Any? {
@@ -80,6 +83,9 @@ class BookSourceAdapter(
             }
             if (oldItem.hasJs != newItem.hasJs) {
                 payload.putBoolean("upJs", true)
+            }
+            if (oldItem.checkStatus != newItem.checkStatus || oldItem.checkDetail != newItem.checkDetail) {
+                payload.putString("checkSourceMessage", null)
             }
             if (payload.isEmpty) {
                 return null
@@ -231,19 +237,18 @@ class BookSourceAdapter(
         binding: ItemBookSourceBinding,
         item: BookSourcePart
     ) = binding.run {
-        val msg = Debug.debugMessageMap[item.bookSourceUrl] ?: ""
-        ivDebugText.text = msg
-        val isEmpty = msg.isEmpty()
-        var isFinalMessage = msg.contains(finalMessageRegex)
-        if (!Debug.isChecking && !isFinalMessage) {
-            Debug.updateFinalMessage(item.bookSourceUrl, "校验失败")
-            ivDebugText.text = Debug.debugMessageMap[item.bookSourceUrl] ?: ""
-            isFinalMessage = true
+        val msg = if (Debug.isChecking) Debug.debugMessageMap[item.bookSourceUrl].orEmpty() else ""
+        val status = context.getString(when (item.checkStatus) {
+            BookSourceCheckState.PASSED -> R.string.source_check_passed
+            BookSourceCheckState.FAILED -> R.string.source_check_failed
+            else -> R.string.source_check_needed
+        })
+        ivDebugText.text = msg.ifEmpty {
+            if (item.checkDetail.isEmpty()) status else "$status：${item.checkDetail}"
         }
-        ivDebugText.visibility =
-            if (!isEmpty) View.VISIBLE else View.GONE
+        ivDebugText.visibility = View.VISIBLE
         ivProgressBar.visibility =
-            if (isFinalMessage || isEmpty || !Debug.isChecking) View.GONE else View.VISIBLE
+            if (msg.isEmpty() || msg.contains(finalMessageRegex)) View.GONE else View.VISIBLE
     }
 
     private fun upSourceHost(binding: ItemBookSourceBinding, position: Int) = binding.run {
@@ -335,14 +340,8 @@ class BookSourceAdapter(
             movedItems.forEach {
                 sortNumberSet.add(it.customOrder)
             }
-            if (movedItems.size > sortNumberSet.size) {
-                callBack.upOrder(getItems().mapIndexed { index, bookSourcePart ->
-                    bookSourcePart.customOrder = if (callBack.sortAscending) index else -index
-                    bookSourcePart
-                })
-            } else {
-                callBack.upOrder(movedItems.toList())
-            }
+            val resetAll = movedItems.size > sortNumberSet.size
+            callBack.upOrder(if (resetAll) getItems() else movedItems.toList(), resetAll)
             movedItems.clear()
         }
     }
@@ -376,14 +375,13 @@ class BookSourceAdapter(
 
     interface CallBack {
         val sort: BookSourceSort
-        val sortAscending: Boolean
         fun del(bookSource: BookSourcePart)
         fun edit(bookSource: BookSourcePart)
         fun toTop(bookSource: BookSourcePart)
         fun toBottom(bookSource: BookSourcePart)
         fun searchBook(bookSource: BookSourcePart)
         fun debug(bookSource: BookSourcePart)
-        fun upOrder(items: List<BookSourcePart>)
+        fun upOrder(items: List<BookSourcePart>, resetAll: Boolean)
         fun enable(enable: Boolean, bookSource: BookSourcePart)
         fun enableExplore(enable: Boolean, bookSource: BookSourcePart)
         fun upCountView()

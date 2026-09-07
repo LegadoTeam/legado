@@ -131,6 +131,7 @@ class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>()
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
         this.menu = menu
+        updateDownloadMenuState()
         upMenu()
         return super.onPrepareOptionsMenu(menu)
     }
@@ -299,6 +300,20 @@ class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>()
         }
     }
 
+    private fun updateDownloadMenuState() {
+        menu?.findItem(R.id.menu_download)?.let { item ->
+            if (CacheBook.isRun) {
+                item.setTitle(R.string.stop)
+                item.setIconCompat(R.drawable.ic_stop_black_24dp)
+            } else {
+                item.setTitle(R.string.download_start)
+                item.setIconCompat(R.drawable.ic_play_24dp)
+            }
+            item.actionView?.contentDescription = item.title
+        }
+        menu?.applyTint(this)
+    }
+
     override fun observeLiveBus() {
         viewModel.upAdapterLiveData.observe(this) {
             notifyItemChanged(it)
@@ -310,19 +325,7 @@ class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>()
             notifyItemChanged(it)
         }
         observeEvent<String>(EventBus.UP_DOWNLOAD_STATE) {
-            if (!CacheBook.isRun) {
-                menu?.findItem(R.id.menu_download)?.let { item ->
-                    item.setIconCompat(R.drawable.ic_play_24dp)
-                    item.setTitle(R.string.download_start)
-                }
-                menu?.applyTint(this)
-            } else {
-                menu?.findItem(R.id.menu_download)?.let { item ->
-                    item.setIconCompat(R.drawable.ic_stop_black_24dp)
-                    item.setTitle(R.string.stop)
-                }
-                menu?.applyTint(this)
-            }
+            updateDownloadMenuState()
         }
         observeEvent<Pair<Book, BookChapter>>(EventBus.SAVE_CONTENT) { (book, chapter) ->
             viewModel.cacheChapters[book.bookUrl]?.add(chapter.url)

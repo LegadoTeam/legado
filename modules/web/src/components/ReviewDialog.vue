@@ -90,6 +90,7 @@
           <details
             v-if="hasReplies(item)"
             class="reply-details"
+            :open="item.replyItems.length > 0"
             @toggle="onReplyToggle($event, item)"
             @click.stop
           >
@@ -113,7 +114,9 @@
                     <span v-else>{{ badge }}</span>
                   </template>
                 </header>
-                <p v-if="reply.content" class="review-content">{{ reply.content }}</p>
+                <p v-if="reply.content" class="review-content">
+                  <span v-if="reply.replyToName" class="reply-target">回复 {{ reply.replyToName }}：</span>{{ reply.content }}
+                </p>
                 <img
                   v-if="reply.imageUrl"
                   class="review-image"
@@ -126,9 +129,17 @@
                   @keydown.enter.stop="openImage(reply.imageUrl)"
                   @keydown.space.stop.prevent="openImage(reply.imageUrl)"
                 />
-                <div v-if="reply.time || reply.likeCount != null" class="meta">
+                <div
+                  v-if="
+                    reply.time ||
+                    (reply.likeCount != null && reply.likeCount > 0)
+                  "
+                  class="meta"
+                >
                   <span v-if="reply.time">{{ reply.time }}</span>
-                  <span v-if="reply.likeCount != null">{{ reply.likeCount }} 赞</span>
+                  <span v-if="reply.likeCount != null && reply.likeCount > 0">
+                    {{ reply.likeCount }} 赞
+                  </span>
                 </div>
               </article>
 
@@ -235,6 +246,7 @@ const reviewIdentity = (item: ReviewItem) =>
   [
     item.avatar,
     item.name,
+    item.replyToName,
     item.content,
     item.imageUrl,
     item.audioUrl,
@@ -499,6 +511,10 @@ watch(visible, open => {
   line-height: 1.7;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.reply-target {
+  color: var(--el-text-color-secondary);
 }
 
 .review-image {

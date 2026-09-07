@@ -24,13 +24,13 @@ class BookAdapter(context: Context, val callBack: CallBack) :
 
     ItemTouchCallback.Callback {
     val groupRequestCode = 12
-    private val selectedBooks: HashSet<Book> = hashSetOf()
+    private val selectedBookUrls: HashSet<String> = hashSetOf()
     var actionItem: Book? = null
 
     val selection: List<Book>
         get() {
             return getItems().filter {
-                selectedBooks.contains(it)
+                selectedBookUrls.contains(it.bookUrl)
             }
         }
 
@@ -54,7 +54,7 @@ class BookAdapter(context: Context, val callBack: CallBack) :
             tvAuthor.text = item.author
             tvAuthor.visibility = if (item.author.isEmpty()) View.GONE else View.VISIBLE
             tvGroupS.text = getGroupName(item.group)
-            checkbox.isChecked = selectedBooks.contains(item)
+            checkbox.isChecked = selectedBookUrls.contains(item.bookUrl)
             if (item.isLocal) {
                 tvOrigin.setText(R.string.local_book)
             } else {
@@ -68,9 +68,9 @@ class BookAdapter(context: Context, val callBack: CallBack) :
             checkbox.setOnUserCheckedChangeListener { isChecked ->
                 getItem(holder.layoutPosition)?.let {
                     if (isChecked) {
-                        selectedBooks.add(it)
+                        selectedBookUrls.add(it.bookUrl)
                     } else {
-                        selectedBooks.remove(it)
+                        selectedBookUrls.remove(it.bookUrl)
                     }
                     callBack.upSelectCount()
                 }
@@ -79,9 +79,9 @@ class BookAdapter(context: Context, val callBack: CallBack) :
                 getItem(holder.layoutPosition)?.let {
                     checkbox.isChecked = !checkbox.isChecked
                     if (checkbox.isChecked) {
-                        selectedBooks.add(it)
+                        selectedBookUrls.add(it.bookUrl)
                     } else {
-                        selectedBooks.remove(it)
+                        selectedBookUrls.remove(it.bookUrl)
                     }
                     callBack.upSelectCount()
                 }
@@ -111,10 +111,10 @@ class BookAdapter(context: Context, val callBack: CallBack) :
     fun selectAll(selectAll: Boolean) {
         if (selectAll) {
             getItems().forEach {
-                selectedBooks.add(it)
+                selectedBookUrls.add(it.bookUrl)
             }
         } else {
-            selectedBooks.clear()
+            selectedBookUrls.clear()
         }
         notifyDataSetChanged()
         callBack.upSelectCount()
@@ -123,10 +123,10 @@ class BookAdapter(context: Context, val callBack: CallBack) :
     @SuppressLint("NotifyDataSetChanged")
     fun revertSelection() {
         getItems().forEach {
-            if (selectedBooks.contains(it)) {
-                selectedBooks.remove(it)
+            if (selectedBookUrls.contains(it.bookUrl)) {
+                selectedBookUrls.remove(it.bookUrl)
             } else {
-                selectedBooks.add(it)
+                selectedBookUrls.add(it.bookUrl)
             }
         }
         notifyDataSetChanged()
@@ -136,7 +136,7 @@ class BookAdapter(context: Context, val callBack: CallBack) :
     fun checkSelectedInterval() {
         val selectedPosition = linkedSetOf<Int>()
         getItems().forEachIndexed { index, it ->
-            if (selectedBooks.contains(it)) {
+            if (selectedBookUrls.contains(it.bookUrl)) {
                 selectedPosition.add(index)
             }
         }
@@ -146,7 +146,7 @@ class BookAdapter(context: Context, val callBack: CallBack) :
         val itemCount = maxPosition - minPosition + 1
         for (i in minPosition..maxPosition) {
             getItem(i)?.let {
-                selectedBooks.add(it)
+                selectedBookUrls.add(it.bookUrl)
             }
         }
         notifyItemRangeChanged(minPosition, itemCount, Bundle().apply {
@@ -174,15 +174,14 @@ class BookAdapter(context: Context, val callBack: CallBack) :
     }
 
     private var isMoved = false
+    private var needsOrderReset = false
 
     override fun swap(srcPosition: Int, targetPosition: Int): Boolean {
         val srcItem = getItem(srcPosition)
         val targetItem = getItem(targetPosition)
         if (srcItem != null && targetItem != null) {
             if (srcItem.order == targetItem.order) {
-                for ((index, item) in getItems().withIndex()) {
-                    item.order = index + 1
-                }
+                needsOrderReset = true
             } else {
                 val pos = srcItem.order
                 srcItem.order = targetItem.order
@@ -196,27 +195,28 @@ class BookAdapter(context: Context, val callBack: CallBack) :
 
     override fun onClearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
         if (isMoved) {
-            callBack.updateBook(*getItems().toTypedArray())
+            callBack.updateBookOrder(getItems(), needsOrderReset)
         }
         isMoved = false
+        needsOrderReset = false
     }
 
     val dragSelectCallback: DragSelectTouchHelper.Callback =
-        object : DragSelectTouchHelper.AdvanceCallback<Book>(Mode.ToggleAndReverse) {
-            override fun currentSelectedId(): MutableSet<Book> {
-                return selectedBooks
+        object : DragSelectTouchHelper.AdvanceCallback<String>(Mode.ToggleAndReverse) {
+            override fun currentSelectedId(): MutableSet<String> {
+                return selectedBookUrls
             }
 
-            override fun getItemId(position: Int): Book {
-                return getItem(position)!!
+            override fun getItemId(position: Int): String {
+                return getItem(position)!!.bookUrl
             }
 
             override fun updateSelectState(position: Int, isSelected: Boolean): Boolean {
                 getItem(position)?.let {
                     if (isSelected) {
-                        selectedBooks.add(it)
+                        selectedBookUrls.add(it.bookUrl)
                     } else {
-                        selectedBooks.remove(it)
+                        selectedBookUrls.remove(it.bookUrl)
                     }
                     notifyItemChanged(position, Bundle().apply {
                         putString("selected", null)
@@ -233,7 +233,7 @@ class BookAdapter(context: Context, val callBack: CallBack) :
 
         fun upSelectCount()
 
-        fun updateBook(vararg book: Book)
+        fun updateBookOrder(books: List<Book>, resetAll: Boolean)
 
         fun deleteBook(book: Book)
 
