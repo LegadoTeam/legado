@@ -11,6 +11,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.help.book.update
 import io.legado.app.help.book.isPdf
+import io.legado.app.help.book.isEpub
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.globalExecutor
 import io.legado.app.model.AudioPlay
@@ -63,7 +64,7 @@ class TocViewModel(application: Application) : BaseViewModel(application) {
         execute {
             bookData.value?.apply {
                 setReverseToc(!getReverseToc())
-                if (isPdf) {
+                if (isPdf || isEpub) {
                     listOf(ReadBook.book, ReadManga.book, AudioPlay.book, VideoPlay.book)
                         .filter { it?.bookUrl == bookUrl }
                         .forEach { it?.setReverseToc(getReverseToc()) }
