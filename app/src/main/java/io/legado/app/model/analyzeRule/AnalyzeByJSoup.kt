@@ -23,14 +23,14 @@ class AnalyzeByJSoup(doc: Any) {
             return doc
         }
         if (doc is JXNode) {
-            return if (doc.isElement) doc.asElement() else Jsoup.parse(doc.toString())
+            return if (doc.isElement) doc.asElement() else parseSourceHtml(doc.toString())
         }
         kotlin.runCatching {
             if (doc.toString().startsWith("<?xml", true)) {
                 return Jsoup.parse(doc.toString(), Parser.xmlParser())
             }
         }
-        return Jsoup.parse(doc.toString())
+        return parseSourceHtml(doc.toString())
     }
 
     /**

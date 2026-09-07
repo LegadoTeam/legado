@@ -8,6 +8,25 @@ import org.junit.Test
 class AnalyzeByJSoupDomTest {
 
     @Test
+    fun `self closing links preserve legacy direct text nodes`() {
+        val html = """
+            <div class="chapter_content">您现在阅读的是<a href="https://www.303wx.com">303文学<a/>www.303wx.com提供的《示例》<br>正文第一段<br>正文第二段<br>【请收藏 303文学 303wx.com】</div>
+        """.trimIndent()
+        val extracted = AnalyzeByJSoup(html).getString(".chapter_content@textNodes")!!
+        val cleaned = extracted.replace("【请收藏 303文学 303wx.com】|.*www.303wx.com.*|您现在阅读的是".toRegex(), "")
+        assertEquals(listOf("正文第一段", "正文第二段"), cleaned.lines().filter { it.isNotBlank() })
+    }
+
+    @Test
+    fun `ordinary nested tags still exclude descendant text from textNodes`() {
+        val parser = AnalyzeByJSoup("<div>before<a>link</a><span>nested</span>after</div>")
+        assertEquals("before\nafter", parser.getString("div@textNodes"))
+        assertEquals("link", parser.getString("a@text"))
+        assertEquals("nested", parser.getString("span@text"))
+        assertEquals("after", AnalyzeByJSoup("<div><custom/>after</div>").getString("div@textNodes"))
+    }
+
+    @Test
     fun `reading a book name does not replace its link with the author link`() {
         val document = Jsoup.parse(
             """
