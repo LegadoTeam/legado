@@ -46,13 +46,14 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.Callable
 import java.util.concurrent.TimeUnit
 import io.legado.app.model.VideoPlay.VIDEO_PREF_NAME
 
 internal fun selectedBackupFileNames(isEnabled: (String) -> Boolean): List<String> =
     buildList {
         if (isEnabled(BackupConfig.bookshelfContentKey)) {
-            addAll(listOf("bookshelf.json", "bookGroup.json"))
+            addAll(listOf("bookshelf.json", "bookGroup.json", "bookMemo.json"))
         }
         if (isEnabled(BackupConfig.annotationContentKey)) {
             addAll(listOf("bookmark.json", "highlight.json", "highlightRule.json"))
@@ -265,8 +266,11 @@ object Backup {
         } else {
             emptyList()
         }
+        val (books, memos) = appDb.runInTransaction(Callable {
+            appDb.bookDao.all to appDb.bookMemoDao.all()
+        })
         writeListToJson(
-            appDb.bookDao.all.map { book ->
+            books.map { book ->
                 book.copy(
                     persistedCoverUrl = book.persistedCoverUrl
                         .takeIf { backupPersistedCovers },
@@ -276,6 +280,7 @@ object Backup {
             "bookshelf.json",
             backupPath,
         )
+        writeListToJson(memos, "bookMemo.json", backupPath, writeEmpty = true)
         writeListToJson(appDb.bookmarkDao.all, "bookmark.json", backupPath)
         writeListToJson(appDb.bookHighlightDao.all, "highlight.json", backupPath)
         writeListToJson(

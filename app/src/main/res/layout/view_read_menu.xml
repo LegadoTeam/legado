@@ -478,6 +478,51 @@
                 </LinearLayout>
 
                 <View
+                    android:id="@+id/memo_spacer"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="2"
+                    android:importantForAccessibility="no"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:id="@+id/ll_memo"
+                    android:layout_width="60dp"
+                    android:layout_height="wrap_content"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:contentDescription="@string/book_memo"
+                    android:focusable="true"
+                    android:minHeight="48dp"
+                    android:orientation="vertical"
+                    android:paddingBottom="7dp"
+                    android:visibility="gone">
+
+                    <androidx.appcompat.widget.AppCompatImageView
+                        android:id="@+id/iv_memo"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"
+                        android:adjustViewBounds="true"
+                        android:importantForAccessibility="no"
+                        android:maxHeight="20dp"
+                        android:src="@drawable/ic_edit"
+                        app:tint="@color/primaryText" />
+
+                    <TextView
+                        android:id="@+id/tv_memo"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginTop="3dp"
+                        android:importantForAccessibility="no"
+                        android:singleLine="true"
+                        android:text="@string/book_memo"
+                        android:textColor="@color/primaryText"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <View
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"

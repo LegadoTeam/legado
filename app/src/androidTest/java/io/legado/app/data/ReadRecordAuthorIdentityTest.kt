@@ -72,14 +72,15 @@ class ReadRecordAuthorIdentityTest {
                 }
                 close()
             }
-            // Opening the generated Room database validates the migrated table against version 107.
+            helper.runMigrationsAndValidate(name, 107, true, *DatabaseMigrations.migrations).close()
+            // Also preserve those records when opening the current generated Room database.
             val database = Room.databaseBuilder(context, AppDatabase::class.java, name)
                 .addMigrations(*DatabaseMigrations.migrations)
                 .allowMainThreadQueries()
                 .build()
             try {
                 val dao = database.readRecordDao
-                assertEquals(107, database.openHelper.writableDatabase.version)
+                assertEquals(108, database.openHelper.writableDatabase.version)
                 assertEquals(legacy.toSet(), dao.all.toSet())
                 assertEquals(1350L, dao.allTime)
                 assertNull(dao.getRecord("phone", "Same", "Author A"))

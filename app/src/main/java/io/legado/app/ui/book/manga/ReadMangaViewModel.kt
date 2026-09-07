@@ -11,6 +11,7 @@ import io.legado.app.constant.BookType
 import io.legado.app.constant.EventBus
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.replaceBookAfterSourceChange
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookProgress
 import io.legado.app.exception.NoStackTraceException
@@ -249,9 +250,7 @@ class ReadMangaViewModel(application: Application) : BaseViewModel(application) 
             ReadManga.upReadTime()
             ReadManga.book?.migrateTo(book, toc)
             book.removeType(BookType.updateError)
-            ReadManga.book?.delete()
-            appDb.bookDao.insert(book)
-            appDb.bookChapterDao.insert(*toc.toTypedArray())
+            replaceBookAfterSourceChange(ReadManga.book, book, toc)
             ReadManga.resetData(book)
             ReadManga.loadContent()
         }.onSuccess {

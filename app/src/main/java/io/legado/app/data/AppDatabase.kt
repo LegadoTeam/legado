@@ -14,6 +14,7 @@ import io.legado.app.data.dao.BookChapterDao
 import io.legado.app.data.dao.BookDao
 import io.legado.app.data.dao.BookGroupDao
 import io.legado.app.data.dao.BookHighlightDao
+import io.legado.app.data.dao.BookMemoDao
 import io.legado.app.data.dao.BookSourceDao
 import io.legado.app.data.dao.BookmarkDao
 import io.legado.app.data.dao.AutoTaskRuleDao
@@ -38,6 +39,7 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookHighlight
+import io.legado.app.data.entities.BookMemo
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookSourceCheckState
 import io.legado.app.data.entities.BookSourcePart
@@ -75,14 +77,15 @@ val appDb by lazy {
 }
 
 @Database(
-    version = 107,
+    version = 108,
     exportSchema = true,
     entities = [Book::class, BookGroup::class, BookSource::class, BookChapter::class,
         ReplaceRule::class, SearchBook::class, SearchKeyword::class, Cookie::class,
         RssSource::class, Bookmark::class, RssArticle::class, RssReadRecord::class,
         RssStar::class, TxtTocRule::class, ReadRecord::class, HttpTTS::class, Cache::class,
         RuleSub::class, DictRule::class, KeyboardAssist::class, Server::class,
-        AutoTaskRule::class, BookHighlight::class, HighlightRule::class, BookSourceCheckState::class],
+        AutoTaskRule::class, BookHighlight::class, HighlightRule::class, BookSourceCheckState::class,
+        BookMemo::class],
     views = [BookSourcePart::class],
     autoMigrations = [
         AutoMigration(from = 43, to = 44),
@@ -153,6 +156,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract val bookDao: BookDao
     abstract val bookGroupDao: BookGroupDao
     abstract val bookHighlightDao: BookHighlightDao
+    abstract val bookMemoDao: BookMemoDao
     abstract val highlightRuleDao: HighlightRuleDao
     abstract val bookSourceDao: BookSourceDao
     abstract val bookChapterDao: BookChapterDao

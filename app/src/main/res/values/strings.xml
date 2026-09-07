@@ -1808,4 +1808,14 @@
     <string name="read_record_legacy_authors">Legacy combined record: %1$s</string>
     <string name="read_record_empty">No reading records</string>
     <string name="backup_content_read_record_covers">Reading history cover snapshots</string>
+    <string name="book_memo">Memo</string>
+    <string name="show_book_memo">Show book memo</string>
+    <string name="show_book_memo_summary">Add a memo button to the bottom reading menu</string>
+    <string name="book_memo_hint">Write a memo in Markdown</string>
+    <string name="book_memo_empty">No memo yet. Tap Edit to add one.</string>
+    <string name="book_memo_updated">Updated: %1$s</string>
+    <string name="book_memo_save">Save</string>
+    <string name="book_memo_clear_confirm">Clear this book memo?</string>
+    <string name="book_memo_discard">Discard unsaved changes and close?</string>
+    <string name="book_memo_save_failed">Could not save memo: %1$s</string>
 </resources>

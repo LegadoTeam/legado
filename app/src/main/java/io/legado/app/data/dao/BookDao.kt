@@ -215,7 +215,24 @@ interface BookDao {
     fun hasFile(fileName: String): Boolean
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insert(vararg book: Book)
+    fun insertRows(vararg book: Book)
+
+    @Query("""select books.bookUrl from books inner join book_memos using (bookUrl)
+        where books.name = :name and books.author = :author and books.bookUrl != :newBookUrl""")
+    fun getReplacedMemoBookUrl(name: String, author: String, newBookUrl: String): String?
+
+    @Transaction
+    fun insert(vararg book: Book) {
+        book.forEach { item ->
+            // The existing name/author unique index can replace a different URL on import.
+            val previousMemoOwner = getReplacedMemoBookUrl(item.name, item.author, item.bookUrl)
+            insertRows(item)
+            if (previousMemoOwner != null) {
+                copyNewerMemo(previousMemoOwner, item.bookUrl)
+                deleteMemo(previousMemoOwner)
+            }
+        }
+    }
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     fun insertIgnore(book: Book): Long
@@ -338,7 +355,23 @@ interface BookDao {
     }
 
     @Delete
-    fun delete(vararg book: Book)
+    fun deleteRows(vararg book: Book)
+
+    @Query("delete from book_memos where bookUrl = :bookUrl")
+    fun deleteMemo(bookUrl: String)
+
+    @Query("""insert or replace into book_memos (bookUrl, content, updatedAt)
+        select :newBookUrl, content, updatedAt from book_memos
+        where bookUrl = :oldBookUrl and updatedAt > coalesce(
+            (select updatedAt from book_memos where bookUrl = :newBookUrl), -1)
+    """)
+    fun copyNewerMemo(oldBookUrl: String, newBookUrl: String)
+
+    @Transaction
+    fun delete(vararg book: Book) {
+        book.forEach { deleteMemo(it.bookUrl) }
+        deleteRows(*book)
+    }
 
     @Transaction
     fun replace(oldBook: Book, newBook: Book) {
@@ -347,7 +380,7 @@ interface BookDao {
         val persistedCoverUrl = getPersistedCoverUrl(storedBookUrl)
         val readConfig = oldBook.readConfig
             ?: GSON.fromJsonObject<Book.ReadConfig>(getReadConfigJson(oldBook.bookUrl)).getOrNull()
-        delete(oldBook)
+        deleteRows(oldBook)
         insert(
             newBook.copy(
                 customCoverUrl = customCoverUrl,
@@ -355,6 +388,10 @@ interface BookDao {
                 readConfig = readConfig,
             )
         )
+        if (oldBook.bookUrl != newBook.bookUrl) {
+            copyNewerMemo(oldBook.bookUrl, newBook.bookUrl)
+            deleteMemo(oldBook.bookUrl)
+        }
     }
 
     @Query("update books set durChapterPos = :pos where bookUrl = :bookUrl")
@@ -373,7 +410,17 @@ interface BookDao {
     fun removeGroup(group: Long)
 
     @Query("delete from books where type & ${BookType.notShelf} > 0")
-    fun deleteNotShelfBook()
+    fun deleteNotShelfRows()
+
+    @Query("""delete from book_memos where bookUrl in
+        (select bookUrl from books where type & ${BookType.notShelf} > 0)""")
+    fun deleteNotShelfMemos()
+
+    @Transaction
+    fun deleteNotShelfBook() {
+        deleteNotShelfMemos()
+        deleteNotShelfRows()
+    }
 
     @Query("select * from books where type & ${BookType.notShelf} > 0")
     fun getNotShelfBooks(): List<Book>
