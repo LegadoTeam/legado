@@ -25,7 +25,7 @@
     "axios": "^1.20.0",
     "dompurify": "3.4.14",
     "element-plus": "2.14.3",
-    "hotkeys-js": "^4.0.5",
+    "hotkeys-js": "^4.0.7",
     "pinia": "^4.0.2",
     "vue": "^3.5.42",
     "vue-router": "^5.3.0",
