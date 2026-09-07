@@ -3,8 +3,9 @@ package io.legado.app.ui.book.read
 import android.content.Intent
 import android.graphics.Bitmap
 import android.os.SystemClock
+import android.view.View
 import androidx.appcompat.widget.PopupMenu
-import androidx.lifecycle.ViewModelProvider
+import androidx.appcompat.widget.SearchView
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -32,11 +33,12 @@ import io.legado.app.ui.book.manga.ReadMangaActivity
 import io.legado.app.ui.book.manga.entities.MangaPage
 import io.legado.app.ui.book.manga.recyclerview.MangaAdapter
 import io.legado.app.ui.book.read.page.entities.column.ImageColumn
+import io.legado.app.ui.book.read.config.ClickActionConfigDialog
 import io.legado.app.ui.book.toc.ChapterListFragment
 import io.legado.app.ui.book.toc.ChapterListAdapter
 import io.legado.app.ui.book.toc.PdfOutlineAdapter
 import io.legado.app.ui.book.toc.TocActivity
-import io.legado.app.ui.book.toc.TocViewModel
+import io.legado.app.ui.widget.TitleBar
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -81,7 +83,8 @@ class PdfOutlineNavigationTest {
             document.save(file)
         }
         val book = Book(bookUrl = file.absolutePath, originName = file.name, type = BookType.local or BookType.text,
-            name = "PDF test ${UUID.randomUUID()}", totalChapterNum = 2, durChapterPos = 3)
+            name = "PDF test ${UUID.randomUUID()}", totalChapterNum = 2, durChapterPos = 3,
+            durChapterTitle = "分段_0")
         book.setImageStyle("FULL")
         val chapters = (0..1).map { BookChapter(bookUrl = book.bookUrl, url = "pdf_$it", title = "分段_$it", index = it) }
         val bookmark = Bookmark(bookName = book.name, chapterIndex = 1, chapterPos = 7, content = "已有书签")
@@ -98,10 +101,18 @@ class PdfOutlineNavigationTest {
                 clickOutline("第一部分")
                 waitUntil { outlineRows() == listOf("第一部分", "前言") }
                 screenshot("pdf-outline-collapsed")
-                tocScenario.onActivity { ViewModelProvider(it)[TocViewModel::class.java].startChapterListSearch("同页") }
+                tocScenario.onActivity { activity ->
+                    val search = activity.findViewById<TitleBar>(R.id.title_bar).menu.findItem(R.id.menu_search)
+                    search.expandActionView()
+                    (search.actionView as SearchView).setQuery("同页", false)
+                }
                 waitUntil { outlineRows() == listOf("第一部分", "目标十三页", "同页小节") }
                 screenshot("pdf-outline-search")
-                tocScenario.onActivity { ViewModelProvider(it)[TocViewModel::class.java].startChapterListSearch(null) }
+                tocScenario.onActivity { activity ->
+                    val search = activity.findViewById<TitleBar>(R.id.title_bar).menu.findItem(R.id.menu_search)
+                    (search.actionView as SearchView).setQuery("", false)
+                    search.collapseActionView()
+                }
                 waitUntil { outlineRows() == listOf("第一部分", "前言") }
                 clickOutline("第一部分")
                 tocScenario.onActivity { activity ->
@@ -117,6 +128,10 @@ class PdfOutlineNavigationTest {
             reader = ActivityScenario.launch(Intent(context, ReadBookActivity::class.java)
                 .putExtra("bookUrl", book.bookUrl))
             waitUntil { ReadBook.book?.bookUrl == book.bookUrl && ReadBook.curTextChapter?.pages?.isNotEmpty() == true }
+            reader.onActivity { activity ->
+                activity.supportFragmentManager.fragments.filterIsInstance<ClickActionConfigDialog>()
+                    .forEach { it.view?.findViewById<View>(R.id.iv_close)?.performClick() }
+            }
             reader.onActivity { it.openChapterList() }
             waitUntil { outlineRows()?.contains("目标十三页") == true }
             clickOutline("目标十三页")
