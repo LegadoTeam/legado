@@ -662,7 +662,7 @@ object ChapterProvider {
         val titleNormal = Typeface.create(titleTypeface, Typeface.NORMAL)
         val textBold = Typeface.create(textTypeface, Typeface.BOLD)
         val textNormal = Typeface.create(textTypeface, Typeface.NORMAL)
-        val (titleFont, textFont) = when (ReadBookConfig.textBold) {
+        val (legacyTitleFont, textFont) = when (ReadBookConfig.textBold) {
             1 -> {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
                     Pair(Typeface.create(titleTypeface, 900, false), textBold)
@@ -678,6 +678,16 @@ object ChapterProvider {
             }
 
             else -> Pair(titleBold, textNormal)
+        }
+        val titleFont = when (ReadBookConfig.titleBold) {
+            0 -> titleNormal
+            1 -> titleBold
+            2 -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                Typeface.create(titleTypeface, 300, false)
+            } else {
+                titleNormal
+            }
+            else -> legacyTitleFont
         }
 
         //标题

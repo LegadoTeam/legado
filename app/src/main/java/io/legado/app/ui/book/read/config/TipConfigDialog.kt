@@ -71,6 +71,7 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config),
         binding.dsbTitleLineSpacing.progress =
             titleLineSpacingToProgress(ReadBookConfig.titleLineSpacingExtra)
         upTitleFont()
+        upTitleFontWeight()
         upTitleColor()
         binding.swSplitChapterTitle.isChecked = ReadBookConfig.splitChapterTitle
         binding.dsbTitleNumberSize.progress = ReadBookConfig.titleNumberSize
@@ -162,6 +163,14 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config),
         }
     }
 
+    private fun titleFontWeightOptions(): List<String> =
+        listOf(getString(R.string.title_font_weight_follow)) +
+            resources.getStringArray(R.array.text_font_weight)
+
+    private fun upTitleFontWeight() {
+        binding.tvTitleFontWeight.text = titleFontWeightOptions()[ReadBookConfig.titleBold + 1]
+    }
+
     private fun initEvent() = binding.run {
         rgTitleMode.setOnCheckedChangeListener { _, checkedId ->
             ReadBookConfig.titleMode = when (checkedId) {
@@ -182,6 +191,16 @@ class TipConfigDialog : BaseDialogFragment(R.layout.dialog_tip_config),
         }
         llTitleFont.setOnClickListener {
             showDialogFragment<FontSelectDialog>()
+        }
+        llTitleFontWeight.setOnClickListener {
+            context?.selector(
+                title = getString(R.string.title_font_weight),
+                items = titleFontWeightOptions(),
+            ) { _, index ->
+                ReadBookConfig.titleBold = index - 1
+                upTitleFontWeight()
+                postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
+            }
         }
         llTitleColor.setOnClickListener {
             context?.selector(items = ReadTipConfig.tipColorNames) { _, i ->
