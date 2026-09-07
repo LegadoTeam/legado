@@ -48,4 +48,13 @@ class ReadRecordBackupTest {
         val record = ReadRecord(coverUrl = "https://example.invalid/image?key=value")
         assertEquals(record, prepareReadRecordBackup(listOf(record), external, backup, false).single())
     }
+
+    @Test
+    fun `inline image bytes also require the cover backup option`() {
+        val external = temporary.newFolder("external")
+        val backup = temporary.newFolder("backup")
+        val record = ReadRecord(coverUrl = "data:image/png;base64,AQID")
+        assertNull(prepareReadRecordBackup(listOf(record), external, backup, false).single().coverUrl)
+        assertEquals(record, prepareReadRecordBackup(listOf(record), external, backup, true).single())
+    }
 }

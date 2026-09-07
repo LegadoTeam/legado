@@ -12,6 +12,7 @@ import io.legado.app.utils.externalFiles
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
@@ -28,15 +29,15 @@ object ReadRecordCoverCache {
     private val root get() = File(appCtx.externalFiles, DIRECTORY)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val permits = Semaphore(2)
-    private val pending = ConcurrentHashMap.newKeySet<Triple<String, String, String>>()
+    private val pending = ConcurrentHashMap<Triple<String, String, String>, Boolean>()
     private val lock = Any()
 
-    fun request(record: ReadRecord, sourceOrigin: String? = null) {
-        val path = record.coverUrl?.takeIf { it.isNotBlank() } ?: return
-        if (ownedFile(path)?.isFile == true) return
+    fun request(record: ReadRecord, sourceOrigin: String? = null): Job? {
+        val path = record.coverUrl?.takeIf { it.isNotBlank() } ?: return null
+        if (ownedFile(path)?.isFile == true) return null
         val key = Triple(record.deviceId, record.bookName, path)
-        if (!pending.add(key)) return
-        scope.launch {
+        if (pending.putIfAbsent(key, true) != null) return null
+        return scope.launch {
             try {
                 permits.withPermit {
                     val targetFile = File(root, MD5Utils.md5Encode(path) + ".cover")
@@ -51,6 +52,12 @@ object ReadRecordCoverCache {
                     val target = ImageLoader.loadFile(appCtx, path).apply(options).submit()
                     try {
                         val downloaded = runInterruptible { target.get(10, TimeUnit.SECONDS) }
+                        val validation = Glide.with(appCtx).load(downloaded).submit(1, 1)
+                        try {
+                            runInterruptible { validation.get(10, TimeUnit.SECONDS) }
+                        } finally {
+                            Glide.with(appCtx).clear(validation)
+                        }
                         synchronized(lock) {
                             val current = appDb.readRecordDao.getRecord(record.deviceId, record.bookName)
                             if (current?.coverUrl == path) {

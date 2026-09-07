@@ -162,6 +162,23 @@ class ReadRecordHistoryTest {
     }
 
     @Test
+    fun coverDownloadMustDecodeBeforeItReplacesTheOriginalAddress() {
+        val invalid = File(context.cacheDir, "invalid-cover-$id.html").apply { writeText("<html>not an image</html>") }
+        try {
+            val record = ReadRecord(deviceId = AppConst.androidId, bookName = book.name, coverUrl = invalid.absolutePath)
+            appDb.readRecordDao.insert(record)
+            runBlocking { ReadRecordCoverCache.request(record)!!.join() }
+            assertEquals(invalid.absolutePath, appDb.readRecordDao.getRecord(AppConst.androidId, book.name)!!.coverUrl)
+            record.coverUrl = cover.absolutePath
+            appDb.readRecordDao.insert(record)
+            runBlocking { ReadRecordCoverCache.request(record)!!.join() }
+            val saved = appDb.readRecordDao.getRecord(AppConst.androidId, book.name)!!
+            assertNotEquals(cover.absolutePath, saved.coverUrl)
+            assertArrayEquals(cover.readBytes(), File(saved.coverUrl!!).readBytes())
+        } finally { invalid.delete() }
+    }
+
+    @Test
     fun deletingBookRetainsOwnedCoverAndDeletingHistoryRemovesOnlyItsCopy() {
         book.saveReadRecordSnapshot()
         val stored = appDb.readRecordDao.getRecord(AppConst.androidId, book.name)!!

@@ -14,6 +14,9 @@ internal fun prepareReadRecordBackup(
     val coverRoot = File(externalFilesRoot, readRecordCoverDirectory).canonicalFile
     val staged = File(backupRoot, readRecordCoverDirectory)
     return records.map { record ->
+        if (!includeCovers && record.coverUrl?.startsWith("data:", ignoreCase = true) == true) {
+            return@map record.copy(coverUrl = null)
+        }
         val source = record.coverUrl?.let(::File)
         if (source == null || !source.isAbsolute || source.canonicalFile.parentFile != coverRoot) return@map record
         if (includeCovers && source.isFile) {
