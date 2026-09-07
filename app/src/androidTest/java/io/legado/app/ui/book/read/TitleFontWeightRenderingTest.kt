@@ -12,9 +12,11 @@ import android.view.View
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
-import androidx.test.espresso.action.ViewActions.scrollTo
+import androidx.test.espresso.action.ViewActions.pressBack
+import androidx.test.espresso.action.ViewActions.swipeLeft
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isDialog
+import androidx.test.espresso.matcher.ViewMatchers.isCompletelyDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
@@ -33,7 +35,6 @@ import io.legado.app.model.ReadBook
 import io.legado.app.model.localBook.TextFile
 import io.legado.app.ui.book.read.config.ClickActionConfigDialog
 import io.legado.app.ui.book.read.config.ReadStyleDialog
-import io.legado.app.ui.book.read.config.TipConfigDialog
 import io.legado.app.ui.book.read.page.ReadView
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.utils.GSON
@@ -46,6 +47,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -187,7 +190,8 @@ class TitleFontWeightRenderingTest {
         scenario!!.onActivity {
             ReadStyleDialog().showNow(it.supportFragmentManager, "title-weight-style")
         }
-        onView(withId(R.id.tv_tip)).inRoot(isDialog()).perform(scrollTo()).check(matches(isDisplayed()))
+        onView(withId(R.id.style_toolbar_scroll)).inRoot(isDialog()).perform(swipeLeft())
+        onView(withId(R.id.tv_tip)).inRoot(isDialog()).check(matches(isCompletelyDisplayed()))
         screenshot("title-weight-information-entry")
         onView(withId(R.id.tv_tip)).inRoot(isDialog()).perform(click())
         onView(withId(R.id.ll_title_font_weight)).inRoot(isDialog()).check(matches(isDisplayed()))
@@ -210,7 +214,9 @@ class TitleFontWeightRenderingTest {
             assertFontWeight(ChapterProvider.contentPaint.typeface, 700)
             ReadStyleDialog().showNow(it.supportFragmentManager, "title-weight-style")
         }
-        onView(withId(R.id.tv_tip)).inRoot(isDialog()).perform(scrollTo(), click())
+        onView(withId(R.id.style_toolbar_scroll)).inRoot(isDialog()).perform(swipeLeft())
+        onView(withId(R.id.tv_tip)).inRoot(isDialog())
+            .check(matches(isCompletelyDisplayed())).perform(click())
         onView(withId(R.id.tv_title_font_weight)).inRoot(isDialog()).check(matches(withText(weights[0])))
         screenshot("title-weight-settings-restored")
         dismissSettings()
@@ -253,11 +259,8 @@ class TitleFontWeightRenderingTest {
     }
 
     private fun dismissSettings() {
-        scenario!!.onActivity { activity ->
-            val style = activity.supportFragmentManager.findFragmentByTag("title-weight-style") as ReadStyleDialog
-            (style.childFragmentManager.findFragmentByTag("tipConfigDialog") as TipConfigDialog).dismissNow()
-            style.dismissNow()
-        }
+        onView(withId(R.id.ll_title_font_weight)).inRoot(isDialog()).perform(pressBack())
+        onView(withId(R.id.tv_tip)).inRoot(isDialog()).perform(pressBack())
     }
 
     private fun assertFontWeight(typeface: Typeface, weight: Int) {
@@ -292,6 +295,13 @@ class TitleFontWeightRenderingTest {
 
     private fun screenshot(name: String) {
         instrumentation.waitForIdleSync()
+        val frames = CountDownLatch(1)
+        scenario!!.onActivity { activity ->
+            activity.window.decorView.postOnAnimation {
+                activity.window.decorView.postOnAnimation { frames.countDown() }
+            }
+        }
+        assertTrue("The screen must render after scrolling or changing settings", frames.await(5, TimeUnit.SECONDS))
         val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
         try {
             File(context.getExternalFilesDir("ui-regression"), "$name.png").outputStream()
