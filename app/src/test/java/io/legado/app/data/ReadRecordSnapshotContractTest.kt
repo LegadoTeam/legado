@@ -41,7 +41,7 @@ class ReadRecordSnapshotContractTest {
     fun `deletion snapshots bookshelf data and restore prefers latest record`() {
         val record = projectFile("src/main/java/io/legado/app/data/entities/ReadRecord.kt")
         assertTrue(record.contains("fun Book.saveReadRecordSnapshot()"))
-        assertTrue(record.contains("appDb.readRecordDao.getRecord(AppConst.androidId, name)"))
+        assertTrue(record.contains("appDb.readRecordDao.getRecord(AppConst.androidId, name, author)"))
 
         val book = projectFile("src/main/java/io/legado/app/data/entities/Book.kt")
         assertTrue(book.contains("saveReadRecordSnapshot()"))

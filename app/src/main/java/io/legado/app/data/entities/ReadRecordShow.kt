@@ -4,7 +4,7 @@ data class ReadRecordShow(
     var bookName: String,
     var readTime: Long,
     var lastRead: Long,
-    /** Raw author values aggregated across devices; empty for legacy records. */
+    /** Author identity shared across devices; legacy combined-author rows retain their encoding. */
     var author: String = "",
     var lastChapterTitle: String? = null,
     var lastChapterIndex: Int = -1,
@@ -13,4 +13,7 @@ data class ReadRecordShow(
 ) {
     val displayAuthor: String
         get() = ReadRecordAuthors.display(author)
+
+    val hasCombinedAuthors: Boolean
+        get() = ReadRecordAuthors.isCombined(author)
 }

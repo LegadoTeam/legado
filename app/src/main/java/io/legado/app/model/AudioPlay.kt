@@ -36,7 +36,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancelChildren
 import splitties.init.appCtx
-import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.text.trim
 
@@ -122,10 +121,7 @@ internal class AudioReadTimeTracker {
     }
 
     @Synchronized
-    fun updateAuthor(author: String) {
-        record.author = author
-        activeRecord?.author = author
-    }
+    fun isForBook(book: Book): Boolean = record.bookName == book.name && record.author == book.author
 
     @Synchronized
     fun updateSnapshot(book: Book, chapterIndex: Int, chapterPos: Int) {
@@ -142,7 +138,7 @@ internal class AudioReadTimeTracker {
     }
 
     @Synchronized
-    fun stop(now: Long, lastRead: Long): ReadRecord? {
+    fun stop(now: Long, lastRead: Long): Pair<ReadRecord, Long>? {
         val start = startedAt ?: return null
         val record = activeRecord ?: return null
         activeRecord = null
@@ -151,7 +147,7 @@ internal class AudioReadTimeTracker {
         if (elapsed == 0L) return null
         record.readTime += elapsed
         record.lastRead = lastRead
-        return record.copy()
+        return record.copy() to elapsed
     }
 }
 
@@ -207,8 +203,6 @@ object AudioPlay : CoroutineScope by MainScope() {
     private var playingCacheBookUrl: String? = null
     private var playingCacheTreeUri: String? = null
     private val readTimeTracker = AudioReadTimeTracker()
-    @Volatile
-    private var readTimeWrite: Future<*>? = null
     val executor = globalExecutor
 
     fun changePlayMode() {
@@ -233,6 +227,9 @@ object AudioPlay : CoroutineScope by MainScope() {
             val changed = AudioPlay.book?.bookUrl != book.bookUrl ||
                     durChapterIndex != book.durChapterIndex
             if (changed) stopPlay()
+            if (!readTimeTracker.isForBook(book)) {
+                resetReadRecord(book, resumeIfPlaying = !changed)
+            }
             AudioPlay.book = book
             changed
         }
@@ -290,26 +287,26 @@ object AudioPlay : CoroutineScope by MainScope() {
 
     @Synchronized
     fun replaceBook(book: Book) {
-        AudioPlay.book = book
         resetReadRecord(book, resumeIfPlaying = true)
+        AudioPlay.book = book
     }
 
     @Synchronized
     private fun resetReadRecord(book: Book, resumeIfPlaying: Boolean = false) {
         upReadTime()
-        kotlin.runCatching { readTimeWrite?.get() }.onFailure {
-            AppLog.put("保存听书时长失败\n${it.localizedMessage}", it)
-        }
         val record = ReadRecord(
             deviceId = AppConst.androidId,
             bookName = book.name,
             author = book.author,
         )
         record.readTime = appDb.readRecordDao
-            .getReadTime(record.deviceId, record.bookName) ?: 0
+            .getReadTime(record.deviceId, record.bookName, record.author) ?: 0
         readTimeTracker.setRecord(record)
         if (resumeIfPlaying && AudioPlayService.isPlaying) {
-            markReadTimeStart()
+            if (AppConfig.enableReadRecord) {
+                readTimeTracker.updateSnapshot(book, durChapterIndex, durChapterPos)
+                readTimeTracker.start(SystemClock.elapsedRealtime())
+            }
         }
     }
 
@@ -324,7 +321,7 @@ object AudioPlay : CoroutineScope by MainScope() {
     @Synchronized
     fun markReadTimeStart() {
         if (AppConfig.enableReadRecord) {
-            readTimeTracker.updateAuthor(book?.author.orEmpty())
+            book?.takeUnless(readTimeTracker::isForBook)?.let { resetReadRecord(it) }
             book?.let { readTimeTracker.updateSnapshot(it, durChapterIndex, durChapterPos) }
             readTimeTracker.start(SystemClock.elapsedRealtime())
         }
@@ -333,12 +330,12 @@ object AudioPlay : CoroutineScope by MainScope() {
     @Synchronized
     fun upReadTime() {
         book?.let { readTimeTracker.updateSnapshot(it, durChapterIndex, durChapterPos) }
-        val record = readTimeTracker.stop(
+        val (record, elapsed) = readTimeTracker.stop(
             now = SystemClock.elapsedRealtime(),
             lastRead = System.currentTimeMillis(),
         ) ?: return
         val snapshotBook = book?.copy()
-        readTimeWrite = executor.submit { record.saveWithCover(snapshotBook) }
+        executor.execute { record.saveWithCover(snapshotBook, elapsed) }
     }
 
     private fun addLoading(index: Int): Boolean {

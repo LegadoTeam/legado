@@ -28,12 +28,12 @@ object ReadRecordCoverCache {
     private val root get() = File(appCtx.externalFiles, DIRECTORY)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val permits = Semaphore(2)
-    private val pending = ConcurrentHashMap<Triple<String, String, String>, Boolean>()
+    private val pending = ConcurrentHashMap<List<String>, Boolean>()
 
     fun request(record: ReadRecord, sourceOrigin: String? = null): Job? {
         val path = record.coverUrl?.takeIf { it.isNotBlank() } ?: return null
         if (ownedFile(path)?.isFile == true) return null
-        val key = Triple(record.deviceId, record.bookName, path)
+        val key = listOf(record.deviceId, record.bookName, record.author, path)
         if (pending.putIfAbsent(key, true) != null) return null
         return scope.launch {
             try {
@@ -52,7 +52,7 @@ object ReadRecordCoverCache {
                             Glide.with(appCtx).clear(validation)
                         }
                         appDb.runInTransaction {
-                            val current = appDb.readRecordDao.getRecord(record.deviceId, record.bookName)
+                            val current = appDb.readRecordDao.getRecord(record.deviceId, record.bookName, record.author)
                             if (current?.coverUrl == path) {
                                 val targetFile = installPersistentCover(downloaded, root)
                                 attach(record, path, targetFile)
@@ -98,7 +98,7 @@ object ReadRecordCoverCache {
 
     private fun attach(record: ReadRecord, expected: String, file: File) {
         if (file.isFile) {
-            appDb.readRecordDao.updateCoverIfUnchanged(record.deviceId, record.bookName, expected, file.absolutePath)
+            appDb.readRecordDao.updateCoverIfUnchanged(record.deviceId, record.bookName, record.author, expected, file.absolutePath)
         }
     }
 

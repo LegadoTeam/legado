@@ -6,7 +6,7 @@ import io.legado.app.data.entities.ReadRecordBook
 /**
  * 阅读记录的书籍索引,用于判断书籍是否读过
  *
- * 阅读记录以书名为主键,作者只是辅助信息,旧记录、旧备份以及书源未提供作者时都为空,
+ * 阅读记录按书名和作者区分；旧记录、旧备份以及书源未提供作者时都可能为空,
  * 任意一方作者为空时只能退回到按书名判断
  */
 class ReadRecordIndex private constructor(
