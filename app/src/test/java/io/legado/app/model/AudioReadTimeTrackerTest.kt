@@ -17,11 +17,15 @@ class AudioReadTimeTrackerTest {
 
         tracker.start(1_000)
         tracker.start(1_500)
-        assertEquals(1_100L, tracker.stop(2_000, 10_000)?.readTime)
+        val first = tracker.stop(2_000, 10_000)!!
+        assertEquals(1_100L, first.first.readTime)
+        assertEquals(1_000L, first.second)
         assertNull(tracker.stop(2_500, 11_000))
 
         tracker.start(3_000)
-        assertEquals(1_600L, tracker.stop(3_500, 12_000)?.readTime)
+        val next = tracker.stop(3_500, 12_000)!!
+        assertEquals(1_600L, next.first.readTime)
+        assertEquals(500L, next.second)
     }
 
     @Test
@@ -31,9 +35,9 @@ class AudioReadTimeTrackerTest {
         tracker.start(100)
         tracker.setRecord(ReadRecord(bookName = "second"))
 
-        assertEquals("first", tracker.stop(200, 1_000)?.bookName)
+        assertEquals("first", tracker.stop(200, 1_000)?.first?.bookName)
         tracker.start(300)
-        assertEquals("second", tracker.stop(450, 2_000)?.bookName)
+        assertEquals("second", tracker.stop(450, 2_000)?.first?.bookName)
     }
 
     @Test
@@ -42,11 +46,11 @@ class AudioReadTimeTrackerTest {
         tracker.setRecord(ReadRecord(bookName = "book", author = "A", readTime = 100))
         tracker.start(100)
         tracker.setRecord(ReadRecord(bookName = "book", author = "B", readTime = 500))
-        val a = tracker.stop(200, 1_000)!!
+        val a = tracker.stop(200, 1_000)!!.first
         assertEquals("A", a.author)
         assertEquals(200L, a.readTime)
         tracker.start(300)
-        val b = tracker.stop(450, 2_000)!!
+        val b = tracker.stop(450, 2_000)!!.first
         assertEquals("B", b.author)
         assertEquals(650L, b.readTime)
     }
@@ -60,7 +64,7 @@ class AudioReadTimeTrackerTest {
         val other = Book(bookUrl = "B", name = "book", author = "B",
             durChapterTitle = "B chapter", coverUrl = "B cover")
         tracker.updateSnapshot(other, 9, 50)
-        val saved = tracker.stop(200, 1000)!!
+        val saved = tracker.stop(200, 1000)!!.first
         assertEquals("A", saved.author)
         assertEquals("A chapter", saved.lastChapterTitle)
         assertEquals("A cover", saved.coverUrl)
@@ -95,7 +99,7 @@ class AudioReadTimeTrackerTest {
             .readText()
             .replace(Regex("\\s+"), " ")
         assertTrue(model.contains("@Synchronized fun upReadTime()"))
-        assertTrue(model.contains("readTimeWrite = executor.submit"))
+        assertTrue(model.contains("executor.execute { record.saveWithCover(snapshotBook, elapsed) }"))
 
         val viewModel = projectFile(
             "src/main/java/io/legado/app/ui/book/audio/AudioPlayViewModel.kt"

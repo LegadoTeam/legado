@@ -8,6 +8,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.constant.AppConst
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.saveWithCover
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.globalExecutor
 import io.legado.app.model.ReadBook
@@ -26,6 +27,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
@@ -296,6 +298,118 @@ class ReadRecordAuthorIdentityTest {
             dao.clear()
             dao.insert(*saved.toTypedArray())
             AppConfig.enableReadRecord = enabled
+        }
+    }
+
+    @Test
+    fun queuedReaderIntervalsSurviveSwitchingFromAuthorAToBAndBack() {
+        val dao = appDb.readRecordDao
+        val enabled = AppConfig.enableReadRecord
+        val name = "Queued identity ${UUID.randomUUID()}"
+        val first = ReadRecord(deviceId = AppConst.androidId, bookName = name, author = "A", readTime = 10_000)
+        val other = first.copy(author = "B", readTime = 50_000)
+        val remote = first.copy(deviceId = "remote", readTime = 900_000)
+        val unknown = first.copy(author = "", readTime = 7000)
+        val saved = dao.all
+        try {
+            AppConfig.enableReadRecord = true
+            for (model in listOf(ReadBook, ReadManga, AudioPlay)) {
+                globalExecutor.submit {}.get(10, TimeUnit.SECONDS)
+                val type = model.javaClass
+                val bookField = type.getDeclaredField("book").apply { isAccessible = true }
+                val oldBook = bookField.get(model)
+                val isAudio = model === AudioPlay
+                val timer = if (isAudio) {
+                    type.getDeclaredField("readTimeTracker").apply { isAccessible = true }.get(model)
+                } else model
+                val timerFields = (if (isAudio) listOf("record", "activeRecord", "startedAt")
+                    else listOf("readRecord", "readStartTime"))
+                    .map { timer.javaClass.getDeclaredField(it).apply { isAccessible = true } }
+                val oldTimer = timerFields.map { it.get(timer) }
+                try {
+                    dao.clear()
+                    dao.insert(first, other, remote, unknown)
+                    val expected = mutableMapOf("A" to first.readTime, "B" to other.readTime)
+                    withReadRecordWritesPaused {
+                        // Exercise the real loaders and interval writers while their shared
+                        // executor cannot save anything; no wait is allowed between identities.
+                        for ((author, duration) in listOf("A" to 1000L, "B" to 3000L, "A" to 2000L)) {
+                            val current = Book(bookUrl = "queued:$author", name = name, author = author,
+                                durChapterTitle = "Chapter $duration")
+                            val elapsed: Long
+                            if (isAudio) {
+                                AudioPlay.replaceBook(current)
+                                AudioPlay.markReadTimeStart()
+                                val active = timerFields[1].get(timer) as ReadRecord
+                                val before = active.readTime
+                                timerFields[2].set(timer, android.os.SystemClock.elapsedRealtime() - duration)
+                                AudioPlay.upReadTime()
+                                elapsed = active.readTime - before
+                            } else {
+                                bookField.set(model, current)
+                                type.getDeclaredMethod("resetReadRecord", Book::class.java)
+                                    .apply { isAccessible = true }.invoke(model, current)
+                                val start = System.currentTimeMillis() - duration
+                                timerFields[1].setLong(timer, start)
+                                type.getDeclaredMethod("upReadTime").invoke(model)
+                                elapsed = timerFields[1].getLong(timer) - start
+                            }
+                            expected[author] = expected.getValue(author) + elapsed
+                        }
+                        assertEquals(first, dao.getRecord(first.deviceId, name, "A"))
+                        assertEquals(other, dao.getRecord(first.deviceId, name, "B"))
+                    }
+                    for ((author, total) in expected) {
+                        assertEquals("${type.simpleName}: every interval survives", total,
+                            dao.getRecord(first.deviceId, name, author)!!.readTime)
+                    }
+                    assertEquals("Chapter 2000", dao.getRecord(first.deviceId, name, "A")!!.lastChapterTitle)
+                    assertEquals("Chapter 3000", dao.getRecord(first.deviceId, name, "B")!!.lastChapterTitle)
+                    assertEquals(remote, dao.getRecord("remote", name, "A"))
+                    assertEquals(unknown, dao.getRecord(first.deviceId, name, ""))
+                } finally {
+                    globalExecutor.submit {}.get(10, TimeUnit.SECONDS)
+                    bookField.set(model, oldBook)
+                    timerFields.zip(oldTimer).forEach { (field, value) -> field.set(timer, value) }
+                }
+            }
+        } finally {
+            dao.clear()
+            dao.insert(*saved.toTypedArray())
+            AppConfig.enableReadRecord = enabled
+        }
+    }
+
+    @Test
+    fun anOlderQueuedIntervalAddsTimeWithoutReplacingTheNewerSnapshot() {
+        val dao = appDb.readRecordDao
+        val name = "Out-of-order interval ${UUID.randomUUID()}"
+        val current = ReadRecord(deviceId = "phone", bookName = name, author = "A", readTime = 10_000,
+            lastRead = 200, lastChapterTitle = "New chapter", lastChapterIndex = 9, lastChapterPos = 80)
+        try {
+            dao.insert(current)
+            current.copy(readTime = 1000, lastRead = 100, lastChapterTitle = "Old chapter",
+                lastChapterIndex = 1, lastChapterPos = 0).saveWithCover(null, 2000)
+            assertEquals(current.copy(readTime = 12_000), dao.getRecord("phone", name, "A"))
+        } finally {
+            dao.deleteByBook(name, "A")
+        }
+    }
+
+    private fun withReadRecordWritesPaused(block: () -> Unit) {
+        val started = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val gate = globalExecutor.submit {
+            started.countDown()
+            check(release.await(10, TimeUnit.SECONDS)) { "Reader blocked on its queued write" }
+        }
+        try {
+            assertTrue(started.await(5, TimeUnit.SECONDS))
+            block()
+        } finally {
+            release.countDown()
+            gate.get(10, TimeUnit.SECONDS)
+            globalExecutor.submit {}.get(10, TimeUnit.SECONDS)
         }
     }
 

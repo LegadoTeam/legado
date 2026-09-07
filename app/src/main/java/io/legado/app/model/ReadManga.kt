@@ -144,7 +144,7 @@ object ReadManga : CoroutineScope by MainScope() {
 
     //每次切换章节更新阅读记录
     fun upReadTime() {
-        val (record, snapshotBook) = synchronized(readRecordLock) {
+        val (record, snapshotBook, elapsed) = synchronized(readRecordLock) {
             val currentBook = book?.copy() ?: return
             if (readRecord.bookName != currentBook.name || readRecord.author != currentBook.author) {
                 resetReadRecord(currentBook)
@@ -155,13 +155,13 @@ object ReadManga : CoroutineScope by MainScope() {
             readRecord.readTime += elapsed
             readRecord.lastRead = now
             readRecord.updateSnapshot(currentBook, durChapterIndex, durChapterPos)
-            readRecord.copy() to currentBook
+            Triple(readRecord.copy(), currentBook, elapsed)
         }
         executor.execute {
             if (!AppConfig.enableReadRecord) {
                 return@execute
             }
-            record.saveWithCover(snapshotBook)
+            record.saveWithCover(snapshotBook, elapsed)
         }
     }
 

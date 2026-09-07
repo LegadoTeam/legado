@@ -638,21 +638,22 @@ object ReadBook : CoroutineScope by MainScope() {
         if (!AppConfig.enableReadRecord) {
             return
         }
-        val (record, currentBook) = synchronized(readRecordLock) {
+        val (record, currentBook, elapsed) = synchronized(readRecordLock) {
             val currentBook = book?.copy() ?: return
             // Book details may fill in an author on the existing Book instance.
             if (readRecord.bookName != currentBook.name || readRecord.author != currentBook.author) {
                 resetReadRecord(currentBook)
             }
             val now = System.currentTimeMillis()
-            readRecord.readTime += (now - readStartTime).coerceAtLeast(0)
+            val elapsed = (now - readStartTime).coerceAtLeast(0)
+            readRecord.readTime += elapsed
             readStartTime = now
             readRecord.lastRead = now
             readRecord.updateSnapshot(currentBook, durChapterIndex, durChapterPos)
-            readRecord.copy() to currentBook
+            Triple(readRecord.copy(), currentBook, elapsed)
         }
         executor.execute {
-            record.saveWithCover(currentBook)
+            record.saveWithCover(currentBook, elapsed)
         }
     }
 

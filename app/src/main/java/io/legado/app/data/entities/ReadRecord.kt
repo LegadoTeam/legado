@@ -43,11 +43,21 @@ fun ReadRecord.updateSnapshot(
     book.getDisplayCover()?.takeIf { it.isNotBlank() }?.let { coverUrl = it }
 }
 
-fun ReadRecord.saveWithCover(book: Book?) {
+fun ReadRecord.saveWithCover(book: Book?, elapsed: Long? = null) {
     val snapshotBook = book?.takeIf { it.name == bookName && it.author == author }
     refreshChapterTitle(snapshotBook)
-    appDb.readRecordDao.insert(this)
-    ReadRecordCoverCache.request(copy(), snapshotBook?.getCoverSourceOrigin())
+    var saved = this
+    appDb.runInTransaction {
+        if (elapsed != null) {
+            val current = appDb.readRecordDao.getRecord(deviceId, bookName, author)
+            // A reader can revisit this identity before an earlier interval reaches the queue.
+            // Add the interval to the stored total instead of replacing it with a stale total.
+            val snapshot = current?.takeIf { it.lastRead > lastRead } ?: this
+            saved = snapshot.copy(readTime = (current?.readTime ?: 0L) + elapsed.coerceAtLeast(0L))
+        }
+        appDb.readRecordDao.insert(saved)
+    }
+    ReadRecordCoverCache.request(saved.copy(), snapshotBook?.getCoverSourceOrigin())
 }
 
 private fun ReadRecord.refreshChapterTitle(snapshotBook: Book?) {
