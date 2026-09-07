@@ -374,6 +374,7 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
         durChapterPos: Int = 0,
         highlightLayoutTitleLength: Int? = null,
         highlightAnchorText: String? = null,
+        pdfPageIndex: Int? = null,
         success: (() -> Unit)? = null
     ) {
         ReadBook.openChapter(
@@ -381,6 +382,7 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
             durChapterPos,
             highlightLayoutTitleLength = highlightLayoutTitleLength,
             highlightAnchorText = highlightAnchorText,
+            pdfPageIndex = pdfPageIndex,
             success = success
         )
     }
