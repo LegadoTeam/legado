@@ -186,6 +186,36 @@ class BatchContentDownloadTest {
     }
 
     @Test
+    fun contentArrivingBeforeClaimIsRecheckedWithoutAnotherNetworkRequest() = runBlocking {
+        withTimeout(10000) {
+            Fixture().use { f ->
+                // Initialize folder/cache lookup before observing the registry monitor below.
+                assertNull(BookHelp.getContent(f.book, f.chapters[0]))
+                val result = CompletableDeferred<String>()
+                val reader = thread(start = false, isDaemon = true, name = "batch-claim-reader") {
+                    runCatching { runBlocking { f.model.downloadAwait(f.chapters[0]) } }
+                        .onSuccess { result.complete(it) }
+                        .onFailure { result.completeExceptionally(it) }
+                }
+                synchronized(CacheBook) {
+                    reader.start()
+                    val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+                    while (reader.state != Thread.State.BLOCKED && reader.isAlive && System.nanoTime() < deadline) {
+                        Thread.sleep(1)
+                    }
+                    assertEquals("reader did not reach the registry claim", Thread.State.BLOCKED, reader.state)
+                    // A normal network cache write keeps version zero; the WebBook edit fence
+                    // alone cannot avoid the redundant request in this interval.
+                    assertTrue(BookHelp.saveContent(f.source, f.book, f.chapters[0], "arrived before claim"))
+                }
+                assertEquals("arrived before claim", result.await())
+                assertEquals(0, f.server.singleRequests.get())
+                assertEquals(0, f.model.onDownloadCount)
+            }
+        }
+    }
+
+    @Test
     fun callbacksAfterBatchClosureAreRejected() {
         Fixture().use { f ->
             val context = BatchContentContext(f.source, f.book, f.chapters,

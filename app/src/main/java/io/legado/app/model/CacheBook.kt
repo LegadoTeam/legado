@@ -420,7 +420,9 @@ object CacheBook {
                     )
                 }
                 try {
-                    val content = WebBook.getContentAwait(model.bookSource, requestBook, chapter)
+                    // The previous owner may have saved content between our first read and claim.
+                    val content = BookHelp.getContent(requestBook, chapter)
+                        ?: WebBook.getContentAwait(model.bookSource, requestBook, chapter)
                     val currentContent = BookHelp.getContent(requestBook, chapter) ?: content
                     model.onSuccess(ticket, requestBook, chapter, currentContent, notifyReader = false)
                     return currentContent
