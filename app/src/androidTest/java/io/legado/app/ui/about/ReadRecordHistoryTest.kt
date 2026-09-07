@@ -2,6 +2,7 @@ package io.legado.app.ui.about
 
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Rect
 import android.os.SystemClock
 import android.view.Menu
 import android.view.View
@@ -27,6 +28,7 @@ import io.legado.app.databinding.ActivityReadRecordBinding
 import io.legado.app.databinding.ItemReadRecordDisplayBinding
 import io.legado.app.help.book.ReadRecordCoverCache
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.storage.BackupConfig
 import io.legado.app.help.storage.Restore
 import io.legado.app.help.storage.writePreferenceSnapshot
@@ -52,6 +54,7 @@ class ReadRecordHistoryTest {
     private val context = instrumentation.targetContext.applicationContext
     private val prefs = context.defaultSharedPreferences
     private val savedPrefs = prefs.all
+    private val savedSort = LocalConfig.all["readRecordSort"]
     private val savedRecords = appDb.readRecordDao.all
     private val id = UUID.randomUUID().toString()
     private val book = Book(bookUrl = "history:$id", name = "History $id", author = "History Author")
@@ -61,6 +64,7 @@ class ReadRecordHistoryTest {
     @Before
     fun setUp() {
         prefs.edit().remove("readRecordSimpleLayout").remove("readRecordUseDays").commit()
+        LocalConfig.edit().putInt("readRecordSort", 1).commit()
         appDb.readRecordDao.clear()
         cover = File(context.cacheDir, "history-$id.png")
         Bitmap.createBitmap(48, 64, Bitmap.Config.ARGB_8888).apply {
@@ -95,6 +99,9 @@ class ReadRecordHistoryTest {
                 if (value is Boolean) putBoolean(key, value) else remove(key)
             }
         }.commit()
+        LocalConfig.edit().apply {
+            if (savedSort is Int) putInt("readRecordSort", savedSort) else remove("readRecordSort")
+        }.commit()
     }
 
     @Test
@@ -125,7 +132,7 @@ class ReadRecordHistoryTest {
         scenario!!.onActivity { activity ->
             assertEquals("1天1小时", findRow(activity.views, book.name)!!.enhanced.tvReadingTime.text.toString())
             assertNoTextOverflow(activity.views.enhancedSummary.root)
-            assertNoTextOverflow(findRow(activity.views, book.name)!!.enhanced.root)
+            assertRecordLayout(findRow(activity.views, book.name)!!)
         }
         screenshot("reading-history-enhanced")
         scenario!!.recreate()
@@ -279,7 +286,7 @@ class ReadRecordHistoryTest {
             await { findRow(it, book.name) != null }
             scenario!!.onActivity { activity ->
                 assertNoTextOverflow(activity.views.enhancedSummary.root)
-                assertNoTextOverflow(findRow(activity.views, book.name)!!.enhanced.root)
+                assertRecordLayout(findRow(activity.views, book.name)!!)
             }
             screenshot("reading-history-narrow-large-text")
         } finally {
@@ -336,6 +343,21 @@ class ReadRecordHistoryTest {
             assertTrue("Text height: ${view.text}", view.height >= view.layout.height + view.paddingTop + view.paddingBottom)
         }
         if (view is ViewGroup) for (i in 0 until view.childCount) assertNoTextOverflow(view.getChildAt(i))
+    }
+
+    private fun assertRecordLayout(row: ItemReadRecordDisplayBinding) {
+        with(row.enhanced) {
+            assertNoTextOverflow(root)
+            val views = listOf(ivCover, tvBookName, tvAuthor, tvChapter, tvReadingTime, tvLastReadTime, ivRemove)
+            views.forEachIndexed { index, first ->
+                val firstBounds = Rect().also(first::getHitRect)
+                views.drop(index + 1).forEach { second ->
+                    val secondBounds = Rect().also(second::getHitRect)
+                    assertFalse("Overlapping history fields: ${first.id}, ${second.id}",
+                        Rect.intersects(firstBounds, secondBounds))
+                }
+            }
+        }
     }
 
     private fun screenshot(name: String) {

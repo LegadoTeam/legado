@@ -36,6 +36,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
+        android:layout_marginEnd="8dp"
         android:textColor="@color/secondaryText"
         android:textSize="13sp"
         android:maxLines="1"
@@ -65,13 +66,21 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
+        android:layout_marginTop="4dp"
         android:gravity="end"
         android:textColor="@color/primaryText"
         android:textSize="14sp"
         android:textStyle="bold"
         app:layout_constraintWidth_percent="0.32"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/iv_remove" />
+        app:layout_constraintTop_toBottomOf="@id/title_bottom" />
+
+    <androidx.constraintlayout.widget.Barrier
+        android:id="@+id/title_bottom"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:barrierDirection="bottom"
+        app:constraint_referenced_ids="tv_book_name,iv_remove" />
 
     <TextView
         android:id="@+id/tv_last_read_time"
