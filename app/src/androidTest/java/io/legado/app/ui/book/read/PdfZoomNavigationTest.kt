@@ -50,6 +50,7 @@ class PdfZoomNavigationTest {
     private lateinit var book: Book
     private lateinit var file: File
     private var scenario: ActivityScenario<ReadBookActivity>? = null
+    private var lastEventTime = 0L
     private val ReadBookActivity.reader: ReadView get() = findViewById(R.id.read_view)
     private val ReadView.content: ContentTextView get() = curPage.findViewById(R.id.content_text_view)
 
@@ -124,7 +125,7 @@ class PdfZoomNavigationTest {
         screenshot("pdf-zoom-portrait-fit")
         var preview: Bitmap? = null
         scenario!!.onActivity {
-            pinch(it.reader, true)
+            repeat(2) { _ -> pinch(it.reader, true) }
             preview = captureContent(it.reader)
         }
         await { it.reader.pdfZoom.scale > 2f && it.reader.content.pdfRenderCount > 0 }
@@ -177,7 +178,7 @@ class PdfZoomNavigationTest {
         await { images(it).size == 2 }
         val initial = images()
         screenshot("pdf-zoom-landscape-spread")
-        scenario!!.onActivity { pinch(it.reader, true) }
+        scenario!!.onActivity { repeat(2) { _ -> pinch(it.reader, true) } }
         await { it.reader.content.pdfRenderCount > 0 }
         val scale = zoomScale()
         assertTrue(scale > 2f)
@@ -193,6 +194,7 @@ class PdfZoomNavigationTest {
         assertEquals(scale, zoomScale(), .001f)
         await { it.reader.content.pdfRenderCount > 0 }
         screenshot("pdf-zoom-rotation-keeps-scale")
+        scenario!!.onActivity { pinch(it.reader, false, cancelAfterMoves = 8) }
     }
 
     @Test
@@ -203,13 +205,13 @@ class PdfZoomNavigationTest {
         }
         val chapters = PdfFile.getChapterList(book)
         book.totalChapterNum = chapters.size
-        book.durChapterPos = 5
         appDb.bookDao.update(book)
         appDb.bookChapterDao.insert(*chapters.toTypedArray())
         launch()
+        scenario!!.onActivity { ReadBook.openChapter(0, pdfPageIndex = 5) }
         await { images(it).contains(5) }
         screenshot("pdf-zoom-reporter-textbook-fit")
-        scenario!!.onActivity { pinch(it.reader, true) }
+        scenario!!.onActivity { repeat(2) { _ -> pinch(it.reader, true) } }
         await { it.reader.content.pdfRenderCount > 0 }
         screenshot("pdf-zoom-reporter-textbook-detail")
         val scale = zoomScale()
@@ -230,14 +232,14 @@ class PdfZoomNavigationTest {
         book.setImageStyle(Book.imgStyleFull)
         appDb.bookDao.update(book)
         launch()
-        scenario!!.onActivity { pinch(it.reader, true) }
+        scenario!!.onActivity { repeat(2) { _ -> pinch(it.reader, true) } }
         await { it.reader.content.pdfRenderCount > 0 }
         val initial = ReadBook.durChapterPos
         scenario!!.onActivity { drag(it.reader, -100f, -150f) }
         assertEquals(initial, ReadBook.durChapterPos)
         await { it.reader.content.pdfRenderCount >= 2 }
         screenshot("pdf-zoom-scroll-detail")
-        scenario!!.onActivity { pinch(it.reader, false) }
+        scenario!!.onActivity { repeat(3) { _ -> pinch(it.reader, false) } }
         assertEquals(1f, zoomScale(), .001f)
         val offset = ContentTextView::class.java.getDeclaredField("pageOffset").apply { isAccessible = true }
         scenario!!.onActivity { activity ->
@@ -281,7 +283,12 @@ class PdfZoomNavigationTest {
             if (ready) return
             SystemClock.sleep(100)
         } while (SystemClock.elapsedRealtime() < deadline)
-        scenario!!.onActivity { assertTrue("PDF reader did not reach expected state", condition(it)) }
+        scenario!!.onActivity {
+            saveBitmap(captureContent(it.reader), "pdf-zoom-failure-content")
+            assertTrue("PDF reader state: images=${images(it)}, scale=${it.reader.pdfZoom.scale}, " +
+                "rendered=${it.reader.content.pdfRenderedPages}, chapter=${ReadBook.durChapterIndex}, " +
+                "position=${ReadBook.durChapterPos}, size=${it.reader.width}x${it.reader.height}", condition(it))
+        }
     }
     private fun screenshot(name: String) {
         instrumentation.waitForIdleSync()
@@ -300,14 +307,16 @@ class PdfZoomNavigationTest {
         output.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
     private fun dispatch(view: ReadView, down: Long, time: Long, action: Int, points: List<Pair<Float, Float>>) {
+        lastEventTime = time
         val event = MotionEvent.obtain(down, time, action, points.size,
             points.indices.map { MotionEvent.PointerProperties().apply { id = it; toolType = MotionEvent.TOOL_TYPE_FINGER } }.toTypedArray(),
             points.map { p -> MotionEvent.PointerCoords().apply { x = p.first; y = p.second; pressure = 1f; size = 1f } }.toTypedArray(),
             0, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_TOUCHSCREEN, 0)
         try { assertTrue(view.dispatchTouchEvent(event)) } finally { event.recycle() }
     }
-    private fun pinch(view: ReadView, out: Boolean) {
-        val time = SystemClock.uptimeMillis()
+    private fun nextEventTime(): Long = maxOf(SystemClock.uptimeMillis(), lastEventTime + 30)
+    private fun pinch(view: ReadView, out: Boolean, cancelAfterMoves: Int = 0) {
+        val time = nextEventTime()
         val center = view.width / 2f
         val y = view.height / 2f
         val start = view.width * if (out) .1f else .4f
@@ -315,18 +324,26 @@ class PdfZoomNavigationTest {
         fun points(radius: Float) = listOf(center - radius to y, center + radius to y)
         dispatch(view, time, time, MotionEvent.ACTION_DOWN, points(start).take(1))
         dispatch(view, time, time + 20, MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), points(start))
-        repeat(16) { i -> dispatch(view, time, time + 40 + i * 20L, MotionEvent.ACTION_MOVE, points(start + (end - start) * (i + 1) / 16)) }
+        var cancelledScale: Float? = null
+        repeat(16) { i ->
+            dispatch(view, time, time + 40 + i * 20L, MotionEvent.ACTION_MOVE, points(start + (end - start) * (i + 1) / 16))
+            if (i + 1 == cancelAfterMoves) {
+                view.cancelTouchGestures()
+                cancelledScale = view.pdfZoom.scale
+            }
+        }
         dispatch(view, time, time + 380, MotionEvent.ACTION_POINTER_UP or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), points(end))
         dispatch(view, time, time + 400, MotionEvent.ACTION_UP, points(end).take(1))
+        cancelledScale?.let { assertEquals("Cancelled fingers must not keep changing the new view", it, view.pdfZoom.scale, .001f) }
     }
     private fun tap(view: ReadView, x: Float, y: Float) {
-        val time = SystemClock.uptimeMillis()
+        val time = nextEventTime()
         val point = listOf(view.width * x to view.height * y)
         dispatch(view, time, time, MotionEvent.ACTION_DOWN, point)
         dispatch(view, time, time + 70, MotionEvent.ACTION_UP, point)
     }
     private fun drag(view: ReadView, dx: Float, dy: Float) {
-        val time = SystemClock.uptimeMillis()
+        val time = nextEventTime()
         val x = view.width / 2f
         val y = view.height / 2f
         dispatch(view, time, time, MotionEvent.ACTION_DOWN, listOf(x to y))

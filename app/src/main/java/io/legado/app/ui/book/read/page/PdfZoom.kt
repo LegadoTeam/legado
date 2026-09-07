@@ -21,6 +21,7 @@ internal class PdfZoom(private val view: ReadView) {
     private var bookUrl: String? = null
     private var bounds = RectF()
     private var owned = false
+    private var ignoreRemainder = false
     val isInteracting: Boolean get() = owned
     private var multiplePointers = false
     private var moved = false
@@ -52,6 +53,7 @@ internal class PdfZoom(private val view: ReadView) {
             offsetX = 0f
             offsetY = 0f
             owned = false
+            ignoreRemainder = false
         }
         return book?.isPdf == true
     }
@@ -105,6 +107,7 @@ internal class PdfZoom(private val view: ReadView) {
     fun cancelGesture() {
         if (!owned) return
         owned = false
+        ignoreRemainder = true
         multiplePointers = true
         view.autoPager.resume()
         redraw()
@@ -113,6 +116,8 @@ internal class PdfZoom(private val view: ReadView) {
     /** At 1x, keep ordinary swipe navigation. Once zoomed, a drag pans but a tap still acts. */
     fun onTouch(event: MotionEvent, tap: (Float, Float) -> Unit): Boolean {
         if (!isEnabled()) return false
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) ignoreRemainder = false
+        if (ignoreRemainder) return true
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
             owned = scale > 1f
             multiplePointers = false
