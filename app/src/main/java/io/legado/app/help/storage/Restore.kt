@@ -519,6 +519,9 @@ object Restore {
             }
             if ("readRecordSimpleLayout" !in map) edit.putBoolean("readRecordSimpleLayout", true)
             if ("readRecordUseDays" !in map) edit.putBoolean("readRecordUseDays", false)
+            if (!BackupConfig.ignoreReadConfig && PreferKey.mangaRightToLeft !in map) {
+                edit.putBoolean(PreferKey.mangaRightToLeft, false)
+            }
             edit.apply()
         }
         restoredVideoPreferences?.let { map ->

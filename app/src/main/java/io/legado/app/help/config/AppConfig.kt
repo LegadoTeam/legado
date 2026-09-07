@@ -949,6 +949,12 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefBoolean(PreferKey.enableMangaHorizontalScroll, value)
         }
 
+    var mangaRightToLeft
+        get() = appCtx.getPrefBoolean(PreferKey.mangaRightToLeft, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.mangaRightToLeft, value)
+        }
+
     var mangaColorFilter
         get() = appCtx.getPrefString(PreferKey.mangaColorFilter, "")
         set(value) {

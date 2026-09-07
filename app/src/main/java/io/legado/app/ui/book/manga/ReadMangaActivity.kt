@@ -7,12 +7,14 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
 import android.view.WindowManager
 import android.view.animation.LinearInterpolator
 import androidx.activity.addCallback
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.core.net.toUri
+import androidx.core.view.doOnNextLayout
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
@@ -67,7 +69,6 @@ import io.legado.app.utils.ACache
 import io.legado.app.utils.GSON
 import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.StartActivityContract
-import io.legado.app.utils.canScroll
 import io.legado.app.utils.fastBinarySearch
 import io.legado.app.utils.findCenterViewPosition
 import io.legado.app.utils.fromJsonObject
@@ -229,12 +230,17 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                 if (mAdapter.isNotEmpty()) {
                     val item = mAdapter.getItem(position)
                     if (item is BaseMangaPage) {
+                        // Capture the new chapter's page before its transition saves progress.
+                        ReadManga.durChapterPos = if (item is MangaPage) {
+                            item.index
+                        } else {
+                            (item.index - 1).coerceAtLeast(0)
+                        }
                         if (ReadManga.durChapterIndex < item.chapterIndex) {
                             ReadManga.moveToNextChapter()
                         } else if (ReadManga.durChapterIndex > item.chapterIndex) {
                             ReadManga.moveToPrevChapter()
                         } else {
-                            ReadManga.durChapterPos = item.index
                             ReadManga.curPageChanged()
                         }
                         if (item is MangaPage) {
@@ -472,11 +478,17 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     }
 
     override fun scrollBy(distance: Int) {
-        if (!binding.recyclerView.canScroll(1)) {
+        val horizontal = mLayoutManager.orientation == LinearLayoutManager.HORIZONTAL
+        val direction = if (mLayoutManager.reverseLayout) -1 else 1
+        if (if (horizontal) !binding.recyclerView.canScrollHorizontally(direction)
+            else !binding.recyclerView.canScrollVertically(1)) {
             return
         }
         val time = ceil(16f / distance * 10000).toInt()
-        binding.recyclerView.smoothScrollBy(10000, 10000, mLinearInterpolator, time)
+        binding.recyclerView.smoothScrollBy(
+            if (horizontal) 10000 * direction else 0,
+            if (horizontal) 0 else 10000, mLinearInterpolator, time,
+        )
     }
 
     override fun scrollPage() {
@@ -580,6 +592,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                 enableAutoScroll = false
                 mScrollTimer.isEnabled = false
                 mMenu?.findItem(R.id.menu_enable_auto_scroll)?.isChecked = false
+                updatePageSnap()
             }
 
             R.id.menu_manga_auto_page_speed -> {
@@ -603,9 +616,17 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             R.id.menu_enable_horizontal_scroll -> {
                 item.isChecked = !item.isChecked
                 AppConfig.enableMangaHorizontalScroll = item.isChecked
-                mMenu?.findItem(R.id.menu_disable_horizontal_page_snap)?.isVisible = item.isChecked
+                mMenu?.findItem(R.id.menu_disable_horizontal_page_snap)?.isVisible =
+                    item.isChecked && !AppConfig.disableMangaPageAnim
+                mMenu?.findItem(R.id.menu_manga_right_to_left)?.isVisible = item.isChecked
                 setHorizontalScroll(item.isChecked)
                 mAdapter.notifyDataSetChanged()
+            }
+
+            R.id.menu_manga_right_to_left -> {
+                item.isChecked = !item.isChecked
+                AppConfig.mangaRightToLeft = item.isChecked
+                setHorizontalScroll(AppConfig.enableMangaHorizontalScroll)
             }
 
             R.id.menu_manga_color_filter -> {
@@ -621,11 +642,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                 enableAutoScrollPage = false
                 mScrollTimer.isEnabledPage = false
                 mMenu?.findItem(R.id.menu_manga_auto_page_speed)?.isVisible = item.isChecked
-                if (enableAutoScroll) {
-                    mPagerSnapHelper.attachToRecyclerView(null)
-                } else if (AppConfig.enableMangaHorizontalScroll) {
-                    mPagerSnapHelper.attachToRecyclerView(binding.recyclerView)
-                }
+                updatePageSnap()
             }
 
             R.id.menu_hide_manga_title -> {
@@ -650,24 +667,15 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             R.id.menu_disable_horizontal_page_snap -> {
                 item.isChecked = !item.isChecked
                 AppConfig.disableHorizontalPageSnap = item.isChecked
-                if (item.isChecked) {
-                    mPagerSnapHelper.attachToRecyclerView(null)
-                } else {
-                    mPagerSnapHelper.attachToRecyclerView(binding.recyclerView)
-                }
+                updatePageSnap()
             }
 
             R.id.menu_disable_manga_page_anim -> {
                 item.isChecked = !item.isChecked
-                mMenu?.findItem(R.id.menu_disable_horizontal_page_snap)?.isVisible = !item.isChecked
+                mMenu?.findItem(R.id.menu_disable_horizontal_page_snap)?.isVisible =
+                    AppConfig.enableMangaHorizontalScroll && !item.isChecked
                 AppConfig.disableMangaPageAnim = item.isChecked
-                if (item.isChecked) {
-                    mPagerSnapHelper.attachToRecyclerView(null)
-                } else {
-                    if (AppConfig.enableMangaHorizontalScroll && !AppConfig.disableHorizontalPageSnap) {
-                        mPagerSnapHelper.attachToRecyclerView(binding.recyclerView)
-                    }
-                }
+                updatePageSnap()
             }
 
             R.id.menu_gray_manga -> {
@@ -716,6 +724,20 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                 return true
             }
         }
+        if (!binding.mangaMenu.isVisible && !loadingViewVisible) {
+            val direction = when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> if (mLayoutManager.reverseLayout) 1 else -1
+                KeyEvent.KEYCODE_DPAD_RIGHT -> if (mLayoutManager.reverseLayout) -1 else 1
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_PAGE_UP -> -1
+                KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_PAGE_DOWN -> 1
+                KeyEvent.KEYCODE_SPACE -> if (event.isShiftPressed) -1 else 1
+                else -> 0
+            }
+            if (direction != 0) {
+                if (isDown) scrollPageTo(direction)
+                return true
+            }
+        }
         return super.dispatchKeyEvent(event)
     }
 
@@ -730,20 +752,35 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     }
 
     private fun setHorizontalScroll(enable: Boolean) {
+        val recycler = binding.recyclerView
+        val anchor = recycler.currentPagePosition()
+        val resumeAutoScroll = enableAutoScroll && !binding.mangaMenu.isVisible
+        if (resumeAutoScroll) mScrollTimer.isEnabled = false
+        recycler.stopScroll()
+        mPagerSnapHelper.attachToRecyclerView(null)
         mAdapter.isHorizontal = enable
-        if (enable) {
-            if (!enableAutoScroll) {
-                if (AppConfig.disableHorizontalPageSnap || AppConfig.disableMangaPageAnim) {
-                    mPagerSnapHelper.attachToRecyclerView(null)
-                } else {
-                    mPagerSnapHelper.attachToRecyclerView(binding.recyclerView)
-                }
+        // Keep adapter positions in reading order. Only their horizontal placement is reversed.
+        recycler.layoutDirection = View.LAYOUT_DIRECTION_LTR
+        mLayoutManager.orientation = if (enable) LinearLayoutManager.HORIZONTAL else LinearLayoutManager.VERTICAL
+        mLayoutManager.reverseLayout = enable && AppConfig.mangaRightToLeft
+        binding.webtoonFrame.rightToLeft = mLayoutManager.reverseLayout
+        binding.mangaMenu.setRightToLeft(mLayoutManager.reverseLayout)
+        if (anchor != RecyclerView.NO_POSITION) {
+            mLayoutManager.scrollToPositionWithOffset(anchor, 0)
+            recycler.doOnNextLayout {
+                updatePageSnap()
+                if (resumeAutoScroll) mScrollTimer.isEnabled = true
             }
-            mLayoutManager.orientation = LinearLayoutManager.HORIZONTAL
         } else {
-            mPagerSnapHelper.attachToRecyclerView(null)
-            mLayoutManager.orientation = LinearLayoutManager.VERTICAL
+            updatePageSnap()
+            if (resumeAutoScroll) mScrollTimer.isEnabled = true
         }
+    }
+
+    private fun updatePageSnap() {
+        val snap = AppConfig.enableMangaHorizontalScroll && !enableAutoScroll &&
+            !AppConfig.disableHorizontalPageSnap && !AppConfig.disableMangaPageAnim
+        mPagerSnapHelper.attachToRecyclerView(if (snap) binding.recyclerView else null)
     }
 
     @SuppressLint("StringFormatMatches")
@@ -759,6 +796,10 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             getString(R.string.manga_auto_page_speed, AppConfig.mangaAutoPageSpeed)
         menu.findItem(R.id.menu_enable_horizontal_scroll).isChecked =
             AppConfig.enableMangaHorizontalScroll
+        menu.findItem(R.id.menu_manga_right_to_left).run {
+            isVisible = AppConfig.enableMangaHorizontalScroll
+            isChecked = AppConfig.mangaRightToLeft
+        }
         menu.findItem(R.id.menu_epaper_manga).isChecked = AppConfig.enableMangaEInk
         menu.findItem(R.id.menu_epaper_manga_setting).isVisible = AppConfig.enableMangaEInk
         menu.findItem(R.id.menu_disable_horizontal_page_snap).run {
@@ -799,22 +840,21 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     }
 
     private fun scrollPageTo(direction: Int) {
-        if (!binding.recyclerView.canScroll(direction)) {
-            return
-        }
+        if (loadingViewVisible) return
         var dx = 0
         var dy = 0
         if (AppConfig.enableMangaHorizontalScroll) {
+            val physicalDirection = if (mLayoutManager.reverseLayout) -direction else direction
+            if (!binding.recyclerView.canScrollHorizontally(physicalDirection)) return
             dx = binding.recyclerView.run {
                 width - paddingStart - paddingEnd
-            }
+            } * physicalDirection
         } else {
+            if (!binding.recyclerView.canScrollVertically(direction)) return
             dy = binding.recyclerView.run {
                 height - paddingTop - paddingBottom
-            }
+            } * direction
         }
-        dx *= direction
-        dy *= direction
         if (AppConfig.disableMangaPageAnim) {
             binding.recyclerView.scrollBy(dx, dy)
         } else {

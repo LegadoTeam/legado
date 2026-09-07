@@ -46,21 +46,26 @@ class WebtoonFrame : FrameLayout {
     fun onPrevPage(init: () -> Unit) = apply { this.mPrevPage = init }
 
     var disabledClickScroll = false
+    var rightToLeft = false
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         recycler?.tapListener = { ev ->
+            val location = IntArray(2)
+            getLocationOnScreen(location)
+            val x = ev.rawX - location[0]
+            val y = ev.rawY - location[1]
             when {
-                mcRect.contains(ev.rawX, ev.rawY) -> {
+                mcRect.contains(x, y) -> {
                     mTouchMiddle?.invoke()
                 }
 
-                blRect.contains(ev.rawX, ev.rawY) && !disabledClickScroll -> {
-                    mPrevPage?.invoke()
+                blRect.contains(x, y) && !disabledClickScroll -> {
+                    if (rightToLeft) mNextPage?.invoke() else mPrevPage?.invoke()
                 }
 
-                brRect.contains(ev.rawX, ev.rawY) && !disabledClickScroll -> {
-                    mNextPage?.invoke()
+                brRect.contains(x, y) && !disabledClickScroll -> {
+                    if (rightToLeft) mPrevPage?.invoke() else mNextPage?.invoke()
                 }
             }
         }
