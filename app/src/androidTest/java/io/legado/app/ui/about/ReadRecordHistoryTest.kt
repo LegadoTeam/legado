@@ -100,13 +100,13 @@ class ReadRecordHistoryTest {
         scenario!!.onActivity { activity ->
             assertTrue(AppConfig.readRecordSimpleLayout)
             assertFalse(AppConfig.readRecordUseDays)
-            assertTrue(activity.binding.compactSummary.isVisible)
-            assertEquals("28小时", activity.binding.tvReadingTime.text.toString())
+            assertTrue(activity.views.compactSummary.isVisible)
+            assertEquals("28小时", activity.views.tvReadingTime.text.toString())
             select(activity, R.id.menu_simple_layout)
         }
         await { it.enhancedSummary.root.isVisible }
         scenario!!.onActivity { activity ->
-            val binding = activity.binding
+            val binding = activity.views
             assertFalse(binding.compactSummary.isVisible)
             assertTrue(binding.enhancedSummary.tvBookCount.text.contains("3"))
             val row = findRow(binding, book.name)!!
@@ -119,9 +119,9 @@ class ReadRecordHistoryTest {
         }
         await { it.enhancedSummary.tvTotalDuration.text.contains("1天4小时") }
         scenario!!.onActivity { activity ->
-            assertEquals("1天1小时", findRow(activity.binding, book.name)!!.enhanced.tvReadingTime.text.toString())
-            assertNoTextOverflow(activity.binding.enhancedSummary.root)
-            assertNoTextOverflow(findRow(activity.binding, book.name)!!.enhanced.root)
+            assertEquals("1天1小时", findRow(activity.views, book.name)!!.enhanced.tvReadingTime.text.toString())
+            assertNoTextOverflow(activity.views.enhancedSummary.root)
+            assertNoTextOverflow(findRow(activity.views, book.name)!!.enhanced.root)
         }
         screenshot("reading-history-enhanced")
         scenario!!.recreate()
@@ -175,7 +175,7 @@ class ReadRecordHistoryTest {
         launch()
         await { findRow(it, book.name)?.enhanced?.tvChapter?.text == book.durChapterTitle }
         scenario!!.onActivity { activity ->
-            findRow(activity.binding, book.name)!!.enhanced.ivRemove.performClick()
+            findRow(activity.views, book.name)!!.enhanced.ivRemove.performClick()
         }
         instrumentation.waitForIdleSync()
         onView(withId(android.R.id.button1)).perform(click())
@@ -225,8 +225,8 @@ class ReadRecordHistoryTest {
             launch()
             await { findRow(it, book.name) != null }
             scenario!!.onActivity { activity ->
-                assertNoTextOverflow(activity.binding.enhancedSummary.root)
-                assertNoTextOverflow(findRow(activity.binding, book.name)!!.enhanced.root)
+                assertNoTextOverflow(activity.views.enhancedSummary.root)
+                assertNoTextOverflow(findRow(activity.views, book.name)!!.enhanced.root)
             }
             screenshot("reading-history-narrow-large-text")
         } finally {
@@ -240,6 +240,9 @@ class ReadRecordHistoryTest {
 
     private fun launch() { scenario = ActivityScenario.launch(ReadRecordActivity::class.java) }
 
+    private val ReadRecordActivity.views: ActivityReadRecordBinding
+        get() = ActivityReadRecordBinding.bind(findViewById<ViewGroup>(android.R.id.content).getChildAt(0))
+
     private fun shell(command: String) {
         instrumentation.uiAutomation.executeShellCommand(command).use { descriptor ->
             android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes() }
@@ -248,7 +251,7 @@ class ReadRecordHistoryTest {
     }
 
     private fun select(activity: ReadRecordActivity, id: Int) {
-        val menu: Menu = PopupMenu(activity, activity.binding.titleBar).menu
+        val menu: Menu = PopupMenu(activity, activity.views.titleBar).menu
         activity.menuInflater.inflate(R.menu.book_read_record, menu)
         activity.onCompatOptionsItemSelected(menu.findItem(id))
     }
@@ -266,7 +269,7 @@ class ReadRecordHistoryTest {
         while (SystemClock.uptimeMillis() < end) {
             instrumentation.waitForIdleSync()
             var ready = false
-            scenario!!.onActivity { ready = predicate(it.binding) }
+            scenario!!.onActivity { ready = predicate(it.views) }
             if (ready) return
             SystemClock.sleep(50)
         }

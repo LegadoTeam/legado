@@ -52,14 +52,14 @@ class SearchReadRecordContractTest {
     @Test
     fun `reading a book stores the author with the record`() {
         listOf(
-            "src/main/java/io/legado/app/model/ReadBook.kt" to
-                "val author = book?.author.orEmpty()",
-            "src/main/java/io/legado/app/model/ReadManga.kt" to
-                "val author = book?.author ?: return",
-        ).forEach { (path, authorCapture) ->
+            Triple("src/main/java/io/legado/app/model/ReadBook.kt",
+                "val currentBook = book?.copy() ?: return", "readRecord.author = currentBook.author"),
+            Triple("src/main/java/io/legado/app/model/ReadManga.kt",
+                "val author = book?.author ?: return", "readRecord.author = author"),
+        ).forEach { (path, authorCapture, authorAssignment) ->
             val source = projectFile(path).readText().replace(Regex("\\s+"), " ")
             assertTrue(path, source.contains(authorCapture))
-            assertTrue(path, source.contains("readRecord.author = author"))
+            assertTrue(path, source.contains(authorAssignment))
         }
 
         val audioPlay = projectFile("src/main/java/io/legado/app/model/AudioPlay.kt")

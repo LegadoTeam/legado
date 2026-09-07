@@ -203,10 +203,13 @@ object BackupConfig {
         get() = ignoreConfig[runtimeSourceCacheIgnoreKey] == true
 
     internal fun contentIsEnabled(key: String): Boolean {
-        if (key == cookieContentKey || key == readRecordCoverContentKey) {
+        if (key == cookieContentKey) {
             return ignoreConfig[key] == false
         }
         if (key == runtimeSourceCacheContentKey) {
+            return ignoreConfig[key] == false
+        }
+        if (key == readRecordCoverContentKey) {
             return ignoreConfig[key] == false
         }
         return ignoreConfig[key] != true
