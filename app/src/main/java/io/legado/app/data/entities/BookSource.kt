@@ -238,6 +238,12 @@ data class BookSource(
 
     fun isJsSource(): Boolean = !mainJs.isNullOrBlank()
 
+    /** Ranking, timing and list toggles do not change the rules being checked. */
+    fun checkContent(): String = GSON.toJson(copy(
+        customOrder = 0, enabled = true, enabledExplore = true,
+        lastUpdateTime = 0, respondTime = 0, weight = 0,
+    ))
+
     override fun getLoginJs(): String? {
         return if (isJsSource()) mainJs else super.getLoginJs()
     }

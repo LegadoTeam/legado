@@ -3,11 +3,14 @@ package io.legado.app.model
 import android.content.Context
 import io.legado.app.R
 import io.legado.app.constant.IntentAction
+import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.help.CacheManager
 import io.legado.app.help.IntentData
 import io.legado.app.service.CheckSourceService
 import io.legado.app.utils.startService
+import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.withContext
 import splitties.init.appCtx
 
 object CheckSource {
@@ -27,25 +30,27 @@ object CheckSource {
     var checkContent = CacheManager.get("checkContent")?.toBoolean() ?: true
     val summary get() = upSummary()
 
-    fun start(
+    suspend fun start(
         context: Context,
         sources: List<BookSourcePart>,
         sessionId: Long,
     ): String {
         Debug.prepareCheckSession(sessionId, sources.map { it.bookSourceUrl })
-        val selectedSourcesKey = IntentData.put(sources.map { it.copy() })
+        var selectedSourcesKey: String? = null
         try {
+            val queued = withContext(IO) { appDb.bookSourceDao.beginCheck(sources) }
+            selectedSourcesKey = IntentData.put(queued)
             context.startService<CheckSourceService> {
                 action = IntentAction.start
                 putExtra(EXTRA_SESSION_ID, sessionId)
                 putExtra(EXTRA_SELECTED_SOURCES_KEY, selectedSourcesKey)
             }
         } catch (error: Exception) {
-            IntentData.get<Any>(selectedSourcesKey)
+            selectedSourcesKey?.let { IntentData.get<Any>(it) }
             Debug.finishChecking(sessionId)
             throw error
         }
-        return selectedSourcesKey
+        return requireNotNull(selectedSourcesKey)
     }
 
     fun stop(context: Context, sessionId: Long) {

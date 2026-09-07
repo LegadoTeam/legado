@@ -14,6 +14,14 @@
         app:displayHomeAsUp="true"
         app:title="@string/book_source" />
 
+    <androidx.appcompat.widget.AppCompatSpinner
+        android:id="@+id/check_status_filter"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:contentDescription="@string/source_check_status"
+        android:entries="@array/source_check_status_options"
+        android:spinnerMode="dropdown" />
+
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"

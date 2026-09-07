@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="source_check_status">检验状态</string>
+    <string name="source_check_detail">保存详细检验错误</string>
+    <string name="source_check_all">全部检验状态</string>
+    <string name="source_check_needed">需要检验</string>
+    <string name="source_check_passed">检验成功</string>
+    <string name="source_check_failed">检验失败</string>
+    <string-array name="source_check_status_options">
+        <item>@string/source_check_all</item>
+        <item>@string/source_check_needed</item>
+        <item>@string/source_check_passed</item>
+        <item>@string/source_check_failed</item>
+    </string-array>
+</resources>
