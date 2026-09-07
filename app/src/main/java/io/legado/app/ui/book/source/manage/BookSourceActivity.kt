@@ -571,10 +571,7 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
                     }
                 }
                 val selectItems = adapter.selection
-                val adapterItems = adapter.getItems()
-                val firstItem = adapterItems.indexOf(selectItems.firstOrNull())
-                val lastItem = adapterItems.indexOf(selectItems.lastOrNull())
-                if (firstItem < 0 || lastItem < 0) {
+                if (selectItems.isEmpty()) {
                     keepScreenOn(false)
                     return@okButton
                 }
@@ -588,7 +585,7 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
                     try {
                         CheckSource.start(this@BookSourceActivity, selectItems, checkSessionId)
                         checkSourceUiSessionId = checkSessionId
-                        startCheckMessageRefreshJob(firstItem, lastItem)
+                        startCheckMessageRefreshJob()
                     } catch (error: Exception) {
                         keepScreenOn(false)
                         toastOnUi(error.localizedMessage ?: "无法启动书源检验")
@@ -610,7 +607,7 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
         }
         keepScreenOn(true)
         CheckSource.resume(this)
-        startCheckMessageRefreshJob(0, 0)
+        startCheckMessageRefreshJob()
     }
 
     @SuppressLint("InflateParams")
@@ -719,37 +716,18 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
                     putString("checkSourceMessage", null)
                 }
             )
-            groups.forEach { group ->
-                if (group.contains("失效") && searchView.query.isEmpty()) {
-                    searchView.setQuery("失效", true)
-                    toastOnUi("发现有失效书源，已为您自动筛选！")
-                }
-            }
         }
     }
 
-    private fun startCheckMessageRefreshJob(firstItem: Int, lastItem: Int) {
+    private fun startCheckMessageRefreshJob() {
         checkMessageRefreshJob?.cancel()
         checkMessageRefreshJob = lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 while (isActive) {
-                    if (lastItem == 0) {
-                        adapter.notifyItemRangeChanged(
-                            0,
-                            adapter.itemCount,
-                            Bundle().apply {
-                                putString("checkSourceMessage", null)
-                            }
-                        )
-                    } else {
-                        adapter.notifyItemRangeChanged(
-                            firstItem,
-                            lastItem + 1,
-                            Bundle().apply {
-                                putString("checkSourceMessage", null)
-                            }
-                        )
-                    }
+                    // Status filtering can remove finished rows while a batch is running.
+                    adapter.notifyItemRangeChanged(0, adapter.itemCount, Bundle().apply {
+                        putString("checkSourceMessage", null)
+                    })
                     if (!Debug.isChecking) {
                         checkMessageRefreshJob?.cancel()
                     }

@@ -341,7 +341,7 @@ class CheckSourceService : BaseService() {
                     checkBook(searchBooks.first().toBook(), source)
                 }
             } else {
-                source.addGroup("搜索链接规则为空")
+                throw NoStackTraceException("搜索链接规则为空")
             }
         }
         //校验发现书籍
@@ -350,7 +350,7 @@ class CheckSourceService : BaseService() {
                 !it.url.isNullOrBlank()
             }?.url
             if (url.isNullOrBlank()) {
-                source.addGroup("发现规则为空")
+                throw NoStackTraceException("发现规则为空")
             } else {
                 source.removeGroup("发现规则为空")
                 val exploreBooks = WebBook.exploreBookAwait(source, url)
