@@ -6,6 +6,7 @@ sealed class TocListItem {
     abstract val key: String
     abstract val chapter: BookChapter
     abstract val depth: Int
+    abstract val readingChapter: BookChapter?
 
     data class Volume(
         override val chapter: BookChapter,
@@ -15,6 +16,7 @@ sealed class TocListItem {
         val matchedCount: Int? = null,
         val matchedSelf: Boolean = false,
         val containsCurrentChapter: Boolean = false,
+        override val readingChapter: BookChapter? = chapter,
     ) : TocListItem() {
         override val key: String = "volume:${chapter.index}"
         val canToggle: Boolean
@@ -25,6 +27,7 @@ sealed class TocListItem {
         override val chapter: BookChapter,
         override val depth: Int,
         val parentVolumeIndex: Int? = null,
+        override val readingChapter: BookChapter? = chapter,
     ) : TocListItem() {
         override val key: String = "chapter:${chapter.index}"
     }

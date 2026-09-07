@@ -19,6 +19,17 @@ import me.ag2s.epublib.util.StringUtil;
 // package
 class DOMUtil {
 
+    /** Navigation labels and links belong to this node, not to a nested child entry. */
+    static Element getFirstChildElementByTagName(Element parent, String tagName) {
+        for (Node child = parent.getFirstChild(); child != null; child = child.getNextSibling()) {
+            if (child instanceof Element &&
+                    (tagName.equals(child.getLocalName()) || tagName.equals(child.getNodeName()))) {
+                return (Element) child;
+            }
+        }
+        return null;
+    }
+
     /**
      * First tries to get the attribute value by doing an getAttributeNS on the element, if that gets an empty element it does a getAttribute without namespace.
      *

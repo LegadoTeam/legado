@@ -141,7 +141,7 @@ public class NCXDocumentV3 {
         }
 
         Element el = (Element) n;
-        Node node = el.getElementsByTagName(XHTMLTgs.ol).item(0);
+        Node node = DOMUtil.getFirstChildElementByTagName(el, XHTMLTgs.ol);
 
         if (node == null || node.getNodeType() != Document.ELEMENT_NODE) {
             return new ArrayList<>();
@@ -167,7 +167,7 @@ public class NCXDocumentV3 {
 
             Element el = (Element) node;
             //如果该Element的name为”li“,将其添加到目录结果
-            if (el.getTagName().equals(XHTMLTgs.li)) {
+            if (XHTMLTgs.li.equals(el.getLocalName()) || XHTMLTgs.li.equals(el.getTagName())) {
                 result.add(readTOCReference(el, book));
             }
 
@@ -191,14 +191,15 @@ public class NCXDocumentV3 {
             tocResourceRoot = tocResourceRoot + "/";
         }
 
-        String reference = StringUtil
-                .collapsePathDots(tocResourceRoot + readNavReference(navpointElement));
+        String navReference = readNavReference(navpointElement);
+        String reference = StringUtil.isBlank(navReference) ? "" : StringUtil
+                .collapsePathDots(tocResourceRoot + navReference);
         String href = StringUtil
                 .substringBefore(reference, Constants.FRAGMENT_SEPARATOR_CHAR);
         String fragmentId = StringUtil
                 .substringAfter(reference, Constants.FRAGMENT_SEPARATOR_CHAR);
-        Resource resource = book.getResources().getByHref(href);
-        if (resource == null) {
+        Resource resource = StringUtil.isBlank(reference) ? null : book.getResources().getByHref(href);
+        if (resource == null && !StringUtil.isBlank(reference)) {
             Log.e(TAG, "Resource with href " + href + " in NCX document not found");
         }
 //        Log.v(TAG, "label:" + label);
@@ -226,8 +227,7 @@ public class NCXDocumentV3 {
         //父级节点必须是 "li"
         //Log.d(TAG, "readNavReference:" + navpointElement.getTagName());
 
-        Element contentElement = DOMUtil
-                .getFirstElementByTagNameNS(navpointElement, "", XHTMLTgs.a);
+        Element contentElement = DOMUtil.getFirstChildElementByTagName(navpointElement, XHTMLTgs.a);
         if (contentElement == null) {
             return null;
         }
@@ -253,19 +253,11 @@ public class NCXDocumentV3 {
         //https://www.w3.org/publishing/epub/epub-packages.html#sec-package-nav
         //父级节点必须是 "li"
         //Log.d(TAG, "readNavLabel:" + navpointElement.getTagName());
-        String label;
-        Element labelElement = DOMUtil.getFirstElementByTagNameNS(navpointElement, "", "a");
-        assert labelElement != null;
-        label = labelElement.getTextContent();
-        if (StringUtil.isNotBlank(label)) {
-            return label;
-        } else {
-            labelElement = DOMUtil.getFirstElementByTagNameNS(navpointElement, "", "span");
+        Element labelElement = DOMUtil.getFirstChildElementByTagName(navpointElement, XHTMLTgs.a);
+        if (labelElement == null || StringUtil.isBlank(labelElement.getTextContent())) {
+            labelElement = DOMUtil.getFirstChildElementByTagName(navpointElement, XHTMLTgs.span);
         }
-        assert labelElement != null;
-        label = labelElement.getTextContent();
-        //如果通过 a 标签无法获取章节列表,则是无href章节名
-        return label;
+        return labelElement == null ? "" : labelElement.getTextContent();
 
     }
 

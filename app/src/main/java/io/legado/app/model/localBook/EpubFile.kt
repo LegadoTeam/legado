@@ -51,6 +51,10 @@ class EpubFile(var book: Book) : AutoCloseable {
         }
 
         @Synchronized
+        fun getToc(book: Book): List<EpubTocNode> =
+            epubTocNodes(getEFile(book).epubBook?.tableOfContents?.tocReferences.orEmpty())
+
+        @Synchronized
         override fun getContent(book: Book, chapter: BookChapter): String? {
             return getEFile(book).getContent(chapter)
         }
@@ -150,7 +154,8 @@ class EpubFile(var book: Book) : AutoCloseable {
                 findChapterFirstSource = true
                 // 第一个xhtml文件
                 elements.add(
-                    getBody(res, startFragmentId, endFragmentId)
+                    getBody(res, startFragmentId,
+                        endFragmentId.takeIf { currentChapterFirstResourceHref == nextChapterFirstResourceHref })
                 )
                 // 不是最后章节 且 已经遍历到下一章节的内容时停止
                 if (!isLastChapter && res.href == nextChapterFirstResourceHref) break
@@ -357,28 +362,32 @@ class EpubFile(var book: Book) : AutoCloseable {
                 }
             } else {
                 parseFirstPage(chapterList, refs)
-                parseMenu(chapterList, refs, 0)
-                for (i in chapterList.indices) {
-                    chapterList[i].index = i
-                }
+                parseMenu(chapterList, refs)
             }
         }
-        getWordCount(chapterList, book)
-        return chapterList
+        // Multiple navigation labels may point to the same content. Keep the established
+        // reading identities, and link boundaries between actual, distinct resources only.
+        val readingChapters = ArrayList(chapterList.distinctBy { it.url })
+        readingChapters.forEachIndexed { index, chapter ->
+            chapter.index = index
+            val next = readingChapters.getOrNull(index + 1)
+            chapter.endFragmentId = next?.startFragmentId
+            chapter.putVariable("nextUrl", next?.url)
+        }
+        getWordCount(readingChapters, book)
+        return readingChapters
     }
 
     /*获取书籍起始页内容。部分书籍第一章之前存在封面，引言，扉页等内容*/
     /*tile获取不同书籍风格杂乱，格式化处理待优化*/
-    private var durIndex = 0
     private fun parseFirstPage(
         chapterList: ArrayList<BookChapter>,
         refs: List<TOCReference>?
     ) {
         val contents = epubBook?.contents
         if (epubBook == null || contents == null || refs == null) return
-        val firstRef = refs.firstOrNull { it.resource != null } ?: return
+        val firstHref = epubTocNodes(refs).firstOrNull { it.href != null }?.href ?: return
         var i = 0
-        durIndex = 0
         while (i < contents.size) {
             val content = contents[i]
             if (!content.mediaType.toString().contains("htm")) {
@@ -390,7 +399,7 @@ class EpubFile(var book: Book) : AutoCloseable {
              * completeHref可能有fragment(#id) 必须去除
              * fix https://github.com/gedoor/legado/issues/1932
              */
-            if (firstRef.completeHref.substringBeforeLast("#") == content.href) break
+            if (firstHref.substringBeforeLast("#") == content.href) break
             val chapter = BookChapter()
             var title = content.title
             if (TextUtils.isEmpty(title)) {
@@ -413,7 +422,6 @@ class EpubFile(var book: Book) : AutoCloseable {
             chapterList.lastOrNull()?.endFragmentId = chapter.startFragmentId
             chapterList.lastOrNull()?.putVariable("nextUrl", chapter.url)
             chapterList.add(chapter)
-            durIndex++
             i++
         }
     }
@@ -421,7 +429,6 @@ class EpubFile(var book: Book) : AutoCloseable {
     private fun parseMenu(
         chapterList: ArrayList<BookChapter>,
         refs: List<TOCReference>?,
-        level: Int
     ) {
         refs?.forEach { ref ->
             if (ref.resource != null) {
@@ -430,14 +437,11 @@ class EpubFile(var book: Book) : AutoCloseable {
                 chapter.title = ref.title
                 chapter.url = ref.completeHref
                 chapter.startFragmentId = ref.fragmentId
-                chapterList.lastOrNull()?.endFragmentId = chapter.startFragmentId
-                chapterList.lastOrNull()?.putVariable("nextUrl", chapter.url)
+                chapter.isVolume = !ref.children.isNullOrEmpty()
                 chapterList.add(chapter)
-                durIndex++
             }
             if (ref.children != null && ref.children.isNotEmpty()) {
-                chapterList.lastOrNull()?.isVolume = true
-                parseMenu(chapterList, ref.children, level + 1)
+                parseMenu(chapterList, ref.children)
             }
         }
     }

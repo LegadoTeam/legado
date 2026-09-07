@@ -19,6 +19,7 @@ import io.legado.app.databinding.FragmentChapterListBinding
 import io.legado.app.help.audio.AudioCacheManager
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.isAudio
+import io.legado.app.help.book.isEpub
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isPdf
 import io.legado.app.help.book.isVideo
@@ -29,6 +30,8 @@ import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.model.AudioCacheKey
 import io.legado.app.model.AudioCacheStateChanged
 import io.legado.app.model.localBook.PdfFile
+import io.legado.app.model.localBook.EpubFile
+import io.legado.app.model.localBook.EpubTocNode
 import io.legado.app.model.localBook.PdfOutline
 import io.legado.app.model.localBook.PdfOutlineNode
 import io.legado.app.ui.widget.recycler.UpLinearLayoutManager
@@ -57,6 +60,8 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     private val tocListState = TocListState()
     private var pdfOutlineState: PdfOutlineListState? = null
     private var pdfOutlineLoading = false
+    private var epubToc: List<EpubTocNode>? = null
+    private var epubTocLoading = false
     private val pdfOutlineAdapter by lazy {
         PdfOutlineAdapter(requireContext(), ::openPdfOutline) { id ->
             pdfOutlineState?.toggle(id)
@@ -92,6 +97,7 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
         chapterListJob?.cancel()
         cacheFileJob?.cancel()
         pdfOutlineLoading = false
+        epubTocLoading = false
         pendingScrollItemKey = null
         pendingChapterScroll = null
         binding.recyclerView.adapter = null
@@ -133,6 +139,8 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
         cacheFileJob?.cancel()
         pdfOutlineState = null
         pdfOutlineLoading = book.isPdf
+        epubToc = null
+        epubTocLoading = book.isEpub
         binding.recyclerView.adapter = adapter
         durChapterIndex = book.durChapterIndex
         binding.tvCurrentChapterInfo.text =
@@ -150,6 +158,17 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
         pendingScrollItemKey = null
         pendingChapterScroll = null
         chapterListJob = viewLifecycleOwner.lifecycleScope.launch {
+            if (book.isEpub) {
+                epubToc = try {
+                    withContext(IO) { EpubFile.getToc(book) }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    AppLog.put("读取 EPUB 目录失败", e)
+                    null
+                }
+                epubTocLoading = false
+            }
             if (book.isPdf) {
                 val outline = try {
                     withContext(IO) { PdfOutline.read(book) }
@@ -175,6 +194,7 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                 resetCollapse = true,
                 defaultExpanded = book.getTocExpanded(),
                 currentChapterIndex = durChapterIndex,
+                epubToc = epubToc,
             )
             val searchKey = currentSearchKey
             adapter.setItems(
@@ -253,7 +273,7 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     ) {
         currentSearchKey = searchKey?.takeIf { it.isNotBlank() }
         // Keep parsing the document when the user searches before the outline is ready.
-        if (pdfOutlineLoading) return
+        if (pdfOutlineLoading || epubTocLoading) return
         pdfOutlineState?.let { state ->
             if (resetCollapse) state.setExpanded(book?.getTocExpanded() != false)
             showPdfOutline()
@@ -277,6 +297,7 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                         resetCollapse = resetCollapse,
                         defaultExpanded = currentBook.getTocExpanded(),
                         currentChapterIndex = durChapterIndex,
+                        epubToc = epubToc,
                     )
                 }
                 submitChapterItems(
@@ -294,6 +315,7 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                         resetCollapse = resetCollapse,
                         defaultExpanded = currentBook.getTocExpanded(),
                         currentChapterIndex = durChapterIndex,
+                        epubToc = epubToc,
                     )
                 }
                 submitChapterItems(
@@ -328,6 +350,7 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     }
 
     private suspend fun queryChapterIndexes(book: Book, searchKey: String): List<Int> {
+        if (!epubToc.isNullOrEmpty()) return tocListState.searchIndexes(searchKey)
         return withContext(IO) {
             val end = book.simulatedTotalChapterNum() - 1
             appDb.bookChapterDao.searchIndexes(book.bookUrl, searchKey, 0, end)
@@ -393,8 +416,8 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
         if (currentSearchKey != null) return
         val firstVisibleItem = adapter.getItem(layoutManager.findFirstVisibleItemPosition())
         pendingScrollItemKey = if (
-            firstVisibleItem is TocListItem.Chapter &&
-            firstVisibleItem.parentVolumeIndex == volumeIndex &&
+            firstVisibleItem != null &&
+            tocListState.isDescendantOf(firstVisibleItem.chapter.index, volumeIndex) &&
             !tocListState.isVolumeCollapsed(volumeIndex)
         ) {
             "volume:$volumeIndex"

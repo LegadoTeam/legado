@@ -62,7 +62,8 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
                 if (oldItem::class != newItem::class || oldItem.depth != newItem.depth) {
                     return false
                 }
-                if (!sameChapterContent(oldItem.chapter, newItem.chapter)) return false
+                if (!sameChapterContent(oldItem.chapter, newItem.chapter) ||
+                    oldItem.readingChapter?.index != newItem.readingChapter?.index) return false
                 return when {
                     oldItem is TocListItem.Volume && newItem is TocListItem.Volume ->
                         oldItem.collapsed == newItem.collapsed &&
@@ -188,7 +189,7 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
         binding.run {
             val chapter = item.chapter
             val isVolume = item is TocListItem.Volume
-            val isCurrentChapter = callback.durChapterIndex() == chapter.index
+            val isCurrentChapter = callback.durChapterIndex() == item.readingChapter?.index
             val cached = callback.isLocalBook || isVolume ||
                     if (callback.isAudioBook) {
                         !callback.isAudioCacheStateReady ||
@@ -294,7 +295,9 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
     override fun registerListener(holder: ItemViewHolder, binding: ItemChapterListBinding) {
         holder.itemView.setOnClickListener {
             getItem(holder.layoutPosition)?.let { item ->
-                callback.openChapter(item.chapter)
+                val readingChapter = item.readingChapter
+                if (readingChapter != null) callback.openChapter(readingChapter)
+                else if (item is TocListItem.Volume && item.canToggle) callback.onVolumeToggled(item.chapter.index)
             }
         }
         binding.endActions.setOnClickListener {
@@ -302,7 +305,7 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
                 if (item is TocListItem.Volume && item.canToggle) {
                     callback.onVolumeToggled(item.chapter.index)
                 } else {
-                    callback.openChapter(item.chapter)
+                    item.readingChapter?.let(callback::openChapter)
                 }
             }
         }
@@ -326,7 +329,7 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
 
     fun findVisiblePositionByChapterIndex(chapterIndex: Int): Int {
         return getItems().indexOfFirst {
-            it is TocListItem.Chapter && it.chapter.index == chapterIndex
+            it is TocListItem.Chapter && it.readingChapter?.index == chapterIndex
         }
     }
 
