@@ -18,6 +18,7 @@ class TocListState {
     private var descendantCounts: Map<Int, Int> = emptyMap()
     private val collapsedVolumeIndexes = mutableSetOf<Int>()
     private var reverseOrder = false
+    private var reverseDisplay = false
 
     var visibleItems: List<TocListItem> = emptyList()
         private set
@@ -31,6 +32,7 @@ class TocListState {
         descendantCounts = emptyMap()
         collapsedVolumeIndexes.clear()
         reverseOrder = false
+        reverseDisplay = false
         visibleItems = emptyList()
     }
 
@@ -41,18 +43,21 @@ class TocListState {
         defaultExpanded: Boolean = true,
         currentChapterIndex: Int? = null,
         epubToc: List<EpubTocNode>? = null,
+        reverseDisplay: Boolean = false,
     ) {
-        val directionChanged = this.reverseOrder != reverseOrder
+        val directionChanged = this.reverseOrder != reverseOrder || this.reverseDisplay != reverseDisplay
         val previousParents = descendantCounts.keys
         this.reverseOrder = reverseOrder
+        this.reverseDisplay = reverseDisplay
         fullChapters = chapters
         nodes = if (!epubToc.isNullOrEmpty()) {
             buildEpubNodes(chapters, epubToc, reverseOrder)
         } else {
-            buildGroups(chapters, reverseOrder).flatMap { group ->
+            val groups = buildGroups(chapters, reverseOrder)
+            (if (reverseDisplay) groups.asReversed() else groups).flatMap { group ->
                 buildList {
                     group.volume?.let { add(Node(it)) }
-                    group.chapters.forEach {
+                    (if (reverseDisplay) group.chapters.asReversed() else group.chapters).forEach {
                         add(Node(it, depth = if (group.volume == null) 0 else 1,
                             parentIndex = group.volume?.index))
                     }
