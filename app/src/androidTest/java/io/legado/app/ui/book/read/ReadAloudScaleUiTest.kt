@@ -4,6 +4,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
 import android.graphics.Rect
@@ -143,8 +144,13 @@ class ReadAloudScaleUiTest {
                 assertEquals(1f, bar.scaleX, 0f)
                 assertEquals(1f, bar.scaleY, 0f)
                 assertTrue(bar.getGlobalVisibleRect(bounds))
-                assertEquals(bar.width, bounds.width())
-                assertEquals(bar.height, bounds.height())
+                // An odd width can be centered on a half pixel; visible integer bounds round outward.
+                val globalTransform = Matrix()
+                bar.transformMatrixToGlobal(globalTransform)
+                val transformedBounds = RectF(0f, 0f, bar.width.toFloat(), bar.height.toFloat())
+                globalTransform.mapRect(transformedBounds)
+                val expectedBounds = Rect().also { transformedBounds.roundOut(it) }
+                assertEquals("The complete transformed control must remain visible", expectedBounds, bounds)
                 listOf(R.id.ll_back_to_speech, R.id.ll_read_from_here).forEachIndexed { index, id ->
                     activity.findViewById<View>(id).setOnClickListener { clicks[index]++ }
                 }
