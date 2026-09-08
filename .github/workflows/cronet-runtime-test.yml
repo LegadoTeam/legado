@@ -18,6 +18,7 @@ on:
       - 'app/src/main/java/io/legado/app/App.kt'
       - 'app/src/main/java/io/legado/app/ui/config/OtherConfigFragment.kt'
       - 'app/src/cronetRuntime/**'
+      - 'app/src/main/java/io/legado/app/ui/rss/read/**'
   workflow_dispatch:
 
 permissions:
