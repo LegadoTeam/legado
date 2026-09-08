@@ -3,6 +3,7 @@
 ## cronet版本: 152.0.7977.54
 
 **2026/09/08**
+- 修复代码编辑器已有选区时长按其他位置无法重新选中的问题，选区内长按仍保留选区并显示操作栏
 - 修复部分非原生段评弹窗启用嵌套滚动后无法下滑关闭，并污染后续弹窗手势的问题
 - 统一正式版和测试版更新按钮为“立即更新”
 - 修复切换“总是使用默认封面”后书架未立即刷新封面的问题
@@ -891,4 +892,3 @@
 * [2023年日志](https://github.com/LegadoTeam/legado/blob/record2023/app/src/main/assets/updateLog.md)　
 * [2022年日志](https://github.com/LegadoTeam/legado/blob/record2022/app/src/main/assets/updateLog.md)　
 * [2021年日志](https://github.com/LegadoTeam/legado/blob/record2021/app/src/main/assets/updateLog.md)　
-- 修复部分非原生段评弹窗启用嵌套滚动后无法下滑关闭，并污染后续弹窗手势的问题

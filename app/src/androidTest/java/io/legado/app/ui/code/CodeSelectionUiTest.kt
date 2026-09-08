@@ -4,11 +4,14 @@ import android.app.Activity
 import android.app.Instrumentation
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Rect
 import android.os.SystemClock
 import android.view.View
+import android.view.ViewConfiguration
 import androidx.core.view.isVisible
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.espresso.action.GeneralClickAction
 import androidx.test.espresso.action.Press
 import androidx.test.espresso.action.Tap
@@ -54,13 +57,26 @@ class CodeSelectionUiTest {
         selectFunction()
         val expectedLeft = source.indexOf("function")
         val expectedRight = source.indexOf("\nconst after")
-        for ((line, column) in listOf(2 to 11, 5 to 8)) {
-            // Dismiss the old panel so the gesture reaches the editor, then check that it reopens.
+        for ((line, column) in listOf(2 to 11, 3 to 5)) {
             withEditor { actions(it).dismiss() }
+            // Separate independent long presses from the platform's double-tap gesture window.
+            SystemClock.sleep(ViewConfiguration.getDoubleTapTimeout().toLong() + 50)
             press(Tap.LONG, line, column)
-            awaitEditor {
-                it.cursor.left == expectedLeft && it.cursor.right == expectedRight &&
-                    actions(it).isShowing && shareButton(it).isShown
+            try {
+                awaitEditor {
+                    it.cursor.left == expectedLeft && it.cursor.right == expectedRight &&
+                        actions(it).isShowing && shareButton(it).isShown
+                }
+            } catch (failure: AssertionError) {
+                val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+                try {
+                    File(context.getExternalFilesDir("ui-regression"), "code-selection-failed-$line-$column.png")
+                        .outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                } finally { bitmap.recycle() }
+                withEditor {
+                    throw AssertionError("Long press at $line:$column: selection=${it.cursor.left}..${it.cursor.right}, " +
+                        "expected=$expectedLeft..$expectedRight, panel=${actions(it).isShowing}, share=${shareButton(it).isShown}", failure)
+                }
             }
             withEditor { assertEquals(source, it.text.toString()) }
         }
@@ -70,6 +86,33 @@ class CodeSelectionUiTest {
             assertEquals(expectedLeft, it.cursor.left)
             assertEquals(expectedRight, it.cursor.right)
             assertEquals(source, it.text.toString())
+        }
+    }
+
+    @Test fun longPressOutsideSelectionSelectsAndSharesTheNewWord() {
+        assertOutsideSelectionReselects(readOnly = false)
+    }
+
+    @Test fun readOnlyLongPressOutsideSelectionSelectsAndSharesTheNewWord() {
+        assertOutsideSelectionReselects(readOnly = true)
+    }
+
+    private fun assertOutsideSelectionReselects(readOnly: Boolean) {
+        launchEditor(readOnly)
+        for ((line, column, word) in listOf(Triple(0, 8, "before"), Triple(5, 8, "after"))) {
+            selectFunction()
+            withEditor { actions(it).dismiss() }
+            press(Tap.LONG, line, column)
+            awaitEditor {
+                selection(it) == word && actions(it).isShowing && shareButton(it).isShown
+            }
+            withEditor {
+                assertEquals(source.indexOf(word), it.cursor.left)
+                assertEquals(source.indexOf(word) + word.length, it.cursor.right)
+                assertEquals(source, it.text.toString())
+            }
+            screenshot("code-selection-outside-$word-${if (readOnly) "readonly" else "editable"}")
+            shareAndAssert(word)
         }
     }
 
@@ -86,7 +129,7 @@ class CodeSelectionUiTest {
         }
         screenshot("code-selection-first-long-press")
         withEditor { actions(it).dismiss() }
-        // Use an in-bounds position outside the selected word; line 5 is below this fixture.
+        // A normal tap still clears the selection.
         press(Tap.SINGLE, 0, 2)
         awaitEditor { !it.cursor.isSelected && !shareButton(it).isVisible }
         withEditor { assertEquals(source, it.text.toString()) }
@@ -105,6 +148,30 @@ class CodeSelectionUiTest {
         withEditor { assertEquals(source, it.text.toString()) }
     }
 
+    @Test fun searchResultLongPressThenOutsideReselects() {
+        launchEditor()
+        scenario!!.onActivity { activity ->
+            val search = CodeEditActivity::class.java.getDeclaredMethod("search")
+            search.isAccessible = true
+            search.invoke(activity)
+            val searchTxt = CodeEditActivity::class.java.getDeclaredMethod("searchTxt", String::class.java)
+            searchTxt.isAccessible = true
+            searchTxt.invoke(activity, "function")
+        }
+        closeSoftKeyboard()
+        awaitEditor { it.searcher.hasQuery() && it.searcher.matchedPositionCount > 0 }
+        withEditor { assertTrue(it.searcher.gotoNext()) }
+        awaitEditor { selection(it) == "function" }
+
+        press(Tap.LONG, 1, 3)
+        awaitEditor { selection(it) == "function" && actions(it).isShowing }
+        withEditor { actions(it).dismiss() }
+        SystemClock.sleep(ViewConfiguration.getDoubleTapTimeout().toLong() + 50)
+
+        press(Tap.LONG, 0, 8)
+        awaitEditor { selection(it) == "before" && actions(it).isShowing }
+    }
+
     private fun launchEditor(readOnly: Boolean = false) {
         val intent = Intent(context, CodeEditActivity::class.java).putExtra("title", "Code selection regression")
         if (readOnly) {
@@ -119,7 +186,7 @@ class CodeSelectionUiTest {
         val restored = CountDownLatch(1)
         withEditor { it.postDelayed({ restored.countDown() }, 450) }
         assertTrue(restored.await(5, TimeUnit.SECONDS))
-        withEditor { assertFalse(it.props.reselectOnLongPress) }
+        closeSoftKeyboard()
     }
 
     private fun selectFunction() {
@@ -134,8 +201,13 @@ class CodeSelectionUiTest {
             val editor = view as CodeEditor
             val location = IntArray(2)
             editor.getLocationOnScreen(location)
-            floatArrayOf(location[0] + editor.getCharOffsetX(line, column) + editor.dpUnit,
+            val point = floatArrayOf(location[0] + editor.getCharOffsetX(line, column) + editor.dpUnit,
                 location[1] + editor.getCharOffsetY(line, column) - editor.rowHeight / 2f)
+            val visible = Rect()
+            assertTrue(editor.getGlobalVisibleRect(visible))
+            assertTrue("Gesture must hit the visible editor at line $line, column $column",
+                visible.contains(point[0].toInt(), point[1].toInt()))
+            point
         }, Press.FINGER))
     }
 

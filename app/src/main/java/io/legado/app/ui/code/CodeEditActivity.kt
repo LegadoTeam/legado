@@ -26,6 +26,7 @@ import androidx.core.widget.addTextChangedListener
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.textfield.TextInputEditText
 import io.github.rosemoe.sora.event.ColorSchemeUpdateEvent
+import io.github.rosemoe.sora.event.InterceptTarget
 import io.github.rosemoe.sora.event.LongPressEvent
 import io.github.rosemoe.sora.event.PublishSearchResultEvent
 import io.github.rosemoe.sora.event.SelectionChangeEvent
@@ -144,7 +145,6 @@ class CodeEditActivity :
             setEditorLanguage(viewModel.language)
             upEdit(AppConfig.editFontScale, null, AppConfig.editAutoWrap)
             props.maxIPCTextLength = 64 * 1024
-            props.reselectOnLongPress = false
             setupTextActions()
             setText(text)
             editable = viewModel.writable
@@ -183,8 +183,12 @@ class CodeEditActivity :
         updateShareButton()
         editor.subscribeEvent(SelectionChangeEvent::class.java) { _, _ -> updateShareButton() }
         editor.subscribeEvent(ColorSchemeUpdateEvent::class.java) { _, _ -> updateShareButton() }
-        editor.subscribeEvent(LongPressEvent::class.java) { _, _ ->
-            if (editor.cursor.isSelected) editor.postInLifecycle { actions.displayWindow() }
+        editor.subscribeEvent(LongPressEvent::class.java) { event, _ ->
+            val cursor = editor.cursor
+            if (cursor.isSelected && event.index in cursor.left until cursor.right) {
+                event.intercept(InterceptTarget.TARGET_EDITOR)
+                editor.postInLifecycle { actions.displayWindow() }
+            }
         }
     }
 
