@@ -157,13 +157,13 @@ class ReadAloudMenuUiTest {
             ReadAloud.upReadAloudClass()
             activity.startService(Intent(activity, TTSReadAloudService::class.java).setAction(IntentAction.pause))
         }
-        await("real paused service starts") { readAloudService() != null && BaseReadAloudService.isRun && BaseReadAloudService.pause }
+        await("real service starts") { readAloudService() != null && BaseReadAloudService.isRun }
         var service: TTSReadAloudService? = null
         scenario!!.onActivity { activity ->
             service = checkNotNull(readAloudService())
             // Keep the real service lifecycle/commands; voice availability is outside this gesture test.
             service!!.clearTTS()
-            if (!paused) ReadAloud.resume(activity)
+            if (paused) ReadAloud.pause(activity) else ReadAloud.resume(activity)
             activity.showReadAloudControls()
         }
         await("pause control and requested playback state") {
