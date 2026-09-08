@@ -10,6 +10,7 @@ on:
       - 'app/*proguard*'
       - 'app/build.gradle'
       - 'app/download.gradle'
+      - 'app/cronet-loader.gradle'
       - 'gradle.properties'
       - 'gradle/libs.versions.toml'
       - 'app/src/main/assets/cronet.json'
@@ -35,7 +36,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api: [31, 36]
+        api: [23, 29, 31, 36]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -45,12 +46,16 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v6.3.0
+      - name: Verify untouched official Cronet artifacts
+        run: bash .github/scripts/verify-cronet.sh
       - name: Build minified release with platform instrumentation
         run: |
           chmod +x gradlew
           ./gradlew :app:assembleAppRelease \
             --init-script .github/scripts/cronet-runtime-test.init.gradle \
             --build-cache --no-daemon --max-workers=2
+      - name: Verify Java adaptation scope
+        run: python3 .github/scripts/verify-cronet-dynamic.py
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \

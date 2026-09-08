@@ -1,0 +1,85 @@
+import java.security.MessageDigest
+import java.util.jar.JarOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
+import org.objectweb.asm.ClassReader
+import org.objectweb.asm.ClassWriter
+import org.objectweb.asm.Opcodes
+import org.objectweb.asm.tree.ClassNode
+import org.objectweb.asm.tree.FieldInsnNode
+import org.objectweb.asm.tree.InsnList
+import org.objectweb.asm.tree.InsnNode
+import org.objectweb.asm.tree.MethodInsnNode
+
+// Experimental, version-pinned adaptation. Keep the checked-in official JAR byte-for-byte intact.
+// Cronet 153's public setLibraryLoader() is a no-op; reconnect its actual load site instead.
+def original = file('cronetlib/cronet_impl_native_java.jar')
+def adapted = layout.buildDirectory.file('cronet-dynamic/cronet_impl_native_java.jar')
+def adaptCronetLoader = tasks.register('adaptCronetLoader') {
+    inputs.file(original)
+    inputs.file('cronet-loader.gradle')
+    inputs.property('version', CronetVersion)
+    outputs.file(adapted)
+    doLast {
+        if (CronetVersion != '153.0.8010.27' ||
+                MessageDigest.getInstance('SHA-256').digest(original.bytes).encodeHex().toString() !=
+                '775d145e5f33fd6157078a574f788b850bda5a0e7195aa9ec93e67afe6f64127') {
+            throw new GradleException('Review the dynamic loader against the new official Cronet JAR first')
+        }
+        def owner = 'org/chromium/net/impl/CronetLibraryLoader'
+        def destination = adapted.get().asFile
+        destination.parentFile.mkdirs()
+        new ZipFile(original).withCloseable { source ->
+            new JarOutputStream(new FileOutputStream(destination)).withCloseable { output ->
+                source.entries().each { entry ->
+                    byte[] bytes = source.getInputStream(entry).withCloseable { it.bytes }
+                    if (entry.name == owner + '.class') {
+                        def node = new ClassNode()
+                        def reader = new ClassReader(bytes)
+                        reader.accept(node, 0)
+                        def method = node.methods.find { it.name == 'loadLibrary' && it.desc == '()V' }
+                        def instructions = method.instructions.toArray()
+                        def calls = instructions.findAll { it instanceof MethodInsnNode &&
+                                it.owner == 'java/lang/System' && it.name == 'loadLibrary' }
+                        def flag = instructions.findAll { it instanceof FieldInsnNode &&
+                                it.opcode == Opcodes.PUTSTATIC && it.name == 'sLibAlreadyLoaded' }
+                        assert calls.size() == 3 && flag.size() == 1
+                        assert flag[0].previous.opcode == Opcodes.ICONST_1
+                        // Keep the AOSP branch unchanged; redirect only the two standalone Cronet names.
+                        calls.drop(1).each { call ->
+                            def route = new InsnList()
+                            route.add(new FieldInsnNode(Opcodes.GETSTATIC,
+                                    'io/legado/app/lib/cronet/CronetLoader', 'INSTANCE',
+                                    'Lio/legado/app/lib/cronet/CronetLoader;'))
+                            route.add(new InsnNode(Opcodes.SWAP))
+                            route.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL,
+                                    'io/legado/app/lib/cronet/CronetLoader', 'loadLibrary',
+                                    '(Ljava/lang/String;)V', false))
+                            method.instructions.insertBefore(call, route)
+                            method.instructions.remove(call)
+                        }
+                        // A failed download/load must not tell normal initialization that loading succeeded.
+                        method.instructions.remove(flag[0].previous)
+                        method.instructions.remove(flag[0])
+                        def returns = instructions.findAll { it.opcode == Opcodes.RETURN }
+                        assert returns.size() == 1
+                        def loaded = new InsnList()
+                        loaded.add(new InsnNode(Opcodes.ICONST_1))
+                        loaded.add(flag[0])
+                        method.instructions.insertBefore(returns[0], loaded)
+                        def writer = new ClassWriter(reader, ClassWriter.COMPUTE_MAXS)
+                        node.accept(writer)
+                        bytes = writer.toByteArray()
+                    }
+                    def target = new ZipEntry(entry.name)
+                    target.time = 0
+                    output.putNextEntry(target)
+                    output.write(bytes)
+                    output.closeEntry()
+                }
+            }
+        }
+        logger.lifecycle('Cronet 153: adapted only Java library loading; official native/JNI initialization unchanged')
+    }
+}
+ext.dynamicCronetJar = files(adapted).builtBy(adaptCronetLoader)

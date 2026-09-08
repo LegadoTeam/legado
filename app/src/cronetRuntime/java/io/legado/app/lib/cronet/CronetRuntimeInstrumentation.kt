@@ -3,6 +3,7 @@ package io.legado.app.lib.cronet
 import android.app.Activity
 import android.app.Instrumentation
 import android.os.Bundle
+import android.system.Os
 import androidx.annotation.Keep
 import androidx.preference.PreferenceManager
 import io.legado.app.BuildConfig
@@ -15,6 +16,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okio.buffer
 import okio.source
 import org.chromium.net.impl.CronetUrlRequestContext
+import org.chromium.net.impl.CronetLibraryLoader
 import org.json.JSONObject
 import java.io.File
 import java.math.BigInteger
@@ -22,6 +24,7 @@ import java.net.InetAddress
 import java.net.ServerSocket
 import java.security.MessageDigest
 import java.util.concurrent.Executors
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 @Keep
@@ -54,6 +57,42 @@ class CronetRuntimeInstrumentation : Instrumentation() {
         val componentDir = targetContext.getDir("cronet", 0)
         val nativeName = "libcronet.${BuildConfig.Cronet_Version}.so"
         val cachedBefore = componentDir.walkTopDown().any { it.isFile && it.name == nativeName }
+        val cachedMtime = componentDir.walkTopDown().firstOrNull { it.isFile && it.name == nativeName }?.lastModified()
+        // Race real cold downloads/install callers, then retry normal native initialization after real I/O failure.
+        val callers = Executors.newFixedThreadPool(8)
+        try {
+            val start = CountDownLatch(1)
+            val installs = (1..8).map {
+                callers.submit<Boolean> {
+                    start.await()
+                    CronetLoader.preDownload()
+                    CronetLoader.install()
+                }
+            }
+            start.countDown()
+            installs.forEach { check(it.get(120, TimeUnit.SECONDS)) { "Concurrent Cronet install failed" } }
+        } finally {
+            callers.shutdownNow()
+        }
+        val installed = componentDir.walkTopDown().single { it.isFile && it.name == nativeName }
+        if (!cachedBefore) {
+            // Seed an obsolete ABI/version so the final one-file check also verifies migration cleanup.
+            File(componentDir, "obsolete-abi/libcronet.old.so").apply {
+                parentFile!!.mkdirs()
+                writeText("obsolete native fixture")
+            }
+            val abiDir = installed.parentFile!!
+            try {
+                Os.chmod(abiDir.absolutePath, 0)
+                val failure = runCatching { CronetLibraryLoader.ensureInitialized(targetContext) }.exceptionOrNull()
+                check(failure is UnsatisfiedLinkError) { "Expected an actual failed native load, got $failure" }
+                check(File("/proc/self/maps").readLines().none { it.contains(nativeName) }) {
+                    "Failure case unexpectedly loaded Cronet"
+                }
+            } finally {
+                Os.chmod(abiDir.absolutePath, 448) // 0700; no reflection or fabricated Cronet state.
+            }
+        }
         val executor = Executors.newSingleThreadExecutor()
         val client = OkHttpClient.Builder()
             .addInterceptor(CronetInterceptor(CookieJar.NO_COOKIES))
@@ -123,8 +162,20 @@ class CronetRuntimeInstrumentation : Instrumentation() {
             }
             val downloadCache = File(targetContext.cacheDir, "so_download")
             check(downloadCache.walkTopDown().none { it.isFile }) { "The download left a duplicate native library" }
+            if (cachedBefore) assertEquals(cachedMtime, native.lastModified())
+            val storage = componentDir.walkTopDown().filter { it.isFile }.toList()
+            check(storage == listOf(native)) { "Unexpected component files: $storage" }
+            val evidence = File(targetContext.getExternalFilesDir(null), "cronet-runtime/storage.txt")
+            evidence.parentFile!!.mkdirs()
+            evidence.writeText("cachedBefore=$cachedBefore\nconcurrentInstallers=8\n" +
+                "loadFailureRecovery=${!cachedBefore}\ncomponentFiles=${storage.size}\n" +
+                "componentBytes=${storage.sumOf { it.length() }}\nnativeMtime=${native.lastModified()}\n" +
+                "nativeFile=${native.canonicalPath}\n" +
+                File("/proc/self/maps").readLines().filter { it.contains(nativeName) }.joinToString("\n"))
             RssImageRuntimeRegression.verify(this)
-            return "$version; cachedBefore=$cachedBefore; nativeBytes=${native.length()}; nativeFile=$native"
+            return "$version; cachedBefore=$cachedBefore; concurrentInstallers=8; " +
+                "loadFailureRecovery=${!cachedBefore}; componentFiles=1; " +
+                "nativeBytes=${native.length()}; nativeMtime=${native.lastModified()}; nativeFile=$native"
         } finally {
             preferences.edit().apply {
                 if (hadPreference) putBoolean(PreferKey.cronet, previous) else remove(PreferKey.cronet)

@@ -14,6 +14,7 @@ plugins {
     alias libs.plugins.google.services
 }
 apply from: 'download.gradle'
+apply from: 'cronet-loader.gradle'
 
 static def releaseTime() {
     return new Date().format("yyMMddHH", TimeZone.getTimeZone("GMT+8"))
@@ -296,7 +297,9 @@ dependencies {
     //网络
     implementation(libs.okhttp)
     implementation(libs.brotli.dec)
-    implementation(fileTree(dir: 'cronetlib', include: ['*.jar', '*.aar']))
+    implementation(fileTree(dir: 'cronetlib', include: ['*.jar', '*.aar'],
+            exclude: ['cronet_impl_native_java.jar']))
+    implementation(dynamicCronetJar)
 
     implementation(libs.protobuf.javalite)
 

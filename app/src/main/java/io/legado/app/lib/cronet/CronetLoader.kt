@@ -170,7 +170,11 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
         } catch (e: Throwable) {
             //如果找不到，则从远程下载
             //删除历史文件
-            deleteHistoryFile(soFile.parentFile, soFile)
+            // Keep only this process ABI/version after a previous component upgrade.
+            soFile.parentFile?.parentFile?.walkBottomUp()?.forEach { file ->
+                if (file.isFile && file != soFile) file.delete()
+                if (file.isDirectory && file != soFile.parentFile) file.delete()
+            }
             //md5 = getUrlMd5(md5Url)
             DebugLog.d(javaClass.simpleName, "soMD5:$md5")
             if (md5.length != 32 || soUrl.isEmpty()) {
