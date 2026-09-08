@@ -6,12 +6,12 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Rect
 import android.os.SystemClock
-import android.view.MotionEvent
 import android.view.View
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
+import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.swipeUp
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -30,6 +30,7 @@ import io.legado.app.ui.book.read.config.ReadStyleDialog
 import io.legado.app.ui.book.read.page.ContentTextView
 import io.legado.app.ui.book.read.page.ReadView
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
+import org.hamcrest.Matchers.sameInstance
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -137,29 +138,25 @@ class ReadingLayoutTransitionTest {
     private fun switchStyle(scenario: ActivityScenario<ReadBookActivity>, index: Int) {
         scenario.onActivity { ReadStyleDialog().showNow(it.supportFragmentManager, "layout-style") }
         val bounds = Rect()
+        lateinit var styleView: View
         await {
             var visible = false
             scenario.onActivity { activity ->
                 val dialog = activity.supportFragmentManager.findFragmentByTag("layout-style") as? ReadStyleDialog
                 val view = dialog?.view?.findViewById<RecyclerView>(R.id.rv_style)
                     ?.findViewHolderForAdapterPosition(index)?.itemView
-                visible = view?.getGlobalVisibleRect(bounds) == true && bounds.width() > 20 && bounds.height() > 20
+                visible = view?.hasWindowFocus() == true && view.getGlobalVisibleRect(bounds) &&
+                    bounds.width() > 20 && bounds.height() > 20
                 if (visible && view != null) {
-                    val location = IntArray(2)
-                    view.getLocationOnScreen(location)
-                    bounds.set(location[0], location[1], location[0] + view.width, location[1] + view.height)
+                    styleView = view
                 }
             }
             visible
         }
-        // CircleImageView accepts clicks only after a real touch enters its circular hit area.
-        val downTime = SystemClock.uptimeMillis()
-        for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
-            val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action,
-                bounds.exactCenterX(), bounds.exactCenterY(), 0)
-            try { instrumentation.sendPointerSync(event) } finally { event.recycle() }
-        }
         try {
+            // Espresso waits for the focused dialog and calculates the current screen coordinates.
+            // This remains a real touch, required by CircleImageView's circular hit area.
+            onView(sameInstance(styleView)).perform(click())
             await { ReadBookConfig.styleSelect == index }
         } finally {
             capture(scenario, "layout-style-selected-$index")
