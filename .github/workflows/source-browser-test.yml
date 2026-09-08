@@ -27,6 +27,8 @@ on:
       - 'app/src/androidTest/java/io/legado/app/ui/widget/dialog/**'
       - 'app/src/main/java/io/legado/app/ui/book/explore/**'
       - 'app/src/main/java/io/legado/app/ui/main/explore/**'
+      - 'app/src/main/java/io/legado/app/ui/main/MainActivity.kt'
+      - 'app/src/main/AndroidManifest.xml'
       - 'app/src/androidTest/java/io/legado/app/ui/main/explore/**'
       - 'app/src/main/res/layout/item_find_book.xml'
       - 'app/src/main/res/layout/activity_explore_show.xml'

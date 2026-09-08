@@ -2,6 +2,7 @@
 
 package io.legado.app.ui.main
 
+import android.graphics.Rect
 import android.graphics.drawable.StateListDrawable
 import android.os.Bundle
 import android.text.format.DateUtils
@@ -9,6 +10,7 @@ import android.view.MenuItem
 import android.view.ViewGroup
 import androidx.activity.addCallback
 import androidx.activity.viewModels
+import androidx.core.view.doOnLayout
 import androidx.core.view.get
 import androidx.core.view.postDelayed
 import androidx.fragment.app.Fragment
@@ -62,6 +64,7 @@ import io.legado.app.utils.clearClip
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getClipText
 import io.legado.app.utils.isCreated
+import io.legado.app.utils.imeHeight
 import io.legado.app.utils.navigationBarHeight
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.setEdgeEffectColor
@@ -239,6 +242,16 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     }
 
     private fun initView() = binding.run {
+        root.setOnApplyWindowInsetsListenerCompat { view, windowInsets ->
+            val keyboardHeight = windowInsets.imeHeight
+            view.bottomPadding = keyboardHeight
+            if (keyboardHeight > 0) view.doOnLayout {
+                currentFocus?.takeIf { it.onCheckIsTextEditor() }?.let { input ->
+                    input.requestRectangleOnScreen(Rect(0, 0, input.width, input.height), true)
+                }
+            }
+            windowInsets
+        }
         viewPagerMain.setEdgeEffectColor(primaryColor)
         viewPagerMain.offscreenPageLimit = 3
         viewPagerMain.adapter = adapter
