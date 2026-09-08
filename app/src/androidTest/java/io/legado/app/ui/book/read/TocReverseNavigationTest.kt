@@ -114,7 +114,26 @@ class TocReverseNavigationTest {
                 val originalPosition = ReadBook.durChapterPos
                 assertTrue("Fixture must open within the chapter, actual offset $originalPosition", originalPosition > 0)
                 reader.onActivity { it.openChapterList() }
-                await { rows()?.size == 5 }
+                try {
+                    await { rows()?.size == 5 }
+                } finally {
+                    val snapshot = StringBuilder()
+                    val stored = appDb.bookDao.getBook(fixture.book.bookUrl)
+                    snapshot.appendLine("storedTotal=" + stored?.totalChapterNum)
+                    snapshot.appendLine("databaseChapters=" + appDb.bookChapterDao.getChapterList(fixture.book.bookUrl).map { it.index to it.title })
+                    instrumentation.runOnMainSync {
+                        val activity = toc()
+                        snapshot.appendLine("tocBook=" + activity?.intent?.getStringExtra("bookUrl"))
+                        snapshot.appendLine("readBook=" + ReadBook.book?.bookUrl)
+                        snapshot.appendLine("readChapter=" + ReadBook.curTextChapter?.chapter?.bookUrl)
+                        snapshot.appendLine("readerTotal=" + ReadBook.book?.totalChapterNum)
+                        snapshot.appendLine("fragments=" + activity?.supportFragmentManager?.fragments?.map { it.javaClass.simpleName + ":" + it.lifecycle.currentState })
+                        snapshot.appendLine("adapter=" + recycler()?.adapter?.javaClass?.simpleName)
+                        snapshot.appendLine("rows=" + (recycler()?.adapter as? ChapterListAdapter)?.getItems()?.map { it.chapter.index to it.chapter.title })
+                    }
+                    File(context.getExternalFilesDir("ui-regression"), "toc-reader-open-state.txt").writeText(snapshot.toString())
+                    screenshot("toc-reader-open-state")
+                }
                 reverse()
                 await { rows()?.firstOrNull()?.chapter?.title == "Chapter 5" }
                 instrumentation.runOnMainSync { toc()!!.onBackPressedDispatcher.onBackPressed() }
