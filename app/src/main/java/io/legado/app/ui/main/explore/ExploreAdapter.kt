@@ -125,12 +125,24 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                     }
                 }
                 ivStatus.setImageResource(R.drawable.ic_arrow_down)
+                sourceKinds[item.bookSourceUrl]?.let { kindList ->
+                    val position = currentBindingPosition() ?: return@run
+                    // A refresh has already loaded these kinds. Replace them in this layout pass
+                    // so an expanded row cannot briefly collapse above the current viewport.
+                    upKindList(this@run, item, kindList, position)
+                    rotateLoading.gone()
+                    if (scrollTo >= 0) {
+                        callBack.scrollTo(scrollTo)
+                        scrollTo = -1
+                    }
+                    return@run
+                }
                 rotateLoading.loadingColor = context.accentColor
                 rotateLoading.visible()
                 recyclerFlexbox(flexbox)
                 flexbox.gone()
                 Coroutine.async(callBack.scope) {
-                    sourceKinds[item.bookSourceUrl] ?: item.exploreKinds()
+                    item.exploreKinds()
                 }.onSuccess { kindList ->
                     currentBindingPosition()?.let { position ->
                         sourceKinds[item.bookSourceUrl] = kindList

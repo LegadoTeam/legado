@@ -40,6 +40,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 
 /** Exercises the main discovery list, including the source's real JS refresh callback. */
@@ -252,6 +254,12 @@ class ExploreRefreshUiTest {
 
     private fun screenshot(name: String) {
         instrumentation.waitForIdleSync()
+        val rendered = CountDownLatch(1)
+        scenario!!.onActivity { activity ->
+            val decor = activity.window.decorView
+            decor.postOnAnimation { decor.postOnAnimation { rendered.countDown() } }
+        }
+        assertTrue("Window rendered before screenshot", rendered.await(5, TimeUnit.SECONDS))
         val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
         try {
             File(context.getExternalFilesDir("ui-regression"), "$name.png").outputStream().use {
