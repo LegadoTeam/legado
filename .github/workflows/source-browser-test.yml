@@ -12,6 +12,8 @@ on:
       - 'gradle/libs.versions.toml'
       - 'app/src/main/java/io/legado/app/ui/widget/dialog/BottomWebViewDialog.kt'
       - 'app/src/main/java/io/legado/app/ui/widget/dialog/BookMemoDialog.kt'
+      - 'app/src/main/java/io/legado/app/ui/code/**'
+      - 'app/src/androidTest/java/io/legado/app/ui/code/**'
       - 'app/src/main/res/layout/dialog_book_memo.xml'
       - 'app/src/main/res/layout/view_read_menu.xml'
       - 'app/src/main/java/io/legado/app/help/storage/Backup.kt'
