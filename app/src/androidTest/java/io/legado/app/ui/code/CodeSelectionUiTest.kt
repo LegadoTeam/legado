@@ -16,6 +16,7 @@ import androidx.test.espresso.action.GeneralClickAction
 import androidx.test.espresso.action.Press
 import androidx.test.espresso.action.Tap
 import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.isCompletelyDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
@@ -146,6 +147,26 @@ class CodeSelectionUiTest {
         screenshot("code-selection-read-only-share")
         shareAndAssert(selectedText)
         withEditor { assertEquals(source, it.text.toString()) }
+    }
+
+    @Test fun searchResultLongPressThenOutsideReselects() {
+        launchEditor()
+        scenario!!.onActivity { activity ->
+            val search = CodeEditActivity::class.java.getDeclaredMethod("search")
+            search.isAccessible = true
+            search.invoke(activity)
+        }
+        onView(withId(R.id.etFind)).perform(replaceText("function"))
+        closeSoftKeyboard()
+        awaitEditor { selection(it) == "function" }
+
+        press(Tap.LONG, 1, 3)
+        awaitEditor { selection(it) == "function" && actions(it).isShowing }
+        withEditor { actions(it).dismiss() }
+        SystemClock.sleep(ViewConfiguration.getDoubleTapTimeout().toLong() + 50)
+
+        press(Tap.LONG, 0, 8)
+        awaitEditor { selection(it) == "before" && actions(it).isShowing }
     }
 
     private fun launchEditor(readOnly: Boolean = false) {
