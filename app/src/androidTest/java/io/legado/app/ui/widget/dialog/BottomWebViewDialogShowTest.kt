@@ -2,21 +2,31 @@ package io.legado.app.ui.widget.dialog
 
 import android.graphics.Bitmap
 import android.os.SystemClock
+import android.graphics.Rect
 import android.view.View
 import android.webkit.WebChromeClient
+import android.webkit.WebView
 import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.action.GeneralSwipeAction
+import androidx.test.espresso.action.Press
+import androidx.test.espresso.action.Swipe
+import androidx.test.espresso.matcher.RootMatchers.isDialog
+import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.R as MaterialR
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
+import io.legado.app.help.webView.PooledWebView
 import io.legado.app.ui.about.AboutActivity
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -260,6 +270,91 @@ class BottomWebViewDialogShowTest {
         val restored = awaitGeometry { it.height < initial.height && !it.fitToContents }
         assertTrue(restored.toString(), abs(restored.bottomGap) <= 2)
         screenshot("paragraph-sheet-after-full-screen")
+    }
+
+    @Test
+    fun attachedSourcesSwipeDownAfterReusingTheSameWebView() {
+        // Only the dialog options from #1135 comment 5578580309 are needed;
+        // local HTML keeps the native gesture and pool regression independent of login/network.
+        val source1Config = """{"expandedCornersRadius":15,"backgroundDimAmount":0.7,
+            "heightPercentage":0.9}"""
+        val source2Config = """{"expandedCornersRadius":20,"dismissOnTouchOutside":true,
+            "isDraggable":true,"shouldDimBackground":true,"backgroundDimAmount":0.5,
+            "hardwareAccelerated":true,"isNestedScrollingEnabled":true,
+            "isGestureInsetBottomIgnored":true,"setFitToContents":false,
+            "heightPercentage":0.85,"isHideable":true}"""
+        val secondSource = source.copy(bookSourceUrl = source.bookSourceUrl + "/second")
+        appDb.bookSourceDao.insert(secondSource)
+        val failures = mutableListOf<String>()
+        var previous: PooledWebView? = null
+        try {
+            for ((index, entry) in listOf(source to source1Config, secondSource to source2Config,
+                source to source1Config).withIndex()) {
+                val label = "source-${if (index == 1) 2 else 1}-step-${index + 1}"
+                lateinit var browser: BottomWebViewDialog
+                lateinit var pooled: PooledWebView
+                scenario!!.onActivity { activity ->
+                    browser = BottomWebViewDialog(entry.first.bookSourceUrl, 0,
+                        "${entry.first.bookSourceUrl}/$label",
+                        """<html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+                            <title>$label</title></head><body style="margin:0;background:#dbeafe">
+                            <h2>$label</h2><p>Swipe down from this comment page to close it.</p>
+                            </body></html>""", config = entry.second)
+                    browser.show(activity.supportFragmentManager, label)
+                    val field = BottomWebViewDialog::class.java.getDeclaredField("pooledWebView")
+                    field.isAccessible = true
+                    pooled = field.get(browser) as PooledWebView
+                    previous?.let { assertSame("The regression must reuse one WebView", it, pooled) }
+                }
+                previous = pooled
+                val geometry = awaitGeometry {
+                    it.state == BottomSheetBehavior.STATE_EXPANDED && it.height > 0 &&
+                        abs(it.bottomGap) <= 2
+                }
+                assertTrue("$label lost its bottom anchor: $geometry", abs(geometry.bottomGap) <= 2)
+                assertTrue("The local comment page did not finish loading", awaitCondition {
+                    pooled.realWebView.title == label && pooled.realWebView.progress == 100 &&
+                        pooled.realWebView.width > 0 && !pooled.realWebView.canScrollVertically(-1)
+                })
+                screenshot("paragraph-$label-before-swipe")
+                onView(isAssignableFrom(WebView::class.java)).inRoot(isDialog()).perform(
+                    GeneralSwipeAction(Swipe.FAST, { swipePoint(it, 0.15f) },
+                        { swipePoint(it, 0.90f) }, Press.FINGER))
+                if (!awaitCondition(timeoutMs = 3_000) { browser.dialog?.isShowing != true }) {
+                    failures += "$label did not dismiss: ${sheetGeometry()}, " +
+                        "nestedScrolling=${pooled.realWebView.isNestedScrollingEnabled}"
+                    screenshot("paragraph-$label-blocked")
+                    // Clean up a failed stage so the source 1 -> source 2 -> source 1 sequence
+                    // still records whether the same recycled view contaminates the next source.
+                    scenario!!.onActivity { browser.dismiss() }
+                }
+                assertTrue("WebView was not returned to the pool after $label",
+                    awaitCondition { !pooled.isInUse })
+            }
+            assertTrue(failures.joinToString("\n"), failures.isEmpty())
+        } finally {
+            scenario!!.onActivity {
+                previous?.realWebView?.isNestedScrollingEnabled = false
+            }
+            appDb.bookSourceDao.delete(secondSource.bookSourceUrl)
+        }
+    }
+
+    private fun swipePoint(view: View, heightFraction: Float): FloatArray {
+        val visible = Rect()
+        assertTrue(view.getGlobalVisibleRect(visible))
+        return floatArrayOf(visible.exactCenterX(), visible.top + visible.height() * heightFraction)
+    }
+
+    private fun awaitCondition(timeoutMs: Long = 5_000, condition: () -> Boolean): Boolean {
+        val deadline = SystemClock.uptimeMillis() + timeoutMs
+        do {
+            var matched = false
+            scenario!!.onActivity { matched = condition() }
+            if (matched) return true
+            SystemClock.sleep(50)
+        } while (SystemClock.uptimeMillis() < deadline)
+        return false
     }
 
     private fun newDialog(page: String = "comments", config: String? = null) = BottomWebViewDialog(
