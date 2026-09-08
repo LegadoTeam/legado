@@ -60,6 +60,7 @@ class CronetRuntimeInstrumentation : Instrumentation() {
         val cachedMtime = componentDir.walkTopDown().firstOrNull { it.isFile && it.name == nativeName }?.lastModified()
         // Race real cold downloads/install callers, then retry normal native initialization after real I/O failure.
         val callers = Executors.newFixedThreadPool(8)
+        var firstInstallFailures = 0
         try {
             val start = CountDownLatch(1)
             val installs = (1..8).map {
@@ -70,7 +71,16 @@ class CronetRuntimeInstrumentation : Instrumentation() {
                 }
             }
             start.countDown()
-            installs.forEach { check(it.get(120, TimeUnit.SECONDS)) { "Concurrent Cronet install failed" } }
+            val results = installs.map { it.get(120, TimeUnit.SECONDS) }
+            firstInstallFailures = results.count { !it }
+            if (firstInstallFailures > 0) {
+                // Exercise the same one-retry path used by the real request helper after a failed download.
+                check(CronetLoader.installWithRetry()) {
+                    "Cronet install retry failed; results=$results; downloading=${CronetLoader.download}; " +
+                        "files=${componentDir.walkTopDown().filter { it.isFile }.map { "${it.name}:${it.length()}" }.toList()}"
+                }
+                check((1..8).all { CronetLoader.install() }) { "Retry did not publish a valid shared library" }
+            }
         } finally {
             callers.shutdownNow()
         }
@@ -168,12 +178,14 @@ class CronetRuntimeInstrumentation : Instrumentation() {
             val evidence = File(targetContext.getExternalFilesDir(null), "cronet-runtime/storage.txt")
             evidence.parentFile!!.mkdirs()
             evidence.writeText("cachedBefore=$cachedBefore\nconcurrentInstallers=8\n" +
+                "firstInstallFailures=$firstInstallFailures\n" +
                 "loadFailureRecovery=${!cachedBefore}\ncomponentFiles=${storage.size}\n" +
                 "componentBytes=${storage.sumOf { it.length() }}\nnativeMtime=${native.lastModified()}\n" +
                 "nativeFile=${native.canonicalPath}\n" +
                 File("/proc/self/maps").readLines().filter { it.contains(nativeName) }.joinToString("\n"))
             RssImageRuntimeRegression.verify(this)
             return "$version; cachedBefore=$cachedBefore; concurrentInstallers=8; " +
+                "firstInstallFailures=$firstInstallFailures; " +
                 "loadFailureRecovery=${!cachedBefore}; componentFiles=1; " +
                 "nativeBytes=${native.length()}; nativeMtime=${native.lastModified()}; nativeFile=$native"
         } finally {
