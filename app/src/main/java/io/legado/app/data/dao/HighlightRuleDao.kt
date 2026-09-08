@@ -20,6 +20,9 @@ interface HighlightRuleDao {
     @Query("SELECT * FROM highlightRules ORDER BY sortOrder ASC, id ASC")
     fun flowAll(): Flow<List<HighlightRule>>
 
+    @Query("SELECT DISTINCT `group` FROM highlightRules WHERE trim(`group`) <> '' ORDER BY `group` COLLATE NOCASE")
+    fun flowGroups(): Flow<List<String>>
+
     @Query("SELECT * FROM highlightRules WHERE id = :id")
     fun findById(id: Long): HighlightRule?
 
@@ -49,6 +52,12 @@ interface HighlightRuleDao {
 
     @Query("DELETE FROM highlightRules")
     fun deleteAll()
+
+    @Query("UPDATE highlightRules SET `group` = :target WHERE trim(`group`) = trim(:source)")
+    fun moveGroup(source: String, target: String?)
+
+    @Query("DELETE FROM highlightRules WHERE trim(`group`) = trim(:group)")
+    fun deleteGroup(group: String)
 
     @Transaction
     fun importRules(rules: List<HighlightRule>) {

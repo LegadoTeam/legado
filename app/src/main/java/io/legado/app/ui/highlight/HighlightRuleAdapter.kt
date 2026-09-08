@@ -30,7 +30,8 @@ class HighlightRuleAdapter(context: Context, private val callBack: CallBack) :
 
         override fun areContentsTheSame(oldItem: HighlightRule, newItem: HighlightRule) =
             oldItem.getDisplayName() == newItem.getDisplayName() &&
-                oldItem.isEnabled == newItem.isEnabled
+                oldItem.isEnabled == newItem.isEnabled &&
+                oldItem.group == newItem.group
 
         override fun getChangePayload(oldItem: HighlightRule, newItem: HighlightRule): Any? {
             return Bundle().apply {
@@ -71,7 +72,7 @@ class HighlightRuleAdapter(context: Context, private val callBack: CallBack) :
         payloads: MutableList<Any>
     ) {
         if (payloads.isEmpty()) {
-            binding.cbName.text = item.getDisplayName()
+            binding.cbName.text = item.displayNameWithGroup()
             binding.cbName.isChecked = item.uuid in selected
             binding.swtEnabled.isChecked = item.isEnabled
             return
@@ -81,7 +82,7 @@ class HighlightRuleAdapter(context: Context, private val callBack: CallBack) :
                 binding.cbName.isChecked = item.uuid in selected
             }
             if (payload.getBoolean(PAYLOAD_NAME)) {
-                binding.cbName.text = item.getDisplayName()
+                binding.cbName.text = item.displayNameWithGroup()
             }
             if (payload.containsKey(PAYLOAD_ENABLED)) {
                 binding.swtEnabled.isChecked = payload.getBoolean(PAYLOAD_ENABLED)
@@ -180,6 +181,9 @@ class HighlightRuleAdapter(context: Context, private val callBack: CallBack) :
     private fun selectionPayload() = Bundle().apply {
         putBoolean(PAYLOAD_SELECTED, true)
     }
+
+    private fun HighlightRule.displayNameWithGroup() =
+        group?.takeIf { it.isNotBlank() }?.let { "[$it] ${getDisplayName()}" } ?: getDisplayName()
 
     interface CallBack {
         fun update(vararg rule: HighlightRule)

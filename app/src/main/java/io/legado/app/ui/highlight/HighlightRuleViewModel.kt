@@ -32,4 +32,14 @@ class HighlightRuleViewModel(application: Application) : BaseViewModel(applicati
     fun moveSelection(rules: List<HighlightRule>, toTop: Boolean) = execute {
         appDb.highlightRuleDao.move(rules.mapTo(linkedSetOf()) { it.uuid }, toTop)
     }
+
+    fun renameGroup(oldGroup: String, newGroup: String) = execute {
+        appDb.highlightRuleDao.moveGroup(oldGroup, newGroup.trim().takeIf { it.isNotEmpty() })
+    }
+
+    fun deleteGroup(group: String) = execute { appDb.highlightRuleDao.deleteGroup(group) }
+
+    fun moveGroup(group: String, moveTo: String?) = execute {
+        appDb.highlightRuleDao.moveGroup(group, moveTo?.trim()?.takeIf { it.isNotEmpty() })
+    }
 }

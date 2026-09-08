@@ -35,6 +35,7 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class HighlightRuleActivity :
@@ -52,6 +53,8 @@ class HighlightRuleActivity :
     private val exportResult = registerForActivityResult(HandleFileContract()) {
         if (it.uri != null) toastOnUi(R.string.export_success)
     }
+    private var allRules: List<HighlightRule> = emptyList()
+    private var activeGroup: String? = null
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         initRecyclerView()
@@ -103,6 +106,14 @@ class HighlightRuleActivity :
         }
         if (item.itemId == R.id.menu_export_all) {
             exportRules(adapter.getItems())
+            return true
+        }
+        if (item.itemId == R.id.menu_highlight_group_manage) {
+            showDialogFragment<HighlightGroupManageDialog>()
+            return true
+        }
+        if (item.itemId == R.id.menu_highlight_group_filter) {
+            showGroupFilter()
             return true
         }
         return super.onCompatOptionsItemSelected(item)
@@ -164,9 +175,36 @@ class HighlightRuleActivity :
                 .flowOn(IO)
                 .conflate()
                 .collect { rules ->
-                    binding.tvEmptyMsg.isGone = rules.isNotEmpty()
-                    adapter.setItems(rules, adapter.diffItemCallBack)
+                    allRules = rules
+                    renderRules()
                 }
+        }
+    }
+
+    private fun renderRules() {
+        val rules = when (val group = activeGroup) {
+            null -> allRules
+            UNGROUPED -> allRules.filter { it.group.isNullOrBlank() }
+            else -> allRules.filter { it.group == group }
+        }
+        binding.tvEmptyMsg.isGone = rules.isNotEmpty()
+        adapter.setItems(rules, adapter.diffItemCallBack)
+    }
+
+    private fun showGroupFilter() {
+        lifecycleScope.launch(IO) {
+            val groups = appDb.highlightRuleDao.flowGroups().first()
+            val choices = listOf(GroupChoice(getString(R.string.all), null),
+                GroupChoice(getString(R.string.no_group), UNGROUPED)) +
+                groups.map { GroupChoice(it, it) }
+            launch(kotlinx.coroutines.Dispatchers.Main) {
+                alert(titleResource = R.string.highlight_rule_group_filter) {
+                    items(choices) { _, choice, _ ->
+                        activeGroup = choice.value
+                        renderRules()
+                    }
+                }
+            }
         }
     }
 
@@ -208,5 +246,13 @@ class HighlightRuleActivity :
     override fun onPause() {
         adapter.upResumed(false)
         super.onPause()
+    }
+
+    private data class GroupChoice(val title: String, val value: String?) {
+        override fun toString() = title
+    }
+
+    private companion object {
+        const val UNGROUPED = "\u0000"
     }
 }
