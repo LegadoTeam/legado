@@ -92,6 +92,8 @@ class TocReverseNavigationTest {
 
     @Test fun returningToReaderKeepsActualChapterAndPositionAndBookmarkTarget() {
         fixture((1..5).map { "Chapter $it" }, current = 3).use { fixture ->
+            fixture.book.durChapterPos = 1470
+            appDb.bookDao.update(fixture.book)
             ActivityScenario.launch<ReadBookActivity>(Intent(context, ReadBookActivity::class.java)
                 .putExtra("bookUrl", fixture.book.bookUrl)).use { reader ->
                 reader.onActivity { activity ->
@@ -101,6 +103,7 @@ class TocReverseNavigationTest {
                 await { ReadBook.book?.bookUrl == fixture.book.bookUrl && ReadBook.curTextChapter?.isCompleted == true }
                 val originalUrl = ReadBook.curTextChapter!!.chapter.url
                 val originalPosition = ReadBook.durChapterPos
+                assertTrue("Fixture must open within the chapter, actual offset $originalPosition", originalPosition > 0)
                 reader.onActivity { it.openChapterList() }
                 await { rows()?.size == 5 }
                 reverse()
@@ -116,6 +119,8 @@ class TocReverseNavigationTest {
                 }
                 instrumentation.waitForIdleSync()
                 screenshot("toc-reverse-return-to-reader")
+                File(context.getExternalFilesDir("ui-regression"), "toc-reader-position.txt").writeText(
+                    "before=$originalUrl:$originalPosition\nafter=${ReadBook.curTextChapter!!.chapter.url}:${ReadBook.durChapterPos}\n")
                 assertEquals("Returning from reversed TOC must keep actual text chapter", originalUrl, ReadBook.curTextChapter!!.chapter.url)
                 assertEquals("Reversal must not reset reading offset", originalPosition, ReadBook.durChapterPos)
                 val bookmark = appDb.bookmarkDao.getByBook(fixture.book.name, fixture.book.author).single()
