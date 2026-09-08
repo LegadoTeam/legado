@@ -21,7 +21,6 @@ import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.widget.recycler.VerticalDivider
-import io.legado.app.utils.applyTint
 import io.legado.app.utils.requestInputMethod
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.viewbindingdelegate.viewBinding
@@ -83,14 +82,19 @@ class HighlightGroupManageDialog : BaseDialogFragment(R.layout.dialog_recycler_v
     private fun chooseMoveTarget(source: String) {
         lifecycleScope.launch {
             val values = appDb.highlightRuleDao.flowGroups().first()
-                .filterNot { it == source } + getString(R.string.no_group)
+                .filterNot { it == source }.map { MoveTarget("[$it]", it) } +
+                MoveTarget(getString(R.string.no_group), null)
             alert(title = getString(R.string.move_to_group)) {
-                items(values) { _, value, _ ->
-                    viewModel.moveGroup(source, value.takeUnless { it == getString(R.string.no_group) })
+                items(values) { _, target, _ ->
+                    viewModel.moveGroup(source, target.group)
                         .onSuccess { ReadBook.upHighlightRules() }
                 }
             }
         }
+    }
+
+    private data class MoveTarget(val title: String, val group: String?) {
+        override fun toString() = title
     }
 
     private inner class GroupAdapter(context: Context) :

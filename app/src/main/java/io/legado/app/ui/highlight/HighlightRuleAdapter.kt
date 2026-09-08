@@ -35,7 +35,7 @@ class HighlightRuleAdapter(context: Context, private val callBack: CallBack) :
 
         override fun getChangePayload(oldItem: HighlightRule, newItem: HighlightRule): Any? {
             return Bundle().apply {
-                if (oldItem.getDisplayName() != newItem.getDisplayName()) {
+                if (oldItem.displayNameWithGroup() != newItem.displayNameWithGroup()) {
                     putBoolean(PAYLOAD_NAME, true)
                 }
                 if (oldItem.isEnabled != newItem.isEnabled) {

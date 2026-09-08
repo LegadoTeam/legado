@@ -105,7 +105,7 @@ class HighlightRuleActivity :
             return true
         }
         if (item.itemId == R.id.menu_export_all) {
-            exportRules(adapter.getItems())
+            exportRules(allRules)
             return true
         }
         if (item.itemId == R.id.menu_highlight_group_manage) {
@@ -182,6 +182,10 @@ class HighlightRuleActivity :
     }
 
     private fun renderRules() {
+        if (activeGroup != null && activeGroup != UNGROUPED &&
+            allRules.none { it.group == activeGroup }) {
+            activeGroup = null
+        }
         val rules = when (val group = activeGroup) {
             null -> allRules
             UNGROUPED -> allRules.filter { it.group.isNullOrBlank() }
@@ -196,7 +200,7 @@ class HighlightRuleActivity :
             val groups = appDb.highlightRuleDao.flowGroups().first()
             val choices = listOf(GroupChoice(getString(R.string.all), null),
                 GroupChoice(getString(R.string.no_group), UNGROUPED)) +
-                groups.map { GroupChoice(it, it) }
+                groups.map { GroupChoice("[$it]", it) }
             launch(kotlinx.coroutines.Dispatchers.Main) {
                 alert(titleResource = R.string.highlight_rule_group_filter) {
                     items(choices) { _, choice, _ ->

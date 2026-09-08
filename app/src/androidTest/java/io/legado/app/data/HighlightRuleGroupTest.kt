@@ -1,6 +1,8 @@
 package io.legado.app.data
 
 import androidx.room.Room
+import androidx.room.testing.MigrationTestHelper
+import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.data.entities.HighlightRule
@@ -19,6 +21,10 @@ class HighlightRuleGroupTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private val name = "highlight-groups-${UUID.randomUUID()}"
     private var database: AppDatabase? = null
+    @get:Rule val helper = MigrationTestHelper(
+        InstrumentationRegistry.getInstrumentation(), AppDatabase::class.java.canonicalName,
+        FrameworkSQLiteOpenHelperFactory(),
+    )
 
     private fun open(): AppDatabase = Room.databaseBuilder(context, AppDatabase::class.java, name)
         .addMigrations(*DatabaseMigrations.migrations).allowMainThreadQueries().build()
@@ -28,6 +34,33 @@ class HighlightRuleGroupTest {
     fun cleanUp() {
         database?.close()
         context.deleteDatabase(name)
+    }
+
+    @Test
+    fun migrationPreservesExistingRuleContentAndIdentity() {
+        helper.createDatabase(name, 108).use {
+            it.execSQL("""INSERT INTO highlightRules
+                (id, uuid, name, pattern, isRegex, scope, isEnabled, style, sortOrder,
+                 timeoutMillisecond, applyToTitle, applyToBody)
+                VALUES (42, '11111111-1111-1111-1111-111111111111', 'saved', 'a.*',
+                        1, 'book', 0, '{"color":123}', 7, 900, 1, 0)""")
+        }
+        helper.runMigrationsAndValidate(name, 109, true, *DatabaseMigrations.migrations).close()
+        val rule = open().highlightRuleDao.all.single()
+        // Entity equality compares only IDs, so inspect every preserved field.
+        assertEquals(42L, rule.id)
+        assertEquals("11111111-1111-1111-1111-111111111111", rule.uuid)
+        assertEquals("saved", rule.name)
+        assertEquals("a.*", rule.pattern)
+        assertTrue(rule.isRegex)
+        assertEquals("book", rule.scope)
+        assertEquals(false, rule.isEnabled)
+        assertEquals("{\"color\":123}", rule.style)
+        assertEquals(7, rule.order)
+        assertEquals(900L, rule.timeoutMillisecond)
+        assertTrue(rule.applyToTitle)
+        assertEquals(false, rule.applyToBody)
+        assertTrue(rule.group.isNullOrBlank())
     }
 
     @Test
