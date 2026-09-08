@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="show_source_check_status">显示检验状态</string>
     <string name="source_check_status">检验状态</string>
     <string name="source_check_detail">保存详细检验错误</string>
     <string name="source_check_all">全部检验状态</string>

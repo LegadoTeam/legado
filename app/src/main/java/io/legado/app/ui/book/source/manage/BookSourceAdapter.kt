@@ -41,6 +41,7 @@ class BookSourceAdapter(
     private val finalMessageRegex = Regex("成功|失败")
     private val handler = buildMainHandler()
     var showSourceHost = false
+    var showCheckStatus = false
 
     val selection: List<BookSourcePart>
         get() {
@@ -238,6 +239,11 @@ class BookSourceAdapter(
         item: BookSourcePart
     ) = binding.run {
         val msg = if (Debug.isChecking) Debug.debugMessageMap[item.bookSourceUrl].orEmpty() else ""
+        if (!showCheckStatus && msg.isEmpty()) {
+            ivDebugText.gone()
+            ivProgressBar.gone()
+            return@run
+        }
         val status = context.getString(when (item.checkStatus) {
             BookSourceCheckState.PASSED -> R.string.source_check_passed
             BookSourceCheckState.FAILED -> R.string.source_check_failed

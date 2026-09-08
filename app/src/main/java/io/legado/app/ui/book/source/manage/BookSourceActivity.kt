@@ -33,6 +33,7 @@ import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.DirectLinkUpload
 import io.legado.app.help.SourceSharePassphrase
 import io.legado.app.help.config.LocalConfig
+import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.sourceSharePassphraseButton
 import io.legado.app.lib.theme.primaryColor
@@ -120,6 +121,7 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
     private var snackBar: Snackbar? = null
     private var checkSourceUiSessionId: Long? = null
     private var groupSourcesByDomain = false
+    private var showCheckStatus = AppConfig.showSourceCheckStatus
     private var checkStatusFilter = 0
     private val checkStatuses = listOf("", BookSourceCheckState.NEEDS_CHECK,
         BookSourceCheckState.PASSED, BookSourceCheckState.FAILED)
@@ -171,11 +173,15 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        binding.checkStatusFilter.visibility = if (showCheckStatus) View.VISIBLE else View.GONE
+        adapter.showCheckStatus = showCheckStatus
         initRecyclerView()
         initSearchView()
         val savedSearch = savedInstanceState?.getString("sourceSearch")
         savedSearch?.let { searchView.setQuery(it, false) }
-        checkStatusFilter = savedInstanceState?.getInt("checkStatusFilter")?.coerceIn(0, 3) ?: 0
+        checkStatusFilter = if (showCheckStatus) {
+            savedInstanceState?.getInt("checkStatusFilter")?.coerceIn(0, 3) ?: 0
+        } else 0
         binding.checkStatusFilter.setSelection(checkStatusFilter)
         binding.checkStatusFilter.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
@@ -206,6 +212,7 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
     }
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        menu.findItem(R.id.menu_show_source_check_status).isChecked = showCheckStatus
         groupMenu = menu.findItem(R.id.menu_group).subMenu
         val sortSubMenu = menu.findItem(R.id.action_sort).subMenu!!
         sortSubMenu.findItem(R.id.menu_sort_desc).isChecked = !sortAscending
@@ -307,6 +314,21 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
             }
 
             R.id.menu_help -> showHelp("SourceMBookHelp")
+            R.id.menu_show_source_check_status -> {
+                showCheckStatus = !showCheckStatus
+                AppConfig.showSourceCheckStatus = showCheckStatus
+                item.isChecked = showCheckStatus
+                adapter.showCheckStatus = showCheckStatus
+                binding.checkStatusFilter.visibility = if (showCheckStatus) View.VISIBLE else View.GONE
+                if (!showCheckStatus) {
+                    checkStatusFilter = 0
+                    binding.checkStatusFilter.setSelection(0)
+                }
+                adapter.notifyItemRangeChanged(0, adapter.itemCount, Bundle().apply {
+                    putString("checkSourceMessage", null)
+                })
+                upBookSource(searchView.query?.toString())
+            }
         }
         if (item.groupId == R.id.source_group) {
             searchView.setQuery("group:${item.title}", true)
@@ -376,7 +398,7 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
                     appDb.bookSourceDao.flowSearch(searchKey)
                 }
             }.map { sources ->
-                val state = checkStatuses[checkStatusFilter]
+                val state = if (showCheckStatus) checkStatuses[checkStatusFilter] else ""
                 sources.filter { state.isEmpty() || it.checkStatus == state }
             }.map { data ->
                 hostMap.clear()

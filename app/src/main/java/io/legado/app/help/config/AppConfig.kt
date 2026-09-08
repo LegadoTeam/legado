@@ -34,6 +34,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     val isCronet: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.cronet)
+    var showSourceCheckStatus: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.showSourceCheckStatus, false)
+        set(value) = appCtx.putPrefBoolean(PreferKey.showSourceCheckStatus, value)
     var useAntiAlias = appCtx.getPrefBoolean(PreferKey.antiAlias)
     var userAgent: String = getPrefUserAgent()
     var customHosts = appCtx.getPrefString(PreferKey.customHosts)

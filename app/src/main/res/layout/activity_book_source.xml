@@ -16,6 +16,7 @@
 
     <androidx.appcompat.widget.AppCompatSpinner
         android:id="@+id/check_status_filter"
+        android:visibility="gone"
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:contentDescription="@string/source_check_status"

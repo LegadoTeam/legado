@@ -5,21 +5,30 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.view.PixelCopy
+import android.view.View
 import android.widget.Spinner
+import androidx.core.net.toUri
 import androidx.appcompat.widget.SearchView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.R
+import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
 import io.legado.app.databinding.ItemBookSourceBinding
 import io.legado.app.help.config.LocalConfig
+import io.legado.app.help.config.AppConfig
+import io.legado.app.help.storage.Backup
+import io.legado.app.help.storage.BackupConfig
+import io.legado.app.help.storage.Restore
 import io.legado.app.model.CheckSource
 import io.legado.app.model.Debug
 import io.legado.app.ui.book.source.manage.BookSourceActivity
 import io.legado.app.ui.book.source.manage.BookSourceAdapter
 import io.legado.app.ui.widget.recycler.scroller.FastScrollRecyclerView
+import io.legado.app.ui.widget.TitleBar
+import io.legado.app.utils.defaultSharedPreferences
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.*
@@ -30,6 +39,7 @@ import java.io.File
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.zip.ZipFile
 
 @RunWith(AndroidJUnit4::class)
 class BookSourceCheckUiTest {
@@ -42,11 +52,17 @@ class BookSourceCheckUiTest {
         bookSourceGroup = if (it < 2) group else "Other $id", bookSourceComment = "Original comment",
     ) }
     private val savedHelp = LocalConfig.all["bookSourceHelpVersion"]
+    private val preferences = context.defaultSharedPreferences
+    private val savedShowStatus = preferences.all[PreferKey.showSourceCheckStatus] as? Boolean
+    private val savedIgnore = HashMap(BackupConfig.ignoreConfig)
+    private val savedLastBackup = LocalConfig.lastBackup
+    private var archive: File? = null
     private var scenario: ActivityScenario<BookSourceActivity>? = null
     private val savedFlags = listOf(CheckSource.checkDomain, CheckSource.checkSearch,
         CheckSource.checkDiscovery, CheckSource.checkInfo, CheckSource.checkCategory, CheckSource.checkContent)
 
     @Before fun setup() {
+        preferences.edit().remove(PreferKey.showSourceCheckStatus).commit()
         LocalConfig.edit().putInt("bookSourceHelpVersion", 1).commit()
         appDb.bookSourceDao.insert(*sources.toTypedArray())
         scenario = ActivityScenario.launch(BookSourceActivity::class.java)
@@ -56,10 +72,18 @@ class BookSourceCheckUiTest {
         Debug.currentCheckSession()?.let { CheckSource.stop(context, it) }
         waitUntil { !Debug.isChecking }
         scenario?.close()
+        archive?.parentFile?.deleteRecursively()
         appDb.bookSourceDao.delete(*sources.toTypedArray())
         LocalConfig.edit().apply {
             if (savedHelp is Int) putInt("bookSourceHelpVersion", savedHelp) else remove("bookSourceHelpVersion")
         }.commit()
+        preferences.edit().apply {
+            if (savedShowStatus == null) remove(PreferKey.showSourceCheckStatus)
+            else putBoolean(PreferKey.showSourceCheckStatus, savedShowStatus)
+        }.commit()
+        BackupConfig.ignoreConfig.clear()
+        BackupConfig.ignoreConfig.putAll(savedIgnore)
+        LocalConfig.lastBackup = savedLastBackup
         CheckSource.checkDomain = savedFlags[0]
         CheckSource.checkSearch = savedFlags[1]
         CheckSource.checkDiscovery = savedFlags[2]
@@ -73,6 +97,7 @@ class BookSourceCheckUiTest {
         val queued = dao.beginCheck(sources.map { dao.getBookSourcePart(it.bookSourceUrl)!! })
         dao.completeCheck(queued[0], true, "", 1)
         dao.completeCheck(queued[2], true, "", 1)
+        toggleStatus()
         scenario!!.onActivity {
             it.findViewById<SearchView>(R.id.search_view).setQuery("group:$group", false)
             it.findViewById<Spinner>(R.id.check_status_filter).setSelection(2)
@@ -84,6 +109,77 @@ class BookSourceCheckUiTest {
         scenario!!.onActivity { it.findViewById<Spinner>(R.id.check_status_filter).setSelection(1) }
         awaitItems(listOf(sources[1].bookSourceUrl))
         screenshot("source-check-filter-needed")
+        toggleStatus()
+        awaitItems(sources.take(2).map { it.bookSourceUrl })
+        assertStatusVisibility(false)
+        screenshot("source-check-hidden")
+        scenario!!.recreate()
+        awaitItems(sources.take(2).map { it.bookSourceUrl })
+        assertStatusVisibility(false)
+    }
+
+    @Test fun defaultHiddenStatusToggleIsIncludedInRealSettingsBackup() = runBlocking {
+        scenario!!.onActivity {
+            it.findViewById<SearchView>(R.id.search_view).setQuery("group:$group", false)
+        }
+        awaitItems(sources.take(2).map { it.bookSourceUrl })
+        assertFalse(AppConfig.showSourceCheckStatus)
+        assertStatusVisibility(false)
+        screenshot("source-check-default-hidden")
+        toggleStatus()
+        assertTrue(AppConfig.showSourceCheckStatus)
+        waitUntil {
+            var visible = false
+            scenario!!.onActivity {
+                val recycler = it.findViewById<FastScrollRecyclerView>(R.id.recycler_view)
+                visible = recycler.childCount == 2 && (0 until recycler.childCount).all { index ->
+                    ItemBookSourceBinding.bind(recycler.getChildAt(index)).ivDebugText.visibility == View.VISIBLE
+                }
+            }
+            visible
+        }
+        assertStatusVisibility(true)
+        screenshot("source-check-shown")
+        scenario!!.close()
+        scenario = null
+        BackupConfig.contentKeys.forEach {
+            BackupConfig.ignoreConfig[it] = it != BackupConfig.settingContentKey
+        }
+        val backup = Backup.backupForLanTransferLocked(context).also { archive = it }
+        ZipFile(backup).use { zip ->
+            val entry = checkNotNull(zip.getEntry("config.xml"))
+            val xml = zip.getInputStream(entry).bufferedReader().use { it.readText() }
+            assertTrue(xml.contains("name=\"showSourceCheckStatus\" value=\"true\""))
+        }
+        AppConfig.showSourceCheckStatus = false
+        Restore.restoreOrThrow(context, backup.toUri(), lanTransfer = true)
+        assertTrue(AppConfig.showSourceCheckStatus)
+        scenario = ActivityScenario.launch(BookSourceActivity::class.java)
+        scenario!!.onActivity {
+            assertEquals(View.VISIBLE, it.findViewById<Spinner>(R.id.check_status_filter).visibility)
+        }
+    }
+
+    private fun toggleStatus() {
+        scenario!!.onActivity {
+            it.findViewById<TitleBar>(R.id.title_bar).menu
+                .performIdentifierAction(R.id.menu_show_source_check_status, 0)
+        }
+        instrumentation.waitForIdleSync()
+    }
+
+    private fun assertStatusVisibility(shown: Boolean) {
+        instrumentation.waitForIdleSync()
+        scenario!!.onActivity {
+            val visibility = if (shown) View.VISIBLE else View.GONE
+            assertEquals(visibility, it.findViewById<Spinner>(R.id.check_status_filter).visibility)
+            val recycler = it.findViewById<FastScrollRecyclerView>(R.id.recycler_view)
+            for (index in 0 until recycler.childCount) {
+                assertEquals(visibility, ItemBookSourceBinding.bind(recycler.getChildAt(index)).ivDebugText.visibility)
+            }
+            assertEquals(shown, it.findViewById<TitleBar>(R.id.title_bar).menu
+                .findItem(R.id.menu_show_source_check_status).isChecked)
+        }
     }
 
     @Test fun realServicePersistsFailureAndSuccessWithoutChangingGroups() = runBlocking {
