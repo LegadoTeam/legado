@@ -80,7 +80,7 @@ class ReadRecordAuthorIdentityTest {
                 .build()
             try {
                 val dao = database.readRecordDao
-                assertEquals(108, database.openHelper.writableDatabase.version)
+                assertEquals(109, database.openHelper.writableDatabase.version)
                 assertEquals(legacy.toSet(), dao.all.toSet())
                 assertEquals(1350L, dao.allTime)
                 assertNull(dao.getRecord("phone", "Same", "Author A"))

@@ -34,6 +34,8 @@ data class HighlightRule(
     @ColumnInfo(name = "sortOrder")
     var order: Int = Int.MIN_VALUE,
     var timeoutMillisecond: Long = DEFAULT_TIMEOUT_MILLISECONDS,
+    @ColumnInfo(defaultValue = "")
+    var group: String? = null,
     @ColumnInfo(defaultValue = "0")
     var applyToTitle: Boolean = false,
     @ColumnInfo(defaultValue = "1")
@@ -87,6 +89,7 @@ data class HighlightRule(
         name = (name as String?).orEmpty()
         pattern = (pattern as String?).orEmpty()
         style = (style as String?).orEmpty()
+        group = (group as String?)?.trim()?.takeIf { it.isNotEmpty() }
         if (style.isBlank()) applyStyle(HighlightStyle())
         if (timeoutMillisecond <= 0L) {
             timeoutMillisecond = DEFAULT_TIMEOUT_MILLISECONDS
