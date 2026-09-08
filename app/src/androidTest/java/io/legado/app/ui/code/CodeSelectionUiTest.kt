@@ -16,7 +16,6 @@ import androidx.test.espresso.action.GeneralClickAction
 import androidx.test.espresso.action.Press
 import androidx.test.espresso.action.Tap
 import androidx.test.espresso.action.ViewActions.click
-import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.isCompletelyDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
@@ -155,8 +154,10 @@ class CodeSelectionUiTest {
             val search = CodeEditActivity::class.java.getDeclaredMethod("search")
             search.isAccessible = true
             search.invoke(activity)
+            val searchTxt = CodeEditActivity::class.java.getDeclaredMethod("searchTxt", String::class.java)
+            searchTxt.isAccessible = true
+            searchTxt.invoke(activity, "function")
         }
-        onView(withId(R.id.et_find)).perform(replaceText("function"))
         closeSoftKeyboard()
         awaitEditor { selection(it) == "function" }
 
