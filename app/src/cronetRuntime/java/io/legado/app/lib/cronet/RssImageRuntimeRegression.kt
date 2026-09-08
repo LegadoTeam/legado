@@ -136,6 +136,13 @@ internal object RssImageRuntimeRegression {
             check(paths.all { "/rss-fixture/$it.png" in seen } && "/rss-fixture/redirected.png" in seen) {
                 "Missing native RSS image requests: $seen"
             }
+            checkNotNull(instrumentation.uiAutomation.takeScreenshot()) { "RSS screenshot unavailable" }.let { screenshot ->
+                try {
+                    File(report, "rss-images.png").outputStream().use {
+                        check(screenshot.compress(Bitmap.CompressFormat.PNG, 100, it))
+                    }
+                } finally { screenshot.recycle() }
+            }
             File(report, "rss-images-passed.txt").writeText("RSS_IMAGES_PASSED $seen; bytes=${image.size}")
         } finally {
             activity?.let { screen -> instrumentation.runOnMainSync { screen.finish() } }

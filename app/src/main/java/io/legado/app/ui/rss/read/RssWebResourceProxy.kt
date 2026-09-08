@@ -128,15 +128,16 @@ internal class RssProxyResponseInputStream(
 
     private var closed = false
 
+    // WebView may query available() and read() again after EOF; it owns close().
     override fun read(): Int = try {
-        super.read().also { if (it < 0) close() }
+        super.read()
     } catch (error: Throwable) {
         close()
         throw error
     }
 
     override fun read(buffer: ByteArray, offset: Int, length: Int): Int = try {
-        super.read(buffer, offset, length).also { if (it < 0) close() }
+        super.read(buffer, offset, length)
     } catch (error: Throwable) {
         close()
         throw error
