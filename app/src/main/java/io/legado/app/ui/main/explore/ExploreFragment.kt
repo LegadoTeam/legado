@@ -56,6 +56,16 @@ internal fun exploreGroupFromQuery(query: CharSequence?): String? {
 internal fun isExploreAllQuery(query: CharSequence?): Boolean =
     exploreGroupFromQuery(query) == null
 
+internal fun exploreScrollState(
+    pending: Pair<Int, Int>?,
+    position: Int,
+    currentTop: Int?,
+): Pair<Pair<Int, Int>?, Int> {
+    val offset = pending?.takeIf { it.first == position }?.second ?: currentTop ?: 0
+    val nextPending: Pair<Int, Int>? = if (pending?.first == position) null else position to offset
+    return nextPending to offset
+}
+
 internal fun selectedExploreGroup(
     query: CharSequence?,
     groups: Set<String>
@@ -87,6 +97,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private val groups = linkedSetOf<String>()
     private var exploreFlowJob: Job? = null
     private var groupsMenu: SubMenu? = null
+    private var pendingExploreScroll: Pair<Int, Int>? = null
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         setSupportToolbar(binding.titleBar.toolbar)
@@ -274,7 +285,11 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     }
 
     override fun scrollTo(pos: Int) {
-        (binding.rvFind.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(pos, 0)
+        val layoutManager = binding.rvFind.layoutManager as LinearLayoutManager
+        val currentTop = layoutManager.findViewByPosition(pos)?.let { layoutManager.getDecoratedTop(it) }
+        val (nextPending, offset) = exploreScrollState(pendingExploreScroll, pos, currentTop)
+        pendingExploreScroll = nextPending
+        layoutManager.scrollToPositionWithOffset(pos, offset)
     }
 
     override fun openExplore(sourceUrl: String, title: String, exploreUrl: String?) {
