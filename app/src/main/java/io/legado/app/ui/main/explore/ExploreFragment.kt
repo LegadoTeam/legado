@@ -62,7 +62,8 @@ internal fun exploreScrollState(
     currentTop: Int?,
 ): Pair<Pair<Int, Int>?, Int> {
     val offset = pending?.takeIf { it.first == position }?.second ?: currentTop ?: 0
-    return if (pending?.first == position) null to offset else position to offset
+    val nextPending: Pair<Int, Int>? = if (pending?.first == position) null else position to offset
+    return nextPending to offset
 }
 
 internal fun selectedExploreGroup(
