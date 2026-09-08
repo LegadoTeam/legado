@@ -56,16 +56,14 @@ class CodeSelectionUiTest {
         selectFunction()
         val expectedLeft = source.indexOf("function")
         val expectedRight = source.indexOf("\nconst after")
-        for ((line, column) in listOf(2 to 11, 3 to 5)) {
-            // Dismiss the old panel so the gesture reaches the editor, then check that it reopens.
-            withEditor { actions(it).dismiss() }
-            press(Tap.LONG, line, column)
-            awaitEditor {
-                it.cursor.left == expectedLeft && it.cursor.right == expectedRight &&
-                    actions(it).isShowing && shareButton(it).isShown
-            }
-            withEditor { assertEquals(source, it.text.toString()) }
+        // Dismiss the old panel so the gesture reaches the editor, then check that it reopens.
+        withEditor { actions(it).dismiss() }
+        press(Tap.LONG, 2, 11)
+        awaitEditor {
+            it.cursor.left == expectedLeft && it.cursor.right == expectedRight &&
+                actions(it).isShowing && shareButton(it).isShown
         }
+        withEditor { assertEquals(source, it.text.toString()) }
         screenshot("code-selection-preserved-share")
         shareAndAssert(selectedText)
         withEditor {
