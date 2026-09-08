@@ -5,8 +5,8 @@
     <string formatted="false" name="read_aloud_controls_auto_hide">Auto-hide</string>
     <string formatted="false" name="read_aloud_controls_drag">Allow dragging</string>
     <string formatted="false" name="read_aloud_controls_dock">Dock to left/right edge</string>
-    <string formatted="false" name="read_aloud_controls_size">Control size (dp)</string>
-    <string formatted="false" name="read_aloud_controls_size_summary">Touch targets stay 48–72dp tall; position actions retain text</string>
+    <string formatted="false" name="read_aloud_controls_size">Position control width (dp)</string>
+    <string formatted="false" name="read_aloud_controls_size_summary">85–432dp, limited by the screen; height, text and the pause circle scale together</string>
     <string formatted="false" name="read_aloud_controls_opacity">Background opacity (%)</string>
     <string formatted="false" name="read_aloud_controls_opacity_summary">0 is transparent; 100 is opaque. Icons and text remain solid.</string>
     <string formatted="false" name="read_aloud_controls_threshold">Auto-hide threshold (% of a page)</string>
@@ -15,4 +15,6 @@
     <string formatted="false" name="read_aloud_controls_reveal_summary">Close the read-aloud and reader menus to show controls for the current playback position.</string>
     <string formatted="false" name="read_aloud_controls_reset">Reset position</string>
     <string formatted="false" name="read_aloud_controls_reset_summary">Clear the dragged position. Edge docking still applies when enabled.</string>
+    <string name="read_aloud_back_short">Speech</string>
+    <string name="read_aloud_here_short">Here</string>
 </resources>
