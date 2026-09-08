@@ -179,6 +179,8 @@ class TocReverseNavigationTest {
             BookChapter(bookUrl = book.bookUrl, url = "chapter-$index", index = index, title = title,
                 isVolume = index in volumes, start = offset, end = offset + bytes.size).also { offset += bytes.size }
         }
+        // These chapters describe the completed file; opening it must not trigger a fresh TXT parse.
+        book.latestChapterTime = file.lastModified()
         appDb.bookDao.insert(book)
         appDb.bookChapterDao.insert(*chapters.toTypedArray())
         val bookmark = Bookmark(bookName = book.name, bookAuthor = book.author,
