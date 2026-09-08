@@ -11,7 +11,6 @@ import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import androidx.appcompat.widget.TooltipCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
@@ -63,6 +62,10 @@ class ReadAloudControls(
         parent.addOnLayoutChangeListener(layoutListener)
         listOf(bar, binding.ivPauseAloud, binding.llBackToSpeech, binding.llReadFromHere)
             .forEach { it.setOnTouchListener(::onTouch) }
+        binding.ivPauseAloud.setOnLongClickListener {
+            ReadAloud.stop(context)
+            true
+        }
     }
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
@@ -98,7 +101,6 @@ class ReadAloudControls(
         binding.ivPauseAloud.contentDescription = context.getString(
             if (BaseReadAloudService.pause) R.string.resume else R.string.pause,
         )
-        TooltipCompat.setTooltipText(binding.ivPauseAloud, binding.ivPauseAloud.contentDescription)
         val background = context.bottomBackground
         val foreground = context.getPrimaryTextColor(ColorUtils.isColorLight(background))
         val opacity = prefs.getInt(PreferKey.readAloudControlsOpacity, 30).coerceIn(0, 100) / 100f
@@ -224,7 +226,14 @@ class ReadAloudControls(
                 val dx = event.rawX - downX
                 val dy = event.rawY - downY
                 val slop = ViewConfiguration.get(context).scaledTouchSlop
-                if (abs(dx) > slop || abs(dy) > slop) dragging = true
+                if (!dragging && (abs(dx) > slop || abs(dy) > slop)) {
+                    dragging = true
+                    MotionEvent.obtain(event).run {
+                        action = MotionEvent.ACTION_CANCEL
+                        view.onTouchEvent(this)
+                        recycle()
+                    }
+                }
                 if (dragging) {
                     parent.requestDisallowInterceptTouchEvent(true)
                     val (left, top, right, bottom) = safeBounds()
@@ -239,7 +248,7 @@ class ReadAloudControls(
                     val y = (bar.y - top) / (bottom - top).coerceAtLeast(1f)
                     prefs.edit().putFloat(PreferKey.readAloudControlsX, x)
                         .putFloat(PreferKey.readAloudControlsY, y).apply()
-                } else view.performClick()
+                }
                 dragging = false
                 parent.requestDisallowInterceptTouchEvent(false)
                 position()
@@ -250,6 +259,8 @@ class ReadAloudControls(
                 position()
             }
         }
+        // Keep native click/long-click handling; the cancellation above suppresses both when dragged.
+        view.onTouchEvent(event)
         return true
     }
 
