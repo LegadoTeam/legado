@@ -16,6 +16,7 @@ import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.isCompletelyDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
+import androidx.test.espresso.matcher.RootMatchers.isPlatformPopup
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
@@ -85,7 +86,8 @@ class CodeSelectionUiTest {
         }
         screenshot("code-selection-first-long-press")
         withEditor { actions(it).dismiss() }
-        press(Tap.SINGLE, 5, 8)
+        // Use an in-bounds position outside the selected word; line 5 is below this fixture.
+        press(Tap.SINGLE, 0, 2)
         awaitEditor { !it.cursor.isSelected && !shareButton(it).isVisible }
         withEditor { assertEquals(source, it.text.toString()) }
     }
@@ -123,7 +125,8 @@ class CodeSelectionUiTest {
     private fun selectFunction() {
         withEditor { it.setSelectionRegion(1, 0, 4, 1, false) }
         awaitEditor { selection(it) == selectedText && actions(it).isShowing && shareButton(it).isShown }
-        onView(withId(R.id.code_share_selection)).check(matches(isCompletelyDisplayed()))
+        onView(withId(R.id.code_share_selection)).inRoot(isPlatformPopup())
+            .check(matches(isCompletelyDisplayed()))
     }
 
     private fun press(tap: Tap, line: Int, column: Int) {
@@ -148,7 +151,8 @@ class CodeSelectionUiTest {
         }
         instrumentation.addMonitor(monitor)
         try {
-            onView(withId(R.id.code_share_selection)).check(matches(isCompletelyDisplayed())).perform(click())
+            onView(withId(R.id.code_share_selection)).inRoot(isPlatformPopup())
+                .check(matches(isCompletelyDisplayed())).perform(click())
             await { chooser.get() != null }
             val send = chooser.get()!!.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)!!
             assertEquals(Intent.ACTION_SEND, send.action)
