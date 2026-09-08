@@ -4,7 +4,9 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Rect
 import android.os.SystemClock
+import android.view.MotionEvent
 import android.view.View
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
@@ -118,17 +120,29 @@ class ReadingLayoutTransitionTest {
 
     private fun switchStyle(scenario: ActivityScenario<ReadBookActivity>, index: Int) {
         scenario.onActivity { ReadStyleDialog().showNow(it.supportFragmentManager, "layout-style") }
+        val bounds = Rect()
         await {
-            var clicked = false
+            var visible = false
             scenario.onActivity { activity ->
                 val dialog = activity.supportFragmentManager.findFragmentByTag("layout-style") as? ReadStyleDialog
                 val view = dialog?.view?.findViewById<RecyclerView>(R.id.rv_style)
                     ?.findViewHolderForAdapterPosition(index)?.itemView
-                if (view?.isShown == true) clicked = view.performClick()
+                visible = view?.getGlobalVisibleRect(bounds) == true && bounds.width() > 20 && bounds.height() > 20
             }
-            clicked
+            visible
         }
-        await { ReadBookConfig.styleSelect == index }
+        // CircleImageView accepts clicks only after a real touch enters its circular hit area.
+        val downTime = SystemClock.uptimeMillis()
+        for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
+            val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action,
+                bounds.exactCenterX(), bounds.exactCenterY(), 0)
+            try { instrumentation.sendPointerSync(event) } finally { event.recycle() }
+        }
+        try {
+            await { ReadBookConfig.styleSelect == index }
+        } finally {
+            capture(scenario, "layout-style-selected-$index")
+        }
         pressBack()
     }
 
