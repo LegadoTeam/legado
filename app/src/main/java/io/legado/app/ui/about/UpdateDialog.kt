@@ -84,8 +84,8 @@ class UpdateDialog() : BaseDialogFragment(R.layout.dialog_update) {
         binding.btnBetaUpdate.setOnClickListener {
             startDownload(arguments?.getString("url"))
         }
+        binding.toolBar.inflateMenu(R.menu.app_update)
         if (!isBetaUpdate) {
-            binding.toolBar.inflateMenu(R.menu.app_update)
             binding.toolBar.menu.findItem(R.id.menu_download).isVisible = false
             binding.toolBar.menu.findItem(R.id.menu_download_backup).isVisible =
                 !arguments?.getString("backupUrl").isNullOrBlank()
@@ -111,6 +111,21 @@ class UpdateDialog() : BaseDialogFragment(R.layout.dialog_update) {
                     }
                 }
                 return@setOnMenuItemClickListener true
+            }
+        } else {
+            binding.toolBar.menu.findItem(R.id.menu_download).isVisible = false
+            binding.toolBar.menu.findItem(R.id.menu_download_backup).isVisible = false
+            binding.toolBar.menu.findItem(R.id.menu_download_mirror).isVisible = false
+            binding.toolBar.menu.findItem(R.id.menu_download_alternate_mirror).isVisible = false
+            binding.toolBar.menu.findItem(R.id.menu_open_in_browser).isVisible = true
+            binding.toolBar.menu.findItem(R.id.menu_ignore_version).isVisible = false
+            binding.toolBar.setOnMenuItemClickListener {
+                if (it.itemId == R.id.menu_open_in_browser) {
+                    arguments?.getString("url").orEmpty()
+                        .takeIf(String::isNotBlank)
+                        ?.let { url -> requireContext().openUrl(url) }
+                }
+                true
             }
         }
     }

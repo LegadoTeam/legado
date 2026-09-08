@@ -19,4 +19,12 @@ class UpdateDialogDownloadContractTest {
         assertTrue(clickHandler.contains("startDownload(arguments?.getString(\"url\"))"))
         assertFalse(clickHandler.contains("openUrl"))
     }
+
+    @Test
+    fun `beta update exposes browser fallback in toolbar`() {
+        val source = File("src/main/java/io/legado/app/ui/about/UpdateDialog.kt").readText()
+        assertTrue(source.contains("binding.toolBar.inflateMenu(R.menu.app_update)"))
+        assertTrue(source.contains("binding.toolBar.menu.findItem(R.id.menu_open_in_browser).isVisible = true"))
+        assertTrue(source.contains("arguments?.getString(\"url\").orEmpty()"))
+    }
 }
