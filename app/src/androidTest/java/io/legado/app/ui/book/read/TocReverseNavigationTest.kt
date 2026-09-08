@@ -100,7 +100,11 @@ class TocReverseNavigationTest {
                     activity.supportFragmentManager.fragments.filterIsInstance<ClickActionConfigDialog>()
                         .forEach { it.view?.findViewById<View>(R.id.iv_close)?.performClick() }
                 }
-                await { ReadBook.book?.bookUrl == fixture.book.bookUrl && ReadBook.curTextChapter?.isCompleted == true }
+                await {
+                    ReadBook.book?.bookUrl == fixture.book.bookUrl &&
+                        ReadBook.curTextChapter?.chapter?.bookUrl == fixture.book.bookUrl &&
+                        ReadBook.curTextChapter?.isCompleted == true
+                }
                 val originalUrl = ReadBook.curTextChapter!!.chapter.url
                 val originalPosition = ReadBook.durChapterPos
                 assertTrue("Fixture must open within the chapter, actual offset $originalPosition", originalPosition > 0)

@@ -3,13 +3,12 @@ package io.legado.app.ui.book.read
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Rect
-import android.view.MotionEvent
-import android.widget.TextView
-import kotlin.math.roundToInt
-import org.junit.Assert.assertEquals
 import android.os.SystemClock
+import android.view.MotionEvent
 import android.view.View
+import android.widget.TextView
 import androidx.core.view.isVisible
+import androidx.preference.SeekBarPreference
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -25,16 +24,19 @@ import io.legado.app.model.ReadBook
 import io.legado.app.model.localBook.TextFile
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.ui.book.read.config.ClickActionConfigDialog
+import io.legado.app.ui.book.read.config.ReadAloudControlsDialog
 import io.legado.app.ui.book.read.page.ReadView
 import io.legado.app.utils.defaultSharedPreferences
+import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlin.math.roundToInt
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.io.File
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
 /** Actual reader layout and touch bounds; this fixture does not test service lifecycle. */
 @RunWith(AndroidJUnit4::class)
@@ -124,12 +126,13 @@ class ReadAloudScaleUiTest {
             val bounds = Rect()
             val clicks = IntArray(2)
             scenario!!.onActivity { activity ->
-                val bar = activity.findViewById<View>(R.id.read_aloud_float_bar)
+                val bar = activity.findViewById<View>(R.id.read_aloud_float_bar_container)
                 val density = activity.resources.displayMetrics.density
                 val parent = bar.parent as View
                 val expectedWidth = minOf((widthDp * density).roundToInt(), parent.width - (32 * density).roundToInt())
                 expectedHeight = (expectedWidth / 6f).roundToInt()
                 evidence.appendLine("requested=$widthDp actual=${bar.width}x${bar.height} expected=${expectedWidth}x$expectedHeight")
+                File(context.getExternalFilesDir("ui-regression"), "aloud-scale-bounds.txt").writeText(evidence.toString())
                 assertEquals("Long control must use the selected total width", expectedWidth, bar.width)
                 assertEquals("Long control height must scale with its width", expectedHeight, bar.height)
                 assertEquals(1f, bar.scaleX, 0f)
@@ -168,7 +171,7 @@ class ReadAloudScaleUiTest {
                 await("pause control visible") { it.findViewById<View>(R.id.iv_pause_aloud).isShown }
                 screenshot("aloud-scale-circle-$widthDp-$paused")
                 scenario!!.onActivity { activity ->
-                    val bar = activity.findViewById<View>(R.id.read_aloud_float_bar)
+                    val bar = activity.findViewById<View>(R.id.read_aloud_float_bar_container)
                     val pause = activity.findViewById<View>(R.id.iv_pause_aloud)
                     assertEquals("Circle follows the same scale", expectedHeight, bar.width)
                     assertEquals(expectedHeight, bar.height)
@@ -178,6 +181,45 @@ class ReadAloudScaleUiTest {
             }
         }
         File(context.getExternalFilesDir("ui-regression"), "aloud-scale-bounds.txt").writeText(evidence.toString())
+    }
+
+    @Test fun legacySizeAndSelectedWidthSurviveSettingsAndReaderRecreation() {
+        prefs.edit().putInt(PreferKey.readAloudControlsSize, 72).remove("readAloudControlsWidth").commit()
+        scenario!!.onActivity {
+            ReadAloudControlsDialog().show(it.supportFragmentManager, "scale-settings")
+        }
+        await("width preference") { activity ->
+            val dialog = activity.supportFragmentManager.findFragmentByTag("scale-settings")
+            val fragment = dialog?.childFragmentManager?.findFragmentByTag("controls")
+                as? ReadAloudControlsDialog.ControlsPreferenceFragment
+            fragment?.findPreference<SeekBarPreference>("readAloudControlsWidth") != null
+        }
+        screenshot("aloud-scale-legacy-settings")
+        scenario!!.onActivity { activity ->
+            val dialog = activity.supportFragmentManager.findFragmentByTag("scale-settings") as ReadAloudControlsDialog
+            val fragment = dialog.childFragmentManager.findFragmentByTag("controls")
+                as ReadAloudControlsDialog.ControlsPreferenceFragment
+            val width = checkNotNull(fragment.findPreference<SeekBarPreference>("readAloudControlsWidth"))
+            assertEquals("Old 72dp height maps to the original long width", 432, width.value)
+            assertEquals(40, width.min)
+            assertEquals(432, width.max)
+            width.value = 40
+            dialog.dismiss()
+        }
+        await("settings dismissed") { it.bottomDialog == 0 }
+        scenario!!.recreate()
+        scenario!!.onActivity {
+            playbackFlag("isRun", true)
+            BaseReadAloudService.detachReadAloudFollow()
+            it.showReadAloudControls()
+        }
+        await("restored position control") { it.findViewById<View>(R.id.ll_back_to_speech).isShown }
+        screenshot("aloud-scale-restored-40")
+        scenario!!.onActivity { activity ->
+            assertEquals(40, prefs.getInt("readAloudControlsWidth", -1))
+            val bar = activity.findViewById<View>(R.id.read_aloud_float_bar_container)
+            assertEquals((40 * activity.resources.displayMetrics.density).roundToInt(), bar.width)
+        }
     }
 
     private fun tap(x: Float, y: Float) {
