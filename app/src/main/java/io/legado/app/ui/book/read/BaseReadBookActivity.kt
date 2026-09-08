@@ -145,7 +145,8 @@ abstract class BaseReadBookActivity :
 
     private fun onBottomDialogChange() {
         when (bottomDialog) {
-            0 -> onMenuHide()
+            // A dialog can return to the reading menu before it is dismissed.
+            0 -> if (menuLayoutIsVisible) onMenuShow() else onMenuHide()
             1 -> onMenuShow()
         }
     }
