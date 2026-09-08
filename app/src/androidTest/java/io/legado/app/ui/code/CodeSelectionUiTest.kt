@@ -156,7 +156,7 @@ class CodeSelectionUiTest {
             search.isAccessible = true
             search.invoke(activity)
         }
-        onView(withId(R.id.etFind)).perform(replaceText("function"))
+        onView(withId(R.id.et_find)).perform(replaceText("function"))
         closeSoftKeyboard()
         awaitEditor { selection(it) == "function" }
 
