@@ -47,7 +47,9 @@ class TocReverseNavigationTest {
                     instrumentation.waitForIdleSync()
                     screenshot("toc-flat-reversed-$reversed")
                     assertEquals("Displayed titles must match the new row identities without reopening", expected, visibleTitles())
-                    assertEquals(reversed, appDb.bookDao.getBook(fixture.book.bookUrl)!!.getReverseToc())
+                    val stored = appDb.bookDao.getBook(fixture.book.bookUrl)!!
+                    assertEquals(reversed, stored.getReverseTocDisplay())
+                    assertFalse("The source parser order must not change", stored.getReverseToc())
                     scenario.recreate()
                     await { visibleTitles() == expected }
                 }
@@ -64,7 +66,7 @@ class TocReverseNavigationTest {
                 await { rows()?.firstOrNull()?.chapter?.title == "Volume B" }
                 screenshot("toc-current-volume-reversed")
                 val current = appDb.bookDao.getBook(fixture.book.bookUrl)!!
-                assertTrue("Reverse preference must be persisted", current.getReverseToc())
+                assertTrue("Display reverse preference must be persisted", current.getReverseTocDisplay())
                 assertEquals("Current chapter identity must survive reversal", "B1",
                     appDb.bookChapterDao.getChapter(current.bookUrl, current.durChapterIndex)!!.title)
                 assertEquals(147, current.durChapterPos)
@@ -121,6 +123,34 @@ class TocReverseNavigationTest {
                 val bookmark = appDb.bookmarkDao.getByBook(fixture.book.name, fixture.book.author).single()
                 assertEquals("Bookmark must still target the same chapter", "Chapter 4",
                     appDb.bookChapterDao.getChapter(fixture.book.bookUrl, bookmark.chapterIndex)!!.title)
+            }
+        }
+    }
+
+    @Test fun legacyStoredReverseOrderKeepsItsChapterIndexesAndParserPreference() {
+        fixture((1..5).map { "Chapter $it" }).use { fixture ->
+            val book = fixture.book
+            val reversed = appDb.bookChapterDao.getChapterList(book.bookUrl).reversed()
+                .mapIndexed { index, chapter -> chapter.copy(index = index) }
+            appDb.bookChapterDao.delByBook(book.bookUrl)
+            appDb.bookChapterDao.insert(*reversed.toTypedArray())
+            book.setReverseToc(true)
+            book.durChapterIndex = 3
+            appDb.bookDao.update(book)
+            fun identities() = appDb.bookChapterDao.getChapterList(book.bookUrl).map { listOf(it.index, it.url, it.title) }
+            val original = identities()
+            ActivityScenario.launch<TocActivity>(tocIntent(book)).use { scenario ->
+                await { visibleTitles() == fixture.titles.reversed() }
+                reverse()
+                await { visibleTitles() == fixture.titles }
+                assertEquals(original, identities())
+                assertTrue(appDb.bookDao.getBook(book.bookUrl)!!.getReverseToc())
+                assertEquals(3, appDb.bookDao.getBook(book.bookUrl)!!.durChapterIndex)
+                scenario.recreate()
+                await { visibleTitles() == fixture.titles }
+                reverse()
+                await { visibleTitles() == fixture.titles.reversed() }
+                assertEquals(original, identities())
             }
         }
     }
