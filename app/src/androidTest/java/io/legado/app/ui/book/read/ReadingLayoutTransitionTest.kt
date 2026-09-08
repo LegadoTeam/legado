@@ -128,6 +128,11 @@ class ReadingLayoutTransitionTest {
                 val view = dialog?.view?.findViewById<RecyclerView>(R.id.rv_style)
                     ?.findViewHolderForAdapterPosition(index)?.itemView
                 visible = view?.getGlobalVisibleRect(bounds) == true && bounds.width() > 20 && bounds.height() > 20
+                if (visible && view != null) {
+                    val location = IntArray(2)
+                    view.getLocationOnScreen(location)
+                    bounds.set(location[0], location[1], location[0] + view.width, location[1] + view.height)
+                }
             }
             visible
         }
