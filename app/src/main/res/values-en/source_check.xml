@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="show_source_check_status">Show check status</string>
     <string name="source_check_status">Check status</string>
     <string name="source_check_detail">Save detailed check errors</string>
     <string name="source_check_all">All check statuses</string>

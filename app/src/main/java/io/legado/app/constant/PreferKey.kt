@@ -12,6 +12,7 @@ object PreferKey {
     const val editThemeDark = "editThemeDark"
     const val editTemeAuto = "editTemeAuto"
     const val showUnread = "showUnread"
+    const val showSourceCheckStatus = "showSourceCheckStatus"
     const val showBookshelfReadProgress = "showBookshelfReadProgress"
     const val bookshelfReadProgressMode = "bookshelfReadProgressMode"
     const val showBookshelfRecentReading = "showBookshelfRecentReading"
