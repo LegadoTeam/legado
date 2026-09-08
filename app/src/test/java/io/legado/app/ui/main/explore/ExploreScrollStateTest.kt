@@ -5,7 +5,7 @@ import org.junit.Test
 
 class ExploreScrollStateTest {
     @Test fun openingKeepsTheClickedRowTop() {
-        assertEquals(12 to 240, exploreScrollState(null, 12, 240))
+        assertEquals((12 to 240) to 240, exploreScrollState(null, 12, 240))
     }
 
     @Test fun loadedExpansionReusesTheOriginalOffset() {
@@ -13,6 +13,6 @@ class ExploreScrollStateTest {
     }
 
     @Test fun aDifferentRowStartsASeparateAnchor() {
-        assertEquals(18 to 96, exploreScrollState(12 to 240, 18, 96))
+        assertEquals((18 to 96) to 96, exploreScrollState(12 to 240, 18, 96))
     }
 }
