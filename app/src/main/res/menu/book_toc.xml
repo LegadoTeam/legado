@@ -33,6 +33,7 @@
 
         <item
             android:id="@+id/menu_reverse_toc"
+            android:checkable="true"
             android:title="@string/reverse_toc"
             app:showAsAction="never" />
 
