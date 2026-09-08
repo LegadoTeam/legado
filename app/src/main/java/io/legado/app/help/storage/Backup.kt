@@ -35,7 +35,6 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import splitties.init.appCtx
@@ -118,8 +117,6 @@ object Backup {
 
     private const val TAG = "Backup"
 
-    private val mutex = Mutex()
-
     private fun getNowZipFileName(): String {
         val backupDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
             .format(Date(System.currentTimeMillis()))
@@ -140,7 +137,7 @@ object Backup {
         if (!AppConfig.autoBackup) return
         if (shouldBackup()) {
             Coroutine.async {
-                mutex.withLock {
+                backupRestoreMutex.withLock {
                     if (shouldBackup()) {
                         val backupZipFileName = getNowZipFileName()
                         if (!AppWebDav.hasBackUp(backupZipFileName)) {
@@ -157,7 +154,7 @@ object Backup {
     }
 
     suspend fun backupLocked(context: Context, path: String?) {
-        mutex.withLock {
+        backupRestoreMutex.withLock {
             withContext(IO) {
                 backup(context, path)
             }
@@ -165,7 +162,7 @@ object Backup {
     }
 
     suspend fun backupForLanTransferLocked(context: Context): File {
-        return mutex.withLock {
+        return backupRestoreMutex.withLock {
             withContext(IO) {
                 val directory = File(
                     context.cacheDir,
@@ -194,7 +191,7 @@ object Backup {
     }
 
     suspend fun backupBeforeLanRestoreLocked(context: Context) {
-        mutex.withLock {
+        backupRestoreMutex.withLock {
             withContext(IO) {
                 check(
                     backup(
@@ -519,8 +516,13 @@ object Backup {
     }
 
     fun clearCache() {
-        FileUtils.delete(backupPath)
-        FileUtils.delete(zipFilePath)
-        File(appCtx.cacheDir, "lan_backup").deleteRecursively()
+        if (!backupRestoreMutex.tryLock()) return
+        try {
+            FileUtils.delete(backupPath)
+            FileUtils.delete(zipFilePath)
+            File(appCtx.cacheDir, "lan_backup").deleteRecursively()
+        } finally {
+            backupRestoreMutex.unlock()
+        }
     }
 }
