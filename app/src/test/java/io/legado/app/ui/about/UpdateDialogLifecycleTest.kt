@@ -51,7 +51,7 @@ class UpdateDialogLifecycleTest {
         assertTrue(source.contains("putBoolean(\"isBeta\", updateInfo.isBeta)"))
         assertTrue(source.contains("binding.betaActions.isVisible = true"))
         assertTrue(source.contains("setLayout(0.9f, 0.8f)"))
-        assertTrue(source.contains("if (isBetaUpdate) R.string.beta_update_now else R.string.action_download"))
+        assertTrue(source.contains("binding.btnBetaUpdate.setText(R.string.beta_update_now)"))
         assertTrue(source.contains("startDownload(arguments?.getString(\"url\"))"))
         assertFalse(
             source.substringAfter("binding.btnBetaUpdate.setOnClickListener")

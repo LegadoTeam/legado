@@ -78,9 +78,7 @@ class UpdateDialog() : BaseDialogFragment(R.layout.dialog_update) {
             weight = 1f
         }
         binding.btnBetaCancel.setOnClickListener { dismiss() }
-        binding.btnBetaUpdate.setText(
-            if (isBetaUpdate) R.string.beta_update_now else R.string.action_download
-        )
+        binding.btnBetaUpdate.setText(R.string.beta_update_now)
         binding.btnBetaUpdate.setOnClickListener {
             startDownload(arguments?.getString("url"))
         }
