@@ -25,12 +25,12 @@
         android:title="@string/read_aloud_controls_dock"
         app:iconSpaceReserved="false" />
     <androidx.preference.SeekBarPreference
-        android:key="readAloudControlsSize"
-        android:defaultValue="48"
+        android:key="readAloudControlsWidth"
+        android:defaultValue="288"
         android:title="@string/read_aloud_controls_size"
         android:summary="@string/read_aloud_controls_size_summary"
-        android:max="72"
-        app:min="48"
+        android:max="432"
+        app:min="40"
         app:seekBarIncrement="1"
         app:showSeekBarValue="true"
         app:iconSpaceReserved="false" />

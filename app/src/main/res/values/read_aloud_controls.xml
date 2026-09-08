@@ -5,8 +5,8 @@
     <string formatted="false" name="read_aloud_controls_auto_hide">自动隐藏</string>
     <string formatted="false" name="read_aloud_controls_drag">允许拖动</string>
     <string formatted="false" name="read_aloud_controls_dock">贴靠左右边缘</string>
-    <string formatted="false" name="read_aloud_controls_size">控件大小（dp）</string>
-    <string formatted="false" name="read_aloud_controls_size_summary">触控高度为 48–72dp，定位操作保留文字</string>
+    <string formatted="false" name="read_aloud_controls_size">长条控件宽度（dp）</string>
+    <string formatted="false" name="read_aloud_controls_size_summary">40–432dp，最大不超过屏幕；高度、文字和暂停圆钮随宽度缩放</string>
     <string formatted="false" name="read_aloud_controls_opacity">背景不透明度（%）</string>
     <string formatted="false" name="read_aloud_controls_opacity_summary">0 为透明，100 为不透明；图标和文字保持清晰</string>
     <string formatted="false" name="read_aloud_controls_threshold">自动隐藏阈值（% 页）</string>
@@ -15,4 +15,6 @@
     <string formatted="false" name="read_aloud_controls_reveal_summary">关闭朗读和阅读菜单后显示，仍按当前朗读位置决定控件类型</string>
     <string formatted="false" name="read_aloud_controls_reset">恢复默认位置</string>
     <string formatted="false" name="read_aloud_controls_reset_summary">清除拖动位置；贴边开启时仍贴靠边缘</string>
+    <string name="read_aloud_back_short">原进度</string>
+    <string name="read_aloud_here_short">从本页听</string>
 </resources>

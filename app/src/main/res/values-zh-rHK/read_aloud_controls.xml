@@ -5,8 +5,8 @@
     <string formatted="false" name="read_aloud_controls_auto_hide">自動隱藏</string>
     <string formatted="false" name="read_aloud_controls_drag">允許拖動</string>
     <string formatted="false" name="read_aloud_controls_dock">貼靠左右邊緣</string>
-    <string formatted="false" name="read_aloud_controls_size">控制項大小（dp）</string>
-    <string formatted="false" name="read_aloud_controls_size_summary">觸控高度為 48–72dp，定位操作保留文字</string>
+    <string formatted="false" name="read_aloud_controls_size">長條控制項寬度（dp）</string>
+    <string formatted="false" name="read_aloud_controls_size_summary">40–432dp，最大不超過螢幕；高度、文字和暫停圓鈕隨寬度縮放</string>
     <string formatted="false" name="read_aloud_controls_opacity">背景不透明度（%）</string>
     <string formatted="false" name="read_aloud_controls_opacity_summary">0 為透明，100 為不透明；圖示和文字保持清晰</string>
     <string formatted="false" name="read_aloud_controls_threshold">自動隱藏閾值（% 頁）</string>
@@ -15,4 +15,6 @@
     <string formatted="false" name="read_aloud_controls_reveal_summary">關閉朗讀和閱讀選單後顯示，仍按目前朗讀位置決定控制項類型</string>
     <string formatted="false" name="read_aloud_controls_reset">恢復預設位置</string>
     <string formatted="false" name="read_aloud_controls_reset_summary">清除拖動位置；貼邊開啟時仍貼靠邊緣</string>
+    <string name="read_aloud_back_short">原進度</string>
+    <string name="read_aloud_here_short">從本頁聽</string>
 </resources>

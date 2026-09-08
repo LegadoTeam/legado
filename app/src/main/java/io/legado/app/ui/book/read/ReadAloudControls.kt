@@ -4,16 +4,19 @@ import android.annotation.SuppressLint
 import android.content.SharedPreferences
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.util.TypedValue
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import androidx.appcompat.widget.TooltipCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
+import androidx.core.widget.TextViewCompat
 import io.legado.app.R
 import io.legado.app.constant.PreferKey
 import io.legado.app.databinding.ViewReadAloudFloatBarBinding
@@ -26,6 +29,7 @@ import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.defaultSharedPreferences
 import io.legado.app.utils.dpToPx
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /** Reader-only controls; positions are fractions of the safe viewport, so rotation stays reachable. */
 class ReadAloudControls(
@@ -46,7 +50,10 @@ class ReadAloudControls(
     private var downY = 0f
     private var initialX = 0f
     private var initialY = 0f
-    private val layoutListener = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+    private val layoutListener = View.OnLayoutChangeListener { view, left, _, right, _, oldLeft, _, oldRight, _ ->
+        if (view === parent && right - left != oldRight - oldLeft && bar.isVisible) {
+            updateSize(binding.ivPauseAloud.isVisible)
+        }
         if (!dragging) position()
     }
 
@@ -105,17 +112,57 @@ class ReadAloudControls(
         binding.tvBackToSpeech.setTextColor(foreground)
         binding.tvReadFromHere.setTextColor(foreground)
         binding.vBarDivider.setBackgroundColor(ColorUtils.withAlpha(foreground, .3f))
-        val size = prefs.getInt(PreferKey.readAloudControlsSize, 48).coerceIn(48, 72)
-        val height = size.dpToPx()
-        binding.ivPauseAloud.updateLayoutParams { width = height; this.height = height }
-        binding.llBackToSpeech.minimumHeight = height
-        binding.llReadFromHere.minimumHeight = height
-        val width = if (showPause) height else (size * 6).dpToPx()
-        val availableWidth = (parent.width - 32.dpToPx()).coerceAtLeast(96.dpToPx())
-        bar.updateLayoutParams<FrameLayout.LayoutParams> {
-            this.width = minOf(width, availableWidth)
-        }
+        updateSize(showPause)
         position()
+    }
+
+    private fun updateSize(showPause: Boolean) {
+        val width = minOf(readAloudControlWidth(prefs).dpToPx(),
+            (parent.width - 32.dpToPx()).coerceAtLeast(40.dpToPx()))
+        val scale = width / 288f.dpToPx()
+        val height = (width / 6f).roundToInt().coerceAtLeast(1)
+        fun scaled(dp: Float) = (dp.dpToPx() * scale).roundToInt()
+        bar.updateLayoutParams<FrameLayout.LayoutParams> {
+            this.width = if (showPause) height else width
+            this.height = height
+        }
+        (bar.background as GradientDrawable).cornerRadius = height / 2f
+        binding.ivPauseAloud.apply {
+            minimumWidth = 0
+            minimumHeight = 0
+            updateLayoutParams { this.width = height; this.height = height }
+            val padding = scaled(12f)
+            setPadding(padding, padding, padding, padding)
+        }
+        val compact = scale < .65f
+        listOf(binding.llBackToSpeech, binding.llReadFromHere).forEach {
+            it.minimumHeight = 0
+            it.updateLayoutParams { this.height = height }
+            val padding = scaled(if (compact) 2f else 8f)
+            it.setPaddingRelative(padding, 0, padding, 0)
+        }
+        listOf(binding.ivBackToSpeech, binding.ivReadFromHere).forEach {
+            it.isVisible = !compact
+            it.updateLayoutParams { this.width = scaled(20f); this.height = scaled(20f) }
+        }
+        binding.vBarDivider.updateLayoutParams {
+            this.width = scaled(1f).coerceAtLeast(1)
+            this.height = scaled(20f)
+        }
+        binding.tvBackToSpeech.setText(if (compact) R.string.read_aloud_back_short else R.string.back_to_speaking_position)
+        binding.tvReadFromHere.setText(if (compact) R.string.read_aloud_here_short else R.string.read_aloud_from_here)
+        listOf(binding.tvBackToSpeech, binding.tvReadFromHere).forEach { text ->
+            text.includeFontPadding = false
+            text.maxLines = if (compact) 1 else 2
+            text.updateLayoutParams<LinearLayout.LayoutParams> {
+                marginStart = if (compact) 0 else scaled(4f)
+                this.height = height
+            }
+            // Fit complete labels inside the scaled background, including larger system fonts.
+            val textPixels = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP,
+                (if (compact) 22f else 14f) * scale, context.resources.displayMetrics).roundToInt().coerceAtLeast(2)
+            TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(text, 1, textPixels, 1, TypedValue.COMPLEX_UNIT_PX)
+        }
     }
 
     fun onMovement(percentOfPage: Float) {
@@ -219,3 +266,7 @@ class ReadAloudControls(
         parent.removeOnLayoutChangeListener(layoutListener)
     }
 }
+
+internal fun readAloudControlWidth(prefs: SharedPreferences): Int =
+    prefs.getInt(PreferKey.readAloudControlsWidth,
+        prefs.getInt(PreferKey.readAloudControlsSize, 48).coerceIn(48, 72) * 6).coerceIn(40, 432)
