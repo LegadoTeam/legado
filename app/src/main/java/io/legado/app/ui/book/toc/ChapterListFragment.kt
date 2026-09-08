@@ -191,6 +191,7 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
             tocListState.setFullChapters(
                 chapters = chapters,
                 reverseOrder = book.getReverseToc(),
+                reverseDisplay = !book.isPdf && !book.isEpub && book.getReverseTocDisplay(),
                 resetCollapse = true,
                 defaultExpanded = book.getTocExpanded(),
                 currentChapterIndex = durChapterIndex,
@@ -280,6 +281,7 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
             return
         }
         chapterListJob?.cancel()
+        if (replaceAll) adapter.clearDisplayTitle()
         chapterListJob = viewLifecycleOwner.lifecycleScope.launch {
             val normalizedSearchKey = searchKey?.takeIf { it.isNotBlank() }
             currentSearchKey = normalizedSearchKey
@@ -294,6 +296,7 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                     tocListState.setFullChapters(
                         chapters = chapters,
                         reverseOrder = reverseOrder,
+                        reverseDisplay = !currentBook.isPdf && !currentBook.isEpub && currentBook.getReverseTocDisplay(),
                         resetCollapse = resetCollapse,
                         defaultExpanded = currentBook.getTocExpanded(),
                         currentChapterIndex = durChapterIndex,
@@ -312,6 +315,7 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                     tocListState.setFullChapters(
                         chapters = chapters,
                         reverseOrder = reverseOrder,
+                        reverseDisplay = !currentBook.isPdf && !currentBook.isEpub && currentBook.getReverseTocDisplay(),
                         resetCollapse = resetCollapse,
                         defaultExpanded = currentBook.getTocExpanded(),
                         currentChapterIndex = durChapterIndex,

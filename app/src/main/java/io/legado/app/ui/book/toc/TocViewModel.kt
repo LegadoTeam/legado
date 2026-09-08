@@ -63,20 +63,20 @@ class TocViewModel(application: Application) : BaseViewModel(application) {
     fun reverseToc(success: (book: Book) -> Unit) {
         execute {
             bookData.value?.apply {
-                setReverseToc(!getReverseToc())
                 if (isPdf || isEpub) {
+                    setReverseToc(!getReverseToc())
                     listOf(ReadBook.book, ReadManga.book, AudioPlay.book, VideoPlay.book)
                         .filter { it?.bookUrl == bookUrl }
                         .forEach { it?.setReverseToc(getReverseToc()) }
                     appDb.bookDao.updateReverseToc(bookUrl, getReverseToc())
                     return@apply
                 }
-                val toc = appDb.bookChapterDao.getChapterList(bookUrl)
-                val newToc = toc.reversed()
-                newToc.forEachIndexed { index, bookChapter ->
-                    bookChapter.index = index
-                }
-                appDb.bookChapterDao.insert(*newToc.toTypedArray())
+                // Keep source parsing and index-based reading/cache identities unchanged.
+                setReverseTocDisplay(!getReverseTocDisplay())
+                listOf(ReadBook.book, ReadManga.book, AudioPlay.book, VideoPlay.book)
+                    .filter { it?.bookUrl == bookUrl }
+                    .forEach { it?.setReverseTocDisplay(getReverseTocDisplay()) }
+                appDb.bookDao.updateReverseTocDisplay(bookUrl, getReverseTocDisplay())
             }
         }.onSuccess {
             it?.let(success)

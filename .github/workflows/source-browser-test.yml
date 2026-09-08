@@ -41,6 +41,7 @@ on:
       - 'app/src/androidTest/java/io/legado/app/ui/book/read/MouseWheelScrollTest.kt'
       - 'app/src/androidTest/java/io/legado/app/ui/book/read/TitleFontWeightRenderingTest.kt'
       - 'app/src/androidTest/java/io/legado/app/ui/book/read/ReadAloudMenuUiTest.kt'
+      - 'app/src/androidTest/java/io/legado/app/ui/book/read/TocReverseNavigationTest.kt'
       - 'app/src/androidTest/java/io/legado/app/ui/book/read/EpubHierarchyNavigationTest.kt'
       - 'app/src/androidTest/assets/issue1074*'
       - 'app/src/main/java/io/legado/app/model/localBook/Epub*'
