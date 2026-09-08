@@ -92,17 +92,28 @@ class ReadingLayoutTransitionTest {
                 awaitReader(scenario, book.bookUrl, true)
                 onView(withId(R.id.read_view)).perform(swipeUp())
                 instrumentation.waitForIdleSync()
+                await {
+                    var stopped = false
+                    scenario.onActivity {
+                        stopped = it.findViewById<ReadView>(R.id.read_view).pageDelegate?.isRunning != true
+                    }
+                    stopped
+                }
                 val scrolled = capture(scenario, "layout-scroll")
-                assertTrue("The reproduction must include a nonzero scroll offset", scrolled.first < 0)
+                assertTrue("The reproduction must include a nonzero scroll offset", scrolled.offset < 0)
                 switchStyle(scenario, 0)
                 awaitReader(scenario, book.bookUrl, false)
                 val returned = capture(scenario, "layout-cover-returned")
                 scenario.recreate()
                 awaitReader(scenario, book.bookUrl, false)
                 val reopened = capture(scenario, "layout-cover-reopened")
-                assertEquals("Horizontal pages must not retain a vertical scroll offset", 0, returned.first)
-                assertTrue("The lower part of the returned page must contain rendered text", returned.second > 100)
-                assertTrue("Reopening must also render text in the lower part of the page", reopened.second > 100)
+                assertEquals("Horizontal pages must not retain a vertical scroll offset", 0, returned.offset)
+                assertTrue("The lower part of the returned page must contain rendered text", returned.bottomPixels > 100)
+                assertTrue("Reopening must also render text in the lower part of the page", reopened.bottomPixels > 100)
+                assertTrue("The returned page ${returned.pageRange} must contain the last visible reading position ${scrolled.visiblePosition}",
+                    scrolled.visiblePosition in returned.pageRange)
+                assertTrue("The reopened page must retain the same visible reading position",
+                    scrolled.visiblePosition in reopened.pageRange)
             }
         } finally {
             appDb.bookDao.delete(book)
@@ -172,10 +183,13 @@ class ReadingLayoutTransitionTest {
         instrumentation.waitForIdleSync()
     }
 
-    private fun capture(scenario: ActivityScenario<ReadBookActivity>, name: String): Pair<Int, Int> {
+    private data class ReadingSnapshot(val offset: Int, val bottomPixels: Int,
+        val visiblePosition: Int, val pageRange: IntRange)
+
+    private fun capture(scenario: ActivityScenario<ReadBookActivity>, name: String): ReadingSnapshot {
         val output = context.getExternalFilesDir("ui-regression")!!
         output.mkdirs()
-        var result = 0 to 0
+        lateinit var result: ReadingSnapshot
         scenario.onActivity { activity ->
             val readView = activity.findViewById<ReadView>(R.id.read_view)
             val view = readView.curPage.findViewById<ContentTextView>(R.id.content_text_view)
@@ -187,11 +201,14 @@ class ReadingLayoutTransitionTest {
                 for (y in view.height * 2 / 3 until view.height * 9 / 10)
                     for (x in view.width / 10 until view.width * 9 / 10)
                         if (Color.alpha(bitmap.getPixel(x, y)) > 0) bottomPixels++
-                result = offset to bottomPixels
                 File(output, "$name-content.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
                 val page = readView.curPage.textPage
+                val visible = readView.getReadPosition()
+                val pageRange = page.chapterPosition..(page.chapterPosition + page.charSize)
+                result = ReadingSnapshot(offset, bottomPixels, visible?.second?.chapterPosition ?: -1, pageRange)
                 File(output, "$name.txt").writeText("scroll=${readView.isScroll} offset=$offset bottomPixels=$bottomPixels\n" +
                     "view=${view.width}x${view.height} provider=${ChapterProvider.viewWidth}x${ChapterProvider.viewHeight}\n" +
+                    "visibleChapter=${visible?.first} visiblePosition=${visible?.second?.chapterPosition} visibleText=${visible?.second?.text} pageRange=$pageRange animating=${readView.pageDelegate?.isRunning}\n" +
                     "pageIndex=${page.index} height=${page.height} position=${ReadBook.durChapterPos} lines=" +
                     page.lines.map { "${it.lineTop}:${it.lineBottom}:${it.text}" }.joinToString("\n"))
             } finally { bitmap.recycle() }
