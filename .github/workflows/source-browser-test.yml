@@ -140,10 +140,10 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Verify source browser, discovery and content editor on Android 16
+      - name: Reproduce reported layout transition on Android 15
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
-          api-level: 36
+          api-level: 35
           target: google_apis
           arch: x86_64
           disable-animations: true
