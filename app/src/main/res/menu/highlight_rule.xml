@@ -19,4 +19,14 @@
         android:title="@string/export_all"
         app:showAsAction="never" />
 
+    <item
+        android:id="@+id/menu_highlight_group_manage"
+        android:title="@string/highlight_rule_group_manage"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_highlight_group_filter"
+        android:title="@string/highlight_rule_group_filter"
+        app:showAsAction="never" />
+
 </menu>

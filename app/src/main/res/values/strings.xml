@@ -403,6 +403,11 @@
     <string name="highlight_rule_edit_title">Edit highlight rule</string>
     <string name="highlight_rule_pattern">Keyword / regular expression</string>
     <string name="highlight_rule_scope_hint">Scope (book title/source; blank for all)</string>
+    <string name="highlight_rule_group_hint">Group (optional)</string>
+    <string name="highlight_rule_group_manage">Manage highlight groups</string>
+    <string name="highlight_rule_group_filter">Filter by highlight group</string>
+    <string name="highlight_rule_group_delete">Delete group</string>
+    <string name="highlight_rule_group_delete_message">Delete all rules in this group or move them to another group?</string>
     <string name="highlight_rule_apply_to_title">Apply to chapter titles</string>
     <string name="highlight_rule_empty">No highlight rules</string>
     <string name="highlight_rule_invalid">Invalid rule: %1$s</string>

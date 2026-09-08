@@ -24,8 +24,14 @@ object DatabaseMigrations {
             migration_35_36, migration_36_37, migration_37_38, migration_38_39,
             migration_39_40, migration_40_41, migration_41_42, migration_42_43,
             migration_100_101, migration_104_105, migration_105_106, migration_106_107,
-            migration_107_108,
+            migration_107_108, migration_108_109,
         )
+    }
+
+    private val migration_108_109 = object : Migration(108, 109) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE highlightRules ADD COLUMN `group` TEXT DEFAULT ''")
+        }
     }
 
     private val migration_107_108 = object : Migration(107, 108) {
