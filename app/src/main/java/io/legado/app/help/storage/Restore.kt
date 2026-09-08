@@ -74,7 +74,6 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import splitties.init.appCtx
@@ -144,11 +143,9 @@ internal fun parseRuntimeSourceCacheBackup(json: String): List<Cache> {
  */
 object Restore {
 
-    private val mutex = Mutex()
-
     private const val TAG = "Restore"
 
-    suspend fun restore(context: Context, uri: Uri) {
+    suspend fun restore(context: Context, uri: Uri): Unit = backupRestoreMutex.withLock {
         LogUtils.d(TAG, "开始恢复备份 uri:$uri")
         kotlin.runCatching {
             extractBackup(context, uri)
@@ -157,8 +154,7 @@ object Restore {
             return
         }
         kotlin.runCatching {
-            restoreLocked(Backup.backupPath)
-            LocalConfig.lastBackup = System.currentTimeMillis()
+            restoreUnpacked(Backup.backupPath)
         }.onFailure {
             appCtx.toastOnUi("恢复备份出错\n${it.localizedMessage}")
             AppLog.put("恢复备份出错\n${it.localizedMessage}", it)
@@ -169,7 +165,7 @@ object Restore {
         context: Context,
         uri: Uri,
         lanTransfer: Boolean = false,
-    ) {
+    ) = backupRestoreMutex.withLock {
         LogUtils.d(TAG, "开始恢复备份 uri:$uri")
         val restorePath = if (lanTransfer) {
             File(context.cacheDir, "lan_backup/restore/${UUID.randomUUID()}").absolutePath
@@ -185,8 +181,7 @@ object Restore {
                     includeBackgrounds = !BackupConfig.ignoreReadConfig,
                 )
             }
-            restoreLocked(restorePath, lanTransfer)
-            LocalConfig.lastBackup = System.currentTimeMillis()
+            restoreUnpacked(restorePath, lanTransfer)
         } finally {
             if (lanTransfer) FileUtils.delete(restorePath)
         }
@@ -208,16 +203,21 @@ object Restore {
     }
 
     suspend fun restoreLocked(path: String, lanTransfer: Boolean = false) {
-        mutex.withLock {
-            if (lanTransfer) {
-                currentCoroutineContext().ensureActive()
-                withContext(NonCancellable) {
-                    restore(path, lanTransfer = true)
-                }
-            } else {
-                restore(path)
-            }
+        backupRestoreMutex.withLock {
+            restoreUnpacked(path, lanTransfer)
         }
+    }
+
+    private suspend fun restoreUnpacked(path: String, lanTransfer: Boolean = false) {
+        if (lanTransfer) {
+            currentCoroutineContext().ensureActive()
+            withContext(NonCancellable) {
+                restore(path, lanTransfer = true)
+            }
+        } else {
+            restore(path)
+        }
+        LocalConfig.lastBackup = System.currentTimeMillis()
     }
 
     private suspend fun restore(path: String, lanTransfer: Boolean = false) {

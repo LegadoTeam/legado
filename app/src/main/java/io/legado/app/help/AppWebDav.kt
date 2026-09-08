@@ -22,7 +22,6 @@ import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.UrlUtil
-import io.legado.app.utils.compress.ZipUtils
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.isJson
@@ -124,10 +123,13 @@ object AppWebDav {
     suspend fun restoreWebDav(name: String) {
         authorization?.let {
             val webDav = WebDav(rootWebDavUrl + name, it)
-            webDav.downloadTo(Backup.zipFilePath, true)
-            FileUtils.delete(Backup.backupPath)
-            ZipUtils.unZipToPath(File(Backup.zipFilePath), Backup.backupPath)
-            Restore.restoreLocked(Backup.backupPath)
+            val archive = File.createTempFile("webdav-restore-", ".zip", appCtx.cacheDir)
+            try {
+                webDav.downloadTo(archive.absolutePath, true)
+                Restore.restoreOrThrow(appCtx, Uri.fromFile(archive))
+            } finally {
+                archive.delete()
+            }
         }
     }
 
