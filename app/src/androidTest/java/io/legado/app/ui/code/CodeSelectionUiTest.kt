@@ -159,6 +159,8 @@ class CodeSelectionUiTest {
             searchTxt.invoke(activity, "function")
         }
         closeSoftKeyboard()
+        awaitEditor { it.searcher.hasQuery() && it.searcher.matchedPositionCount > 0 }
+        withEditor { assertTrue(it.searcher.gotoNext()) }
         awaitEditor { selection(it) == "function" }
 
         press(Tap.LONG, 1, 3)
