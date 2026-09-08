@@ -30,13 +30,13 @@
         android:title="@string/read_aloud_controls_size"
         android:summary="@string/read_aloud_controls_size_summary"
         android:max="432"
-        app:min="40"
+        app:min="85"
         app:seekBarIncrement="1"
         app:showSeekBarValue="true"
         app:iconSpaceReserved="false" />
     <androidx.preference.SeekBarPreference
         android:key="readAloudControlsOpacity"
-        android:defaultValue="30"
+        android:defaultValue="90"
         android:title="@string/read_aloud_controls_opacity"
         android:summary="@string/read_aloud_controls_opacity_summary"
         android:max="100"

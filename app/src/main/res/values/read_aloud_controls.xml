@@ -6,7 +6,7 @@
     <string formatted="false" name="read_aloud_controls_drag">允许拖动</string>
     <string formatted="false" name="read_aloud_controls_dock">贴靠左右边缘</string>
     <string formatted="false" name="read_aloud_controls_size">长条控件宽度（dp）</string>
-    <string formatted="false" name="read_aloud_controls_size_summary">40–432dp，最大不超过屏幕；高度、文字和暂停圆钮随宽度缩放</string>
+    <string formatted="false" name="read_aloud_controls_size_summary">85–432dp，最大不超过屏幕；高度、文字和暂停圆钮随宽度缩放</string>
     <string formatted="false" name="read_aloud_controls_opacity">背景不透明度（%）</string>
     <string formatted="false" name="read_aloud_controls_opacity_summary">0 为透明，100 为不透明；图标和文字保持清晰</string>
     <string formatted="false" name="read_aloud_controls_threshold">自动隐藏阈值（% 页）</string>

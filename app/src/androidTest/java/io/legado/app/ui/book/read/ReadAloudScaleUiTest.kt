@@ -2,11 +2,16 @@ package io.legado.app.ui.book.read
 
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.RectF
+import android.graphics.drawable.GradientDrawable
 import android.graphics.Rect
 import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
 import android.widget.TextView
+import android.widget.ImageView
 import androidx.core.view.isVisible
 import androidx.preference.SeekBarPreference
 import androidx.test.core.app.ActivityScenario
@@ -46,7 +51,7 @@ class ReadAloudScaleUiTest {
     private val prefs = context.defaultSharedPreferences
     private val savedMenuHelp = LocalConfig.all["readMenuHelpVersion"]
     private val savedPrefs = listOf(PreferKey.readAloudControlsPause, PreferKey.readAloudControlsSize,
-        PreferKey.readAloudControlsDrag, PreferKey.readAloudControlsDock, "readAloudControlsWidth")
+        PreferKey.readAloudControlsDrag, PreferKey.readAloudControlsDock, PreferKey.readAloudControlsOpacity, "readAloudControlsWidth")
         .associateWith { prefs.all[it] }
     private val savedRunning = BaseReadAloudService.isRun
     private val savedPaused = BaseReadAloudService.pause
@@ -59,7 +64,7 @@ class ReadAloudScaleUiTest {
         prefs.edit().putBoolean(PreferKey.readAloudControlsPause, true)
             .putBoolean(PreferKey.readAloudControlsDrag, false)
             .putBoolean(PreferKey.readAloudControlsDock, false)
-            .remove("readAloudControlsWidth").commit()
+            .remove("readAloudControlsWidth").remove(PreferKey.readAloudControlsOpacity).commit()
         LocalConfig.edit().putInt("readMenuHelpVersion", 1).commit()
         val file = File.createTempFile("aloud-menu-", ".txt", context.cacheDir).also { textFile = it }
         file.writeText((0..60).joinToString("\n") { "Reader content line $it for the playback menu regression." })
@@ -113,7 +118,7 @@ class ReadAloudScaleUiTest {
 
     @Test fun widthControlsWholeBarAndCircleWithMatchingTouchBounds() {
         val evidence = StringBuilder()
-        for (widthDp in listOf(288, 144, 40, 432)) {
+        for (widthDp in listOf(288, 144, 85, 432)) {
             prefs.edit().putInt("readAloudControlsWidth", widthDp).commit()
             scenario!!.onActivity {
                 playbackFlag("isRun", true)
@@ -172,11 +177,12 @@ class ReadAloudScaleUiTest {
                 screenshot("aloud-scale-circle-$widthDp-$paused")
                 scenario!!.onActivity { activity ->
                     val bar = activity.findViewById<View>(R.id.read_aloud_float_bar_container)
-                    val pause = activity.findViewById<View>(R.id.iv_pause_aloud)
+                    val pause = activity.findViewById<ImageView>(R.id.iv_pause_aloud)
                     assertEquals("Circle follows the same scale", expectedHeight, bar.width)
                     assertEquals(expectedHeight, bar.height)
                     assertEquals(expectedHeight, pause.width)
                     assertEquals(expectedHeight, pause.height)
+                    assertCircleIconPixels(pause, "aloud-scale-icon-$widthDp-$paused", evidence)
                 }
             }
         }
@@ -201,9 +207,9 @@ class ReadAloudScaleUiTest {
                 as ReadAloudControlsDialog.ControlsPreferenceFragment
             val width = checkNotNull(fragment.findPreference<SeekBarPreference>("readAloudControlsWidth"))
             assertEquals("Old 72dp height maps to the original long width", 432, width.value)
-            assertEquals(40, width.min)
+            assertEquals(85, width.min)
             assertEquals(432, width.max)
-            width.value = 40
+            width.value = 85
             dialog.dismiss()
         }
         await("settings dismissed") { it.bottomDialog == 0 }
@@ -214,12 +220,102 @@ class ReadAloudScaleUiTest {
             it.showReadAloudControls()
         }
         await("restored position control") { it.findViewById<View>(R.id.ll_back_to_speech).isShown }
-        screenshot("aloud-scale-restored-40")
+        screenshot("aloud-scale-restored-85")
         scenario!!.onActivity { activity ->
-            assertEquals(40, prefs.getInt("readAloudControlsWidth", -1))
+            assertEquals(85, prefs.getInt("readAloudControlsWidth", -1))
             val bar = activity.findViewById<View>(R.id.read_aloud_float_bar_container)
-            assertEquals((40 * activity.resources.displayMetrics.density).roundToInt(), bar.width)
+            assertEquals((85 * activity.resources.displayMetrics.density).roundToInt(), bar.width)
         }
+    }
+
+    @Test fun oldSmallWidthIsClampedAndOpacityDefaultsOnlyWhenUnset() {
+        prefs.edit().putInt("readAloudControlsWidth", 40).remove(PreferKey.readAloudControlsOpacity).commit()
+        scenario!!.onActivity {
+            playbackFlag("isRun", true)
+            BaseReadAloudService.detachReadAloudFollow()
+            it.showReadAloudControls()
+        }
+        await("clamped control") { it.findViewById<View>(R.id.ll_back_to_speech).isShown }
+        screenshot("aloud-scale-old40-clamped85-opacity90")
+        scenario!!.onActivity { activity ->
+            val bar = activity.findViewById<View>(R.id.read_aloud_float_bar_container)
+            assertEquals((85 * activity.resources.displayMetrics.density).roundToInt(), bar.width)
+            assertEquals("Unset opacity uses 90 percent", 229,
+                Color.alpha((bar.background as GradientDrawable).color!!.defaultColor))
+            ReadAloudControlsDialog().show(activity.supportFragmentManager, "new-defaults")
+        }
+        await("new settings") { activity ->
+            val dialog = activity.supportFragmentManager.findFragmentByTag("new-defaults")
+            val fragment = dialog?.childFragmentManager?.findFragmentByTag("controls")
+                as? ReadAloudControlsDialog.ControlsPreferenceFragment
+            fragment?.findPreference<SeekBarPreference>(PreferKey.readAloudControlsOpacity) != null
+        }
+        scenario!!.onActivity { activity ->
+            val dialog = activity.supportFragmentManager.findFragmentByTag("new-defaults") as ReadAloudControlsDialog
+            val fragment = dialog.childFragmentManager.findFragmentByTag("controls")
+                as ReadAloudControlsDialog.ControlsPreferenceFragment
+            assertEquals(85, fragment.findPreference<SeekBarPreference>("readAloudControlsWidth")!!.value)
+            assertEquals(85, prefs.getInt("readAloudControlsWidth", -1))
+            val opacity = fragment.findPreference<SeekBarPreference>(PreferKey.readAloudControlsOpacity)!!
+            assertEquals(90, opacity.value)
+            opacity.value = 30
+            dialog.dismiss()
+        }
+        await("new settings dismissed") { it.bottomDialog == 0 }
+        scenario!!.recreate()
+        scenario!!.onActivity {
+            playbackFlag("isRun", true)
+            BaseReadAloudService.detachReadAloudFollow()
+            it.showReadAloudControls()
+        }
+        await("explicit opacity restored") { it.findViewById<View>(R.id.ll_back_to_speech).isShown }
+        screenshot("aloud-scale-explicit-opacity30")
+        scenario!!.onActivity { activity ->
+            val bar = activity.findViewById<View>(R.id.read_aloud_float_bar_container)
+            assertEquals("Explicit opacity remains unchanged", 30, prefs.getInt(PreferKey.readAloudControlsOpacity, -1))
+            assertEquals(76, Color.alpha((bar.background as GradientDrawable).color!!.defaultColor))
+            ReadAloudControlsDialog().show(activity.supportFragmentManager, "saved-opacity")
+        }
+        await("saved opacity preference") { activity ->
+            val dialog = activity.supportFragmentManager.findFragmentByTag("saved-opacity")
+            val fragment = dialog?.childFragmentManager?.findFragmentByTag("controls")
+                as? ReadAloudControlsDialog.ControlsPreferenceFragment
+            fragment?.findPreference<SeekBarPreference>(PreferKey.readAloudControlsOpacity)?.value == 30
+        }
+        scenario!!.onActivity {
+            (it.supportFragmentManager.findFragmentByTag("saved-opacity") as ReadAloudControlsDialog).dismiss()
+        }
+    }
+
+    /** Render the actual ImageButton, then measure its nontransparent icon pixels, not its view box. */
+    private fun assertCircleIconPixels(pause: ImageView, name: String, evidence: StringBuilder) {
+        val content = Rect(pause.paddingLeft, pause.paddingTop,
+            pause.width - pause.paddingRight, pause.height - pause.paddingBottom)
+        val drawableBounds = RectF(pause.drawable.bounds)
+        pause.imageMatrix.mapRect(drawableBounds)
+        drawableBounds.offset(pause.paddingLeft.toFloat(), pause.paddingTop.toFloat())
+        assertTrue("The complete drawable must fit the inner circle",
+            drawableBounds.left >= content.left - 1 && drawableBounds.top >= content.top - 1 &&
+                drawableBounds.right <= content.right + 1 && drawableBounds.bottom <= content.bottom + 1)
+        val bitmap = Bitmap.createBitmap(pause.width, pause.height, Bitmap.Config.ARGB_8888)
+        try {
+            pause.draw(Canvas(bitmap))
+            val pixels = Rect(pause.width, pause.height, 0, 0)
+            for (y in 0 until bitmap.height) for (x in 0 until bitmap.width) {
+                if (Color.alpha(bitmap.getPixel(x, y)) > 16) {
+                    pixels.left = minOf(pixels.left, x)
+                    pixels.top = minOf(pixels.top, y)
+                    pixels.right = maxOf(pixels.right, x + 1)
+                    pixels.bottom = maxOf(pixels.bottom, y + 1)
+                }
+            }
+            evidence.appendLine("$name view=${pause.width}x${pause.height} content=$content drawable=$drawableBounds pixels=$pixels")
+            File(context.getExternalFilesDir("ui-regression"), "$name.png").outputStream()
+                .use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+            File(context.getExternalFilesDir("ui-regression"), "aloud-scale-bounds.txt").writeText(evidence.toString())
+            assertTrue("The icon must remain visibly rendered", pixels.width() >= 2 && pixels.height() >= 2)
+            assertTrue("Actual icon pixels must stay inside the padded circle", content.contains(pixels))
+        } finally { bitmap.recycle() }
     }
 
     private fun tap(x: Float, y: Float) {

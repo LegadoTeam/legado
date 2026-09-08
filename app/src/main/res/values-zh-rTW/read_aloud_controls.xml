@@ -6,7 +6,7 @@
     <string formatted="false" name="read_aloud_controls_drag">允許拖動</string>
     <string formatted="false" name="read_aloud_controls_dock">貼靠左右邊緣</string>
     <string formatted="false" name="read_aloud_controls_size">長條控制項寬度（dp）</string>
-    <string formatted="false" name="read_aloud_controls_size_summary">40–432dp，最大不超過螢幕；高度、文字和暫停圓鈕隨寬度縮放</string>
+    <string formatted="false" name="read_aloud_controls_size_summary">85–432dp，最大不超過螢幕；高度、文字和暫停圓鈕隨寬度縮放</string>
     <string formatted="false" name="read_aloud_controls_opacity">背景不透明度（%）</string>
     <string formatted="false" name="read_aloud_controls_opacity_summary">0 為透明，100 為不透明；圖示和文字保持清晰</string>
     <string formatted="false" name="read_aloud_controls_threshold">自動隱藏閾值（% 頁）</string>

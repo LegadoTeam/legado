@@ -103,7 +103,7 @@ class ReadAloudControls(
         )
         val background = context.bottomBackground
         val foreground = context.getPrimaryTextColor(ColorUtils.isColorLight(background))
-        val opacity = prefs.getInt(PreferKey.readAloudControlsOpacity, 30).coerceIn(0, 100) / 100f
+        val opacity = prefs.getInt(PreferKey.readAloudControlsOpacity, 90).coerceIn(0, 100) / 100f
         (bar.background.mutate() as GradientDrawable).apply {
             setColor(ColorUtils.withAlpha(background, opacity))
             setStroke(1.dpToPx(), ColorUtils.withAlpha(foreground, if (AppConfig.isEInkMode) 1f else .25f))
@@ -120,7 +120,7 @@ class ReadAloudControls(
 
     private fun updateSize(showPause: Boolean) {
         val width = minOf(readAloudControlWidth(prefs).dpToPx(),
-            (parent.width - 32.dpToPx()).coerceAtLeast(40.dpToPx()))
+            (parent.width - 32.dpToPx()).coerceAtLeast(85.dpToPx()))
         val scale = width / 288f.dpToPx()
         val height = (width / 6f).roundToInt().coerceAtLeast(1)
         fun scaled(dp: Float) = (dp.dpToPx() * scale).roundToInt()
@@ -280,4 +280,4 @@ class ReadAloudControls(
 
 internal fun readAloudControlWidth(prefs: SharedPreferences): Int =
     prefs.getInt(PreferKey.readAloudControlsWidth,
-        prefs.getInt(PreferKey.readAloudControlsSize, 48).coerceIn(48, 72) * 6).coerceIn(40, 432)
+        prefs.getInt(PreferKey.readAloudControlsSize, 48).coerceIn(48, 72) * 6).coerceIn(85, 432)

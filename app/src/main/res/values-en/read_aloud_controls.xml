@@ -6,7 +6,7 @@
     <string formatted="false" name="read_aloud_controls_drag">Allow dragging</string>
     <string formatted="false" name="read_aloud_controls_dock">Dock to left/right edge</string>
     <string formatted="false" name="read_aloud_controls_size">Position control width (dp)</string>
-    <string formatted="false" name="read_aloud_controls_size_summary">40–432dp, limited by the screen; height, text and the pause circle scale together</string>
+    <string formatted="false" name="read_aloud_controls_size_summary">85–432dp, limited by the screen; height, text and the pause circle scale together</string>
     <string formatted="false" name="read_aloud_controls_opacity">Background opacity (%)</string>
     <string formatted="false" name="read_aloud_controls_opacity_summary">0 is transparent; 100 is opaque. Icons and text remain solid.</string>
     <string formatted="false" name="read_aloud_controls_threshold">Auto-hide threshold (% of a page)</string>
