@@ -114,6 +114,9 @@ class UpdateDialog() : BaseDialogFragment(R.layout.dialog_update) {
             }
         } else {
             binding.toolBar.menu.findItem(R.id.menu_download).isVisible = false
+            binding.toolBar.menu.findItem(R.id.menu_download_backup).isVisible = false
+            binding.toolBar.menu.findItem(R.id.menu_download_mirror).isVisible = false
+            binding.toolBar.menu.findItem(R.id.menu_download_alternate_mirror).isVisible = false
             binding.toolBar.menu.findItem(R.id.menu_open_in_browser).isVisible = true
             binding.toolBar.menu.findItem(R.id.menu_ignore_version).isVisible = false
             binding.toolBar.setOnMenuItemClickListener {
