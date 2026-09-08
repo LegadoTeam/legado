@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.Rect
 import android.os.SystemClock
 import android.view.View
+import android.view.ViewConfiguration
 import androidx.core.view.isVisible
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
@@ -56,14 +57,29 @@ class CodeSelectionUiTest {
         selectFunction()
         val expectedLeft = source.indexOf("function")
         val expectedRight = source.indexOf("\nconst after")
-        // Dismiss the old panel so the gesture reaches the editor, then check that it reopens.
-        withEditor { actions(it).dismiss() }
-        press(Tap.LONG, 2, 11)
-        awaitEditor {
-            it.cursor.left == expectedLeft && it.cursor.right == expectedRight &&
-                actions(it).isShowing && shareButton(it).isShown
+        for ((line, column) in listOf(2 to 11, 3 to 5)) {
+            withEditor { actions(it).dismiss() }
+            // Separate independent long presses from the platform's double-tap gesture window.
+            SystemClock.sleep(ViewConfiguration.getDoubleTapTimeout().toLong() + 50)
+            press(Tap.LONG, line, column)
+            try {
+                awaitEditor {
+                    it.cursor.left == expectedLeft && it.cursor.right == expectedRight &&
+                        actions(it).isShowing && shareButton(it).isShown
+                }
+            } catch (failure: AssertionError) {
+                val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+                try {
+                    File(context.getExternalFilesDir("ui-regression"), "code-selection-failed-$line-$column.png")
+                        .outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                } finally { bitmap.recycle() }
+                withEditor {
+                    throw AssertionError("Long press at $line:$column: selection=${it.cursor.left}..${it.cursor.right}, " +
+                        "expected=$expectedLeft..$expectedRight, panel=${actions(it).isShowing}, share=${shareButton(it).isShown}", failure)
+                }
+            }
+            withEditor { assertEquals(source, it.text.toString()) }
         }
-        withEditor { assertEquals(source, it.text.toString()) }
         screenshot("code-selection-preserved-share")
         shareAndAssert(selectedText)
         withEditor {

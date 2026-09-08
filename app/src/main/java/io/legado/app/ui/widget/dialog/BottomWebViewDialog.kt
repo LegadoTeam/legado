@@ -546,7 +546,9 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                 webView.settings.cacheMode = cacheMode
             }
             config.isNestedScrollingEnabled?.let { enabled ->
-                webView.isNestedScrollingEnabled = enabled
+                // WebView does not implement nested scrolling; advertising it makes Material's
+                // bottom sheet reserve the gesture for a scrolling child that cannot consume it.
+                webView.isNestedScrollingEnabled = false
             }
         }
 
