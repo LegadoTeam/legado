@@ -11,6 +11,7 @@ on:
       - 'gradle.properties'
       - 'gradle/libs.versions.toml'
       - 'app/src/main/java/io/legado/app/ui/widget/dialog/BottomWebViewDialog.kt'
+      - 'app/src/main/java/io/legado/app/help/webView/WebViewPool.kt'
       - 'app/src/main/java/io/legado/app/ui/widget/dialog/BookMemoDialog.kt'
       - 'app/src/main/java/io/legado/app/ui/code/**'
       - 'app/src/androidTest/java/io/legado/app/ui/code/**'

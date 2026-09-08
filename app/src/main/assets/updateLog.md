@@ -3,6 +3,7 @@
 ## cronet版本: 152.0.7977.54
 
 **2026/09/08**
+- 修复部分非原生段评弹窗启用嵌套滚动后无法下滑关闭，并污染后续弹窗手势的问题
 - 统一正式版和测试版更新按钮为“立即更新”
 - 修复切换“总是使用默认封面”后书架未立即刷新封面的问题
 - 测试版更新对话框新增右上角“浏览器下载”备用入口
@@ -890,3 +891,4 @@
 * [2023年日志](https://github.com/LegadoTeam/legado/blob/record2023/app/src/main/assets/updateLog.md)　
 * [2022年日志](https://github.com/LegadoTeam/legado/blob/record2022/app/src/main/assets/updateLog.md)　
 * [2021年日志](https://github.com/LegadoTeam/legado/blob/record2021/app/src/main/assets/updateLog.md)　
+- 修复部分非原生段评弹窗启用嵌套滚动后无法下滑关闭，并污染后续弹窗手势的问题

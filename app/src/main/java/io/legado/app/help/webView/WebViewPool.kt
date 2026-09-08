@@ -82,6 +82,7 @@ object WebViewPool {
             removeJavascriptInterface(WebJsExtensions.nameSource)
             removeJavascriptInterface(WebJsExtensions.nameCache)
             clearFocus() //清除焦点
+            isNestedScrollingEnabled = false
             setOnLongClickListener(null)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 setOnScrollChangeListener(null)
