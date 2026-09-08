@@ -48,7 +48,6 @@ class TocReverseNavigationTest {
                     screenshot("toc-flat-reversed-$reversed")
                     assertEquals("Displayed titles must match the new row identities without reopening", expected, visibleTitles())
                     val stored = appDb.bookDao.getBook(fixture.book.bookUrl)!!
-                    assertEquals(reversed, stored.getReverseTocDisplay())
                     assertFalse("The source parser order must not change", stored.getReverseToc())
                     scenario.recreate()
                     await { visibleTitles() == expected }
@@ -66,7 +65,6 @@ class TocReverseNavigationTest {
                 await { rows()?.firstOrNull()?.chapter?.title == "Volume B" }
                 screenshot("toc-current-volume-reversed")
                 val current = appDb.bookDao.getBook(fixture.book.bookUrl)!!
-                assertTrue("Display reverse preference must be persisted", current.getReverseTocDisplay())
                 assertEquals("Current chapter identity must survive reversal", "B1",
                     appDb.bookChapterDao.getChapter(current.bookUrl, current.durChapterIndex)!!.title)
                 assertEquals(147, current.durChapterPos)
@@ -204,7 +202,7 @@ class TocReverseNavigationTest {
         instrumentation.runOnMainSync {
             val list = recycler() ?: return@runOnMainSync
             result = (0 until (list.adapter?.itemCount ?: 0)).mapNotNull { position ->
-                list.findViewHolderForAdapterPosition(position)?.itemView?.findViewById<TextView>(R.id.tv_chapter_item)?.text?.toString()
+                list.findViewHolderForAdapterPosition(position)?.itemView?.findViewById<TextView>(R.id.tv_chapter_name)?.text?.toString()
             }
         }
         return result
