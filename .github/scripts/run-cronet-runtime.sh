@@ -2,7 +2,7 @@
 set -euo pipefail
 
 mkdir -p app/build/cronet-runtime
-trap 'adb logcat -d > app/build/cronet-runtime/logcat.txt || true' EXIT
+trap 'adb logcat -d > app/build/cronet-runtime/logcat.txt || true; adb pull /sdcard/Android/data/com.legado.app.release/files/cronet-runtime app/build/cronet-runtime/rss || true' EXIT
 apks=(app/build/outputs/apk/app/release/*.apk)
 [[ ${#apks[@]} -eq 1 && -f "${apks[0]}" ]]
 python3 - "${apks[0]}" <<'PY' | tee app/build/cronet-runtime/apk-checksums.txt

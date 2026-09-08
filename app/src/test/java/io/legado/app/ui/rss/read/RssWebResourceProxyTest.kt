@@ -1,12 +1,43 @@
 package io.legado.app.ui.rss.read
 
 import okhttp3.Headers
+import okhttp3.Protocol
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.asResponseBody
+import okio.Buffer
+import okio.ForwardingSource
+import okio.buffer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RssWebResourceProxyTest {
+
+    @Test
+    fun webViewCanQueryAndReadAfterEofUntilItClosesTheResponse() {
+        var closeCount = 0
+        val source = object : ForwardingSource(Buffer().writeUtf8("complete image bytes")) {
+            override fun close() {
+                closeCount++
+                super.close()
+            }
+        }
+        val body = source.buffer().asResponseBody()
+        val response = Response.Builder().request(Request.Builder().url("https://example.com/image.png").build())
+            .protocol(Protocol.HTTP_1_1).code(200).message("OK").body(body).build()
+        val stream = RssProxyResponseInputStream(response, body)
+
+        assertEquals("complete image bytes", stream.readBytes().toString(Charsets.UTF_8))
+        assertEquals(0, closeCount)
+        assertEquals(0, stream.available())
+        assertEquals(-1, stream.read())
+        assertEquals(-1, stream.read(ByteArray(8), 0, 8))
+        stream.close()
+        stream.close()
+        assertEquals(1, closeCount)
+    }
 
     @Test
     fun proxiesMediaSubresourcesButNotPagesOrNonNetworkRequests() {

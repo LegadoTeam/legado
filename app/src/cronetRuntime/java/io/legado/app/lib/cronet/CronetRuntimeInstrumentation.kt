@@ -123,6 +123,7 @@ class CronetRuntimeInstrumentation : Instrumentation() {
             }
             val downloadCache = File(targetContext.cacheDir, "so_download")
             check(downloadCache.walkTopDown().none { it.isFile }) { "The download left a duplicate native library" }
+            RssImageRuntimeRegression.verify(this)
             return "$version; cachedBefore=$cachedBefore; nativeBytes=${native.length()}; nativeFile=$native"
         } finally {
             preferences.edit().apply {
