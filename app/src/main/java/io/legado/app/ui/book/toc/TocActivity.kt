@@ -14,6 +14,8 @@ import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.data.entities.Book
 import io.legado.app.databinding.ActivityChapterListBinding
+import io.legado.app.help.book.isEpub
+import io.legado.app.help.book.isPdf
 import io.legado.app.help.book.isLocalTxt
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.accentColor
@@ -132,6 +134,9 @@ class TocActivity : VMBaseActivity<ActivityChapterListBinding, TocViewModel>(),
                 )
             }
         }
+        menu.findItem(R.id.menu_reverse_toc)?.isChecked = viewModel.bookData.value?.run {
+            if (isEpub || isPdf) getReverseToc() else getReverseTocDisplay()
+        } == true
         menu.findItem(R.id.menu_use_replace)?.isChecked =
             AppConfig.tocUiUseReplace
         menu.findItem(R.id.menu_load_word_count)?.isChecked =

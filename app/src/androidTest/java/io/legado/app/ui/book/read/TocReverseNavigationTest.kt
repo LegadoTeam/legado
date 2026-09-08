@@ -8,6 +8,8 @@ import android.widget.TextView
 import androidx.appcompat.widget.PopupMenu
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
+import androidx.test.espresso.Espresso.openActionBarOverflowOrOptionsMenu
+import androidx.test.espresso.Espresso.pressBack
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
@@ -51,6 +53,9 @@ class TocReverseNavigationTest {
                     assertFalse("The source parser order must not change", stored.getReverseToc())
                     scenario.recreate()
                     await { visibleTitles() == expected }
+                    openActionBarOverflowOrOptionsMenu(context)
+                    screenshot("toc-menu-reversed-$reversed")
+                    pressBack()
                 }
             }
         }
@@ -100,7 +105,11 @@ class TocReverseNavigationTest {
                     activity.supportFragmentManager.fragments.filterIsInstance<ClickActionConfigDialog>()
                         .forEach { it.view?.findViewById<View>(R.id.iv_close)?.performClick() }
                 }
-                await { ReadBook.book?.bookUrl == fixture.book.bookUrl && ReadBook.curTextChapter?.isCompleted == true }
+                await {
+                    ReadBook.book?.bookUrl == fixture.book.bookUrl &&
+                        ReadBook.curTextChapter?.chapter?.bookUrl == fixture.book.bookUrl &&
+                        ReadBook.curTextChapter?.isCompleted == true
+                }
                 val originalUrl = ReadBook.curTextChapter!!.chapter.url
                 val originalPosition = ReadBook.durChapterPos
                 assertTrue("Fixture must open within the chapter, actual offset $originalPosition", originalPosition > 0)
