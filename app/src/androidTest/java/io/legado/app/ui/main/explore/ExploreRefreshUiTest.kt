@@ -7,15 +7,21 @@ import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
+import android.widget.AutoCompleteTextView
 import android.widget.TextView
 import androidx.appcompat.widget.SearchView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.children
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.action.ViewActions.closeSoftKeyboard
+import androidx.test.espresso.action.ViewActions.typeText
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.withHint
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -78,6 +84,7 @@ class ExploreRefreshUiTest {
                 action:"changeKind('expanded', infoMap['More categories'])", style:row});
             kinds.push({title:'Category mode', type:'select', chars:['Short list', 'Long list'],
                 action:"changeKind('mode', infoMap['Category mode'])", style:row});
+            kinds.push({title:'Search categories', type:'text', style:row});
             label('Rendered ' + (state.expanded || '+ ') + (state.mode || 'Short list'));
             var count = state.expanded == '- ' || state.mode == 'Long list' ? 42 : 12;
             for (var i = 0; i < count; i++) label('Category after controls ' + i);
@@ -161,6 +168,50 @@ class ExploreRefreshUiTest {
             }
         }
     }
+
+    @Test fun discoveryInputRemainsVisibleAboveTheActualKeyboard() {
+        var originalHeight = 0
+        scenario!!.onActivity { activity ->
+            val list = activity.list
+            originalHeight = list.height
+            val input = checkNotNull(activity.searchInput())
+            val rectangle = Rect(0, 0, input.width, input.height)
+            list.offsetDescendantRectToMyCoords(input, rectangle)
+            list.scrollBy(0, rectangle.bottom - list.height + 32.dpToPx())
+        }
+        instrumentation.waitForIdleSync()
+        screenshot("explore-input-before-keyboard")
+        onView(allOf(withHint("Search categories"), isDisplayed())).perform(click(), typeText("reader"))
+        await("actual keyboard visible") {
+            ViewCompat.getRootWindowInsets(it.window.decorView)?.isVisible(WindowInsetsCompat.Type.ime()) == true
+        }
+        screenshot("explore-input-with-keyboard")
+        scenario!!.onActivity { activity ->
+            val input = checkNotNull(activity.searchInput())
+            val decor = activity.window.decorView
+            val keyboard = checkNotNull(ViewCompat.getRootWindowInsets(decor)).getInsets(WindowInsetsCompat.Type.ime()).bottom
+            val keyboardTop = decor.screenY() + decor.height - keyboard
+            assertTrue("IME must have a measurable height", keyboard > 0)
+            assertEquals("reader", input.text.toString())
+            assertTrue("Focused input bottom ${input.screenY() + input.height} is hidden below keyboard top $keyboardTop",
+                input.screenY() + input.height <= keyboardTop)
+            assertTrue("Input must stay focused", input.hasFocus())
+        }
+        onView(withHint("Search categories")).perform(closeSoftKeyboard())
+        await("keyboard dismissed") {
+            ViewCompat.getRootWindowInsets(it.window.decorView)?.isVisible(WindowInsetsCompat.Type.ime()) == false
+        }
+        instrumentation.waitForIdleSync()
+        screenshot("explore-input-keyboard-dismissed")
+        scenario!!.onActivity { activity ->
+            assertEquals("Discovery viewport recovers after hiding IME", originalHeight, activity.list.height)
+            assertEquals("reader", checkNotNull(activity.searchInput()).text.toString())
+        }
+    }
+
+    private fun MainActivity.searchInput(): AutoCompleteTextView? =
+        list.findViewHolderForAdapterPosition(0)?.itemView?.descendants()
+            ?.filterIsInstance<AutoCompleteTextView>()?.firstOrNull { it.hint.toString() == "Search categories" }
 
     private fun positionControls() {
         // Position the real long RecyclerView row so its source header is well above the viewport.
