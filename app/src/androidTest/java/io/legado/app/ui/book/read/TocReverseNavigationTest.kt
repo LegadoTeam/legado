@@ -8,6 +8,8 @@ import android.widget.TextView
 import androidx.appcompat.widget.PopupMenu
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
+import androidx.test.espresso.Espresso.openActionBarOverflowOrOptionsMenu
+import androidx.test.espresso.Espresso.pressBack
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
@@ -51,6 +53,9 @@ class TocReverseNavigationTest {
                     assertFalse("The source parser order must not change", stored.getReverseToc())
                     scenario.recreate()
                     await { visibleTitles() == expected }
+                    openActionBarOverflowOrOptionsMenu(context)
+                    screenshot("toc-menu-reversed-$reversed")
+                    pressBack()
                 }
             }
         }
@@ -100,12 +105,35 @@ class TocReverseNavigationTest {
                     activity.supportFragmentManager.fragments.filterIsInstance<ClickActionConfigDialog>()
                         .forEach { it.view?.findViewById<View>(R.id.iv_close)?.performClick() }
                 }
-                await { ReadBook.book?.bookUrl == fixture.book.bookUrl && ReadBook.curTextChapter?.isCompleted == true }
+                await {
+                    ReadBook.book?.bookUrl == fixture.book.bookUrl &&
+                        ReadBook.curTextChapter?.chapter?.bookUrl == fixture.book.bookUrl &&
+                        ReadBook.curTextChapter?.isCompleted == true
+                }
                 val originalUrl = ReadBook.curTextChapter!!.chapter.url
                 val originalPosition = ReadBook.durChapterPos
                 assertTrue("Fixture must open within the chapter, actual offset $originalPosition", originalPosition > 0)
                 reader.onActivity { it.openChapterList() }
-                await { rows()?.size == 5 }
+                try {
+                    await { rows()?.size == 5 }
+                } finally {
+                    val snapshot = StringBuilder()
+                    val stored = appDb.bookDao.getBook(fixture.book.bookUrl)
+                    snapshot.appendLine("storedTotal=" + stored?.totalChapterNum)
+                    snapshot.appendLine("databaseChapters=" + appDb.bookChapterDao.getChapterList(fixture.book.bookUrl).map { it.index to it.title })
+                    instrumentation.runOnMainSync {
+                        val activity = toc()
+                        snapshot.appendLine("tocBook=" + activity?.intent?.getStringExtra("bookUrl"))
+                        snapshot.appendLine("readBook=" + ReadBook.book?.bookUrl)
+                        snapshot.appendLine("readChapter=" + ReadBook.curTextChapter?.chapter?.bookUrl)
+                        snapshot.appendLine("readerTotal=" + ReadBook.book?.totalChapterNum)
+                        snapshot.appendLine("fragments=" + activity?.supportFragmentManager?.fragments?.map { it.javaClass.simpleName + ":" + it.lifecycle.currentState })
+                        snapshot.appendLine("adapter=" + recycler()?.adapter?.javaClass?.simpleName)
+                        snapshot.appendLine("rows=" + (recycler()?.adapter as? ChapterListAdapter)?.getItems()?.map { it.chapter.index to it.chapter.title })
+                    }
+                    File(context.getExternalFilesDir("ui-regression"), "toc-reader-open-state.txt").writeText(snapshot.toString())
+                    screenshot("toc-reader-open-state")
+                }
                 reverse()
                 await { rows()?.firstOrNull()?.chapter?.title == "Chapter 5" }
                 instrumentation.runOnMainSync { toc()!!.onBackPressedDispatcher.onBackPressed() }
@@ -175,6 +203,8 @@ class TocReverseNavigationTest {
             BookChapter(bookUrl = book.bookUrl, url = "chapter-$index", index = index, title = title,
                 isVolume = index in volumes, start = offset, end = offset + bytes.size).also { offset += bytes.size }
         }
+        // These chapters describe the completed file; opening it must not trigger a fresh TXT parse.
+        book.latestChapterTime = file.lastModified()
         appDb.bookDao.insert(book)
         appDb.bookChapterDao.insert(*chapters.toTypedArray())
         val bookmark = Bookmark(bookName = book.name, bookAuthor = book.author,
