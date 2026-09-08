@@ -49,11 +49,16 @@ class ReadingLayoutTransitionTest {
         val configFiles = listOf(File(ReadBookConfig.configFilePath), File(ReadBookConfig.shareConfigFilePath))
             .associateWith { it.takeIf(File::exists)?.readBytes() }
         val file = File.createTempFile("layout-transition-", ".txt", context.cacheDir)
-        file.writeText((1..300).joinToString("\n") {
-            "Line $it: reading must fill the available page after changing the layout and scrolling."
-        })
+        val paragraphs = listOf(
+            "窗外的雨渐渐停了。",
+            "她推开窗，远处的山谷被薄薄的晨雾笼罩，屋檐上的水珠一颗接一颗落下来。",
+            "“现在可以出发了吗？”他把地图展开，指了指那条沿着河岸向北延伸的小路。",
+            "大家收拾好行李，仔细检查了门窗，然后穿过安静的院子。石板路上还留着昨夜的积水，天空却已经露出一片清澈的蓝色。",
+            "没有人回答。"
+        )
+        file.writeText((1..140).joinToString("\n\n") { "第${it}段。" + paragraphs[it % paragraphs.size] })
         val book = Book(bookUrl = file.absolutePath, originName = file.name, name = file.name,
-            charset = "UTF-8", type = BookType.local or BookType.text, totalChapterNum = 1,
+            charset = "UTF-8", type = BookType.local or BookType.text, totalChapterNum = 1, durChapterPos = 1470,
             latestChapterTime = file.lastModified()).apply { setPageAnim(-1) }
         appDb.bookDao.insert(book)
         appDb.bookChapterDao.insert(BookChapter(bookUrl = book.bookUrl, url = "layout-chapter",
