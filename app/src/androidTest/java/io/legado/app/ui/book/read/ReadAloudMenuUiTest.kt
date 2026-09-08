@@ -1,55 +1,80 @@
 package io.legado.app.ui.book.read
 
 import android.content.Intent
+import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.os.PowerManager
 import android.os.SystemClock
 import android.view.View
 import androidx.core.view.isVisible
+import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.action.GeneralLocation
+import androidx.test.espresso.action.GeneralSwipeAction
+import androidx.test.espresso.action.Press
+import androidx.test.espresso.action.Swipe
 import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.action.ViewActions.longClick
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.R
 import io.legado.app.constant.BookType
+import io.legado.app.constant.IntentAction
 import io.legado.app.constant.PageAnim
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.help.config.LocalConfig
+import io.legado.app.help.LifecycleHelp
+import io.legado.app.model.ReadAloud
 import io.legado.app.model.ReadBook
 import io.legado.app.model.localBook.TextFile
 import io.legado.app.service.BaseReadAloudService
+import io.legado.app.service.TTSReadAloudService
 import io.legado.app.ui.book.read.config.ClickActionConfigDialog
 import io.legado.app.ui.book.read.page.ReadView
 import io.legado.app.utils.defaultSharedPreferences
+import io.legado.app.utils.dpToPx
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.io.FileInputStream
+import java.lang.ref.WeakReference
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
-/** Real reader/dialog navigation with playback state supplied without a TTS service. */
+/** Real reader gestures; stop tests run the production service with its speech engine shut down. */
 @RunWith(AndroidJUnit4::class)
 class ReadAloudMenuUiTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
     private val prefs = context.defaultSharedPreferences
     private val savedMenuHelp = LocalConfig.all["readMenuHelpVersion"]
-    private val savedPauseControl = prefs.all[PreferKey.readAloudControlsPause]
+    private val savedPreferences = listOf(PreferKey.readAloudControlsPause,
+        PreferKey.readAloudControlsDrag, PreferKey.readAloudControlsDock,
+        PreferKey.readAloudControlsX, PreferKey.readAloudControlsY,
+        PreferKey.readAloudWakeLock, PreferKey.ttsTimer).associateWith { prefs.all[it] }
     private val savedRunning = BaseReadAloudService.isRun
     private val savedPaused = BaseReadAloudService.pause
     private val savedFollowing = BaseReadAloudService.followReadAloudPosition
     private var scenario: ActivityScenario<ReadBookActivity>? = null
     private var book: Book? = null
     private var textFile: File? = null
+    private var serviceStarted = false
+    private val notificationPermission = "android.permission.POST_NOTIFICATIONS"
+    private val hadNotificationPermission = context.checkSelfPermission(notificationPermission) == PackageManager.PERMISSION_GRANTED
+    private val wasBatteryExempt = (context.getSystemService(Context.POWER_SERVICE) as PowerManager)
+        .isIgnoringBatteryOptimizations(context.packageName)
 
     @Before fun setUp() {
         prefs.edit().putBoolean(PreferKey.readAloudControlsPause, true).commit()
@@ -76,6 +101,12 @@ class ReadAloudMenuUiTest {
     }
 
     @After fun tearDown() {
+        if (serviceStarted) {
+            context.stopService(Intent(context, TTSReadAloudService::class.java))
+            await("test service destroyed") { readAloudService() == null && !BaseReadAloudService.isRun }
+            if (!hadNotificationPermission) shell("pm revoke ${context.packageName} $notificationPermission")
+            if (!wasBatteryExempt) shell("dumpsys deviceidle whitelist -${context.packageName}")
+        }
         instrumentation.runOnMainSync {
             playbackFlag("isRun", savedRunning)
             playbackFlag("pause", savedPaused)
@@ -94,9 +125,100 @@ class ReadAloudMenuUiTest {
             else putInt("readMenuHelpVersion", savedMenuHelp as Int)
         }.commit()
         prefs.edit().apply {
-            if (savedPauseControl == null) remove(PreferKey.readAloudControlsPause)
-            else putBoolean(PreferKey.readAloudControlsPause, savedPauseControl as Boolean)
+            savedPreferences.forEach { (key, value) ->
+                when (value) {
+                    null -> remove(key)
+                    is Boolean -> putBoolean(key, value)
+                    is Int -> putInt(key, value)
+                    is Float -> putFloat(key, value)
+                }
+            }
         }.commit()
+    }
+
+    @Test fun fixedPlayingControlLongPressStopsTheService() = verifyLongPressStops(paused = false, movable = false)
+
+    @Test fun fixedPausedControlLongPressStopsTheService() = verifyLongPressStops(paused = true, movable = false)
+
+    @Test fun movablePlayingControlLongPressStopsTheService() = verifyLongPressStops(paused = false, movable = true)
+
+    @Test fun movablePausedControlLongPressStopsTheService() = verifyLongPressStops(paused = true, movable = true)
+
+    private fun verifyLongPressStops(paused: Boolean, movable: Boolean) {
+        serviceStarted = true
+        shell("pm grant ${context.packageName} $notificationPermission")
+        shell("dumpsys deviceidle whitelist +${context.packageName}")
+        scenario!!.onActivity { activity ->
+            prefs.edit().putBoolean(PreferKey.readAloudControlsDrag, movable)
+                .putBoolean(PreferKey.readAloudControlsDock, false)
+                .putFloat(PreferKey.readAloudControlsX, .5f)
+                .putFloat(PreferKey.readAloudControlsY, .7f)
+                .putBoolean(PreferKey.readAloudWakeLock, false)
+                .putInt(PreferKey.ttsTimer, 0).commit()
+            ReadBook.book!!.setTtsEngine("")
+            ReadAloud.upReadAloudClass()
+            activity.startService(Intent(activity, TTSReadAloudService::class.java).setAction(IntentAction.pause))
+        }
+        await("real paused service starts") { readAloudService() != null && BaseReadAloudService.isRun && BaseReadAloudService.pause }
+        var service: TTSReadAloudService? = null
+        scenario!!.onActivity { activity ->
+            service = checkNotNull(readAloudService())
+            // Keep the real service lifecycle/commands; voice availability is outside this gesture test.
+            service!!.clearTTS()
+            if (!paused) ReadAloud.resume(activity)
+            activity.showReadAloudControls()
+        }
+        await("pause control and requested playback state") {
+            BaseReadAloudService.isRun && BaseReadAloudService.pause == paused &&
+                it.findViewById<View>(R.id.iv_pause_aloud).isShown
+        }
+        onView(withId(R.id.iv_pause_aloud)).perform(click())
+        await("short tap changes pause state") { BaseReadAloudService.isRun && BaseReadAloudService.pause != paused }
+        onView(withId(R.id.iv_pause_aloud)).perform(click())
+        await("second tap restores pause state") { BaseReadAloudService.isRun && BaseReadAloudService.pause == paused }
+        if (movable) {
+            var beforeY = 0f
+            scenario!!.onActivity { beforeY = it.findViewById<View>(R.id.read_aloud_float_bar_container).y }
+            // A slow drag lasts beyond the long-press timeout and must not stop or toggle playback.
+            onView(withId(R.id.iv_pause_aloud)).perform(GeneralSwipeAction(Swipe.SLOW,
+                GeneralLocation.CENTER, { view ->
+                    GeneralLocation.CENTER.calculateCoordinates(view).also { it[1] -= 96.dpToPx() }
+                }, Press.FINGER))
+            scenario!!.onActivity {
+                assertTrue("Drag moves the control", it.findViewById<View>(R.id.read_aloud_float_bar_container).y < beforeY - 48.dpToPx())
+                assertTrue("Dragging must keep the service alive", BaseReadAloudService.isRun)
+                assertEquals("Dragging must not toggle playback", paused, BaseReadAloudService.pause)
+                assertTrue("Drag stores the new position", prefs.getFloat(PreferKey.readAloudControlsY, .7f) < .7f)
+            }
+        }
+        val label = "aloud-stop-paused-$paused-movable-$movable"
+        screenshot("$label-before")
+        try {
+            onView(withId(R.id.iv_pause_aloud)).perform(longClick())
+            await("long press destroys service (paused=$paused, movable=$movable)", 5000) {
+                !BaseReadAloudService.isRun && readAloudService() == null
+            }
+            scenario!!.onActivity {
+                assertEquals(Lifecycle.State.DESTROYED, service!!.lifecycle.currentState)
+                assertTrue("Stopped service remains paused", BaseReadAloudService.pause)
+                assertFalse("Stopped controls disappear", it.findViewById<View>(R.id.read_aloud_float_bar_container).isVisible)
+            }
+        } finally {
+            screenshot("$label-after")
+            File(context.getExternalFilesDir("ui-regression"), "$label-state.txt").writeText(
+                "running=${BaseReadAloudService.isRun}, paused=${BaseReadAloudService.pause}, lifecycle=${service!!.lifecycle.currentState}")
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun readAloudService(): TTSReadAloudService? {
+        val services = LifecycleHelp::class.java.getDeclaredField("services").apply { isAccessible = true }
+            .get(LifecycleHelp) as List<WeakReference<*>>
+        return services.mapNotNull { it.get() }.filterIsInstance<TTSReadAloudService>().singleOrNull()
+    }
+
+    private fun shell(command: String) = instrumentation.uiAutomation.executeShellCommand(command).use {
+        FileInputStream(it.fileDescriptor).bufferedReader().use { reader -> reader.readText() }
     }
 
     @Test fun returningFromAloudDialogKeepsControlsHiddenUntilMainMenuCloses() {
@@ -128,8 +250,8 @@ class ReadAloudMenuUiTest {
             .setBoolean(null, value)
     }
 
-    private fun await(description: String, condition: (ReadBookActivity) -> Boolean) {
-        val deadline = SystemClock.uptimeMillis() + 30000
+    private fun await(description: String, timeoutMillis: Long = 30000, condition: (ReadBookActivity) -> Boolean) {
+        val deadline = SystemClock.uptimeMillis() + timeoutMillis
         do {
             var ready = false
             scenario!!.onActivity { ready = condition(it) }
