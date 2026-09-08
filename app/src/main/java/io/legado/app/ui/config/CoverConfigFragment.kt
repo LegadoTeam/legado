@@ -74,6 +74,10 @@ class CoverConfigFragment : PreferenceFragment(),
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
         sharedPreferences ?: return
         when (key) {
+            PreferKey.useDefaultCover -> {
+                BookCover.upDefaultCover()
+                postEvent(EventBus.BOOKSHELF_REFRESH, "")
+            }
             PreferKey.defaultCover,
             PreferKey.defaultCoverDark -> {
                 upPreferenceSummary(key, getPrefString(key))
