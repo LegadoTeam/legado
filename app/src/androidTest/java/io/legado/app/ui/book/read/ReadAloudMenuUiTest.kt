@@ -1,8 +1,7 @@
 package io.legado.app.ui.book.read
 
-import android.content.Intent
 import android.content.Context
-import android.content.pm.PackageManager
+import android.content.Intent
 import android.graphics.Bitmap
 import android.os.PowerManager
 import android.os.SystemClock
@@ -29,8 +28,8 @@ import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
-import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.LifecycleHelp
+import io.legado.app.help.config.LocalConfig
 import io.legado.app.model.ReadAloud
 import io.legado.app.model.ReadBook
 import io.legado.app.model.localBook.TextFile
@@ -72,7 +71,6 @@ class ReadAloudMenuUiTest {
     private var textFile: File? = null
     private var serviceStarted = false
     private val notificationPermission = "android.permission.POST_NOTIFICATIONS"
-    private val hadNotificationPermission = context.checkSelfPermission(notificationPermission) == PackageManager.PERMISSION_GRANTED
     private val wasBatteryExempt = (context.getSystemService(Context.POWER_SERVICE) as PowerManager)
         .isIgnoringBatteryOptimizations(context.packageName)
 
@@ -104,7 +102,6 @@ class ReadAloudMenuUiTest {
         if (serviceStarted) {
             context.stopService(Intent(context, TTSReadAloudService::class.java))
             await("test service destroyed") { readAloudService() == null && !BaseReadAloudService.isRun }
-            if (!hadNotificationPermission) shell("pm revoke ${context.packageName} $notificationPermission")
             if (!wasBatteryExempt) shell("dumpsys deviceidle whitelist -${context.packageName}")
         }
         instrumentation.runOnMainSync {
@@ -146,6 +143,7 @@ class ReadAloudMenuUiTest {
 
     private fun verifyLongPressStops(paused: Boolean, movable: Boolean) {
         serviceStarted = true
+        // Grant for this disposable instrumentation session; revocation kills the target process.
         shell("pm grant ${context.packageName} $notificationPermission")
         shell("dumpsys deviceidle whitelist +${context.packageName}")
         scenario!!.onActivity { activity ->
