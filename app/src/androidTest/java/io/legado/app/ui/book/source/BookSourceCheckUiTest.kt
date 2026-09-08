@@ -118,7 +118,7 @@ class BookSourceCheckUiTest {
         assertStatusVisibility(false)
     }
 
-    @Test fun defaultHiddenStatusToggleIsIncludedInRealSettingsBackup() = runBlocking {
+    @Test fun defaultHiddenStatusToggleIsIncludedInRealSettingsBackup(): Unit = runBlocking {
         scenario!!.onActivity {
             it.findViewById<SearchView>(R.id.search_view).setQuery("group:$group", false)
         }
