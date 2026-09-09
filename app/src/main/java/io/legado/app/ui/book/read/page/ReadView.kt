@@ -1095,10 +1095,9 @@ class ReadView(context: Context, attrs: AttributeSet) :
         if (chapterIndex == ReadBook.durChapterIndex) {
             ReadBook.durChapterPos = line.chapterPosition
             if (preserveText) {
-                // A style can change indentation, so the same character offset can mean other text.
-                val anchor = line.text.trimStart()
-                ReadBook.durChapterPos += line.text.length - anchor.length
-                ReadBook.preserveCurrentPositionForRefresh(anchor)
+                // chapterPosition already points at this line's first character;
+                // keep that source text as the anchor while the new layout is built.
+                ReadBook.preserveCurrentPositionForRefresh(line.text)
             }
         }
     }
