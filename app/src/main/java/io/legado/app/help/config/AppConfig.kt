@@ -731,6 +731,10 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     val autoBackup get() = appCtx.getPrefBoolean(PreferKey.autoBackup, true)
 
+    val autoBackupWebDav get() = appCtx.getPrefBoolean(PreferKey.autoBackupWebDav, true)
+
+    val autoBackupIntervalDays get() = appCtx.getPrefInt(PreferKey.autoBackupIntervalDays, 1).coerceAtLeast(1)
+
     val liveUpdateNotifications
         get() = appCtx.getPrefBoolean(PreferKey.liveUpdateNotifications, false)
 

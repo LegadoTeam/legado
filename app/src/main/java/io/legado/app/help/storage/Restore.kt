@@ -528,6 +528,9 @@ object Restore {
             ) {
                 edit.putBoolean(PreferKey.coverTitleAdaptive, true)
             }
+            if (PreferKey.autoBackup !in map) edit.putBoolean(PreferKey.autoBackup, true)
+            if (PreferKey.autoBackupWebDav !in map) edit.putBoolean(PreferKey.autoBackupWebDav, true)
+            if (PreferKey.autoBackupIntervalDays !in map) edit.putInt(PreferKey.autoBackupIntervalDays, 1)
             if ("readRecordSimpleLayout" !in map) edit.putBoolean("readRecordSimpleLayout", true)
             if ("readRecordUseDays" !in map) edit.putBoolean("readRecordUseDays", false)
             if ("readRecordShowSeconds" !in map) edit.putBoolean("readRecordShowSeconds", true)

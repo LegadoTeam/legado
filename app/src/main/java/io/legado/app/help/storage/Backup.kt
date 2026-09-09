@@ -34,7 +34,6 @@ import io.legado.app.utils.writeToOutputStream
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import splitties.init.appCtx
@@ -128,35 +127,35 @@ object Backup {
         }.normalizeFileName()
     }
 
-    private fun shouldBackup(): Boolean {
-        val lastBackup = LocalConfig.lastBackup
-        return lastBackup + TimeUnit.DAYS.toMillis(1) < System.currentTimeMillis()
+    internal fun shouldBackup(now: Long = System.currentTimeMillis()): Boolean {
+        return now - LocalConfig.lastBackup >= TimeUnit.DAYS.toMillis(AppConfig.autoBackupIntervalDays.toLong())
     }
 
     fun autoBack(context: Context) {
-        if (!AppConfig.autoBackup) return
-        if (shouldBackup()) {
-            Coroutine.async {
-                backupRestoreMutex.withLock {
-                    if (shouldBackup()) {
-                        val backupZipFileName = getNowZipFileName()
-                        if (!AppWebDav.hasBackUp(backupZipFileName)) {
-                            backup(context, AppConfig.backupPath)
-                        } else {
-                            LocalConfig.lastBackup = System.currentTimeMillis()
-                        }
+        if (!AppConfig.autoBackup || !shouldBackup()) return
+        Coroutine.async {
+            autoBackupLocked(context)
+        }.onError {
+            AppLog.put("自动备份失败\n${it.localizedMessage}")
+        }
+    }
+
+    internal suspend fun autoBackupLocked(context: Context) {
+        backupRestoreMutex.withLock {
+            if (AppConfig.autoBackup && shouldBackup()) {
+                withContext(IO) {
+                    check(backup(context, AppConfig.backupPath, uploadWebDav = AppConfig.autoBackupWebDav)) {
+                        "生成备份失败"
                     }
                 }
-            }.onError {
-                AppLog.put("自动备份失败\n${it.localizedMessage}")
             }
         }
     }
 
-    suspend fun backupLocked(context: Context, path: String?) {
+    suspend fun backupLocked(context: Context, path: String?, uploadWebDav: Boolean = true) {
         backupRestoreMutex.withLock {
             withContext(IO) {
-                backup(context, path)
+                check(backup(context, path, uploadWebDav = uploadWebDav)) { "生成备份失败" }
             }
         }
     }
@@ -241,9 +240,6 @@ object Backup {
                     )
                 }
             }
-        }
-        if (!lanTransfer) {
-            LocalConfig.lastBackup = System.currentTimeMillis()
         }
         val aes = BackupAES(password)
         FileUtils.delete(backupPath)
@@ -425,11 +421,11 @@ object Backup {
         } else {
             zipFileName
         }
-        val backupCreated = ZipUtils.zipFiles(paths, workingZipFile.absolutePath)
-        if (backupCreated) {
+        try {
+            if (!ZipUtils.zipFiles(paths, workingZipFile.absolutePath)) return false
             when {
                 path.isNullOrBlank() -> {
-                    copyBackup(workingZipFile, context.getExternalFilesDir(null)!!, backupFileName)
+                    copyBackup(workingZipFile, context.externalFiles, backupFileName)
                 }
 
                 path.isContentScheme() -> {
@@ -441,30 +437,20 @@ object Backup {
                 }
             }
             if (uploadWebDav) {
-                try {
-                    AppWebDav.backUpWebDav(zipFileName)
-                } catch (e: Exception) {
-                    if (currentCoroutineContext().isActive) {
-                        AppLog.put("上传备份至webdav失败\n$e", e)
-                    }
+                AppWebDav.backUpWebDav(zipFileName)
+                if (backupBackgrounds) {
+                    backgroundPaths.map {
+                        if (it.contains(File.separator)) File(it) else appCtx.externalFiles.getFile("bg", it)
+                    }.let { AppWebDav.upBgs(it.toTypedArray()) }
                 }
             }
+            currentCoroutineContext().ensureActive()
+            if (!lanTransfer) LocalConfig.lastBackup = System.currentTimeMillis()
+            return true
+        } finally {
+            FileUtils.delete(backupPath)
+            FileUtils.delete(workingZipFile.absolutePath)
         }
-        FileUtils.delete(backupPath)
-        FileUtils.delete(workingZipFile.absolutePath)
-        currentCoroutineContext().ensureActive()
-        if (backupBackgrounds && uploadWebDav) {
-            backgroundPaths.map {
-                if (it.contains(File.separator)) {
-                    File(it)
-                } else {
-                    appCtx.externalFiles.getFile("bg", it)
-                }
-            }.let {
-                AppWebDav.upBgs(it.toTypedArray())
-            }
-        }
-        return backupCreated
     }
 
     private suspend fun writeListToJson(
