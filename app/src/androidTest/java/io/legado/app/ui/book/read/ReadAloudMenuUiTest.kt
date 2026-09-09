@@ -60,7 +60,7 @@ class ReadAloudMenuUiTest {
     private val prefs = context.defaultSharedPreferences
     private val savedMenuHelp = LocalConfig.all["readMenuHelpVersion"]
     private val savedPreferences = listOf(PreferKey.readAloudControlsPause,
-        PreferKey.readAloudControlsDrag, PreferKey.readAloudControlsDock,
+        PreferKey.readAloudControlsDrag, PreferKey.readAloudControlsDock, PreferKey.readAloudControlsWidth,
         PreferKey.readAloudControlsX, PreferKey.readAloudControlsY,
         PreferKey.readAloudWakeLock, PreferKey.ttsTimer).associateWith { prefs.all[it] }
     private val savedRunning = BaseReadAloudService.isRun
@@ -133,15 +133,15 @@ class ReadAloudMenuUiTest {
         }.commit()
     }
 
-    @Test fun fixedPlayingControlLongPressStopsTheService() = verifyLongPressStops(paused = false, movable = false)
+    @Test fun fixedPlayingControlLongPressStopsTheService() = verifyLongPressStops(paused = false, movable = false, width = 288)
 
-    @Test fun fixedPausedControlLongPressStopsTheService() = verifyLongPressStops(paused = true, movable = false)
+    @Test fun fixedPausedControlLongPressStopsTheService() = verifyLongPressStops(paused = true, movable = false, width = 288)
 
-    @Test fun movablePlayingControlLongPressStopsTheService() = verifyLongPressStops(paused = false, movable = true)
+    @Test fun movablePlayingControlLongPressStopsTheService() = verifyLongPressStops(paused = false, movable = true, width = 85)
 
-    @Test fun movablePausedControlLongPressStopsTheService() = verifyLongPressStops(paused = true, movable = true)
+    @Test fun movablePausedControlLongPressStopsTheService() = verifyLongPressStops(paused = true, movable = true, width = 85)
 
-    private fun verifyLongPressStops(paused: Boolean, movable: Boolean) {
+    private fun verifyLongPressStops(paused: Boolean, movable: Boolean, width: Int) {
         serviceStarted = true
         // Grant for this disposable instrumentation session; revocation kills the target process.
         shell("pm grant ${context.packageName} $notificationPermission")
@@ -149,6 +149,7 @@ class ReadAloudMenuUiTest {
         scenario!!.onActivity { activity ->
             prefs.edit().putBoolean(PreferKey.readAloudControlsDrag, movable)
                 .putBoolean(PreferKey.readAloudControlsDock, false)
+                .putInt(PreferKey.readAloudControlsWidth, width)
                 .putFloat(PreferKey.readAloudControlsX, .5f)
                 .putFloat(PreferKey.readAloudControlsY, .7f)
                 .putBoolean(PreferKey.readAloudWakeLock, false)
@@ -189,7 +190,7 @@ class ReadAloudMenuUiTest {
                 assertTrue("Drag stores the new position", prefs.getFloat(PreferKey.readAloudControlsY, .7f) < .7f)
             }
         }
-        val label = "aloud-stop-paused-$paused-movable-$movable"
+        val label = "aloud-stop-paused-$paused-movable-$movable-width-$width"
         screenshot("$label-before")
         try {
             onView(withId(R.id.iv_pause_aloud)).perform(longClick())
@@ -204,7 +205,7 @@ class ReadAloudMenuUiTest {
         } finally {
             screenshot("$label-after")
             File(context.getExternalFilesDir("ui-regression"), "$label-state.txt").writeText(
-                "running=${BaseReadAloudService.isRun}, paused=${BaseReadAloudService.pause}, lifecycle=${service!!.lifecycle.currentState}")
+                "width=$width, shortTapToggled=true, shortTapRestored=true, running=${BaseReadAloudService.isRun}, paused=${BaseReadAloudService.pause}, lifecycle=${service!!.lifecycle.currentState}")
         }
     }
 

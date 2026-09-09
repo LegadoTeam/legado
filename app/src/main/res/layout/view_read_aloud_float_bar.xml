@@ -21,6 +21,7 @@
         android:background="?android:attr/selectableItemBackgroundBorderless"
         android:contentDescription="@string/pause"
         android:padding="12dp"
+        android:scaleType="centerInside"
         android:src="@drawable/ic_pause_24dp"
         android:visibility="gone" />
 
