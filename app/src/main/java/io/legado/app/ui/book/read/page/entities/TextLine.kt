@@ -497,6 +497,30 @@ data class TextLine(
             )
             // Keep the end glyphs clear of the capsule's curved border.
             val padding = if (shape == HighlightStyle.FillShape.PILL) (band.bottom - band.top) / 2f else 0f
+            val saved = canvas.save()
+            // Keep image/review columns clear even across a narrow unhighlighted space.
+            // Only inspect columns within the cap's actual reach.
+            if (padding > 0f) {
+                var left = first.start - padding
+                var right = last.end + padding
+                for (i in index - 1 downTo 0) {
+                    val column = columns[i]
+                    if (column.end <= left) break
+                    if (column !is TextBaseColumn) {
+                        left = maxOf(left, column.end)
+                        break
+                    }
+                }
+                for (i in endIndex until columns.size) {
+                    val column = columns[i]
+                    if (column.start >= right) break
+                    if (column !is TextBaseColumn) {
+                        right = minOf(right, column.start)
+                        break
+                    }
+                }
+                canvas.clipRect(left, band.top, right, band.bottom)
+            }
             HighlightDraw.drawFillRun(
                 canvas,
                 first.start - padding,
@@ -506,6 +530,7 @@ data class TextLine(
                 fill,
                 shape
             )
+            canvas.restoreToCount(saved)
             index = endIndex
         }
     }
