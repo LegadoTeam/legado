@@ -25,6 +25,7 @@ import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import fi.iki.elonen.NanoHTTPD
 import io.legado.app.R
+import io.legado.app.constant.AppLog
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
@@ -53,6 +54,7 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.ZipFile
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -126,10 +128,16 @@ class SharedFileImportTest {
     @Test fun sharedBookListConfirmsThenUsesEnabledSourceSearchAndPersistsTheMatchedBook() {
         val name = "Shared book $id"
         val author = "Shared author"
+        val missing = "Missing book $id"
+        val mixed = AtomicBoolean()
         val requests = AtomicInteger()
         val server = object : NanoHTTPD("127.0.0.1", 0) {
             override fun serve(session: IHTTPSession): Response {
                 requests.incrementAndGet()
+                if (mixed.get()) {
+                    if (session.parameters["key"]?.firstOrNull() == missing) return newFixedLengthResponse("<html></html>")
+                    Thread.sleep(600)
+                }
                 return newFixedLengthResponse("<article><h2>$name</h2><span class='author'>$author</span>" +
                     "<a href='/book/$id'>Details</a></article>")
             }
@@ -160,6 +168,23 @@ class SharedFileImportTest {
                 assertEquals(source.bookSourceUrl, book.origin)
                 assertTrue(requests.get() > 0)
             }
+            val savedEnabled = appDb.bookSourceDao.allEnabled.filter { it.bookSourceUrl != source.bookSourceUrl }
+            savedEnabled.forEach { appDb.bookSourceDao.enable(it.bookSourceUrl, false) }
+            try {
+                appDb.bookDao.delete(books.single())
+                mixed.set(true)
+                requests.set(0)
+                file.writeText(GSON.toJson(listOf(mapOf("name" to missing, "author" to author),
+                    mapOf("name" to name, "author" to author))))
+                launchShare(file, "application/json").use { scenario ->
+                    awaitDialog(scenario)
+                    onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+                    await { appDb.bookDao.has(name, author) && AppLog.logs.any { it.second.contains(missing) } }
+                    assertFalse(appDb.bookDao.has(missing, author))
+                    assertTrue(requests.get() >= 2)
+                    assertEquals(source.bookSourceUrl, appDb.bookDao.getBook(name, author)!!.origin)
+                }
+            } finally { savedEnabled.forEach { appDb.bookSourceDao.enable(it.bookSourceUrl, true) } }
         } finally { server.stop() }
     }
 

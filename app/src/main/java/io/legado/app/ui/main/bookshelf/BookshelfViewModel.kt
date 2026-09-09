@@ -34,6 +34,8 @@ import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import java.io.File
@@ -212,17 +214,22 @@ internal suspend fun importBookshelfJson(json: String, groupId: Long) = coroutin
     }.distinct()
     val sources = appDb.bookSourceDao.allEnabledPart
     val semaphore = Semaphore(AppConfig.threadCount)
-    books.map { (name, author) ->
+    val failures = books.map { (name, author) ->
         async {
-            semaphore.withPermit {
-                if (appDb.bookDao.has(name, author)) return@withPermit
-                val book = sources.firstNotNullOfOrNull { part ->
-                    part.getBookSource()?.let { WebBook.preciseSearchAwait(it, name, author).getOrNull() }
-                } ?: throw NoStackTraceException("没有搜索到<$name>$author")
-                if (groupId > 0) book.group = groupId
-                book.savePreservingCustomCoverUrl()
-            }
+            runCatching {
+                semaphore.withPermit {
+                    if (appDb.bookDao.has(name, author)) return@withPermit
+                    val book = sources.firstNotNullOfOrNull { part ->
+                        part.getBookSource()?.let { WebBook.preciseSearchAwait(it, name, author).getOrNull() }
+                    } ?: throw NoStackTraceException("没有搜索到<$name>$author")
+                    if (groupId > 0) book.group = groupId
+                    book.savePreservingCustomCoverUrl()
+                }
+            }.onFailure { currentCoroutineContext().ensureActive() }.exceptionOrNull()
         }
-    }.awaitAll()
+    }.awaitAll().filterNotNull()
+    if (failures.isNotEmpty()) {
+        throw NoStackTraceException(failures.joinToString("\n") { it.localizedMessage.orEmpty() })
+    }
     Unit
 }
