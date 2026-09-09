@@ -14,6 +14,7 @@ import androidx.test.espresso.action.ViewActions.closeSoftKeyboard
 import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.isCompletelyDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -44,6 +45,7 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipFile
 
@@ -163,7 +165,7 @@ class BackupOptionsTest {
                 .scrollToPreference(PreferKey.backupPath)
         }
         instrumentation.waitForIdleSync()
-        onView(withText(containsString(context.externalFiles.absolutePath))).check(matches(isDisplayed()))
+        onView(withText(containsString(context.externalFiles.absolutePath))).check(matches(isCompletelyDisplayed()))
         screenshot("backup-password-and-default-directory")
         clickPreference(PreferKey.autoBackup)
         assertTrue(AppConfig.autoBackup)
@@ -309,6 +311,12 @@ class BackupOptionsTest {
 
     private fun screenshot(name: String) {
         instrumentation.waitForIdleSync()
+        val rendered = CountDownLatch(1)
+        scenario!!.onActivity {
+            val decor = it.window.decorView
+            decor.postOnAnimation { decor.postOnAnimation { rendered.countDown() } }
+        }
+        assertTrue(rendered.await(5, TimeUnit.SECONDS))
         val image = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
         try {
             File(context.getExternalFilesDir("ui-regression"), "$name.png").outputStream().use {

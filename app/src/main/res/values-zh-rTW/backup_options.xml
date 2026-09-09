@@ -6,4 +6,5 @@
     <string name="auto_backup_interval_invalid">請輸入至少為 1 的整數</string>
     <string name="auto_backup_destination_summary">%1$s · 每 %2$d 天一次</string>
     <string name="auto_backup_disabled">已關閉</string>
+    <string name="backup_destination_summary">選擇僅本機或本機和 WebDav 備份</string>
 </resources>
