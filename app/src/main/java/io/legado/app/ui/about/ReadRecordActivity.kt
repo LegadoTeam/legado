@@ -155,6 +155,7 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
     }
 
     private fun initView() {
+        binding.enhancedSummary.root.setCardBackgroundColor(backgroundColor)
         initSearchView()
         binding.tvBookName.setText(R.string.all_read_time)
         binding.tvRemove.setOnClickListener {

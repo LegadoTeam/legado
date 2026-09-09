@@ -190,6 +190,8 @@ class ReadRecordHistoryTest {
                     val binding = activity.views
                     val missing = findRow(binding, "Archived second")!!.enhanced.ivCover
                     val fill = centerColor(missing)
+                    assertEquals("Summary card follows the selected background", background,
+                        binding.enhancedSummary.root.cardBackgroundColor.defaultColor)
                     assertEquals("Row and summary use the same empty cover", fill,
                         centerColor(binding.enhancedSummary.coverSecond))
                     assertNotEquals("The cover must remain distinguishable", background, fill)
