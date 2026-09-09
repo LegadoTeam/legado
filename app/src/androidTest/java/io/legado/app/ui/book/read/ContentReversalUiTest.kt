@@ -119,7 +119,7 @@ class ContentReversalUiTest {
             BookHelp.writeImage(book, reviewSrc, bytes)
         } finally { bitmap.recycle() }
         scenario = ActivityScenario.launch(Intent(context, ReadBookActivity::class.java)
-            .putExtra("bookUrl", book.bookUrl).putExtra("inBookshelf", false))
+            .putExtra("bookUrl", book.bookUrl).putExtra("inBookshelf", true))
         awaitReader(0)
     }
 
@@ -260,7 +260,7 @@ class ContentReversalUiTest {
     private fun closeReaderMenu() {
         var visible = false
         scenario!!.onActivity { visible = it.findViewById<ReadMenu>(R.id.read_menu).isVisible }
-        if (visible) onView(withId(R.id.vw_menu_bg)).perform(click())
+        if (visible) onView(allOf(withId(R.id.vw_menu_bg), isDisplayed())).perform(click())
         await("reader menu hidden") { !it.findViewById<ReadMenu>(R.id.read_menu).isVisible }
     }
 
@@ -317,8 +317,13 @@ class ContentReversalUiTest {
             SystemClock.sleep(50)
         } while (SystemClock.uptimeMillis() < deadline)
         val chapter = ReadBook.curTextChapter
+        var pageState = "unavailable"
+        scenario!!.onActivity {
+            pageState = "messagePage=${it.findViewById<ReadView>(R.id.read_view).curPage.textPage.isMsgPage}, " +
+                "readerMenu=${it.findViewById<ReadMenu>(R.id.read_menu).isVisible}, bottomDialog=${it.bottomDialog}"
+        }
         throw AssertionError("Timed out waiting for $description; chapter=${ReadBook.durChapterIndex}, " +
-            "url=${chapter?.chapter?.url}, complete=${chapter?.isCompleted}, " +
+            "book=${ReadBook.book?.bookUrl}, url=${chapter?.chapter?.url}, complete=${chapter?.isCompleted}, $pageState, " +
             "cached=${BookHelp.getContent(book, chapters[ReadBook.durChapterIndex.coerceIn(0, 1)])}")
     }
 
