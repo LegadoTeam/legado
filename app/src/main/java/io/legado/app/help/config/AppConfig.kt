@@ -572,6 +572,10 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefBoolean("readRecordUseDays", false)
         set(value) { appCtx.putPrefBoolean("readRecordUseDays", value) }
 
+    var readRecordShowSeconds: Boolean
+        get() = appCtx.getPrefBoolean("readRecordShowSeconds", true)
+        set(value) { appCtx.putPrefBoolean("readRecordShowSeconds", value) }
+
     var enableReadRecord: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.enableReadRecord, true)
         set(value) {
