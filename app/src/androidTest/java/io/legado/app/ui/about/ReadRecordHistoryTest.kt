@@ -155,6 +155,18 @@ class ReadRecordHistoryTest {
         await { it.recyclerView.adapter?.itemCount == 83 && findRow(it, book.name) == null }
         assertNull(appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author))
         assertNotNull(appDb.readRecordDao.getRecord("remote", "Archived second", ""))
+        scenario!!.onActivity { select(it, R.id.menu_simple_layout) }
+        await { it.recyclerView.adapter?.itemCount == 82 && it.compactSummary.isVisible }
+        scenario!!.onActivity { it.views.recyclerView.scrollToPosition(0) }
+        await { binding ->
+            findRow(binding, "Archived second")?.root?.let {
+                it === binding.recyclerView.getChildAt(0)
+            } == true
+        }
+        screenshot("reading-history-unpinned-compact")
+        scenario!!.onActivity { select(it, R.id.menu_simple_layout) }
+        await { it.recyclerView.adapter?.itemCount == 83 &&
+            it.enhancedSummary.root.parent === it.recyclerView }
         scenario!!.onActivity { select(it, R.id.menu_fixed_card) }
         await { it.recyclerView.adapter?.itemCount == 82 &&
             it.enhancedSummary.root.parent === it.root }
@@ -705,7 +717,9 @@ class ReadRecordHistoryTest {
     private fun launch() { scenario = ActivityScenario.launch(ReadRecordActivity::class.java) }
 
     private val ReadRecordActivity.views: ActivityReadRecordBinding
-        get() = ActivityReadRecordBinding.bind(findViewById<ViewGroup>(android.R.id.content).getChildAt(0))
+        get() = ReadRecordActivity::class.java.getDeclaredMethod("getBinding").apply {
+            isAccessible = true
+        }.invoke(this) as ActivityReadRecordBinding
 
     private fun shell(command: String) {
         instrumentation.uiAutomation.executeShellCommand(command).use { descriptor ->

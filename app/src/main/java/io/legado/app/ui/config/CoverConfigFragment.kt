@@ -38,7 +38,7 @@ class CoverConfigFragment : PreferenceFragment(),
         PreferKey.readRecordCover, PreferKey.readRecordCoverDark)
     private val selectImage = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
-            coverKeys.getOrNull(it.requestCode - 111)?.let { key -> setCoverFromUri(key, uri) }
+            it.value?.takeIf { key -> key in coverKeys }?.let { key -> setCoverFromUri(key, uri) }
         }
     }
 
@@ -113,7 +113,7 @@ class CoverConfigFragment : PreferenceFragment(),
             in coverKeys ->
                 if (getPrefString(preference.key).isNullOrEmpty()) {
                     selectImage.launch {
-                        requestCode = 111 + coverKeys.indexOf(preference.key)
+                        value = preference.key
                         mode = HandleFileContract.IMAGE
                     }
                 } else {
@@ -128,7 +128,7 @@ class CoverConfigFragment : PreferenceFragment(),
                             BookCover.upDefaultCover()
                         } else {
                             selectImage.launch {
-                                requestCode = 111 + coverKeys.indexOf(preference.key)
+                                value = preference.key
                                 mode = HandleFileContract.IMAGE
                             }
                         }

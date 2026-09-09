@@ -138,7 +138,7 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
 
             R.id.menu_simple_layout -> {
                 AppConfig.readRecordSimpleLayout = !AppConfig.readRecordSimpleLayout
-                initData()
+                if (AppConfig.readRecordFixedCard) initData() else recreate()
             }
 
             R.id.menu_use_days -> {
@@ -172,7 +172,7 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
         binding.tvRemove.setOnClickListener {
             clearRecords()
         }
-        if (!AppConfig.readRecordFixedCard) {
+        if (!AppConfig.readRecordFixedCard && !AppConfig.readRecordSimpleLayout) {
             (binding.enhancedSummary.root.parent as ViewGroup).removeView(binding.enhancedSummary.root)
             adapter.addHeaderView { binding.enhancedSummary }
         }

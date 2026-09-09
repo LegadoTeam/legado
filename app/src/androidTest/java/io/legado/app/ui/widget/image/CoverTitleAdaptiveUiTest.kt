@@ -3,13 +3,13 @@ package io.legado.app.ui.widget.image
 import android.content.Intent
 import android.app.Activity
 import android.app.Instrumentation
-import android.net.Uri
 import android.os.SystemClock
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import java.io.File
 import android.widget.FrameLayout
+import androidx.core.content.FileProvider
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
@@ -115,7 +115,16 @@ class CoverTitleAdaptiveUiTest {
                 if (intent.component?.className != HandleFileActivity::class.java.name) return null
                 assertEquals(HandleFileContract.IMAGE, intent.getIntExtra("mode", -1))
                 selections++
-                return Instrumentation.ActivityResult(Activity.RESULT_OK, Intent().setData(Uri.fromFile(image)))
+                val result = Intent().setData(FileProvider.getUriForFile(
+                    context, "${context.packageName}.fileProvider", image))
+                    .putExtra("value", intent.getStringExtra("value"))
+                // A recreated contract has no transient requestCode; the persisted value still routes the result.
+                val restoredResult = HandleFileContract().parseResult(Activity.RESULT_OK, result)
+                assertEquals(0, restoredResult.requestCode)
+                assertEquals(result.data, restoredResult.uri)
+                assertEquals(intent.getStringExtra("value"), restoredResult.value)
+                assertTrue(restoredResult.value in listOf(PreferKey.readRecordCover, PreferKey.readRecordCoverDark))
+                return Instrumentation.ActivityResult(Activity.RESULT_OK, result)
             }
         }
         instrumentation.addMonitor(monitor)
