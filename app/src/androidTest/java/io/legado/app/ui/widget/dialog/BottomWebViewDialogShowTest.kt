@@ -22,10 +22,14 @@ import androidx.test.filters.SdkSuppress
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.R as MaterialR
 import fi.iki.elonen.NanoHTTPD
+import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
+import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookSource
 import io.legado.app.help.webView.PooledWebView
+import io.legado.app.model.SourceCallBack
 import io.legado.app.ui.about.AboutActivity
+import io.legado.app.utils.defaultSharedPreferences
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -39,6 +43,7 @@ import java.io.FileInputStream
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 import kotlin.math.abs
 
@@ -65,6 +70,107 @@ class BottomWebViewDialogShowTest {
             scenario?.close()
         } finally {
             appDb.bookSourceDao.delete(source.bookSourceUrl)
+        }
+    }
+
+    @Test
+    fun repeatedCustomCallbacksFetchOneDynamicPageAndCanReopen() {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val duplicate = CountDownLatch(1)
+        val requests = AtomicInteger()
+        val server = object : NanoHTTPD("127.0.0.1", 0) {
+            override fun serve(session: IHTTPSession): Response {
+                val number = requests.incrementAndGet()
+                if (number == 1) entered.countDown() else duplicate.countDown()
+                check(release.await(8, TimeUnit.SECONDS))
+                return newFixedLengthResponse(Response.Status.OK, "text/html",
+                    "<html><head><title>Request $number</title></head><body>Dynamic page $number</body></html>")
+                    .apply { addHeader("Cache-Control", "no-store") }
+            }
+        }
+        val preferences = InstrumentationRegistry.getInstrumentation().targetContext.defaultSharedPreferences
+        val previousCronet = preferences.all[PreferKey.cronet] as Boolean?
+        val book = Book(bookUrl = "${source.bookSourceUrl}/book", name = "Custom callback fixture")
+        lateinit var manager: FragmentManager
+        scenario!!.onActivity { manager = it.supportFragmentManager }
+        server.start()
+        try {
+            preferences.edit().putBoolean(PreferKey.cronet, false).commit()
+            source.eventListener = true
+            source.getContentRule().callBackJs = """
+                var html = java.ajax('http://127.0.0.1:${server.listeningPort}/page');
+                java.showBrowser('${source.bookSourceUrl}/dialog', html);
+                true;
+            """.trimIndent()
+            scenario!!.onActivity { activity ->
+                repeat(2) {
+                    SourceCallBack.callBackBtn(activity, SourceCallBack.CLICK_CUSTOM_BUTTON, source, book, null)
+                }
+            }
+            assertTrue("The real source callback must reach HTTP", entered.await(5, TimeUnit.SECONDS))
+            assertFalse("A second click must not launch another pending callback",
+                duplicate.await(700, TimeUnit.MILLISECONDS))
+            release.countDown()
+            assertTrue("The first callback must show its browser", awaitCondition {
+                visibleDialogs(manager) == 1
+            })
+            assertEquals(1, requests.get())
+            scenario!!.onActivity { activity ->
+                val dialog = activity.supportFragmentManager.fragments.filterIsInstance<BottomWebViewDialog>()
+                    .single { it.dialog?.isShowing == true }
+                assertTrue(dialog.arguments?.getString("html").orEmpty().contains("Dynamic page 1"))
+                dialog.dismiss()
+            }
+            // The UI handoff must finish before a new user interaction starts another callback.
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            scenario!!.onActivity { activity ->
+                SourceCallBack.callBackBtn(activity, SourceCallBack.CLICK_CUSTOM_BUTTON, source, book, null)
+            }
+            assertTrue("Dismissal must allow another fetch", duplicate.await(5, TimeUnit.SECONDS))
+            assertTrue("Reopening must display the newly generated HTML", awaitCondition {
+                manager.fragments.filterIsInstance<BottomWebViewDialog>()
+                    .singleOrNull { it.dialog?.isShowing == true }?.arguments?.getString("html")
+                    ?.contains("Dynamic page 2") == true
+            })
+            assertEquals(2, requests.get())
+            assertTrue("The reopened dynamic page must finish rendering", awaitCondition {
+                val dialog = manager.fragments.filterIsInstance<BottomWebViewDialog>()
+                    .single { it.dialog?.isShowing == true }
+                val web = (dialog.requireView().findViewById<View>(io.legado.app.R.id.web_view_container)
+                    as android.view.ViewGroup).getChildAt(0) as WebView
+                web.title == "Request 2" && web.progress == 100
+            })
+            // A collapsed sheet extends below its parent; check its visible resting state.
+            awaitGeometry {
+                it.state == BottomSheetBehavior.STATE_COLLAPSED &&
+                        it.height > 0 && it.top in 0 until it.parentHeight
+            }
+            val drawn = CountDownLatch(1)
+            scenario!!.onActivity {
+                val dialog = manager.fragments.filterIsInstance<BottomWebViewDialog>()
+                    .single { it.dialog?.isShowing == true }
+                val web = (dialog.requireView().findViewById<View>(io.legado.app.R.id.web_view_container)
+                    as android.view.ViewGroup).getChildAt(0) as WebView
+                val visible = Rect()
+                assertTrue("The reopened WebView must occupy visible screen space",
+                    web.isShown && web.getGlobalVisibleRect(visible) &&
+                            visible.width() > 0 && visible.height() > 0)
+                web.postVisualStateCallback(0, object : WebView.VisualStateCallback() {
+                    override fun onComplete(requestId: Long) {
+                        web.postOnAnimation { web.postOnAnimation { drawn.countDown() } }
+                    }
+                })
+            }
+            assertTrue("The dynamic page must reach the compositor before capture",
+                drawn.await(5, TimeUnit.SECONDS))
+            screenshot("custom-button-dynamic-reopened")
+        } finally {
+            release.countDown()
+            server.stop()
+            preferences.edit().apply {
+                if (previousCronet == null) remove(PreferKey.cronet) else putBoolean(PreferKey.cronet, previousCronet)
+            }.commit()
         }
     }
 
