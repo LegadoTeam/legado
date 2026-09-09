@@ -24,6 +24,7 @@ class SourceLoginJsExtensions(
     bookType: Int = 0,
     callback: Callback? = null
 ) : RssJsExtensions(activity, source, bookType) {
+    internal var customButtonKey: String? = null
     private val callbackRef: WeakReference<Callback> = WeakReference(callback)
     interface Callback {
         fun upUiData(data: Map<String, Any?>?)
@@ -76,7 +77,7 @@ class SourceLoginJsExtensions(
                 html,
                 preloadJs,
                 config
-            )
+            ).apply { customButtonKey = this@SourceLoginJsExtensions.customButtonKey }
         )
     }
 
