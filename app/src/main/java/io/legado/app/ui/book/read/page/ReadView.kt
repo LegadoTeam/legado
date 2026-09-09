@@ -909,6 +909,8 @@ class ReadView(context: Context, attrs: AttributeSet) :
     fun upPageAnim(upRecorder: Boolean = false) {
         updateScrollReadPosition()
         isScroll = ReadBook.pageAnim() == 3
+        // Replacing the delegate rebinds content; it must use the new page mode.
+        curPage.setIsScroll(isScroll)
         ChapterProvider.upLayout()
         when (ReadBook.pageAnim()) {
             PageAnim.coverPageAnim -> if (pageDelegate !is CoverPageDelegate) {
@@ -942,7 +944,6 @@ class ReadView(context: Context, attrs: AttributeSet) :
         } else {
             curPage.setAutoPager(null)
         }
-        curPage.setIsScroll(isScroll)
     }
 
     /**
