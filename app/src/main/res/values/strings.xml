@@ -1809,6 +1809,7 @@
     <string name="read_record_simple_layout">Simple layout</string>
     <string name="read_record_use_days">Show days</string>
     <string name="read_record_show_seconds">Show seconds</string>
+    <string name="read_record_clear">Clear records</string>
     <string name="read_record_achievement">Reading achievements</string>
     <string name="read_record_book_count">Read %1$d books</string>
     <string name="read_record_total_duration">Total %1$s</string>
