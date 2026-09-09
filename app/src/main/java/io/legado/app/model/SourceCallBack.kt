@@ -9,6 +9,8 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.ui.login.SourceLoginJsExtensions
+import io.legado.app.ui.widget.dialog.BottomWebViewDialog
+import io.legado.app.utils.GSON
 import io.legado.app.utils.isTrue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -77,10 +79,18 @@ object SourceCallBack {
             CustomButtonRequest(activity, source.getKey(), book.bookUrl, chapter?.index, bookType, event)
         } else null
         if (request != null && !pendingCustomButtons.add(request)) return
+        val browserKey = request?.let {
+            GSON.toJson(listOf(it.sourceKey, it.bookUrl, it.chapterIndex, it.bookType, it.event))
+        }
         // Finish on Main after any showBrowser work posted by the script.
         activity.lifecycleScope.launch(start = CoroutineStart.LAZY) {
+            if (browserKey != null && activity.supportFragmentManager.fragments.any {
+                it is BottomWebViewDialog && it.handlesCustomButton(browserKey)
+            }) return@launch
             withContext(IO) {
-                val java = SourceLoginJsExtensions(activity, source,  bookType)
+                val java = SourceLoginJsExtensions(activity, source, bookType).apply {
+                    customButtonKey = browserKey
+                }
                 kotlin.runCatching {
                     val result = runScriptWithContext {
                         source.evalJS(jsStr) {

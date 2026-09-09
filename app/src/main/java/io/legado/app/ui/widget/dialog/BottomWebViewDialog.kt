@@ -324,6 +324,13 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     private var sheetSizeBeforeFullScreen: SheetSizeSnapshot? = null
     private val pendingFullScreenConfigs = ArrayDeque<Config>()
     private var dismissed = false
+    internal var customButtonKey: String?
+        get() = arguments?.getString("customButtonKey")
+        set(value) { requireArguments().putString("customButtonKey", value) }
+
+    internal fun handlesCustomButton(key: String): Boolean =
+        !dismissed && !isRemoving && customButtonKey == key
+
     private val browserRequest: BrowserDialogRequest?
         get() = arguments?.let {
             BrowserDialogRequest(
@@ -377,7 +384,8 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                 val request = browserRequest
                 if (request != null && manager.fragments.any {
                     it is BottomWebViewDialog && !it.dismissed && !it.isRemoving &&
-                            it.browserRequest == request
+                            (it.browserRequest == request ||
+                                customButtonKey?.let(it::handlesCustomButton) == true)
                 }) return@runCatching
                 // Register synchronously so another queued script cannot add the same request.
                 dismissed = false
