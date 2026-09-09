@@ -1,6 +1,7 @@
 package io.legado.app.help.book
 
 import android.os.ParcelFileDescriptor
+import androidx.core.util.AtomicFile
 import androidx.documentfile.provider.DocumentFile
 import com.script.rhino.runScriptWithContext
 import io.legado.app.constant.AppLog
@@ -285,6 +286,60 @@ object BookHelp {
         }
     }
 
+    fun isContentReversed(book: Book, chapter: BookChapter): Boolean {
+        val fileName = contentSaveFileName(book, chapter) ?: chapter.getFileName()
+        val file = downloadDir.getFile(cacheFolderName, book.getFolderName(), fileName)
+        val marker = File(file.path + ".reversed")
+        return runCatching {
+            marker.isFile && file.isFile &&
+                marker.bufferedReader().use { it.readLine() } == file.inputStream().use(MD5Utils::md5Encode)
+        }.getOrDefault(false)
+    }
+
+    fun reverseContent(book: Book, chapter: BookChapter): Boolean {
+        val folderName = book.getFolderName()
+        val fileName = contentSaveFileName(book, chapter) ?: chapter.getFileName()
+        val file = downloadDir.getFile(cacheFolderName, folderName, fileName)
+        if (!file.isFile || file.length() == 0L) return false
+        var saved = false
+        contentSaveFence.replace(contentSaveKey(book, chapter), fileName) {
+            if (!file.isFile) return@replace
+            val content = file.readText().takeIf { it.isNotEmpty() } ?: return@replace
+            val wasReversed = isContentReversed(book, chapter)
+            val marker = File(file.path + ".reversed")
+            // Restore the original verbatim, even when reversing plain text
+            // happened to create a sequence that looks like reader markup.
+            val reversed = if (wasReversed) marker.readText().substringAfter('\n')
+                else reverseContentText(content)
+            // Prepare the undo data before changing the cache. The fingerprint
+            // only becomes valid after the atomic content write succeeds.
+            if (!wasReversed) {
+                try {
+                    marker.writeText(MD5Utils.md5Encode(reversed) + "\n" + content)
+                } catch (error: Throwable) {
+                    if (marker.isFile) marker.delete()
+                    throw error
+                }
+            }
+            val atomicFile = AtomicFile(file)
+            var output: FileOutputStream? = null
+            try {
+                output = atomicFile.startWrite()
+                output.write(reversed.toByteArray(Charsets.UTF_8))
+                atomicFile.finishWrite(output)
+                output = null
+                if (file.readText() != reversed) throw IOException("Reversed content was not saved")
+            } catch (error: Throwable) {
+                atomicFile.failWrite(output)
+                if (!wasReversed) marker.delete()
+                throw error
+            }
+            if (wasReversed) marker.delete()
+            saved = true
+        }
+        return saved
+    }
+
     internal fun contentSaveToken(book: Book, bookChapter: BookChapter): ContentSaveToken {
         val key = contentSaveKey(book, bookChapter)
         return ContentSaveToken(
@@ -315,6 +370,8 @@ object BookHelp {
             folderName,
             fileName,
         ).writeText(content)
+        // A fresh download or a manual edit replaces the reversed cache.
+        File(downloadDir.getFile(cacheFolderName, folderName, fileName).path + ".reversed").delete()
         if (book.isOnLineTxt && AppConfig.tocCountWords) {
             val wordCount = StringUtils.wordCountFormat(content.length)
             bookChapter.wordCount = wordCount
@@ -595,6 +652,7 @@ object BookHelp {
             folderName,
             fileName,
         ).delete()
+        File(downloadDir.getFile(cacheFolderName, folderName, fileName).path + ".reversed").delete()
     }
 
     /**

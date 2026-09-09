@@ -10,6 +10,7 @@ import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.GeneralSwipeAction
 import androidx.test.espresso.action.Press
 import androidx.test.espresso.action.Swipe
@@ -17,12 +18,18 @@ import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.filters.SdkSuppress
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.R as MaterialR
+import fi.iki.elonen.NanoHTTPD
+import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
+import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookSource
 import io.legado.app.help.webView.PooledWebView
+import io.legado.app.model.SourceCallBack
 import io.legado.app.ui.about.AboutActivity
+import io.legado.app.utils.defaultSharedPreferences
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -32,7 +39,11 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.io.FileInputStream
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 import kotlin.math.abs
 
@@ -59,6 +70,107 @@ class BottomWebViewDialogShowTest {
             scenario?.close()
         } finally {
             appDb.bookSourceDao.delete(source.bookSourceUrl)
+        }
+    }
+
+    @Test
+    fun repeatedCustomCallbacksFetchOneDynamicPageAndCanReopen() {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val duplicate = CountDownLatch(1)
+        val requests = AtomicInteger()
+        val server = object : NanoHTTPD("127.0.0.1", 0) {
+            override fun serve(session: IHTTPSession): Response {
+                val number = requests.incrementAndGet()
+                if (number == 1) entered.countDown() else duplicate.countDown()
+                check(release.await(8, TimeUnit.SECONDS))
+                return newFixedLengthResponse(Response.Status.OK, "text/html",
+                    "<html><head><title>Request $number</title></head><body>Dynamic page $number</body></html>")
+                    .apply { addHeader("Cache-Control", "no-store") }
+            }
+        }
+        val preferences = InstrumentationRegistry.getInstrumentation().targetContext.defaultSharedPreferences
+        val previousCronet = preferences.all[PreferKey.cronet] as Boolean?
+        val book = Book(bookUrl = "${source.bookSourceUrl}/book", name = "Custom callback fixture")
+        lateinit var manager: FragmentManager
+        scenario!!.onActivity { manager = it.supportFragmentManager }
+        server.start()
+        try {
+            preferences.edit().putBoolean(PreferKey.cronet, false).commit()
+            source.eventListener = true
+            source.getContentRule().callBackJs = """
+                var html = java.ajax('http://127.0.0.1:${server.listeningPort}/page');
+                java.showBrowser('${source.bookSourceUrl}/dialog', html);
+                true;
+            """.trimIndent()
+            scenario!!.onActivity { activity ->
+                repeat(2) {
+                    SourceCallBack.callBackBtn(activity, SourceCallBack.CLICK_CUSTOM_BUTTON, source, book, null)
+                }
+            }
+            assertTrue("The real source callback must reach HTTP", entered.await(5, TimeUnit.SECONDS))
+            assertFalse("A second click must not launch another pending callback",
+                duplicate.await(700, TimeUnit.MILLISECONDS))
+            release.countDown()
+            assertTrue("The first callback must show its browser", awaitCondition {
+                visibleDialogs(manager) == 1
+            })
+            assertEquals(1, requests.get())
+            scenario!!.onActivity { activity ->
+                val dialog = activity.supportFragmentManager.fragments.filterIsInstance<BottomWebViewDialog>()
+                    .single { it.dialog?.isShowing == true }
+                assertTrue(dialog.arguments?.getString("html").orEmpty().contains("Dynamic page 1"))
+                dialog.dismiss()
+            }
+            // The UI handoff must finish before a new user interaction starts another callback.
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            scenario!!.onActivity { activity ->
+                SourceCallBack.callBackBtn(activity, SourceCallBack.CLICK_CUSTOM_BUTTON, source, book, null)
+            }
+            assertTrue("Dismissal must allow another fetch", duplicate.await(5, TimeUnit.SECONDS))
+            assertTrue("Reopening must display the newly generated HTML", awaitCondition {
+                manager.fragments.filterIsInstance<BottomWebViewDialog>()
+                    .singleOrNull { it.dialog?.isShowing == true }?.arguments?.getString("html")
+                    ?.contains("Dynamic page 2") == true
+            })
+            assertEquals(2, requests.get())
+            assertTrue("The reopened dynamic page must finish rendering", awaitCondition {
+                val dialog = manager.fragments.filterIsInstance<BottomWebViewDialog>()
+                    .single { it.dialog?.isShowing == true }
+                val web = (dialog.requireView().findViewById<View>(io.legado.app.R.id.web_view_container)
+                    as android.view.ViewGroup).getChildAt(0) as WebView
+                web.title == "Request 2" && web.progress == 100
+            })
+            // A collapsed sheet extends below its parent; check its visible resting state.
+            awaitGeometry {
+                it.state == BottomSheetBehavior.STATE_COLLAPSED &&
+                        it.height > 0 && it.top in 0 until it.parentHeight
+            }
+            val drawn = CountDownLatch(1)
+            scenario!!.onActivity {
+                val dialog = manager.fragments.filterIsInstance<BottomWebViewDialog>()
+                    .single { it.dialog?.isShowing == true }
+                val web = (dialog.requireView().findViewById<View>(io.legado.app.R.id.web_view_container)
+                    as android.view.ViewGroup).getChildAt(0) as WebView
+                val visible = Rect()
+                assertTrue("The reopened WebView must occupy visible screen space",
+                    web.isShown && web.getGlobalVisibleRect(visible) &&
+                            visible.width() > 0 && visible.height() > 0)
+                web.postVisualStateCallback(0, object : WebView.VisualStateCallback() {
+                    override fun onComplete(requestId: Long) {
+                        web.postOnAnimation { web.postOnAnimation { drawn.countDown() } }
+                    }
+                })
+            }
+            assertTrue("The dynamic page must reach the compositor before capture",
+                drawn.await(5, TimeUnit.SECONDS))
+            screenshot("custom-button-dynamic-reopened")
+        } finally {
+            release.countDown()
+            server.stop()
+            preferences.edit().apply {
+                if (previousCronet == null) remove(PreferKey.cronet) else putBoolean(PreferKey.cronet, previousCronet)
+            }.commit()
         }
     }
 
@@ -339,6 +451,244 @@ class BottomWebViewDialogShowTest {
             appDb.bookSourceDao.delete(secondSource.bookSourceUrl)
         }
     }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 29)
+    fun edgeBackExitsFullscreenThenHistoryThenOnlyTheTopBrowser() {
+        val overlay = shell("cmd overlay list --user current").lineSequence()
+            .map(String::trim).first { it.startsWith("[x] com.android.internal.systemui.navbar.") }
+            .removePrefix("[x] ")
+        val server = object : NanoHTTPD("127.0.0.1", 0) {
+            override fun serve(session: IHTTPSession): Response = newFixedLengthResponse(
+                Response.Status.OK, "text/html",
+                "<html><head><title>Second</title></head><body>${session.uri}</body></html>"
+            )
+        }
+        try {
+            server.start()
+            writeBackEvidence("paragraph-back-system-before-setup", systemBackState())
+            shell("cmd overlay enable-exclusive --user current --category com.android.internal.systemui.navbar.gestural")
+            assertTrue("System gesture navigation must actually be enabled", awaitCondition {
+                val resources = InstrumentationRegistry.getInstrumentation().targetContext.resources
+                val mode = resources.getIdentifier("config_navBarInteractionMode", "integer", "android")
+                mode != 0 && resources.getInteger(mode) == 2
+            })
+            awaitSystemBackGestures()
+            for (outside in listOf(false, true)) {
+                val firstUrl = "http://127.0.0.1:${server.listeningPort}/back-$outside"
+                val secondUrl = "$firstUrl/second"
+                lateinit var lower: BottomWebViewDialog
+                lateinit var browser: BottomWebViewDialog
+                lateinit var web: WebView
+                scenario!!.onActivity { activity ->
+                    lower = newDialog("lower-$outside", """{"heightPercentage":0.5}""")
+                    lower.show(activity.supportFragmentManager, "lower")
+                    browser = BottomWebViewDialog(source.bookSourceUrl, 0, firstUrl,
+                        "<html><head><title>First</title></head><body>First</body></html>",
+                        config = """{"heightPercentage":0.6,
+                            "dismissOnTouchOutside":$outside,"isHideable":true}""")
+                    browser.show(activity.supportFragmentManager, "back")
+                    web = (browser.requireView().findViewById<View>(io.legado.app.R.id.web_view_container)
+                        as android.view.ViewGroup).getChildAt(0) as WebView
+                }
+                assertTrue("Browser initial page must be ready", awaitCondition {
+                    web.url == firstUrl && web.title == "First" &&
+                        web.progress == 100 && web.copyBackForwardList().size == 1 &&
+                        browser.dialog?.window?.decorView?.hasWindowFocus() == true
+                })
+                scenario!!.onActivity {
+                    // Navigate to a second document instead of assuming pushState updates the
+                    // virtual URL of the initial loadDataWithBaseURL entry on every WebView.
+                    web.loadUrl(secondUrl)
+                }
+                var historyState = ""
+                val historyReady = awaitCondition {
+                    val history = web.copyBackForwardList()
+                    historyState = "url=${web.url}, title=${web.title}, progress=${web.progress}, " +
+                        "size=${history.size}, index=${history.currentIndex}"
+                    web.canGoBack() && web.url == secondUrl && web.title == "Second" &&
+                        web.progress == 100 && history.size == 2 && history.currentIndex == 1
+                }
+                assertTrue("The fixture must create real WebView history: $historyState", historyReady)
+                var hidden = 0
+                scenario!!.onActivity { activity ->
+                    val chrome = browser.CustomWebChromeClient()
+                    chrome.onShowCustomView(View(activity), object : WebChromeClient.CustomViewCallback {
+                        override fun onCustomViewHidden() {
+                            hidden++
+                            chrome.onHideCustomView()
+                        }
+                    })
+                }
+                recordBackState("paragraph-back-before-fullscreen-$outside", browser, web, hidden)
+                edgeBack(browser)
+                val exitedFullscreen = awaitCondition {
+                    hidden == 1 && browser.dialog?.isShowing == true && web.canGoBack()
+                }
+                val fullscreenState = recordBackState(
+                    "paragraph-back-after-fullscreen-$outside", browser, web, hidden)
+                assertTrue("Back must exit fullscreen without dismissing or navigating: $fullscreenState",
+                    exitedFullscreen)
+                screenshot("paragraph-back-fullscreen-$outside")
+                edgeBack(browser)
+                assertTrue("Back must consume the real web history before dismissing", awaitCondition {
+                    browser.dialog?.isShowing == true && !web.canGoBack() &&
+                        web.url == firstUrl && web.title == "First" &&
+                        web.copyBackForwardList().currentIndex == 0
+                })
+                val historyDrawn = CountDownLatch(1)
+                scenario!!.onActivity {
+                    web.postVisualStateCallback(0, object : WebView.VisualStateCallback() {
+                        override fun onComplete(requestId: Long) {
+                            web.postOnAnimation { web.postOnAnimation { historyDrawn.countDown() } }
+                        }
+                    })
+                }
+                assertTrue("The restored history page must reach the compositor before capture",
+                    historyDrawn.await(5, TimeUnit.SECONDS))
+                screenshot("paragraph-back-history-$outside")
+                edgeBack(browser)
+                assertTrue("Back must close only the top browser", awaitCondition {
+                    browser.dialog?.isShowing != true && lower.dialog?.isShowing == true
+                })
+                scenario!!.onActivity {
+                    assertFalse("A dialog back gesture must not finish the host", it.isFinishing)
+                    lower.dismiss()
+                }
+            }
+        } finally {
+            server.stop()
+            shell("cmd overlay enable-exclusive --user current --category $overlay")
+        }
+    }
+
+    @Test
+    fun outsideTouchToggleDoesNotDisableKeyBackOrSwipeDismissal() {
+        lateinit var browser: BottomWebViewDialog
+        scenario!!.onActivity { activity ->
+            browser = newDialog(config = """{"heightPercentage":0.5,
+                "dismissOnTouchOutside":false,"isHideable":true}""")
+            browser.show(activity.supportFragmentManager, "outside-off")
+        }
+        awaitGeometry { it.height > 0 && it.top > 0 && it.state == BottomSheetBehavior.STATE_EXPANDED }
+        assertTrue(awaitCondition { browser.dialog?.window?.decorView?.hasWindowFocus() == true })
+        tapOutside(browser)
+        scenario!!.onActivity {
+            assertTrue(browser.dialog?.isShowing == true)
+            assertTrue("Outside-touch setting must not disable downward dismissal",
+                BottomSheetBehavior.from(checkNotNull(browser.requireDialog()
+                    .findViewById<View>(MaterialR.id.design_bottom_sheet))).isHideable)
+        }
+        pressBack()
+        assertTrue("Hardware back must close even when outside touch is disabled",
+            awaitCondition { browser.dialog?.isShowing != true })
+        scenario!!.onActivity { activity ->
+            browser = newDialog(config = """{"heightPercentage":0.5,
+                "dismissOnTouchOutside":false,"isHideable":true}""")
+            browser.show(activity.supportFragmentManager, "outside-off-swipe")
+        }
+        awaitGeometry { it.height > 0 && it.top > 0 && it.state == BottomSheetBehavior.STATE_EXPANDED }
+        assertTrue(awaitCondition { browser.dialog?.window?.decorView?.hasWindowFocus() == true })
+        onView(isAssignableFrom(WebView::class.java)).inRoot(isDialog()).perform(
+            GeneralSwipeAction(Swipe.FAST, { swipePoint(it, 0.15f) },
+                { swipePoint(it, 0.90f) }, Press.FINGER))
+        assertTrue("Outside-touch setting must preserve real downward swipe dismissal",
+            awaitCondition { browser.dialog?.isShowing != true })
+        scenario!!.onActivity { activity ->
+            browser = newDialog(config = """{"heightPercentage":0.5,"dismissOnTouchOutside":false}""")
+            browser.show(activity.supportFragmentManager, "outside-toggle")
+            browser.upConfig("""{"dismissOnTouchOutside":true}""")
+        }
+        awaitGeometry { it.height > 0 && it.top > 0 && it.state == BottomSheetBehavior.STATE_EXPANDED }
+        assertTrue(awaitCondition { browser.dialog?.window?.decorView?.hasWindowFocus() == true })
+        tapOutside(browser)
+        assertTrue("Enabling outside touch must still dismiss the browser",
+            awaitCondition { browser.dialog?.isShowing != true })
+        scenario!!.onActivity { assertFalse(it.isFinishing) }
+    }
+
+    private fun edgeBack(browser: BottomWebViewDialog) {
+        var width = 0
+        var y = 0
+        assertTrue(awaitCondition { browser.dialog?.window?.decorView?.hasWindowFocus() == true })
+        scenario!!.onActivity {
+            val decor = browser.requireDialog().window!!.decorView
+            width = decor.width
+            y = decor.height * 2 / 3
+        }
+        // Inject a touchscreen gesture from the system edge, never a KEYCODE_BACK surrogate.
+        shell("input touchscreen swipe 1 $y ${width * 3 / 4} $y 350")
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+    }
+
+    private fun systemBackState(): String =
+        "qemu.hw.mainkeys=${shell("getprop qemu.hw.mainkeys").trim()}\n" +
+        "user_setup_complete=${shell("settings --user current get secure user_setup_complete").trim()}\n" +
+        shell("dumpsys activity service com.android.systemui/.SystemUIService dumpables")
+
+    private fun awaitSystemBackGestures() {
+        val deadline = SystemClock.uptimeMillis() + 10_000
+        var state: String
+        do {
+            state = systemBackState()
+            val ready = state.split("EdgeBackGestureHandler:").drop(1).any { section ->
+                val handler = section.lineSequence().take(12).joinToString("\n")
+                handler.contains("mIsEnabled=true") && handler.contains("mIsAttached=true") &&
+                    handler.contains("mIsBackGestureAllowed=true")
+            }
+            if (ready) {
+                writeBackEvidence("paragraph-back-system-ready", state)
+                return
+            }
+            SystemClock.sleep(100)
+        } while (SystemClock.uptimeMillis() < deadline)
+        writeBackEvidence("paragraph-back-system-not-ready", state)
+        throw AssertionError("SystemUI must enable and allow actual edge back gestures; see system-not-ready.txt")
+    }
+
+    private fun recordBackState(name: String, browser: BottomWebViewDialog, web: WebView,
+                                hidden: Int): String {
+        var state = ""
+        scenario!!.onActivity { activity ->
+            val history = web.copyBackForwardList()
+            val sheet = browser.dialog?.findViewById<View>(MaterialR.id.design_bottom_sheet)
+            state = "hidden=$hidden, showing=${browser.dialog?.isShowing}, " +
+                "focus=${browser.dialog?.window?.decorView?.hasWindowFocus()}, " +
+                "fullscreenChildren=${(browser.view?.findViewById<View>(io.legado.app.R.id.custom_web_view)
+                    as? android.view.ViewGroup)?.childCount}, " +
+                "url=${web.url}, canGoBack=${web.canGoBack()}, index=${history.currentIndex}, " +
+                "sheetState=${sheet?.let { BottomSheetBehavior.from(it).state }}, " +
+                "hostFinishing=${activity.isFinishing}"
+        }
+        writeBackEvidence(name, "$state\n\n${systemBackState()}\n\n${shell("dumpsys window windows")}")
+        screenshot(name)
+        return state
+    }
+
+    private fun writeBackEvidence(name: String, state: String) {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        File(context.getExternalFilesDir("ui-regression"), "$name.txt").writeText(state)
+    }
+
+    private fun tapOutside(browser: BottomWebViewDialog) {
+        var x = 0
+        var y = 0
+        scenario!!.onActivity {
+            val sheet = checkNotNull(browser.requireDialog().findViewById<View>(MaterialR.id.design_bottom_sheet))
+            val location = IntArray(2)
+            sheet.getLocationOnScreen(location)
+            x = sheet.width / 2
+            y = location[1] / 2
+            assertTrue("The fixture needs an exposed outside-touch area", y > 0)
+        }
+        shell("input touchscreen tap $x $y")
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+    }
+
+    private fun shell(command: String): String =
+        InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command).use {
+            FileInputStream(it.fileDescriptor).bufferedReader().use { reader -> reader.readText() }
+        }
 
     private fun swipePoint(view: View, heightFraction: Float): FloatArray {
         val visible = Rect()

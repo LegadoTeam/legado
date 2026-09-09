@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="backup_local_only">Local backup only</string>
+    <string name="backup_local_webdav">Local and WebDav backup</string>
+    <string name="auto_backup_interval_days">Backup interval (days)</string>
+    <string name="auto_backup_interval_invalid">Enter a whole number of at least 1</string>
+    <string name="auto_backup_destination_summary">%1$s · Every %2$d days</string>
+    <string name="auto_backup_disabled">Disabled</string>
+    <string name="backup_destination_summary">Choose local backup only or local and WebDav backup</string>
+</resources>

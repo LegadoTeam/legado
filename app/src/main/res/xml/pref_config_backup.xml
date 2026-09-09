@@ -78,6 +78,12 @@
         app:layout="@layout/view_preference_category">
 
         <io.legado.app.lib.prefs.Preference
+            android:key="localPassword"
+            android:summary="@string/set_local_password_summary"
+            android:title="@string/set_local_password"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
             android:key="backupUri"
             android:summary="@string/select_backup_path"
             android:title="@string/backup_path"
@@ -97,7 +103,7 @@
 
         <io.legado.app.lib.prefs.Preference
             android:key="web_dav_backup"
-            android:summary="@string/backup_summary"
+            android:summary="@string/backup_destination_summary"
             android:title="@string/backup"
             app:iconSpaceReserved="false" />
 
@@ -120,10 +126,8 @@
             android:title="@string/only_latest_backup_t"
             app:iconSpaceReserved="false" />
 
-        <io.legado.app.lib.prefs.SwitchPreference
-            android:defaultValue="true"
+        <io.legado.app.lib.prefs.Preference
             android:key="autoBackup"
-            android:summary="@string/auto_backup_s"
             android:title="@string/auto_backup_t"
             app:allowDividerAbove="false"
             app:allowDividerBelow="false"

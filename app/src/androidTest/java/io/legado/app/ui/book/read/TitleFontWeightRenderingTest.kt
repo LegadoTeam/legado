@@ -13,7 +13,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.pressBack
-import androidx.test.espresso.action.ViewActions.swipeLeft
+import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.isCompletelyDisplayed
@@ -28,6 +28,8 @@ import io.legado.app.constant.PageAnim
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
+import io.legado.app.help.HighlightGeometry
+import io.legado.app.help.HighlightStyle
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.parseReadConfigObject
@@ -35,9 +37,15 @@ import io.legado.app.model.ReadBook
 import io.legado.app.model.localBook.TextFile
 import io.legado.app.ui.book.read.config.ClickActionConfigDialog
 import io.legado.app.ui.book.read.config.ReadStyleDialog
+import io.legado.app.ui.book.read.page.ContentTextView
+import io.legado.app.ui.book.read.page.HighlightDraw
 import io.legado.app.ui.book.read.page.ReadView
+import io.legado.app.ui.book.read.page.entities.TextLine
+import io.legado.app.ui.book.read.page.entities.TextPage
+import io.legado.app.ui.book.read.page.entities.column.TextColumn
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.utils.GSON
+import io.legado.app.utils.dpToPx
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -51,6 +59,8 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import kotlin.math.ceil
+import kotlin.math.floor
 
 @RunWith(AndroidJUnit4::class)
 class TitleFontWeightRenderingTest {
@@ -145,6 +155,117 @@ class TitleFontWeightRenderingTest {
     }
 
     @Test
+    fun highlightPillKeepsEndGlyphsInsideItsBorderAndUsesThePageMargins() {
+        launchReader()
+        val savedOptimize = AppConfig.optimizeRender
+        try {
+            scenario!!.onActivity { activity ->
+                val width = activity.findViewById<ReadView>(R.id.read_view).curPage
+                    .findViewById<ContentTextView>(R.id.content_text_view).width
+                for (optimized in listOf(false, true)) {
+                    AppConfig.optimizeRender = optimized
+                    for (size in listOf(20, 50)) {
+                        for (margin in listOf(0, 24)) {
+                            ReadBookConfig.textSize = size
+                            ReadBookConfig.paddingLeft = margin
+                            ReadBookConfig.paddingRight = margin
+                            ChapterProvider.upStyle()
+                            val paint = ChapterProvider.contentPaint
+                            val textSize = paint.textSize
+                            val lineHeight = ceil(textSize * 1.5f).toInt()
+                            val top = ChapterProvider.paddingTop.toFloat()
+                            val height = ceil(top + lineHeight * 2).toInt()
+                            val page = TextPage(text = "多恐怖吗顶\n上", height = height.toFloat())
+                            // A wrapped run at the left margin and a single glyph at the right.
+                            for ((row, text) in listOf("多恐怖吗顶", "上").withIndex()) {
+                                val widths = text.map { paint.measureText(it.toString()) }
+                                var x = if (row == 0) ChapterProvider.paddingLeft.toFloat()
+                                else width - ChapterProvider.paddingRight - widths.sum()
+                                val y = top + row * lineHeight
+                                val line = TextLine(text = text, startX = x, lineTop = y,
+                                    lineBase = y + textSize, lineBottom = y + lineHeight)
+                                text.forEachIndexed { index, char ->
+                                    line.addColumn(TextColumn(x, x + widths[index], char.toString()))
+                                    x += widths[index]
+                                }
+                                page.addLine(line)
+                            }
+                            page.upRenderHeight()
+                            page.isCompleted = true
+                            val view = ContentTextView(activity, null).apply {
+                                layout(0, 0, width, height)
+                                setContent(page)
+                            }
+                            val columns = page.lines.flatMap { it.columns }.filterIsInstance<TextColumn>()
+                            val positions = columns.map { it.start to it.end }
+                            fun render(style: HighlightStyle): Bitmap {
+                                columns.forEach { it.highlightStyle = style }
+                                return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                                    .also { view.draw(Canvas(it)) }
+                            }
+                            val glyphs = render(HighlightStyle(textColor = Color.BLACK, bold = true))
+                            val fill = Color.rgb(32, 144, 80)
+                            // Nonzero transparent ARGB hides ink without disabling its style.
+                            val background = render(HighlightStyle(fill = fill,
+                                fillShape = HighlightStyle.FillShape.PILL, textColor = 1, bold = true))
+                            val legacy = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                            try {
+                                // Save the actual production-view rendering even if an assertion fails.
+                                val result = render(HighlightStyle(fill = fill,
+                                    fillShape = HighlightStyle.FillShape.PILL, textColor = Color.BLACK, bold = true))
+                                try {
+                                    File(context.getExternalFilesDir("ui-regression"),
+                                        "highlight-pill-$size-$margin-$optimized.png").outputStream().use {
+                                        assertTrue(result.compress(Bitmap.CompressFormat.PNG, 100, it))
+                                    }
+                                } finally { result.recycle() }
+                                // The unchanged low-level renderer supplies a negative control:
+                                // using bare text bounds must still reproduce the reported overlap.
+                                val canvas = Canvas(legacy)
+                                for (line in page.lines) {
+                                    val band = HighlightGeometry.fillBand(line.lineBase, textSize,
+                                        line.lineBottom, HighlightStyle.FillShape.PILL, 1f.dpToPx())
+                                    HighlightDraw.drawFillRun(canvas, line.lineStart, line.lineEnd,
+                                        band.top, band.bottom, fill, HighlightStyle.FillShape.PILL)
+                                }
+                                var inkPixels = 0
+                                var oldBorderCollisions = 0
+                                for (y in 0 until height) for (x in 0 until width) {
+                                    if (Color.alpha(glyphs.getPixel(x, y)) < 240) continue
+                                    inkPixels++
+                                    val alpha = Color.alpha(background.getPixel(x, y))
+                                    assertTrue("Glyph crosses capsule: size=$size margin=$margin optimized=$optimized ($x,$y) alpha=$alpha",
+                                        alpha in 70..110)
+                                    if (Color.alpha(legacy.getPixel(x, y)) !in 70..110) oldBorderCollisions++
+                                }
+                                assertTrue("The fixture must draw actual Chinese glyphs", inkPixels > 50)
+                                assertTrue("The original capsule must cross some glyph pixels", oldBorderCollisions > 0)
+                                if (margin == 24 && textSize > 60f) {
+                                    val x = floor(ChapterProvider.visibleRect.left).toInt() - 2
+                                    val line = page.lines.first()
+                                    val band = HighlightGeometry.fillBand(line.lineBase, textSize,
+                                        line.lineBottom, HighlightStyle.FillShape.PILL, 1f.dpToPx())
+                                    assertTrue("The left cap must survive the old 10px clipping limit",
+                                        Color.alpha(background.getPixel(x, ((band.top + band.bottom) / 2).toInt())) > 0)
+                                }
+                                assertEquals("Highlights must not move text columns", positions,
+                                    columns.map { it.start to it.end })
+                            } finally {
+                                glyphs.recycle()
+                                background.recycle()
+                                legacy.recycle()
+                                page.recycleRecorders()
+                            }
+                        }
+                    }
+                }
+            }
+        } finally {
+            instrumentation.runOnMainSync { AppConfig.optimizeRender = savedOptimize }
+        }
+    }
+
+    @Test
     fun savedStylesSharedLayoutAndZipImportKeepSeparateWeights() {
         ReadBookConfig.configList[0].apply { titleBold = 0; textBold = 1 }
         ReadBookConfig.configList[1].apply { titleBold = 2; textBold = 0 }
@@ -190,7 +311,8 @@ class TitleFontWeightRenderingTest {
         scenario!!.onActivity {
             ReadStyleDialog().showNow(it.supportFragmentManager, "title-weight-style")
         }
-        onView(withId(R.id.style_toolbar_scroll)).inRoot(isDialog()).perform(swipeLeft())
+        // Reveal the item within its horizontal scroller without starting Android's edge-back gesture.
+        onView(withId(R.id.tv_tip)).inRoot(isDialog()).perform(scrollTo())
         onView(withId(R.id.tv_tip)).inRoot(isDialog()).check(matches(isCompletelyDisplayed()))
         screenshot("title-weight-information-entry")
         onView(withId(R.id.tv_tip)).inRoot(isDialog()).perform(click())
@@ -214,7 +336,7 @@ class TitleFontWeightRenderingTest {
             assertFontWeight(ChapterProvider.contentPaint.typeface, 700)
             ReadStyleDialog().showNow(it.supportFragmentManager, "title-weight-style")
         }
-        onView(withId(R.id.style_toolbar_scroll)).inRoot(isDialog()).perform(swipeLeft())
+        onView(withId(R.id.tv_tip)).inRoot(isDialog()).perform(scrollTo())
         onView(withId(R.id.tv_tip)).inRoot(isDialog())
             .check(matches(isCompletelyDisplayed())).perform(click())
         onView(withId(R.id.tv_title_font_weight)).inRoot(isDialog()).check(matches(withText(weights[0])))

@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.Instrumentation
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.BitmapDrawable
@@ -14,6 +15,8 @@ import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.ImageView
 import androidx.appcompat.widget.PopupMenu
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.appcompat.widget.SearchView
 import androidx.core.view.isVisible
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
@@ -24,10 +27,12 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.R
 import io.legado.app.constant.AppConst
+import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.ReadRecord
+import io.legado.app.data.entities.replaceBookAfterSourceChange
 import io.legado.app.data.entities.saveReadRecordSnapshot
 import io.legado.app.data.entities.saveWithCover
 import io.legado.app.databinding.ActivityReadRecordBinding
@@ -38,6 +43,8 @@ import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.storage.BackupConfig
 import io.legado.app.help.storage.Restore
 import io.legado.app.help.storage.writePreferenceSnapshot
+import io.legado.app.lib.theme.ThemeStore
+import io.legado.app.lib.theme.ThemeStorePrefKeys
 import io.legado.app.ui.book.read.ReadBookActivity
 import io.legado.app.utils.defaultSharedPreferences
 import io.legado.app.utils.GSON
@@ -71,7 +78,8 @@ class ReadRecordHistoryTest {
 
     @Before
     fun setUp() {
-        prefs.edit().remove("readRecordSimpleLayout").remove("readRecordUseDays").commit()
+        prefs.edit().remove("readRecordSimpleLayout").remove("readRecordUseDays")
+            .remove("readRecordShowSeconds").commit()
         LocalConfig.edit().putInt("readRecordSort", 1).commit()
         appDb.readRecordDao.clear()
         cover = File(context.cacheDir, "history-$id.png")
@@ -102,7 +110,7 @@ class ReadRecordHistoryTest {
         ReadRecordCoverCache.prune()
         cover.delete()
         prefs.edit().apply {
-            for (key in listOf("readRecordSimpleLayout", "readRecordUseDays")) {
+            for (key in listOf("readRecordSimpleLayout", "readRecordUseDays", "readRecordShowSeconds")) {
                 val value = savedPrefs[key]
                 if (value is Boolean) putBoolean(key, value) else remove(key)
             }
@@ -145,6 +153,153 @@ class ReadRecordHistoryTest {
         screenshot("reading-history-enhanced")
         scenario!!.recreate()
         await { it.enhancedSummary.root.isVisible && it.enhancedSummary.tvTotalDuration.text.contains("1天4小时") }
+    }
+
+    @Test
+    fun emptyCoversStayWhiteAndDarkCardsRemainDistinguishable() {
+        val themePrefs = ThemeStore.prefs(context)
+        val backgroundKey = ThemeStorePrefKeys.KEY_BACKGROUND_COLOR
+        val savedBackground = themePrefs.all[backgroundKey]
+        val savedMode = prefs.getString(PreferKey.themeMode, null)
+        val savedNightMode = AppCompatDelegate.getDefaultNightMode()
+        fun centerColor(image: ImageView): Int {
+            val bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
+            return try {
+                image.draw(Canvas(bitmap))
+                bitmap.getPixel(bitmap.width / 2, bitmap.height / 2)
+            } finally { bitmap.recycle() }
+        }
+        try {
+            AppConfig.readRecordSimpleLayout = false
+            for ((name, background) in listOf("light" to Color.rgb(245, 245, 245),
+                "dark" to Color.rgb(32, 32, 32), "black" to Color.BLACK,
+                "brown" to Color.rgb(52, 39, 34), "blue" to Color.rgb(37, 48, 68),
+                "custom" to Color.rgb(231, 214, 185))) {
+                val dark = name !in listOf("light", "custom")
+                prefs.edit().putString(PreferKey.themeMode, if (dark) "2" else "1").commit()
+                themePrefs.edit().putInt(backgroundKey, background).commit()
+                instrumentation.runOnMainSync {
+                    AppCompatDelegate.setDefaultNightMode(if (dark) AppCompatDelegate.MODE_NIGHT_YES
+                        else AppCompatDelegate.MODE_NIGHT_NO)
+                }
+                launch()
+                await { binding ->
+                    findRow(binding, "Archived second")?.enhanced?.ivCover?.drawable != null &&
+                        coverColor(binding.enhancedSummary.coverFirst) == Color.rgb(35, 148, 115) &&
+                        findRow(binding, book.name)?.enhanced?.ivCover?.let(::coverColor) == Color.rgb(35, 148, 115)
+                }
+                scenario!!.onActivity { activity ->
+                    val binding = activity.views
+                    val missing = findRow(binding, "Archived second")!!.enhanced.ivCover
+                    val fill = centerColor(missing)
+                    val card = binding.enhancedSummary.root
+                    val cardColor = card.cardBackgroundColor.defaultColor
+                    if (dark) {
+                        for (channel in listOf<(Int) -> Int>(Color::red, Color::green, Color::blue)) {
+                            assertTrue("Dark card boundary must differ without a thick border",
+                                channel(cardColor) - channel(background) in 12..21)
+                        }
+                    } else {
+                        assertEquals("Light backgrounds stay unchanged", background, cardColor)
+                    }
+                    val density = activity.resources.displayMetrics.density
+                    assertEquals(16 * density, card.radius, 0.01f)
+                    assertEquals(2 * density, card.cardElevation, 0.01f)
+                    assertEquals("Row and summary use the same empty cover", fill,
+                        centerColor(binding.enhancedSummary.coverSecond))
+                    assertEquals("Empty covers retain the original fixed white", Color.WHITE, fill)
+                    assertEquals("Real covers retain their original pixels", Color.rgb(35, 148, 115),
+                        centerColor(findRow(binding, book.name)!!.enhanced.ivCover))
+                }
+                screenshot("reading-history-covers-$name")
+                scenario!!.close()
+                scenario = null
+            }
+        } finally {
+            scenario?.close()
+            scenario = null
+            themePrefs.edit().apply {
+                if (savedBackground is Int) putInt(backgroundKey, savedBackground) else remove(backgroundKey)
+            }.commit()
+            prefs.edit().apply {
+                if (savedMode != null) putString(PreferKey.themeMode, savedMode) else remove(PreferKey.themeMode)
+            }.commit()
+            instrumentation.runOnMainSync { AppCompatDelegate.setDefaultNightMode(savedNightMode) }
+        }
+    }
+
+    @Test
+    fun secondsToggleUpdatesBothLayoutsWithoutChangingStoredDuration() {
+        val record = appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author)!!
+        record.readTime += 123_000L
+        appDb.readRecordDao.update(record)
+        val original = appDb.readRecordDao.all.toSet()
+        launch()
+        await { findRow(it, book.name)?.compact?.tvReadingTime?.text == "25小时2分钟3秒" }
+        scenario!!.onActivity {
+            assertTrue(AppConfig.readRecordShowSeconds)
+            select(it, R.id.menu_show_seconds)
+        }
+        await { it.tvReadingTime.text == "28小时2分钟" &&
+            findRow(it, book.name)?.compact?.tvReadingTime?.text == "25小时2分钟" }
+        scenario!!.onActivity { select(it, R.id.menu_simple_layout) }
+        await { it.enhancedSummary.root.isVisible &&
+            it.enhancedSummary.tvTotalDuration.text.contains("28小时2分钟") &&
+            findRow(it, book.name)?.enhanced?.tvReadingTime?.text == "25小时2分钟" }
+        screenshot("reading-history-minutes")
+        scenario!!.onActivity { select(it, R.id.menu_use_days) }
+        await { it.enhancedSummary.tvTotalDuration.text.contains("1天4小时2分钟") }
+        scenario!!.recreate()
+        await { findRow(it, book.name)?.enhanced?.tvReadingTime?.text == "1天1小时2分钟" }
+        scenario!!.onActivity {
+            assertFalse(AppConfig.readRecordShowSeconds)
+            select(it, R.id.menu_show_seconds)
+        }
+        await { it.enhancedSummary.tvTotalDuration.text.contains("1天4小时2分钟3秒") &&
+            findRow(it, book.name)?.enhanced?.tvReadingTime?.text == "1天1小时2分钟3秒" }
+        assertEquals(original, appDb.readRecordDao.all.toSet())
+    }
+
+    @Test
+    fun largeHistoryOpensAndFiltersWithoutWritingBookshelfSnapshots() {
+        appDb.readRecordDao.insert(*(0 until 6372).map { index ->
+            ReadRecord(deviceId = "history-device", bookName = "Archived $id $index",
+                author = "Author $index", readTime = index + 1L, lastRead = index + 1L,
+                lastChapterTitle = "Saved chapter $index", lastChapterIndex = index,
+                lastChapterPos = index % 10)
+        }.toTypedArray())
+        val before = appDb.readRecordDao.all.toSet()
+        AppConfig.readRecordSimpleLayout = false
+        val start = SystemClock.elapsedRealtime()
+        launch()
+        await { it.recyclerView.adapter?.itemCount == 6375 && findRow(it, book.name) != null }
+        val elapsed = SystemClock.elapsedRealtime() - start
+        assertTrue("First history rows took ${elapsed}ms", elapsed < 8000)
+        scenario!!.onActivity { activity ->
+            assertEquals(book.durChapterTitle, findRow(activity.views, book.name)!!.enhanced.tvChapter.text.toString())
+            assertEquals(context.getString(R.string.read_record_total_duration,
+                formatDuring(before.sumOf { it.readTime })), activity.views.enhancedSummary.tvTotalDuration.text.toString())
+        }
+        screenshot("reading-history-6375-records")
+        scenario!!.onActivity { activity ->
+            activity.views.titleBar.findViewById<SearchView>(R.id.search_view).setQuery(book.name, false)
+        }
+        await { it.recyclerView.adapter?.itemCount == 1 && findRow(it, book.name) != null }
+        scenario!!.onActivity { activity ->
+            assertEquals(context.getString(R.string.read_record_total_duration,
+                formatDuring(before.sumOf { it.readTime })), activity.views.enhancedSummary.tvTotalDuration.text.toString())
+            select(activity, R.id.menu_simple_layout)
+            select(activity, R.id.menu_use_days)
+            select(activity, R.id.menu_sort_name)
+        }
+        await { it.compactSummary.isVisible && it.recyclerView.adapter?.itemCount == 1 }
+        scenario!!.onActivity { activity ->
+            activity.views.titleBar.findViewById<SearchView>(R.id.search_view).setQuery("", false)
+        }
+        await { it.recyclerView.adapter?.itemCount == 6375 }
+        assertEquals("Displaying, filtering and sorting must not rewrite persisted history", before,
+            appDb.readRecordDao.all.toSet())
+        println("History first display: rows=6375 elapsedMs=$elapsed")
     }
 
     @Test
@@ -336,12 +491,12 @@ class ReadRecordHistoryTest {
 
     @Test
     fun deletingBookRetainsOwnedCoverAndDeletingHistoryRemovesOnlyItsCopy() {
-        book.saveReadRecordSnapshot()
+        // The real deletion boundary must retain the snapshot without first opening history.
+        book.delete()
         val stored = appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author)!!
         val retained = File(stored.coverUrl!!)
         assertNotEquals(cover.absolutePath, retained.absolutePath)
         assertArrayEquals(cover.readBytes(), retained.readBytes())
-        appDb.bookDao.delete(book)
         cover.delete()
         assertTrue(retained.isFile)
         AppConfig.readRecordSimpleLayout = false
@@ -358,11 +513,36 @@ class ReadRecordHistoryTest {
     }
 
     @Test
+    fun changingSourceRetainsHistoryBeforeRemovingTheOldBookshelfEntry() {
+        val replacement = book.copy(bookUrl = "history-new:$id", coverUrl = null,
+            durChapterTitle = "New source chapter")
+        val before = appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author)!!
+        try {
+            replaceBookAfterSourceChange(book, replacement, emptyList(), clearActiveReader = false)
+            assertNull(appDb.bookDao.getBook(book.bookUrl))
+            assertNotNull(appDb.bookDao.getBook(replacement.bookUrl))
+            val saved = appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author)!!
+            assertEquals(before.readTime, saved.readTime)
+            assertEquals(before.lastRead, saved.lastRead)
+            assertEquals(book.durChapterTitle, saved.lastChapterTitle)
+            assertEquals(book.durChapterIndex, saved.lastChapterIndex)
+            assertEquals(book.durChapterPos, saved.lastChapterPos)
+            assertArrayEquals(cover.readBytes(), File(saved.coverUrl!!).readBytes())
+            AppConfig.readRecordSimpleLayout = false
+            launch()
+            await { findRow(it, book.name)?.enhanced?.tvChapter?.text == replacement.durChapterTitle }
+            assertEquals("Showing the new bookshelf chapter must not replace the saved snapshot", saved,
+                appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author))
+        } finally { appDb.bookDao.delete(replacement) }
+    }
+
+    @Test
     fun oldPreferencesRestoreSimpleLayoutAndCoversDefaultToExcluded() {
         val directory = File(context.cacheDir, "history-preferences-$id").apply { mkdirs() }
         try {
             AppConfig.readRecordSimpleLayout = false
             AppConfig.readRecordUseDays = true
+            AppConfig.readRecordShowSeconds = false
             writePreferenceSnapshot(context, directory.absolutePath, "config") { putBoolean("enableReadRecord", true) }
             File(directory, "readRecord.json").writeText(GSON.toJson(listOf(ReadRecord(
                 deviceId = "", bookName = book.name, readTime = 30 * 3600_000L, lastRead = 2000,
@@ -371,6 +551,7 @@ class ReadRecordHistoryTest {
             runBlocking(Dispatchers.IO) { Restore.restoreLocked(directory.absolutePath) }
             assertTrue(AppConfig.readRecordSimpleLayout)
             assertFalse(AppConfig.readRecordUseDays)
+            assertTrue(AppConfig.readRecordShowSeconds)
             val restored = appDb.readRecordDao.getRecord(AppConst.androidId, book.name, "")!!
             assertEquals(30 * 3600_000L, restored.readTime)
             assertEquals("Restored chapter", restored.lastChapterTitle)
@@ -388,6 +569,11 @@ class ReadRecordHistoryTest {
             } finally {
                 if (previous != null) BackupConfig.ignoreConfig[BackupConfig.readRecordCoverContentKey] = previous
             }
+            writePreferenceSnapshot(context, directory.absolutePath, "config") {
+                putBoolean("readRecordShowSeconds", false)
+            }
+            runBlocking(Dispatchers.IO) { Restore.restoreLocked(directory.absolutePath) }
+            assertFalse(AppConfig.readRecordShowSeconds)
         } finally {
             directory.deleteRecursively()
         }

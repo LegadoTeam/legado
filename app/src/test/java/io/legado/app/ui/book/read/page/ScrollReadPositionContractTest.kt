@@ -7,6 +7,22 @@ import java.io.File
 class ScrollReadPositionContractTest {
 
     @Test
+    fun `applying preset updates the reader before reflecting radio selection`() {
+        val dialog = source("app/src/main/java/io/legado/app/ui/book/read/config/ReadStyleDialog.kt")
+        val change = dialog.substringAfter("private fun changeBgTextConfig(")
+            .substringBefore("private fun showBgTextConfig")
+        val apply = change.indexOf("callBack?.upPageAnim()")
+        assertTrue(apply >= 0)
+        assertTrue(change.indexOf("upView()") > apply)
+        assertTrue(change.contains("if (ReadBook.pageAnim() != oldPageAnim) callBack?.upPageAnim()"))
+        assertTrue(dialog.contains("if (updatingPageAnim) return@setOnCheckedChangeListener"))
+        val update = dialog.substringAfter("private fun upView()")
+        assertTrue(update.indexOf("updatingPageAnim = true") >= 0)
+        assertTrue(update.indexOf("rgPageAnim.check") > update.indexOf("updatingPageAnim = true"))
+        assertTrue(update.indexOf("updatingPageAnim = false") > update.indexOf("rgPageAnim.check"))
+    }
+
+    @Test
     fun `initial content waits for the reader layout`() {
         val activity = source("app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
         val onPostCreate = activity.substringAfter("override fun onPostCreate")
@@ -31,18 +47,24 @@ class ScrollReadPositionContractTest {
             onPause.indexOf("updateScrollReadPosition()") <
                 onPause.indexOf("ReadBook.saveRead()")
         )
-        assertTrue(activity.contains("binding.readView.getReadPosition()"))
-        assertTrue(activity.contains("ReadBook.msg != null || !ReadBook.isLayoutAvailable"))
-        assertTrue(activity.contains("ReadBook.durChapterPos = line.chapterPosition"))
+        val readView = source("app/src/main/java/io/legado/app/ui/book/read/page/ReadView.kt")
+        val savePosition = readView.substringAfter("fun updateScrollReadPosition(")
+            .substringBefore("fun getReadAloudPos()")
+        assertTrue(savePosition.contains("getReadPosition()"))
+        assertTrue(savePosition.contains("ReadBook.msg != null || !ReadBook.isLayoutAvailable"))
+        assertTrue(savePosition.contains("if (isScroll || (preserveText && ReadBook.isScroll))"))
+        assertTrue(savePosition.contains("ReadBook.durChapterPos = line.chapterPosition"))
+        assertTrue(savePosition.contains("curPage.textPage.textChapter !== ReadBook.curTextChapter"))
+        assertTrue(savePosition.contains("!preserveText || ReadBook.durChapterPos !in line.chapterIndices"))
         assertTrue(activity.contains("resetPageOffset = ReadBook.isScroll"))
         val configUpdate = activity.substringAfter(
             "observeEvent<ArrayList<Int>>(EventBus.UP_CONFIG)"
         ).substringBefore("observeEvent<Int>(EventBus.ALOUD_STATE)")
         assertTrue(configUpdate.contains("if (5 in values && isInitFinish)"))
-        assertTrue(
-            configUpdate.indexOf("updateScrollReadPosition()") <
-                configUpdate.indexOf("values.forEach")
-        )
+        val capturePosition = configUpdate.indexOf("updateScrollReadPosition(")
+        val applyConfig = configUpdate.indexOf("values.forEach")
+        assertTrue(capturePosition >= 0)
+        assertTrue(applyConfig > capturePosition)
         assertTrue(
             configUpdate.contains(
                 "readPositionVersion = readView.getReadPositionVersion()"

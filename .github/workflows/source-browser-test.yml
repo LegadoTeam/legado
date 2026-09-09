@@ -18,10 +18,17 @@ on:
       - 'app/src/main/res/layout/dialog_book_memo.xml'
       - 'app/src/main/res/layout/view_read_menu.xml'
       - 'app/src/main/java/io/legado/app/help/storage/Backup.kt'
+      - 'app/src/main/java/io/legado/app/ui/config/BackupConfigFragment.kt'
+      - 'app/src/main/java/io/legado/app/ui/config/OtherConfigFragment.kt'
+      - 'app/src/main/res/xml/pref_config_backup.xml'
+      - 'app/src/main/res/xml/pref_config_other.xml'
+      - 'app/src/main/res/layout/dialog_auto_backup.xml'
+      - 'app/src/main/res/values*/backup_options.xml'
       - 'app/src/main/java/io/legado/app/help/storage/BackupRestoreLock.kt'
       - 'app/src/main/java/io/legado/app/help/AppWebDav.kt'
       - 'app/src/androidTest/java/io/legado/app/help/storage/**'
       - 'app/src/main/java/io/legado/app/ui/login/SourceLoginJsExtensions.kt'
+      - 'app/src/main/java/io/legado/app/model/SourceCallBack.kt'
       - 'app/src/main/java/io/legado/app/help/JsExtensions.kt'
       - 'app/src/main/java/io/legado/app/utils/HandlerUtils.kt'
       - 'app/src/androidTest/java/io/legado/app/ui/widget/dialog/**'
@@ -38,6 +45,7 @@ on:
       - 'app/src/main/res/layout/dialog_content_edit.xml'
       - 'app/src/main/res/menu/content_edit.xml'
       - 'app/src/androidTest/java/io/legado/app/ui/book/read/ContentEditSearchTest.kt'
+      - 'app/src/androidTest/java/io/legado/app/ui/book/read/ContentReversalUiTest.kt'
       - 'app/src/androidTest/java/io/legado/app/ui/book/read/MouseWheelScrollTest.kt'
       - 'app/src/androidTest/java/io/legado/app/ui/book/read/TitleFontWeightRenderingTest.kt'
       - 'app/src/androidTest/java/io/legado/app/ui/book/read/ReadAloudMenuUiTest.kt'
@@ -56,6 +64,8 @@ on:
       - 'app/src/main/java/io/legado/app/ui/replace/**'
       - 'app/src/main/java/io/legado/app/ui/book/toc/rule/**'
       - 'app/src/main/java/io/legado/app/ui/dict/rule/**'
+      - 'app/src/main/java/io/legado/app/ui/highlight/**'
+      - 'app/src/androidTest/java/io/legado/app/ui/highlight/**'
       - 'app/src/androidTest/java/io/legado/app/ui/association/**'
       - 'app/src/main/java/io/legado/app/ui/about/ReadRecordActivity.kt'
       - 'app/src/main/java/io/legado/app/data/dao/ReadRecordDao.kt'
@@ -98,6 +108,9 @@ on:
       - 'app/src/main/java/io/legado/app/model/BatchContentContext.kt'
       - 'app/src/main/java/io/legado/app/model/jsSource/**'
       - 'app/src/main/java/io/legado/app/help/book/BookHelp.kt'
+      - 'app/src/main/java/io/legado/app/help/book/ContentReversal.kt'
+      - 'app/src/androidTest/java/io/legado/app/help/book/ContentReversalCacheTest.kt'
+      - 'app/src/main/res/menu/book_read.xml'
       - 'app/src/main/java/io/legado/app/utils/HtmlFormatter.kt'
       - 'app/src/androidTest/java/io/legado/app/model/webBook/**'
       - 'app/src/androidTest/assets/issue1180*'
@@ -148,6 +161,11 @@ jobs:
           target: google_apis
           arch: x86_64
           disable-animations: true
+          # The generic AVD defaults to hardware Back/Home keys, which prevents SystemUI
+          # from creating a navigation bar and attaching the real edge-back input monitor.
+          pre-emulator-launch-script: |
+            sed -i '/^hw\.mainKeys=/d' "$ANDROID_AVD_HOME/test.avd/config.ini"
+            echo 'hw.mainKeys=no' >> "$ANDROID_AVD_HOME/test.avd/config.ini"
           script: bash .github/scripts/run-ui-regression.sh
 
       - name: Upload test results
