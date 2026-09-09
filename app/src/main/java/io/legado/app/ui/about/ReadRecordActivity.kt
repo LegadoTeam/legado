@@ -23,7 +23,6 @@ import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.ReadRecordShow
-import io.legado.app.data.entities.saveReadRecordSnapshot
 import io.legado.app.databinding.ActivityReadRecordBinding
 import io.legado.app.databinding.ItemReadRecordDisplayBinding
 import io.legado.app.help.config.AppConfig
@@ -177,7 +176,6 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
             val (allRecords, readRecords, books) = withContext(IO) {
                 val bookshelf = appDb.bookDao.all.sortedBy { it.durChapterTime }
                     .associateBy { it.name to it.author }
-                bookshelf.values.forEach { it.saveReadRecordSnapshot() }
                 val all = appDb.readRecordDao.allShow
                 val filtered = if (searchKey.isNullOrBlank()) all
                     else appDb.readRecordDao.search(searchKey)
