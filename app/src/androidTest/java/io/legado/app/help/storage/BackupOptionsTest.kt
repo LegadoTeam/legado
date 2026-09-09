@@ -17,6 +17,8 @@ import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.isCompletelyDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
+import androidx.test.espresso.matcher.RootMatchers.isDialog
+import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import fi.iki.elonen.NanoHTTPD
@@ -167,6 +169,13 @@ class BackupOptionsTest {
         instrumentation.waitForIdleSync()
         onView(withText(containsString(context.externalFiles.absolutePath))).check(matches(isCompletelyDisplayed()))
         screenshot("backup-password-and-default-directory")
+        clickPreference(PreferKey.backupPath)
+        onView(withText(R.string.default_path)).inRoot(isDialog()).check(matches(isDisplayed()))
+        onView(withText(containsString(context.externalFiles.absolutePath))).inRoot(isDialog())
+            .check(doesNotExist())
+        screenshot("backup-default-directory-selector")
+        onView(withText(R.string.default_path)).inRoot(isDialog()).perform(click())
+        onView(withText(containsString(context.externalFiles.absolutePath))).check(matches(isCompletelyDisplayed()))
         clickPreference(PreferKey.autoBackup)
         assertTrue(AppConfig.autoBackup)
         assertTrue(AppConfig.autoBackupWebDav)
