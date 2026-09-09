@@ -71,7 +71,8 @@ class HighlightTriggerUiTest {
     private val savedRules = appDb.highlightRuleDao.all
     private val id = UUID.randomUUID().toString()
     private val source = BookSource(bookSourceUrl = "https://example.invalid/highlight-source/$id")
-    private val book = Book(bookUrl = "https://example.invalid/highlight/$id", origin = source.bookSourceUrl,
+    private val book = Book(bookUrl = "https://example.invalid/highlight/$id",
+        tocUrl = "https://example.invalid/highlight/$id/toc", origin = source.bookSourceUrl,
         name = "Highlight trigger fixture", type = BookType.text, totalChapterNum = 1, canUpdate = false)
         .apply { setPageAnim(PageAnim.noAnim); setUseReplaceRule(false); setImageStyle(Book.imgStyleText) }
     private val chapter = BookChapter(bookUrl = book.bookUrl, url = "${book.bookUrl}/0", title = "Triggers")
@@ -308,7 +309,14 @@ class HighlightTriggerUiTest {
             if (ready) return
             SystemClock.sleep(50)
         } while (SystemClock.uptimeMillis() < deadline)
-        error("Reader did not reach the expected highlight state")
+        var state = ""
+        scenario!!.onActivity {
+            val page = it.findViewById<ReadView>(R.id.read_view).curPage.textPage
+            state = "book=${ReadBook.book?.bookUrl}; completed=${ReadBook.curTextChapter?.isCompleted}; " +
+                "rules=${ReadBook.highlightRules.map { rule -> rule.pattern }}; page=${page.text.take(240)}"
+        }
+        screenshot("highlight-trigger-timeout")
+        error("Reader did not reach the expected highlight state: $state")
     }
     private fun screenshot(name: String) {
         instrumentation.waitForIdleSync()
