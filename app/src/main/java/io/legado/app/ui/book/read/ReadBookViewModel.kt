@@ -85,7 +85,6 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
             else -> appDb.bookDao.getBook(bookUrl)
         } ?: return
         ReadBook.upReadBookConfig(book)
-        if (resourceTheme?.first != book.bookUrl) resourceTheme = currentResourceTheme(book)
     }
 
     /**
@@ -138,6 +137,7 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
     }
 
     private suspend fun initBook(book: Book) {
+        if (resourceTheme?.first != book.bookUrl) resourceTheme = currentResourceTheme(book)
         val isSameBook = ReadBook.book?.bookUrl == book.bookUrl
         if (isSameBook) {
             ReadBook.upData(book)
