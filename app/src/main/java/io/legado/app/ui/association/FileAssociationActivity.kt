@@ -44,7 +44,9 @@ class FileAssociationActivity :
     VMBaseActivity<ActivityTranslucenceBinding, FileAssociationViewModel>() {
 
     private val localBookTreeSelect = registerForActivityResult(HandleFileContract()) {
-        viewModel.pendingBookUri?.let { uri ->
+        (viewModel.pendingBookUri ?: intent.data ?: IntentCompat.getParcelableExtra(
+            intent, Intent.EXTRA_STREAM, Uri::class.java
+        ))?.let { uri ->
             it.uri?.let { treeUri ->
                 AppConfig.defaultBookTreeUri = treeUri.toString()
                 importBook(treeUri, uri)

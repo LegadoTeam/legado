@@ -52,7 +52,9 @@ class FileAssociationViewModel(application: Application) : BaseAssociationViewMo
 
     fun dispatchSharedUri(uri: Uri) {
         execute {
-            require(uri.isContentScheme() && uri.canRead())
+            require(uri.isContentScheme())
+            // Provider ownership can allow reading without an explicit URI grant.
+            uri.inputStream(context).getOrThrow().use { }
             dispatchFile(FileDoc.fromUri(uri, false))
         }.onError {
             reportSharedImportError(it)

@@ -160,8 +160,10 @@ class SharedFileImportTest {
                 awaitDialog(scenario)
                 onView(withText(R.string.import_bookshelf)).inRoot(isDialog()).check(matches(isDisplayed()))
                 screenshot("share-bookshelf-confirmation")
+                lateinit var model: FileAssociationViewModel
+                scenario.onActivity { model = it.viewModel }
                 onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
-                await { appDb.bookDao.has(name, author) }
+                await { model.importedData.value == true }
                 val book = checkNotNull(appDb.bookDao.getBook(name, author))
                 books.add(book)
                 assertEquals("${source.bookSourceUrl}/book/$id", book.bookUrl)
@@ -265,8 +267,11 @@ class SharedFileImportTest {
         assertFalse(prefs.contains(marker))
         launchShare(renamed, "application/zip").use { scenario ->
             awaitDialog(scenario)
+            lateinit var model: FileAssociationViewModel
+            scenario.onActivity { model = it.viewModel }
             onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
-            await { appDb.bookDao.has(book.bookUrl) && prefs.getString(marker, null) == "restored value" }
+            await { model.importedData.value == true }
+            assertEquals("restored value", prefs.getString(marker, null))
             assertEquals(7, appDb.bookDao.getBook(book.bookUrl)!!.durChapterIndex)
             assertEquals(source.bookSourceName, appDb.bookSourceDao.getBookSource(source.bookSourceUrl)!!.bookSourceName)
             assertEquals(rule.styleObj(), appDb.highlightRuleDao.all.single { it.uuid == rule.uuid }.styleObj())
@@ -313,7 +318,7 @@ class SharedFileImportTest {
         }
     }
 
-    @Test fun firstSharedBookContinuesWithItsStreamAfterTheFolderResult() {
+    @Test fun firstSharedBookRecoversItsStreamWhenVolatileStateIsLostBeforeTheFolderResult() {
         prefs.edit().remove(PreferKey.defaultBookTreeUri).commit()
         val file = File(directory, "first-share-$id.txt").apply { writeText("FIRST_SHARED_STREAM $id\n".repeat(15)) }
         val folderRequests = AtomicInteger()
@@ -322,6 +327,11 @@ class SharedFileImportTest {
                 if (intent.component?.className != HandleFileActivity::class.java.name) return null
                 assertEquals(HandleFileContract.DIR_SYS, intent.getIntExtra("mode", -1))
                 folderRequests.incrementAndGet()
+                val activity = listOf(Stage.CREATED, Stage.STARTED, Stage.RESUMED)
+                    .flatMap { ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(it) }
+                    .filterIsInstance<FileAssociationActivity>().single()
+                assertNotNull(activity.viewModel.pendingBookUri)
+                activity.viewModel.pendingBookUri = null
                 return Instrumentation.ActivityResult(Activity.RESULT_OK,
                     Intent().setData(Uri.fromFile(File(directory, "books"))))
             }
