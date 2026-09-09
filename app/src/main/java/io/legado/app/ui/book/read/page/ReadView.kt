@@ -1094,9 +1094,15 @@ class ReadView(context: Context, attrs: AttributeSet) :
         // The configured mode may already have changed; capture the page still on screen.
         if (ReadBook.msg != null || !ReadBook.isLayoutAvailable) return
         if (isScroll || preserveText) {
+            // A replacement chapter can finish before its final UI bind runs.
+            if (curPage.textPage.textChapter !== ReadBook.curTextChapter) return
             val (chapterIndex, line) = getReadPosition() ?: return
             if (chapterIndex != ReadBook.durChapterIndex) return
-            ReadBook.durChapterPos = line.chapterPosition
+            // A second size/config callback must retain the restored character if
+            // wrapping only moved it within the first visible line.
+            if (!preserveText || ReadBook.durChapterPos !in line.chapterIndices) {
+                ReadBook.durChapterPos = line.chapterPosition
+            }
         }
         if (preserveText) ReadBook.preserveCurrentPositionForRefresh()
     }

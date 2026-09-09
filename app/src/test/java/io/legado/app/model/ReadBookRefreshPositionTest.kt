@@ -85,6 +85,7 @@ class ReadBookRefreshPositionTest {
             "resolvePendingHighlightAnchor(book, textChapter)"
         )
         assertFalse(anchorResolver.contains("textChapter.isCompleted"))
+        assertTrue(loadCurrentChapter.contains("restoredAnchor || (!available && shouldResetPageOffset)"))
     }
 
     @Test

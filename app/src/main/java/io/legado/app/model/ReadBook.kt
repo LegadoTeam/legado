@@ -1383,11 +1383,11 @@ object ReadBook : CoroutineScope by MainScope() {
                         callBack?.onLayoutPageCompleted(index, page)
                     }
                     finishPendingPdfJump(book, textChapter)
-                    resolvePendingHighlightAnchor(book, textChapter)
+                    val restoredAnchor = resolvePendingHighlightAnchor(book, textChapter)
                     if (upContent) {
                         callBack?.upContent(
                             offset,
-                            !available && shouldResetPageOffset,
+                            restoredAnchor || (!available && shouldResetPageOffset),
                             readPositionVersion = readPositionVersion,
                         )
                     }
@@ -1519,11 +1519,11 @@ object ReadBook : CoroutineScope by MainScope() {
                         callBack?.onLayoutPageCompleted(index, page)
                     }
                     finishPendingPdfJump(book, textChapter)
-                    resolvePendingHighlightAnchor(book, textChapter)
+                    val restoredAnchor = resolvePendingHighlightAnchor(book, textChapter)
                     if (upContent) {
                         callBack?.upContent(
                             offset,
-                            !available && shouldResetPageOffset,
+                            restoredAnchor || (!available && shouldResetPageOffset),
                             readPositionVersion = readPositionVersion,
                         )
                     }
@@ -1832,17 +1832,17 @@ object ReadBook : CoroutineScope by MainScope() {
     private fun resolvePendingHighlightAnchor(
         layoutBook: Book,
         textChapter: TextChapter
-    ) {
-        val pending = pendingHighlightAnchor ?: return
-        if (curTextChapter !== textChapter) return
+    ): Boolean {
+        val pending = pendingHighlightAnchor ?: return false
+        if (curTextChapter !== textChapter) return false
         if (pending.bookUrl != layoutBook.bookUrl ||
             pending.chapterIndex != durChapterIndex ||
             pending.chapterIndex != textChapter.chapter.index
         ) {
             pendingHighlightAnchor = null
-            return
+            return false
         }
-        val currentTitleLength = textChapter.layoutTitleLength.takeIf { it >= 0 } ?: return
+        val currentTitleLength = textChapter.layoutTitleLength.takeIf { it >= 0 } ?: return false
         val expectedPosition = resolveHighlightChapterPosition(
             pending.rawPosition,
             pending.sourceTitleLength,
@@ -1863,14 +1863,15 @@ object ReadBook : CoroutineScope by MainScope() {
                     currentTitleLength + layoutPosition
                 }
                 saveRead()
-                return
+                return true
             }
         }
-        if (durChapterPos != expectedPosition) return
+        if (durChapterPos != expectedPosition) return false
         val bodyPosition = (expectedPosition - currentTitleLength).coerceAtLeast(0)
         durChapterPos = currentTitleLength +
             HighlightAnchor.jumpPos(bodyText, bodyPosition, pending.bookText)
         saveRead()
+        return true
     }
 
     private fun currentPositionAnchor(): PendingHighlightAnchor? {

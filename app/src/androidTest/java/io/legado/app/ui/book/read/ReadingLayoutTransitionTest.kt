@@ -97,6 +97,8 @@ class ReadingLayoutTransitionTest {
                 assertNotNull("The original page must identify an actual source paragraph", initial.visiblePosition)
                 assertEquals("Entering scroll mode must preserve the same source character",
                     initial.visiblePosition, enteredScroll.savedPosition)
+                assertEquals("The restored paragraph must be at the top of the actual scroll view",
+                    initial.visiblePosition?.paragraph, enteredScroll.visiblePosition?.paragraph)
                 // Recreating a scroll reader must not recursively inflate the Activity binding.
                 scenario.recreate()
                 awaitReader(scenario, book.bookUrl, true)

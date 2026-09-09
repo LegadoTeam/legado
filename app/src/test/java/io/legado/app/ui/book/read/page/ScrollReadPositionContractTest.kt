@@ -38,6 +38,8 @@ class ScrollReadPositionContractTest {
         assertTrue(savePosition.contains("ReadBook.msg != null || !ReadBook.isLayoutAvailable"))
         assertTrue(savePosition.contains("if (isScroll || preserveText)"))
         assertTrue(savePosition.contains("ReadBook.durChapterPos = line.chapterPosition"))
+        assertTrue(savePosition.contains("curPage.textPage.textChapter !== ReadBook.curTextChapter"))
+        assertTrue(savePosition.contains("!preserveText || ReadBook.durChapterPos !in line.chapterIndices"))
         assertTrue(activity.contains("resetPageOffset = ReadBook.isScroll"))
         val configUpdate = activity.substringAfter(
             "observeEvent<ArrayList<Int>>(EventBus.UP_CONFIG)"
