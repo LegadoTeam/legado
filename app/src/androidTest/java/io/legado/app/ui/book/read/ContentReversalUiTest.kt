@@ -7,6 +7,7 @@ import android.graphics.BitmapFactory
 import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
+import android.widget.TextView
 import androidx.core.view.isVisible
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ActivityScenario
@@ -24,6 +25,7 @@ import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.google.android.material.snackbar.Snackbar
 import io.legado.app.R
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.BookType
@@ -158,7 +160,7 @@ class ContentReversalUiTest {
                     bodyRequests.incrementAndGet(index)
                     if (index == 3) refreshGate.getAndSet(null)?.let { (entered, release) ->
                         entered.countDown()
-                        check(release.await(15, TimeUnit.SECONDS))
+                        check(release.await(30, TimeUnit.SECONDS))
                     }
                     if (index == 3 && delayNextBody.compareAndSet(true, false)) {
                         obsoleteEntered.countDown()
@@ -215,7 +217,7 @@ class ContentReversalUiTest {
                 onView(withText(R.string.menu_refresh_resources)).inRoot(isPlatformPopup()).perform(click())
             }
             fun expectResourceFailure(action: () -> Unit) {
-                val layout = ReadBook.curTextChapter
+                var layout = ReadBook.curTextChapter
                 val savedPosition = ReadBook.durChapterPos
                 val contents = refreshChapters.map { BookHelp.getContent(book, it) }
                 val metadata = refreshChapters.map {
@@ -227,13 +229,16 @@ class ContentReversalUiTest {
                 val failures = AppLog.logs.count { it.second.startsWith("刷新资源失败\n") }
                 val entered = CountDownLatch(1)
                 val release = CountDownLatch(1)
+                val repeatedRelease = CountDownLatch(1)
                 refreshGate.set(entered to release)
                 try {
                     action()
                     assertTrue("The refresh must fetch in the background", entered.await(5, TimeUnit.SECONDS))
                     await("loading notice before the blocked request completes") {
                         ViewModelProvider(it)[ReadBookViewModel::class.java].resourceRefreshing.value == true &&
-                            it.findViewById<View>(com.google.android.material.R.id.snackbar_text)?.isShown == true
+                            it.findViewById<TextView>(com.google.android.material.R.id.snackbar_text)?.let { text ->
+                                text.isShown && text.text == context.getString(R.string.data_loading)
+                            } == true
                     }
                     assertSame("Loading must keep the old rendered chapter", layout, ReadBook.curTextChapter)
                     assertEquals(savedPosition, ReadBook.durChapterPos)
@@ -244,9 +249,50 @@ class ContentReversalUiTest {
                         reader.postOnAnimation { frame.countDown() }
                     }
                     assertTrue("Reader frames must continue while HTTP is blocked", frame.await(2, TimeUnit.SECONDS))
-                    if (failBody.get() == 3) screenshot("resource-refresh-loading")
+                    if (failBody.get() == 3) {
+                        scenario!!.recreate()
+                        await("restored reader still shows the pending refresh") {
+                            it.isInitFinish && !it.findViewById<ReadView>(R.id.read_view).curPage.textPage.isMsgPage &&
+                                it.findViewById<TextView>(com.google.android.material.R.id.snackbar_text)?.let { text ->
+                                    text.isShown && text.text == context.getString(R.string.data_loading)
+                                } == true
+                        }
+                        layout = ReadBook.curTextChapter
+                        assertEquals(savedPosition, ReadBook.durChapterPos)
+                        val oldCompleted = CountDownLatch(1)
+                        scenario!!.onActivity {
+                            val model = ViewModelProvider(it)[ReadBookViewModel::class.java]
+                            // Observe actual cancellation completion, not a guessed delay.
+                            val field = ReadBookViewModel::class.java.getDeclaredField("resourceRefreshCoroutine")
+                                .apply { isAccessible = true }
+                            (field.get(model) as io.legado.app.help.coroutine.Coroutine<*>)
+                                .invokeOnCompletion { oldCompleted.countDown() }
+                            // The same Snackbar queue is used by first/last-page notices.
+                            Snackbar.make(it.findViewById(R.id.read_view), R.string.no_prev_page,
+                                Snackbar.LENGTH_INDEFINITE).show()
+                        }
+                        await("another reader notice replaced loading") {
+                            it.findViewById<TextView>(com.google.android.material.R.id.snackbar_text)?.let { text ->
+                                text.isShown && text.text == context.getString(R.string.no_prev_page)
+                            } == true
+                        }
+                        val repeatedEntered = CountDownLatch(1)
+                        refreshGate.set(repeatedEntered to repeatedRelease)
+                        action()
+                        assertTrue("The replacement refresh must start", repeatedEntered.await(5, TimeUnit.SECONDS))
+                        release.countDown()
+                        assertTrue("The old refresh must actually finish cancellation", oldCompleted.await(5, TimeUnit.SECONDS))
+                        await("the successor retains its loading notice after old completion") {
+                            ViewModelProvider(it)[ReadBookViewModel::class.java].resourceRefreshing.value == true &&
+                                it.findViewById<TextView>(com.google.android.material.R.id.snackbar_text)?.let { text ->
+                                    text.isShown && text.text == context.getString(R.string.data_loading)
+                                } == true
+                        }
+                        screenshot("resource-refresh-loading")
+                    }
                 } finally {
                     release.countDown()
+                    repeatedRelease.countDown()
                     refreshGate.set(null)
                 }
                 await("resource failure reported without replacing cached resources") {

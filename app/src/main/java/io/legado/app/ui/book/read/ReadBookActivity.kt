@@ -357,10 +357,11 @@ class ReadBookActivity : BaseReadBookActivity(),
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
         viewModel.resourceRefreshing.observe(this) { loading ->
-            if (loading && resourceRefreshNotice == null) {
-                resourceRefreshNotice = Snackbar.make(binding.root, R.string.data_loading,
-                    Snackbar.LENGTH_INDEFINITE).also { it.show() }
-            } else if (!loading) {
+            if (loading) {
+                val notice = resourceRefreshNotice ?: Snackbar.make(binding.root, R.string.data_loading,
+                    Snackbar.LENGTH_INDEFINITE).also { resourceRefreshNotice = it }
+                if (!notice.isShownOrQueued) notice.show()
+            } else {
                 resourceRefreshNotice?.dismiss()
                 resourceRefreshNotice = null
             }
