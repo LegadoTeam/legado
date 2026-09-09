@@ -285,6 +285,37 @@ object BookHelp {
         }
     }
 
+    fun isContentReversed(book: Book, chapter: BookChapter): Boolean {
+        val fileName = contentSaveFileName(book, chapter) ?: chapter.getFileName()
+        val file = downloadDir.getFile(cacheFolderName, book.getFolderName(), fileName)
+        val marker = File(file.path + ".reversed")
+        return runCatching {
+            marker.isFile && file.isFile &&
+                marker.bufferedReader().use { it.readLine() } == file.inputStream().use(MD5Utils::md5Encode)
+        }.getOrDefault(false)
+    }
+
+    fun reverseContent(book: Book, chapter: BookChapter): Boolean {
+        val folderName = book.getFolderName()
+        val fileName = contentSaveFileName(book, chapter) ?: chapter.getFileName()
+        var saved = false
+        contentSaveFence.replace(contentSaveKey(book, chapter), fileName) {
+            val file = downloadDir.getFile(cacheFolderName, folderName, fileName)
+            if (!file.isFile) return@replace
+            val content = file.readText().takeIf { it.isNotEmpty() } ?: return@replace
+            val wasReversed = isContentReversed(book, chapter)
+            val marker = File(file.path + ".reversed")
+            // Restore the original verbatim, even when reversing plain text
+            // happened to create a sequence that looks like reader markup.
+            val reversed = if (wasReversed) marker.readText().substringAfter('\n')
+                else reverseContentText(content)
+            writeText(book, chapter, folderName, fileName, reversed)
+            if (!wasReversed) marker.writeText(MD5Utils.md5Encode(reversed) + "\n" + content)
+            saved = true
+        }
+        return saved
+    }
+
     internal fun contentSaveToken(book: Book, bookChapter: BookChapter): ContentSaveToken {
         val key = contentSaveKey(book, bookChapter)
         return ContentSaveToken(
@@ -315,6 +346,8 @@ object BookHelp {
             folderName,
             fileName,
         ).writeText(content)
+        // A fresh download or a manual edit replaces the reversed cache.
+        File(downloadDir.getFile(cacheFolderName, folderName, fileName).path + ".reversed").delete()
         if (book.isOnLineTxt && AppConfig.tocCountWords) {
             val wordCount = StringUtils.wordCountFormat(content.length)
             bookChapter.wordCount = wordCount
@@ -595,6 +628,7 @@ object BookHelp {
             folderName,
             fileName,
         ).delete()
+        File(downloadDir.getFile(cacheFolderName, folderName, fileName).path + ".reversed").delete()
     }
 
     /**
