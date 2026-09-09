@@ -166,6 +166,9 @@ class HighlightTriggerUiTest {
         taps(alpha, ordinary, alpha)
         noRulePopup()
         SystemClock.sleep(ViewConfiguration.getDoubleTapTimeout().toLong() + 50)
+        gesture(listOf(alpha, alpha), 30, cancelBetween = true)
+        noRulePopup()
+        SystemClock.sleep(ViewConfiguration.getDoubleTapTimeout().toLong() + 50)
         taps(alpha, alpha)
         onView(withText(R.string.highlight_rule_disable)).inRoot(isPlatformPopup()).check(matches(isDisplayed()))
         var editY = 0
@@ -257,12 +260,12 @@ class HighlightTriggerUiTest {
 
     private fun taps(vararg points: FloatArray) = gesture(points.toList(), 30)
     private fun hold(point: FloatArray) = gesture(listOf(point), 750)
-    private fun gesture(points: List<FloatArray>, duration: Long) {
+    private fun gesture(points: List<FloatArray>, duration: Long, cancelBetween: Boolean = false) {
         onView(withId(R.id.read_view)).perform(object : ViewAction {
             override fun getConstraints(): Matcher<View> = isDisplayed()
             override fun getDescription() = "Dispatch real reader touch events with bounded timing"
             override fun perform(uiController: UiController, view: View) {
-                points.forEach { point ->
+                points.forEachIndexed { index, point ->
                     val down = SystemClock.uptimeMillis()
                     fun dispatch(action: Int) {
                         val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, point[0], point[1], 0)
@@ -272,6 +275,10 @@ class HighlightTriggerUiTest {
                     uiController.loopMainThreadForAtLeast(duration)
                     dispatch(MotionEvent.ACTION_UP)
                     uiController.loopMainThreadForAtLeast(40)
+                    if (cancelBetween && index == 0) {
+                        dispatch(MotionEvent.ACTION_DOWN)
+                        dispatch(MotionEvent.ACTION_CANCEL)
+                    }
                 }
             }
         })

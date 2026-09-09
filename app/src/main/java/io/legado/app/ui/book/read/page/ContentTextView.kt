@@ -79,6 +79,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
     private var highlightTapX = 0f
     private var highlightTapY = 0f
     private val highlightDoubleTapSlop = ViewConfiguration.get(context).scaledDoubleTapSlop
+    internal fun cancelHighlightTap() { highlightTapColumn = null }
     private val pdfZoom: PdfZoom?
         get() = (parent?.parent?.parent as? ReadView)?.pdfZoom
     private var pdfRenderer: PdfZoomRenderer? = null
@@ -92,6 +93,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
     }
 
     override fun onDetachedFromWindow() {
+        cancelHighlightTap()
         closePdfRenderer()
         super.onDetachedFromWindow()
     }
@@ -198,6 +200,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
      * pageOffset + textPage.height 为 textPage 下方的高度
      */
     fun scroll(mOffset: Int) {
+        cancelHighlightTap()
         val previousOffset = pageOffset
         val previousPage = textPage
         pageOffset += mOffset
