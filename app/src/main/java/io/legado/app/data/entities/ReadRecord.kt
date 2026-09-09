@@ -2,6 +2,7 @@ package io.legado.app.data.entities
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import io.legado.app.constant.AppConst
 import io.legado.app.data.appDb
 import io.legado.app.help.book.ReadRecordCoverCache
@@ -9,7 +10,15 @@ import io.legado.app.help.book.ContentProcessor
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
 
-@Entity(tableName = "readRecord", primaryKeys = ["deviceId", "bookName", "author"])
+@Entity(
+    tableName = "readRecord",
+    primaryKeys = ["deviceId", "bookName", "author"],
+    indices = [Index(
+        name = "index_readRecord_snapshot",
+        value = ["bookName", "author", "lastRead", "deviceId"],
+        orders = [Index.Order.ASC, Index.Order.ASC, Index.Order.DESC, Index.Order.ASC],
+    )],
+)
 data class ReadRecord(
     var deviceId: String = "",
     var bookName: String = "",
