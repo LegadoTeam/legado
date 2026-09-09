@@ -13,6 +13,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.R
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.DictRule
+import io.legado.app.data.entities.HighlightRule
+import io.legado.app.data.entities.HighlightRuleFile
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.data.entities.TxtTocRule
 import io.legado.app.help.config.ReplacePreviewConfig
@@ -22,6 +24,8 @@ import io.legado.app.ui.dict.rule.DictRuleActivity
 import io.legado.app.ui.dict.rule.DictRuleAdapter
 import io.legado.app.ui.replace.ReplaceRuleActivity
 import io.legado.app.ui.replace.ReplaceRuleAdapter
+import io.legado.app.ui.highlight.HighlightRuleActivity
+import io.legado.app.ui.highlight.HighlightRuleAdapter
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
 import org.junit.Assert.assertEquals
@@ -38,6 +42,35 @@ import java.util.concurrent.atomic.AtomicReference
 class RuleSelectionShareTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext.applicationContext
+
+    @Test
+    fun highlightSelectionSharesOnlyCheckedRulesWithTheImportEnvelopeAndFullStyle() {
+        val id = UUID.randomUUID().toString()
+        val rule = HighlightRule(name = "Share highlight $id", pattern = "甲乙[?&]",
+            isRegex = true, scope = "Fixture", group = "Share group", isEnabled = false,
+            applyToTitle = true, applyToBody = false, timeoutMillisecond = 4567,
+            style = "{\"textColor\":123456}")
+        val other = HighlightRule(name = "Unselected highlight $id", pattern = "other")
+        val ids = appDb.highlightRuleDao.insert(rule, other)
+        rule.id = ids[0]
+        other.id = ids[1]
+        try {
+            val json = shareSelection(HighlightRuleActivity::class.java, R.menu.replace_rule_sel) { activity ->
+                val adapter = activity.findViewById<RecyclerView>(R.id.recycler_view).adapter as HighlightRuleAdapter
+                val index = adapter.getItems().indexOfFirst { it.uuid == rule.uuid }
+                if (index < 0 || adapter.getItems().none { it.uuid == other.uuid }) false else {
+                    assertTrue(adapter.dragSelectCallback.onSelectChange(index, true))
+                    assertEquals(listOf(rule.uuid), adapter.selection.map { it.uuid })
+                    true
+                }
+            }
+            val restored = GSON.fromJson(json, HighlightRuleFile::class.java)
+            assertEquals(HighlightRuleFile.TYPE, restored.type)
+            assertEquals(GSON.toJson(rule), GSON.toJson(restored.rules!!.single()))
+        } finally {
+            appDb.highlightRuleDao.delete(rule, other)
+        }
+    }
 
     @Test
     fun replacementSelectionSharesAnImportableFileIncludingItsPreviewSample() {
