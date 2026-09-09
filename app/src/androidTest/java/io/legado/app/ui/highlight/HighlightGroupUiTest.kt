@@ -256,6 +256,15 @@ class HighlightGroupUiTest {
                 previousClip?.let(clipboard::setPrimaryClip) ?: clipboard.clearPrimaryClip()
             }
             server.stop()
+            // Clearing the clipboard leaves SystemUI's preview covering later tests' touch targets.
+            instrumentation.uiAutomation.executeShellCommand(
+                "am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS"
+            ).use { descriptor ->
+                android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).bufferedReader().use {
+                    assertTrue(it.readText().contains("Broadcast completed"))
+                }
+            }
+            instrumentation.uiAutomation.waitForIdle(200, 5_000)
         }
     }
 
