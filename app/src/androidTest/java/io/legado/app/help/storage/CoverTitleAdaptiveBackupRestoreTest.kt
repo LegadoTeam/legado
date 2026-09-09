@@ -37,7 +37,7 @@ class CoverTitleAdaptiveBackupRestoreTest {
 
     @Test
     fun backupRestoresAdaptiveSettingAndLegacyDefaultsToEnabled() {
-        val directory = File(context.cacheDir, "cover-title-backup-${UUID.randomUUID()}")
+        val directory = File(context.filesDir, "cover-title-backup-${UUID.randomUUID()}")
         try {
             writePreferenceSnapshot(context, directory.path, "config") {
                 putBoolean(PreferKey.coverTitleAdaptive, false)
@@ -57,7 +57,7 @@ class CoverTitleAdaptiveBackupRestoreTest {
 
     @Test
     fun ignoredCoverConfigDoesNotRestoreAdaptiveSetting() {
-        val directory = File(context.cacheDir, "cover-title-backup-ignore-${UUID.randomUUID()}")
+        val directory = File(context.filesDir, "cover-title-backup-ignore-${UUID.randomUUID()}")
         try {
             writePreferenceSnapshot(context, directory.path, "config") {
                 putBoolean(PreferKey.coverTitleAdaptive, false)
