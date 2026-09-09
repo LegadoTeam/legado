@@ -57,7 +57,8 @@ class ReadingLayoutTransitionTest {
             "大家收拾好行李，仔细检查了门窗，然后穿过安静的院子。石板路上还留着昨夜的积水，天空却已经露出一片清澈的蓝色。",
             "没有人回答。"
         )
-        file.writeText((1..140).joinToString("\n\n") { "第${it}段。" + paragraphs[it % paragraphs.size] })
+        // Keep the swipe away from the chapter's short final page, where offset zero is legitimate.
+        file.writeText((1..500).joinToString("\n\n") { "第${it}段。" + paragraphs[it % paragraphs.size] })
         val book = Book(bookUrl = file.absolutePath, originName = file.name, name = file.name,
             charset = "UTF-8", type = BookType.local or BookType.text, totalChapterNum = 1, durChapterPos = 1470,
             latestChapterTime = file.lastModified()).apply { setPageAnim(-1) }
