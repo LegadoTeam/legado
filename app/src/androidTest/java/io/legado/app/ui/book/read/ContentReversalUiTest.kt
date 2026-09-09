@@ -8,6 +8,7 @@ import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.view.isVisible
+import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
@@ -69,7 +70,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 
-/** Uses cached online chapters and real reader/menu gestures, with no source requests. */
+/** Exercises the real reader with cached chapters, controlled HTTP responses and menu gestures. */
 @RunWith(AndroidJUnit4::class)
 class ContentReversalUiTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -232,14 +233,15 @@ class ContentReversalUiTest {
                 refreshedLayout, ReadBook.curTextChapter)
             assertTrue(BookHelp.getContent(book, refreshChapters[3])!!.contains("Version 3"))
             scenario!!.onActivity {
-                assertFalse(it.viewModel.resourceThemeChanged(book))
+                val viewModel = ViewModelProvider(it)[ReadBookViewModel::class.java]
+                assertFalse(viewModel.resourceThemeChanged(book))
                 val style = ReadBookConfig.styleSelect
                 try {
                     ReadBookConfig.styleSelect = (style + 1) % ReadBookConfig.configList.size
                     assertTrue("Switching reader styles must request resource refresh",
-                        it.viewModel.resourceThemeChanged(book))
+                        viewModel.resourceThemeChanged(book))
                 } finally { ReadBookConfig.styleSelect = style }
-                assertFalse(it.viewModel.resourceThemeChanged(book))
+                assertFalse(viewModel.resourceThemeChanged(book))
             }
 
             val outside = listOf(0, 6).associateWith { BookHelp.getContent(book, refreshChapters[it]) }
