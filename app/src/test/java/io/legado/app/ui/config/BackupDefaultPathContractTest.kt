@@ -1,5 +1,6 @@
 package io.legado.app.ui.config
 
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -11,7 +12,8 @@ class BackupDefaultPathContractTest {
         val source = source("app/src/main/java/io/legado/app/ui/config/BackupConfigFragment.kt")
         val selector = source.substringAfter("private fun showBackupPathSelector()")
             .substringBefore("private fun lanBackupTransfer()")
-        assertTrue(selector.contains("defaultBackupPathSummary()"))
+        assertTrue(selector.contains("getString(R.string.default_path)"))
+        assertFalse(selector.contains("defaultBackupPathSummary()"))
         val defaultSummary = source.substringAfter("private fun defaultBackupPathSummary()")
             .substringBefore("private fun updateAutoBackupSummary()")
         assertTrue(defaultSummary.contains("getString(R.string.default_path)"))
