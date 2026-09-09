@@ -165,6 +165,7 @@ object BackupConfig {
         PreferKey.coverShowNameN,
         PreferKey.coverShowAuthorN,
         PreferKey.coverHorizontal,
+        PreferKey.coverTitleAdaptive,
         PreferKey.coverKeepPunctuation
     )
 

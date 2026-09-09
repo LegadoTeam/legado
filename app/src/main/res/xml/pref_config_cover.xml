@@ -35,6 +35,15 @@
         app:iconSpaceReserved="false" />
 
     <io.legado.app.lib.prefs.SwitchPreference
+        android:defaultValue="true"
+        android:key="coverTitleAdaptive"
+        android:title="@string/cover_title_adaptive"
+        android:summary="@string/cover_title_adaptive_summary"
+        app:allowDividerAbove="false"
+        app:allowDividerBelow="false"
+        app:iconSpaceReserved="false" />
+
+    <io.legado.app.lib.prefs.SwitchPreference
         android:defaultValue="false"
         android:key="coverKeepPunctuation"
         android:title="@string/cover_keep_punctuation"

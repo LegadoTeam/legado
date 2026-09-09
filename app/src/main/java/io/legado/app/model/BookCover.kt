@@ -52,6 +52,8 @@ object BookCover {
         private set
     var drawBookNameHorizontal = false
         private set
+    var adaptiveTitleSize = true
+        private set
     var keepPunctuation = false
         private set
     lateinit var defaultDrawable: Drawable
@@ -76,6 +78,7 @@ object BookCover {
             path = appCtx.getPrefString(PreferKey.defaultCover)
         }
         drawBookNameHorizontal = appCtx.getPrefBoolean(PreferKey.coverHorizontal, false)
+        adaptiveTitleSize = appCtx.getPrefBoolean(PreferKey.coverTitleAdaptive, true)
         keepPunctuation = appCtx.getPrefBoolean(PreferKey.coverKeepPunctuation, false)
         defaultDrawable = runCatching {
             BitmapUtils.decodeBitmap(path!!, 600, 900)!!.toDrawable(appCtx.resources)
