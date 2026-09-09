@@ -14,6 +14,7 @@ import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.ImageView
 import androidx.appcompat.widget.PopupMenu
+import androidx.appcompat.widget.SearchView
 import androidx.core.view.isVisible
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
@@ -28,6 +29,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.ReadRecord
+import io.legado.app.data.entities.replaceBookAfterSourceChange
 import io.legado.app.data.entities.saveReadRecordSnapshot
 import io.legado.app.data.entities.saveWithCover
 import io.legado.app.databinding.ActivityReadRecordBinding
@@ -145,6 +147,48 @@ class ReadRecordHistoryTest {
         screenshot("reading-history-enhanced")
         scenario!!.recreate()
         await { it.enhancedSummary.root.isVisible && it.enhancedSummary.tvTotalDuration.text.contains("1天4小时") }
+    }
+
+    @Test
+    fun largeHistoryOpensAndFiltersWithoutWritingBookshelfSnapshots() {
+        appDb.readRecordDao.insert(*(0 until 6372).map { index ->
+            ReadRecord(deviceId = "history-device", bookName = "Archived $id $index",
+                author = "Author $index", readTime = index + 1L, lastRead = index + 1L,
+                lastChapterTitle = "Saved chapter $index", lastChapterIndex = index,
+                lastChapterPos = index % 10)
+        }.toTypedArray())
+        val before = appDb.readRecordDao.all.toSet()
+        AppConfig.readRecordSimpleLayout = false
+        val start = SystemClock.elapsedRealtime()
+        launch()
+        await { it.recyclerView.adapter?.itemCount == 6375 && findRow(it, book.name) != null }
+        val elapsed = SystemClock.elapsedRealtime() - start
+        assertTrue("First history rows took ${elapsed}ms", elapsed < 8000)
+        scenario!!.onActivity { activity ->
+            assertEquals(book.durChapterTitle, findRow(activity.views, book.name)!!.enhanced.tvChapter.text.toString())
+            assertEquals(context.getString(R.string.read_record_total_duration,
+                formatDuring(before.sumOf { it.readTime })), activity.views.enhancedSummary.tvTotalDuration.text.toString())
+        }
+        screenshot("reading-history-6375-records")
+        scenario!!.onActivity { activity ->
+            activity.views.titleBar.findViewById<SearchView>(R.id.search_view).setQuery(book.name, false)
+        }
+        await { it.recyclerView.adapter?.itemCount == 1 && findRow(it, book.name) != null }
+        scenario!!.onActivity { activity ->
+            assertEquals(context.getString(R.string.read_record_total_duration,
+                formatDuring(before.sumOf { it.readTime })), activity.views.enhancedSummary.tvTotalDuration.text.toString())
+            select(activity, R.id.menu_simple_layout)
+            select(activity, R.id.menu_use_days)
+            select(activity, R.id.menu_sort_name)
+        }
+        await { it.compactSummary.isVisible && it.recyclerView.adapter?.itemCount == 1 }
+        scenario!!.onActivity { activity ->
+            activity.views.titleBar.findViewById<SearchView>(R.id.search_view).setQuery("", false)
+        }
+        await { it.recyclerView.adapter?.itemCount == 6375 }
+        assertEquals("Displaying, filtering and sorting must not rewrite persisted history", before,
+            appDb.readRecordDao.all.toSet())
+        println("History first display: rows=6375 elapsedMs=$elapsed")
     }
 
     @Test
@@ -336,12 +380,12 @@ class ReadRecordHistoryTest {
 
     @Test
     fun deletingBookRetainsOwnedCoverAndDeletingHistoryRemovesOnlyItsCopy() {
-        book.saveReadRecordSnapshot()
+        // The real deletion boundary must retain the snapshot without first opening history.
+        book.delete()
         val stored = appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author)!!
         val retained = File(stored.coverUrl!!)
         assertNotEquals(cover.absolutePath, retained.absolutePath)
         assertArrayEquals(cover.readBytes(), retained.readBytes())
-        appDb.bookDao.delete(book)
         cover.delete()
         assertTrue(retained.isFile)
         AppConfig.readRecordSimpleLayout = false
@@ -355,6 +399,30 @@ class ReadRecordHistoryTest {
         await { it.recyclerView.adapter?.itemCount == 2 }
         assertFalse(retained.exists())
         assertTrue(appDb.readRecordDao.all.any { it.bookName == "Archived second" })
+    }
+
+    @Test
+    fun changingSourceRetainsHistoryBeforeRemovingTheOldBookshelfEntry() {
+        val replacement = book.copy(bookUrl = "history-new:$id", coverUrl = null,
+            durChapterTitle = "New source chapter")
+        val before = appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author)!!
+        try {
+            replaceBookAfterSourceChange(book, replacement, emptyList(), clearActiveReader = false)
+            assertNull(appDb.bookDao.getBook(book.bookUrl))
+            assertNotNull(appDb.bookDao.getBook(replacement.bookUrl))
+            val saved = appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author)!!
+            assertEquals(before.readTime, saved.readTime)
+            assertEquals(before.lastRead, saved.lastRead)
+            assertEquals(book.durChapterTitle, saved.lastChapterTitle)
+            assertEquals(book.durChapterIndex, saved.lastChapterIndex)
+            assertEquals(book.durChapterPos, saved.lastChapterPos)
+            assertArrayEquals(cover.readBytes(), File(saved.coverUrl!!).readBytes())
+            AppConfig.readRecordSimpleLayout = false
+            launch()
+            await { findRow(it, book.name)?.enhanced?.tvChapter?.text == replacement.durChapterTitle }
+            assertEquals("Showing the new bookshelf chapter must not replace the saved snapshot", saved,
+                appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author))
+        } finally { appDb.bookDao.delete(replacement) }
     }
 
     @Test
