@@ -146,6 +146,10 @@ class RuntimeMediaStabilityTest {
             coverBitmapCacheKey("Title", "Author", 105, 140, true, true, 1, 2),
             coverBitmapCacheKey("Title", "Author", 105, 140, true, true, 3, 4)
         )
+        assertNotEquals(
+            coverBitmapCacheKey("Title", "Author", 105, 140, true, true, 1, 2, true),
+            coverBitmapCacheKey("Title", "Author", 105, 140, true, true, 1, 2, false)
+        )
     }
 
     @Test
@@ -174,6 +178,7 @@ class RuntimeMediaStabilityTest {
             .takeIf { it.isFile }
             ?: File("app/src/main/java/io/legado/app/ui/config/CoverConfigFragment.kt")
         assertTrue(configSource.readText().contains("postEvent(EventBus.BOOKSHELF_REFRESH, \"\")"))
+        assertTrue(configSource.readText().contains("PreferKey.coverTitleAdaptive"))
     }
 
     @Test
