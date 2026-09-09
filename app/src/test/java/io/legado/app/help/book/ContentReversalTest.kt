@@ -12,6 +12,8 @@ class ContentReversalTest {
 
     @Test fun `reader images and their nonstandard JSON stay byte for byte unchanged`() {
         val image = """<img src="https://example.com/image.png,{"style":"TEXT","reviewCount":"12","click":"getDP(1,12)","js":"dpurl(12,'正文')"}">"""
+        val dataImage = """<img src="data:image/svg+xml;base64,PHN2Zy8+,{'click':'showCmt("1234567890123456789","49")','style':'text'}">"""
+        assertEquals("乙甲${dataImage}丁丙", reverseContentText("甲乙${dataImage}丙丁"))
         val content = "甲😀乙$image 丙丁"
         assertEquals("乙😀甲${image}丁丙 ", reverseContentText(content))
         assertEquals(content, reverseContentText(reverseContentText(content)))
