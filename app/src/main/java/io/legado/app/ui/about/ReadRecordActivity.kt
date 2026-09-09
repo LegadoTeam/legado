@@ -1,6 +1,7 @@
 package io.legado.app.ui.about
 
 import android.content.Context
+import android.graphics.Color
 import android.os.Bundle
 import android.text.SpannableString
 import android.text.Spanned
@@ -23,7 +24,6 @@ import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.ReadRecordShow
-import io.legado.app.data.entities.saveReadRecordSnapshot
 import io.legado.app.databinding.ActivityReadRecordBinding
 import io.legado.app.databinding.ItemReadRecordDisplayBinding
 import io.legado.app.help.config.AppConfig
@@ -34,11 +34,14 @@ import io.legado.app.help.glide.OkHttpModelLoader
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.lib.theme.accentColor
+import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.cnCompare
+import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.dpToPx
+import io.legado.app.utils.getCompatDrawable
 import io.legado.app.utils.getInt
 import io.legado.app.utils.putInt
 import io.legado.app.utils.startActivityForBook
@@ -50,7 +53,7 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-internal fun formatDuring(mss: Long, useDays: Boolean = false): String {
+internal fun formatDuring(mss: Long, useDays: Boolean = false, showSeconds: Boolean = true): String {
     val totalHours = mss / (1000 * 60 * 60)
     val days = if (useDays) totalHours / 24 else 0
     val hours = if (useDays) totalHours % 24 else totalHours
@@ -59,8 +62,8 @@ internal fun formatDuring(mss: Long, useDays: Boolean = false): String {
     val h = if (hours > 0) "${hours}小时" else ""
     val d = if (days > 0) "${days}天" else ""
     val m = if (minutes > 0) "${minutes}分钟" else ""
-    val s = if (seconds > 0) "${seconds}秒" else ""
-    return "$d$h$m$s".ifBlank { "0秒" }
+    val s = if (showSeconds && seconds > 0) "${seconds}秒" else ""
+    return "$d$h$m$s".ifBlank { if (showSeconds) "0秒" else "0分钟" }
 }
 
 class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
@@ -97,6 +100,7 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
         menu.findItem(R.id.menu_enable_record)?.isChecked = AppConfig.enableReadRecord
         menu.findItem(R.id.menu_simple_layout)?.isChecked = AppConfig.readRecordSimpleLayout
         menu.findItem(R.id.menu_use_days)?.isChecked = AppConfig.readRecordUseDays
+        menu.findItem(R.id.menu_show_seconds)?.isChecked = AppConfig.readRecordShowSeconds
         when (sortMode) {
             1 -> menu.findItem(R.id.menu_sort_read_long)?.isChecked = true
             2 -> menu.findItem(R.id.menu_sort_read_time)?.isChecked = true
@@ -139,12 +143,22 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
                 initData()
             }
 
+            R.id.menu_show_seconds -> {
+                AppConfig.readRecordShowSeconds = !AppConfig.readRecordShowSeconds
+                initData()
+            }
+
             R.id.menu_clear_record -> clearRecords()
         }
         return super.onCompatOptionsItemSelected(item)
     }
 
     private fun initView() {
+        val background = backgroundColor
+        binding.enhancedSummary.root.setCardBackgroundColor(
+            if (ColorUtils.isColorLight(background)) background
+            else ColorUtils.blendColors(background, Color.WHITE, 0.08f),
+        )
         initSearchView()
         binding.tvBookName.setText(R.string.all_read_time)
         binding.tvRemove.setOnClickListener {
@@ -177,7 +191,6 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
             val (allRecords, readRecords, books) = withContext(IO) {
                 val bookshelf = appDb.bookDao.all.sortedBy { it.durChapterTime }
                     .associateBy { it.name to it.author }
-                bookshelf.values.forEach { it.saveReadRecordSnapshot() }
                 val all = appDb.readRecordDao.allShow
                 val filtered = if (searchKey.isNullOrBlank()) all
                     else appDb.readRecordDao.search(searchKey)
@@ -198,7 +211,7 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
             binding.compactSummary.isVisible = simple
             binding.enhancedSummary.root.isVisible = !simple
             binding.tvReadingTime.text = formatDuring(
-                allRecords.sumOf { it.readTime }, AppConfig.readRecordUseDays,
+                allRecords.sumOf { it.readTime }, AppConfig.readRecordUseDays, AppConfig.readRecordShowSeconds,
             )
             binding.tvEmpty.isVisible = readRecords.isEmpty()
             bindSummary(allRecords)
@@ -218,7 +231,7 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
         }
         binding.enhancedSummary.tvTotalDuration.text = getString(
             R.string.read_record_total_duration,
-            formatDuring(records.sumOf { it.readTime }, AppConfig.readRecordUseDays),
+            formatDuring(records.sumOf { it.readTime }, AppConfig.readRecordUseDays, AppConfig.readRecordShowSeconds),
         )
         val top = records.sortedByDescending { it.readTime }.take(3)
         with(binding.enhancedSummary) {
@@ -231,6 +244,7 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
     }
 
     private fun loadCover(image: ImageView, record: ReadRecordShow) {
+        val placeholder = getCompatDrawable(R.drawable.read_record_cover_placeholder)
         val book = booksByIdentity[record.bookName to record.author]
         val cover = book?.getDisplayCover()?.takeIf { it.isNotBlank() } ?: record.coverUrl
         var options = RequestOptions().set(
@@ -242,10 +256,10 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
         image.contentDescription = record.bookName
         ImageLoader.load(this, cover)
             .apply(options)
-            .placeholder(R.drawable.read_record_cover_placeholder)
+            .placeholder(placeholder)
             .error(ImageLoader.load(this, record.coverUrl)
                 .apply(options)
-                .error(R.drawable.read_record_cover_placeholder)
+                .error(placeholder)
                 .transform(CenterCrop(), RoundedCorners(4.dpToPx())))
             .transform(CenterCrop(), RoundedCorners(4.dpToPx()))
             .into(image)
@@ -292,7 +306,7 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
                 tvBookName.text = item.bookName
                 tvAuthor.isVisible = true
                 tvAuthor.text = context.getString(R.string.author_show, author)
-                tvReadingTime.text = formatDuring(item.readTime, AppConfig.readRecordUseDays)
+                tvReadingTime.text = formatDuring(item.readTime, AppConfig.readRecordUseDays, AppConfig.readRecordShowSeconds)
                 if (item.lastRead > 0) {
                     tvLastReadTime.text = dateFormat.format(item.lastRead)
                 } else {
@@ -307,7 +321,7 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
                         ?.takeIf { it.isNotBlank() }
                         ?: item.lastChapterTitle?.takeIf { it.isNotBlank() }
                         ?: getString(R.string.read_record_no_chapter)
-                    tvReadingTime.text = formatDuring(item.readTime, AppConfig.readRecordUseDays)
+                    tvReadingTime.text = formatDuring(item.readTime, AppConfig.readRecordUseDays, AppConfig.readRecordShowSeconds)
                     tvLastReadTime.text = if (item.lastRead > 0) dateFormat.format(item.lastRead) else ""
                     loadCover(ivCover, item)
                 }

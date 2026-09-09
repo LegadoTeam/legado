@@ -1159,6 +1159,8 @@
     <string name="cover_show_author_summary">封面上显示作者</string>
     <string name="cover_horizontal">横向显示封面文字</string>
     <string name="cover_horizontal_summary">书名显示在顶部，作者显示在右下角</string>
+    <string name="cover_title_adaptive">书名首行/列自适应</string>
+    <string name="cover_title_adaptive_summary">根据书名长度调整字号；关闭后首行或首列使用大字号</string>
     <string name="cover_keep_punctuation">保留书名和作者标点</string>
     <string name="cover_keep_punctuation_summary">生成文字封面时不移除标点符号</string>
     <string name="read_aloud_prev_paragraph">朗读上一段</string>
@@ -1692,6 +1694,8 @@
     <string name="show_explore_categories">显示全部分类</string>
     <string name="read_record_simple_layout">简洁布局</string>
     <string name="read_record_use_days">按天统计</string>
+    <string name="read_record_show_seconds">显示秒数</string>
+    <string name="read_record_clear">清除记录</string>
     <string name="read_record_achievement">累计阅读成就</string>
     <string name="read_record_book_count">已读 %1$d 本书</string>
     <string name="read_record_total_duration">共阅读 %1$s</string>

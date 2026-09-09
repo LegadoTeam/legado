@@ -8,6 +8,9 @@ import androidx.annotation.Keep
 import androidx.preference.PreferenceManager
 import io.legado.app.BuildConfig
 import io.legado.app.constant.PreferKey
+import io.legado.app.help.http.Cronet
+import io.legado.app.help.http.getProxyClient
+import io.legado.app.help.http.okHttpClient
 import okhttp3.CookieJar
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -26,6 +29,7 @@ import java.security.MessageDigest
 import java.util.concurrent.Executors
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 @Keep
 class CronetRuntimeInstrumentation : Instrumentation() {
@@ -54,6 +58,20 @@ class CronetRuntimeInstrumentation : Instrumentation() {
         val preferences = PreferenceManager.getDefaultSharedPreferences(targetContext)
         val hadPreference = preferences.contains(PreferKey.cronet)
         val previous = preferences.getBoolean(PreferKey.cronet, false)
+        check(preferences.edit().putBoolean(PreferKey.cronet, false).commit())
+        val ordinaryRequests = AtomicInteger()
+        // Use the actual startup client, created while the switch is off, throughout all toggles.
+        val sharedClient = okHttpClient.newBuilder().addNetworkInterceptor { chain ->
+            check(!preferences.getBoolean(PreferKey.cronet, false)) {
+                "Enabling Cronet did not update the existing production client"
+            }
+            ordinaryRequests.incrementAndGet()
+            chain.proceed(chain.request())
+        }.build()
+        val proxyClient = getProxyClient("http://127.0.0.1:8888")
+        check(Cronet.interceptor !in proxyClient.interceptors) {
+            "A proxy client created while Cronet was disabled retained its interceptor"
+        }
         val componentDir = targetContext.getDir("cronet", 0)
         val nativeName = "libcronet.${BuildConfig.Cronet_Version}.so"
         val cachedBefore = componentDir.walkTopDown().any { it.isFile && it.name == nativeName }
@@ -111,12 +129,11 @@ class CronetRuntimeInstrumentation : Instrumentation() {
             .readTimeout(30, TimeUnit.SECONDS)
             .build()
         try {
-            check(preferences.edit().putBoolean(PreferKey.cronet, true).commit())
             ServerSocket(0, 2, InetAddress.getByName("127.0.0.1")).use { server ->
                 server.soTimeout = 180_000
                 val payload = "Cronet 上传\n\n验证"
                 val served = executor.submit {
-                    listOf("GET" to "", "POST" to payload).forEach { (method, body) ->
+                    (List(5) { "GET" to "" } + ("POST" to payload)).forEach { (method, body) ->
                         server.accept().use { socket ->
                             socket.soTimeout = 30_000
                             val input = socket.getInputStream().source().buffer()
@@ -142,6 +159,17 @@ class CronetRuntimeInstrumentation : Instrumentation() {
                     }
                 }
                 val request = Request.Builder().url("http://127.0.0.1:${server.localPort}/runtime")
+                listOf(false, true, false, true).forEachIndexed { index, enabled ->
+                    check(preferences.edit().putBoolean(PreferKey.cronet, enabled).commit())
+                    sharedClient.newCall(request.build()).execute().use { response ->
+                        assertEquals(200, response.code)
+                        assertEquals("GET:", response.body.string())
+                    }
+                    assertEquals(if (index < 2) 1 else 2, ordinaryRequests.get())
+                    if (enabled) {
+                        check(Cronet.interceptor !in getProxyClient("http://127.0.0.1:8888").interceptors)
+                    }
+                }
                 client.newCall(request.build()).execute().use { response ->
                     assertEquals(200, response.code)
                     assertEquals("GET:", response.body.string())
@@ -178,13 +206,14 @@ class CronetRuntimeInstrumentation : Instrumentation() {
             val evidence = File(targetContext.getExternalFilesDir(null), "cronet-runtime/storage.txt")
             evidence.parentFile!!.mkdirs()
             evidence.writeText("cachedBefore=$cachedBefore\nconcurrentInstallers=8\n" +
+                "productionClientToggle=off,on,off,on\nordinaryRequests=${ordinaryRequests.get()}\n" +
                 "firstInstallFailures=$firstInstallFailures\n" +
                 "loadFailureRecovery=${!cachedBefore}\ncomponentFiles=${storage.size}\n" +
                 "componentBytes=${storage.sumOf { it.length() }}\nnativeMtime=${native.lastModified()}\n" +
                 "nativeFile=${native.canonicalPath}\n" +
                 File("/proc/self/maps").readLines().filter { it.contains(nativeName) }.joinToString("\n"))
             RssImageRuntimeRegression.verify(this)
-            return "$version; cachedBefore=$cachedBefore; concurrentInstallers=8; " +
+            return "$version; productionClientToggle=off,on,off,on; cachedBefore=$cachedBefore; concurrentInstallers=8; " +
                 "firstInstallFailures=$firstInstallFailures; " +
                 "loadFailureRecovery=${!cachedBefore}; componentFiles=1; " +
                 "nativeBytes=${native.length()}; nativeMtime=${native.lastModified()}; nativeFile=$native"

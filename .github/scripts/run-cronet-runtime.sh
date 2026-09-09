@@ -29,6 +29,7 @@ timeout 300 adb shell am instrument -w -r \
   com.legado.app.release/io.legado.app.lib.cronet.CronetRuntimeInstrumentation \
   | tee app/build/cronet-runtime/result.txt
 grep -Fq 'CRONET_RUNTIME_PASSED' app/build/cronet-runtime/result.txt
+grep -Fq 'productionClientToggle=off,on,off,on' app/build/cronet-runtime/result.txt
 grep -Fq 'INSTRUMENTATION_CODE: -1' app/build/cronet-runtime/result.txt
 grep -Fq 'cachedBefore=false' app/build/cronet-runtime/result.txt
 grep -Fq 'loadFailureRecovery=true; componentFiles=1' app/build/cronet-runtime/result.txt
@@ -39,6 +40,7 @@ timeout 300 adb shell am instrument -w -r \
   com.legado.app.release/io.legado.app.lib.cronet.CronetRuntimeInstrumentation \
   | tee app/build/cronet-runtime/cached-result.txt
 grep -Fq 'CRONET_RUNTIME_PASSED' app/build/cronet-runtime/cached-result.txt
+grep -Fq 'productionClientToggle=off,on,off,on' app/build/cronet-runtime/cached-result.txt
 grep -Fq 'INSTRUMENTATION_CODE: -1' app/build/cronet-runtime/cached-result.txt
 grep -Fq 'cachedBefore=true' app/build/cronet-runtime/cached-result.txt
 adb pull /sdcard/Android/data/com.legado.app.release/files/cronet-runtime/storage.txt \

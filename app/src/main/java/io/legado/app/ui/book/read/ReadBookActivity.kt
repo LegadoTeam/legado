@@ -480,7 +480,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         binding.readView.cancelTouchGestures()
         autoPageStop()
         backupJob?.cancel()
-        updateScrollReadPosition()
+        binding.readView.updateScrollReadPosition()
         ReadBook.saveRead()
         ReadBook.cancelPreDownloadTask()
         unregisterReceiver(timeBatteryReceiver)
@@ -556,7 +556,12 @@ class ReadBookActivity : BaseReadBookActivity(),
 //                        item.isChecked = AppConfig.enableReview
 //                    }
 
-                    R.id.menu_reverse_content -> item.isVisible = onLine
+                    R.id.menu_reverse_content -> {
+                        item.isVisible = onLine
+                        item.isChecked = ReadBook.curTextChapter?.chapter?.takeIf {
+                            it.bookUrl == book.bookUrl && it.index == ReadBook.durChapterIndex
+                        }?.let { BookHelp.isContentReversed(book, it) } == true
+                    }
                     R.id.menu_del_ruby_tag -> item.isChecked = book.getDelTag(Book.rubyTag)
                     R.id.menu_del_h_tag -> item.isChecked = book.getDelTag(Book.hTag)
                 }
@@ -1567,15 +1572,6 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     fun showReadAloudControls(resetPosition: Boolean = false) {
         aloudControls.reveal(resetPosition)
-    }
-
-    private fun updateScrollReadPosition() {
-        if (!ReadBook.isScroll) return
-        if (ReadBook.msg != null || !ReadBook.isLayoutAvailable) return
-        val (chapterIndex, line) = binding.readView.getReadPosition() ?: return
-        if (chapterIndex == ReadBook.durChapterIndex) {
-            ReadBook.durChapterPos = line.chapterPosition
-        }
     }
 
     /**
@@ -2873,7 +2869,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
         observeEvent<ArrayList<Int>>(EventBus.UP_CONFIG) { values ->
             if (5 in values && isInitFinish) {
-                updateScrollReadPosition()
+                binding.readView.updateScrollReadPosition(preserveText = true)
             }
             values.forEach { value ->
                 when (value) {

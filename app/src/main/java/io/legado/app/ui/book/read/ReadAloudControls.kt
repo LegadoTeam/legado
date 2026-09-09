@@ -200,12 +200,12 @@ class ReadAloudControls(
     private fun position() {
         if (bar.width == 0 || parent.height == 0 || dragging) return
         val (left, top, right, bottom) = safeBounds()
-        val movable = prefs.getBoolean(PreferKey.readAloudControlsDrag, false)
         val dock = prefs.getBoolean(PreferKey.readAloudControlsDock, false)
-        var x = if (movable) prefs.getFloat(PreferKey.readAloudControlsX, .5f) else .5f
+        // Keep the last manually chosen position when dragging is disabled.
+        var x = prefs.getFloat(PreferKey.readAloudControlsX, .5f)
         x = if (x.isFinite()) x.coerceIn(0f, 1f) else .5f
         if (dock) x = if (x < .5f) 0f else 1f
-        val y = if (movable) prefs.getFloat(PreferKey.readAloudControlsY, -1f) else -1f
+        val y = prefs.getFloat(PreferKey.readAloudControlsY, -1f)
         bar.x = left + (right - left) * x
         bar.y = if (y.isFinite() && y >= 0f) top + (bottom - top) * y.coerceIn(0f, 1f)
             else (bottom - 24.dpToPx()).coerceAtLeast(top)

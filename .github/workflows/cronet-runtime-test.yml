@@ -17,6 +17,8 @@ on:
       - 'app/src/main/assets/cronet.json'
       - 'app/src/main/java/io/legado/app/lib/cronet/**'
       - 'app/src/main/java/io/legado/app/help/http/Cronet.kt'
+      - 'app/src/main/java/io/legado/app/help/http/HttpHelper.kt'
+      - 'app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeUrl.kt'
       - 'app/src/main/java/io/legado/app/App.kt'
       - 'app/src/main/java/io/legado/app/ui/config/OtherConfigFragment.kt'
       - 'app/src/cronetRuntime/**'

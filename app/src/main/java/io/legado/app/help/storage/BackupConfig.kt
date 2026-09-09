@@ -108,7 +108,6 @@ object BackupConfig {
         PreferKey.defaultBookTreeUri,
         PreferKey.webDavDeviceName,
         PreferKey.webDavBookAutoRestore,
-        PreferKey.autoBackup,
         PreferKey.jsSourceApiToken,
         PreferKey.launcherIcon,
         PreferKey.bitmapCacheSize,
@@ -165,6 +164,7 @@ object BackupConfig {
         PreferKey.coverShowNameN,
         PreferKey.coverShowAuthorN,
         PreferKey.coverHorizontal,
+        PreferKey.coverTitleAdaptive,
         PreferKey.coverKeepPunctuation
     )
 

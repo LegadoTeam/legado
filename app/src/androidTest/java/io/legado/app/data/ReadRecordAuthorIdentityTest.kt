@@ -1,13 +1,18 @@
 package io.legado.app.data
 
 import androidx.room.Room
+import androidx.room.RoomDatabase
 import androidx.room.testing.MigrationTestHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.constant.AppConst
 import io.legado.app.data.entities.ReadRecord
+import io.legado.app.data.entities.ReadRecordShow
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.BookChapter
+import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.rule.ContentRule
 import io.legado.app.data.entities.saveWithCover
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.globalExecutor
@@ -29,6 +34,8 @@ import java.io.File
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.Executor
+import java.util.concurrent.atomic.AtomicReference
 
 @RunWith(AndroidJUnit4::class)
 class ReadRecordAuthorIdentityTest {
@@ -80,7 +87,7 @@ class ReadRecordAuthorIdentityTest {
                 .build()
             try {
                 val dao = database.readRecordDao
-                assertEquals(109, database.openHelper.writableDatabase.version)
+                assertEquals(110, database.openHelper.writableDatabase.version)
                 assertEquals(legacy.toSet(), dao.all.toSet())
                 assertEquals(1350L, dao.allTime)
                 assertNull(dao.getRecord("phone", "Same", "Author A"))
@@ -100,6 +107,84 @@ class ReadRecordAuthorIdentityTest {
         } finally {
             context.deleteDatabase(name)
         }
+    }
+
+    @Test
+    fun migrate109To110PreservesLargeHistoryAndIndexesBothActualDaoQueries() {
+        val name = "read-record-index-migration-${UUID.randomUUID()}"
+        val records = (0 until 6375).map { index ->
+            ReadRecord(deviceId = "phone", bookName = "History $index", author = "Author $index",
+                readTime = index + 1L, lastRead = index + 10L, lastChapterTitle = "Chapter $index",
+                lastChapterIndex = index, lastChapterPos = index % 50, coverUrl = "/saved/$index.cover")
+        }.toMutableList()
+        records += records.first().copy(deviceId = "tablet", readTime = 200, lastRead = 9000,
+            lastChapterTitle = "Tablet chapter", lastChapterIndex = 12, lastChapterPos = 17, coverUrl = "tablet-cover")
+        records += records.last().copy(deviceId = "desktop", readTime = 300,
+            lastChapterTitle = "Tie winner", coverUrl = "desktop-cover")
+        records += records.first().copy(author = "", readTime = 400)
+        records += records.first().copy(author = combinedAuthor, readTime = 500)
+        val expected = records.groupBy { it.bookName to it.author }.values.map { devices ->
+            val snapshot = devices.sortedWith(compareByDescending<ReadRecord> { it.lastRead }
+                .thenBy { it.deviceId }).first()
+            ReadRecordShow(snapshot.bookName, devices.sumOf { it.readTime }, snapshot.lastRead,
+                snapshot.author, snapshot.lastChapterTitle, snapshot.lastChapterIndex,
+                snapshot.lastChapterPos, snapshot.coverUrl)
+        }.toSet()
+        val actualQuery = AtomicReference<Pair<String, List<Any?>>>()
+        try {
+            helper.createDatabase(name, 109).use { legacy ->
+                legacy.beginTransaction()
+                try {
+                    val statement = legacy.compileStatement("INSERT INTO readRecord VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                    try {
+                        records.forEach { record ->
+                            statement.bindString(1, record.deviceId)
+                            statement.bindString(2, record.bookName)
+                            statement.bindString(3, record.author)
+                            statement.bindLong(4, record.readTime)
+                            statement.bindLong(5, record.lastRead)
+                            statement.bindString(6, record.lastChapterTitle!!)
+                            statement.bindLong(7, record.lastChapterIndex.toLong())
+                            statement.bindLong(8, record.lastChapterPos.toLong())
+                            statement.bindString(9, record.coverUrl!!)
+                            statement.executeInsert()
+                        }
+                    } finally { statement.close() }
+                    legacy.setTransactionSuccessful()
+                } finally { legacy.endTransaction() }
+            }
+            // Opening the generated Room database runs and validates the real migration.
+            val database = Room.databaseBuilder(context, AppDatabase::class.java, name)
+                .addMigrations(*DatabaseMigrations.migrations)
+                .setQueryCallback(object : RoomDatabase.QueryCallback {
+                    override fun onQuery(sqlQuery: String, bindArgs: List<Any?>) {
+                        if (sqlQuery.trimStart().startsWith("select history.bookName")) {
+                            actualQuery.set(sqlQuery to bindArgs.toList())
+                        }
+                    }
+                }, Executor { it.run() }).build()
+            try {
+                val sqlite = database.openHelper.writableDatabase
+                assertEquals(110, sqlite.version)
+                assertEquals(records.toSet(), database.readRecordDao.all.toSet())
+                for (search in listOf(false, true)) {
+                    val start = android.os.SystemClock.elapsedRealtime()
+                    val result = if (search) database.readRecordDao.search("History") else database.readRecordDao.allShow
+                    val elapsed = android.os.SystemClock.elapsedRealtime() - start
+                    assertEquals(expected, result.toSet())
+                    val (query, args) = checkNotNull(actualQuery.getAndSet(null))
+                    val plan = sqlite.query("EXPLAIN QUERY PLAN $query", args.toTypedArray()).use { cursor ->
+                        buildList { while (cursor.moveToNext()) add(cursor.getString(3)) }
+                    }
+                    assertTrue("Latest snapshot must use the covering index: $plan",
+                        plan.any { it.contains("SEARCH readRecord USING COVERING INDEX index_readRecord_snapshot") })
+                    assertFalse("The correlated query must not scan all records: $plan",
+                        plan.any { it.contains("SCAN readRecord") })
+                    assertTrue("Indexed history query took ${elapsed}ms", elapsed < 3000)
+                    println("History query: search=$search rows=${result.size} elapsedMs=$elapsed plan=$plan")
+                }
+            } finally { database.close() }
+        } finally { context.deleteDatabase(name) }
     }
 
     @Test
@@ -378,6 +463,123 @@ class ReadRecordAuthorIdentityTest {
             dao.clear()
             dao.insert(*saved.toTypedArray())
             AppConfig.enableReadRecord = enabled
+        }
+    }
+
+    @Test
+    fun queuedProgressKeepsEachBooksPositionAndSourceWhenTheReaderSwitches() {
+        globalExecutor.submit {}.get(10, TimeUnit.SECONDS)
+        val originalBook = ReadBook.book
+        val originalSource = ReadBook.bookSource
+        val originalIndex = ReadBook.durChapterIndex
+        val originalPosition = ReadBook.durChapterPos
+        val jumpField = ReadBook.javaClass.getDeclaredField("pendingHighlightJump").apply { isAccessible = true }
+        val originalJump = jumpField.get(ReadBook)
+        val id = UUID.randomUUID().toString()
+        val sources = listOf("A", "B").map { author ->
+            BookSource(bookSourceUrl = "https://example.invalid/queued-progress/$id/$author",
+                bookSourceName = "Queued progress $author", enabled = false, eventListener = true,
+                ruleContent = ContentRule(callBackJs = """
+                    if (event === 'saveRead') {
+                        source.putVariable([source.getKey(), book.bookUrl, chapter.bookUrl,
+                            chapter.index, book.durChapterIndex, book.durChapterPos,
+                            book.durChapterTitle, result].join('|'));
+                    }
+                """.trimIndent()))
+        }
+        val books = sources.mapIndexed { index, source ->
+            Book(bookUrl = "${source.bookSourceUrl}/book", name = "Queued progress $id $index",
+                origin = source.bookSourceUrl, author = "Author $index",
+                durChapterIndex = 0, durChapterPos = 10 + index,
+                durChapterTitle = "Initial $index", durChapterTime = 1, lastCheckCount = 7).apply {
+                setUseReplaceRule(false)
+            }
+        }
+        val evidence = StringBuilder()
+        val firstWritten = AtomicReference<List<Book>>()
+        var queuedAt = 0L
+        var releaseAt = 0L
+        try {
+            appDb.bookSourceDao.insert(*sources.toTypedArray())
+            appDb.bookDao.insert(*books.toTypedArray())
+            books.forEach { book ->
+                appDb.bookChapterDao.insert(*(0..2).map { index ->
+                    BookChapter(bookUrl = book.bookUrl, url = "${book.bookUrl}/$index",
+                        index = index, title = "${book.author} chapter $index")
+                }.toTypedArray())
+            }
+            withReadRecordWritesPaused {
+                queuedAt = System.currentTimeMillis()
+                books.forEachIndexed { index, book ->
+                    // Switch the real reader state without starting unrelated chapter/network loads.
+                    ReadBook.book = book
+                    ReadBook.bookSource = sources[index]
+                    ReadBook.durChapterIndex = index + 1
+                    ReadBook.durChapterPos = 123 * (index + 1)
+                    ReadBook.saveRead(pageChanged = index == 1)
+                    if (index == 0) {
+                        globalExecutor.execute {
+                            firstWritten.set(books.map { appDb.bookDao.getBook(it.bookUrl)!! })
+                        }
+                    }
+                }
+                // Neither queued write may borrow a subsequent visible position from book B.
+                ReadBook.durChapterIndex = 0
+                ReadBook.durChapterPos = 999
+                books.forEachIndexed { index, book ->
+                    val saved = appDb.bookDao.getBook(book.bookUrl)!!
+                    assertEquals(0, saved.durChapterIndex)
+                    assertEquals(10 + index, saved.durChapterPos)
+                    assertEquals(1L, saved.durChapterTime)
+                }
+                assertTrue(sources.all { it.getVariable().isEmpty() })
+                evidence.appendLine("Queue blocked: A=0/10 B=0/11; queued A=1/123 B=2/246; visible B=0/999")
+                releaseAt = System.currentTimeMillis()
+            }
+            val intermediate = checkNotNull(firstWritten.get())
+            evidence.appendLine("After first writer: " + intermediate.joinToString { "${it.author}=${it.durChapterIndex}/${it.durChapterPos}" })
+            assertEquals(1, intermediate[0].durChapterIndex)
+            assertEquals(123, intermediate[0].durChapterPos)
+            assertEquals(0, intermediate[1].durChapterIndex)
+            assertEquals(11, intermediate[1].durChapterPos)
+            val deadline = android.os.SystemClock.elapsedRealtime() + 10_000
+            while (sources.any { it.getVariable().isEmpty() } &&
+                android.os.SystemClock.elapsedRealtime() < deadline) {
+                android.os.SystemClock.sleep(20)
+            }
+            books.forEachIndexed { index, book ->
+                val saved = appDb.bookDao.getBook(book.bookUrl)!!
+                val chapterIndex = index + 1
+                val position = 123 * chapterIndex
+                val callback = sources[index].getVariable()
+                evidence.appendLine("Saved ${book.author}: ${saved.durChapterIndex}/${saved.durChapterPos} time=${saved.durChapterTime}; callback=$callback")
+                assertEquals(chapterIndex, saved.durChapterIndex)
+                assertEquals(position, saved.durChapterPos)
+                assertEquals("${book.author} chapter $chapterIndex", saved.durChapterTitle)
+                assertEquals(0, saved.lastCheckCount)
+                assertTrue("Save time must belong to the enqueue operation",
+                    saved.durChapterTime in queuedAt..releaseAt)
+                assertEquals(listOf(sources[index].bookSourceUrl, book.bookUrl, book.bookUrl,
+                    chapterIndex, chapterIndex, position, saved.durChapterTitle,
+                    saved.durChapterTime).joinToString("|"), callback)
+            }
+            assertSame(books[1], ReadBook.book)
+            assertEquals(0, ReadBook.durChapterIndex)
+            assertEquals(999, ReadBook.durChapterPos)
+        } finally {
+            File(context.getExternalFilesDir("ui-regression"), "queued-read-progress.txt")
+                .writeText(evidence.toString())
+            globalExecutor.submit {}.get(10, TimeUnit.SECONDS)
+            ReadBook.book = originalBook
+            ReadBook.bookSource = originalSource
+            ReadBook.durChapterIndex = originalIndex
+            ReadBook.durChapterPos = originalPosition
+            jumpField.set(ReadBook, originalJump)
+            appDb.bookDao.delete(*books.toTypedArray())
+            sources.forEach { source ->
+                source.putVariable(null)
+                appDb.bookSourceDao.delete(source.bookSourceUrl)
+            }
         }
     }
 

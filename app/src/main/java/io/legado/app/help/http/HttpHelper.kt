@@ -105,10 +105,9 @@ val okHttpClient: OkHttpClient by lazy {
         }
     }
     builder.addInterceptor(HttpLogInterceptor())
-    if (AppConfig.isCronet) {
-        Cronet.interceptor?.let {
-            builder.addInterceptor(it)
-        }
+    // The shared client outlives settings changes; the interceptor reads the current switch.
+    Cronet.interceptor?.let {
+        builder.addInterceptor(it)
     }
     builder.addInterceptor(DecompressInterceptor)
     builder.build().apply {
@@ -176,9 +175,7 @@ fun getProxyClient(proxy: String? = null): OkHttpClient {
             )
         )
     }
-    if (AppConfig.isCronet) {
-        Cronet.interceptor?.let { builder.interceptors().remove(it) }
-    }
+    Cronet.interceptor?.let { builder.interceptors().remove(it) }
     proxyConfig.credentials?.takeIf { proxyConfig.protocol == ProxyProtocol.HTTP }
         ?.let { credentials ->
             builder.proxyAuthenticator { _, response ->

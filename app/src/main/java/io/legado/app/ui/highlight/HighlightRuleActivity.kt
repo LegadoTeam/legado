@@ -16,6 +16,8 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.HighlightRule
 import io.legado.app.data.entities.HighlightRuleFile
 import io.legado.app.databinding.ActivityHighlightRuleBinding
+import io.legado.app.databinding.DialogEditTextBinding
+import io.legado.app.help.DirectLinkUpload
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.model.ReadBook
@@ -27,6 +29,10 @@ import io.legado.app.ui.widget.recycler.DragSelectTouchHelper
 import io.legado.app.ui.widget.recycler.ItemTouchCallback
 import io.legado.app.ui.widget.recycler.VerticalDivider
 import io.legado.app.utils.GSON
+import io.legado.app.utils.isAbsUrl
+import io.legado.app.utils.sendToClip
+import io.legado.app.utils.share
+import io.legado.app.utils.stackTraceStr
 import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.toastOnUi
@@ -37,6 +43,7 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.io.File
 
 class HighlightRuleActivity :
     VMBaseActivity<ActivityHighlightRuleBinding, HighlightRuleViewModel>(),
@@ -51,7 +58,20 @@ class HighlightRuleActivity :
         it.uri?.let { uri -> showDialogFragment(ImportHighlightRuleDialog(uri.toString())) }
     }
     private val exportResult = registerForActivityResult(HandleFileContract()) {
-        if (it.uri != null) toastOnUi(R.string.export_success)
+        it.uri?.let { uri ->
+            val url = uri.toString()
+            alert(R.string.export_success) {
+                if (url.isAbsUrl()) {
+                    setMessage(DirectLinkUpload.getSummary())
+                }
+                val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
+                    editView.hint = getString(R.string.path)
+                    editView.setText(url)
+                }
+                customView { alertBinding.root }
+                okButton { sendToClip(url) }
+            }
+        }
     }
     private var allRules: List<HighlightRule> = emptyList()
     private var activeGroup: String? = null
@@ -131,6 +151,7 @@ class HighlightRuleActivity :
             R.id.menu_bottom_sel ->
                 viewModel.moveSelection(selection, false).onSuccess { ReadBook.upHighlightRules() }
             R.id.menu_export_selection -> exportRules(selection)
+            R.id.menu_share_source -> shareRules(selection)
         }
         return true
     }
@@ -165,6 +186,20 @@ class HighlightRuleActivity :
                 ).toByteArray(),
                 "application/json"
             )
+        }
+    }
+
+    private fun shareRules(rules: List<HighlightRule>) {
+        if (rules.isEmpty()) return
+        val selected = rules.toList()
+        viewModel.execute(scope = lifecycleScope) {
+            File.createTempFile("highlightRules_", ".json", cacheDir).apply {
+                writeText(GSON.toJson(HighlightRuleFile(type = HighlightRuleFile.TYPE, rules = selected)))
+            }
+        }.onSuccess {
+            share(it)
+        }.onError {
+            toastOnUi(it.stackTraceStr)
         }
     }
 
