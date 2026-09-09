@@ -53,6 +53,15 @@ class ReadAloudFloatingBarTest {
             .contains("postEvent(EventBus.READ_ALOUD_FOLLOW"))
     }
 
+    @Test
+    fun `disabling drag keeps the stored floating bar position`() {
+        val controls = projectFile("src/main/java/io/legado/app/ui/book/read/ReadAloudControls.kt").readText()
+        val position = controls.substringAfter("private fun position()").substringBefore("@SuppressLint")
+        assertTrue(position.contains("prefs.getFloat(PreferKey.readAloudControlsX, .5f)"))
+        assertTrue(position.contains("prefs.getFloat(PreferKey.readAloudControlsY, -1f)"))
+        assertFalse(position.contains("if (movable) prefs.getFloat"))
+    }
+
     private fun projectFile(pathInApp: String): File {
         return listOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull { it.isFile }
