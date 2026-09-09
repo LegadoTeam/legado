@@ -17,7 +17,7 @@ buildscript {
     dependencies { classpath 'org.ow2.asm:asm-tree:9.8' }
 }
 
-// Experimental, version-pinned adaptation. Keep the checked-in official JAR byte-for-byte intact.
+// Version-pinned adaptation. Keep the checked-in official JAR byte-for-byte intact.
 // Cronet 153's public setLibraryLoader() is a no-op; reconnect its actual load site instead.
 def original = file('cronetlib/cronet_impl_native_java.jar')
 def adapted = layout.buildDirectory.file('cronet-dynamic/cronet_impl_native_java.jar')

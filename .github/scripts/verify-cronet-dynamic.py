@@ -1,4 +1,4 @@
-"""Bound the experimental adaptation to one Java method in one official class."""
+"""Bound the version-pinned adaptation to one Java method in one official class."""
 from pathlib import Path
 import subprocess
 import zipfile

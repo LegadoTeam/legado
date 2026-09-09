@@ -6,6 +6,7 @@ on:
       - '.github/workflows/cronet-runtime-test.yml'
       - '.github/scripts/cronet-runtime-test.init.gradle'
       - '.github/scripts/run-cronet-runtime.sh'
+      - '.github/scripts/verify-cronet-dynamic.py'
       - 'app/cronetlib/**'
       - 'app/*proguard*'
       - 'app/build.gradle'
