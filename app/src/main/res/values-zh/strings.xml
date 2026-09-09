@@ -1694,6 +1694,7 @@
     <string name="show_explore_categories">显示全部分类</string>
     <string name="read_record_simple_layout">简洁布局</string>
     <string name="read_record_use_days">按天统计</string>
+    <string name="read_record_show_seconds">显示秒数</string>
     <string name="read_record_achievement">累计阅读成就</string>
     <string name="read_record_book_count">已读 %1$d 本书</string>
     <string name="read_record_total_duration">共阅读 %1$s</string>
