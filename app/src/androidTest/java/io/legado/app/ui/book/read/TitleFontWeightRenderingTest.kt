@@ -13,7 +13,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.pressBack
-import androidx.test.espresso.action.ViewActions.swipeLeft
+import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.isCompletelyDisplayed
@@ -311,7 +311,8 @@ class TitleFontWeightRenderingTest {
         scenario!!.onActivity {
             ReadStyleDialog().showNow(it.supportFragmentManager, "title-weight-style")
         }
-        onView(withId(R.id.style_toolbar_scroll)).inRoot(isDialog()).perform(swipeLeft())
+        // Reveal the item within its horizontal scroller without starting Android's edge-back gesture.
+        onView(withId(R.id.tv_tip)).inRoot(isDialog()).perform(scrollTo())
         onView(withId(R.id.tv_tip)).inRoot(isDialog()).check(matches(isCompletelyDisplayed()))
         screenshot("title-weight-information-entry")
         onView(withId(R.id.tv_tip)).inRoot(isDialog()).perform(click())
@@ -335,7 +336,7 @@ class TitleFontWeightRenderingTest {
             assertFontWeight(ChapterProvider.contentPaint.typeface, 700)
             ReadStyleDialog().showNow(it.supportFragmentManager, "title-weight-style")
         }
-        onView(withId(R.id.style_toolbar_scroll)).inRoot(isDialog()).perform(swipeLeft())
+        onView(withId(R.id.tv_tip)).inRoot(isDialog()).perform(scrollTo())
         onView(withId(R.id.tv_tip)).inRoot(isDialog())
             .check(matches(isCompletelyDisplayed())).perform(click())
         onView(withId(R.id.tv_title_font_weight)).inRoot(isDialog()).check(matches(withText(weights[0])))
