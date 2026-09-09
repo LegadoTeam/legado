@@ -533,6 +533,7 @@ object Restore {
             if (PreferKey.autoBackupIntervalDays !in map) edit.putInt(PreferKey.autoBackupIntervalDays, 1)
             if ("readRecordSimpleLayout" !in map) edit.putBoolean("readRecordSimpleLayout", true)
             if ("readRecordUseDays" !in map) edit.putBoolean("readRecordUseDays", false)
+            if ("readRecordShowSeconds" !in map) edit.putBoolean("readRecordShowSeconds", true)
             if (!BackupConfig.ignoreReadConfig && PreferKey.mangaRightToLeft !in map) {
                 edit.putBoolean(PreferKey.mangaRightToLeft, false)
             }
