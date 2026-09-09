@@ -907,7 +907,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
      * 更新翻页动画
      */
     fun upPageAnim(upRecorder: Boolean = false) {
-        updateScrollReadPosition()
+        updateScrollReadPosition(preserveText = ReadBook.pageAnim() != PageAnim.scrollPageAnim)
         isScroll = ReadBook.pageAnim() == 3
         // Replacing the delegate rebinds content; it must use the new page mode.
         curPage.setIsScroll(isScroll)
@@ -1088,12 +1088,18 @@ class ReadView(context: Context, attrs: AttributeSet) :
         return curPage.getReadPosition()
     }
 
-    fun updateScrollReadPosition() {
+    fun updateScrollReadPosition(preserveText: Boolean = false) {
         // The configured mode may already have changed; capture the page still on screen.
         if (!isScroll || ReadBook.msg != null || !ReadBook.isLayoutAvailable) return
         val (chapterIndex, line) = getReadPosition() ?: return
         if (chapterIndex == ReadBook.durChapterIndex) {
             ReadBook.durChapterPos = line.chapterPosition
+            if (preserveText) {
+                // A style can change indentation, so the same character offset can mean other text.
+                val anchor = line.text.trimStart()
+                ReadBook.durChapterPos += line.text.length - anchor.length
+                ReadBook.preserveCurrentPositionForRefresh(anchor)
+            }
         }
     }
 

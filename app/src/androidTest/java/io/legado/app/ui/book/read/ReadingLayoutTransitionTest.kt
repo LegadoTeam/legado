@@ -113,10 +113,13 @@ class ReadingLayoutTransitionTest {
                 assertEquals("Horizontal pages must not retain a vertical scroll offset", 0, returned.offset)
                 assertTrue("The lower part of the returned page must contain rendered text", returned.bottomPixels > 100)
                 assertTrue("Reopening must also render text in the lower part of the page", reopened.bottomPixels > 100)
-                assertTrue("The returned page ${returned.pageRange} must contain the last visible reading position ${scrolled.visiblePosition}",
-                    scrolled.visiblePosition in returned.pageRange)
-                assertTrue("The reopened page must retain the same visible reading position",
-                    scrolled.visiblePosition in reopened.pageRange)
+                // Different indentation changes rendered character offsets. Check the text itself.
+                val anchor = scrolled.visibleText.filterNot(Char::isWhitespace).take(12)
+                assertTrue("The scrolled page must expose a text anchor", anchor.isNotEmpty())
+                assertTrue("The returned page must contain the last visible text: $anchor",
+                    returned.pageText.filterNot(Char::isWhitespace).contains(anchor))
+                assertTrue("Reopening must retain the same visible text: $anchor",
+                    reopened.pageText.filterNot(Char::isWhitespace).contains(anchor))
             }
         } finally {
             appDb.bookDao.delete(book)
@@ -193,7 +196,7 @@ class ReadingLayoutTransitionTest {
     }
 
     private data class ReadingSnapshot(val offset: Int, val bottomPixels: Int,
-        val visiblePosition: Int, val pageRange: IntRange)
+        val visiblePosition: Int, val pageRange: IntRange, val visibleText: String, val pageText: String)
 
     private fun capture(scenario: ActivityScenario<ReadBookActivity>, name: String): ReadingSnapshot {
         val output = context.getExternalFilesDir("ui-regression")!!
@@ -214,7 +217,8 @@ class ReadingLayoutTransitionTest {
                 val page = readView.curPage.textPage
                 val visible = readView.getReadPosition()
                 val pageRange = page.chapterPosition..(page.chapterPosition + page.charSize)
-                result = ReadingSnapshot(offset, bottomPixels, visible?.second?.chapterPosition ?: -1, pageRange)
+                result = ReadingSnapshot(offset, bottomPixels, visible?.second?.chapterPosition ?: -1,
+                    pageRange, visible?.second?.text.orEmpty(), page.lines.joinToString("") { it.text })
                 File(output, "$name.txt").writeText("scroll=${readView.isScroll} offset=$offset bottomPixels=$bottomPixels\n" +
                     "view=${view.width}x${view.height} provider=${ChapterProvider.viewWidth}x${ChapterProvider.viewHeight}\n" +
                     "visibleChapter=${visible?.first} visiblePosition=${visible?.second?.chapterPosition} visibleText=${visible?.second?.text} pageRange=$pageRange animating=${readView.pageDelegate?.isRunning}\n" +

@@ -571,8 +571,10 @@ object ReadBook : CoroutineScope by MainScope() {
         nextTextChapter = null
     }
 
-    fun preserveCurrentPositionForRefresh() {
-        pendingHighlightAnchor = currentPositionAnchor()
+    fun preserveCurrentPositionForRefresh(anchorText: String? = null) {
+        pendingHighlightAnchor = currentPositionAnchor()?.let { anchor ->
+            anchorText?.takeIf(String::isNotEmpty)?.let { anchor.copy(bookText = it) } ?: anchor
+        }
     }
 
     fun clearSearchResult() {
