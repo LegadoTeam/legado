@@ -9,6 +9,7 @@ import android.graphics.Paint.FontMetrics
 import android.os.Build
 import androidx.annotation.Keep
 import io.legado.app.help.HighlightGeometry
+import io.legado.app.help.HighlightStyle
 import io.legado.app.help.PaintPool
 import io.legado.app.help.book.isImage
 import io.legado.app.help.config.AppConfig
@@ -494,10 +495,12 @@ data class TextLine(
                 shape,
                 1f.dpToPx()
             )
+            // Keep the end glyphs clear of the capsule's curved border.
+            val padding = if (shape == HighlightStyle.FillShape.PILL) (band.bottom - band.top) / 2f else 0f
             HighlightDraw.drawFillRun(
                 canvas,
-                first.start,
-                last.end,
+                first.start - padding,
+                last.end + padding,
                 band.top,
                 band.bottom,
                 fill,
