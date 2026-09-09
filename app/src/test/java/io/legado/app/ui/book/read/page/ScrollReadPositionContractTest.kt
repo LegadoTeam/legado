@@ -36,7 +36,7 @@ class ScrollReadPositionContractTest {
             .substringBefore("fun getReadAloudPos()")
         assertTrue(savePosition.contains("getReadPosition()"))
         assertTrue(savePosition.contains("ReadBook.msg != null || !ReadBook.isLayoutAvailable"))
-        assertTrue(savePosition.contains("if (isScroll || preserveText)"))
+        assertTrue(savePosition.contains("if (isScroll || (preserveText && ReadBook.isScroll))"))
         assertTrue(savePosition.contains("ReadBook.durChapterPos = line.chapterPosition"))
         assertTrue(savePosition.contains("curPage.textPage.textChapter !== ReadBook.curTextChapter"))
         assertTrue(savePosition.contains("!preserveText || ReadBook.durChapterPos !in line.chapterIndices"))

@@ -1,5 +1,7 @@
 package io.legado.app.model
 
+import android.util.Log
+import io.legado.app.BuildConfig
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.EventBus
@@ -599,6 +601,9 @@ object ReadBook : CoroutineScope by MainScope() {
 
     fun preserveCurrentPositionForRefresh() {
         pendingHighlightAnchor = currentPositionAnchor()
+        if (BuildConfig.DEBUG) Log.d("ReadPosition",
+            "anchor position=$durChapterPos pending=${pendingHighlightAnchor?.rawPosition} " +
+                "chapter=${System.identityHashCode(curTextChapter)}")
     }
 
     fun clearSearchResult() {
@@ -1862,6 +1867,9 @@ object ReadBook : CoroutineScope by MainScope() {
                 } else {
                     currentTitleLength + layoutPosition
                 }
+                if (BuildConfig.DEBUG) Log.d("ReadPosition",
+                    "restore raw=${pending.rawPosition} position=$durChapterPos " +
+                        "chapter=${System.identityHashCode(textChapter)}")
                 saveRead()
                 return true
             }
