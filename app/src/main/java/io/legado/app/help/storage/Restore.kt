@@ -523,6 +523,11 @@ object Restore {
             if (PreferKey.showExploreCategories !in map) {
                 edit.putBoolean(PreferKey.showExploreCategories, false)
             }
+            if (BackupConfig.keyIsNotIgnore(PreferKey.coverTitleAdaptive) &&
+                PreferKey.coverTitleAdaptive !in map
+            ) {
+                edit.putBoolean(PreferKey.coverTitleAdaptive, true)
+            }
             if ("readRecordSimpleLayout" !in map) edit.putBoolean("readRecordSimpleLayout", true)
             if ("readRecordUseDays" !in map) edit.putBoolean("readRecordUseDays", false)
             if (!BackupConfig.ignoreReadConfig && PreferKey.mangaRightToLeft !in map) {

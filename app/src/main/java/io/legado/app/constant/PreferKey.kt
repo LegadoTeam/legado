@@ -27,6 +27,7 @@ object PreferKey {
     const val coverShowNameN = "coverShowNameN"
     const val coverShowAuthorN = "coverShowAuthorN"
     const val coverHorizontal = "coverHorizontal"
+    const val coverTitleAdaptive = "coverTitleAdaptive"
     const val coverKeepPunctuation = "coverKeepPunctuation"
     const val remoteServerId = "remoteServerId"
     const val hideStatusBar = "hideStatusBar"
