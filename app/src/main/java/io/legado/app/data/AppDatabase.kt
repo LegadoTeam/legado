@@ -77,7 +77,7 @@ val appDb by lazy {
 }
 
 @Database(
-    version = 109,
+    version = 110,
     exportSchema = true,
     entities = [Book::class, BookGroup::class, BookSource::class, BookChapter::class,
         ReplaceRule::class, SearchBook::class, SearchKeyword::class, Cookie::class,

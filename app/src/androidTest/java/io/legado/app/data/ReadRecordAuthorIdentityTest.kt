@@ -1,12 +1,14 @@
 package io.legado.app.data
 
 import androidx.room.Room
+import androidx.room.RoomDatabase
 import androidx.room.testing.MigrationTestHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.constant.AppConst
 import io.legado.app.data.entities.ReadRecord
+import io.legado.app.data.entities.ReadRecordShow
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.saveWithCover
 import io.legado.app.help.config.AppConfig
@@ -29,6 +31,8 @@ import java.io.File
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.Executor
+import java.util.concurrent.atomic.AtomicReference
 
 @RunWith(AndroidJUnit4::class)
 class ReadRecordAuthorIdentityTest {
@@ -80,7 +84,7 @@ class ReadRecordAuthorIdentityTest {
                 .build()
             try {
                 val dao = database.readRecordDao
-                assertEquals(109, database.openHelper.writableDatabase.version)
+                assertEquals(110, database.openHelper.writableDatabase.version)
                 assertEquals(legacy.toSet(), dao.all.toSet())
                 assertEquals(1350L, dao.allTime)
                 assertNull(dao.getRecord("phone", "Same", "Author A"))
@@ -100,6 +104,84 @@ class ReadRecordAuthorIdentityTest {
         } finally {
             context.deleteDatabase(name)
         }
+    }
+
+    @Test
+    fun migrate109To110PreservesLargeHistoryAndIndexesBothActualDaoQueries() {
+        val name = "read-record-index-migration-${UUID.randomUUID()}"
+        val records = (0 until 6375).map { index ->
+            ReadRecord(deviceId = "phone", bookName = "History $index", author = "Author $index",
+                readTime = index + 1L, lastRead = index + 10L, lastChapterTitle = "Chapter $index",
+                lastChapterIndex = index, lastChapterPos = index % 50, coverUrl = "/saved/$index.cover")
+        }.toMutableList()
+        records += records.first().copy(deviceId = "tablet", readTime = 200, lastRead = 9000,
+            lastChapterTitle = "Tablet chapter", lastChapterIndex = 12, lastChapterPos = 17, coverUrl = "tablet-cover")
+        records += records.last().copy(deviceId = "desktop", readTime = 300,
+            lastChapterTitle = "Tie winner", coverUrl = "desktop-cover")
+        records += records.first().copy(author = "", readTime = 400)
+        records += records.first().copy(author = combinedAuthor, readTime = 500)
+        val expected = records.groupBy { it.bookName to it.author }.values.map { devices ->
+            val snapshot = devices.sortedWith(compareByDescending<ReadRecord> { it.lastRead }
+                .thenBy { it.deviceId }).first()
+            ReadRecordShow(snapshot.bookName, devices.sumOf { it.readTime }, snapshot.lastRead,
+                snapshot.author, snapshot.lastChapterTitle, snapshot.lastChapterIndex,
+                snapshot.lastChapterPos, snapshot.coverUrl)
+        }.toSet()
+        val actualQuery = AtomicReference<Pair<String, List<Any?>>>()
+        try {
+            helper.createDatabase(name, 109).use { legacy ->
+                legacy.beginTransaction()
+                try {
+                    val statement = legacy.compileStatement("INSERT INTO readRecord VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                    try {
+                        records.forEach { record ->
+                            statement.bindString(1, record.deviceId)
+                            statement.bindString(2, record.bookName)
+                            statement.bindString(3, record.author)
+                            statement.bindLong(4, record.readTime)
+                            statement.bindLong(5, record.lastRead)
+                            statement.bindString(6, record.lastChapterTitle!!)
+                            statement.bindLong(7, record.lastChapterIndex.toLong())
+                            statement.bindLong(8, record.lastChapterPos.toLong())
+                            statement.bindString(9, record.coverUrl!!)
+                            statement.executeInsert()
+                        }
+                    } finally { statement.close() }
+                    legacy.setTransactionSuccessful()
+                } finally { legacy.endTransaction() }
+            }
+            // Opening the generated Room database runs and validates the real migration.
+            val database = Room.databaseBuilder(context, AppDatabase::class.java, name)
+                .addMigrations(*DatabaseMigrations.migrations)
+                .setQueryCallback(object : RoomDatabase.QueryCallback {
+                    override fun onQuery(sqlQuery: String, bindArgs: List<Any?>) {
+                        if (sqlQuery.trimStart().startsWith("select history.bookName")) {
+                            actualQuery.set(sqlQuery to bindArgs.toList())
+                        }
+                    }
+                }, Executor { it.run() }).build()
+            try {
+                val sqlite = database.openHelper.writableDatabase
+                assertEquals(110, sqlite.version)
+                assertEquals(records.toSet(), database.readRecordDao.all.toSet())
+                for (search in listOf(false, true)) {
+                    val start = android.os.SystemClock.elapsedRealtime()
+                    val result = if (search) database.readRecordDao.search("History") else database.readRecordDao.allShow
+                    val elapsed = android.os.SystemClock.elapsedRealtime() - start
+                    assertEquals(expected, result.toSet())
+                    val (query, args) = checkNotNull(actualQuery.getAndSet(null))
+                    val plan = sqlite.query("EXPLAIN QUERY PLAN $query", args.toTypedArray()).use { cursor ->
+                        buildList { while (cursor.moveToNext()) add(cursor.getString(3)) }
+                    }
+                    assertTrue("Latest snapshot must use the covering index: $plan",
+                        plan.any { it.contains("SEARCH readRecord USING COVERING INDEX index_readRecord_snapshot") })
+                    assertFalse("The correlated query must not scan all records: $plan",
+                        plan.any { it.contains("SCAN readRecord") })
+                    assertTrue("Indexed history query took ${elapsed}ms", elapsed < 3000)
+                    println("History query: search=$search rows=${result.size} elapsedMs=$elapsed plan=$plan")
+                }
+            } finally { database.close() }
+        } finally { context.deleteDatabase(name) }
     }
 
     @Test
