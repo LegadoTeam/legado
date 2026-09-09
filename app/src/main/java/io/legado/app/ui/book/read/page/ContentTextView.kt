@@ -128,7 +128,9 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
             canvas.translate(0f, scrollY.toFloat())
         }
         check(!visibleRect.isEmpty) { "visibleRect 为空" }
-        canvas.clipRect(visibleRect)
+        // Capsule backgrounds may extend into either page margin. Keep the shared
+        // visibleRect unchanged: PDF zoom and reading positions still use its bounds.
+        canvas.clipRect(0f, visibleRect.top, visibleRect.right, visibleRect.bottom)
         val zoom = pdfZoom?.takeIf { it.isEnabled() && !longScreenshot }
         if (zoom != null) {
             zoom.setBounds(visibleRect)
