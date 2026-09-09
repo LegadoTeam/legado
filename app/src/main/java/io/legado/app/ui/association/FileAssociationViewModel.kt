@@ -91,7 +91,7 @@ class FileAssociationViewModel(application: Application) : BaseAssociationViewMo
         if (fileDoc.name.matches(AppPattern.archiveFileRegex)) {
             val backupNames = selectedBackupFileNames { true }.toSet()
             if (fileDoc.name.endsWith(".zip", true) &&
-                ArchiveUtils.getArchiveFilesName(fileDoc).any { it in backupNames }
+                ArchiveUtils.getArchiveFilesName(fileDoc) { it in backupNames }.isNotEmpty()
             ) {
                 successLive.postValue("backup" to fileDoc.uri.toString())
             } else {

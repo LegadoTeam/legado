@@ -126,7 +126,7 @@ class SharedFileImportTest {
         directory.deleteRecursively()
     }
 
-    @Test fun sharedBookListConfirmsThenUsesEnabledSourceSearchAndPersistsTheMatchedBook() {
+    @Test(timeout = 120_000) fun sharedBookListConfirmsThenUsesEnabledSourceSearchAndPersistsTheMatchedBook() {
         val name = "Shared book $id"
         val author = "Shared author"
         val missing = "Missing book $id"
@@ -191,7 +191,7 @@ class SharedFileImportTest {
         } finally { server.stop() }
     }
 
-    @Test fun rawAndTypedHighlightFilesUseTheHighlightPreviewWhileReplacementFilesKeepTheirRoute() {
+    @Test(timeout = 120_000) fun rawAndTypedHighlightFilesUseTheHighlightPreviewWhileReplacementFilesKeepTheirRoute() {
         for (typed in listOf(false, true)) {
             val rule = HighlightRule(name = "Shared highlight $typed", pattern = "target-$id-$typed",
                 style = "{\"bold\":true,\"textColor\":123456}", group = "Share group",
@@ -229,7 +229,7 @@ class SharedFileImportTest {
         }
     }
 
-    @Test fun actualBackupZipConfirmsBeforeRestoringBooksSourcesRulesAndSettings() = runBlocking {
+    @Test(timeout = 120_000) fun actualBackupZipConfirmsBeforeRestoringBooksSourcesRulesAndSettings() = runBlocking {
         val source = BookSource("https://shared-backup-$id.invalid", "Backup source")
         val book = Book(bookUrl = "${source.bookSourceUrl}/book", origin = source.bookSourceUrl,
             name = "Backup book $id", author = "Author", durChapterIndex = 7)
@@ -279,7 +279,7 @@ class SharedFileImportTest {
         }
     }
 
-    @Test fun sharedTxtEpubPdfAndBookZipCopyDurablyAndOpenTheRealReader() {
+    @Test(timeout = 120_000) fun sharedTxtEpubPdfAndBookZipCopyDurablyAndOpenTheRealReader() {
         val txt = File(directory, "shared-txt-$id.txt").apply { writeText("Chapter one\n" + "SHARED_TEXT_VISIBLE $id\n".repeat(20)) }
         val epub = File(directory, "shared-epub-$id.epub").apply {
             instrumentation.context.assets.open("issue1074-containers-fragments.epub").use { input -> outputStream().use(input::copyTo) }
@@ -319,7 +319,7 @@ class SharedFileImportTest {
         }
     }
 
-    @Test fun firstSharedBookRecoversItsStreamWhenVolatileStateIsLostBeforeTheFolderResult() {
+    @Test(timeout = 120_000) fun firstSharedBookRecoversItsStreamWhenVolatileStateIsLostBeforeTheFolderResult() {
         prefs.edit().remove(PreferKey.defaultBookTreeUri).commit()
         val file = File(directory, "first-share-$id.txt").apply { writeText("FIRST_SHARED_STREAM $id\n".repeat(15)) }
         val folderRequests = AtomicInteger()
