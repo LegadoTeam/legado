@@ -3,10 +3,14 @@ package io.legado.app.lib.cronet
 import android.app.Activity
 import android.app.Instrumentation
 import android.os.Bundle
+import android.system.Os
 import androidx.annotation.Keep
 import androidx.preference.PreferenceManager
 import io.legado.app.BuildConfig
 import io.legado.app.constant.PreferKey
+import io.legado.app.help.http.Cronet
+import io.legado.app.help.http.getProxyClient
+import io.legado.app.help.http.okHttpClient
 import okhttp3.CookieJar
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -15,6 +19,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okio.buffer
 import okio.source
 import org.chromium.net.impl.CronetUrlRequestContext
+import org.chromium.net.impl.CronetLibraryLoader
 import org.json.JSONObject
 import java.io.File
 import java.math.BigInteger
@@ -22,7 +27,9 @@ import java.net.InetAddress
 import java.net.ServerSocket
 import java.security.MessageDigest
 import java.util.concurrent.Executors
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 @Keep
 class CronetRuntimeInstrumentation : Instrumentation() {
@@ -51,9 +58,69 @@ class CronetRuntimeInstrumentation : Instrumentation() {
         val preferences = PreferenceManager.getDefaultSharedPreferences(targetContext)
         val hadPreference = preferences.contains(PreferKey.cronet)
         val previous = preferences.getBoolean(PreferKey.cronet, false)
+        check(preferences.edit().putBoolean(PreferKey.cronet, false).commit())
+        val ordinaryRequests = AtomicInteger()
+        // Use the actual startup client, created while the switch is off, throughout all toggles.
+        val sharedClient = okHttpClient.newBuilder().addNetworkInterceptor { chain ->
+            check(!preferences.getBoolean(PreferKey.cronet, false)) {
+                "Enabling Cronet did not update the existing production client"
+            }
+            ordinaryRequests.incrementAndGet()
+            chain.proceed(chain.request())
+        }.build()
+        val proxyClient = getProxyClient("http://127.0.0.1:8888")
+        check(Cronet.interceptor !in proxyClient.interceptors) {
+            "A proxy client created while Cronet was disabled retained its interceptor"
+        }
         val componentDir = targetContext.getDir("cronet", 0)
         val nativeName = "libcronet.${BuildConfig.Cronet_Version}.so"
         val cachedBefore = componentDir.walkTopDown().any { it.isFile && it.name == nativeName }
+        val cachedMtime = componentDir.walkTopDown().firstOrNull { it.isFile && it.name == nativeName }?.lastModified()
+        // Race real cold downloads/install callers, then retry normal native initialization after real I/O failure.
+        val callers = Executors.newFixedThreadPool(8)
+        var firstInstallFailures = 0
+        try {
+            val start = CountDownLatch(1)
+            val installs = (1..8).map {
+                callers.submit<Boolean> {
+                    start.await()
+                    CronetLoader.preDownload()
+                    CronetLoader.install()
+                }
+            }
+            start.countDown()
+            val results = installs.map { it.get(120, TimeUnit.SECONDS) }
+            firstInstallFailures = results.count { !it }
+            if (firstInstallFailures > 0) {
+                // Exercise the same one-retry path used by the real request helper after a failed download.
+                check(CronetLoader.installWithRetry()) {
+                    "Cronet install retry failed; results=$results; downloading=${CronetLoader.download}; " +
+                        "files=${componentDir.walkTopDown().filter { it.isFile }.map { "${it.name}:${it.length()}" }.toList()}"
+                }
+                check((1..8).all { CronetLoader.install() }) { "Retry did not publish a valid shared library" }
+            }
+        } finally {
+            callers.shutdownNow()
+        }
+        val installed = componentDir.walkTopDown().single { it.isFile && it.name == nativeName }
+        if (!cachedBefore) {
+            // Seed an obsolete ABI/version so the final one-file check also verifies migration cleanup.
+            File(componentDir, "obsolete-abi/libcronet.old.so").apply {
+                parentFile!!.mkdirs()
+                writeText("obsolete native fixture")
+            }
+            val abiDir = installed.parentFile!!
+            try {
+                Os.chmod(abiDir.absolutePath, 0)
+                val failure = runCatching { CronetLibraryLoader.ensureInitialized(targetContext) }.exceptionOrNull()
+                check(failure is UnsatisfiedLinkError) { "Expected an actual failed native load, got $failure" }
+                check(File("/proc/self/maps").readLines().none { it.contains(nativeName) }) {
+                    "Failure case unexpectedly loaded Cronet"
+                }
+            } finally {
+                Os.chmod(abiDir.absolutePath, 448) // 0700; no reflection or fabricated Cronet state.
+            }
+        }
         val executor = Executors.newSingleThreadExecutor()
         val client = OkHttpClient.Builder()
             .addInterceptor(CronetInterceptor(CookieJar.NO_COOKIES))
@@ -62,12 +129,11 @@ class CronetRuntimeInstrumentation : Instrumentation() {
             .readTimeout(30, TimeUnit.SECONDS)
             .build()
         try {
-            check(preferences.edit().putBoolean(PreferKey.cronet, true).commit())
             ServerSocket(0, 2, InetAddress.getByName("127.0.0.1")).use { server ->
                 server.soTimeout = 180_000
                 val payload = "Cronet 上传\n\n验证"
                 val served = executor.submit {
-                    listOf("GET" to "", "POST" to payload).forEach { (method, body) ->
+                    (List(5) { "GET" to "" } + ("POST" to payload)).forEach { (method, body) ->
                         server.accept().use { socket ->
                             socket.soTimeout = 30_000
                             val input = socket.getInputStream().source().buffer()
@@ -93,6 +159,17 @@ class CronetRuntimeInstrumentation : Instrumentation() {
                     }
                 }
                 val request = Request.Builder().url("http://127.0.0.1:${server.localPort}/runtime")
+                listOf(false, true, false, true).forEachIndexed { index, enabled ->
+                    check(preferences.edit().putBoolean(PreferKey.cronet, enabled).commit())
+                    sharedClient.newCall(request.build()).execute().use { response ->
+                        assertEquals(200, response.code)
+                        assertEquals("GET:", response.body.string())
+                    }
+                    assertEquals(if (index < 2) 1 else 2, ordinaryRequests.get())
+                    if (enabled) {
+                        check(Cronet.interceptor !in getProxyClient("http://127.0.0.1:8888").interceptors)
+                    }
+                }
                 client.newCall(request.build()).execute().use { response ->
                     assertEquals(200, response.code)
                     assertEquals("GET:", response.body.string())
@@ -123,8 +200,23 @@ class CronetRuntimeInstrumentation : Instrumentation() {
             }
             val downloadCache = File(targetContext.cacheDir, "so_download")
             check(downloadCache.walkTopDown().none { it.isFile }) { "The download left a duplicate native library" }
+            if (cachedBefore) assertEquals(cachedMtime, native.lastModified())
+            val storage = componentDir.walkTopDown().filter { it.isFile }.toList()
+            check(storage == listOf(native)) { "Unexpected component files: $storage" }
+            val evidence = File(targetContext.getExternalFilesDir(null), "cronet-runtime/storage.txt")
+            evidence.parentFile!!.mkdirs()
+            evidence.writeText("cachedBefore=$cachedBefore\nconcurrentInstallers=8\n" +
+                "productionClientToggle=off,on,off,on\nordinaryRequests=${ordinaryRequests.get()}\n" +
+                "firstInstallFailures=$firstInstallFailures\n" +
+                "loadFailureRecovery=${!cachedBefore}\ncomponentFiles=${storage.size}\n" +
+                "componentBytes=${storage.sumOf { it.length() }}\nnativeMtime=${native.lastModified()}\n" +
+                "nativeFile=${native.canonicalPath}\n" +
+                File("/proc/self/maps").readLines().filter { it.contains(nativeName) }.joinToString("\n"))
             RssImageRuntimeRegression.verify(this)
-            return "$version; cachedBefore=$cachedBefore; nativeBytes=${native.length()}; nativeFile=$native"
+            return "$version; productionClientToggle=off,on,off,on; cachedBefore=$cachedBefore; concurrentInstallers=8; " +
+                "firstInstallFailures=$firstInstallFailures; " +
+                "loadFailureRecovery=${!cachedBefore}; componentFiles=1; " +
+                "nativeBytes=${native.length()}; nativeMtime=${native.lastModified()}; nativeFile=$native"
         } finally {
             preferences.edit().apply {
                 if (hadPreference) putBoolean(PreferKey.cronet, previous) else remove(PreferKey.cronet)

@@ -174,12 +174,13 @@ internal object RssImageRuntimeRegression {
         val ready = CountDownLatch(1)
         var value = "null"
         instrumentation.runOnMainSync {
-            web.evaluateJavascript("""JSON.stringify(Object.fromEntries(['fixed','chunked','gzip','redirect'].map(k=>{
-                const i=document.getElementById('fixture-'+k); let pixel='';
-                if(i && i.complete && i.naturalWidth){try{const c=document.createElement('canvas');c.width=256;c.height=192;
-                    const x=c.getContext('2d');x.drawImage(i,0,0);pixel=Array.from(x.getImageData(255,191,1,1).data).join(',');}catch(e){pixel=String(e);}}
-                return [k,{complete:!!i&&i.complete,width:i?i.naturalWidth:0,height:i?i.naturalHeight:0,pixel}];
-            })))""".trimIndent()) { value = it; ready.countDown() }
+            // API 23's stock WebView predates arrow functions, Array.from and Object.fromEntries.
+            web.evaluateJavascript("""(function(){var state={};['fixed','chunked','gzip','redirect'].forEach(function(k){
+                var i=document.getElementById('fixture-'+k),pixel='';
+                if(i && i.complete && i.naturalWidth){try{var c=document.createElement('canvas');c.width=256;c.height=192;
+                    var x=c.getContext('2d');x.drawImage(i,0,0);pixel=Array.prototype.join.call(x.getImageData(255,191,1,1).data,',');}catch(e){pixel=String(e);}}
+                state[k]={complete:!!i&&i.complete,width:i?i.naturalWidth:0,height:i?i.naturalHeight:0,pixel:pixel};
+            });return JSON.stringify(state);})()""".trimIndent()) { value = it; ready.countDown() }
         }
         check(ready.await(5, TimeUnit.SECONDS)) { "RSS WebView did not respond" }
         return (JSONTokener(value).nextValue() as? String)?.let(::JSONObject) ?: JSONObject()
