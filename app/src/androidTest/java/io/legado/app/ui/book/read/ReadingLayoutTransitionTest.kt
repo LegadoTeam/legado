@@ -93,6 +93,9 @@ class ReadingLayoutTransitionTest {
                 capture(scenario, "layout-cover-before")
                 switchStyle(scenario, 1)
                 awaitReader(scenario, book.bookUrl, true)
+                // Recreating a scroll reader must not recursively inflate the Activity binding.
+                scenario.recreate()
+                awaitReader(scenario, book.bookUrl, true)
                 onView(withId(R.id.read_view)).perform(swipeUp())
                 instrumentation.waitForIdleSync()
                 await {
