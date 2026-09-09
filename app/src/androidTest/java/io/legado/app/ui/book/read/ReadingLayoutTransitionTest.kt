@@ -139,26 +139,34 @@ class ReadingLayoutTransitionTest {
         scenario.onActivity { ReadStyleDialog().showNow(it.supportFragmentManager, "layout-style") }
         val bounds = Rect()
         lateinit var styleView: View
-        await {
-            var visible = false
-            scenario.onActivity { activity ->
-                val dialog = activity.supportFragmentManager.findFragmentByTag("layout-style") as? ReadStyleDialog
-                val view = dialog?.view?.findViewById<RecyclerView>(R.id.rv_style)
-                    ?.findViewHolderForAdapterPosition(index)?.itemView
-                visible = view?.hasWindowFocus() == true && view.getGlobalVisibleRect(bounds) &&
-                    bounds.width() > 20 && bounds.height() > 20
-                if (visible && view != null) {
-                    styleView = view
-                }
-            }
-            visible
-        }
         try {
+            await {
+                var visible = false
+                scenario.onActivity { activity ->
+                    val dialog = activity.supportFragmentManager.findFragmentByTag("layout-style") as? ReadStyleDialog
+                    val view = dialog?.view?.findViewById<RecyclerView>(R.id.rv_style)
+                        ?.findViewHolderForAdapterPosition(index)?.itemView
+                    visible = view?.getGlobalVisibleRect(bounds) == true &&
+                        bounds.width() > 20 && bounds.height() > 20
+                    if (visible && view != null) {
+                        styleView = view
+                    }
+                }
+                visible
+            }
             // Espresso waits for the focused dialog and calculates the current screen coordinates.
             // This remains a real touch, required by CircleImageView's circular hit area.
             onView(sameInstance(styleView)).perform(click())
             await { ReadBookConfig.styleSelect == index }
         } finally {
+            scenario.onActivity { activity ->
+                val dialog = activity.supportFragmentManager.findFragmentByTag("layout-style") as? ReadStyleDialog
+                val list = dialog?.view?.findViewById<RecyclerView>(R.id.rv_style)
+                File(context.getExternalFilesDir("ui-regression"), "layout-style-window-$index.txt")
+                    .writeText("showing=${dialog?.dialog?.isShowing} state=${dialog?.lifecycle?.currentState} " +
+                        "focused=${dialog?.dialog?.window?.decorView?.hasWindowFocus()} " +
+                        "items=${list?.adapter?.itemCount} children=${list?.childCount} bounds=$bounds")
+            }
             capture(scenario, "layout-style-selected-$index")
         }
         pressBack()
