@@ -37,6 +37,8 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.io.FileInputStream
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 import kotlin.math.abs
 
@@ -428,6 +430,16 @@ class BottomWebViewDialogShowTest {
                         web.url == firstUrl && web.title == "First" &&
                         web.copyBackForwardList().currentIndex == 0
                 })
+                val historyDrawn = CountDownLatch(1)
+                scenario!!.onActivity {
+                    web.postVisualStateCallback(0, object : WebView.VisualStateCallback() {
+                        override fun onComplete(requestId: Long) {
+                            web.postOnAnimation { web.postOnAnimation { historyDrawn.countDown() } }
+                        }
+                    })
+                }
+                assertTrue("The restored history page must reach the compositor before capture",
+                    historyDrawn.await(5, TimeUnit.SECONDS))
                 screenshot("paragraph-back-history-$outside")
                 edgeBack(browser)
                 assertTrue("Back must close only the top browser", awaitCondition {
