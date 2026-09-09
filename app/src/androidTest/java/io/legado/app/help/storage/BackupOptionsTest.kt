@@ -61,7 +61,6 @@ class BackupOptionsTest {
     @Volatile private var failUpload = false
     private var scenario: ActivityScenario<ConfigActivity>? = null
     private val defaultArchive = File(context.externalFiles, "backup.zip")
-    private var changedDefaultArchive = false
     private var savedDefaultArchive: ByteArray? = null
     private val server = object : NanoHTTPD("127.0.0.1", 0) {
         override fun serve(session: IHTTPSession): Response {
@@ -80,6 +79,7 @@ class BackupOptionsTest {
 
     @Before fun setUp() {
         directory.mkdirs()
+        savedDefaultArchive = defaultArchive.takeIf { it.exists() }?.readBytes()
         server.start()
         preferences.edit().putString(PreferKey.backupPath, directory.path)
             .putBoolean(PreferKey.autoBackup, true).putBoolean(PreferKey.autoBackupWebDav, false)
@@ -107,14 +107,10 @@ class BackupOptionsTest {
         runBlocking(Dispatchers.IO) { AppWebDav.upConfig() }
         server.stop()
         directory.deleteRecursively()
-        if (changedDefaultArchive) {
-            savedDefaultArchive?.let { defaultArchive.writeBytes(it) } ?: defaultArchive.delete()
-        }
+        savedDefaultArchive?.let { defaultArchive.writeBytes(it) } ?: defaultArchive.delete()
     }
 
     @Test fun manualChoiceConfirmsBeforeCreatingLocalAndWebDavArchives() {
-        savedDefaultArchive = defaultArchive.takeIf { it.exists() }?.readBytes()
-        changedDefaultArchive = true
         defaultArchive.delete()
         preferences.edit().remove(PreferKey.backupPath).commit()
         launchSettings()
