@@ -6,6 +6,9 @@ import android.content.ClipData
 import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import android.os.SystemClock
 import androidx.core.content.FileProvider
@@ -285,7 +288,18 @@ class SharedFileImportTest {
             instrumentation.context.assets.open("issue1074-containers-fragments.epub").use { input -> outputStream().use(input::copyTo) }
         }
         val pdf = File(directory, "shared-pdf-$id.pdf").apply {
-            instrumentation.context.assets.open("pdf-outline-direct-named.pdf").use { input -> outputStream().use(input::copyTo) }
+            val document = PdfDocument()
+            try {
+                val page = document.startPage(PdfDocument.PageInfo.Builder(600, 800, 1).create())
+                page.canvas.drawColor(Color.WHITE)
+                val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(20, 100, 170) }
+                page.canvas.drawRect(24f, 24f, 576f, 120f, paint)
+                paint.color = Color.WHITE
+                paint.textSize = 32f
+                page.canvas.drawText("SHARED PDF VISIBLE", 40f, 85f, paint)
+                document.finishPage(page)
+                outputStream().use(document::writeTo)
+            } finally { document.close() }
         }
         listOf(txt to "text/plain", epub to "application/epub+zip", pdf to "application/pdf").forEach { (file, mime) ->
             val expected = file.readBytes()
@@ -300,6 +314,7 @@ class SharedFileImportTest {
                 val chapters = appDb.bookChapterDao.getChapterList(book.bookUrl)
                 assertTrue(chapters.isNotEmpty())
                 assertFalse(LocalBook.getContent(book, chapters.first()).isNullOrBlank())
+                if (file.extension == "pdf") await { pdfMarkerIsVisible() }
                 screenshot("share-reader-${copied.extension}")
                 closeReaders()
             }
@@ -410,5 +425,17 @@ class SharedFileImportTest {
             outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
         bitmap.recycle()
+    }
+
+    private fun pdfMarkerIsVisible(): Boolean {
+        val bitmap = instrumentation.uiAutomation.takeScreenshot() ?: return false
+        return try {
+            (0 until bitmap.height step 4).sumOf { y ->
+                (0 until bitmap.width step 4).count { x ->
+                    val pixel = bitmap.getPixel(x, y)
+                    Color.red(pixel) < 40 && Color.green(pixel) in 80..120 && Color.blue(pixel) > 150
+                }
+            } > 100
+        } finally { bitmap.recycle() }
     }
 }
