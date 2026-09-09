@@ -351,6 +351,9 @@ object BookHelp {
         )
     }
 
+    internal fun isContentSaveCurrent(token: ContentSaveToken): Boolean =
+        contentSaveFence.state(token.key).version == token.version
+
     private fun contentSaveFileName(book: Book, bookChapter: BookChapter): String? {
         return contentSaveFence.state(contentSaveKey(book, bookChapter)).fileName
     }

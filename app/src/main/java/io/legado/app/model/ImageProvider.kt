@@ -93,6 +93,7 @@ object ImageProvider {
         return bitmapLruCache.remove(key)
     }
 
+    @Synchronized
     fun clearImage(book: Book, src: String) {
         val path = BookHelp.getImage(book, src).absolutePath
         BookHelp.delImage(book, src)
@@ -179,6 +180,8 @@ object ImageProvider {
     /**
      *获取bitmap 使用LruCache缓存
      */
+    // ponytail: serialize local bitmap decode with invalidation; use per-path locks if contention matters.
+    @Synchronized
     fun getImage(
         book: Book,
         src: String,

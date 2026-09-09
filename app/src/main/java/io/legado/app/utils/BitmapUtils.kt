@@ -75,6 +75,7 @@ object BitmapUtils {
     /**
      * 获取图片尺寸。BitmapFactory 不认识的格式（例如 HEIF/HEIC）交给系统解码器探测。
      */
+    @Synchronized
     fun getImageSize(path: String): Size? {
         val file = File(path)
         imageSizeCache.get(path)?.takeIf { it.matches(file) }?.let { return it.size }
@@ -101,6 +102,7 @@ object BitmapUtils {
         imageSizeCache.evictAll()
     }
 
+    @Synchronized
     fun removeImageSizeCache(path: String) {
         imageSizeCache.remove(path)
     }

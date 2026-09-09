@@ -12,6 +12,29 @@ import org.junit.Test
 
 class ChapterDownloadStateTest {
     @Test
+    fun `refresh replaces only target owners and preserves explicit caching`() = runBlocking {
+        val state = ChapterDownloadState()
+        state.enqueue(listOf(1, 2, 4))
+        val old = state.claimRead(1).first
+        val outside = state.claimRead(2).first
+        val readerOnly = state.claimRead(3).first
+        state.invalidate(listOf(1, 3))
+        assertNull(old.result.await())
+        assertNull(readerOnly.result.await())
+        assertEquals(listOf(4, 1), state.waitingIndexes())
+        assertSame(outside, state.claimRead(2).first)
+        val fresh = state.claimRead(1).first
+        assertNotSame(old, fresh)
+        assertFalse(state.finish(old, Result.success("obsolete")))
+        assertFalse(fresh.result.isCompleted)
+        state.stopManual()
+        state.invalidate(listOf(1))
+        assertFalse(state.hasManualWork)
+        assertTrue(state.finish(outside))
+        assertTrue(state.isIdle)
+    }
+
+    @Test
     fun `cancelled prefetch restores only borrowed manual requests`() {
         val state = ChapterDownloadState()
         state.enqueue(listOf(1, 2))

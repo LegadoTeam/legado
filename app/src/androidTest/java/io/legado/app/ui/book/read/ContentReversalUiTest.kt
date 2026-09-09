@@ -3,6 +3,7 @@ package io.legado.app.ui.book.read
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.BitmapFactory
 import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
@@ -11,6 +12,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.action.ViewActions.longClick
 import androidx.test.espresso.action.ViewActions.closeSoftKeyboard
 import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.matcher.RootMatchers.isDialog
@@ -33,6 +35,9 @@ import io.legado.app.help.ReaderMenuConfig
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
+import io.legado.app.help.config.ReadBookConfig
+import io.legado.app.model.ImageProvider
+import fi.iki.elonen.NanoHTTPD
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.page.ReadView
 import io.legado.app.ui.book.read.page.entities.TextChapter
@@ -53,6 +58,8 @@ import java.io.File
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicIntegerArray
 
 /** Uses cached online chapters and real reader/menu gestures, with no source requests. */
 @RunWith(AndroidJUnit4::class)
@@ -93,6 +100,171 @@ class ContentReversalUiTest {
     private val reversed = "😀乙甲$imageTag" + "丁丙$reviewTag" + "己戊\n$html"
     private val secondContent = "Second chapter keeps its own state. 😀\nAnother paragraph."
     private var scenario: ActivityScenario<ReadBookActivity>? = null
+
+    @Test fun refreshUsesThemeChangesAndTheExplicitPreloadRange() {
+        scenario?.close()
+        scenario = null
+        val originalCronet = prefs.all[PreferKey.cronet] as Boolean?
+        val config = ReadBookConfig.durConfig
+        val originalColor = ReadBookConfig.textColor
+        val bodyVersion = AtomicInteger(1)
+        val imageColor = AtomicInteger(Color.RED)
+        val bodyRequests = AtomicIntegerArray(7)
+        val imageRequests = AtomicIntegerArray(7)
+        var base = ""
+        fun body(index: Int, version: Int) =
+            "<img src=\"$base/image/$index.png\">\n" +
+                (1..80).joinToString("\n") { "第${it}段。Stable text keeps the same reading position. 阅读位置保持不变。" } +
+                "\nVersion $version"
+        fun png(color: Int): ByteArray {
+            val bitmap = Bitmap.createBitmap(32, 16, Bitmap.Config.ARGB_8888)
+            return try {
+                bitmap.eraseColor(color)
+                ByteArrayOutputStream().use {
+                    assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+                    it.toByteArray()
+                }
+            } finally { bitmap.recycle() }
+        }
+        val server = object : NanoHTTPD("127.0.0.1", 0) {
+            override fun serve(session: IHTTPSession): Response {
+                val index = session.uri.substringAfterLast('/').substringBefore('.').toIntOrNull()
+                    ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "missing")
+                return if (session.uri.startsWith("/image/")) {
+                    imageRequests.incrementAndGet(index)
+                    val bytes = png(imageColor.get())
+                    newFixedLengthResponse(Response.Status.OK, "image/png", bytes.inputStream(), bytes.size.toLong())
+                } else {
+                    bodyRequests.incrementAndGet(index)
+                    newFixedLengthResponse(Response.Status.OK, "text/plain", body(index, bodyVersion.get()))
+                }.apply { addHeader("Cache-Control", "no-store") }
+            }
+        }
+        server.start()
+        base = "http://127.0.0.1:${server.listeningPort}"
+        val refreshChapters = (0..6).map {
+            BookChapter(bookUrl = book.bookUrl, url = "$base/chapter/$it", index = it,
+                title = "Chapter ${it + 1}", baseUrl = base)
+        }
+        try {
+            prefs.edit().putBoolean(PreferKey.cronet, false).putInt(PreferKey.preDownloadNum, 2).commit()
+            source.getContentRule().content = "@js:result"
+            appDb.bookSourceDao.insert(source)
+            book.durChapterIndex = 3
+            book.durChapterPos = 0
+            book.totalChapterNum = 7
+            appDb.bookDao.insert(book)
+            appDb.bookChapterDao.delByBook(book.bookUrl)
+            appDb.bookChapterDao.insert(*refreshChapters.toTypedArray())
+            refreshChapters.forEach {
+                BookHelp.saveText(book, it, body(it.index, 1))
+                BookHelp.writeImage(book, "$base/image/${it.index}.png", png(Color.RED))
+            }
+            scenario = ActivityScenario.launch(Intent(context, ReadBookActivity::class.java)
+                .putExtra("bookUrl", book.bookUrl).putExtra("inBookshelf", true))
+            fun ready(previous: TextChapter? = null) = await("refreshed real reader") {
+                val chapter = ReadBook.curTextChapter
+                val page = it.findViewById<ReadView>(R.id.read_view).curPage.textPage
+                it.isInitFinish && ReadBook.durChapterIndex == 3 && chapter != null &&
+                    chapter !== previous && chapter.isCompleted && page.textChapter === chapter && !page.isMsgPage
+            }
+            fun refresh() {
+                showReaderMenu()
+                onView(allOf(withId(R.id.menu_refresh), isDisplayed())).perform(click())
+            }
+            fun pixel(index: Int): Int {
+                val bitmap = BitmapFactory.decodeFile(BookHelp.getImage(book, "$base/image/$index.png").path)
+                    ?: return 0
+                return try { bitmap.getPixel(0, 0) } finally { bitmap.recycle() }
+            }
+            ready()
+            scenario!!.onActivity { ReadBook.skipToPage(1) }
+            await("second visible page") { ReadBook.durPageIndex == 1 }
+            val position = ReadBook.durChapterPos
+            assertTrue(position > 0)
+            val before = ReadBook.curTextChapter
+            bodyVersion.set(2)
+            imageColor.set(Color.GREEN)
+            refresh()
+            ready(before)
+            assertTrue(BookHelp.getContent(book, refreshChapters[3])!!.contains("Version 2"))
+            assertEquals("Unchanged theme must preserve the cached image", 0, imageRequests.get(3))
+            assertEquals(Color.RED, pixel(3))
+            assertEquals(position, ReadBook.durChapterPos)
+
+            scenario!!.onActivity { config.setCurTextColor(originalColor xor 0x00010101) }
+            scenario!!.recreate()
+            ready()
+            val beforeTheme = ReadBook.curTextChapter
+            bodyVersion.set(3)
+            refresh()
+            ready(beforeTheme)
+            await("same URL has fresh green pixels") { pixel(3) == Color.GREEN }
+            assertTrue(BookHelp.getContent(book, refreshChapters[3])!!.contains("Version 3"))
+            assertTrue(imageRequests.get(3) > 0)
+            assertEquals(position, ReadBook.durChapterPos)
+
+            val outside = listOf(0, 6).associateWith { BookHelp.getContent(book, refreshChapters[it]) }
+            bodyVersion.set(4)
+            imageColor.set(Color.BLUE)
+            showReaderMenu()
+            onView(allOf(withId(R.id.menu_refresh), isDisplayed())).perform(longClick())
+            screenshot("resource-refresh-menu")
+            var resourceY = 0
+            onView(withText(R.string.menu_refresh_resources)).inRoot(isPlatformPopup()).check { view, error ->
+                if (error != null) throw error
+                val location = IntArray(2)
+                view.getLocationOnScreen(location)
+                resourceY = location[1]
+            }
+            listOf(R.string.menu_refresh_dur, R.string.menu_refresh_after, R.string.menu_refresh_all).forEach {
+                onView(withText(it)).inRoot(isPlatformPopup()).check { view, error ->
+                    if (error != null) throw error
+                    val location = IntArray(2)
+                    view.getLocationOnScreen(location)
+                    assertTrue("Refresh all data must be below the existing actions", location[1] < resourceY)
+                }
+            }
+            val beforeAll = ReadBook.curTextChapter
+            onView(withText(R.string.menu_refresh_resources)).inRoot(isPlatformPopup()).perform(click())
+            ready(beforeAll)
+            await("all five target chapters and image responses") {
+                (1..5).all { index ->
+                    BookHelp.getContent(book, refreshChapters[index])?.contains("Version 4") == true &&
+                        pixel(index) == Color.BLUE
+                }
+            }
+            assertEquals(position, ReadBook.durChapterPos)
+            listOf(0, 6).forEach {
+                assertEquals(outside[it], BookHelp.getContent(book, refreshChapters[it]))
+                assertEquals(0, bodyRequests.get(it))
+                assertEquals(0, imageRequests.get(it))
+                assertEquals(Color.RED, pixel(it))
+            }
+            scenario!!.onActivity {
+                val bitmap = ImageProvider.getImage(book, "$base/image/3.png", 32)
+                assertEquals(Color.BLUE, bitmap.getPixel(0, 0))
+            }
+            screenshot("resource-refresh-position")
+            scenario!!.onActivity { ReadBook.skipToPage(0) }
+            await("refreshed image visible on first page") { ReadBook.durPageIndex == 0 }
+            closeReaderMenu()
+            screenshot("resource-refresh-blue-image")
+            File(checkNotNull(context.getExternalFilesDir("ui-regression")), "resource-refresh.txt")
+                .writeText("chapter=3 position=$position range=1..5 outside=0,6 preserved; " +
+                    "bodyRequests=${(0..6).map { bodyRequests.get(it) }} " +
+                    "imageRequests=${(0..6).map { imageRequests.get(it) }}")
+        } finally {
+            scenario?.close()
+            scenario = null
+            server.stop()
+            config.setCurTextColor(originalColor)
+            prefs.edit().apply {
+                if (originalCronet == null) remove(PreferKey.cronet) else putBoolean(PreferKey.cronet, originalCronet)
+            }.commit()
+            BookHelp.clearCache(book)
+        }
+    }
 
     @Before fun setUp() {
         prefs.edit().putInt(PreferKey.preDownloadNum, 0).putInt(PreferKey.clickActionMC, 0)

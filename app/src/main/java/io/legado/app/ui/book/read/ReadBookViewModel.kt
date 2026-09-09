@@ -25,8 +25,10 @@ import io.legado.app.help.book.removeType
 import io.legado.app.help.book.simulatedTotalChapterNum
 import io.legado.app.help.book.update
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.ImageProvider
+import io.legado.app.model.CacheBook
 import io.legado.app.model.ReadAloud
 import io.legado.app.model.ReadBook
 import io.legado.app.model.SourceCallBack
@@ -43,6 +45,8 @@ import io.legado.app.utils.mapParallelSafe
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.Dispatchers.Main
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
@@ -67,6 +71,8 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
     var searchResultList: List<SearchResult>? = null
     var searchResultIndex: Int = 0
     private var changeSourceCoroutine: Coroutine<*>? = null
+    private var resourceRefreshCoroutine: Coroutine<*>? = null
+    private var resourceTheme: Pair<String, List<Int>>? = null
 
     init {
         AppConfig.detectClickArea()
@@ -79,6 +85,7 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
             else -> appDb.bookDao.getBook(bookUrl)
         } ?: return
         ReadBook.upReadBookConfig(book)
+        if (resourceTheme?.first != book.bookUrl) resourceTheme = currentResourceTheme(book)
     }
 
     /**
@@ -406,25 +413,100 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
     }
 
     fun refreshContentDur(book: Book) {
+        val index = ReadBook.durChapterIndex
         execute {
-            appDb.bookChapterDao.getChapter(book.bookUrl, ReadBook.durChapterIndex)
+            appDb.bookChapterDao.getChapter(book.bookUrl, index)
                 ?.let { chapter ->
                     BookHelp.delContent(book, chapter)
-                    ReadBook.loadContent(ReadBook.durChapterIndex, resetPageOffset = false)
+                    CacheBook.invalidateChapters(book.bookUrl, index..index)
+                    withContext(Main) {
+                        if (ReadBook.book?.bookUrl == book.bookUrl) {
+                            ReadBook.clearResourceChapters(index..index)
+                            ReadBook.loadContent(index, resetPageOffset = false)
+                        }
+                    }
                 }
         }
     }
 
+    private fun currentResourceTheme(book: Book) = book.bookUrl to listOf(
+        ReadBookConfig.styleSelect, ReadBookConfig.textColor, ReadBookConfig.textAccentColor,
+        if (AppConfig.isNightTheme) 1 else 0, if (AppConfig.isEInkMode) 1 else 0,
+    )
+
+    fun resourceThemeChanged(book: Book): Boolean =
+        resourceTheme != null && resourceTheme != currentResourceTheme(book)
+
+    fun refreshResources(book: Book, includePreloaded: Boolean) {
+        val source = ReadBook.bookSource ?: return
+        val currentIndex = ReadBook.durChapterIndex
+        val before = if (includePreloaded) maxOf(1, minOf(5, AppConfig.preDownloadNum)) else 0
+        val after = if (includePreloaded) maxOf(1, AppConfig.preDownloadNum) else 0
+        val indexes = maxOf(0, currentIndex - before)..minOf(ReadBook.chapterSize - 1, currentIndex + after)
+        val images = ReadBook.resourceImageSources(indexes).toMutableSet()
+        val theme = currentResourceTheme(book)
+        resourceRefreshCoroutine?.cancel()
+        resourceRefreshCoroutine = execute {
+            val chapters = appDb.bookChapterDao.getChapterList(book.bookUrl, indexes.first, indexes.last)
+            chapters.forEach { chapter ->
+                BookHelp.getContent(book, chapter)?.let { content ->
+                    BookHelp.flowImages(chapter, content).collect { images.add(it) }
+                    val processed = ContentProcessor.get(book).getContent(book, chapter, content,
+                        includeTitle = false)
+                    BookHelp.flowImages(chapter, processed.textList.joinToString("\n"))
+                        .collect { images.add(it) }
+                }
+            }
+            chapters.forEach { chapter ->
+                ensureActive()
+                BookHelp.delContent(book, chapter)
+            }
+            CacheBook.invalidateChapters(book.bookUrl, indexes)
+            withContext(Main) {
+                if (ReadBook.book?.bookUrl == book.bookUrl) {
+                    ReadBook.clearResourceChapters(indexes)
+                    ReadBook.callBack?.upContent()
+                }
+                // Evict/recycle only between UI frames, after detaching the old layouts.
+                images.forEach { src ->
+                    ensureActive()
+                    ImageProvider.clearImage(book, src)
+                }
+                if (ReadBook.book?.bookUrl == book.bookUrl) {
+                    if (ReadBook.durChapterIndex in indexes) ReadBook.loadContent(false)
+                }
+            }
+            // Explicit refresh also fetches images for chapters beyond the three rendered layouts.
+            chapters.sortedBy { kotlin.math.abs(it.index - currentIndex) }.forEach { chapter ->
+                ensureActive()
+                if (!chapter.isVolume) {
+                    val result = CacheBook.getOrCreate(source, book).downloadAwait(chapter)
+                    val content = BookHelp.getContent(book, chapter) ?: throw NoStackTraceException(result)
+                    BookHelp.saveImages(source, book, chapter, content)
+                }
+            }
+        }.onSuccess {
+            if (ReadBook.book?.bookUrl == book.bookUrl) resourceTheme = theme
+        }
+    }
+
     fun refreshContentAfter(book: Book) {
+        val indexes = ReadBook.durChapterIndex until book.totalChapterNum
         execute {
             appDb.bookChapterDao.getChapterList(
                 book.bookUrl,
-                ReadBook.durChapterIndex,
+                indexes.first,
                 book.totalChapterNum
             ).forEach { chapter ->
                 BookHelp.delContent(book, chapter)
             }
-            ReadBook.loadContent(false)
+            CacheBook.invalidateChapters(book.bookUrl, indexes)
+            withContext(Main) {
+                if (ReadBook.book?.bookUrl == book.bookUrl) {
+                    ReadBook.clearResourceChapters(indexes)
+                    ReadBook.loadContent(false)
+                }
+            }
         }
     }
 

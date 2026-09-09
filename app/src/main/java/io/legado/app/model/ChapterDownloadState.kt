@@ -38,6 +38,17 @@ internal class ChapterDownloadState {
     @Synchronized
     fun waitingIndexes(): List<Int> = waiting.toList()
 
+    /** Refresh only these chapters; preserve explicit caching and release readers to retry. */
+    fun invalidate(indexes: Iterable<Int>) {
+        val obsolete = synchronized(this) {
+            indexes.mapNotNull { index ->
+                batchFallback.remove(index)
+                running.remove(index)?.also { if (it.manualRequested) waiting.add(index) }
+            }
+        }
+        obsolete.forEach { it.result.complete(null) }
+    }
+
     @Synchronized
     fun discardWaiting(index: Int) { waiting.remove(index) }
 

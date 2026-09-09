@@ -1231,6 +1231,7 @@
     <string name="menu_refresh_dur">Refresh the current chapter</string>
     <string name="menu_refresh_after">Refresh the chapter after</string>
     <string name="menu_refresh_all">Refresh all chapters</string>
+    <string name="menu_refresh_resources">Refresh all data</string>
     <string name="edit_content">Edit Content</string>
     <string name="chapter_change_source">Single chapter source switching</string>
     <string name="batch_chapter_change_source">Batch chapter source switching</string>
