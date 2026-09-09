@@ -55,6 +55,12 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_show_seconds"
+        android:checkable="true"
+        android:title="@string/read_record_show_seconds"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_clear_record"
         android:title="@string/clear"
         app:showAsAction="never" />
