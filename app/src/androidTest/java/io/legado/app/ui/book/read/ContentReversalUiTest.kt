@@ -251,6 +251,7 @@ class ContentReversalUiTest {
     }
 
     private fun showReaderMenu() {
+        awaitDraw()
         var visible = false
         scenario!!.onActivity { visible = it.findViewById<ReadMenu>(R.id.read_menu).isVisible }
         if (!visible) onView(withId(R.id.read_view)).perform(click())
@@ -303,9 +304,11 @@ class ContentReversalUiTest {
 
     private fun awaitReader(index: Int, previous: TextChapter? = null) = await("reader chapter $index completed") {
         val chapter = ReadBook.curTextChapter
+        val page = it.findViewById<ReadView>(R.id.read_view).curPage.textPage
         ReadBook.book?.bookUrl == book.bookUrl && ReadBook.durChapterIndex == index &&
             chapter != null && chapter.chapter.url == chapters[index].url && chapter !== previous && chapter.isCompleted &&
-            !it.findViewById<ReadView>(R.id.read_view).curPage.textPage.isMsgPage
+            it.isInitFinish && it.window.decorView.hasWindowFocus() &&
+            page.textChapter === chapter && !page.isMsgPage
     }
 
     private fun await(description: String, condition: (ReadBookActivity) -> Boolean) {
@@ -327,7 +330,7 @@ class ContentReversalUiTest {
             "cached=${BookHelp.getContent(book, chapters[ReadBook.durChapterIndex.coerceIn(0, 1)])}")
     }
 
-    private fun screenshot(name: String) {
+    private fun awaitDraw() {
         instrumentation.waitForIdleSync()
         val rendered = CountDownLatch(1)
         scenario!!.onActivity {
@@ -335,6 +338,11 @@ class ContentReversalUiTest {
             decor.postOnAnimation { decor.postOnAnimation { rendered.countDown() } }
         }
         assertTrue(rendered.await(5, TimeUnit.SECONDS))
+        instrumentation.waitForIdleSync()
+    }
+
+    private fun screenshot(name: String) {
+        awaitDraw()
         val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
         try {
             val directory = checkNotNull(context.getExternalFilesDir("ui-regression")).apply { mkdirs() }
