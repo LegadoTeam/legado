@@ -1,5 +1,7 @@
 package io.legado.app.model
 
+import android.util.Log
+import io.legado.app.BuildConfig
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.EventBus
@@ -86,6 +88,32 @@ internal fun resolveHighlightChapterPosition(
 
 // ponytail: fixed 64-character anchor; use contextual matching if sources rewrite larger spans.
 private const val REFRESH_POSITION_ANCHOR_LENGTH = 64
+
+internal fun resolveLayoutBodyPosition(source: String, position: Int, target: String): Int? {
+    if (source == target) return position.coerceIn(0, target.length)
+    val sourceParagraphs = source.split('\n')
+    val targetParagraphs = target.split('\n')
+    // Indentation contributes to chapterPosition. Match the entire body before using
+    // paragraph order, so repeated sentences stay in their original paragraph.
+    if (sourceParagraphs.size != targetParagraphs.size || sourceParagraphs.indices.any {
+            sourceParagraphs[it].trimStart() != targetParagraphs[it].trimStart()
+        }) return null
+    var sourceStart = 0
+    var targetStart = 0
+    for (index in sourceParagraphs.indices) {
+        val old = sourceParagraphs[index]
+        val new = targetParagraphs[index]
+        if (position <= sourceStart + old.length) {
+            val oldIndent = old.length - old.trimStart().length
+            val newIndent = new.length - new.trimStart().length
+            val offset = (position - sourceStart - oldIndent).coerceAtLeast(0)
+            return targetStart + (newIndent + offset).coerceAtMost(new.length)
+        }
+        sourceStart += old.length + 1
+        targetStart += new.length + 1
+    }
+    return target.length
+}
 
 internal fun resolveReplacePreviewPosition(
     sourceText: String,
@@ -573,6 +601,9 @@ object ReadBook : CoroutineScope by MainScope() {
 
     fun preserveCurrentPositionForRefresh() {
         pendingHighlightAnchor = currentPositionAnchor()
+        if (BuildConfig.DEBUG) Log.d("ReadPosition",
+            "anchor position=$durChapterPos pending=${pendingHighlightAnchor?.rawPosition} " +
+                "chapter=${System.identityHashCode(curTextChapter)}")
     }
 
     fun clearSearchResult() {
@@ -1357,11 +1388,11 @@ object ReadBook : CoroutineScope by MainScope() {
                         callBack?.onLayoutPageCompleted(index, page)
                     }
                     finishPendingPdfJump(book, textChapter)
-                    resolvePendingHighlightAnchor(book, textChapter)
+                    val restoredAnchor = resolvePendingHighlightAnchor(book, textChapter)
                     if (upContent) {
                         callBack?.upContent(
                             offset,
-                            !available && shouldResetPageOffset,
+                            restoredAnchor || (!available && shouldResetPageOffset),
                             readPositionVersion = readPositionVersion,
                         )
                     }
@@ -1493,11 +1524,11 @@ object ReadBook : CoroutineScope by MainScope() {
                         callBack?.onLayoutPageCompleted(index, page)
                     }
                     finishPendingPdfJump(book, textChapter)
-                    resolvePendingHighlightAnchor(book, textChapter)
+                    val restoredAnchor = resolvePendingHighlightAnchor(book, textChapter)
                     if (upContent) {
                         callBack?.upContent(
                             offset,
-                            !available && shouldResetPageOffset,
+                            restoredAnchor || (!available && shouldResetPageOffset),
                             readPositionVersion = readPositionVersion,
                         )
                     }
@@ -1806,29 +1837,49 @@ object ReadBook : CoroutineScope by MainScope() {
     private fun resolvePendingHighlightAnchor(
         layoutBook: Book,
         textChapter: TextChapter
-    ) {
-        val pending = pendingHighlightAnchor ?: return
-        if (curTextChapter !== textChapter) return
+    ): Boolean {
+        val pending = pendingHighlightAnchor ?: return false
+        if (curTextChapter !== textChapter) return false
         if (pending.bookUrl != layoutBook.bookUrl ||
             pending.chapterIndex != durChapterIndex ||
             pending.chapterIndex != textChapter.chapter.index
         ) {
             pendingHighlightAnchor = null
-            return
+            return false
         }
-        val currentTitleLength = textChapter.layoutTitleLength.takeIf { it >= 0 } ?: return
+        val currentTitleLength = textChapter.layoutTitleLength.takeIf { it >= 0 } ?: return false
         val expectedPosition = resolveHighlightChapterPosition(
             pending.rawPosition,
             pending.sourceTitleLength,
             currentTitleLength
         )
         pendingHighlightAnchor = null
-        if (durChapterPos != expectedPosition) return
         val bodyText = chapterText(textChapter).drop(currentTitleLength)
+        if (durChapterPos == pending.rawPosition) {
+            val layoutPosition = pending.layoutBodyText?.let {
+                resolveLayoutBodyPosition(
+                    it, pending.rawPosition - pending.sourceTitleLength, bodyText
+                )
+            }
+            if (layoutPosition != null) {
+                durChapterPos = if (pending.rawPosition < pending.sourceTitleLength) {
+                    pending.rawPosition.coerceIn(0, currentTitleLength)
+                } else {
+                    currentTitleLength + layoutPosition
+                }
+                if (BuildConfig.DEBUG) Log.d("ReadPosition",
+                    "restore raw=${pending.rawPosition} position=$durChapterPos " +
+                        "chapter=${System.identityHashCode(textChapter)}")
+                saveRead()
+                return true
+            }
+        }
+        if (durChapterPos != expectedPosition) return false
         val bodyPosition = (expectedPosition - currentTitleLength).coerceAtLeast(0)
         durChapterPos = currentTitleLength +
             HighlightAnchor.jumpPos(bodyText, bodyPosition, pending.bookText)
         saveRead()
+        return true
     }
 
     private fun currentPositionAnchor(): PendingHighlightAnchor? {
@@ -1849,7 +1900,8 @@ object ReadBook : CoroutineScope by MainScope() {
             durChapterPos,
             titleLength,
             anchorText,
-            waitForLayout = true
+            waitForLayout = true,
+            layoutBodyText = bodyText,
         )
     }
 
@@ -1866,7 +1918,8 @@ object ReadBook : CoroutineScope by MainScope() {
         val rawPosition: Int,
         val sourceTitleLength: Int,
         val bookText: String,
-        val waitForLayout: Boolean = false
+        val waitForLayout: Boolean = false,
+        val layoutBodyText: String? = null,
     )
 
     /**
