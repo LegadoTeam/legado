@@ -1,5 +1,6 @@
 package io.legado.app.help.storage
 
+import android.content.SharedPreferences
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.constant.PreferKey
@@ -68,5 +69,16 @@ class CoverTitleAdaptiveBackupRestoreTest {
         } finally {
             directory.deleteRecursively()
         }
+    }
+}
+
+private fun SharedPreferences.Editor.putValue(key: String, value: Any?) {
+    when (value) {
+        is Boolean -> putBoolean(key, value)
+        is Int -> putInt(key, value)
+        is Long -> putLong(key, value)
+        is Float -> putFloat(key, value)
+        is String -> putString(key, value)
+        is Set<*> -> putStringSet(key, value.filterIsInstance<String>().toSet())
     }
 }
