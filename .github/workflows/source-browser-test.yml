@@ -28,6 +28,7 @@ on:
       - 'app/src/main/java/io/legado/app/help/AppWebDav.kt'
       - 'app/src/androidTest/java/io/legado/app/help/storage/**'
       - 'app/src/main/java/io/legado/app/ui/login/SourceLoginJsExtensions.kt'
+      - 'app/src/main/java/io/legado/app/model/SourceCallBack.kt'
       - 'app/src/main/java/io/legado/app/help/JsExtensions.kt'
       - 'app/src/main/java/io/legado/app/utils/HandlerUtils.kt'
       - 'app/src/androidTest/java/io/legado/app/ui/widget/dialog/**'
