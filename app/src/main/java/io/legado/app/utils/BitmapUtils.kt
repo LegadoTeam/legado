@@ -101,6 +101,10 @@ object BitmapUtils {
         imageSizeCache.evictAll()
     }
 
+    fun removeImageSizeCache(path: String) {
+        imageSizeCache.remove(path)
+    }
+
     /** 检测网络返回的图片字节，保留 SVG 的调用方回退。 */
     fun isImage(bytes: ByteArray): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && hasHeifFileSignature(bytes)) {

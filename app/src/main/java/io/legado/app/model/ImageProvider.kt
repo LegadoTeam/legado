@@ -93,6 +93,13 @@ object ImageProvider {
         return bitmapLruCache.remove(key)
     }
 
+    fun clearImage(book: Book, src: String) {
+        val path = BookHelp.getImage(book, src).absolutePath
+        BookHelp.delImage(book, src)
+        bitmapLruCache.remove(path)
+        BitmapUtils.removeImageSizeCache(path)
+    }
+
     private fun getNotRecycled(key: String): Bitmap? {
         val bitmap = bitmapLruCache[key] ?: return null
         if (bitmap.isRecycled) {

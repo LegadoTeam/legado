@@ -117,6 +117,8 @@ object BookHelp {
     private const val cacheImageFolderName = "images"
     private const val cacheEpubFolderName = "epub"
     private val downloadImages = ConcurrentHashMap<String, Mutex>()
+    // Guarded by this, together with image invalidation and writes.
+    private val imageVersions = hashMapOf<String, Long>()
     private val contentSaveFence = ContentSaveFence()
 
     val cachePath = FileUtils.getPath(downloadDir, cacheFolderName)
@@ -408,8 +410,10 @@ object BookHelp {
         src: String,
         chapter: BookChapter? = null
     ) {
-        if (isImageExist(book, src)) {
-            return
+        val imagePath = getImage(book, src).absolutePath
+        val version = synchronized(this) {
+            if (isImageExist(book, src)) return
+            imageVersions[imagePath] ?: 0L
         }
         val mutex = synchronized(this) {
             downloadImages.getOrPut(src) { Mutex() }
@@ -435,7 +439,11 @@ object BookHelp {
                     // throw NoStackTraceException("数据异常")
                     AppLog.put("${book.name} ${chapter?.title} 图片 $src 下载错误 数据异常")
                 }
-                writeImage(book, src, it)
+                synchronized(this) {
+                    if ((imageVersions[imagePath] ?: 0L) == version) {
+                        writeImage(book, src, it)
+                    }
+                }
             }
         } catch (e: Exception) {
             currentCoroutineContext().ensureActive()
@@ -459,6 +467,15 @@ object BookHelp {
     @Synchronized
     fun writeImage(book: Book, src: String, bytes: ByteArray) {
         getImage(book, src).createFileIfNotExist().writeBytes(bytes)
+    }
+
+    @Synchronized
+    fun delImage(book: Book, src: String) {
+        val file = getImage(book, src)
+        imageVersions[file.absolutePath] = (imageVersions[file.absolutePath] ?: 0L) + 1L
+        if (file.exists() && !file.delete()) {
+            throw IOException("删除图片缓存失败: ${file.name}")
+        }
     }
 
     @Synchronized
@@ -646,13 +663,16 @@ object BookHelp {
         val folderName = book.getFolderName()
         val fileName = contentSaveFileName(book, bookChapter)
             ?: bookChapter.getFileName()
-        FileUtils.createFileIfNotExist(
-            downloadDir,
-            cacheFolderName,
-            folderName,
-            fileName,
-        ).delete()
-        File(downloadDir.getFile(cacheFolderName, folderName, fileName).path + ".reversed").delete()
+        // A response started before a refresh must not repopulate the invalidated chapter.
+        contentSaveFence.replace(contentSaveKey(book, bookChapter), fileName) {
+            FileUtils.createFileIfNotExist(
+                downloadDir,
+                cacheFolderName,
+                folderName,
+                fileName,
+            ).delete()
+            File(downloadDir.getFile(cacheFolderName, folderName, fileName).path + ".reversed").delete()
+        }
     }
 
     /**

@@ -552,14 +552,13 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
      * 刷新图片
      */
     fun refreshImage(src: String) {
+        val book = ReadBook.book ?: return
         execute {
-            ReadBook.book?.let { book ->
-                val vFile = BookHelp.getImage(book, src)
-                ImageProvider.bitmapLruCache.remove(vFile.absolutePath)
-                vFile.delete()
+            ImageProvider.clearImage(book, src)
+        }.onSuccess {
+            if (ReadBook.book?.bookUrl == book.bookUrl) {
+                ReadBook.loadContent(false)
             }
-        }.onFinally {
-            ReadBook.loadContent(false)
         }
     }
 
