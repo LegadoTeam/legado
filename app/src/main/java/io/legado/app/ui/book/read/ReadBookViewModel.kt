@@ -44,6 +44,7 @@ import io.legado.app.utils.FileUtils
 import io.legado.app.utils.isContentScheme
 import io.legado.app.utils.mapParallelSafe
 import io.legado.app.utils.postEvent
+import io.legado.app.utils.runOnUI
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers.Main
@@ -73,6 +74,7 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
     var searchResultIndex: Int = 0
     private var changeSourceCoroutine: Coroutine<*>? = null
     private var resourceRefreshCoroutine: Coroutine<*>? = null
+    val resourceRefreshing = MutableLiveData(false)
     private var resourceTheme: Pair<String, List<Int>>? = null
     private val refreshedResourceThemes = java.util.concurrent.ConcurrentHashMap<Int, Pair<String, List<Int>>>()
 
@@ -452,8 +454,8 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
         val indexes = maxOf(0, currentIndex - before)..minOf(ReadBook.chapterSize - 1, currentIndex + after)
         val oldImages = ReadBook.resourceImageSources(indexes)
         val theme = currentResourceTheme(book)
-        resourceRefreshCoroutine?.cancel()
-        resourceRefreshCoroutine = execute {
+        val previousRefresh = resourceRefreshCoroutine
+        val refresh = executeLazy {
             val chapters = appDb.bookChapterDao.getChapterList(book.bookUrl, indexes.first, indexes.last)
                 .filterNot { it.isVolume }
             val tokens = chapters.associate { it.index to BookHelp.contentSaveToken(book, it) }
@@ -503,6 +505,18 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
         }.onError {
             AppLog.put("刷新资源失败\n${it.localizedMessage}", it, true)
         }
+        resourceRefreshCoroutine = refresh
+        refresh.invokeOnCompletion {
+            runOnUI {
+                if (resourceRefreshCoroutine === refresh) {
+                    resourceRefreshCoroutine = null
+                    resourceRefreshing.value = false
+                }
+            }
+        }
+        resourceRefreshing.value = true
+        previousRefresh?.cancel()
+        refresh.start()
     }
 
     fun refreshContentAfter(book: Book) {

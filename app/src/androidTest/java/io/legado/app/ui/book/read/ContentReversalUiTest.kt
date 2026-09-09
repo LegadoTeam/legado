@@ -65,6 +65,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicIntegerArray
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -125,6 +126,7 @@ class ContentReversalUiTest {
         val failBody = AtomicInteger(-1)
         val failImage = AtomicInteger(-1)
         val delayNextBody = AtomicBoolean()
+        val refreshGate = AtomicReference<Pair<CountDownLatch, CountDownLatch>?>(null)
         val obsoleteEntered = CountDownLatch(1)
         val releaseObsolete = CountDownLatch(1)
         var obsoleteRead: Deferred<Unit>? = null
@@ -154,6 +156,10 @@ class ContentReversalUiTest {
                 } else {
                     val version = bodyVersion.get()
                     bodyRequests.incrementAndGet(index)
+                    if (index == 3) refreshGate.getAndSet(null)?.let { (entered, release) ->
+                        entered.countDown()
+                        check(release.await(15, TimeUnit.SECONDS))
+                    }
                     if (index == 3 && delayNextBody.compareAndSet(true, false)) {
                         obsoleteEntered.countDown()
                         check(releaseObsolete.await(15, TimeUnit.SECONDS))
@@ -191,7 +197,8 @@ class ContentReversalUiTest {
                 val chapter = ReadBook.curTextChapter
                 val page = it.findViewById<ReadView>(R.id.read_view).curPage.textPage
                 it.isInitFinish && ReadBook.durChapterIndex == 3 && chapter != null &&
-                    chapter !== previous && chapter.isCompleted && page.textChapter === chapter && !page.isMsgPage
+                    chapter !== previous && chapter.isCompleted && page.textChapter === chapter && !page.isMsgPage &&
+                    ViewModelProvider(it)[ReadBookViewModel::class.java].resourceRefreshing.value != true
             }
             fun refresh() {
                 showReaderMenu()
@@ -218,9 +225,34 @@ class ContentReversalUiTest {
                 }
                 val imageBytes = (0..6).map { BookHelp.getImage(book, "$base/image/$it.png").readBytes() }
                 val failures = AppLog.logs.count { it.second.startsWith("刷新资源失败\n") }
-                action()
+                val entered = CountDownLatch(1)
+                val release = CountDownLatch(1)
+                refreshGate.set(entered to release)
+                try {
+                    action()
+                    assertTrue("The refresh must fetch in the background", entered.await(5, TimeUnit.SECONDS))
+                    await("loading notice before the blocked request completes") {
+                        ViewModelProvider(it)[ReadBookViewModel::class.java].resourceRefreshing.value == true &&
+                            it.findViewById<View>(com.google.android.material.R.id.snackbar_text)?.isShown == true
+                    }
+                    assertSame("Loading must keep the old rendered chapter", layout, ReadBook.curTextChapter)
+                    assertEquals(savedPosition, ReadBook.durChapterPos)
+                    val frame = CountDownLatch(1)
+                    scenario!!.onActivity {
+                        val reader = it.findViewById<ReadView>(R.id.read_view)
+                        assertFalse("The loading notice must not replace readable text", reader.curPage.textPage.isMsgPage)
+                        reader.postOnAnimation { frame.countDown() }
+                    }
+                    assertTrue("Reader frames must continue while HTTP is blocked", frame.await(2, TimeUnit.SECONDS))
+                    if (failBody.get() == 3) screenshot("resource-refresh-loading")
+                } finally {
+                    release.countDown()
+                    refreshGate.set(null)
+                }
                 await("resource failure reported without replacing cached resources") {
-                    AppLog.logs.count { it.second.startsWith("刷新资源失败\n") } > failures
+                    AppLog.logs.count { it.second.startsWith("刷新资源失败\n") } > failures &&
+                        ViewModelProvider(it)[ReadBookViewModel::class.java].resourceRefreshing.value == false &&
+                        it.findViewById<View>(com.google.android.material.R.id.snackbar_text)?.isShown != true
                 }
                 assertSame("A failed refresh must retain the rendered chapter", layout, ReadBook.curTextChapter)
                 assertEquals(savedPosition, ReadBook.durChapterPos)
