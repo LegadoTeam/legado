@@ -63,7 +63,7 @@ android {
         }
     }
     defaultConfig {
-        applicationId "com.legado.app"
+        applicationId "com.legado.cronet153phone"
         minSdk 23
         targetSdk 36
         versionCode = versionCodeValue
@@ -114,9 +114,9 @@ android {
             }
             applicationIdSuffix '.release'
             if (getApplicationIdSuffix() == '.releaseA') {
-                manifestPlaceholders.put("app_name", "@string/app_name_a")
+                manifestPlaceholders.put("app_name", "阅读·153测试A")
             } else {
-                manifestPlaceholders.put("app_name", "@string/app_name")
+                manifestPlaceholders.put("app_name", "阅读·153测试")
             }
 
             minifyEnabled true

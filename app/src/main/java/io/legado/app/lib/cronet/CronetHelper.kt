@@ -4,6 +4,7 @@
 package io.legado.app.lib.cronet
 
 import androidx.annotation.Keep
+import android.os.Build
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern
 import io.legado.app.help.config.AppConfig
@@ -20,6 +21,7 @@ import org.chromium.net.UploadDataProvider
 import org.chromium.net.UrlRequest
 import org.json.JSONObject
 import splitties.init.appCtx
+import java.io.File
 
 internal const val BUFFER_SIZE = 32 * 1024
 
@@ -41,6 +43,17 @@ val cronetEngine: ExperimentalCronetEngine? by lazy {
         }
         val engine = builder.build()
         DebugLog.d("Cronet Version:", engine.versionString)
+        // Phone-only test branch: export native/storage evidence through the existing app log.
+        runCatching {
+            val mapped = File("/proc/self/maps").useLines { lines ->
+                lines.filter { it.contains("libcronet") }.map { it.substringAfterLast(' ') }
+                    .distinct().toList()
+            }
+            AppLog.put("CRONET_PHONE ${Build.MANUFACTURER} ${Build.MODEL}; Android ${Build.VERSION.RELEASE}; " +
+                "API ${Build.VERSION.SDK_INT}; engine=${engine.versionString}; mapped=$mapped\n" +
+                cronetPhoneStorageReport(File(appCtx.applicationInfo.dataDir, "app_cronet"),
+                    File(appCtx.cacheDir, "so_download")))
+        }.onFailure { AppLog.put("Cronet phone storage report failed", it) }
         engine
     } catch (e: Throwable) {
         cronetEngineFailure = e
