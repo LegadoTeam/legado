@@ -496,7 +496,7 @@ data class TextLine(
                 1f.dpToPx()
             )
             // Keep the end glyphs clear of the capsule's curved border.
-            val padding = if (shape == HighlightStyle.FillShape.PILL) textSize * 0.25f else 0f
+            val padding = if (shape == HighlightStyle.FillShape.PILL) (band.bottom - band.top) / 2f else 0f
             HighlightDraw.drawFillRun(
                 canvas,
                 first.start - padding,
