@@ -74,7 +74,7 @@ class HighlightTriggerUiTest {
     private val book = Book(bookUrl = "https://example.invalid/highlight/$id",
         tocUrl = "https://example.invalid/highlight/$id/toc", origin = source.bookSourceUrl,
         name = "Highlight trigger fixture", type = BookType.text, totalChapterNum = 1, canUpdate = false)
-        .apply { setPageAnim(PageAnim.noAnim); setUseReplaceRule(false); setImageStyle(Book.imgStyleText) }
+        .apply { setPageAnim(PageAnim.noAnim); setUseReplaceRule(false); setImageStyle(Book.imgStyleDefault) }
     private val chapter = BookChapter(bookUrl = book.bookUrl, url = "${book.bookUrl}/0", title = "Triggers")
     private val image = "https://example.invalid/$id/image.png," +
         """{"style":"text","click":"book.putVariable('imageDoubleTap', 'done')"}"""
@@ -229,7 +229,13 @@ class HighlightTriggerUiTest {
             assertEquals("HTML links keep single-tap priority", 1, monitor.hits)
         } finally { instrumentation.removeMonitor(monitor) }
         prefs.edit().putString(PreferKey.clickImgWay, "4").commit()
-        val imagePoint = point { it is ImageColumn }
+        val imagePoint = point {
+            if (it !is ImageColumn) false else {
+                assertEquals("The real image column must retain the source click script",
+                    "book.putVariable('imageDoubleTap', 'done')", it.click)
+                true
+            }
+        }
         SystemClock.sleep(350)
         taps(imagePoint)
         assertEquals("", ReadBook.book!!.getVariable("imageDoubleTap"))
