@@ -1,11 +1,16 @@
 package io.legado.app.ui.association
 
+import android.app.Activity
+import android.app.Instrumentation
 import android.content.ClipData
 import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Bitmap
+import android.net.Uri
 import android.os.SystemClock
 import androidx.core.content.FileProvider
+import androidx.fragment.app.DialogFragment
+import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
@@ -35,6 +40,8 @@ import io.legado.app.help.storage.BackupConfig
 import io.legado.app.model.ReadBook
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.ui.book.read.ReadBookActivity
+import io.legado.app.ui.file.HandleFileActivity
+import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.utils.GSON
 import io.legado.app.utils.defaultSharedPreferences
 import kotlinx.coroutines.runBlocking
@@ -126,7 +133,7 @@ class SharedFileImportTest {
                 return newFixedLengthResponse("<article><h2>$name</h2><span class='author'>$author</span>" +
                     "<a href='/book/$id'>Details</a></article>")
             }
-        }.apply { start(SOCKET_READ_TIMEOUT, false) }
+        }.apply { start(NanoHTTPD.SOCKET_READ_TIMEOUT, false) }
         val source = BookSource("http://127.0.0.1:${server.listeningPort}", "Share fixture",
             customOrder = Int.MIN_VALUE, searchUrl = "/search?key={{key}}",
             ruleSearch = SearchRule(bookList = "article", name = "h2@text", author = ".author@text", bookUrl = "a@href"))
@@ -137,10 +144,12 @@ class SharedFileImportTest {
         }
         try {
             launchShare(file, "application/json").use { scenario ->
+                awaitDialog(scenario)
                 onView(withText(R.string.import_bookshelf)).inRoot(isDialog()).check(matches(isDisplayed()))
                 assertFalse(appDb.bookDao.has(name, author))
                 assertEquals(0, requests.get())
                 scenario.recreate()
+                awaitDialog(scenario)
                 onView(withText(R.string.import_bookshelf)).inRoot(isDialog()).check(matches(isDisplayed()))
                 screenshot("share-bookshelf-confirmation")
                 onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
@@ -163,7 +172,8 @@ class SharedFileImportTest {
             val file = File(directory, "unrelated-$typed.json").apply {
                 writeText(GSON.toJson(if (typed) HighlightRuleFile(HighlightRuleFile.TYPE, listOf(rule)) else listOf(rule)))
             }
-            launchShare(file, "application/octet-stream").use {
+            launchShare(file, "application/octet-stream").use { scenario ->
+                awaitDialog(scenario)
                 onView(withText(rule.name)).check(matches(isDisplayed()))
                 assertFalse(appDb.highlightRuleDao.all.any { it.uuid == rule.uuid })
                 screenshot("share-highlight-$typed")
@@ -180,7 +190,8 @@ class SharedFileImportTest {
         val rule = ReplaceRule(id = System.currentTimeMillis(), name = "Shared replacement", pattern = id, replacement = "changed")
         replacements.add(rule)
         val file = File(directory, "misleading-highlight-name.json").apply { writeText(GSON.toJson(listOf(rule))) }
-        launchShare(file, "application/json").use {
+        launchShare(file, "application/json").use { scenario ->
+            awaitDialog(scenario)
             onView(withText(R.string.import_replace_rule)).check(matches(isDisplayed()))
             onView(withText(rule.name)).check(matches(isDisplayed()))
             onView(withId(R.id.tv_ok)).perform(click())
@@ -218,7 +229,8 @@ class SharedFileImportTest {
         appDb.bookSourceDao.delete(source)
         appDb.highlightRuleDao.all.find { it.uuid == rule.uuid }!!.let { appDb.highlightRuleDao.delete(it) }
         prefs.edit().remove(marker).commit()
-        launchShare(renamed, "application/zip").use {
+        launchShare(renamed, "application/zip").use { scenario ->
+            awaitDialog(scenario)
             onView(withText(R.string.restore_confirmation)).inRoot(isDialog()).check(matches(isDisplayed()))
             assertFalse(appDb.bookDao.has(book.bookUrl))
             screenshot("share-backup-confirmation")
@@ -226,7 +238,8 @@ class SharedFileImportTest {
         }
         assertFalse(appDb.bookDao.has(book.bookUrl))
         assertFalse(prefs.contains(marker))
-        launchShare(renamed, "application/zip").use {
+        launchShare(renamed, "application/zip").use { scenario ->
+            awaitDialog(scenario)
             onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
             await { appDb.bookDao.has(book.bookUrl) && prefs.getString(marker, null) == "restored value" }
             assertEquals(7, appDb.bookDao.getBook(book.bookUrl)!!.durChapterIndex)
@@ -236,11 +249,11 @@ class SharedFileImportTest {
     }
 
     @Test fun sharedTxtEpubPdfAndBookZipCopyDurablyAndOpenTheRealReader() {
-        val txt = File(directory, "shared-$id.txt").apply { writeText("Chapter one\n" + "SHARED_TEXT_VISIBLE $id\n".repeat(20)) }
-        val epub = File(directory, "shared-$id.epub").apply {
+        val txt = File(directory, "shared-txt-$id.txt").apply { writeText("Chapter one\n" + "SHARED_TEXT_VISIBLE $id\n".repeat(20)) }
+        val epub = File(directory, "shared-epub-$id.epub").apply {
             instrumentation.context.assets.open("issue1074-containers-fragments.epub").use { input -> outputStream().use(input::copyTo) }
         }
-        val pdf = File(directory, "shared-$id.pdf").apply {
+        val pdf = File(directory, "shared-pdf-$id.pdf").apply {
             instrumentation.context.assets.open("pdf-outline-direct-named.pdf").use { input -> outputStream().use(input::copyTo) }
         }
         listOf(txt to "text/plain", epub to "application/epub+zip", pdf to "application/pdf").forEach { (file, mime) ->
@@ -275,6 +288,35 @@ class SharedFileImportTest {
         }
     }
 
+    @Test fun firstSharedBookContinuesWithItsStreamAfterTheFolderResult() {
+        prefs.edit().remove(PreferKey.defaultBookTreeUri).commit()
+        val file = File(directory, "first-share-$id.txt").apply { writeText("FIRST_SHARED_STREAM $id\n".repeat(15)) }
+        val folderRequests = AtomicInteger()
+        val monitor = object : Instrumentation.ActivityMonitor() {
+            override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? {
+                if (intent.component?.className != HandleFileActivity::class.java.name) return null
+                assertEquals(HandleFileContract.DIR_SYS, intent.getIntExtra("mode", -1))
+                folderRequests.incrementAndGet()
+                return Instrumentation.ActivityResult(Activity.RESULT_OK,
+                    Intent().setData(Uri.fromFile(File(directory, "books"))))
+            }
+        }
+        instrumentation.addMonitor(monitor)
+        try {
+            launchShare(file, "text/plain").use {
+                val copied = File(directory, "books/${file.name}")
+                await { copied.exists() && appDb.bookDao.has(copied.path) }
+                val book = appDb.bookDao.getBook(copied.path)!!
+                books.add(book)
+                assertEquals(1, folderRequests.get())
+                assertEquals(file.readText(), copied.readText())
+                awaitReader(book)
+                assertTrue(ReadBook.curTextChapter!!.pages.any { it.text.contains("FIRST_SHARED_STREAM") })
+                closeReaders()
+            }
+        } finally { instrumentation.removeMonitor(monitor) }
+    }
+
     private fun launchShare(file: File, mime: String): ActivityScenario<FileAssociationActivity> {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileProvider", file)
         val intent = Intent(Intent.ACTION_SEND).setType(mime).setPackage(context.packageName)
@@ -291,6 +333,20 @@ class SharedFileImportTest {
             ReadBook.book?.bookUrl == book.bookUrl &&
                 ReadBook.curTextChapter?.isCompleted == true &&
                 ReadBook.curTextChapter?.pages?.isNotEmpty() == true
+        }
+    }
+
+    private fun awaitDialog(scenario: ActivityScenario<FileAssociationActivity>) {
+        await {
+            var ready = false
+            scenario.onActivity { activity ->
+                ready = activity.supportFragmentManager.fragments.filterIsInstance<DialogFragment>()
+                    .any { dialog ->
+                        dialog.dialog?.isShowing == true &&
+                            (dialog.view?.findViewById<RecyclerView>(R.id.recycler_view)?.adapter?.itemCount ?: 1) > 0
+                    }
+            }
+            ready
         }
     }
 
