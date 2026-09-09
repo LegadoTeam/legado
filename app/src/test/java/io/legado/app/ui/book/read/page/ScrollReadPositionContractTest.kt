@@ -31,9 +31,12 @@ class ScrollReadPositionContractTest {
             onPause.indexOf("updateScrollReadPosition()") <
                 onPause.indexOf("ReadBook.saveRead()")
         )
-        assertTrue(activity.contains("binding.readView.getReadPosition()"))
-        assertTrue(activity.contains("ReadBook.msg != null || !ReadBook.isLayoutAvailable"))
-        assertTrue(activity.contains("ReadBook.durChapterPos = line.chapterPosition"))
+        val readView = source("app/src/main/java/io/legado/app/ui/book/read/page/ReadView.kt")
+        val savePosition = readView.substringAfter("fun updateScrollReadPosition(")
+            .substringBefore("fun getReadAloudPos()")
+        assertTrue(savePosition.contains("getReadPosition()"))
+        assertTrue(savePosition.contains("!isScroll || ReadBook.msg != null || !ReadBook.isLayoutAvailable"))
+        assertTrue(savePosition.contains("ReadBook.durChapterPos = line.chapterPosition"))
         assertTrue(activity.contains("resetPageOffset = ReadBook.isScroll"))
         val configUpdate = activity.substringAfter(
             "observeEvent<ArrayList<Int>>(EventBus.UP_CONFIG)"
