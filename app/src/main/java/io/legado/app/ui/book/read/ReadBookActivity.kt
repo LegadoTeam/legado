@@ -556,7 +556,12 @@ class ReadBookActivity : BaseReadBookActivity(),
 //                        item.isChecked = AppConfig.enableReview
 //                    }
 
-                    R.id.menu_reverse_content -> item.isVisible = onLine
+                    R.id.menu_reverse_content -> {
+                        item.isVisible = onLine
+                        item.isChecked = ReadBook.curTextChapter?.chapter?.takeIf {
+                            it.bookUrl == book.bookUrl && it.index == ReadBook.durChapterIndex
+                        }?.let { BookHelp.isContentReversed(book, it) } == true
+                    }
                     R.id.menu_del_ruby_tag -> item.isChecked = book.getDelTag(Book.rubyTag)
                     R.id.menu_del_h_tag -> item.isChecked = book.getDelTag(Book.hTag)
                 }

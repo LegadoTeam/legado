@@ -7,11 +7,15 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import androidx.preference.Preference
+import androidx.preference.SeekBarPreference
 import io.legado.app.R
 import io.legado.app.base.BasePrefDialogFragment
+import io.legado.app.constant.PreferKey
 import io.legado.app.lib.prefs.fragment.PreferenceFragment
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.ui.book.read.ReadBookActivity
+import io.legado.app.ui.book.read.readAloudControlWidth
+import io.legado.app.utils.defaultSharedPreferences
 import io.legado.app.utils.setLayout
 
 class ReadAloudControlsDialog : BasePrefDialogFragment() {
@@ -46,7 +50,9 @@ class ReadAloudControlsDialog : BasePrefDialogFragment() {
 
     class ControlsPreferenceFragment : PreferenceFragment() {
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+            val width = readAloudControlWidth(requireContext().defaultSharedPreferences)
             setPreferencesFromResource(R.xml.pref_config_aloud_controls, rootKey)
+            findPreference<SeekBarPreference>(PreferKey.readAloudControlsWidth)?.value = width
         }
 
         override fun onPreferenceTreeClick(preference: Preference): Boolean {
