@@ -85,8 +85,13 @@ data class BookChapter(
         }
     }
 
+    @Ignore
+    @IgnoredOnParcel
+    @Transient
+    internal var deferUpdates = false
+
     fun update() {
-        appDb.bookChapterDao.update(this)
+        if (!deferUpdates) appDb.bookChapterDao.update(this)
     }
 
     @Ignore

@@ -24,6 +24,7 @@ import io.legado.app.help.HighlightRuleMatcher
 import io.legado.app.help.HighlightStyle
 import io.legado.app.help.HighlightTextBuilder
 import io.legado.app.help.book.BookHelp
+import io.legado.app.help.book.ContentSaveToken
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.isImage
 import io.legado.app.help.book.isLocal
@@ -43,6 +44,7 @@ import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.service.CacheBookService
 import io.legado.app.ui.book.read.page.entities.TextChapter
+import io.legado.app.ui.book.read.page.entities.column.ImageColumn
 import io.legado.app.ui.book.read.page.entities.TextPage
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.ui.book.read.page.provider.LayoutProgressListener
@@ -259,6 +261,22 @@ object ReadBook : CoroutineScope by MainScope() {
             content = rules.filter { it.scopeContent },
         )
     }
+
+    internal fun processChapterContent(book: Book, chapter: BookChapter, content: String) =
+        ContentProcessor.get(book).let { processor ->
+            val manualRules = manualReplaceRules(book)
+            val title = chapter.getDisplayTitle(
+                manualRules?.title ?: processor.getTitleReplaceRules(),
+                manualRules?.enabled ?: book.getUseReplaceRule(),
+                replaceBook = book.toReplaceBook(),
+            )
+            title to processor.getContent(
+                book, chapter, content, includeTitle = false,
+                replaceEnabledOverride = manualRules?.enabled,
+                titleReplaceRulesOverride = manualRules?.title,
+                contentReplaceRulesOverride = manualRules?.content,
+            )
+        }
 
     fun loadHighlights(book: Book) {
         highlights = appDb.bookHighlightDao.getByBook(book.bookUrl)
@@ -604,6 +622,32 @@ object ReadBook : CoroutineScope by MainScope() {
         if (BuildConfig.DEBUG) Log.d("ReadPosition",
             "anchor position=$durChapterPos pending=${pendingHighlightAnchor?.rawPosition} " +
                 "chapter=${System.identityHashCode(curTextChapter)}")
+    }
+
+    fun resourceImageSources(indexes: IntRange): Set<String> =
+        listOfNotNull(prevTextChapter, curTextChapter, nextTextChapter)
+            .filter { it.chapter.index in indexes }
+            .flatMap { chapter -> chapter.pages.flatMap { it.lines }.flatMap { it.columns } }
+            .filterIsInstance<ImageColumn>().map { it.src }.toSet()
+
+    @Synchronized
+    fun clearResourceChapters(indexes: IntRange) {
+        if (durChapterIndex in indexes && curTextChapter != null) preserveCurrentPositionForRefresh()
+        preDownloadTask?.cancel()
+        listOfNotNull(prevTextChapter, curTextChapter, nextTextChapter)
+            .filter { it.chapter.index in indexes }.forEach {
+                it.cancelLayout()
+                it.invalidateHighlightRuleMatches()
+            }
+        indexes.forEach { index ->
+            chapterLoadingJobs.remove(index)?.cancel()
+            loadingChapters.remove(index)
+            downloadedChapters.remove(index)
+            downloadFailChapters.remove(index)
+        }
+        if (prevTextChapter?.chapter?.index?.let { it in indexes } == true) prevTextChapter = null
+        if (curTextChapter?.chapter?.index?.let { it in indexes } == true) curTextChapter = null
+        if (nextTextChapter?.chapter?.index?.let { it in indexes } == true) nextTextChapter = null
     }
 
     fun clearSearchResult() {
@@ -1177,9 +1221,11 @@ object ReadBook : CoroutineScope by MainScope() {
         readPositionVersion: Long? = null,
         success: (() -> Unit)? = null,
     ) {
+        val requestBook = book ?: return
         Coroutine.async {
-            val book = book!!
+            val book = requestBook
             val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, index) ?: return@async
+            val contentToken = BookHelp.contentSaveToken(book, chapter)
             if (addLoading(index)) {
                 BookHelp.getContent(book, chapter)?.let {
                     contentLoadFinish(
@@ -1189,6 +1235,7 @@ object ReadBook : CoroutineScope by MainScope() {
                         upContent,
                         resetPageOffset,
                         readPositionVersion = readPositionVersion,
+                        contentToken = contentToken,
                         success = success
                     )
                 } ?: download(
@@ -1210,10 +1257,11 @@ object ReadBook : CoroutineScope by MainScope() {
         readPositionVersion: Long? = null,
         success: (() -> Unit)? = null,
     ) = withContext(IO) {
+        val book = book ?: return@withContext
+        val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, index) ?: return@withContext
+        val contentToken = BookHelp.contentSaveToken(book, chapter)
         if (addLoading(index)) {
             try {
-                val book = book!!
-                val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, index)!!
                 val content = BookHelp.getContent(book, chapter) ?: downloadAwait(chapter)
                 contentLoadFinishAwait(
                     book,
@@ -1222,12 +1270,17 @@ object ReadBook : CoroutineScope by MainScope() {
                     upContent,
                     resetPageOffset,
                     readPositionVersion,
+                    contentToken,
                 )
-                success?.invoke()
+                if (BookHelp.isContentSaveCurrent(contentToken)) success?.invoke()
             } catch (e: Exception) {
                 AppLog.put("加载正文出错\n${e.localizedMessage}")
             } finally {
-                removeLoading(index)
+                synchronized(this@ReadBook) {
+                    if (ReadBook.book?.bookUrl == book.bookUrl && BookHelp.isContentSaveCurrent(contentToken)) {
+                        removeLoading(index)
+                    }
+                }
             }
         }
     }
@@ -1322,8 +1375,10 @@ object ReadBook : CoroutineScope by MainScope() {
         resetPageOffset: Boolean,
         canceled: Boolean = false,
         readPositionVersion: Long? = null,
+        contentToken: ContentSaveToken = BookHelp.contentSaveToken(book, chapter),
         success: (() -> Unit)? = null,
     ) {
+        if (this.book?.bookUrl != book.bookUrl || !BookHelp.isContentSaveCurrent(contentToken)) return
         removeLoading(chapter.index)
         if (canceled || chapter.index !in durChapterIndex - 1..durChapterIndex + 1) {
             return
@@ -1332,24 +1387,8 @@ object ReadBook : CoroutineScope by MainScope() {
             shouldApplyReadPositionReset(readPositionVersion)
         chapterLoadingJobs[chapter.index]?.cancel()
         val job = Coroutine.async(this, start = CoroutineStart.LAZY) {
-            val contentProcessor = ContentProcessor.get(book.name, book.origin)
-            val manualRules = manualReplaceRules(book)
-            val titleRules = manualRules?.title ?: contentProcessor.getTitleReplaceRules()
-            val replaceEnabled = manualRules?.enabled ?: book.getUseReplaceRule()
-            val displayTitle = chapter.getDisplayTitle(
-                titleRules,
-                replaceEnabled,
-                replaceBook = book.toReplaceBook()
-            )
-            val contents = contentProcessor.getContent(
-                book,
-                chapter,
-                content,
-                includeTitle = false,
-                replaceEnabledOverride = manualRules?.enabled,
-                titleReplaceRulesOverride = manualRules?.title,
-                contentReplaceRulesOverride = manualRules?.content,
-            )
+            ensureContentCurrent(book, contentToken)
+            val (displayTitle, contents) = processChapterContent(book, chapter, content)
             ensureActive()
             val textChapter = ChapterProvider.getTextChapterAsync(
                 this, book, chapter, displayTitle, contents, simulatedChapterSize,
@@ -1359,6 +1398,7 @@ object ReadBook : CoroutineScope by MainScope() {
             when (val offset = chapter.index - durChapterIndex) {
                 0 -> curChapterLoadingLock.withLock {
                     withContext(Main) {
+                        ensureContentCurrent(book, contentToken)
                         ensureActive()
                         curTextChapter?.invalidateHighlightRuleMatches()
                         curTextChapter = textChapter
@@ -1367,6 +1407,7 @@ object ReadBook : CoroutineScope by MainScope() {
                     callBack?.upMenuView()
                     var available = false
                     for (page in textChapter.layoutChannel) {
+                        ensureContentCurrent(book, contentToken)
                         val index = page.index
                         val positionReady = resolvePendingPdfJump(book, textChapter, page) &&
                             resolvePendingHighlightJump(book, textChapter)
@@ -1387,6 +1428,7 @@ object ReadBook : CoroutineScope by MainScope() {
                         }
                         callBack?.onLayoutPageCompleted(index, page)
                     }
+                    ensureContentCurrent(book, contentToken)
                     finishPendingPdfJump(book, textChapter)
                     val restoredAnchor = resolvePendingHighlightAnchor(book, textChapter)
                     if (upContent) {
@@ -1404,12 +1446,13 @@ object ReadBook : CoroutineScope by MainScope() {
 
                 -1 -> prevChapterLoadingLock.withLock {
                     withContext(Main) {
+                        ensureContentCurrent(book, contentToken)
                         ensureActive()
                         prevTextChapter?.invalidateHighlightRuleMatches()
                         prevTextChapter = textChapter
                         observeHighlightRuleLayout(textChapter)
                     }
-                    textChapter.layoutChannel.receiveAsFlow().collect()
+                    textChapter.layoutChannel.receiveAsFlow().collect { ensureContentCurrent(book, contentToken) }
                     if (upContent) {
                         callBack?.upContent(
                             offset,
@@ -1421,12 +1464,14 @@ object ReadBook : CoroutineScope by MainScope() {
 
                 1 -> nextChapterLoadingLock.withLock {
                     withContext(Main) {
+                        ensureContentCurrent(book, contentToken)
                         ensureActive()
                         nextTextChapter?.invalidateHighlightRuleMatches()
                         nextTextChapter = textChapter
                         observeHighlightRuleLayout(textChapter)
                     }
                     for (page in textChapter.layoutChannel) {
+                        ensureContentCurrent(book, contentToken)
                         if (page.index > 1) {
                             continue
                         }
@@ -1449,7 +1494,7 @@ object ReadBook : CoroutineScope by MainScope() {
             AppLog.put("ChapterProvider ERROR", it)
             appCtx.toastOnUi("ChapterProvider ERROR:\n${it.stackTraceStr}")
         }.onSuccess {
-            success?.invoke()
+            if (BookHelp.isContentSaveCurrent(contentToken)) success?.invoke()
         }
         chapterLoadingJobs[chapter.index] = job
         job.start()
@@ -1462,32 +1507,17 @@ object ReadBook : CoroutineScope by MainScope() {
         upContent: Boolean = true,
         resetPageOffset: Boolean,
         readPositionVersion: Long? = null,
+        contentToken: ContentSaveToken = BookHelp.contentSaveToken(book, chapter),
     ) {
-        removeLoading(chapter.index)
-        if (chapter.index !in durChapterIndex - 1..durChapterIndex + 1) {
-            return
+        synchronized(this) {
+            if (this.book?.bookUrl != book.bookUrl || !BookHelp.isContentSaveCurrent(contentToken)) return
+            removeLoading(chapter.index)
+            if (chapter.index !in durChapterIndex - 1..durChapterIndex + 1) return
         }
         val shouldResetPageOffset = resetPageOffset &&
             shouldApplyReadPositionReset(readPositionVersion)
         kotlin.runCatching {
-            val contentProcessor = ContentProcessor.get(book.name, book.origin)
-            val manualRules = manualReplaceRules(book)
-            val titleRules = manualRules?.title ?: contentProcessor.getTitleReplaceRules()
-            val replaceEnabled = manualRules?.enabled ?: book.getUseReplaceRule()
-            val displayTitle = chapter.getDisplayTitle(
-                titleRules,
-                replaceEnabled,
-                replaceBook = book.toReplaceBook()
-            )
-            val contents = contentProcessor.getContent(
-                book,
-                chapter,
-                content,
-                includeTitle = false,
-                replaceEnabledOverride = manualRules?.enabled,
-                titleReplaceRulesOverride = manualRules?.title,
-                contentReplaceRulesOverride = manualRules?.content,
-            )
+            val (displayTitle, contents) = processChapterContent(book, chapter, content)
             val textChapter = ChapterProvider.getTextChapterAsync(
                 this@ReadBook, book, chapter, displayTitle, contents, simulatedChapterSize,
                 hasBodyContent = contents.textList.isNotEmpty() &&
@@ -1495,14 +1525,16 @@ object ReadBook : CoroutineScope by MainScope() {
             )
             when (val offset = chapter.index - durChapterIndex) {
                 0 -> {
-                    curTextChapter?.cancelLayout()
                     withContext(Main) {
+                        ensureContentCurrent(book, contentToken)
+                        curTextChapter?.cancelLayout()
                         curTextChapter = textChapter
                         observeHighlightRuleLayout(textChapter)
                     }
                     callBack?.upMenuView()
                     var available = false
                     for (page in textChapter.layoutChannel) {
+                        ensureContentCurrent(book, contentToken)
                         val index = page.index
                         val positionReady = resolvePendingPdfJump(book, textChapter, page) &&
                             resolvePendingHighlightJump(book, textChapter)
@@ -1523,6 +1555,7 @@ object ReadBook : CoroutineScope by MainScope() {
                         }
                         callBack?.onLayoutPageCompleted(index, page)
                     }
+                    ensureContentCurrent(book, contentToken)
                     finishPendingPdfJump(book, textChapter)
                     val restoredAnchor = resolvePendingHighlightAnchor(book, textChapter)
                     if (upContent) {
@@ -1539,12 +1572,13 @@ object ReadBook : CoroutineScope by MainScope() {
                 }
 
                 -1 -> {
-                    prevTextChapter?.cancelLayout()
                     withContext(Main) {
+                        ensureContentCurrent(book, contentToken)
+                        prevTextChapter?.cancelLayout()
                         prevTextChapter = textChapter
                         observeHighlightRuleLayout(textChapter)
                     }
-                    textChapter.layoutChannel.receiveAsFlow().collect()
+                    textChapter.layoutChannel.receiveAsFlow().collect { ensureContentCurrent(book, contentToken) }
                     if (upContent) {
                         callBack?.upContent(
                             offset,
@@ -1555,12 +1589,14 @@ object ReadBook : CoroutineScope by MainScope() {
                 }
 
                 1 -> {
-                    nextTextChapter?.cancelLayout()
                     withContext(Main) {
+                        ensureContentCurrent(book, contentToken)
+                        nextTextChapter?.cancelLayout()
                         nextTextChapter = textChapter
                         observeHighlightRuleLayout(textChapter)
                     }
                     for (page in textChapter.layoutChannel) {
+                        ensureContentCurrent(book, contentToken)
                         if (page.index > 1) {
                             continue
                         }
@@ -1580,6 +1616,12 @@ object ReadBook : CoroutineScope by MainScope() {
             }
             AppLog.put("ChapterProvider ERROR", it)
             appCtx.toastOnUi("ChapterProvider ERROR:\n${it.stackTraceStr}")
+        }
+    }
+
+    private fun ensureContentCurrent(book: Book, token: ContentSaveToken) {
+        if (this.book?.bookUrl != book.bookUrl || !BookHelp.isContentSaveCurrent(token)) {
+            throw CancellationException("Chapter resources were refreshed")
         }
     }
 

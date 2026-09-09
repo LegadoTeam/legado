@@ -714,11 +714,16 @@ class ReadBookActivity : BaseReadBookActivity(),
             item(getString(R.string.menu_refresh_dur), "dur")
             item(getString(R.string.menu_refresh_after), "after")
             item(getString(R.string.menu_refresh_all), "all")
+            item(getString(R.string.menu_refresh_resources), "resources")
         }.show(anchor) { action ->
             when (action) {
                 "dur" -> refreshDurChapter()
                 "after" -> refreshAfterChapters()
                 "all" -> refreshAllChapters()
+                "resources" -> {
+                    resetReviewSummaryState()
+                    ReadBook.book?.let { viewModel.refreshResources(it, includePreloaded = true) }
+                }
             }
         }
     }
@@ -754,6 +759,10 @@ class ReadBookActivity : BaseReadBookActivity(),
             upContent()
         } else {
             ReadBook.book?.let {
+                if (viewModel.resourceThemeChanged(it)) {
+                    viewModel.refreshResources(it, includePreloaded = false)
+                    return@let
+                }
                 ReadBook.preserveCurrentPositionForRefresh()
                 ReadBook.curTextChapter = null
                 binding.readView.upContent()

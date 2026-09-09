@@ -10,6 +10,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.exception.ConcurrentException
 import io.legado.app.help.book.BookHelp
+import io.legado.app.help.book.ContentSaveToken
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.CompositeCoroutine
@@ -46,6 +47,11 @@ object CacheBook {
 
     private val workingState = MutableStateFlow(true)
     private val mutex = Mutex()
+
+    @Synchronized
+    fun invalidateChapters(bookUrl: String, indexes: Iterable<Int>) {
+        cacheBookMap[bookUrl]?.downloads?.invalidate(indexes)
+    }
 
     @Synchronized
     fun getOrCreate(bookUrl: String): CacheBookModel? {
@@ -242,16 +248,22 @@ object CacheBook {
             chapter: BookChapter,
             content: String,
             notifyReader: Boolean,
-        ) {
+            contentToken: ContentSaveToken,
+        ): Boolean {
+            if (!BookHelp.isContentSaveCurrent(contentToken)) return false
             if (!downloads.finish(ticket, Result.success(content), manualComplete = notifyReader) {
                 successDownloadSet.add(chapter.primaryStr())
                 errorDownloadMap.remove(chapter.primaryStr())
-            }) return
-            if (ReadBook.book?.bookUrl == requestBook.bookUrl) {
-                ReadBook.downloadedChapters.add(chapter.index)
-                ReadBook.downloadFailChapters.remove(chapter.index)
-                if (notifyReader) downloadFinish(requestBook, chapter, content)
+            }) return false
+            synchronized(ReadBook) {
+                if (ReadBook.book?.bookUrl == requestBook.bookUrl && BookHelp.isContentSaveCurrent(contentToken)) {
+                    ReadBook.downloadedChapters.add(chapter.index)
+                    ReadBook.downloadFailChapters.remove(chapter.index)
+                    if (notifyReader) downloadFinish(requestBook, chapter, content,
+                        contentToken = contentToken)
+                }
             }
+            return true
         }
 
         private fun onError(
@@ -259,17 +271,22 @@ object CacheBook {
             requestBook: Book,
             chapter: BookChapter,
             error: Throwable,
-        ) {
+            contentToken: ContentSaveToken,
+        ): Boolean {
+            if (!BookHelp.isContentSaveCurrent(contentToken)) return false
             val errorCount = (errorDownloadMap[chapter.primaryStr()] ?: 0) +
                 if (error is ConcurrentException) 0 else 1
             if (!downloads.finish(ticket, Result.failure(error), retryManual = errorCount < 3) {
                 errorDownloadMap[chapter.primaryStr()] = errorCount
-            }) return
-            if (ReadBook.book?.bookUrl == requestBook.bookUrl) {
-                ReadBook.downloadFailChapters[chapter.index] =
-                    (ReadBook.downloadFailChapters[chapter.index] ?: 0) + 1
+            }) return false
+            synchronized(ReadBook) {
+                if (ReadBook.book?.bookUrl == requestBook.bookUrl && BookHelp.isContentSaveCurrent(contentToken)) {
+                    ReadBook.downloadFailChapters[chapter.index] =
+                        (ReadBook.downloadFailChapters[chapter.index] ?: 0) + 1
+                }
             }
             if (errorCount >= 3) AppLog.put("下载${requestBook.name}-${chapter.title}失败\n${error.localizedMessage}", error)
+            return true
         }
 
         /** Start one explicit cache operation. All four download entry points share downloads. */
@@ -302,19 +319,23 @@ object CacheBook {
                 return onFinally()
             }
             val ticket = downloads.claimManual(index) ?: return
+            val contentToken = BookHelp.contentSaveToken(requestBook, chapter)
             startManual(scope, context, listOf(ticket)) {
                 try {
                     val content = BookHelp.getContent(requestBook, chapter)
                         ?: WebBook.getContentAwait(source, requestBook, chapter)
                     BookHelp.saveImages(source, requestBook, chapter, content, 1)
                     val currentContent = BookHelp.getContent(requestBook, chapter) ?: content
-                    onSuccess(ticket, requestBook, chapter, currentContent, notifyReader = true)
+                    onSuccess(ticket, requestBook, chapter, currentContent, notifyReader = true,
+                        contentToken = contentToken)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     delay(1000)
-                    onError(ticket, requestBook, chapter, e)
-                    downloadFinish(requestBook, chapter, "获取正文失败\n${e.localizedMessage}")
+                    if (onError(ticket, requestBook, chapter, e, contentToken)) {
+                        downloadFinish(requestBook, chapter, "获取正文失败\n${e.localizedMessage}",
+                            contentToken = contentToken)
+                    }
                 }
             }
         }
@@ -346,6 +367,7 @@ object CacheBook {
         ) {
             val byIndex = chapters.associateBy { it.index }
             val claimed = tickets.map { byIndex.getValue(it.index) }
+            val contentTokens = claimed.associate { it.index to BookHelp.contentSaveToken(requestBook, it) }
             try {
                 try {
                     WebBook.getContentBatchAwait(source, requestBook, claimed)
@@ -358,6 +380,8 @@ object CacheBook {
                 for (ticket in tickets) {
                     currentCoroutineContext().ensureActive()
                     val chapter = byIndex.getValue(ticket.index)
+                    val contentToken = contentTokens.getValue(ticket.index)
+                    if (!BookHelp.isContentSaveCurrent(contentToken)) continue
                     val content = BookHelp.getContent(requestBook, chapter)
                     if (content.isNullOrBlank()) {
                         downloads.finish(ticket, fallback = true)
@@ -366,7 +390,8 @@ object CacheBook {
                     try {
                         BookHelp.saveImages(source, requestBook, chapter, content, 1)
                         val currentContent = BookHelp.getContent(requestBook, chapter) ?: content
-                        onSuccess(ticket, requestBook, chapter, currentContent, notifyReader = true)
+                        onSuccess(ticket, requestBook, chapter, currentContent, notifyReader = true,
+                            contentToken = contentToken)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
@@ -401,7 +426,9 @@ object CacheBook {
         suspend fun downloadAwait(chapter: BookChapter): String {
             while (true) {
                 currentCoroutineContext().ensureActive()
+                val contentToken = BookHelp.contentSaveToken(book, chapter)
                 BookHelp.getContent(book, chapter)?.let {
+                    if (!BookHelp.isContentSaveCurrent(contentToken)) return@let
                     onFinally()
                     return it
                 }
@@ -414,6 +441,7 @@ object CacheBook {
                 if (!owner) {
                     // Cancelling a waiter does not cancel the independent producer/result.
                     val result = ticket.result.await() ?: continue
+                    if (!BookHelp.isContentSaveCurrent(contentToken)) continue
                     return result.fold(
                         { BookHelp.getContent(requestBook, chapter) ?: it },
                         { "获取正文失败\n${it.localizedMessage}" },
@@ -424,12 +452,13 @@ object CacheBook {
                     val content = BookHelp.getContent(requestBook, chapter)
                         ?: WebBook.getContentAwait(model.bookSource, requestBook, chapter)
                     val currentContent = BookHelp.getContent(requestBook, chapter) ?: content
-                    model.onSuccess(ticket, requestBook, chapter, currentContent, notifyReader = false)
+                    if (!model.onSuccess(ticket, requestBook, chapter, currentContent,
+                            notifyReader = false, contentToken = contentToken)) continue
                     return currentContent
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    model.onError(ticket, requestBook, chapter, e)
+                    if (!model.onError(ticket, requestBook, chapter, e, contentToken)) continue
                     return "获取正文失败\n${e.localizedMessage}"
                 } finally {
                     model.downloads.finish(ticket)
@@ -446,17 +475,18 @@ object CacheBook {
             readPositionVersion: Long? = null,
         ) {
             val requestBook = book
+            val contentToken = BookHelp.contentSaveToken(requestBook, chapter)
             Coroutine.async(scope, IO, start = CoroutineStart.LAZY, executeContext = IO, semaphore = semaphore) {
                 downloadAwait(chapter)
             }.onSuccess { content ->
                 downloadFinish(requestBook, chapter, content, resetPageOffset,
-                    readPositionVersion = readPositionVersion)
+                    readPositionVersion = readPositionVersion, contentToken = contentToken)
             }.onCancel {
                 downloadFinish(requestBook, chapter, "download canceled", resetPageOffset,
-                    canceled = true, readPositionVersion = readPositionVersion)
+                    canceled = true, readPositionVersion = readPositionVersion, contentToken = contentToken)
             }.onError {
                 downloadFinish(requestBook, chapter, "获取正文失败\n${it.localizedMessage}",
-                    resetPageOffset, readPositionVersion = readPositionVersion)
+                    resetPageOffset, readPositionVersion = readPositionVersion, contentToken = contentToken)
             }.start()
         }
 
@@ -467,13 +497,15 @@ object CacheBook {
             resetPageOffset: Boolean = false,
             canceled: Boolean = false,
             readPositionVersion: Long? = null,
+            contentToken: ContentSaveToken,
         ) {
-            if (ReadBook.book?.bookUrl == requestBook.bookUrl) {
+            if (ReadBook.book?.bookUrl == requestBook.bookUrl && BookHelp.isContentSaveCurrent(contentToken)) {
                 ReadBook.contentLoadFinish(
                     requestBook, chapter, content,
                     resetPageOffset = resetPageOffset,
                     canceled = canceled,
                     readPositionVersion = readPositionVersion,
+                    contentToken = contentToken,
                 )
             }
         }

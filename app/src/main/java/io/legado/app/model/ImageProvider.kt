@@ -93,6 +93,24 @@ object ImageProvider {
         return bitmapLruCache.remove(key)
     }
 
+    @Synchronized
+    fun clearImage(book: Book, src: String) {
+        val path = BookHelp.getImage(book, src).absolutePath
+        BookHelp.delImage(book, src)
+        bitmapLruCache.remove(path)
+        BitmapUtils.removeImageSizeCache(path)
+    }
+
+    @Synchronized
+    internal fun replaceResources(book: Book, images: Collection<String>, replace: () -> Unit) {
+        replace()
+        images.forEach { src ->
+            val path = BookHelp.getImage(book, src).absolutePath
+            bitmapLruCache.remove(path)
+            BitmapUtils.removeImageSizeCache(path)
+        }
+    }
+
     private fun getNotRecycled(key: String): Bitmap? {
         val bitmap = bitmapLruCache[key] ?: return null
         if (bitmap.isRecycled) {
@@ -172,6 +190,8 @@ object ImageProvider {
     /**
      *获取bitmap 使用LruCache缓存
      */
+    // ponytail: serialize local bitmap decode with invalidation; use per-path locks if contention matters.
+    @Synchronized
     fun getImage(
         book: Book,
         src: String,

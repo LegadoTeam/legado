@@ -19,14 +19,17 @@ import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
+import io.legado.app.help.book.PendingResourceChapter
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isLocalModified
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.simulatedTotalChapterNum
 import io.legado.app.help.book.update
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.ImageProvider
+import io.legado.app.model.CacheBook
 import io.legado.app.model.ReadAloud
 import io.legado.app.model.ReadBook
 import io.legado.app.model.SourceCallBack
@@ -43,6 +46,8 @@ import io.legado.app.utils.mapParallelSafe
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.Dispatchers.Main
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
@@ -67,6 +72,9 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
     var searchResultList: List<SearchResult>? = null
     var searchResultIndex: Int = 0
     private var changeSourceCoroutine: Coroutine<*>? = null
+    private var resourceRefreshCoroutine: Coroutine<*>? = null
+    private var resourceTheme: Pair<String, List<Int>>? = null
+    private val refreshedResourceThemes = java.util.concurrent.ConcurrentHashMap<Int, Pair<String, List<Int>>>()
 
     init {
         AppConfig.detectClickArea()
@@ -131,6 +139,10 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
     }
 
     private suspend fun initBook(book: Book) {
+        if (resourceTheme?.first != book.bookUrl) {
+            resourceTheme = currentResourceTheme(book)
+            refreshedResourceThemes.clear()
+        }
         val isSameBook = ReadBook.book?.bookUrl == book.bookUrl
         if (isSameBook) {
             ReadBook.upData(book)
@@ -406,25 +418,110 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
     }
 
     fun refreshContentDur(book: Book) {
+        val index = ReadBook.durChapterIndex
         execute {
-            appDb.bookChapterDao.getChapter(book.bookUrl, ReadBook.durChapterIndex)
+            appDb.bookChapterDao.getChapter(book.bookUrl, index)
                 ?.let { chapter ->
                     BookHelp.delContent(book, chapter)
-                    ReadBook.loadContent(ReadBook.durChapterIndex, resetPageOffset = false)
+                    CacheBook.invalidateChapters(book.bookUrl, index..index)
+                    withContext(Main) {
+                        if (ReadBook.book?.bookUrl == book.bookUrl) {
+                            ReadBook.clearResourceChapters(index..index)
+                            ReadBook.loadContent(index, resetPageOffset = false)
+                        }
+                    }
                 }
         }
     }
 
+    private fun currentResourceTheme(book: Book) = book.bookUrl to listOf(
+        ReadBookConfig.styleSelect, ReadBookConfig.textColor, ReadBookConfig.textAccentColor,
+        if (AppConfig.isNightTheme) 1 else 0, if (AppConfig.isEInkMode) 1 else 0,
+    )
+
+    fun resourceThemeChanged(book: Book): Boolean {
+        val previous = refreshedResourceThemes[ReadBook.durChapterIndex] ?: resourceTheme
+        return previous != null && previous != currentResourceTheme(book)
+    }
+
+    fun refreshResources(book: Book, includePreloaded: Boolean) {
+        val source = ReadBook.bookSource ?: return
+        val currentIndex = ReadBook.durChapterIndex
+        val before = if (includePreloaded) maxOf(1, minOf(5, AppConfig.preDownloadNum)) else 0
+        val after = if (includePreloaded) maxOf(1, AppConfig.preDownloadNum) else 0
+        val indexes = maxOf(0, currentIndex - before)..minOf(ReadBook.chapterSize - 1, currentIndex + after)
+        val oldImages = ReadBook.resourceImageSources(indexes)
+        val theme = currentResourceTheme(book)
+        resourceRefreshCoroutine?.cancel()
+        resourceRefreshCoroutine = execute {
+            val chapters = appDb.bookChapterDao.getChapterList(book.bookUrl, indexes.first, indexes.last)
+                .filterNot { it.isVolume }
+            val tokens = chapters.associate { it.index to BookHelp.contentSaveToken(book, it) }
+            val staging = BookHelp.resourceStagingDir(book)
+            try {
+                val images = linkedSetOf<String>()
+                val prepared = chapters.sortedBy { kotlin.math.abs(it.index - currentIndex) }.map { original ->
+                    ensureActive()
+                    val chapter = original.copy().apply { deferUpdates = true }
+                    val content = WebBook.getContentAwait(source, book, chapter, needSave = false)
+                    if (content.isBlank()) throw NoStackTraceException("刷新正文为空：${chapter.title}")
+                    chapter.imgUrl?.takeIf { it.isNotBlank() }?.let { images.add(it) }
+                    BookHelp.flowImages(chapter, content).collect { images.add(it) }
+                    val (_, processed) = ReadBook.processChapterContent(book, chapter, content)
+                    BookHelp.flowImages(chapter, processed.textList.joinToString("\n"))
+                        .collect { images.add(it) }
+                    PendingResourceChapter(chapter, tokens.getValue(chapter.index), original.getFileName(),
+                        content, File(staging, "chapter-${chapter.index}").apply { writeText(content) })
+                }
+                val imageTokens = images.associateWith { BookHelp.imageSaveVersion(book, it) }
+                val preparedImages = images.withIndex().associate { (index, src) ->
+                    ensureActive()
+                    val bytes = BookHelp.fetchImage(source, book, src)
+                    if (bytes == null || !BookHelp.checkImage(bytes)) {
+                        throw NoStackTraceException("刷新图片失败：$src")
+                    }
+                    src to File(staging, "image-$index").apply { writeBytes(bytes) }
+                }
+                withContext(Main) {
+                    ensureActive()
+                    if (ReadBook.book?.bookUrl != book.bookUrl || currentResourceTheme(book) != theme) {
+                        throw NoStackTraceException("书籍或主题已变化，请重新刷新")
+                    }
+                    // No suspension during publication: old layouts/caches survive every download failure.
+                    ImageProvider.replaceResources(book, oldImages + images) {
+                        BookHelp.commitResources(book, prepared, preparedImages, imageTokens)
+                    }
+                    CacheBook.invalidateChapters(book.bookUrl, indexes)
+                    ReadBook.clearResourceChapters(indexes)
+                    ReadBook.callBack?.upContent()
+                    prepared.forEach { refreshedResourceThemes[it.chapter.index] = theme }
+                    if (ReadBook.durChapterIndex in indexes) ReadBook.loadContent(false)
+                }
+            } finally {
+                staging.deleteRecursively()
+            }
+        }.onError {
+            AppLog.put("刷新资源失败\n${it.localizedMessage}", it, true)
+        }
+    }
+
     fun refreshContentAfter(book: Book) {
+        val indexes = ReadBook.durChapterIndex until book.totalChapterNum
         execute {
             appDb.bookChapterDao.getChapterList(
                 book.bookUrl,
-                ReadBook.durChapterIndex,
+                indexes.first,
                 book.totalChapterNum
             ).forEach { chapter ->
                 BookHelp.delContent(book, chapter)
             }
-            ReadBook.loadContent(false)
+            CacheBook.invalidateChapters(book.bookUrl, indexes)
+            withContext(Main) {
+                if (ReadBook.book?.bookUrl == book.bookUrl) {
+                    ReadBook.clearResourceChapters(indexes)
+                    ReadBook.loadContent(false)
+                }
+            }
         }
     }
 
@@ -552,14 +649,13 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
      * 刷新图片
      */
     fun refreshImage(src: String) {
+        val book = ReadBook.book ?: return
         execute {
-            ReadBook.book?.let { book ->
-                val vFile = BookHelp.getImage(book, src)
-                ImageProvider.bitmapLruCache.remove(vFile.absolutePath)
-                vFile.delete()
+            ImageProvider.clearImage(book, src)
+        }.onSuccess {
+            if (ReadBook.book?.bookUrl == book.bookUrl) {
+                ReadBook.loadContent(false)
             }
-        }.onFinally {
-            ReadBook.loadContent(false)
         }
     }
 
