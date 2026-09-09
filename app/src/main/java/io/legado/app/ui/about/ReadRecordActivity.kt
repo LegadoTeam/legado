@@ -2,7 +2,6 @@ package io.legado.app.ui.about
 
 import android.content.Context
 import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.text.SpannableString
 import android.text.Spanned
@@ -155,7 +154,11 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
     }
 
     private fun initView() {
-        binding.enhancedSummary.root.setCardBackgroundColor(backgroundColor)
+        val background = backgroundColor
+        binding.enhancedSummary.root.setCardBackgroundColor(
+            if (ColorUtils.isColorLight(background)) background
+            else ColorUtils.blendColors(background, Color.WHITE, 0.08f),
+        )
         initSearchView()
         binding.tvBookName.setText(R.string.all_read_time)
         binding.tvRemove.setOnClickListener {
@@ -241,12 +244,7 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
     }
 
     private fun loadCover(image: ImageView, record: ReadRecordShow) {
-        val placeholder = (getCompatDrawable(R.drawable.read_record_cover_placeholder)!!.mutate()
-                as GradientDrawable).apply {
-            val background = backgroundColor
-            val contrast = if (ColorUtils.isColorLight(background)) Color.BLACK else Color.WHITE
-            setColor(ColorUtils.blendColors(background, contrast, 0.08f))
-        }
+        val placeholder = getCompatDrawable(R.drawable.read_record_cover_placeholder)
         val book = booksByIdentity[record.bookName to record.author]
         val cover = book?.getDisplayCover()?.takeIf { it.isNotBlank() } ?: record.coverUrl
         var options = RequestOptions().set(

@@ -156,7 +156,7 @@ class ReadRecordHistoryTest {
     }
 
     @Test
-    fun emptyCoversFollowLightDarkAndCustomBackgrounds() {
+    fun emptyCoversStayWhiteAndDarkCardsRemainDistinguishable() {
         val themePrefs = ThemeStore.prefs(context)
         val backgroundKey = ThemeStorePrefKeys.KEY_BACKGROUND_COLOR
         val savedBackground = themePrefs.all[backgroundKey]
@@ -172,8 +172,10 @@ class ReadRecordHistoryTest {
         try {
             AppConfig.readRecordSimpleLayout = false
             for ((name, background) in listOf("light" to Color.rgb(245, 245, 245),
-                "dark" to Color.rgb(32, 32, 32), "custom" to Color.rgb(231, 214, 185))) {
-                val dark = name == "dark"
+                "dark" to Color.rgb(32, 32, 32), "black" to Color.BLACK,
+                "brown" to Color.rgb(52, 39, 34), "blue" to Color.rgb(37, 48, 68),
+                "custom" to Color.rgb(231, 214, 185))) {
+                val dark = name !in listOf("light", "custom")
                 prefs.edit().putString(PreferKey.themeMode, if (dark) "2" else "1").commit()
                 themePrefs.edit().putInt(backgroundKey, background).commit()
                 instrumentation.runOnMainSync {
@@ -190,15 +192,22 @@ class ReadRecordHistoryTest {
                     val binding = activity.views
                     val missing = findRow(binding, "Archived second")!!.enhanced.ivCover
                     val fill = centerColor(missing)
-                    assertEquals("Summary card follows the selected background", background,
-                        binding.enhancedSummary.root.cardBackgroundColor.defaultColor)
+                    val card = binding.enhancedSummary.root
+                    val cardColor = card.cardBackgroundColor.defaultColor
+                    if (dark) {
+                        for (channel in listOf<(Int) -> Int>(Color::red, Color::green, Color::blue)) {
+                            assertTrue("Dark card boundary must differ without a thick border",
+                                channel(cardColor) - channel(background) in 12..21)
+                        }
+                    } else {
+                        assertEquals("Light backgrounds stay unchanged", background, cardColor)
+                    }
+                    val density = activity.resources.displayMetrics.density
+                    assertEquals(16 * density, card.radius, 0.01f)
+                    assertEquals(2 * density, card.cardElevation, 0.01f)
                     assertEquals("Row and summary use the same empty cover", fill,
                         centerColor(binding.enhancedSummary.coverSecond))
-                    assertNotEquals("The cover must remain distinguishable", background, fill)
-                    assertNotEquals("Dark/custom covers must not stay white", Color.WHITE, fill)
-                    for (channel in listOf<(Int) -> Int>(Color::red, Color::green, Color::blue)) {
-                        assertTrue("Cover stays close to its background", kotlin.math.abs(channel(fill) - channel(background)) <= 21)
-                    }
+                    assertEquals("Empty covers retain the original fixed white", Color.WHITE, fill)
                     assertEquals("Real covers retain their original pixels", Color.rgb(35, 148, 115),
                         centerColor(findRow(binding, book.name)!!.enhanced.ivCover))
                 }
