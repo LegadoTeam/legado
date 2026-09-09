@@ -43,7 +43,7 @@ class BottomWebViewDialogLifecycleContractTest {
 
         assertTrue(fields.contains("private var pooledWebView: PooledWebView? = null"))
         assertTrue(fields.contains("get() = checkNotNull(pooledWebView).realWebView"))
-        assertFalse(source.contains("override fun onAttach"))
+        assertFalse(source.contains("override fun onAttach("))
 
         val acquire = onViewCreated.indexOf("pooledWebView = WebViewPool.acquire(requireContext())")
         val resetHistory = onViewCreated.indexOf("needClearHistory = true", acquire)
@@ -141,6 +141,19 @@ class BottomWebViewDialogLifecycleContractTest {
         assertTrue(styles.contains("<item name=\"paddingLeftSystemWindowInsets\">true</item>"))
         assertTrue(styles.contains("<item name=\"paddingRightSystemWindowInsets\">true</item>"))
         assertTrue(styles.contains("<item name=\"paddingTopSystemWindowInsets\">true</item>"))
+    }
+
+    @Test
+    fun `browser back callback registers after Material attaches and is removed with its window`() {
+        val create = section("override fun onCreateDialog", "override fun onStart")
+        assertTrue(create.indexOf("super.onAttachedToWindow()") <
+            create.indexOf("onBackPressedDispatcher.addCallback { navigateBack() }"))
+        assertTrue(create.contains("backCallback?.remove()"))
+        assertTrue(create.contains("super.onDetachedFromWindow()"))
+        assertFalse(source.contains("setOnKeyListener"))
+        val setConfig = section("private fun setConfig", "private fun reapplyConfiguredHeight")
+        assertTrue(setConfig.contains("dialog.setCanceledOnTouchOutside(touchOutside)"))
+        assertFalse(setConfig.contains("isCancelable = touchOutside"))
     }
 
     @Test

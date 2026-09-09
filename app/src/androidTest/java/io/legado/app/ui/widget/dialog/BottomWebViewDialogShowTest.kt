@@ -10,6 +10,7 @@ import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.GeneralSwipeAction
 import androidx.test.espresso.action.Press
 import androidx.test.espresso.action.Swipe
@@ -17,6 +18,7 @@ import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.filters.SdkSuppress
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.R as MaterialR
 import io.legado.app.data.appDb
@@ -32,6 +34,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.io.FileInputStream
 import java.util.UUID
 import kotlin.concurrent.thread
 import kotlin.math.abs
@@ -339,6 +342,157 @@ class BottomWebViewDialogShowTest {
             appDb.bookSourceDao.delete(secondSource.bookSourceUrl)
         }
     }
+
+    @Test
+    @SdkSuppress(minSdkVersion = 29)
+    fun edgeBackExitsFullscreenThenHistoryThenOnlyTheTopBrowser() {
+        val overlay = shell("cmd overlay list --user current").lineSequence()
+            .map(String::trim).first { it.startsWith("[x] com.android.internal.systemui.navbar.") }
+            .removePrefix("[x] ")
+        try {
+            shell("cmd overlay enable-exclusive --user current --category com.android.internal.systemui.navbar.gestural")
+            assertTrue("System gesture navigation must actually be enabled", awaitCondition {
+                val resources = InstrumentationRegistry.getInstrumentation().targetContext.resources
+                val mode = resources.getIdentifier("config_navBarInteractionMode", "integer", "android")
+                mode != 0 && resources.getInteger(mode) == 2
+            })
+            for (outside in listOf(false, true)) {
+                lateinit var lower: BottomWebViewDialog
+                lateinit var browser: BottomWebViewDialog
+                lateinit var web: WebView
+                scenario!!.onActivity { activity ->
+                    lower = newDialog("lower-$outside", """{"heightPercentage":0.5}""")
+                    lower.show(activity.supportFragmentManager, "lower")
+                    browser = newDialog("back-$outside", """{"heightPercentage":0.6,
+                        "dismissOnTouchOutside":$outside,"isHideable":true}""")
+                    browser.show(activity.supportFragmentManager, "back")
+                    web = (browser.requireView().findViewById<View>(io.legado.app.R.id.web_view_container)
+                        as android.view.ViewGroup).getChildAt(0) as WebView
+                }
+                assertTrue("Browser initial page must be ready", awaitCondition {
+                    web.url == "${source.bookSourceUrl}/back-$outside" &&
+                        web.progress == 100 && web.copyBackForwardList().size == 1 &&
+                        browser.dialog?.window?.decorView?.hasWindowFocus() == true
+                })
+                scenario!!.onActivity {
+                    web.evaluateJavascript("history.pushState({}, '', '#second'); document.title='Second'", null)
+                }
+                assertTrue("The fixture must create real WebView history", awaitCondition {
+                    web.canGoBack() && web.url?.endsWith("#second") == true
+                })
+                var hidden = 0
+                scenario!!.onActivity { activity ->
+                    val chrome = browser.CustomWebChromeClient()
+                    chrome.onShowCustomView(View(activity), object : WebChromeClient.CustomViewCallback {
+                        override fun onCustomViewHidden() {
+                            hidden++
+                            chrome.onHideCustomView()
+                        }
+                    })
+                }
+                edgeBack(browser)
+                assertTrue("Back must exit fullscreen without dismissing or navigating", awaitCondition {
+                    hidden == 1 && browser.dialog?.isShowing == true && web.canGoBack()
+                })
+                screenshot("paragraph-back-fullscreen-$outside")
+                edgeBack(browser)
+                assertTrue("Back must consume the real web history before dismissing", awaitCondition {
+                    browser.dialog?.isShowing == true && !web.canGoBack() &&
+                        web.url?.endsWith("#second") == false
+                })
+                screenshot("paragraph-back-history-$outside")
+                edgeBack(browser)
+                assertTrue("Back must close only the top browser", awaitCondition {
+                    browser.dialog?.isShowing != true && lower.dialog?.isShowing == true
+                })
+                scenario!!.onActivity {
+                    assertFalse("A dialog back gesture must not finish the host", it.isFinishing)
+                    lower.dismiss()
+                }
+            }
+        } finally {
+            shell("cmd overlay enable-exclusive --user current --category $overlay")
+        }
+    }
+
+    @Test
+    fun outsideTouchToggleDoesNotDisableKeyBackOrSwipeDismissal() {
+        lateinit var browser: BottomWebViewDialog
+        scenario!!.onActivity { activity ->
+            browser = newDialog(config = """{"heightPercentage":0.5,
+                "dismissOnTouchOutside":false,"isHideable":true}""")
+            browser.show(activity.supportFragmentManager, "outside-off")
+        }
+        awaitGeometry { it.height > 0 && it.top > 0 && it.state == BottomSheetBehavior.STATE_EXPANDED }
+        assertTrue(awaitCondition { browser.dialog?.window?.decorView?.hasWindowFocus() == true })
+        tapOutside(browser)
+        scenario!!.onActivity {
+            assertTrue(browser.dialog?.isShowing == true)
+            assertTrue("Outside-touch setting must not disable downward dismissal",
+                BottomSheetBehavior.from(checkNotNull(browser.requireDialog()
+                    .findViewById<View>(MaterialR.id.design_bottom_sheet))).isHideable)
+        }
+        pressBack()
+        assertTrue("Hardware back must close even when outside touch is disabled",
+            awaitCondition { browser.dialog?.isShowing != true })
+        scenario!!.onActivity { activity ->
+            browser = newDialog(config = """{"heightPercentage":0.5,
+                "dismissOnTouchOutside":false,"isHideable":true}""")
+            browser.show(activity.supportFragmentManager, "outside-off-swipe")
+        }
+        awaitGeometry { it.height > 0 && it.top > 0 && it.state == BottomSheetBehavior.STATE_EXPANDED }
+        assertTrue(awaitCondition { browser.dialog?.window?.decorView?.hasWindowFocus() == true })
+        onView(isAssignableFrom(WebView::class.java)).inRoot(isDialog()).perform(
+            GeneralSwipeAction(Swipe.FAST, { swipePoint(it, 0.15f) },
+                { swipePoint(it, 0.90f) }, Press.FINGER))
+        assertTrue("Outside-touch setting must preserve real downward swipe dismissal",
+            awaitCondition { browser.dialog?.isShowing != true })
+        scenario!!.onActivity { activity ->
+            browser = newDialog(config = """{"heightPercentage":0.5,"dismissOnTouchOutside":false}""")
+            browser.show(activity.supportFragmentManager, "outside-toggle")
+            browser.upConfig("""{"dismissOnTouchOutside":true}""")
+        }
+        awaitGeometry { it.height > 0 && it.top > 0 && it.state == BottomSheetBehavior.STATE_EXPANDED }
+        assertTrue(awaitCondition { browser.dialog?.window?.decorView?.hasWindowFocus() == true })
+        tapOutside(browser)
+        assertTrue("Enabling outside touch must still dismiss the browser",
+            awaitCondition { browser.dialog?.isShowing != true })
+        scenario!!.onActivity { assertFalse(it.isFinishing) }
+    }
+
+    private fun edgeBack(browser: BottomWebViewDialog) {
+        var width = 0
+        var y = 0
+        assertTrue(awaitCondition { browser.dialog?.window?.decorView?.hasWindowFocus() == true })
+        scenario!!.onActivity {
+            val decor = browser.requireDialog().window!!.decorView
+            width = decor.width
+            y = decor.height * 2 / 3
+        }
+        // Inject a touchscreen gesture from the system edge, never a KEYCODE_BACK surrogate.
+        shell("input touchscreen swipe 1 $y ${width * 3 / 4} $y 350")
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+    }
+
+    private fun tapOutside(browser: BottomWebViewDialog) {
+        var x = 0
+        var y = 0
+        scenario!!.onActivity {
+            val sheet = checkNotNull(browser.requireDialog().findViewById<View>(MaterialR.id.design_bottom_sheet))
+            val location = IntArray(2)
+            sheet.getLocationOnScreen(location)
+            x = sheet.width / 2
+            y = location[1] / 2
+            assertTrue("The fixture needs an exposed outside-touch area", y > 0)
+        }
+        shell("input touchscreen tap $x $y")
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+    }
+
+    private fun shell(command: String): String =
+        InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command).use {
+            FileInputStream(it.fileDescriptor).bufferedReader().use { reader -> reader.readText() }
+        }
 
     private fun swipePoint(view: View, heightFraction: Float): FloatArray {
         val visible = Rect()
