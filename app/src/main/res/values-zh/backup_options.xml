@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="backup_local_only">仅本地备份</string>
+    <string name="backup_local_webdav">本地和 WebDav 备份</string>
+    <string name="auto_backup_interval_days">备份间隔（天）</string>
+    <string name="auto_backup_interval_invalid">请输入至少为 1 的整数</string>
+    <string name="auto_backup_destination_summary">%1$s · 每 %2$d 天一次</string>
+    <string name="auto_backup_disabled">已关闭</string>
+    <string name="backup_destination_summary">选择仅本地或本地和 WebDav 备份</string>
+</resources>

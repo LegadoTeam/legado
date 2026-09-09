@@ -11,7 +11,11 @@ class BackupDefaultPathContractTest {
         val source = source("app/src/main/java/io/legado/app/ui/config/BackupConfigFragment.kt")
         val selector = source.substringAfter("private fun showBackupPathSelector()")
             .substringBefore("private fun lanBackupTransfer()")
-        assertTrue(selector.contains("getString(R.string.default_path)"))
+        assertTrue(selector.contains("defaultBackupPathSummary()"))
+        val defaultSummary = source.substringAfter("private fun defaultBackupPathSummary()")
+            .substringBefore("private fun updateAutoBackupSummary()")
+        assertTrue(defaultSummary.contains("getString(R.string.default_path)"))
+        assertTrue(defaultSummary.contains("requireContext().externalFiles.absolutePath"))
         assertTrue(selector.contains("getString(R.string.select_folder)"))
         assertTrue(selector.contains("0 -> AppConfig.backupPath = null"))
         assertTrue(selector.contains("1 -> selectBackupPath.launch()"))
@@ -24,15 +28,17 @@ class BackupDefaultPathContractTest {
             .substringBefore("override fun onPreferenceTreeClick")
         assertTrue(
             summary.contains(
-                "value?.takeIf { it.isNotBlank() } ?: getString(R.string.default_path)"
+                "value?.takeIf { it.isNotBlank() } ?: defaultBackupPathSummary()"
             )
         )
 
         val backup = source.substringAfter("fun backup()")
             .substringBefore("private fun backupUsePermission")
         assertTrue(backup.contains("if (backupPath.isNullOrEmpty())"))
-        assertTrue(backup.contains("backup(null)"))
-        assertTrue(source.contains("private fun backup(backupPath: String?)"))
+        assertTrue(backup.contains("backup(null, uploadWebDav)"))
+        assertTrue(source.contains("private fun backup(backupPath: String?, uploadWebDav: Boolean)"))
+        assertTrue(backup.contains("manualBackupUploadWebDav = index == 1"))
+        assertTrue(backup.contains("Backup.backupLocked(requireContext(), backupPath, uploadWebDav)"))
     }
 
     private fun source(relativePath: String): String {
