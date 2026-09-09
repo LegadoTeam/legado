@@ -6,7 +6,13 @@ trap 'adb pull /sdcard/Android/data/com.legado.app.debug/files/ui-regression app
 # Keep unrelated UI fixtures in a fresh instrumentation process.
 ./gradlew :app:connectedAppDebugAndroidTest \
   --init-script .github/scripts/source-browser-test.init.gradle \
-  -Pandroid.testInstrumentationRunnerArguments.class=io.legado.app.ui.widget.dialog.BottomWebViewDialogShowTest,io.legado.app.ui.book.explore.ExploreCategoriesTest,io.legado.app.ui.main.explore.ExploreRefreshUiTest,io.legado.app.ui.book.read.ContentEditSearchTest,io.legado.app.ui.book.read.ContentReversalUiTest,io.legado.app.help.book.ContentReversalCacheTest,io.legado.app.ui.association.RuleSelectionShareTest,io.legado.app.ui.about.ReadRecordHistoryTest,io.legado.app.data.ReadRecordAuthorIdentityTest,io.legado.app.data.BookSourceCheckStateTest,io.legado.app.data.BookSourceCheckApiTest,io.legado.app.ui.book.source.BookSourceCheckUiTest,io.legado.app.model.webBook.SourceContentCompatibilityTest,io.legado.app.model.webBook.BatchContentDownloadTest,io.legado.app.help.storage.CoverTitleAdaptiveBackupRestoreTest,io.legado.app.ui.code.CodeSelectionUiTest,io.legado.app.ui.widget.image.CoverTitleAdaptiveUiTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=io.legado.app.ui.widget.dialog.BottomWebViewDialogShowTest,io.legado.app.ui.book.explore.ExploreCategoriesTest,io.legado.app.ui.main.explore.ExploreRefreshUiTest,io.legado.app.ui.book.read.ContentEditSearchTest,io.legado.app.help.book.ContentReversalCacheTest,io.legado.app.ui.association.RuleSelectionShareTest,io.legado.app.ui.about.ReadRecordHistoryTest,io.legado.app.data.ReadRecordAuthorIdentityTest,io.legado.app.data.BookSourceCheckStateTest,io.legado.app.data.BookSourceCheckApiTest,io.legado.app.ui.book.source.BookSourceCheckUiTest,io.legado.app.model.webBook.SourceContentCompatibilityTest,io.legado.app.model.webBook.BatchContentDownloadTest,io.legado.app.help.storage.CoverTitleAdaptiveBackupRestoreTest,io.legado.app.ui.code.CodeSelectionUiTest,io.legado.app.ui.widget.image.CoverTitleAdaptiveUiTest \
+  --build-cache --no-daemon --max-workers=2
+
+# Content reversal recreates the reader repeatedly; keep its stateful fixture isolated.
+./gradlew :app:connectedAppDebugAndroidTest \
+  --init-script .github/scripts/source-browser-test.init.gradle \
+  -Pandroid.testInstrumentationRunnerArguments.class=io.legado.app.ui.book.read.ContentReversalUiTest \
   --build-cache --no-daemon --max-workers=2
 
 # Reader interaction tests are isolated from the base fixtures.
