@@ -86,13 +86,13 @@ class HighlightTriggerUiTest {
         AppConfig.adaptSpecialStyle = true
         LocalConfig.edit().putInt("readHelpVersion", 1).putInt("readMenuHelpVersion", 1).commit()
         appDb.highlightRuleDao.deleteAll()
-        appDb.highlightRuleDao.insert(*listOf("ALPHA", "OMEGA", "HTML", "LINK").map {
+        appDb.highlightRuleDao.insert(*listOf("ALPHA", "OMEGA", "自然高亮", "HTML", "LINK").map {
             HighlightRule(name = it, pattern = it).apply { applyStyle(HighlightStyle(fill = Color.YELLOW)) }
         }.toTypedArray())
         appDb.bookSourceDao.insert(source)
         appDb.bookDao.insert(book)
         appDb.bookChapterDao.insert(chapter)
-        BookHelp.saveText(book, chapter, "ALPHA ordinary OMEGA\n" +
+        BookHelp.saveText(book, chapter, "ALPHA ALPHA ordinary OMEGA\n自然高亮\n" +
             "<usehtml><b>HTML</b> <a href='https://example.invalid/highlight-link'>LINK</a></usehtml>\n" +
             "<img src=\"$image\">\n" + (0 until 80).joinToString("\n") { "Ordinary reading line $it." })
         val bitmap = Bitmap.createBitmap(24, 24, Bitmap.Config.ARGB_8888)
@@ -147,12 +147,16 @@ class HighlightTriggerUiTest {
         pressBack()
         val alpha = point { it is TextBaseColumn && it.charData == "P" && it.highlightStyle != null }
         val omega = point { it is TextBaseColumn && it.charData == "G" && it.highlightStyle != null }
+        val otherAlpha = point(occurrence = 1) { it is TextBaseColumn && it.charData == "P" && it.highlightStyle != null }
         val page = ReadBook.durPageIndex
         taps(alpha)
         assertEquals("First tap on a highlight must not turn the page", page, ReadBook.durPageIndex)
         noRulePopup()
         SystemClock.sleep(ViewConfiguration.getDoubleTapTimeout().toLong() + 50)
         taps(alpha, omega)
+        noRulePopup()
+        SystemClock.sleep(ViewConfiguration.getDoubleTapTimeout().toLong() + 50)
+        taps(alpha, otherAlpha)
         noRulePopup()
         SystemClock.sleep(ViewConfiguration.getDoubleTapTimeout().toLong() + 50)
         taps(alpha)
@@ -168,6 +172,12 @@ class HighlightTriggerUiTest {
         SystemClock.sleep(ViewConfiguration.getDoubleTapTimeout().toLong() + 50)
         gesture(listOf(alpha, alpha), 30, cancelBetween = true)
         noRulePopup()
+        SystemClock.sleep(ViewConfiguration.getDoubleTapTimeout().toLong() + 50)
+        val firstCharacter = point { it is TextBaseColumn && it.charData == "然" }
+        val nextCharacter = point { it is TextBaseColumn && it.charData == "高" }
+        taps(firstCharacter, nextCharacter)
+        onView(withText(R.string.highlight_rule_disable)).inRoot(isPlatformPopup()).check(matches(isDisplayed()))
+        pressBack()
         SystemClock.sleep(ViewConfiguration.getDoubleTapTimeout().toLong() + 50)
         taps(alpha, alpha)
         onView(withText(R.string.highlight_rule_disable)).inRoot(isPlatformPopup()).check(matches(isDisplayed()))
@@ -244,15 +254,18 @@ class HighlightTriggerUiTest {
         noRulePopup()
     }
 
-    private fun point(matches: (BaseColumn) -> Boolean): FloatArray {
+    private fun point(occurrence: Int = 0, matches: (BaseColumn) -> Boolean): FloatArray {
         var point: FloatArray? = null
         scenario!!.onActivity { activity ->
             val page = activity.findViewById<ReadView>(R.id.read_view).curPage
+            var remaining = occurrence
             for (line in page.textPage.lines) {
-                val column = line.columns.firstOrNull(matches) ?: continue
-                point = floatArrayOf((column.start + column.end) / 2 + page.imgBgPaddingStart,
-                    (line.lineTop + line.lineBottom) / 2 + page.headerHeight)
-                break
+                for (column in line.columns) {
+                    if (!matches(column) || remaining-- > 0) continue
+                    point = floatArrayOf((column.start + column.end) / 2 + page.imgBgPaddingStart,
+                        (line.lineTop + line.lineBottom) / 2 + page.headerHeight)
+                    return@onActivity
+                }
             }
         }
         return checkNotNull(point) { "The real reader must contain the expected clickable column" }

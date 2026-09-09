@@ -132,7 +132,7 @@ class ManualHighlightRenderTest {
         assertTrue(click.contains("highlightActionTrigger != \"longPress\""))
         val offGate = notify.indexOf("if (AppConfig.highlightActionTrigger == \"off\") return false")
         val manual = notify.indexOf("highlightAt(column, textPos, page)?.let")
-        val automatic = notify.indexOf("highlightRuleIdAt(column, textPos, page)?.let")
+        val automatic = notify.indexOf("highlightRuleAt(column, textPos, page)?.let")
         assertTrue(offGate in 0 until manual)
         assertTrue(manual in 0 until automatic)
     }
@@ -159,13 +159,13 @@ class ManualHighlightRenderTest {
         val notify = content.substringAfter("private fun notifyHighlightClick(")
             .substringBefore("private fun relativeOffset(")
         val manual = notify.indexOf("highlightAt(column, textPos, page)?.let")
-        val automatic = notify.indexOf("highlightRuleIdAt(column, textPos, page)?.let")
+        val automatic = notify.indexOf("highlightRuleAt(column, textPos, page)?.let")
 
         assertTrue(manual in 0 until automatic)
-        assertTrue(notify.contains("callBack.onHighlightRuleClick(it, x, y)"))
+        assertTrue(notify.contains("callBack.onHighlightRuleClick(it.ruleId, x, y)"))
         assertTrue(notify.contains("ReadBook.ruleMatchesOfChapter(chapter)"))
         assertTrue(notify.contains("highlightRangeIntersects("))
-        assertTrue(notify.contains("highlightRuleIdAtColumn("))
+        assertTrue(notify.contains("highlightRuleAtColumn("))
         assertTrue(activity.contains("override fun onHighlightRuleClick(ruleId: Long"))
         assertTrue(activity.contains("HighlightRuleEditDialog.edit(ruleId)"))
         assertTrue(activity.contains("R.string.highlight_rule_disable"))
@@ -189,11 +189,11 @@ class ManualHighlightRenderTest {
             RuleMatch(1, 2, 2, style, applyToTitle = true, applyToBody = false)
         )
 
-        assertEquals(1L, highlightRuleIdAtColumn(matches, 0, 2, isTitle = false))
-        assertEquals(2L, highlightRuleIdAtColumn(matches, 0, 2, isTitle = true))
-        assertNull(highlightRuleIdAtColumn(matches.take(1), 0, 2, isTitle = true))
-        assertNull(highlightRuleIdAtColumn(matches.drop(1), 0, 2, isTitle = false))
-        assertNull(highlightRuleIdAtColumn(matches, 2, 3, isTitle = false))
+        assertEquals(1L, highlightRuleAtColumn(matches, 0, 2, isTitle = false)?.ruleId)
+        assertEquals(2L, highlightRuleAtColumn(matches, 0, 2, isTitle = true)?.ruleId)
+        assertNull(highlightRuleAtColumn(matches.take(1), 0, 2, isTitle = true))
+        assertNull(highlightRuleAtColumn(matches.drop(1), 0, 2, isTitle = false))
+        assertNull(highlightRuleAtColumn(matches, 2, 3, isTitle = false))
     }
 
     @Test
