@@ -1,6 +1,8 @@
 package io.legado.app.ui.about
 
 import android.content.Context
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.text.SpannableString
 import android.text.Spanned
@@ -33,11 +35,14 @@ import io.legado.app.help.glide.OkHttpModelLoader
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.lib.theme.accentColor
+import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.cnCompare
+import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.dpToPx
+import io.legado.app.utils.getCompatDrawable
 import io.legado.app.utils.getInt
 import io.legado.app.utils.putInt
 import io.legado.app.utils.startActivityForBook
@@ -235,6 +240,12 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
     }
 
     private fun loadCover(image: ImageView, record: ReadRecordShow) {
+        val placeholder = (getCompatDrawable(R.drawable.read_record_cover_placeholder)!!.mutate()
+                as GradientDrawable).apply {
+            val background = backgroundColor
+            val contrast = if (ColorUtils.isColorLight(background)) Color.BLACK else Color.WHITE
+            setColor(ColorUtils.blendColors(background, contrast, 0.08f))
+        }
         val book = booksByIdentity[record.bookName to record.author]
         val cover = book?.getDisplayCover()?.takeIf { it.isNotBlank() } ?: record.coverUrl
         var options = RequestOptions().set(
@@ -246,10 +257,10 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
         image.contentDescription = record.bookName
         ImageLoader.load(this, cover)
             .apply(options)
-            .placeholder(R.drawable.read_record_cover_placeholder)
+            .placeholder(placeholder)
             .error(ImageLoader.load(this, record.coverUrl)
                 .apply(options)
-                .error(R.drawable.read_record_cover_placeholder)
+                .error(placeholder)
                 .transform(CenterCrop(), RoundedCorners(4.dpToPx())))
             .transform(CenterCrop(), RoundedCorners(4.dpToPx()))
             .into(image)
