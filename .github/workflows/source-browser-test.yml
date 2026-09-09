@@ -48,6 +48,7 @@ on:
       - 'app/src/androidTest/java/io/legado/app/ui/book/read/ContentReversalUiTest.kt'
       - 'app/src/androidTest/java/io/legado/app/ui/book/read/MouseWheelScrollTest.kt'
       - 'app/src/androidTest/java/io/legado/app/ui/book/read/TitleFontWeightRenderingTest.kt'
+      - 'app/src/androidTest/java/io/legado/app/ui/book/read/HighlightTriggerUiTest.kt'
       - 'app/src/androidTest/java/io/legado/app/ui/book/read/ReadAloudMenuUiTest.kt'
       - 'app/src/androidTest/java/io/legado/app/ui/book/read/TocReverseNavigationTest.kt'
       - 'app/src/androidTest/java/io/legado/app/ui/book/read/ReadAloudScaleUiTest.kt'
