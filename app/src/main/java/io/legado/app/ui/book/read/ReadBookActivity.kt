@@ -118,6 +118,7 @@ import io.legado.app.ui.book.read.page.provider.LayoutProgressListener
 import io.legado.app.ui.book.searchContent.SearchContentActivity
 import io.legado.app.ui.book.searchContent.SearchResult
 import io.legado.app.model.SourceCallBack
+import com.google.android.material.snackbar.Snackbar
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
 import io.legado.app.ui.book.toc.TocActivityResult
 import io.legado.app.ui.book.toc.rule.TxtTocRuleDialog
@@ -337,6 +338,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
     private var justInitData: Boolean = false
     private var syncDialog: AlertDialog? = null
+    private var resourceRefreshNotice: Snackbar? = null
 
     @Suppress("DEPRECATION")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -354,6 +356,16 @@ class ReadBookActivity : BaseReadBookActivity(),
     @SuppressLint("ClickableViewAccessibility")
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
+        viewModel.resourceRefreshing.observe(this) { loading ->
+            if (loading) {
+                val notice = resourceRefreshNotice ?: Snackbar.make(binding.root, R.string.data_loading,
+                    Snackbar.LENGTH_INDEFINITE).also { resourceRefreshNotice = it }
+                if (!notice.isShownOrQueued) notice.show()
+            } else {
+                resourceRefreshNotice?.dismiss()
+                resourceRefreshNotice = null
+            }
+        }
         binding.readView.pdfZoom.restore(savedInstanceState?.getBundle("pdfZoom"))
         aloudControls.restore(savedInstanceState?.getBundle("aloudControls"))
         binding.cursorLeft.setColorFilter(accentColor)
@@ -2848,6 +2860,8 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     override fun onDestroy() {
+        resourceRefreshNotice?.dismiss()
+        resourceRefreshNotice = null
         super.onDestroy()
         aloudControls.dispose()
         tts?.clearTts()
