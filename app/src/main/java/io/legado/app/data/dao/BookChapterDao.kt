@@ -43,6 +43,9 @@ interface BookChapterDao {
     @Query("update chapters set title = :title, imgUrl = :imgUrl where bookUrl = :bookUrl and `index` = :index")
     fun updateContentMetadata(bookUrl: String, index: Int, title: String, imgUrl: String?)
 
+    @Query("update chapters set title = :title, imgUrl = :imgUrl, variable = :variable where bookUrl = :bookUrl and `index` = :index")
+    fun updateResourceMetadata(bookUrl: String, index: Int, title: String, imgUrl: String?, variable: String?)
+
     @Query("delete from chapters where bookUrl = :bookUrl")
     fun delByBook(bookUrl: String)
 
