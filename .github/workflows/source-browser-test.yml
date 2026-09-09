@@ -152,6 +152,11 @@ jobs:
           target: google_apis
           arch: x86_64
           disable-animations: true
+          # The generic AVD defaults to hardware Back/Home keys, which prevents SystemUI
+          # from creating a navigation bar and attaching the real edge-back input monitor.
+          pre-emulator-launch-script: |
+            sed -i '/^hw\.mainKeys=/d' "$ANDROID_AVD_HOME/test.avd/config.ini"
+            echo 'hw.mainKeys=no' >> "$ANDROID_AVD_HOME/test.avd/config.ini"
           script: bash .github/scripts/run-ui-regression.sh
 
       - name: Upload test results

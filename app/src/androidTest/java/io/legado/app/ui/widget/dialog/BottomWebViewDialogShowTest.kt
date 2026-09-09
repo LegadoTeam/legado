@@ -350,7 +350,6 @@ class BottomWebViewDialogShowTest {
         val overlay = shell("cmd overlay list --user current").lineSequence()
             .map(String::trim).first { it.startsWith("[x] com.android.internal.systemui.navbar.") }
             .removePrefix("[x] ")
-        val setupComplete = shell("settings --user current get secure user_setup_complete").trim()
         val server = object : NanoHTTPD("127.0.0.1", 0) {
             override fun serve(session: IHTTPSession): Response = newFixedLengthResponse(
                 Response.Status.OK, "text/html",
@@ -359,11 +358,7 @@ class BottomWebViewDialogShowTest {
         }
         try {
             server.start()
-            // Android 16 forces navigation buttons and rejects edge gestures until setup finishes,
-            // even when config_navBarInteractionMode already reports the gestural overlay.
-            writeBackEvidence("paragraph-back-system-before-setup",
-                "user_setup_complete=$setupComplete\n${systemBackState()}")
-            shell("settings --user current put secure user_setup_complete 1")
+            writeBackEvidence("paragraph-back-system-before-setup", systemBackState())
             shell("cmd overlay enable-exclusive --user current --category com.android.internal.systemui.navbar.gestural")
             assertTrue("System gesture navigation must actually be enabled", awaitCondition {
                 val resources = InstrumentationRegistry.getInstrumentation().targetContext.resources
@@ -446,11 +441,6 @@ class BottomWebViewDialogShowTest {
         } finally {
             server.stop()
             shell("cmd overlay enable-exclusive --user current --category $overlay")
-            if (setupComplete == "null") {
-                shell("settings --user current delete secure user_setup_complete")
-            } else {
-                shell("settings --user current put secure user_setup_complete $setupComplete")
-            }
         }
     }
 
@@ -514,6 +504,8 @@ class BottomWebViewDialogShowTest {
     }
 
     private fun systemBackState(): String =
+        "qemu.hw.mainkeys=${shell("getprop qemu.hw.mainkeys").trim()}\n" +
+        "user_setup_complete=${shell("settings --user current get secure user_setup_complete").trim()}\n" +
         shell("dumpsys activity service com.android.systemui/.SystemUIService dumpables")
 
     private fun awaitSystemBackGestures() {
@@ -521,9 +513,12 @@ class BottomWebViewDialogShowTest {
         var state: String
         do {
             state = systemBackState()
-            val handler = state.lineSequence().dropWhile { !it.contains("EdgeBackGestureHandler:") }
-                .take(12).joinToString("\n")
-            if (handler.contains("mIsEnabled=true") && handler.contains("mIsBackGestureAllowed=true")) {
+            val ready = state.split("EdgeBackGestureHandler:").drop(1).any { section ->
+                val handler = section.lineSequence().take(12).joinToString("\n")
+                handler.contains("mIsEnabled=true") && handler.contains("mIsAttached=true") &&
+                    handler.contains("mIsBackGestureAllowed=true")
+            }
+            if (ready) {
                 writeBackEvidence("paragraph-back-system-ready", state)
                 return
             }
