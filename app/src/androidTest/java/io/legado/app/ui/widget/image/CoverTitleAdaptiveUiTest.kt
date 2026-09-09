@@ -2,6 +2,7 @@ package io.legado.app.ui.widget.image
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import java.io.File
 import android.widget.FrameLayout
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -62,14 +63,28 @@ class CoverTitleAdaptiveUiTest {
     @Test
     fun adaptiveToggleChangesTheActualRenderedCover() {
         val adaptive = renderedCover()
+        screenshot("cover-title-adaptive-on")
         preferences.edit().putBoolean(PreferKey.coverTitleAdaptive, false).commit()
         instrumentation.runOnMainSync {
             BookCover.upDefaultCover()
             cover!!.invalidate()
         }
         val fixed = renderedCover()
+        screenshot("cover-title-adaptive-off")
         assertFalse("adaptive setting must change rendered title pixels", adaptive.contentEquals(fixed))
         assertTrue("both renders contain visible cover pixels", adaptive.any { it != 0 } && fixed.any { it != 0 })
+    }
+
+    private fun screenshot(name: String) {
+        instrumentation.waitForIdleSync()
+        val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+        try {
+            File(context.getExternalFilesDir("ui-regression"), "$name.png").outputStream().use {
+                assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+            }
+        } finally {
+            bitmap.recycle()
+        }
     }
 
     private fun renderedCover(): IntArray {
