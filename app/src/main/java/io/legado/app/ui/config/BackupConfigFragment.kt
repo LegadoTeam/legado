@@ -334,7 +334,7 @@ class BackupConfigFragment : PreferenceFragment(),
         requireContext().selector(
             titleSource = R.string.backup_path,
             items = listOf(
-                defaultBackupPathSummary(),
+                getString(R.string.default_path),
                 getString(R.string.select_folder),
             ),
         ) { _, index ->
