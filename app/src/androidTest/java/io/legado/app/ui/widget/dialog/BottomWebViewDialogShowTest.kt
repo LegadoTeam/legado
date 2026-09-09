@@ -147,15 +147,15 @@ class BottomWebViewDialogShowTest {
                         it.height > 0 && it.top in 0 until it.parentHeight
             }
             val drawn = CountDownLatch(1)
+            val visibleWeb = Rect()
             scenario!!.onActivity {
                 val dialog = manager.fragments.filterIsInstance<BottomWebViewDialog>()
                     .single { it.dialog?.isShowing == true }
                 val web = (dialog.requireView().findViewById<View>(io.legado.app.R.id.web_view_container)
                     as android.view.ViewGroup).getChildAt(0) as WebView
-                val visible = Rect()
                 assertTrue("The reopened WebView must occupy visible screen space",
-                    web.isShown && web.getGlobalVisibleRect(visible) &&
-                            visible.width() > 0 && visible.height() > 0)
+                    web.isShown && web.getGlobalVisibleRect(visibleWeb) &&
+                            visibleWeb.width() > 0 && visibleWeb.height() > 0)
                 web.postVisualStateCallback(0, object : WebView.VisualStateCallback() {
                     override fun onComplete(requestId: Long) {
                         web.postOnAnimation { web.postOnAnimation { drawn.countDown() } }
@@ -164,7 +164,34 @@ class BottomWebViewDialogShowTest {
             }
             assertTrue("The dynamic page must reach the compositor before capture",
                 drawn.await(5, TimeUnit.SECONDS))
-            screenshot("custom-button-dynamic-reopened")
+            // WebView's visual-state callback can precede the window's compositor frame.
+            // Require actual white page pixels and dark text in the visible first lines.
+            val deadline = SystemClock.uptimeMillis() + 5000
+            var visiblePage = false
+            do {
+                val instrumentation = InstrumentationRegistry.getInstrumentation()
+                val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+                try {
+                    var white = 0
+                    var ink = 0
+                    var samples = 0
+                    for (y in visibleWeb.top.coerceAtLeast(0) until minOf(visibleWeb.top + 64, bitmap.height)) {
+                        for (x in visibleWeb.left.coerceAtLeast(0) until minOf(visibleWeb.right, bitmap.width)) {
+                            val pixel = bitmap.getPixel(x, y) and 0x00ffffff
+                            if (pixel == 0x00ffffff) white++
+                            if (pixel == 0) ink++
+                            samples++
+                        }
+                    }
+                    visiblePage = white > samples / 2 && ink > 12
+                    File(instrumentation.targetContext.getExternalFilesDir("ui-regression"),
+                        "custom-button-dynamic-reopened.png").outputStream().use {
+                        assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+                    }
+                } finally { bitmap.recycle() }
+                if (!visiblePage) SystemClock.sleep(50)
+            } while (!visiblePage && SystemClock.uptimeMillis() < deadline)
+            assertTrue("The actual screenshot must show the reopened page and its text", visiblePage)
             // The first reopened callback has finished: a cached/fast second click must
             // still be owned by the visible dialog, even when its HTML would change.
             InstrumentationRegistry.getInstrumentation().waitForIdleSync()
