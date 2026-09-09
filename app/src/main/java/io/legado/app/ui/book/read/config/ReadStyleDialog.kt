@@ -142,8 +142,9 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
             ReadBook.loadContent(false)
         }
         cbShareLayout.onCheckedChangeListener = { _, isChecked ->
+            val oldPageAnim = ReadBook.pageAnim()
             ReadBookConfig.shareLayout = isChecked
-            callBack?.upPageAnim()
+            if (ReadBook.pageAnim() != oldPageAnim) callBack?.upPageAnim()
             upView()
             postEvent(EventBus.UP_CONFIG, arrayListOf(1, 2, 5))
         }
@@ -168,8 +169,9 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
     private fun changeBgTextConfig(index: Int) {
         val oldIndex = ReadBookConfig.styleSelect
         if (index != oldIndex) {
+            val oldPageAnim = ReadBook.pageAnim()
             ReadBookConfig.styleSelect = index
-            callBack?.upPageAnim()
+            if (ReadBook.pageAnim() != oldPageAnim) callBack?.upPageAnim()
             upView()
             styleAdapter.notifyItemChanged(oldIndex)
             styleAdapter.notifyItemChanged(index)

@@ -80,7 +80,9 @@ class ReadingLayoutTransitionTest {
                         textFont = ""
                     }
                 }
-                repeat(4) { ReadBookConfig.configList += ReadBookConfig.Config() }
+                // Same scroll mode with the other preset's padding, spacing and indentation.
+                ReadBookConfig.configList += ReadBookConfig.configList[0].copy().apply { setCurPageAnim(3) }
+                repeat(3) { ReadBookConfig.configList += ReadBookConfig.Config() }
                 ReadBookConfig.shareConfig = ReadBookConfig.Config()
             }
             ActivityScenario.launch<ReadBookActivity>(Intent(context, ReadBookActivity::class.java)
@@ -113,6 +115,13 @@ class ReadingLayoutTransitionTest {
                 }
                 val scrolled = capture(scenario, "layout-scroll")
                 assertTrue("The reproduction must include a nonzero scroll offset", scrolled.offset < 0)
+                switchStyle(scenario, 2)
+                awaitReader(scenario, book.bookUrl, true)
+                val sameMode = capture(scenario, "layout-scroll-same-mode")
+                assertEquals("Changing between scroll presets must preserve the source character",
+                    scrolled.visiblePosition, sameMode.savedPosition)
+                assertEquals("A same-mode preset must keep the original paragraph at the top",
+                    scrolled.visiblePosition?.paragraph, sameMode.visiblePosition?.paragraph)
                 switchStyle(scenario, 0)
                 awaitReader(scenario, book.bookUrl, false)
                 val returned = capture(scenario, "layout-cover-returned")
