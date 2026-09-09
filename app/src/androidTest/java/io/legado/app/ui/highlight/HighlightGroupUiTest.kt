@@ -3,6 +3,8 @@ package io.legado.app.ui.highlight
 import android.app.Activity
 import android.app.Instrumentation
 import android.content.Intent
+import android.content.ClipboardManager
+import android.content.Context
 import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
@@ -21,24 +23,32 @@ import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.closeSoftKeyboard
 import androidx.test.espresso.action.ViewActions.replaceText
+import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
+import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.hasSibling
+import androidx.test.espresso.matcher.ViewMatchers.isDescendantOfA
+import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
+import fi.iki.elonen.NanoHTTPD
 import io.legado.app.R
+import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.HighlightRule
 import io.legado.app.data.entities.HighlightRuleFile
 import io.legado.app.databinding.ItemHighlightRuleBinding
 import io.legado.app.help.IntentData
+import io.legado.app.help.DirectLinkUpload
 import io.legado.app.ui.file.HandleFileActivity
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.widget.TitleBar
 import io.legado.app.utils.GSON
+import io.legado.app.utils.defaultSharedPreferences
 import org.hamcrest.Matchers.allOf
 import org.junit.After
 import org.junit.Assert.*
@@ -46,6 +56,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.net.URL
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -167,8 +178,84 @@ class HighlightGroupUiTest {
             assertEquals(HighlightRuleFile.TYPE, exported.type)
             assertEquals(fixtures.map { it.uuid }.toSet(), exported.rules!!.map { it!!.uuid }.toSet())
             assertEquals(5, exported.rules!!.size)
+            onView(withText(R.string.export_success)).check(doesNotExist())
         } finally {
             instrumentation.removeMonitor(monitor)
+        }
+    }
+
+    @Test fun selectedExportUploadsOnlyCheckedRulesAndShowsACopyableDownloadLink() {
+        val uploaded = AtomicReference<String?>()
+        val uploadedName = AtomicReference<String?>()
+        val server = object : NanoHTTPD("127.0.0.1", 0) {
+            override fun serve(session: IHTTPSession): Response {
+                if (session.method == Method.POST && session.uri == "/upload") {
+                    val files = hashMapOf<String, String>()
+                    session.parseBody(files)
+                    uploaded.set(File(checkNotNull(files["file"])).readText())
+                    uploadedName.set(session.parameters["file"]?.single())
+                    return newFixedLengthResponse(Response.Status.OK, "application/json",
+                        """{"url":"http://127.0.0.1:$listeningPort/HighlightRules.json"}""")
+                }
+                return newFixedLengthResponse(Response.Status.OK, "application/json", uploaded.get().orEmpty())
+            }
+        }
+        val previousRule = DirectLinkUpload.getConfig()
+        val preferences = context.defaultSharedPreferences
+        val previousCronet = preferences.all[PreferKey.cronet] as Boolean?
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        var previousClip: android.content.ClipData? = null
+        scenario!!.onActivity { previousClip = clipboard.primaryClip }
+        server.start()
+        try {
+            preferences.edit().putBoolean(PreferKey.cronet, false).commit()
+            val url = "http://127.0.0.1:${server.listeningPort}/HighlightRules.json"
+            val summary = "Local export regression server"
+            DirectLinkUpload.putConfig(DirectLinkUpload.Rule(
+                uploadUrl = "http://127.0.0.1:${server.listeningPort}/upload," +
+                    """{"method":"POST","body":{"file":"fileRequest"},"type":"multipart/form-data"}""",
+                downloadUrlRule = "$.url", summary = summary,
+            ))
+            val expected = dao.all.first()
+            onView(allOf(withId(R.id.cb_name), withText("[Characters] Alice"))).perform(click())
+            onView(allOf(withId(R.id.iv_menu_more), isDescendantOfA(withId(R.id.select_action_bar))))
+                .perform(click())
+            onView(withText(R.string.export_selection)).perform(click())
+            onView(withText(R.string.upload_url)).inRoot(isDialog()).perform(click())
+            await {
+                var shown = false
+                instrumentation.runOnMainSync {
+                    shown = WindowInspector.getGlobalWindowViews().any {
+                        it.hasWindowFocus() && it.findViewById<TextView>(R.id.edit_view)?.text?.toString() == url
+                    }
+                }
+                shown
+            }
+            onView(withText(R.string.export_success)).inRoot(isDialog()).check(matches(isDisplayed()))
+            onView(withText(summary)).inRoot(isDialog()).check(matches(isDisplayed()))
+            onView(withId(R.id.edit_view)).inRoot(isDialog()).check(matches(withText(url)))
+            assertEquals("HighlightRules.json", uploadedName.get())
+            val downloaded = URL(url).readText()
+            assertEquals(uploaded.get(), downloaded)
+            val exported = GSON.fromJson(downloaded, HighlightRuleFile::class.java)
+            assertEquals(HighlightRuleFile.TYPE, exported.type)
+            assertEquals(GSON.toJson(expected), GSON.toJson(exported.rules!!.single()))
+            val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+            try {
+                File(context.getExternalFilesDir("ui-regression"), "highlight-export-success.png")
+                    .outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+            } finally { bitmap.recycle() }
+            onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+            scenario!!.onActivity { assertEquals(url, clipboard.primaryClip?.getItemAt(0)?.text?.toString()) }
+        } finally {
+            if (previousRule == null) DirectLinkUpload.delConfig() else DirectLinkUpload.putConfig(previousRule)
+            preferences.edit().apply {
+                if (previousCronet == null) remove(PreferKey.cronet) else putBoolean(PreferKey.cronet, previousCronet)
+            }.commit()
+            scenario!!.onActivity {
+                previousClip?.let(clipboard::setPrimaryClip) ?: clipboard.clearPrimaryClip()
+            }
+            server.stop()
         }
     }
 
