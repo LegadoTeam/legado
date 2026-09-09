@@ -3,12 +3,19 @@ set -euo pipefail
 
 trap 'adb pull /sdcard/Android/data/com.legado.app.debug/files/ui-regression app/build/ui-regression || true' EXIT
 
+# Keep unrelated UI fixtures in a fresh instrumentation process.
 ./gradlew :app:connectedAppDebugAndroidTest \
   --init-script .github/scripts/source-browser-test.init.gradle \
-  -Pandroid.testInstrumentationRunnerArguments.class=io.legado.app.ui.widget.dialog.BottomWebViewDialogShowTest,io.legado.app.ui.book.explore.ExploreCategoriesTest,io.legado.app.ui.main.explore.ExploreRefreshUiTest,io.legado.app.ui.book.read.ContentEditSearchTest,io.legado.app.ui.book.read.ContentReversalUiTest,io.legado.app.help.book.ContentReversalCacheTest,io.legado.app.ui.association.RuleSelectionShareTest,io.legado.app.ui.about.ReadRecordHistoryTest,io.legado.app.data.ReadRecordAuthorIdentityTest,io.legado.app.data.BookSourceCheckStateTest,io.legado.app.data.BookSourceCheckApiTest,io.legado.app.ui.book.source.BookSourceCheckUiTest,io.legado.app.model.webBook.SourceContentCompatibilityTest,io.legado.app.model.webBook.BatchContentDownloadTest,io.legado.app.ui.book.read.MouseWheelScrollTest,io.legado.app.ui.book.read.TitleFontWeightRenderingTest,io.legado.app.ui.book.read.EpubHierarchyNavigationTest,io.legado.app.ui.book.manga.MangaReadingDirectionTest,io.legado.app.data.BookMemoTest,io.legado.app.ui.book.read.ReadAloudScaleUiTest,io.legado.app.ui.book.read.ReadingLayoutTransitionTest,io.legado.app.ui.book.read.ReadAloudMenuUiTest,io.legado.app.ui.book.read.TocReverseNavigationTest,io.legado.app.help.storage.CoverTitleAdaptiveBackupRestoreTest,io.legado.app.ui.code.CodeSelectionUiTest,io.legado.app.ui.widget.image.CoverTitleAdaptiveUiTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=io.legado.app.ui.widget.dialog.BottomWebViewDialogShowTest,io.legado.app.ui.book.explore.ExploreCategoriesTest,io.legado.app.ui.main.explore.ExploreRefreshUiTest,io.legado.app.ui.book.read.ContentEditSearchTest,io.legado.app.ui.book.read.ContentReversalUiTest,io.legado.app.help.book.ContentReversalCacheTest,io.legado.app.ui.association.RuleSelectionShareTest,io.legado.app.ui.about.ReadRecordHistoryTest,io.legado.app.data.ReadRecordAuthorIdentityTest,io.legado.app.data.BookSourceCheckStateTest,io.legado.app.data.BookSourceCheckApiTest,io.legado.app.ui.book.source.BookSourceCheckUiTest,io.legado.app.model.webBook.SourceContentCompatibilityTest,io.legado.app.model.webBook.BatchContentDownloadTest,io.legado.app.help.storage.CoverTitleAdaptiveBackupRestoreTest,io.legado.app.ui.code.CodeSelectionUiTest,io.legado.app.ui.widget.image.CoverTitleAdaptiveUiTest \
   --build-cache --no-daemon --max-workers=2
 
-# PDF rendering uses a 192 MB app heap; run it in a fresh instrumentation process so
+# Reader interaction tests are isolated from the base fixtures.
+./gradlew :app:connectedAppDebugAndroidTest \
+  --init-script .github/scripts/source-browser-test.init.gradle \
+  -Pandroid.testInstrumentationRunnerArguments.class=io.legado.app.ui.book.read.MouseWheelScrollTest,io.legado.app.ui.book.read.TitleFontWeightRenderingTest,io.legado.app.ui.book.read.EpubHierarchyNavigationTest,io.legado.app.ui.book.manga.MangaReadingDirectionTest,io.legado.app.data.BookMemoTest,io.legado.app.ui.widget.dialog.BookMemoDialogTest,io.legado.app.data.HighlightRuleGroupTest,io.legado.app.ui.highlight.HighlightGroupUiTest,io.legado.app.ui.book.read.ReadAloudScaleUiTest,io.legado.app.ui.book.read.ReadingLayoutTransitionTest,io.legado.app.ui.book.read.ReadAloudMenuUiTest,io.legado.app.ui.book.read.TocReverseNavigationTest \
+  --build-cache --no-daemon --max-workers=2
+
+# PDF rendering uses a 192 MB app heap; keep it in its own process.
 ./gradlew :app:connectedAppDebugAndroidTest \
   --init-script .github/scripts/source-browser-test.init.gradle \
   -Pandroid.testInstrumentationRunnerArguments.class=io.legado.app.model.localBook.PdfOutlineTest,io.legado.app.ui.book.read.PdfPagePositionTest,io.legado.app.ui.book.read.PdfOutlineNavigationTest,io.legado.app.ui.book.read.PdfZoomNavigationTest \
