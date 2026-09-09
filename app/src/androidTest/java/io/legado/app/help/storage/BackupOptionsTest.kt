@@ -35,6 +35,7 @@ import io.legado.app.utils.externalFiles
 import io.legado.app.utils.fromJsonArray
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import org.hamcrest.Matchers.containsString
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -49,7 +50,7 @@ import java.util.zip.ZipFile
 @RunWith(AndroidJUnit4::class)
 class BackupOptionsTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
-    private val context = instrumentation.targetContext
+    private val context = instrumentation.targetContext.applicationContext
     private val preferences = context.defaultSharedPreferences
     private val savedPreferences = HashMap(preferences.all)
     private val savedLocal = HashMap(LocalConfig.all)
@@ -59,12 +60,14 @@ class BackupOptionsTest {
     private val requests = CopyOnWriteArrayList<String>()
     @Volatile private var upload: ByteArray? = null
     @Volatile private var failUpload = false
+    @Volatile private var failAuthorization = false
     private var scenario: ActivityScenario<ConfigActivity>? = null
     private val defaultArchive = File(context.externalFiles, "backup.zip")
     private var savedDefaultArchive: ByteArray? = null
     private val server = object : NanoHTTPD("127.0.0.1", 0) {
         override fun serve(session: IHTTPSession): Response {
             requests += "${session.method} ${session.uri}"
+            if (failAuthorization) return newFixedLengthResponse(Response.Status.UNAUTHORIZED, "text/plain", "invalid credentials")
             val files = HashMap<String, String>()
             session.parseBody(files)
             if (session.method == Method.PUT) {
@@ -155,6 +158,12 @@ class BackupOptionsTest {
         onView(withText(R.string.ok)).perform(click())
         assertEquals("backup-options-password", LocalConfig.password)
         assertFalse(preferences.contains("password"))
+        scenario!!.onActivity { activity ->
+            (activity.supportFragmentManager.findFragmentByTag(ConfigTag.BACKUP_CONFIG) as BackupConfigFragment)
+                .scrollToPreference(PreferKey.backupPath)
+        }
+        instrumentation.waitForIdleSync()
+        onView(withText(containsString(context.externalFiles.absolutePath))).check(matches(isDisplayed()))
         screenshot("backup-password-and-default-directory")
         clickPreference(PreferKey.autoBackup)
         assertTrue(AppConfig.autoBackup)
@@ -167,12 +176,12 @@ class BackupOptionsTest {
         onView(withId(R.id.interval_days)).check(matches(isDisplayed()))
         assertEquals(1, AppConfig.autoBackupIntervalDays)
         onView(withId(R.id.interval_days)).perform(replaceText("7"), closeSoftKeyboard())
-        screenshot("backup-auto-local-seven-days")
         onView(withText(R.string.ok)).perform(click())
         assertFalse(AppConfig.autoBackupWebDav)
         assertEquals(7, AppConfig.autoBackupIntervalDays)
         scenario!!.recreate()
         clickPreference(PreferKey.autoBackup)
+        screenshot("backup-auto-local-seven-days")
         onView(withId(R.id.enabled)).perform(click())
         onView(withText(R.string.ok)).perform(click())
         assertFalse(AppConfig.autoBackup)
@@ -220,6 +229,25 @@ class BackupOptionsTest {
         assertArchive(File(directory, "backup.zip"))
         assertEquals("A failed cloud upload must remain due for retry", 123L, LocalConfig.lastBackup)
         assertTrue(requests.any { it.startsWith("PUT /backup") })
+    }
+
+    @Test fun selectedCloudBackupDoesNotReportSuccessWithoutAuthorization() = runBlocking(Dispatchers.IO) {
+        failAuthorization = true
+        AppWebDav.upConfig()
+        assertFalse(AppWebDav.isOk)
+        requests.clear()
+        LocalConfig.lastBackup = 123
+        assertTrue(runCatching { Backup.backupLocked(context, directory.path, uploadWebDav = true) }.isFailure)
+        assertArchive(File(directory, "backup.zip"))
+        assertEquals(123L, LocalConfig.lastBackup)
+        assertFalse(requests.any { it.startsWith("PUT ") })
+        preferences.edit().remove(PreferKey.webDavAccount).remove(PreferKey.webDavPassword).commit()
+        AppWebDav.upConfig()
+        assertTrue(runCatching { Backup.backupLocked(context, directory.path, uploadWebDav = true) }.isFailure)
+        assertEquals(123L, LocalConfig.lastBackup)
+        Backup.backupLocked(context, directory.path, uploadWebDav = false)
+        assertTrue(LocalConfig.lastBackup > 123)
+        assertTrue(requests.isEmpty())
     }
 
     @Test fun actualArchiveRestoresExplicitAutoSettingsAndLegacyMissingKeysUseDefaults() = runBlocking(Dispatchers.IO) {

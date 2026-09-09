@@ -13,6 +13,7 @@ import android.view.View
 import androidx.appcompat.app.AlertDialog
 import androidx.core.net.toUri
 import androidx.core.view.MenuProvider
+import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.EditTextPreference
@@ -295,6 +296,7 @@ class BackupConfigFragment : PreferenceFragment(),
         binding.enabled.isChecked = AppConfig.autoBackup
         binding.destination.check(if (AppConfig.autoBackupWebDav) R.id.local_webdav else R.id.local_only)
         binding.intervalDays.setText(AppConfig.autoBackupIntervalDays.toString())
+        binding.intervalDays.doAfterTextChanged { binding.intervalDays.error = null }
         AlertDialog.Builder(requireContext())
             .setTitle(R.string.auto_backup_t)
             .setView(binding.root)

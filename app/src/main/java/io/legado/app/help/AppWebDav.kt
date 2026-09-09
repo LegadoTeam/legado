@@ -165,11 +165,10 @@ object AppWebDav {
      */
     @Throws(Exception::class)
     suspend fun backUpWebDav(fileName: String) {
-        authorization?.let {
-            if (!NetworkUtils.isAvailable()) throw NoStackTraceException("网络未连接")
-            val putUrl = "$rootWebDavUrl$fileName"
-            WebDav(putUrl, it).upload(Backup.zipFilePath)
-        }
+        val authorization = authorization ?: throw NoStackTraceException("webDav未配置或授权失败")
+        if (!NetworkUtils.isAvailable()) throw NoStackTraceException("网络未连接")
+        val putUrl = "$rootWebDavUrl$fileName"
+        WebDav(putUrl, authorization).upload(Backup.zipFilePath)
     }
 
     /**
@@ -190,8 +189,8 @@ object AppWebDav {
      * 上传背景图片
      */
     suspend fun upBgs(files: Array<File>) {
-        val authorization = authorization ?: return
-        if (!NetworkUtils.isAvailable()) return
+        val authorization = authorization ?: throw NoStackTraceException("webDav未配置或授权失败")
+        if (!NetworkUtils.isAvailable()) throw NoStackTraceException("网络未连接")
         val bgWebDavFiles = getAllBgWebDavFiles().getOrThrow()
             .map { it.displayName }
             .toSet()
