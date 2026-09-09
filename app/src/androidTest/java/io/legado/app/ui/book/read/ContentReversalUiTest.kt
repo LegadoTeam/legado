@@ -188,7 +188,7 @@ class ContentReversalUiTest {
             }
             fun refresh() {
                 showReaderMenu()
-                onView(allOf(withId(R.id.menu_refresh), isDisplayed())).perform(click())
+                onView(allOf(withContentDescription(R.string.refresh), isDisplayed())).perform(click())
             }
             fun pixel(index: Int): Int {
                 val bitmap = BitmapFactory.decodeFile(BookHelp.getImage(book, "$base/image/$index.png").path)
@@ -248,7 +248,7 @@ class ContentReversalUiTest {
             bodyVersion.set(4)
             imageColor.set(Color.BLUE)
             showReaderMenu()
-            onView(allOf(withId(R.id.menu_refresh), isDisplayed())).perform(longClick())
+            onView(allOf(withContentDescription(R.string.refresh), isDisplayed())).perform(longClick())
             screenshot("resource-refresh-menu")
             var resourceY = 0
             onView(withText(R.string.menu_refresh_resources)).inRoot(isPlatformPopup()).check { view, error ->

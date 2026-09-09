@@ -630,8 +630,8 @@ object BookHelp {
             folderName,
             fileName,
         )
+        val token = contentSaveToken(book, bookChapter)
         if (file.exists()) {
-            val token = contentSaveToken(book, bookChapter)
             val string = file.readText()
             if (string.isEmpty()) {
                 return null
@@ -652,7 +652,10 @@ object BookHelp {
         if (book.isLocal) {
             val string = LocalBook.getContent(book, bookChapter)
             if (string != null && book.isEpub) {
-                saveText(book, bookChapter, string)
+                // Materializing an EPUB cache is part of this read, not a replacement edit.
+                contentSaveFence.writeIfCurrent(token.key, token.version, fileName) {
+                    writeText(book, bookChapter, folderName, fileName, string)
+                }
             }
             return string
         }
