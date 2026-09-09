@@ -62,7 +62,7 @@
 
     <item
         android:id="@+id/menu_clear_record"
-        android:title="@string/clear"
+        android:title="@string/read_record_clear"
         app:showAsAction="never" />
 
 </menu>
