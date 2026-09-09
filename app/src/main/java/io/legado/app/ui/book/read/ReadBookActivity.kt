@@ -480,7 +480,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         binding.readView.cancelTouchGestures()
         autoPageStop()
         backupJob?.cancel()
-        updateScrollReadPosition()
+        binding.readView.updateScrollReadPosition()
         ReadBook.saveRead()
         ReadBook.cancelPreDownloadTask()
         unregisterReceiver(timeBatteryReceiver)
@@ -1567,15 +1567,6 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     fun showReadAloudControls(resetPosition: Boolean = false) {
         aloudControls.reveal(resetPosition)
-    }
-
-    private fun updateScrollReadPosition() {
-        if (!ReadBook.isScroll) return
-        if (ReadBook.msg != null || !ReadBook.isLayoutAvailable) return
-        val (chapterIndex, line) = binding.readView.getReadPosition() ?: return
-        if (chapterIndex == ReadBook.durChapterIndex) {
-            ReadBook.durChapterPos = line.chapterPosition
-        }
     }
 
     /**
@@ -2873,7 +2864,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
         observeEvent<ArrayList<Int>>(EventBus.UP_CONFIG) { values ->
             if (5 in values && isInitFinish) {
-                updateScrollReadPosition()
+                binding.readView.updateScrollReadPosition()
             }
             values.forEach { value ->
                 when (value) {

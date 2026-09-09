@@ -907,6 +907,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
      * 更新翻页动画
      */
     fun upPageAnim(upRecorder: Boolean = false) {
+        updateScrollReadPosition()
         isScroll = ReadBook.pageAnim() == 3
         ChapterProvider.upLayout()
         when (ReadBook.pageAnim()) {
@@ -1084,6 +1085,15 @@ class ReadView(context: Context, attrs: AttributeSet) :
     fun getReadPosition(): Pair<Int, TextLine>? {
         if (replacePreview != null) return null
         return curPage.getReadPosition()
+    }
+
+    fun updateScrollReadPosition() {
+        // The configured mode may already have changed; capture the page still on screen.
+        if (!isScroll || ReadBook.msg != null || !ReadBook.isLayoutAvailable) return
+        val (chapterIndex, line) = getReadPosition() ?: return
+        if (chapterIndex == ReadBook.durChapterIndex) {
+            ReadBook.durChapterPos = line.chapterPosition
+        }
     }
 
     fun getReadAloudPos(): Pair<Int, TextLine>? {
