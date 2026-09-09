@@ -21,6 +21,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.filters.SdkSuppress
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.R as MaterialR
+import fi.iki.elonen.NanoHTTPD
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
 import io.legado.app.help.webView.PooledWebView
@@ -349,7 +350,14 @@ class BottomWebViewDialogShowTest {
         val overlay = shell("cmd overlay list --user current").lineSequence()
             .map(String::trim).first { it.startsWith("[x] com.android.internal.systemui.navbar.") }
             .removePrefix("[x] ")
+        val server = object : NanoHTTPD("127.0.0.1", 0) {
+            override fun serve(session: IHTTPSession): Response = newFixedLengthResponse(
+                Response.Status.OK, "text/html",
+                "<html><head><title>Second</title></head><body>${session.uri}</body></html>"
+            )
+        }
         try {
+            server.start()
             shell("cmd overlay enable-exclusive --user current --category com.android.internal.systemui.navbar.gestural")
             assertTrue("System gesture navigation must actually be enabled", awaitCondition {
                 val resources = InstrumentationRegistry.getInstrumentation().targetContext.resources
@@ -357,29 +365,41 @@ class BottomWebViewDialogShowTest {
                 mode != 0 && resources.getInteger(mode) == 2
             })
             for (outside in listOf(false, true)) {
+                val firstUrl = "http://127.0.0.1:${server.listeningPort}/back-$outside"
+                val secondUrl = "$firstUrl/second"
                 lateinit var lower: BottomWebViewDialog
                 lateinit var browser: BottomWebViewDialog
                 lateinit var web: WebView
                 scenario!!.onActivity { activity ->
                     lower = newDialog("lower-$outside", """{"heightPercentage":0.5}""")
                     lower.show(activity.supportFragmentManager, "lower")
-                    browser = newDialog("back-$outside", """{"heightPercentage":0.6,
-                        "dismissOnTouchOutside":$outside,"isHideable":true}""")
+                    browser = BottomWebViewDialog(source.bookSourceUrl, 0, firstUrl,
+                        "<html><head><title>First</title></head><body>First</body></html>",
+                        config = """{"heightPercentage":0.6,
+                            "dismissOnTouchOutside":$outside,"isHideable":true}""")
                     browser.show(activity.supportFragmentManager, "back")
                     web = (browser.requireView().findViewById<View>(io.legado.app.R.id.web_view_container)
                         as android.view.ViewGroup).getChildAt(0) as WebView
                 }
                 assertTrue("Browser initial page must be ready", awaitCondition {
-                    web.url == "${source.bookSourceUrl}/back-$outside" &&
+                    web.url == firstUrl && web.title == "First" &&
                         web.progress == 100 && web.copyBackForwardList().size == 1 &&
                         browser.dialog?.window?.decorView?.hasWindowFocus() == true
                 })
                 scenario!!.onActivity {
-                    web.evaluateJavascript("history.pushState({}, '', '#second'); document.title='Second'", null)
+                    // Navigate to a second document instead of assuming pushState updates the
+                    // virtual URL of the initial loadDataWithBaseURL entry on every WebView.
+                    web.loadUrl(secondUrl)
                 }
-                assertTrue("The fixture must create real WebView history", awaitCondition {
-                    web.canGoBack() && web.url?.endsWith("#second") == true
-                })
+                var historyState = ""
+                val historyReady = awaitCondition {
+                    val history = web.copyBackForwardList()
+                    historyState = "url=${web.url}, title=${web.title}, progress=${web.progress}, " +
+                        "size=${history.size}, index=${history.currentIndex}"
+                    web.canGoBack() && web.url == secondUrl && web.title == "Second" &&
+                        web.progress == 100 && history.size == 2 && history.currentIndex == 1
+                }
+                assertTrue("The fixture must create real WebView history: $historyState", historyReady)
                 var hidden = 0
                 scenario!!.onActivity { activity ->
                     val chrome = browser.CustomWebChromeClient()
@@ -398,7 +418,8 @@ class BottomWebViewDialogShowTest {
                 edgeBack(browser)
                 assertTrue("Back must consume the real web history before dismissing", awaitCondition {
                     browser.dialog?.isShowing == true && !web.canGoBack() &&
-                        web.url?.endsWith("#second") == false
+                        web.url == firstUrl && web.title == "First" &&
+                        web.copyBackForwardList().currentIndex == 0
                 })
                 screenshot("paragraph-back-history-$outside")
                 edgeBack(browser)
@@ -411,6 +432,7 @@ class BottomWebViewDialogShowTest {
                 }
             }
         } finally {
+            server.stop()
             shell("cmd overlay enable-exclusive --user current --category $overlay")
         }
     }
