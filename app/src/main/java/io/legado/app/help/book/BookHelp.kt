@@ -1,7 +1,7 @@
 package io.legado.app.help.book
 
 import android.os.ParcelFileDescriptor
-import android.util.AtomicFile
+import androidx.core.util.AtomicFile
 import androidx.documentfile.provider.DocumentFile
 import com.script.rhino.runScriptWithContext
 import io.legado.app.constant.AppLog
