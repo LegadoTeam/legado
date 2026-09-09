@@ -7,6 +7,21 @@ import java.io.File
 class ScrollReadPositionContractTest {
 
     @Test
+    fun `applying preset updates the reader before reflecting radio selection`() {
+        val dialog = source("app/src/main/java/io/legado/app/ui/book/read/config/ReadStyleDialog.kt")
+        val change = dialog.substringAfter("private fun changeBgTextConfig(")
+            .substringBefore("private fun showBgTextConfig")
+        val apply = change.indexOf("callBack?.upPageAnim()")
+        assertTrue(apply >= 0)
+        assertTrue(change.indexOf("upView()") > apply)
+        assertTrue(dialog.contains("if (updatingPageAnim) return@setOnCheckedChangeListener"))
+        val update = dialog.substringAfter("private fun upView()")
+        assertTrue(update.indexOf("updatingPageAnim = true") >= 0)
+        assertTrue(update.indexOf("rgPageAnim.check") > update.indexOf("updatingPageAnim = true"))
+        assertTrue(update.indexOf("updatingPageAnim = false") > update.indexOf("rgPageAnim.check"))
+    }
+
+    @Test
     fun `initial content waits for the reader layout`() {
         val activity = source("app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt")
         val onPostCreate = activity.substringAfter("override fun onPostCreate")

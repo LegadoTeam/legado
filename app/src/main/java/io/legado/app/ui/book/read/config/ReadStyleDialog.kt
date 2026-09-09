@@ -39,6 +39,7 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
     private val binding by viewBinding(DialogReadBookStyleBinding::bind)
     private val callBack get() = activity as? ReadBookActivity
     private lateinit var styleAdapter: StyleAdapter
+    private var updatingPageAnim = false
 
     override fun onStart() {
         super.onStart()
@@ -134,6 +135,7 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
             TipConfigDialog().show(childFragmentManager, "tipConfigDialog")
         }
         rgPageAnim.setOnCheckedChangeListener { _, checkedId ->
+            if (updatingPageAnim) return@setOnCheckedChangeListener
             ReadBook.book?.setPageAnim(-1)
             ReadBookConfig.pageAnim = binding.rgPageAnim.getIndexById(checkedId)
             callBack?.upPageAnim()
@@ -141,6 +143,7 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
         }
         cbShareLayout.onCheckedChangeListener = { _, isChecked ->
             ReadBookConfig.shareLayout = isChecked
+            callBack?.upPageAnim()
             upView()
             postEvent(EventBus.UP_CONFIG, arrayListOf(1, 2, 5))
         }
@@ -166,6 +169,7 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
         val oldIndex = ReadBookConfig.styleSelect
         if (index != oldIndex) {
             ReadBookConfig.styleSelect = index
+            callBack?.upPageAnim()
             upView()
             styleAdapter.notifyItemChanged(oldIndex)
             styleAdapter.notifyItemChanged(index)
@@ -185,10 +189,17 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
 
     private fun upView() = binding.run {
         textFontWeightConverter.upUi(ReadBookConfig.textBold)
-        ReadBook.pageAnim().let {
-            if (it >= 0 && it < rgPageAnim.childCount) {
-                rgPageAnim.check(rgPageAnim[it].id)
+        // Reflect the selected preset without replaying radio-button change callbacks.
+        // Those callbacks can apply new padding while the old scroll page is still bound.
+        updatingPageAnim = true
+        try {
+            ReadBook.pageAnim().let {
+                if (it >= 0 && it < rgPageAnim.childCount) {
+                    rgPageAnim.check(rgPageAnim[it].id)
+                }
             }
+        } finally {
+            updatingPageAnim = false
         }
         ReadBookConfig.let {
             dsbTextSize.progress = it.textSize - 5
