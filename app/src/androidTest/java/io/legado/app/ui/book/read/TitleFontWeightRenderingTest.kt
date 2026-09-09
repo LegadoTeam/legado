@@ -30,10 +30,12 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.help.HighlightGeometry
 import io.legado.app.help.HighlightStyle
+import io.legado.app.help.book.BookHelp
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.parseReadConfigObject
 import io.legado.app.model.ReadBook
+import io.legado.app.model.ImageProvider
 import io.legado.app.model.localBook.TextFile
 import io.legado.app.ui.book.read.config.ClickActionConfigDialog
 import io.legado.app.ui.book.read.config.ReadStyleDialog
@@ -43,6 +45,9 @@ import io.legado.app.ui.book.read.page.ReadView
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.book.read.page.entities.TextPage
 import io.legado.app.ui.book.read.page.entities.column.TextColumn
+import io.legado.app.ui.book.read.page.entities.column.BaseColumn
+import io.legado.app.ui.book.read.page.entities.column.ImageColumn
+import io.legado.app.ui.book.read.page.entities.column.ReviewColumn
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.utils.GSON
 import io.legado.app.utils.dpToPx
@@ -262,6 +267,142 @@ class TitleFontWeightRenderingTest {
             }
         } finally {
             instrumentation.runOnMainSync { AppConfig.optimizeRender = savedOptimize }
+        }
+    }
+
+    @Test
+    fun highlightPillLeavesTransparentReviewImagesClearOnBothSides() {
+        launchReader()
+        // The unmodified SVG supplied with https://github.com/LegadoTeam/legado/issues/1255.
+        val svg = instrumentation.context.assets.open("issue1255-transparent-cat.svg")
+            .bufferedReader().use { it.readText() }
+        val src = "https://fixture.invalid/issue1255-transparent-cat.svg"
+        val imageFile = BookHelp.getImage(book!!, src)
+        imageFile.parentFile!!.mkdirs()
+        imageFile.writeText(svg)
+        val savedOptimize = AppConfig.optimizeRender
+        try {
+            scenario!!.onActivity { activity ->
+                ReadBookConfig.reviewIconSvg = svg
+                ReadBookConfig.reviewIconScale = 180
+                val width = activity.findViewById<ReadView>(R.id.read_view).curPage
+                    .findViewById<ContentTextView>(R.id.content_text_view).width
+                for (optimized in listOf(false, true)) for (size in listOf(20, 50)) {
+                    AppConfig.optimizeRender = optimized
+                    ReadBookConfig.textSize = size
+                    ChapterProvider.upStyle()
+                    ImageProvider.remove(imageFile.absolutePath)
+                    val textSize = ChapterProvider.contentPaint.textSize
+                    val iconWidth = ceil(ChapterProvider.getReviewWidth(false))
+                    val glyphWidth = ceil(ChapterProvider.contentPaint.measureText("顶"))
+                    val lineHeight = ceil(textSize * 2.1f)
+                    val top = ChapterProvider.paddingTop.toFloat()
+                    val height = ceil(top + lineHeight * 3).toInt()
+                    val start = floor((width - 2 * iconWidth - 2 * glyphWidth) / 2)
+                    assertTrue("All text and icons must fit inside the page", start > 0)
+                    val page = TextPage(text = "顶上\n顶上\n顶上", height = height.toFloat())
+                    for (kind in 0..2) {
+                        fun icon(x: Float): BaseColumn = when (kind) {
+                            0 -> ReviewColumn(x, x + iconWidth, 88)
+                            1 -> ImageColumn(x, x + iconWidth, src)
+                            else -> ImageColumn(x, x + iconWidth,
+                                """$src,{"style":"text","reviewCount":"88","click":"review"}""")
+                        }
+                        val y = top + lineHeight * kind
+                        val line = TextLine(text = "顶上", startX = start + iconWidth,
+                            lineTop = y, lineBase = y + textSize * 1.35f, lineBottom = y + lineHeight)
+                        line.addColumn(icon(start))
+                        line.addColumn(TextColumn(start + iconWidth, start + iconWidth + glyphWidth, "顶"))
+                        line.addColumn(TextColumn(start + iconWidth + glyphWidth,
+                            start + iconWidth + 2 * glyphWidth, "上"))
+                        line.addColumn(icon(start + iconWidth + 2 * glyphWidth))
+                        page.addLine(line)
+                    }
+                    page.upRenderHeight()
+                    page.isCompleted = true
+                    val view = ContentTextView(activity, null).apply {
+                        layout(0, 0, width, height)
+                        setContent(page)
+                    }
+                    val columns = page.lines.flatMap { it.columns }
+                    val positions = columns.map { it.start to it.end }
+                    val textColumns = columns.filterIsInstance<TextColumn>()
+                    val fill = Color.rgb(32, 144, 80)
+                    fun render(color: Int, withFill: Boolean): Bitmap {
+                        textColumns.forEach {
+                            it.highlightStyle = HighlightStyle(textColor = color, bold = true,
+                                fill = if (withFill) fill else 0, fillShape = HighlightStyle.FillShape.PILL)
+                        }
+                        return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                            .also { view.draw(Canvas(it)) }
+                    }
+                    val icons = render(1, false)
+                    val glyphs = render(Color.BLACK, false)
+                    val background = render(1, true)
+                    val result = render(Color.BLACK, true)
+                    val legacy = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                    try {
+                        // Negative control: the original expanded capsule behind the same SVG pixels.
+                        val canvas = Canvas(legacy)
+                        for (line in page.lines) {
+                            val band = HighlightGeometry.fillBand(line.lineBase - line.lineTop,
+                                textSize, line.height, HighlightStyle.FillShape.PILL, 1f.dpToPx())
+                            val padding = (band.bottom - band.top) / 2
+                            HighlightDraw.drawFillRun(canvas, line.columns[1].start - padding,
+                                line.columns[2].end + padding, line.lineTop + band.top,
+                                line.lineTop + band.bottom, fill, HighlightStyle.FillShape.PILL)
+                        }
+                        canvas.drawBitmap(icons, 0f, 0f, null)
+                        for ((name, bitmap) in listOf("fixed" to result, "original" to legacy)) {
+                            File(context.getExternalFilesDir("ui-regression"),
+                                "highlight-transparent-$size-$optimized-$name.png").outputStream().use {
+                                assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+                            }
+                        }
+                        for ((row, line) in page.lines.withIndex()) {
+                            for (icon in listOf(line.columns.first(), line.columns.last())) {
+                                var transparent = 0
+                                var opaque = 0
+                                var oldOverlap = 0
+                                for (y in ceil(line.lineTop).toInt() until floor(line.lineBottom).toInt()) {
+                                    for (x in icon.start.toInt() until icon.end.toInt()) {
+                                        val before = icons.getPixel(x, y)
+                                        if (Color.alpha(before) == 0) transparent++
+                                        if (Color.alpha(before) > 240) opaque++
+                                        if (legacy.getPixel(x, y) != before) oldOverlap++
+                                        assertEquals("SVG changed: row=$row size=$size optimized=$optimized ($x,$y)",
+                                            before, background.getPixel(x, y))
+                                    }
+                                }
+                                assertTrue("The real SVG must retain transparent areas", transparent > 100)
+                                assertTrue("The real SVG must draw visible ink", opaque > 10)
+                                assertTrue("The original cap must overlap the real transparent SVG", oldOverlap > 0)
+                            }
+                            var ink = 0
+                            for (y in ceil(line.lineTop).toInt() until floor(line.lineBottom).toInt()) {
+                                for (x in line.columns[1].start.toInt() until line.columns[2].end.toInt()) {
+                                    if (Color.alpha(glyphs.getPixel(x, y)) < 240) continue
+                                    ink++
+                                    assertTrue("Adjacent icons must not push the cap through text glyphs",
+                                        Color.alpha(background.getPixel(x, y)) in 70..110)
+                                }
+                            }
+                            assertTrue("Both real Chinese glyphs must be rendered", ink > 50)
+                        }
+                        assertEquals("Highlight clipping must not move text or review columns", positions,
+                            columns.map { it.start to it.end })
+                    } finally {
+                        listOf(icons, glyphs, background, result, legacy).forEach(Bitmap::recycle)
+                        page.recycleRecorders()
+                    }
+                }
+            }
+        } finally {
+            instrumentation.runOnMainSync {
+                AppConfig.optimizeRender = savedOptimize
+                ImageProvider.remove(imageFile.absolutePath)
+            }
+            imageFile.delete()
         }
     }
 
