@@ -350,6 +350,7 @@ class BottomWebViewDialogShowTest {
         val overlay = shell("cmd overlay list --user current").lineSequence()
             .map(String::trim).first { it.startsWith("[x] com.android.internal.systemui.navbar.") }
             .removePrefix("[x] ")
+        val setupComplete = shell("settings --user current get secure user_setup_complete").trim()
         val server = object : NanoHTTPD("127.0.0.1", 0) {
             override fun serve(session: IHTTPSession): Response = newFixedLengthResponse(
                 Response.Status.OK, "text/html",
@@ -358,12 +359,18 @@ class BottomWebViewDialogShowTest {
         }
         try {
             server.start()
+            // Android 16 forces navigation buttons and rejects edge gestures until setup finishes,
+            // even when config_navBarInteractionMode already reports the gestural overlay.
+            writeBackEvidence("paragraph-back-system-before-setup",
+                "user_setup_complete=$setupComplete\n${systemBackState()}")
+            shell("settings --user current put secure user_setup_complete 1")
             shell("cmd overlay enable-exclusive --user current --category com.android.internal.systemui.navbar.gestural")
             assertTrue("System gesture navigation must actually be enabled", awaitCondition {
                 val resources = InstrumentationRegistry.getInstrumentation().targetContext.resources
                 val mode = resources.getIdentifier("config_navBarInteractionMode", "integer", "android")
                 mode != 0 && resources.getInteger(mode) == 2
             })
+            awaitSystemBackGestures()
             for (outside in listOf(false, true)) {
                 val firstUrl = "http://127.0.0.1:${server.listeningPort}/back-$outside"
                 val secondUrl = "$firstUrl/second"
@@ -410,10 +417,15 @@ class BottomWebViewDialogShowTest {
                         }
                     })
                 }
+                recordBackState("paragraph-back-before-fullscreen-$outside", browser, web, hidden)
                 edgeBack(browser)
-                assertTrue("Back must exit fullscreen without dismissing or navigating", awaitCondition {
+                val exitedFullscreen = awaitCondition {
                     hidden == 1 && browser.dialog?.isShowing == true && web.canGoBack()
-                })
+                }
+                val fullscreenState = recordBackState(
+                    "paragraph-back-after-fullscreen-$outside", browser, web, hidden)
+                assertTrue("Back must exit fullscreen without dismissing or navigating: $fullscreenState",
+                    exitedFullscreen)
                 screenshot("paragraph-back-fullscreen-$outside")
                 edgeBack(browser)
                 assertTrue("Back must consume the real web history before dismissing", awaitCondition {
@@ -434,6 +446,11 @@ class BottomWebViewDialogShowTest {
         } finally {
             server.stop()
             shell("cmd overlay enable-exclusive --user current --category $overlay")
+            if (setupComplete == "null") {
+                shell("settings --user current delete secure user_setup_complete")
+            } else {
+                shell("settings --user current put secure user_setup_complete $setupComplete")
+            }
         }
     }
 
@@ -494,6 +511,50 @@ class BottomWebViewDialogShowTest {
         // Inject a touchscreen gesture from the system edge, never a KEYCODE_BACK surrogate.
         shell("input touchscreen swipe 1 $y ${width * 3 / 4} $y 350")
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+    }
+
+    private fun systemBackState(): String =
+        shell("dumpsys activity service com.android.systemui/.SystemUIService dumpables")
+
+    private fun awaitSystemBackGestures() {
+        val deadline = SystemClock.uptimeMillis() + 10_000
+        var state: String
+        do {
+            state = systemBackState()
+            val handler = state.lineSequence().dropWhile { !it.contains("EdgeBackGestureHandler:") }
+                .take(12).joinToString("\n")
+            if (handler.contains("mIsEnabled=true") && handler.contains("mIsBackGestureAllowed=true")) {
+                writeBackEvidence("paragraph-back-system-ready", state)
+                return
+            }
+            SystemClock.sleep(100)
+        } while (SystemClock.uptimeMillis() < deadline)
+        writeBackEvidence("paragraph-back-system-not-ready", state)
+        throw AssertionError("SystemUI must enable and allow actual edge back gestures; see system-not-ready.txt")
+    }
+
+    private fun recordBackState(name: String, browser: BottomWebViewDialog, web: WebView,
+                                hidden: Int): String {
+        var state = ""
+        scenario!!.onActivity { activity ->
+            val history = web.copyBackForwardList()
+            val sheet = browser.dialog?.findViewById<View>(MaterialR.id.design_bottom_sheet)
+            state = "hidden=$hidden, showing=${browser.dialog?.isShowing}, " +
+                "focus=${browser.dialog?.window?.decorView?.hasWindowFocus()}, " +
+                "fullscreenChildren=${(browser.view?.findViewById<View>(io.legado.app.R.id.custom_web_view)
+                    as? android.view.ViewGroup)?.childCount}, " +
+                "url=${web.url}, canGoBack=${web.canGoBack()}, index=${history.currentIndex}, " +
+                "sheetState=${sheet?.let { BottomSheetBehavior.from(it).state }}, " +
+                "hostFinishing=${activity.isFinishing}"
+        }
+        writeBackEvidence(name, "$state\n\n${systemBackState()}\n\n${shell("dumpsys window windows")}")
+        screenshot(name)
+        return state
+    }
+
+    private fun writeBackEvidence(name: String, state: String) {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        File(context.getExternalFilesDir("ui-regression"), "$name.txt").writeText(state)
     }
 
     private fun tapOutside(browser: BottomWebViewDialog) {
