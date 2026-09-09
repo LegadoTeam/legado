@@ -165,6 +165,46 @@ class BottomWebViewDialogShowTest {
             assertTrue("The dynamic page must reach the compositor before capture",
                 drawn.await(5, TimeUnit.SECONDS))
             screenshot("custom-button-dynamic-reopened")
+            // The first reopened callback has finished: a cached/fast second click must
+            // still be owned by the visible dialog, even when its HTML would change.
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            scenario!!.onActivity { activity ->
+                SourceCallBack.callBackBtn(activity, SourceCallBack.CLICK_CUSTOM_BUTTON, source, book, null)
+            }
+            assertFalse("A completed callback must not allow a duplicate while its browser is open",
+                awaitCondition(700) { requests.get() > 2 })
+            assertEquals(1, visibleDialogs(manager))
+
+            scenario!!.recreate()
+            scenario!!.onActivity { manager = it.supportFragmentManager }
+            assertTrue("The browser must survive host recreation", awaitCondition {
+                visibleDialogs(manager) == 1
+            })
+            scenario!!.onActivity { activity ->
+                SourceCallBack.callBackBtn(activity, SourceCallBack.CLICK_CUSTOM_BUTTON, source, book, null)
+            }
+            assertFalse("Restoring a browser must retain its custom-button ownership",
+                awaitCondition(700) { requests.get() > 2 })
+
+            scenario!!.onActivity { activity ->
+                manager.fragments.filterIsInstance<BottomWebViewDialog>()
+                    .single { it.dialog?.isShowing == true }.dismiss()
+                SourceCallBack.callBackBtn(activity, SourceCallBack.CLICK_CUSTOM_BUTTON, source, book, null)
+            }
+            assertTrue("Dismissal must immediately permit a fresh callback", awaitCondition {
+                manager.fragments.filterIsInstance<BottomWebViewDialog>()
+                    .singleOrNull { it.dialog?.isShowing == true }?.arguments?.getString("html")
+                    ?.contains("Dynamic page 3") == true
+            })
+            assertEquals(3, requests.get())
+            scenario!!.onActivity { activity ->
+                SourceCallBack.callBackBtn(activity, SourceCallBack.CLICK_CUSTOM_BUTTON,
+                    source, book.copy(bookUrl = book.bookUrl + "/other"), null)
+            }
+            assertTrue("Another book's callback must remain independent", awaitCondition {
+                visibleDialogs(manager) == 2
+            })
+            assertEquals(4, requests.get())
         } finally {
             release.countDown()
             server.stop()
