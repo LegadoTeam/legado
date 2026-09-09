@@ -2869,9 +2869,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
         observeEvent<ArrayList<Int>>(EventBus.UP_CONFIG) { values ->
             if (5 in values && isInitFinish) {
-                binding.readView.updateScrollReadPosition(
-                    preserveText = binding.readView.isScroll
-                )
+                binding.readView.updateScrollReadPosition(preserveText = true)
             }
             values.forEach { value ->
                 when (value) {

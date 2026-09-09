@@ -1,11 +1,31 @@
 package io.legado.app.model
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
 class ReadBookRefreshPositionTest {
+
+    @Test
+    fun `layout changes keep the same occurrence within repeated paragraphs`() {
+        val paragraphs = (1..100).map { "第${it}段。屋檐上的水珠一颗接一颗落下来。" }
+        val scroll = paragraphs.joinToString("\n")
+        val cover = paragraphs.joinToString("\n") { "　　$it" }
+        val position = scroll.indexOf("第81段。") + paragraphs[80].indexOf("落下来。")
+        val expected = cover.indexOf("第81段。") + paragraphs[80].indexOf("落下来。")
+        assertEquals(expected, resolveLayoutBodyPosition(scroll, position, cover))
+        assertEquals(position, resolveLayoutBodyPosition(cover, expected, scroll))
+        // Whole paragraphs may also repeat: their ordinal, rather than a unique text match, matters.
+        val repeated = List(100) { "同一句。" }.joinToString("\n")
+        val indented = List(100) { "　　同一句。" }.joinToString("\n")
+        assertEquals(80 * 7 + 4, resolveLayoutBodyPosition(repeated, 80 * 5 + 2, indented))
+        assertEquals(2, resolveLayoutBodyPosition("第一段\n第二段", 0, "　　第一段\n　　第二段"))
+        assertNull(resolveLayoutBodyPosition(scroll, position, cover.replace("第81段", "changed")))
+        assertNull(resolveLayoutBodyPosition("one\ntwo", 4, "one\nextra\ntwo"))
+    }
 
     @Test
     fun `reader refresh preserves position before discarding layout`() {

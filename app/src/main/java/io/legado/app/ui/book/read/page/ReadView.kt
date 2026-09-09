@@ -907,8 +907,9 @@ class ReadView(context: Context, attrs: AttributeSet) :
      * 更新翻页动画
      */
     fun upPageAnim(upRecorder: Boolean = false) {
-        updateScrollReadPosition(preserveText = ReadBook.pageAnim() != PageAnim.scrollPageAnim)
-        isScroll = ReadBook.pageAnim() == PageAnim.scrollPageAnim
+        val scroll = ReadBook.pageAnim() == PageAnim.scrollPageAnim
+        if (pageDelegate != null) updateScrollReadPosition(preserveText = isScroll != scroll)
+        isScroll = scroll
         // Runtime changes rebind content; initial inflation must not access Activity callbacks yet.
         if (pageDelegate != null) curPage.setIsScroll(isScroll)
         ChapterProvider.upLayout()
@@ -1091,16 +1092,13 @@ class ReadView(context: Context, attrs: AttributeSet) :
 
     fun updateScrollReadPosition(preserveText: Boolean = false) {
         // The configured mode may already have changed; capture the page still on screen.
-        if (!isScroll || ReadBook.msg != null || !ReadBook.isLayoutAvailable) return
-        val (chapterIndex, line) = getReadPosition() ?: return
-        if (chapterIndex == ReadBook.durChapterIndex) {
+        if (ReadBook.msg != null || !ReadBook.isLayoutAvailable) return
+        if (isScroll || preserveText) {
+            val (chapterIndex, line) = getReadPosition() ?: return
+            if (chapterIndex != ReadBook.durChapterIndex) return
             ReadBook.durChapterPos = line.chapterPosition
-            if (preserveText) {
-                // chapterPosition already points at this line's first character;
-                // keep that source text as the anchor while the new layout is built.
-                ReadBook.preserveCurrentPositionForRefresh(line.text)
-            }
         }
+        if (preserveText) ReadBook.preserveCurrentPositionForRefresh()
     }
 
     fun getReadAloudPos(): Pair<Int, TextLine>? {

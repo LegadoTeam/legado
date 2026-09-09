@@ -90,9 +90,13 @@ class ReadingLayoutTransitionTest {
                         .forEach { it.view?.findViewById<View>(R.id.iv_close)?.performClick() }
                 }
                 awaitReader(scenario, book.bookUrl, false)
-                capture(scenario, "layout-cover-before")
+                val initial = capture(scenario, "layout-cover-before")
                 switchStyle(scenario, 1)
                 awaitReader(scenario, book.bookUrl, true)
+                val enteredScroll = capture(scenario, "layout-scroll-before-swipe")
+                assertNotNull("The original page must identify an actual source paragraph", initial.visiblePosition)
+                assertEquals("Entering scroll mode must preserve the same source character",
+                    initial.visiblePosition, enteredScroll.savedPosition)
                 // Recreating a scroll reader must not recursively inflate the Activity binding.
                 scenario.recreate()
                 awaitReader(scenario, book.bookUrl, true)
@@ -116,13 +120,17 @@ class ReadingLayoutTransitionTest {
                 assertEquals("Horizontal pages must not retain a vertical scroll offset", 0, returned.offset)
                 assertTrue("The lower part of the returned page must contain rendered text", returned.bottomPixels > 100)
                 assertTrue("Reopening must also render text in the lower part of the page", reopened.bottomPixels > 100)
-                // Different indentation changes rendered character offsets. Check the text itself.
-                val anchor = scrolled.visibleText.filterNot(Char::isWhitespace).take(12)
-                assertTrue("The scrolled page must expose a text anchor", anchor.isNotEmpty())
-                assertTrue("The returned page must contain the last visible text: $anchor",
-                    returned.pageText.filterNot(Char::isWhitespace).contains(anchor))
-                assertTrue("Reopening must retain the same visible text: $anchor",
-                    reopened.pageText.filterNot(Char::isWhitespace).contains(anchor))
+                // The first visible line can be just "落下来。", repeated every five paragraphs.
+                // Compare its paragraph identity, character offset, and 96 characters of following
+                // context across paragraph boundaries, then verify that position is actually drawn.
+                val anchor = checkNotNull(scrolled.visiblePosition)
+                assertEquals("The anchor must include substantial following context", 96, anchor.context.length)
+                assertEquals("Returning must retain the same paragraph and source character",
+                    anchor, returned.savedPosition)
+                assertEquals("Reopening must retain the same paragraph and source character",
+                    anchor, reopened.savedPosition)
+                assertTrue("The returned page must draw the preserved position", returned.savedPositionVisible)
+                assertTrue("The reopened page must draw the preserved position", reopened.savedPositionVisible)
             }
         } finally {
             appDb.bookDao.delete(book)
@@ -189,6 +197,7 @@ class ReadingLayoutTransitionTest {
                 val view = it.findViewById<ReadView>(R.id.read_view)
                 ready = ReadBook.book?.bookUrl == url && ReadBook.curTextChapter?.chapter?.bookUrl == url &&
                     ReadBook.curTextChapter?.isCompleted == true && !view.curPage.textPage.isMsgPage &&
+                    view.curPage.textPage.textChapter === ReadBook.curTextChapter &&
                     view.curPage.textPage.lines.size > 3 && view.isScroll == scroll && it.bottomDialog == 0
             }
             ready
@@ -198,8 +207,10 @@ class ReadingLayoutTransitionTest {
         instrumentation.waitForIdleSync()
     }
 
+    private data class SourcePosition(val paragraph: Int, val offset: Int, val context: String)
     private data class ReadingSnapshot(val offset: Int, val bottomPixels: Int,
-        val visiblePosition: Int, val pageRange: IntRange, val visibleText: String, val pageText: String)
+        val visiblePosition: SourcePosition?, val savedPosition: SourcePosition?,
+        val savedPositionVisible: Boolean)
 
     private fun capture(scenario: ActivityScenario<ReadBookActivity>, name: String): ReadingSnapshot {
         val output = context.getExternalFilesDir("ui-regression")!!
@@ -220,11 +231,27 @@ class ReadingLayoutTransitionTest {
                 val page = readView.curPage.textPage
                 val visible = readView.getReadPosition()
                 val pageRange = page.chapterPosition..(page.chapterPosition + page.charSize)
-                result = ReadingSnapshot(offset, bottomPixels, visible?.second?.chapterPosition ?: -1,
-                    pageRange, visible?.second?.text.orEmpty(), page.lines.joinToString("") { it.text })
+                val paragraphs = page.textChapter.paragraphsInternal.filterNot { it.firstLine.isTitle }
+                fun sourcePosition(position: Int): SourcePosition? {
+                    val index = paragraphs.indexOfFirst { position in it.chapterIndices }
+                    if (index < 0) return null
+                    val paragraph = paragraphs[index]
+                    val text = paragraph.text.trimStart()
+                    val id = Regex("第(\\d+)段。").find(text)?.groupValues?.get(1)?.toInt() ?: return null
+                    val indent = paragraph.text.length - text.length
+                    val sourceOffset = (position - paragraph.chapterPosition - indent).coerceAtLeast(0)
+                    val context = paragraphs.drop(index).joinToString("\n") { it.text.trimStart() }
+                        .drop(sourceOffset).take(96)
+                    return SourcePosition(id, sourceOffset, context)
+                }
+                result = ReadingSnapshot(offset, bottomPixels,
+                    visible?.second?.chapterPosition?.let(::sourcePosition),
+                    sourcePosition(ReadBook.durChapterPos),
+                    page.lines.any { ReadBook.durChapterPos in it.chapterIndices && it.isVisible(offset.toFloat()) })
                 File(output, "$name.txt").writeText("scroll=${readView.isScroll} offset=$offset bottomPixels=$bottomPixels\n" +
                     "view=${view.width}x${view.height} provider=${ChapterProvider.viewWidth}x${ChapterProvider.viewHeight}\n" +
                     "visibleChapter=${visible?.first} visiblePosition=${visible?.second?.chapterPosition} visibleText=${visible?.second?.text} pageRange=$pageRange animating=${readView.pageDelegate?.isRunning}\n" +
+                    "sourcePosition=$result\n" +
                     "pageIndex=${page.index} height=${page.height} position=${ReadBook.durChapterPos} lines=" +
                     page.lines.map { "${it.lineTop}:${it.lineBottom}:${it.text}" }.joinToString("\n"))
             } finally { bitmap.recycle() }

@@ -35,17 +35,18 @@ class ScrollReadPositionContractTest {
         val savePosition = readView.substringAfter("fun updateScrollReadPosition(")
             .substringBefore("fun getReadAloudPos()")
         assertTrue(savePosition.contains("getReadPosition()"))
-        assertTrue(savePosition.contains("!isScroll || ReadBook.msg != null || !ReadBook.isLayoutAvailable"))
+        assertTrue(savePosition.contains("ReadBook.msg != null || !ReadBook.isLayoutAvailable"))
+        assertTrue(savePosition.contains("if (isScroll || preserveText)"))
         assertTrue(savePosition.contains("ReadBook.durChapterPos = line.chapterPosition"))
         assertTrue(activity.contains("resetPageOffset = ReadBook.isScroll"))
         val configUpdate = activity.substringAfter(
             "observeEvent<ArrayList<Int>>(EventBus.UP_CONFIG)"
         ).substringBefore("observeEvent<Int>(EventBus.ALOUD_STATE)")
         assertTrue(configUpdate.contains("if (5 in values && isInitFinish)"))
-        assertTrue(
-            configUpdate.indexOf("updateScrollReadPosition()") <
-                configUpdate.indexOf("values.forEach")
-        )
+        val capturePosition = configUpdate.indexOf("updateScrollReadPosition(")
+        val applyConfig = configUpdate.indexOf("values.forEach")
+        assertTrue(capturePosition >= 0)
+        assertTrue(applyConfig > capturePosition)
         assertTrue(
             configUpdate.contains(
                 "readPositionVersion = readView.getReadPositionVersion()"
