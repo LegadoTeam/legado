@@ -150,3 +150,14 @@ private fun SharedPreferences.Editor.putValue(key: String, value: Any?) {
         is Set<*> -> putStringSet(key, value.filterIsInstance<String>().toSet())
     }
 }
+
+private fun android.content.SharedPreferences.Editor.putValue(key: String, value: Any?) {
+    when (value) {
+        is Boolean -> putBoolean(key, value)
+        is Int -> putInt(key, value)
+        is Long -> putLong(key, value)
+        is Float -> putFloat(key, value)
+        is String -> putString(key, value)
+        is Set<*> -> putStringSet(key, value.filterIsInstance<String>().toSet())
+    }
+}
