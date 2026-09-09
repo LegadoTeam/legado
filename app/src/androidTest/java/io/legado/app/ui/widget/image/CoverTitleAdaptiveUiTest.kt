@@ -1,6 +1,7 @@
 package io.legado.app.ui.widget.image
 
 import android.content.Intent
+import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import java.io.File
@@ -136,5 +137,16 @@ class CoverTitleAdaptiveUiTest {
         val values = IntArray(width * height)
         getPixels(values, 0, width, 0, 0, width, height)
         return values
+    }
+}
+
+private fun SharedPreferences.Editor.putValue(key: String, value: Any?) {
+    when (value) {
+        is Boolean -> putBoolean(key, value)
+        is Int -> putInt(key, value)
+        is Long -> putLong(key, value)
+        is Float -> putFloat(key, value)
+        is String -> putString(key, value)
+        is Set<*> -> putStringSet(key, value.filterIsInstance<String>().toSet())
     }
 }
