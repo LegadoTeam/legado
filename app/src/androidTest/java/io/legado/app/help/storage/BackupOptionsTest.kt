@@ -288,6 +288,7 @@ class BackupOptionsTest {
             fragment.scrollToPreference(key)
         }
         instrumentation.waitForIdleSync()
+        screenshot("backup-before-click-$key")
         onView(withText(title)).perform(click())
     }
 

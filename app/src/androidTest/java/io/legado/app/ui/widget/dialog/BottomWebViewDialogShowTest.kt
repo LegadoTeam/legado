@@ -141,6 +141,21 @@ class BottomWebViewDialogShowTest {
                     as android.view.ViewGroup).getChildAt(0) as WebView
                 web.title == "Request 2" && web.progress == 100
             })
+            awaitGeometry { it.height > 0 && it.top < it.parentHeight && it.bottomGap == 0 }
+            val drawn = CountDownLatch(1)
+            scenario!!.onActivity {
+                val dialog = manager.fragments.filterIsInstance<BottomWebViewDialog>()
+                    .single { it.dialog?.isShowing == true }
+                val web = (dialog.requireView().findViewById<View>(io.legado.app.R.id.web_view_container)
+                    as android.view.ViewGroup).getChildAt(0) as WebView
+                web.postVisualStateCallback(0, object : WebView.VisualStateCallback() {
+                    override fun onComplete(requestId: Long) {
+                        web.postOnAnimation { web.postOnAnimation { drawn.countDown() } }
+                    }
+                })
+            }
+            assertTrue("The dynamic page must reach the compositor before capture",
+                drawn.await(5, TimeUnit.SECONDS))
             screenshot("custom-button-dynamic-reopened")
         } finally {
             release.countDown()
