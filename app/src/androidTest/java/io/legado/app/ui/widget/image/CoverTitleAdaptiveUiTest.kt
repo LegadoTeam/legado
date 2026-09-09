@@ -1,16 +1,23 @@
 package io.legado.app.ui.widget.image
 
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import java.io.File
 import android.widget.FrameLayout
 import androidx.test.core.app.ActivityScenario
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.constant.PreferKey
 import io.legado.app.help.config.AppConfig
 import io.legado.app.model.BookCover
 import io.legado.app.ui.about.AboutActivity
+import io.legado.app.ui.config.ConfigActivity
+import io.legado.app.ui.config.ConfigTag
+import io.legado.app.R
 import io.legado.app.utils.defaultSharedPreferences
 import org.junit.After
 import org.junit.Assert.assertFalse
@@ -62,17 +69,37 @@ class CoverTitleAdaptiveUiTest {
 
     @Test
     fun adaptiveToggleChangesTheActualRenderedCover() {
-        val adaptive = renderedCover()
-        screenshot("cover-title-adaptive-on")
-        preferences.edit().putBoolean(PreferKey.coverTitleAdaptive, false).commit()
-        instrumentation.runOnMainSync {
-            BookCover.upDefaultCover()
-            cover!!.invalidate()
+        for (horizontal in listOf(false, true)) {
+            preferences.edit().putBoolean(PreferKey.coverHorizontal, horizontal)
+                .putBoolean(PreferKey.coverTitleAdaptive, true).commit()
+            instrumentation.runOnMainSync { BookCover.upDefaultCover(); cover!!.invalidate() }
+            val adaptive = renderedCover()
+            screenshot("cover-title-${if (horizontal) "horizontal" else "vertical"}-on")
+            preferences.edit().putBoolean(PreferKey.coverTitleAdaptive, false).commit()
+            instrumentation.runOnMainSync { BookCover.upDefaultCover(); cover!!.invalidate() }
+            val fixed = renderedCover()
+            screenshot("cover-title-${if (horizontal) "horizontal" else "vertical"}-off")
+            assertFalse("adaptive setting must change rendered title pixels, horizontal=$horizontal",
+                adaptive.contentEquals(fixed))
+            assertTrue("both renders contain visible cover pixels", adaptive.any { it != 0 } && fixed.any { it != 0 })
         }
-        val fixed = renderedCover()
-        screenshot("cover-title-adaptive-off")
-        assertFalse("adaptive setting must change rendered title pixels", adaptive.contentEquals(fixed))
-        assertTrue("both renders contain visible cover pixels", adaptive.any { it != 0 } && fixed.any { it != 0 })
+    }
+
+    @Test
+    fun coverSettingsToggleUpdatesRuntimeImmediately() {
+        scenario?.close()
+        scenario = null
+        ActivityScenario.launch<ConfigActivity>(Intent(context, ConfigActivity::class.java)
+            .putExtra("configTag", ConfigTag.COVER_CONFIG)).use {
+            onView(withText(R.string.cover_title_adaptive)).perform(click())
+            assertFalse(preferences.getBoolean(PreferKey.coverTitleAdaptive, true))
+            assertFalse(BookCover.adaptiveTitleSize)
+            screenshot("cover-title-setting-off")
+            onView(withText(R.string.cover_title_adaptive)).perform(click())
+            assertTrue(preferences.getBoolean(PreferKey.coverTitleAdaptive, false))
+            assertTrue(BookCover.adaptiveTitleSize)
+            screenshot("cover-title-setting-on")
+        }
     }
 
     private fun screenshot(name: String) {
