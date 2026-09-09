@@ -14,7 +14,6 @@ import android.util.Base64
 import android.util.LruCache
 import android.util.TypedValue
 import android.view.Gravity
-import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -29,12 +28,15 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.annotation.Keep
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.net.toUri
 import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import io.legado.app.R
 import io.legado.app.constant.AppConst
@@ -338,7 +340,22 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
 
     @Suppress("DEPRECATION")
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-        val dialog = super.onCreateDialog(savedInstanceState)
+        val dialog = object : BottomSheetDialog(requireContext(), theme) {
+            private var backCallback: OnBackPressedCallback? = null
+
+            override fun onAttachedToWindow() {
+                super.onAttachedToWindow()
+                // Material registers its sheet callback during attachment. Register after it
+                // so both system gestures and keys use the browser's fullscreen/history logic.
+                backCallback = onBackPressedDispatcher.addCallback { navigateBack() }
+            }
+
+            override fun onDetachedFromWindow() {
+                backCallback?.remove()
+                backCallback = null
+                super.onDetachedFromWindow()
+            }
+        }
         dialog.window?.let { window ->
             window.decorView.systemUiVisibility = activity?.window?.decorView?.systemUiVisibility ?: 0
             window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
@@ -525,7 +542,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                 }
             }
             config.dismissOnTouchOutside?.let { touchOutside ->
-                isCancelable = touchOutside
+                dialog.setCanceledOnTouchOutside(touchOutside)
             }
             config.hardwareAccelerated?.let { hwAccel ->
                 if (hwAccel) {
@@ -871,51 +888,48 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                 }
             }
         }
-        dialog?.setOnKeyListener { _, keyCode, event ->
-            if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
-                if (binding.customWebView.size > 0) { //网页全屏
-                    customWebViewCallback?.onCustomViewHidden()
-                    return@setOnKeyListener true
-                }
-                if (currentWebView.canGoBack()) {
-                    val list = currentWebView.copyBackForwardList()
-                    val size = list.size
-                    if (size == 1) {
-                        dismiss()
-                        return@setOnKeyListener true
-                    }
-                    val currentIndex = list.currentIndex
-                    val currentItem = list.currentItem
-                    val currentUrl = currentItem?.originalUrl ?: BLANK_HTML
-                    val currentTitle = currentItem?.title
-                    var steps = 1
-                    for (i in currentIndex - 1 downTo 0) {
-                        val item = list.getItemAtIndex(i)
-                        val itemUrl = item.originalUrl
-                        if (itemUrl == BLANK_HTML) {
-                            dismiss()
-                            return@setOnKeyListener true
-                        }
-                        if (itemUrl != currentUrl || currentTitle != item.title) {
-                            break
-                        }
-                        if (currentUrl == DATA_HTML) {
-                            break
-                        }
-                        steps++
-                    }
-                    if (steps == size) {
-                        dismiss()
-                        return@setOnKeyListener true
-                    }
-                    currentWebView.goBackOrForward(-steps)
-                    return@setOnKeyListener true
-                }
-                dismiss()
-                return@setOnKeyListener true
-            }
-            false
+    }
+
+    private fun navigateBack() {
+        if (binding.customWebView.size > 0) { //网页全屏
+            customWebViewCallback?.onCustomViewHidden()
+            return
         }
+        if (currentWebView.canGoBack()) {
+            val list = currentWebView.copyBackForwardList()
+            val size = list.size
+            if (size == 1) {
+                dismiss()
+                return
+            }
+            val currentIndex = list.currentIndex
+            val currentItem = list.currentItem
+            val currentUrl = currentItem?.originalUrl ?: BLANK_HTML
+            val currentTitle = currentItem?.title
+            var steps = 1
+            for (i in currentIndex - 1 downTo 0) {
+                val item = list.getItemAtIndex(i)
+                val itemUrl = item.originalUrl
+                if (itemUrl == BLANK_HTML) {
+                    dismiss()
+                    return
+                }
+                if (itemUrl != currentUrl || currentTitle != item.title) {
+                    break
+                }
+                if (currentUrl == DATA_HTML) {
+                    break
+                }
+                steps++
+            }
+            if (steps == size) {
+                dismiss()
+                return
+            }
+            currentWebView.goBackOrForward(-steps)
+            return
+        }
+        dismiss()
     }
 
     private fun initWebView(
