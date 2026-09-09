@@ -18,6 +18,7 @@ import com.bumptech.glide.load.resource.bitmap.CenterCrop
 import com.bumptech.glide.load.resource.bitmap.RoundedCorners
 import com.bumptech.glide.request.RequestOptions
 import io.legado.app.R
+import io.legado.app.constant.PreferKey
 import io.legado.app.base.BaseActivity
 import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.base.adapter.RecyclerAdapter
@@ -43,6 +44,7 @@ import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getCompatDrawable
 import io.legado.app.utils.getInt
+import io.legado.app.utils.getPrefString
 import io.legado.app.utils.putInt
 import io.legado.app.utils.startActivityForBook
 import io.legado.app.utils.viewbindingdelegate.viewBinding
@@ -101,6 +103,7 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
         menu.findItem(R.id.menu_simple_layout)?.isChecked = AppConfig.readRecordSimpleLayout
         menu.findItem(R.id.menu_use_days)?.isChecked = AppConfig.readRecordUseDays
         menu.findItem(R.id.menu_show_seconds)?.isChecked = AppConfig.readRecordShowSeconds
+        menu.findItem(R.id.menu_fixed_card)?.isChecked = AppConfig.readRecordFixedCard
         when (sortMode) {
             1 -> menu.findItem(R.id.menu_sort_read_long)?.isChecked = true
             2 -> menu.findItem(R.id.menu_sort_read_time)?.isChecked = true
@@ -148,6 +151,11 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
                 initData()
             }
 
+            R.id.menu_fixed_card -> {
+                AppConfig.readRecordFixedCard = !AppConfig.readRecordFixedCard
+                recreate()
+            }
+
             R.id.menu_clear_record -> clearRecords()
         }
         return super.onCompatOptionsItemSelected(item)
@@ -163,6 +171,10 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
         binding.tvBookName.setText(R.string.all_read_time)
         binding.tvRemove.setOnClickListener {
             clearRecords()
+        }
+        if (!AppConfig.readRecordFixedCard) {
+            (binding.enhancedSummary.root.parent as ViewGroup).removeView(binding.enhancedSummary.root)
+            adapter.addHeaderView { binding.enhancedSummary }
         }
         binding.recyclerView.adapter = adapter
         binding.recyclerView.applyNavigationBarPadding()
@@ -245,6 +257,10 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
 
     private fun loadCover(image: ImageView, record: ReadRecordShow) {
         val placeholder = getCompatDrawable(R.drawable.read_record_cover_placeholder)
+        val fallback = getPrefString(if (AppConfig.isNightTheme) PreferKey.readRecordCoverDark else PreferKey.readRecordCover)
+        val fallbackRequest = ImageLoader.load(this, fallback)
+            .error(placeholder)
+            .transform(CenterCrop(), RoundedCorners(4.dpToPx()))
         val book = booksByIdentity[record.bookName to record.author]
         val cover = book?.getDisplayCover()?.takeIf { it.isNotBlank() } ?: record.coverUrl
         var options = RequestOptions().set(
@@ -259,7 +275,7 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
             .placeholder(placeholder)
             .error(ImageLoader.load(this, record.coverUrl)
                 .apply(options)
-                .error(placeholder)
+                .error(fallbackRequest)
                 .transform(CenterCrop(), RoundedCorners(4.dpToPx())))
             .transform(CenterCrop(), RoundedCorners(4.dpToPx()))
             .into(image)
@@ -331,7 +347,7 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
         override fun registerListener(holder: ItemViewHolder, binding: ItemReadRecordDisplayBinding) {
             binding.apply {
                 root.setOnClickListener {
-                    val item = getItem(holder.layoutPosition) ?: return@setOnClickListener
+                    val item = getItemByLayoutPosition(holder.layoutPosition) ?: return@setOnClickListener
                     lifecycleScope.launch {
                         val book = withContext(IO) {
                             appDb.bookDao.findByName(item.bookName)
@@ -346,12 +362,12 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
                     }
                 }
                 compact.tvRemove.setOnClickListener {
-                    getItem(holder.layoutPosition)?.let { item ->
+                    getItemByLayoutPosition(holder.layoutPosition)?.let { item ->
                         sureDelAlert(item)
                     }
                 }
                 enhanced.ivRemove.setOnClickListener {
-                    getItem(holder.layoutPosition)?.let { item ->
+                    getItemByLayoutPosition(holder.layoutPosition)?.let { item ->
                         sureDelAlert(item)
                     }
                 }

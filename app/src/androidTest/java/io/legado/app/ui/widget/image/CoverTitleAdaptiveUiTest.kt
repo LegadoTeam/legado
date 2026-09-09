@@ -1,6 +1,10 @@
 package io.legado.app.ui.widget.image
 
 import android.content.Intent
+import android.app.Activity
+import android.app.Instrumentation
+import android.net.Uri
+import android.os.SystemClock
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -18,11 +22,17 @@ import io.legado.app.model.BookCover
 import io.legado.app.ui.about.AboutActivity
 import io.legado.app.ui.config.ConfigActivity
 import io.legado.app.ui.config.ConfigTag
+import io.legado.app.ui.config.CoverConfigFragment
+import io.legado.app.ui.file.HandleFileActivity
+import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.R
 import io.legado.app.utils.defaultSharedPreferences
+import io.legado.app.utils.externalFiles
 import org.junit.After
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertArrayEquals
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -83,6 +93,60 @@ class CoverTitleAdaptiveUiTest {
             assertFalse("adaptive setting must change rendered title pixels, horizontal=$horizontal",
                 adaptive.contentEquals(fixed))
             assertTrue("both renders contain visible cover pixels", adaptive.any { it != 0 } && fixed.any { it != 0 })
+        }
+    }
+
+    @Test
+    fun recordCoverPreferencesCopyBothSelectedImagesThroughTheActivityResult() {
+        scenario?.close()
+        scenario = null
+        preferences.edit().remove(PreferKey.readRecordCover).remove(PreferKey.readRecordCoverDark).commit()
+        val image = File.createTempFile("record-cover-selection", ".png", context.cacheDir)
+        Bitmap.createBitmap(40, 60, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(android.graphics.Color.rgb(49, 123, 191))
+            image.outputStream().use { compress(Bitmap.CompressFormat.PNG, 100, it) }
+            recycle()
+        }
+        val existing = File(context.externalFiles, "covers").listFiles()?.map { it.name }.orEmpty().toSet()
+        val copied = mutableSetOf<File>()
+        var selections = 0
+        val monitor = object : Instrumentation.ActivityMonitor() {
+            override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? {
+                if (intent.component?.className != HandleFileActivity::class.java.name) return null
+                assertEquals(HandleFileContract.IMAGE, intent.getIntExtra("mode", -1))
+                selections++
+                return Instrumentation.ActivityResult(Activity.RESULT_OK, Intent().setData(Uri.fromFile(image)))
+            }
+        }
+        instrumentation.addMonitor(monitor)
+        try {
+            ActivityScenario.launch<ConfigActivity>(Intent(context, ConfigActivity::class.java)
+                .putExtra("configTag", ConfigTag.COVER_CONFIG)).use { settings ->
+                for ((key, label) in listOf(PreferKey.readRecordCover to R.string.read_record_cover_day,
+                    PreferKey.readRecordCoverDark to R.string.read_record_cover_night)) {
+                    settings.onActivity {
+                        (it.supportFragmentManager.findFragmentByTag(ConfigTag.COVER_CONFIG) as CoverConfigFragment)
+                            .scrollToPreference(key)
+                    }
+                    onView(withText(label)).perform(click())
+                    val deadline = SystemClock.uptimeMillis() + 5000
+                    while (preferences.getString(key, null) == null && SystemClock.uptimeMillis() < deadline) {
+                        instrumentation.waitForIdleSync()
+                        SystemClock.sleep(50)
+                    }
+                    val path = checkNotNull(preferences.getString(key, null))
+                    val file = File(path)
+                    if (file.name !in existing) copied.add(file)
+                    assertEquals(File(context.externalFiles, "covers"), file.parentFile)
+                    assertArrayEquals(image.readBytes(), file.readBytes())
+                }
+                assertEquals(2, selections)
+                screenshot("reading-history-cover-settings")
+            }
+        } finally {
+            instrumentation.removeMonitor(monitor)
+            copied.forEach { it.delete() }
+            image.delete()
         }
     }
 

@@ -1697,6 +1697,10 @@
     <string name="read_record_use_days">按天统计</string>
     <string name="read_record_show_seconds">显示秒数</string>
     <string name="read_record_clear">清除记录</string>
+    <string name="read_record_fixed_card">固定卡片</string>
+    <string name="read_record_covers">阅读记录封面</string>
+    <string name="read_record_cover_day">日间默认封面</string>
+    <string name="read_record_cover_night">夜间默认封面</string>
     <string name="read_record_achievement">累计阅读成就</string>
     <string name="read_record_book_count">已读 %1$d 本书</string>
     <string name="read_record_total_duration">共阅读 %1$s</string>
