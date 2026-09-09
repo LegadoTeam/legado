@@ -141,13 +141,21 @@ class BottomWebViewDialogShowTest {
                     as android.view.ViewGroup).getChildAt(0) as WebView
                 web.title == "Request 2" && web.progress == 100
             })
-            awaitGeometry { it.height > 0 && it.top < it.parentHeight && it.bottomGap == 0 }
+            // A collapsed sheet extends below its parent; check its visible resting state.
+            awaitGeometry {
+                it.state == BottomSheetBehavior.STATE_COLLAPSED &&
+                        it.height > 0 && it.top in 0 until it.parentHeight
+            }
             val drawn = CountDownLatch(1)
             scenario!!.onActivity {
                 val dialog = manager.fragments.filterIsInstance<BottomWebViewDialog>()
                     .single { it.dialog?.isShowing == true }
                 val web = (dialog.requireView().findViewById<View>(io.legado.app.R.id.web_view_container)
                     as android.view.ViewGroup).getChildAt(0) as WebView
+                val visible = Rect()
+                assertTrue("The reopened WebView must occupy visible screen space",
+                    web.isShown && web.getGlobalVisibleRect(visible) &&
+                            visible.width() > 0 && visible.height() > 0)
                 web.postVisualStateCallback(0, object : WebView.VisualStateCallback() {
                     override fun onComplete(requestId: Long) {
                         web.postOnAnimation { web.postOnAnimation { drawn.countDown() } }
