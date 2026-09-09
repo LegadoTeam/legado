@@ -23,6 +23,7 @@ import androidx.test.espresso.action.ViewActions.closeSoftKeyboard
 import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.hasSibling
+import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -81,6 +82,15 @@ class HighlightGroupUiTest {
     }
 
     @Test fun filterRenameMoveAndDeleteUseRealDialogsAndPreserveOtherRules() {
+        onView(withContentDescription(androidx.appcompat.R.string.abc_action_menu_overflow_description))
+            .perform(click())
+        instrumentation.waitForIdleSync()
+        val menuBitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+        try {
+            File(context.getExternalFilesDir("ui-regression"), "highlight-more-menu.png")
+                .outputStream().use { assertTrue(menuBitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+        } finally { menuBitmap.recycle() }
+        pressBack()
         filter("[Characters]")
         awaitRules(dao.all.filter { it.group == "Characters" })
         screenshot("highlight-group-filter")
