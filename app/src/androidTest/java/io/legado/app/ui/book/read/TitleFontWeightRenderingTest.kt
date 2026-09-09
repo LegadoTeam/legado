@@ -9,6 +9,7 @@ import android.graphics.Typeface
 import android.os.Build
 import android.os.SystemClock
 import android.view.View
+import android.view.ViewGroup
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
@@ -282,6 +283,7 @@ class TitleFontWeightRenderingTest {
         imageFile.parentFile!!.mkdirs()
         imageFile.writeText(svg)
         val savedOptimize = AppConfig.optimizeRender
+        var hardwareView: ContentTextView? = null
         try {
             scenario!!.onActivity { activity ->
                 ReadBookConfig.reviewIconSvg = svg
@@ -407,14 +409,22 @@ class TitleFontWeightRenderingTest {
                         }
                         assertEquals("Highlight clipping must not move text or review columns", positions,
                             columns.map { it.start to it.end })
+                        if (optimized && size == 50 && withSpace) {
+                            view.setBackgroundColor(Color.WHITE)
+                            activity.addContentView(view, ViewGroup.LayoutParams(width, height))
+                            assertTrue("The final preview must use hardware rendering", view.isHardwareAccelerated)
+                            hardwareView = view
+                        }
                     } finally {
                         listOf(icons, glyphs, background, result, legacy).forEach(Bitmap::recycle)
                         page.recycleRecorders()
                     }
                 }
             }
+            screenshot("highlight-transparent-hardware")
         } finally {
             instrumentation.runOnMainSync {
+                hardwareView?.let { (it.parent as? ViewGroup)?.removeView(it) }
                 AppConfig.optimizeRender = savedOptimize
                 ImageProvider.remove(imageFile.absolutePath)
             }
