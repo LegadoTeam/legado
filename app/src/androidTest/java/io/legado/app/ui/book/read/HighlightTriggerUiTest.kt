@@ -146,9 +146,14 @@ class HighlightTriggerUiTest {
         assertTrue("The existing preference remains included in backup", BackupConfig.keyIsNotIgnore(PreferKey.highlightActionTrigger))
         screenshot("highlight-trigger-setting")
         pressBack()
-        val alpha = point { it is TextBaseColumn && it.charData == "P" && it.highlightStyle != null }
+        val alpha = point(occurrence = 1) { it is TextBaseColumn && it.charData == "A" && it.highlightStyle != null }
         val omega = point { it is TextBaseColumn && it.charData == "G" && it.highlightStyle != null }
-        val otherAlpha = point(occurrence = 1) { it is TextBaseColumn && it.charData == "P" && it.highlightStyle != null }
+        val otherAlpha = point(occurrence = 2) { it is TextBaseColumn && it.charData == "A" && it.highlightStyle != null }
+        val dx = alpha[0] - otherAlpha[0]
+        val dy = alpha[1] - otherAlpha[1]
+        val slop = ViewConfiguration.get(context).scaledDoubleTapSlop
+        assertTrue("Different occurrences must be close enough to test target identity",
+            dx * dx + dy * dy <= slop * slop)
         val page = ReadBook.durPageIndex
         taps(alpha)
         assertEquals("First tap on a highlight must not turn the page", page, ReadBook.durPageIndex)
