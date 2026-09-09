@@ -73,7 +73,8 @@ class ReadRecordHistoryTest {
 
     @Before
     fun setUp() {
-        prefs.edit().remove("readRecordSimpleLayout").remove("readRecordUseDays").commit()
+        prefs.edit().remove("readRecordSimpleLayout").remove("readRecordUseDays")
+            .remove("readRecordShowSeconds").commit()
         LocalConfig.edit().putInt("readRecordSort", 1).commit()
         appDb.readRecordDao.clear()
         cover = File(context.cacheDir, "history-$id.png")
@@ -104,7 +105,7 @@ class ReadRecordHistoryTest {
         ReadRecordCoverCache.prune()
         cover.delete()
         prefs.edit().apply {
-            for (key in listOf("readRecordSimpleLayout", "readRecordUseDays")) {
+            for (key in listOf("readRecordSimpleLayout", "readRecordUseDays", "readRecordShowSeconds")) {
                 val value = savedPrefs[key]
                 if (value is Boolean) putBoolean(key, value) else remove(key)
             }
@@ -147,6 +148,38 @@ class ReadRecordHistoryTest {
         screenshot("reading-history-enhanced")
         scenario!!.recreate()
         await { it.enhancedSummary.root.isVisible && it.enhancedSummary.tvTotalDuration.text.contains("1天4小时") }
+    }
+
+    @Test
+    fun secondsToggleUpdatesBothLayoutsWithoutChangingStoredDuration() {
+        val record = appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author)!!
+        record.readTime += 123_000L
+        appDb.readRecordDao.update(record)
+        val original = appDb.readRecordDao.all.toSet()
+        launch()
+        await { findRow(it, book.name)?.compact?.tvReadingTime?.text == "25小时2分钟3秒" }
+        scenario!!.onActivity {
+            assertTrue(AppConfig.readRecordShowSeconds)
+            select(it, R.id.menu_show_seconds)
+        }
+        await { it.tvReadingTime.text == "28小时2分钟" &&
+            findRow(it, book.name)?.compact?.tvReadingTime?.text == "25小时2分钟" }
+        scenario!!.onActivity { select(it, R.id.menu_simple_layout) }
+        await { it.enhancedSummary.root.isVisible &&
+            it.enhancedSummary.tvTotalDuration.text.contains("28小时2分钟") &&
+            findRow(it, book.name)?.enhanced?.tvReadingTime?.text == "25小时2分钟" }
+        screenshot("reading-history-minutes")
+        scenario!!.onActivity { select(it, R.id.menu_use_days) }
+        await { it.enhancedSummary.tvTotalDuration.text.contains("1天4小时2分钟") }
+        scenario!!.recreate()
+        await { findRow(it, book.name)?.enhanced?.tvReadingTime?.text == "1天1小时2分钟" }
+        scenario!!.onActivity {
+            assertFalse(AppConfig.readRecordShowSeconds)
+            select(it, R.id.menu_show_seconds)
+        }
+        await { it.enhancedSummary.tvTotalDuration.text.contains("1天4小时2分钟3秒") &&
+            findRow(it, book.name)?.enhanced?.tvReadingTime?.text == "1天1小时2分钟3秒" }
+        assertEquals(original, appDb.readRecordDao.all.toSet())
     }
 
     @Test
@@ -431,6 +464,7 @@ class ReadRecordHistoryTest {
         try {
             AppConfig.readRecordSimpleLayout = false
             AppConfig.readRecordUseDays = true
+            AppConfig.readRecordShowSeconds = false
             writePreferenceSnapshot(context, directory.absolutePath, "config") { putBoolean("enableReadRecord", true) }
             File(directory, "readRecord.json").writeText(GSON.toJson(listOf(ReadRecord(
                 deviceId = "", bookName = book.name, readTime = 30 * 3600_000L, lastRead = 2000,
@@ -439,6 +473,7 @@ class ReadRecordHistoryTest {
             runBlocking(Dispatchers.IO) { Restore.restoreLocked(directory.absolutePath) }
             assertTrue(AppConfig.readRecordSimpleLayout)
             assertFalse(AppConfig.readRecordUseDays)
+            assertTrue(AppConfig.readRecordShowSeconds)
             val restored = appDb.readRecordDao.getRecord(AppConst.androidId, book.name, "")!!
             assertEquals(30 * 3600_000L, restored.readTime)
             assertEquals("Restored chapter", restored.lastChapterTitle)
@@ -456,6 +491,11 @@ class ReadRecordHistoryTest {
             } finally {
                 if (previous != null) BackupConfig.ignoreConfig[BackupConfig.readRecordCoverContentKey] = previous
             }
+            writePreferenceSnapshot(context, directory.absolutePath, "config") {
+                putBoolean("readRecordShowSeconds", false)
+            }
+            runBlocking(Dispatchers.IO) { Restore.restoreLocked(directory.absolutePath) }
+            assertFalse(AppConfig.readRecordShowSeconds)
         } finally {
             directory.deleteRecursively()
         }
