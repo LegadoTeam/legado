@@ -288,7 +288,7 @@ class TitleFontWeightRenderingTest {
                 ReadBookConfig.reviewIconScale = 180
                 val width = activity.findViewById<ReadView>(R.id.read_view).curPage
                     .findViewById<ContentTextView>(R.id.content_text_view).width
-                for (optimized in listOf(false, true)) for (size in listOf(20, 50)) {
+                for (optimized in listOf(false, true)) for (size in listOf(20, 50)) for (withSpace in listOf(false, true)) {
                     AppConfig.optimizeRender = optimized
                     ReadBookConfig.textSize = size
                     ChapterProvider.upStyle()
@@ -296,6 +296,7 @@ class TitleFontWeightRenderingTest {
                     val textSize = ChapterProvider.contentPaint.textSize
                     val iconWidth = ceil(ChapterProvider.getReviewWidth(false))
                     val glyphWidth = ceil(ChapterProvider.contentPaint.measureText("顶"))
+                    val gap = if (withSpace) ceil(glyphWidth / 4) else 0f
                     val lineHeight = ceil(textSize * 2.1f)
                     assertNotNull("The author's SVG must decode through the real review icon provider",
                         ChapterProvider.getReviewIconBitmap(88, iconWidth.toInt(), lineHeight.toInt()))
@@ -305,9 +306,10 @@ class TitleFontWeightRenderingTest {
                     assertEquals(80f / 90f, decodedImage.width.toFloat() / decodedImage.height, 0.03f)
                     val top = ChapterProvider.paddingTop.toFloat()
                     val height = ceil(top + lineHeight * 3).toInt()
-                    val start = floor((width - 2 * iconWidth - 2 * glyphWidth) / 2)
+                    val start = floor((width - 2 * iconWidth - 2 * glyphWidth - 2 * gap) / 2)
                     assertTrue("All text and icons must fit inside the page", start > 0)
-                    val page = TextPage(text = "顶上\n顶上\n顶上", height = height.toFloat())
+                    val rowText = if (withSpace) " 顶上 " else "顶上"
+                    val page = TextPage(text = List(3) { rowText }.joinToString("\n"), height = height.toFloat())
                     for (kind in 0..2) {
                         fun icon(x: Float): BaseColumn = when (kind) {
                             0 -> ReviewColumn(x, x + iconWidth, 88)
@@ -316,13 +318,16 @@ class TitleFontWeightRenderingTest {
                                 """$src,{"style":"text","reviewCount":"88","click":"review"}""")
                         }
                         val y = top + lineHeight * kind
-                        val line = TextLine(text = "顶上", startX = start + iconWidth,
+                        val line = TextLine(text = rowText, startX = start + iconWidth,
                             lineTop = y, lineBase = y + textSize * 1.35f, lineBottom = y + lineHeight)
                         line.addColumn(icon(start))
-                        line.addColumn(TextColumn(start + iconWidth, start + iconWidth + glyphWidth, "顶"))
-                        line.addColumn(TextColumn(start + iconWidth + glyphWidth,
-                            start + iconWidth + 2 * glyphWidth, "上"))
-                        line.addColumn(icon(start + iconWidth + 2 * glyphWidth))
+                        val textStart = start + iconWidth + gap
+                        if (withSpace) line.addColumn(TextColumn(start + iconWidth, textStart, " "))
+                        line.addColumn(TextColumn(textStart, textStart + glyphWidth, "顶"))
+                        line.addColumn(TextColumn(textStart + glyphWidth, textStart + 2 * glyphWidth, "上"))
+                        val textEnd = textStart + 2 * glyphWidth
+                        if (withSpace) line.addColumn(TextColumn(textEnd, textEnd + gap, " "))
+                        line.addColumn(icon(textEnd + gap))
                         page.addLine(line)
                     }
                     page.upRenderHeight()
@@ -333,7 +338,7 @@ class TitleFontWeightRenderingTest {
                     }
                     val columns = page.lines.flatMap { it.columns }
                     val positions = columns.map { it.start to it.end }
-                    val textColumns = columns.filterIsInstance<TextColumn>()
+                    val textColumns = columns.filterIsInstance<TextColumn>().filter { it.charData != " " }
                     val fill = Color.rgb(32, 144, 80)
                     fun render(color: Int, withFill: Boolean): Bitmap {
                         textColumns.forEach {
@@ -352,17 +357,19 @@ class TitleFontWeightRenderingTest {
                         // Negative control: the original expanded capsule behind the same SVG pixels.
                         val canvas = Canvas(legacy)
                         for (line in page.lines) {
+                            val highlighted = line.columns.filterIsInstance<TextColumn>()
+                                .filter { it.charData != " " }
                             val band = HighlightGeometry.fillBand(line.lineBase - line.lineTop,
                                 textSize, line.height, HighlightStyle.FillShape.PILL, 1f.dpToPx())
                             val padding = (band.bottom - band.top) / 2
-                            HighlightDraw.drawFillRun(canvas, line.columns[1].start - padding,
-                                line.columns[2].end + padding, line.lineTop + band.top,
+                            HighlightDraw.drawFillRun(canvas, highlighted.first().start - padding,
+                                highlighted.last().end + padding, line.lineTop + band.top,
                                 line.lineTop + band.bottom, fill, HighlightStyle.FillShape.PILL)
                         }
                         canvas.drawBitmap(icons, 0f, 0f, null)
                         for ((name, bitmap) in listOf("fixed" to result, "original" to legacy)) {
                             File(context.getExternalFilesDir("ui-regression"),
-                                "highlight-transparent-$size-$optimized-$name.png").outputStream().use {
+                                "highlight-transparent-$size-$optimized-$withSpace-$name.png").outputStream().use {
                                 assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
                             }
                         }
@@ -377,7 +384,7 @@ class TitleFontWeightRenderingTest {
                                         if (Color.alpha(before) == 0) transparent++
                                         if (Color.alpha(before) > 240) opaque++
                                         if (legacy.getPixel(x, y) != before) oldOverlap++
-                                        assertEquals("SVG changed: row=$row size=$size optimized=$optimized ($x,$y)",
+                                        assertEquals("SVG changed: row=$row size=$size optimized=$optimized space=$withSpace ($x,$y)",
                                             before, background.getPixel(x, y))
                                     }
                                 }
@@ -386,8 +393,10 @@ class TitleFontWeightRenderingTest {
                                 assertTrue("The original cap must overlap the real transparent SVG", oldOverlap > 0)
                             }
                             var ink = 0
+                            val highlighted = line.columns.filterIsInstance<TextColumn>()
+                                .filter { it.charData != " " }
                             for (y in ceil(line.lineTop).toInt() until floor(line.lineBottom).toInt()) {
-                                for (x in line.columns[1].start.toInt() until line.columns[2].end.toInt()) {
+                                for (x in highlighted.first().start.toInt() until highlighted.last().end.toInt()) {
                                     if (Color.alpha(glyphs.getPixel(x, y)) < 240) continue
                                     ink++
                                     assertTrue("Adjacent icons must not push the cap through text glyphs",

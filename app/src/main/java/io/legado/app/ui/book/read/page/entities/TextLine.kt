@@ -498,17 +498,28 @@ data class TextLine(
             // Keep the end glyphs clear of the capsule's curved border.
             val padding = if (shape == HighlightStyle.FillShape.PILL) (band.bottom - band.top) / 2f else 0f
             val saved = canvas.save()
-            // Clip the expanded cap at adjacent image/review columns without moving
-            // its rounded geometry back through the first or last text glyph.
-            val previous = columns.getOrNull(index - 1)?.takeUnless { it is TextBaseColumn }
-            val next = columns.getOrNull(endIndex)?.takeUnless { it is TextBaseColumn }
-            if (padding > 0f && (previous != null || next != null)) {
-                canvas.clipRect(
-                    maxOf(first.start - padding, previous?.end ?: first.start - padding),
-                    band.top,
-                    minOf(last.end + padding, next?.start ?: last.end + padding),
-                    band.bottom,
-                )
+            // Keep image/review columns clear even across a narrow unhighlighted space.
+            // Only inspect columns within the cap's actual reach.
+            if (padding > 0f) {
+                var left = first.start - padding
+                var right = last.end + padding
+                for (i in index - 1 downTo 0) {
+                    val column = columns[i]
+                    if (column.end <= left) break
+                    if (column !is TextBaseColumn) {
+                        left = maxOf(left, column.end)
+                        break
+                    }
+                }
+                for (i in endIndex until columns.size) {
+                    val column = columns[i]
+                    if (column.start >= right) break
+                    if (column !is TextBaseColumn) {
+                        right = minOf(right, column.start)
+                        break
+                    }
+                }
+                canvas.clipRect(left, band.top, right, band.bottom)
             }
             HighlightDraw.drawFillRun(
                 canvas,
