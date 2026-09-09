@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.SystemClock
 import androidx.core.content.FileProvider
 import androidx.fragment.app.DialogFragment
+import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
@@ -161,7 +162,7 @@ class SharedFileImportTest {
                 onView(withText(R.string.import_bookshelf)).inRoot(isDialog()).check(matches(isDisplayed()))
                 screenshot("share-bookshelf-confirmation")
                 lateinit var model: FileAssociationViewModel
-                scenario.onActivity { model = it.viewModel }
+                scenario.onActivity { model = ViewModelProvider(it)[FileAssociationViewModel::class.java] }
                 onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
                 await { model.importedData.value == true }
                 val book = checkNotNull(appDb.bookDao.getBook(name, author))
@@ -268,7 +269,7 @@ class SharedFileImportTest {
         launchShare(renamed, "application/zip").use { scenario ->
             awaitDialog(scenario)
             lateinit var model: FileAssociationViewModel
-            scenario.onActivity { model = it.viewModel }
+            scenario.onActivity { model = ViewModelProvider(it)[FileAssociationViewModel::class.java] }
             onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
             await { model.importedData.value == true }
             assertEquals("restored value", prefs.getString(marker, null))
@@ -330,8 +331,9 @@ class SharedFileImportTest {
                 val activity = listOf(Stage.CREATED, Stage.STARTED, Stage.RESUMED)
                     .flatMap { ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(it) }
                     .filterIsInstance<FileAssociationActivity>().single()
-                assertNotNull(activity.viewModel.pendingBookUri)
-                activity.viewModel.pendingBookUri = null
+                val model = ViewModelProvider(activity)[FileAssociationViewModel::class.java]
+                assertNotNull(model.pendingBookUri)
+                model.pendingBookUri = null
                 return Instrumentation.ActivityResult(Activity.RESULT_OK,
                     Intent().setData(Uri.fromFile(File(directory, "books"))))
             }
