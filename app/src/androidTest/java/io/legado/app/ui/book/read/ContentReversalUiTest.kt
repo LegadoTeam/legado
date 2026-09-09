@@ -49,6 +49,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -60,6 +61,13 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicIntegerArray
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 
 /** Uses cached online chapters and real reader/menu gestures, with no source requests. */
 @RunWith(AndroidJUnit4::class)
@@ -111,6 +119,10 @@ class ContentReversalUiTest {
         val imageColor = AtomicInteger(Color.RED)
         val bodyRequests = AtomicIntegerArray(7)
         val imageRequests = AtomicIntegerArray(7)
+        val delayNextBody = AtomicBoolean()
+        val obsoleteEntered = CountDownLatch(1)
+        val releaseObsolete = CountDownLatch(1)
+        var obsoleteRead: Deferred<Unit>? = null
         var base = ""
         fun body(index: Int, version: Int) =
             "<img src=\"$base/image/$index.png\">\n" +
@@ -135,8 +147,13 @@ class ContentReversalUiTest {
                     val bytes = png(imageColor.get())
                     newFixedLengthResponse(Response.Status.OK, "image/png", bytes.inputStream(), bytes.size.toLong())
                 } else {
+                    val version = bodyVersion.get()
                     bodyRequests.incrementAndGet(index)
-                    newFixedLengthResponse(Response.Status.OK, "text/plain", body(index, bodyVersion.get()))
+                    if (index == 3 && delayNextBody.compareAndSet(true, false)) {
+                        obsoleteEntered.countDown()
+                        check(releaseObsolete.await(15, TimeUnit.SECONDS))
+                    }
+                    newFixedLengthResponse(Response.Status.OK, "text/plain", body(index, version))
                 }.apply { addHeader("Cache-Control", "no-store") }
             }
         }
@@ -196,6 +213,10 @@ class ContentReversalUiTest {
             scenario!!.recreate()
             ready()
             val beforeTheme = ReadBook.curTextChapter
+            BookHelp.delContent(book, refreshChapters[3])
+            delayNextBody.set(true)
+            obsoleteRead = CoroutineScope(Dispatchers.IO).async { ReadBook.loadContentAwait(3); Unit }
+            assertTrue("An obsolete real reader request must be pending", obsoleteEntered.await(5, TimeUnit.SECONDS))
             bodyVersion.set(3)
             refresh()
             ready(beforeTheme)
@@ -203,6 +224,23 @@ class ContentReversalUiTest {
             assertTrue(BookHelp.getContent(book, refreshChapters[3])!!.contains("Version 3"))
             assertTrue(imageRequests.get(3) > 0)
             assertEquals(position, ReadBook.durChapterPos)
+            val refreshedLayout = ReadBook.curTextChapter
+            releaseObsolete.countDown()
+            runBlocking { withTimeout(5000) { obsoleteRead!!.await() } }
+            awaitDraw()
+            assertSame("The completed old response must not replace or cancel the fresh layout",
+                refreshedLayout, ReadBook.curTextChapter)
+            assertTrue(BookHelp.getContent(book, refreshChapters[3])!!.contains("Version 3"))
+            scenario!!.onActivity {
+                assertFalse(it.viewModel.resourceThemeChanged(book))
+                val style = ReadBookConfig.styleSelect
+                try {
+                    ReadBookConfig.styleSelect = (style + 1) % ReadBookConfig.configList.size
+                    assertTrue("Switching reader styles must request resource refresh",
+                        it.viewModel.resourceThemeChanged(book))
+                } finally { ReadBookConfig.styleSelect = style }
+                assertFalse(it.viewModel.resourceThemeChanged(book))
+            }
 
             val outside = listOf(0, 6).associateWith { BookHelp.getContent(book, refreshChapters[it]) }
             bodyVersion.set(4)
@@ -255,6 +293,8 @@ class ContentReversalUiTest {
                     "bodyRequests=${(0..6).map { bodyRequests.get(it) }} " +
                     "imageRequests=${(0..6).map { imageRequests.get(it) }}")
         } finally {
+            releaseObsolete.countDown()
+            obsoleteRead?.cancel()
             scenario?.close()
             scenario = null
             server.stop()
