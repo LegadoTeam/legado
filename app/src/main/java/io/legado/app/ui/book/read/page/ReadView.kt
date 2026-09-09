@@ -7,12 +7,14 @@ import android.graphics.Canvas
 import android.graphics.RectF
 import android.os.Build
 import android.util.AttributeSet
+import android.util.Log
 import android.view.MotionEvent
 import android.view.ViewConfiguration
 import android.view.WindowInsets
 import android.widget.FrameLayout
 import android.widget.Magnifier
 import androidx.annotation.RequiresApi
+import io.legado.app.BuildConfig
 import io.legado.app.R
 import io.legado.app.constant.PageAnim
 import io.legado.app.data.entities.BookProgress
@@ -907,7 +909,11 @@ class ReadView(context: Context, attrs: AttributeSet) :
      * 更新翻页动画
      */
     fun upPageAnim(upRecorder: Boolean = false) {
-        isScroll = ReadBook.pageAnim() == 3
+        val scroll = ReadBook.pageAnim() == PageAnim.scrollPageAnim
+        if (pageDelegate != null) updateScrollReadPosition(preserveText = isScroll != scroll)
+        isScroll = scroll
+        // Runtime changes rebind content; initial inflation must not access Activity callbacks yet.
+        if (pageDelegate != null) curPage.setIsScroll(isScroll)
         ChapterProvider.upLayout()
         when (ReadBook.pageAnim()) {
             PageAnim.coverPageAnim -> if (pageDelegate !is CoverPageDelegate) {
@@ -950,6 +956,9 @@ class ReadView(context: Context, attrs: AttributeSet) :
      * @param resetPageOffset 滚动阅读是是否重置位置
      */
     override fun upContent(relativePosition: Int, resetPageOffset: Boolean) {
+        if (BuildConfig.DEBUG && relativePosition == 0) Log.d("ReadPosition",
+            "bind scroll=$isScroll reset=$resetPageOffset position=${ReadBook.durChapterPos} " +
+                "chapter=${System.identityHashCode(ReadBook.curTextChapter)}")
         post {
             curPage.setContentDescription(pageFactory.curPage.text)
         }
@@ -1084,6 +1093,29 @@ class ReadView(context: Context, attrs: AttributeSet) :
     fun getReadPosition(): Pair<Int, TextLine>? {
         if (replacePreview != null) return null
         return curPage.getReadPosition()
+    }
+
+    fun updateScrollReadPosition(preserveText: Boolean = false) {
+        // The configured mode may already have changed; capture the page still on screen.
+        if (ReadBook.msg != null || !ReadBook.isLayoutAvailable) return
+        // A replacement chapter can finish before its final UI bind runs.
+        if (curPage.textPage.textChapter !== ReadBook.curTextChapter) return
+        if (BuildConfig.DEBUG) Log.d("ReadPosition",
+            "capture scroll=$isScroll preserve=$preserveText position=${ReadBook.durChapterPos} " +
+                "visible=${getReadPosition()?.second?.chapterPosition} " +
+                "chapter=${System.identityHashCode(ReadBook.curTextChapter)}")
+        if (isScroll || (preserveText && ReadBook.isScroll)) {
+            val (chapterIndex, line) = getReadPosition() ?: return
+            if (chapterIndex != ReadBook.durChapterIndex) return
+            // A second size/config callback must retain the restored character if
+            // wrapping only moved it within the first visible line.
+            if (!preserveText || ReadBook.durChapterPos !in line.chapterIndices) {
+                ReadBook.durChapterPos = line.chapterPosition
+            }
+        }
+        // Horizontal pages contain the saved character anywhere on the page. A
+        // repeated config/size callback must not replace it with that page's start.
+        if (preserveText) ReadBook.preserveCurrentPositionForRefresh()
     }
 
     fun getReadAloudPos(): Pair<Int, TextLine>? {
