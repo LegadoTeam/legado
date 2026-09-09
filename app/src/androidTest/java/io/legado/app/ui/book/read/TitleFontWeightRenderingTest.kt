@@ -54,6 +54,7 @@ import io.legado.app.utils.dpToPx
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -296,6 +297,12 @@ class TitleFontWeightRenderingTest {
                     val iconWidth = ceil(ChapterProvider.getReviewWidth(false))
                     val glyphWidth = ceil(ChapterProvider.contentPaint.measureText("顶"))
                     val lineHeight = ceil(textSize * 2.1f)
+                    assertNotNull("The author's SVG must decode through the real review icon provider",
+                        ChapterProvider.getReviewIconBitmap(88, iconWidth.toInt(), lineHeight.toInt()))
+                    val decodedImage = ImageProvider.getImage(book!!, src, iconWidth.toInt(), lineHeight.toInt())
+                    assertEquals("The image column must decode the SVG instead of using an error placeholder",
+                        iconWidth.toInt(), decodedImage.width)
+                    assertEquals(80f / 90f, decodedImage.width.toFloat() / decodedImage.height, 0.03f)
                     val top = ChapterProvider.paddingTop.toFloat()
                     val height = ceil(top + lineHeight * 3).toInt()
                     val start = floor((width - 2 * iconWidth - 2 * glyphWidth) / 2)
