@@ -19,6 +19,7 @@ import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
+import io.legado.app.help.book.PendingResourceChapter
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isLocalModified
 import io.legado.app.help.book.removeType
@@ -73,6 +74,7 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
     private var changeSourceCoroutine: Coroutine<*>? = null
     private var resourceRefreshCoroutine: Coroutine<*>? = null
     private var resourceTheme: Pair<String, List<Int>>? = null
+    private val refreshedResourceThemes = java.util.concurrent.ConcurrentHashMap<Int, Pair<String, List<Int>>>()
 
     init {
         AppConfig.detectClickArea()
@@ -137,7 +139,10 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
     }
 
     private suspend fun initBook(book: Book) {
-        if (resourceTheme?.first != book.bookUrl) resourceTheme = currentResourceTheme(book)
+        if (resourceTheme?.first != book.bookUrl) {
+            resourceTheme = currentResourceTheme(book)
+            refreshedResourceThemes.clear()
+        }
         val isSameBook = ReadBook.book?.bookUrl == book.bookUrl
         if (isSameBook) {
             ReadBook.upData(book)
@@ -434,8 +439,10 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
         if (AppConfig.isNightTheme) 1 else 0, if (AppConfig.isEInkMode) 1 else 0,
     )
 
-    fun resourceThemeChanged(book: Book): Boolean =
-        resourceTheme != null && resourceTheme != currentResourceTheme(book)
+    fun resourceThemeChanged(book: Book): Boolean {
+        val previous = refreshedResourceThemes[ReadBook.durChapterIndex] ?: resourceTheme
+        return previous != null && previous != currentResourceTheme(book)
+    }
 
     fun refreshResources(book: Book, includePreloaded: Boolean) {
         val source = ReadBook.bookSource ?: return
@@ -443,50 +450,58 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
         val before = if (includePreloaded) maxOf(1, minOf(5, AppConfig.preDownloadNum)) else 0
         val after = if (includePreloaded) maxOf(1, AppConfig.preDownloadNum) else 0
         val indexes = maxOf(0, currentIndex - before)..minOf(ReadBook.chapterSize - 1, currentIndex + after)
-        val images = ReadBook.resourceImageSources(indexes).toMutableSet()
+        val oldImages = ReadBook.resourceImageSources(indexes)
         val theme = currentResourceTheme(book)
         resourceRefreshCoroutine?.cancel()
         resourceRefreshCoroutine = execute {
             val chapters = appDb.bookChapterDao.getChapterList(book.bookUrl, indexes.first, indexes.last)
-            chapters.forEach { chapter ->
-                BookHelp.getContent(book, chapter)?.let { content ->
+                .filterNot { it.isVolume }
+            val tokens = chapters.associate { it.index to BookHelp.contentSaveToken(book, it) }
+            val staging = BookHelp.resourceStagingDir(book)
+            try {
+                val images = linkedSetOf<String>()
+                val prepared = chapters.sortedBy { kotlin.math.abs(it.index - currentIndex) }.map { original ->
+                    ensureActive()
+                    val chapter = original.copy().apply { deferUpdates = true }
+                    val content = WebBook.getContentAwait(source, book, chapter, needSave = false)
+                    if (content.isBlank()) throw NoStackTraceException("刷新正文为空：${chapter.title}")
+                    chapter.imgUrl?.takeIf { it.isNotBlank() }?.let { images.add(it) }
                     BookHelp.flowImages(chapter, content).collect { images.add(it) }
-                    val processed = ContentProcessor.get(book).getContent(book, chapter, content,
-                        includeTitle = false)
+                    val (_, processed) = ReadBook.processChapterContent(book, chapter, content)
                     BookHelp.flowImages(chapter, processed.textList.joinToString("\n"))
                         .collect { images.add(it) }
+                    PendingResourceChapter(chapter, tokens.getValue(chapter.index), original.getFileName(),
+                        content, File(staging, "chapter-${chapter.index}").apply { writeText(content) })
                 }
-            }
-            chapters.forEach { chapter ->
-                ensureActive()
-                BookHelp.delContent(book, chapter)
-            }
-            CacheBook.invalidateChapters(book.bookUrl, indexes)
-            withContext(Main) {
-                if (ReadBook.book?.bookUrl == book.bookUrl) {
+                val imageTokens = images.associateWith { BookHelp.imageSaveVersion(book, it) }
+                val preparedImages = images.withIndex().associate { (index, src) ->
+                    ensureActive()
+                    val bytes = BookHelp.fetchImage(source, book, src)
+                    if (bytes == null || !BookHelp.checkImage(bytes)) {
+                        throw NoStackTraceException("刷新图片失败：$src")
+                    }
+                    src to File(staging, "image-$index").apply { writeBytes(bytes) }
+                }
+                withContext(Main) {
+                    ensureActive()
+                    if (ReadBook.book?.bookUrl != book.bookUrl || currentResourceTheme(book) != theme) {
+                        throw NoStackTraceException("书籍或主题已变化，请重新刷新")
+                    }
+                    // No suspension during publication: old layouts/caches survive every download failure.
+                    ImageProvider.replaceResources(book, oldImages + images) {
+                        BookHelp.commitResources(book, prepared, preparedImages, imageTokens)
+                    }
+                    CacheBook.invalidateChapters(book.bookUrl, indexes)
                     ReadBook.clearResourceChapters(indexes)
                     ReadBook.callBack?.upContent()
-                }
-                // Evict/recycle only between UI frames, after detaching the old layouts.
-                images.forEach { src ->
-                    ensureActive()
-                    ImageProvider.clearImage(book, src)
-                }
-                if (ReadBook.book?.bookUrl == book.bookUrl) {
+                    prepared.forEach { refreshedResourceThemes[it.chapter.index] = theme }
                     if (ReadBook.durChapterIndex in indexes) ReadBook.loadContent(false)
                 }
+            } finally {
+                staging.deleteRecursively()
             }
-            // Explicit refresh also fetches images for chapters beyond the three rendered layouts.
-            chapters.sortedBy { kotlin.math.abs(it.index - currentIndex) }.forEach { chapter ->
-                ensureActive()
-                if (!chapter.isVolume) {
-                    val result = CacheBook.getOrCreate(source, book).downloadAwait(chapter)
-                    val content = BookHelp.getContent(book, chapter) ?: throw NoStackTraceException(result)
-                    BookHelp.saveImages(source, book, chapter, content)
-                }
-            }
-        }.onSuccess {
-            if (ReadBook.book?.bookUrl == book.bookUrl) resourceTheme = theme
+        }.onError {
+            AppLog.put("刷新资源失败\n${it.localizedMessage}", it, true)
         }
     }
 

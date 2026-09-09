@@ -70,11 +70,24 @@ data class ContentSaveToken internal constructor(
     val version: Long,
 )
 
+internal data class PendingResourceChapter(
+    val chapter: BookChapter,
+    val token: ContentSaveToken,
+    val oldFileName: String,
+    val content: String,
+    val file: File,
+)
+
 internal class ContentSaveFence {
     private val states = ConcurrentHashMap<ContentSaveKey, ContentSaveState>()
 
+    @Synchronized
     fun state(key: ContentSaveKey): ContentSaveState = states[key] ?: ContentSaveState()
 
+    // ponytail: serialize cache publication; use per-book locks if disk contention becomes measurable.
+    fun <T> exclusive(block: () -> T): T = synchronized(this, block)
+
+    @Synchronized
     fun writeIfCurrent(
         key: ContentSaveKey,
         expectedVersion: Long,
@@ -94,6 +107,7 @@ internal class ContentSaveFence {
         return written
     }
 
+    @Synchronized
     fun replace(key: ContentSaveKey, fileName: String, write: () -> Unit) {
         var failure: Throwable? = null
         states.compute(key) { _, current ->
@@ -354,6 +368,63 @@ object BookHelp {
     internal fun isContentSaveCurrent(token: ContentSaveToken): Boolean =
         contentSaveFence.state(token.key).version == token.version
 
+    internal fun resourceStagingDir(book: Book): File {
+        val parent = FileUtils.createFolderIfNotExist(downloadDir, cacheFolderName, book.getFolderName())
+        return File.createTempFile(".resource-refresh-", ".tmp", parent).apply {
+            if (!delete() || !mkdir()) throw IOException("Cannot prepare resource refresh")
+        }
+    }
+
+    @Synchronized
+    internal fun imageSaveVersion(book: Book, src: String): Long =
+        imageVersions[getImage(book, src).absolutePath] ?: 0L
+
+    internal fun commitResources(
+        book: Book,
+        chapters: List<PendingResourceChapter>,
+        images: Map<String, File>,
+        imageTokens: Map<String, Long>,
+    ) = contentSaveFence.exclusive { synchronized(this) {
+        if (chapters.any { !isContentSaveCurrent(it.token) || it.token.folderName != book.getFolderName() ||
+                it.token.key.bookUrl != book.bookUrl || it.token.key.chapterIndex != it.chapter.index } ||
+            imageTokens.any { (src, version) -> imageSaveVersion(book, src) != version }) {
+            throw IOException("资源已被其他操作更新，请重试刷新")
+        }
+        val files = linkedMapOf<File, File?>()
+        chapters.forEach { pending ->
+            val current = downloadDir.getFile(cacheFolderName, pending.token.folderName,
+                contentSaveFileName(book, pending.chapter) ?: pending.oldFileName)
+            val target = downloadDir.getFile(cacheFolderName, pending.token.folderName,
+                pending.chapter.getFileName())
+            if (current != target) files[current] = null
+            files[File(current.path + ".reversed")] = null
+            files[File(target.path + ".reversed")] = null
+            files[target] = pending.file
+        }
+        images.forEach { (src, file) -> files[getImage(book, src)] = file }
+        replaceResourceFiles(files) {
+            appDb.runInTransaction {
+                chapters.forEach { pending ->
+                    val chapter = pending.chapter
+                    appDb.bookChapterDao.updateResourceMetadata(book.bookUrl, chapter.index,
+                        chapter.title, chapter.imgUrl, chapter.variable)
+                    if (book.isOnLineTxt && AppConfig.tocCountWords) {
+                        val wordCount = StringUtils.wordCountFormat(pending.content.length)
+                        chapter.wordCount = wordCount
+                        appDb.bookChapterDao.upWordCount(book.bookUrl, chapter.url, wordCount)
+                    }
+                }
+            }
+        }
+        chapters.forEach {
+            contentSaveFence.replace(it.token.key, it.chapter.getFileName()) {}
+        }
+        images.keys.forEach { src ->
+            val path = getImage(book, src).absolutePath
+            imageVersions[path] = (imageVersions[path] ?: 0L) + 1L
+        }
+    } }
+
     private fun contentSaveFileName(book: Book, bookChapter: BookChapter): String? {
         return contentSaveFence.state(contentSaveKey(book, bookChapter)).fileName
     }
@@ -426,16 +497,7 @@ object BookHelp {
             if (isImageExist(book, src)) {
                 return
             }
-            val analyzeUrl = AnalyzeUrl(
-                src, source = bookSource, coroutineContext = currentCoroutineContext()
-            )
-            val bytes = analyzeUrl.getByteArrayAwait()
-            //某些图片被加密，需要进一步解密
-            runScriptWithContext {
-                ImageUtils.decode(
-                    src, bytes, isCover = false, bookSource, book
-                )
-            }?.let {
+            fetchImage(bookSource, book, src)?.let {
                 if (!checkImage(it)) {
                     // 如果部分图片失效，每次进入正文都会花很长时间再次获取图片数据
                     // 所以无论如何都要将数据写入到文件里
@@ -470,6 +532,12 @@ object BookHelp {
     @Synchronized
     fun writeImage(book: Book, src: String, bytes: ByteArray) {
         getImage(book, src).createFileIfNotExist().writeBytes(bytes)
+    }
+
+    internal suspend fun fetchImage(bookSource: BookSource?, book: Book, src: String): ByteArray? {
+        val bytes = AnalyzeUrl(src, source = bookSource, coroutineContext = currentCoroutineContext())
+            .getByteArrayAwait()
+        return runScriptWithContext { ImageUtils.decode(src, bytes, isCover = false, bookSource, book) }
     }
 
     @Synchronized
@@ -589,7 +657,7 @@ object BookHelp {
         return ret
     }
 
-    private fun checkImage(bytes: ByteArray): Boolean {
+    internal fun checkImage(bytes: ByteArray): Boolean {
         return BitmapUtils.isImage(bytes) ||
             SvgUtils.getSize(ByteArrayInputStream(bytes)) != null
     }
@@ -624,7 +692,7 @@ object BookHelp {
         bookChapter: BookChapter,
         folderName: String,
         fileName: String,
-    ): String? {
+    ): String? = contentSaveFence.exclusive {
         val file = downloadDir.getFile(
             cacheFolderName,
             folderName,
@@ -634,7 +702,7 @@ object BookHelp {
         if (file.exists()) {
             val string = file.readText()
             if (string.isEmpty()) {
-                return null
+                return@exclusive null
             }
             if (book.isEpub) {
                 val repaired = runCatching {
@@ -645,9 +713,9 @@ object BookHelp {
                         file.writeText(repaired)
                     }
                 }
-                return repaired
+                return@exclusive repaired
             }
-            return string
+            return@exclusive string
         }
         if (book.isLocal) {
             val string = LocalBook.getContent(book, bookChapter)
@@ -657,9 +725,9 @@ object BookHelp {
                     writeText(book, bookChapter, folderName, fileName, string)
                 }
             }
-            return string
+            return@exclusive string
         }
-        return null
+        null
     }
 
     /**

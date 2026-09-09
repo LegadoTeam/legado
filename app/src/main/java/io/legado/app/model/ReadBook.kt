@@ -262,6 +262,22 @@ object ReadBook : CoroutineScope by MainScope() {
         )
     }
 
+    internal fun processChapterContent(book: Book, chapter: BookChapter, content: String) =
+        ContentProcessor.get(book).let { processor ->
+            val manualRules = manualReplaceRules(book)
+            val title = chapter.getDisplayTitle(
+                manualRules?.title ?: processor.getTitleReplaceRules(),
+                manualRules?.enabled ?: book.getUseReplaceRule(),
+                replaceBook = book.toReplaceBook(),
+            )
+            title to processor.getContent(
+                book, chapter, content, includeTitle = false,
+                replaceEnabledOverride = manualRules?.enabled,
+                titleReplaceRulesOverride = manualRules?.title,
+                contentReplaceRulesOverride = manualRules?.content,
+            )
+        }
+
     fun loadHighlights(book: Book) {
         highlights = appDb.bookHighlightDao.getByBook(book.bookUrl)
         highlightsVersion++
@@ -1372,24 +1388,7 @@ object ReadBook : CoroutineScope by MainScope() {
         chapterLoadingJobs[chapter.index]?.cancel()
         val job = Coroutine.async(this, start = CoroutineStart.LAZY) {
             ensureContentCurrent(book, contentToken)
-            val contentProcessor = ContentProcessor.get(book.name, book.origin)
-            val manualRules = manualReplaceRules(book)
-            val titleRules = manualRules?.title ?: contentProcessor.getTitleReplaceRules()
-            val replaceEnabled = manualRules?.enabled ?: book.getUseReplaceRule()
-            val displayTitle = chapter.getDisplayTitle(
-                titleRules,
-                replaceEnabled,
-                replaceBook = book.toReplaceBook()
-            )
-            val contents = contentProcessor.getContent(
-                book,
-                chapter,
-                content,
-                includeTitle = false,
-                replaceEnabledOverride = manualRules?.enabled,
-                titleReplaceRulesOverride = manualRules?.title,
-                contentReplaceRulesOverride = manualRules?.content,
-            )
+            val (displayTitle, contents) = processChapterContent(book, chapter, content)
             ensureActive()
             val textChapter = ChapterProvider.getTextChapterAsync(
                 this, book, chapter, displayTitle, contents, simulatedChapterSize,
@@ -1518,24 +1517,7 @@ object ReadBook : CoroutineScope by MainScope() {
         val shouldResetPageOffset = resetPageOffset &&
             shouldApplyReadPositionReset(readPositionVersion)
         kotlin.runCatching {
-            val contentProcessor = ContentProcessor.get(book.name, book.origin)
-            val manualRules = manualReplaceRules(book)
-            val titleRules = manualRules?.title ?: contentProcessor.getTitleReplaceRules()
-            val replaceEnabled = manualRules?.enabled ?: book.getUseReplaceRule()
-            val displayTitle = chapter.getDisplayTitle(
-                titleRules,
-                replaceEnabled,
-                replaceBook = book.toReplaceBook()
-            )
-            val contents = contentProcessor.getContent(
-                book,
-                chapter,
-                content,
-                includeTitle = false,
-                replaceEnabledOverride = manualRules?.enabled,
-                titleReplaceRulesOverride = manualRules?.title,
-                contentReplaceRulesOverride = manualRules?.content,
-            )
+            val (displayTitle, contents) = processChapterContent(book, chapter, content)
             val textChapter = ChapterProvider.getTextChapterAsync(
                 this@ReadBook, book, chapter, displayTitle, contents, simulatedChapterSize,
                 hasBodyContent = contents.textList.isNotEmpty() &&

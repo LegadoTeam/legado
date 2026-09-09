@@ -101,6 +101,16 @@ object ImageProvider {
         BitmapUtils.removeImageSizeCache(path)
     }
 
+    @Synchronized
+    internal fun replaceResources(book: Book, images: Collection<String>, replace: () -> Unit) {
+        replace()
+        images.forEach { src ->
+            val path = BookHelp.getImage(book, src).absolutePath
+            bitmapLruCache.remove(path)
+            BitmapUtils.removeImageSizeCache(path)
+        }
+    }
+
     private fun getNotRecycled(key: String): Bitmap? {
         val bitmap = bitmapLruCache[key] ?: return null
         if (bitmap.isRecycled) {
