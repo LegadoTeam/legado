@@ -21,6 +21,8 @@ import androidx.preference.Preference
 import io.legado.app.R
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.PreferKey
+import io.legado.app.databinding.DialogAutoBackupBinding
+import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.databinding.DialogLanBackupSendBinding
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppWebDav
@@ -47,6 +49,8 @@ import io.legado.app.utils.FileDoc
 import io.legado.app.utils.QRCodeUtils
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.checkWrite
+import io.legado.app.utils.defaultSharedPreferences
+import io.legado.app.utils.externalFiles
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.isContentScheme
 import io.legado.app.utils.launch
@@ -71,6 +75,7 @@ class BackupConfigFragment : PreferenceFragment(),
     private val viewModel by activityViewModels<ConfigViewModel>()
     private val waitDialog by lazy { WaitDialog(requireContext()) }
     private var backupJob: Job? = null
+    private var manualBackupUploadWebDav = true
     private var restoreJob: Job? = null
     private var lanBackupJob: Job? = null
     private var lanBackupSession: LanBackupSession? = null
@@ -89,11 +94,11 @@ class BackupConfigFragment : PreferenceFragment(),
         result.uri?.let { uri ->
             if (uri.isContentScheme()) {
                 AppConfig.backupPath = uri.toString()
-                backup(uri.toString())
+                backup(uri.toString(), manualBackupUploadWebDav)
             } else {
                 uri.path?.let { path ->
                     AppConfig.backupPath = path
-                    backup(path)
+                    backup(path, manualBackupUploadWebDav)
                 }
             }
         }
@@ -122,6 +127,7 @@ class BackupConfigFragment : PreferenceFragment(),
     }
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        manualBackupUploadWebDav = savedInstanceState?.getBoolean("manualBackupUploadWebDav", true) ?: true
         addPreferencesFromResource(R.xml.pref_config_backup)
         findPreference<EditTextPreference>(PreferKey.webDavPassword)?.let {
             it.setOnBindEditTextListener { editText ->
@@ -148,11 +154,17 @@ class BackupConfigFragment : PreferenceFragment(),
         upPreferenceSummary(PreferKey.webDavDir, AppConfig.webDavDir)
         upPreferenceSummary(PreferKey.webDavDeviceName, AppConfig.webDavDeviceName)
         upPreferenceSummary(PreferKey.backupPath, getPrefString(PreferKey.backupPath))
+        updateAutoBackupSummary()
         findPreference<io.legado.app.lib.prefs.Preference>("web_dav_restore")
             ?.onLongClick {
                 restoreFromLocal()
                 true
             }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean("manualBackupUploadWebDav", manualBackupUploadWebDav)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -195,6 +207,7 @@ class BackupConfigFragment : PreferenceFragment(),
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
         when (key) {
+            PreferKey.autoBackup, PreferKey.autoBackupWebDav, PreferKey.autoBackupIntervalDays -> updateAutoBackupSummary()
             PreferKey.backupPath -> upPreferenceSummary(key, getPrefString(key))
             PreferKey.webDavUrl,
             PreferKey.webDavAccount,
@@ -212,7 +225,7 @@ class BackupConfigFragment : PreferenceFragment(),
         val preference = findPreference<Preference>(preferenceKey) ?: return
         when (preferenceKey) {
             PreferKey.backupPath -> preference.summary =
-                value?.takeIf { it.isNotBlank() } ?: getString(R.string.default_path)
+                value?.takeIf { it.isNotBlank() } ?: defaultBackupPathSummary()
 
             PreferKey.webDavUrl ->
                 if (value.isNullOrBlank()) {
@@ -258,17 +271,68 @@ class BackupConfigFragment : PreferenceFragment(),
             PreferKey.backupContent -> backupContent()
             PreferKey.restoreIgnore -> backupIgnore()
             "web_dav_backup" -> backup()
+            "localPassword" -> alertLocalPassword()
+            PreferKey.autoBackup -> configureAutoBackup()
             "web_dav_restore" -> restore()
             "lan_backup_transfer" -> lanBackupTransfer()
         }
         return super.onPreferenceTreeClick(preference)
     }
 
+    private fun defaultBackupPathSummary() =
+        "${getString(R.string.default_path)}\n${requireContext().externalFiles.absolutePath}"
+
+    private fun updateAutoBackupSummary() {
+        findPreference<Preference>(PreferKey.autoBackup)?.summary = if (AppConfig.autoBackup) {
+            getString(R.string.auto_backup_destination_summary,
+                getString(if (AppConfig.autoBackupWebDav) R.string.backup_local_webdav else R.string.backup_local_only),
+                AppConfig.autoBackupIntervalDays)
+        } else getString(R.string.auto_backup_disabled)
+    }
+
+    private fun configureAutoBackup() {
+        val binding = DialogAutoBackupBinding.inflate(layoutInflater)
+        binding.enabled.isChecked = AppConfig.autoBackup
+        binding.destination.check(if (AppConfig.autoBackupWebDav) R.id.local_webdav else R.id.local_only)
+        binding.intervalDays.setText(AppConfig.autoBackupIntervalDays.toString())
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.auto_backup_t)
+            .setView(binding.root)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.ok, null)
+            .create().apply {
+                setOnShowListener {
+                    getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val days = binding.intervalDays.text.toString().toIntOrNull()
+                        if (days == null || days < 1) {
+                            binding.intervalDays.error = getString(R.string.auto_backup_interval_invalid)
+                            return@setOnClickListener
+                        }
+                        requireContext().defaultSharedPreferences.edit()
+                            .putBoolean(PreferKey.autoBackup, binding.enabled.isChecked)
+                            .putBoolean(PreferKey.autoBackupWebDav, binding.destination.checkedRadioButtonId == R.id.local_webdav)
+                            .putInt(PreferKey.autoBackupIntervalDays, days).apply()
+                        dismiss()
+                    }
+                }
+                show()
+            }
+    }
+
+    private fun alertLocalPassword() {
+        alert(R.string.set_local_password, R.string.set_local_password_summary) {
+            val binding = DialogEditTextBinding.inflate(layoutInflater).apply { editView.hint = "password" }
+            customView { binding.root }
+            okButton { LocalConfig.password = binding.editView.text.toString() }
+            cancelButton()
+        }
+    }
+
     private fun showBackupPathSelector() {
         requireContext().selector(
             titleSource = R.string.backup_path,
             items = listOf(
-                getString(R.string.default_path),
+                defaultBackupPathSummary(),
                 getString(R.string.select_folder),
             ),
         ) { _, index ->
@@ -461,9 +525,18 @@ class BackupConfigFragment : PreferenceFragment(),
 
 
     fun backup() {
+        requireContext().selector(R.string.backup, listOf(
+            getString(R.string.backup_local_only), getString(R.string.backup_local_webdav),
+        )) { _, index ->
+            manualBackupUploadWebDav = index == 1
+            startBackup(manualBackupUploadWebDav)
+        }
+    }
+
+    private fun startBackup(uploadWebDav: Boolean) {
         val backupPath = AppConfig.backupPath
         if (backupPath.isNullOrEmpty()) {
-            backup(null)
+            backup(null, uploadWebDav)
         } else {
             if (backupPath.isContentScheme()) {
                 lifecycleScope.launch {
@@ -471,18 +544,18 @@ class BackupConfigFragment : PreferenceFragment(),
                         FileDoc.fromDir(backupPath).checkWrite()
                     }
                     if (canWrite) {
-                        backup(backupPath)
+                        backup(backupPath, uploadWebDav)
                     } else {
                         backupDir.launch()
                     }
                 }
             } else {
-                backupUsePermission(backupPath)
+                backupUsePermission(backupPath, uploadWebDav)
             }
         }
     }
 
-    private fun backup(backupPath: String?) {
+    private fun backup(backupPath: String?, uploadWebDav: Boolean) {
         waitDialog.setText("备份中…")
         waitDialog.setOnCancelListener {
             backupJob?.cancel()
@@ -491,7 +564,7 @@ class BackupConfigFragment : PreferenceFragment(),
         backupJob?.cancel()
         backupJob = lifecycleScope.launch {
             try {
-                Backup.backupLocked(requireContext(), backupPath)
+                Backup.backupLocked(requireContext(), backupPath, uploadWebDav)
                 appCtx.toastOnUi(R.string.backup_success)
             } catch (e: Throwable) {
                 ensureActive()
@@ -509,12 +582,12 @@ class BackupConfigFragment : PreferenceFragment(),
         }
     }
 
-    private fun backupUsePermission(path: String) {
+    private fun backupUsePermission(path: String, uploadWebDav: Boolean) {
         PermissionsCompat.Builder()
             .addPermissions(*Permissions.Group.STORAGE)
             .rationale(R.string.tip_perm_request_storage)
             .onGranted {
-                backup(path)
+                backup(path, uploadWebDav)
             }
             .request()
     }

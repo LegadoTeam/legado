@@ -165,8 +165,8 @@ object AppWebDav {
      */
     @Throws(Exception::class)
     suspend fun backUpWebDav(fileName: String) {
-        if (!NetworkUtils.isAvailable()) return
         authorization?.let {
+            if (!NetworkUtils.isAvailable()) throw NoStackTraceException("网络未连接")
             val putUrl = "$rootWebDavUrl$fileName"
             WebDav(putUrl, it).upload(Backup.zipFilePath)
         }
