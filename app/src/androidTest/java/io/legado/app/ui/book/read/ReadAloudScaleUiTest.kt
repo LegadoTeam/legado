@@ -234,6 +234,90 @@ class ReadAloudScaleUiTest {
         }
     }
 
+    @Test fun draggedPositionSurvivesDisablingDragAndResetRestoresDefault() {
+        prefs.edit().remove(PreferKey.readAloudControlsX).remove(PreferKey.readAloudControlsY)
+            .putBoolean(PreferKey.readAloudControlsDrag, true)
+            .putBoolean(PreferKey.readAloudControlsPause, true)
+            .putInt(PreferKey.readAloudControlsWidth, 85).commit()
+        scenario!!.onActivity {
+            playbackFlag("isRun", true)
+            BaseReadAloudService.detachReadAloudFollow()
+            it.showReadAloudControls(resetPosition = true)
+        }
+        await("movable control visible") { it.findViewById<View>(R.id.iv_pause_aloud).isShown }
+
+        var defaultX = 0f
+        var defaultY = 0f
+        var startGlobalX = 0f
+        var startGlobalY = 0f
+        scenario!!.onActivity { activity ->
+            val bar = activity.findViewById<View>(R.id.read_aloud_float_bar_container)
+            defaultX = bar.x
+            defaultY = bar.y
+            val location = IntArray(2)
+            bar.getLocationOnScreen(location)
+            startGlobalX = location[0] + bar.width / 2f
+            startGlobalY = location[1] + bar.height / 2f
+        }
+        // Move inside the real control bounds; the production listener stores normalized coordinates on ACTION_UP.
+        drag(startGlobalX, startGlobalY, startGlobalX - 48.dpToPx(), startGlobalY - 72.dpToPx())
+        var movedX = 0f
+        var movedY = 0f
+        var storedX = 0f
+        var storedY = 0f
+        scenario!!.onActivity { activity ->
+            val bar = activity.findViewById<View>(R.id.read_aloud_float_bar_container)
+            movedX = bar.x
+            movedY = bar.y
+            storedX = prefs.getFloat(PreferKey.readAloudControlsX, Float.NaN)
+            storedY = prefs.getFloat(PreferKey.readAloudControlsY, Float.NaN)
+            assertTrue("Drag must move the real control", movedX < defaultX - 24.dpToPx() && movedY < defaultY - 24.dpToPx())
+            assertTrue("Drag must persist normalized X", storedX.isFinite() && storedX != .5f)
+            assertTrue("Drag must persist normalized Y", storedY.isFinite() && storedY >= 0f)
+        }
+
+        prefs.edit().putBoolean(PreferKey.readAloudControlsDrag, false).commit()
+        scenario!!.onActivity { it.showReadAloudControls() }
+        await("control remains visible after disabling drag") { it.findViewById<View>(R.id.iv_pause_aloud).isShown }
+        scenario!!.onActivity { activity ->
+            val bar = activity.findViewById<View>(R.id.read_aloud_float_bar_container)
+            assertEquals("Disabling drag must retain X", movedX, bar.x, 1f)
+            assertEquals("Disabling drag must retain Y", movedY, bar.y, 1f)
+        }
+
+        // With dragging disabled the same real gesture must leave both the view and stored coordinates unchanged.
+        var movedGlobalX = 0f
+        var movedGlobalY = 0f
+        scenario!!.onActivity { activity ->
+            val bar = activity.findViewById<View>(R.id.read_aloud_float_bar_container)
+            val location = IntArray(2)
+            bar.getLocationOnScreen(location)
+            movedGlobalX = location[0] + bar.width / 2f
+            movedGlobalY = location[1] + bar.height / 2f
+        }
+        drag(movedGlobalX, movedGlobalY, movedGlobalX + 48.dpToPx(), movedGlobalY + 48.dpToPx())
+        scenario!!.onActivity { activity ->
+            val bar = activity.findViewById<View>(R.id.read_aloud_float_bar_container)
+            assertEquals("Disabled drag must ignore movement on X", movedX, bar.x, 1f)
+            assertEquals("Disabled drag must ignore movement on Y", movedY, bar.y, 1f)
+            assertEquals(storedX, prefs.getFloat(PreferKey.readAloudControlsX, Float.NaN), 0f)
+            assertEquals(storedY, prefs.getFloat(PreferKey.readAloudControlsY, Float.NaN), 0f)
+        }
+
+        scenario!!.onActivity { it.showReadAloudControls(resetPosition = true) }
+        await("control remains visible after reset") {
+            it.findViewById<View>(R.id.iv_pause_aloud).isShown &&
+                !prefs.contains(PreferKey.readAloudControlsX) && !prefs.contains(PreferKey.readAloudControlsY)
+        }
+        scenario!!.onActivity { activity ->
+            val bar = activity.findViewById<View>(R.id.read_aloud_float_bar_container)
+            assertFalse("Reset must remove stored X", prefs.contains(PreferKey.readAloudControlsX))
+            assertFalse("Reset must remove stored Y", prefs.contains(PreferKey.readAloudControlsY))
+            assertEquals("Reset must restore default X", defaultX, bar.x, 1f)
+            assertEquals("Reset must restore default Y", defaultY, bar.y, 1f)
+        }
+    }
+
     @Test fun oldSmallWidthIsClampedAndOpacityDefaultsOnlyWhenUnset() {
         prefs.edit().putInt("readAloudControlsWidth", 40).remove(PreferKey.readAloudControlsOpacity).commit()
         scenario!!.onActivity {
@@ -322,6 +406,23 @@ class ReadAloudScaleUiTest {
             assertTrue("The icon must remain visibly rendered", pixels.width() >= 2 && pixels.height() >= 2)
             assertTrue("Actual icon pixels must stay inside the padded circle", content.contains(pixels))
         } finally { bitmap.recycle() }
+    }
+
+    private fun drag(fromX: Float, fromY: Float, toX: Float, toY: Float) {
+        val downTime = SystemClock.uptimeMillis()
+        fun send(action: Int, x: Float, y: Float, eventTime: Long) {
+            MotionEvent.obtain(downTime, eventTime, action, x, y, 0).let {
+                try { instrumentation.sendPointerSync(it) } finally { it.recycle() }
+            }
+        }
+        send(MotionEvent.ACTION_DOWN, fromX, fromY, downTime)
+        repeat(4) { index ->
+            val fraction = (index + 1) / 4f
+            send(MotionEvent.ACTION_MOVE, fromX + (toX - fromX) * fraction,
+                fromY + (toY - fromY) * fraction, downTime + (index + 1) * 40L)
+        }
+        send(MotionEvent.ACTION_UP, toX, toY, downTime + 200L)
+        instrumentation.waitForIdleSync()
     }
 
     private fun tap(x: Float, y: Float) {
