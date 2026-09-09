@@ -9,7 +9,6 @@ trap 'adb pull /sdcard/Android/data/com.legado.app.debug/files/ui-regression app
   --build-cache --no-daemon --max-workers=2
 
 # PDF rendering uses a 192 MB app heap; run it in a fresh instrumentation process so
-after_previous_ui_tests=''
 ./gradlew :app:connectedAppDebugAndroidTest \
   --init-script .github/scripts/source-browser-test.init.gradle \
   -Pandroid.testInstrumentationRunnerArguments.class=io.legado.app.model.localBook.PdfOutlineTest,io.legado.app.ui.book.read.PdfPagePositionTest,io.legado.app.ui.book.read.PdfOutlineNavigationTest,io.legado.app.ui.book.read.PdfZoomNavigationTest \
