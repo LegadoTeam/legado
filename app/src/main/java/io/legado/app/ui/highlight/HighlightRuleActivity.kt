@@ -31,6 +31,8 @@ import io.legado.app.ui.widget.recycler.VerticalDivider
 import io.legado.app.utils.GSON
 import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.sendToClip
+import io.legado.app.utils.share
+import io.legado.app.utils.stackTraceStr
 import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.toastOnUi
@@ -41,6 +43,7 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.io.File
 
 class HighlightRuleActivity :
     VMBaseActivity<ActivityHighlightRuleBinding, HighlightRuleViewModel>(),
@@ -148,6 +151,7 @@ class HighlightRuleActivity :
             R.id.menu_bottom_sel ->
                 viewModel.moveSelection(selection, false).onSuccess { ReadBook.upHighlightRules() }
             R.id.menu_export_selection -> exportRules(selection)
+            R.id.menu_share_source -> shareRules(selection)
         }
         return true
     }
@@ -182,6 +186,20 @@ class HighlightRuleActivity :
                 ).toByteArray(),
                 "application/json"
             )
+        }
+    }
+
+    private fun shareRules(rules: List<HighlightRule>) {
+        if (rules.isEmpty()) return
+        val selected = rules.toList()
+        viewModel.execute(scope = lifecycleScope) {
+            File.createTempFile("highlightRules_", ".json", cacheDir).apply {
+                writeText(GSON.toJson(HighlightRuleFile(type = HighlightRuleFile.TYPE, rules = selected)))
+            }
+        }.onSuccess {
+            share(it)
+        }.onError {
+            toastOnUi(it.stackTraceStr)
         }
     }
 
