@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.os.SystemClock
 import androidx.core.net.toUri
 import androidx.preference.Preference
+import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
@@ -288,6 +289,18 @@ class BackupOptionsTest {
             fragment.scrollToPreference(key)
         }
         instrumentation.waitForIdleSync()
+        await {
+            var ready = false
+            scenario!!.onActivity { activity ->
+                val fragment = activity.supportFragmentManager.findFragmentByTag(ConfigTag.BACKUP_CONFIG) as BackupConfigFragment
+                val list = fragment.listView
+                ready = activity.hasWindowFocus() && !list.isComputingLayout &&
+                    !list.isLayoutRequested && !list.hasPendingAdapterUpdates() &&
+                    list.itemAnimator?.isRunning != true && list.scrollState == RecyclerView.SCROLL_STATE_IDLE
+            }
+            ready
+        }
+        screenshot("backup-before-click-$key")
         onView(withText(title)).perform(click())
     }
 
