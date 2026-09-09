@@ -1,6 +1,7 @@
 package io.legado.app.help.book
 
 import android.os.ParcelFileDescriptor
+import android.util.AtomicFile
 import androidx.documentfile.provider.DocumentFile
 import com.script.rhino.runScriptWithContext
 import io.legado.app.constant.AppLog
@@ -298,9 +299,10 @@ object BookHelp {
     fun reverseContent(book: Book, chapter: BookChapter): Boolean {
         val folderName = book.getFolderName()
         val fileName = contentSaveFileName(book, chapter) ?: chapter.getFileName()
+        val file = downloadDir.getFile(cacheFolderName, folderName, fileName)
+        if (!file.isFile || file.length() == 0L) return false
         var saved = false
         contentSaveFence.replace(contentSaveKey(book, chapter), fileName) {
-            val file = downloadDir.getFile(cacheFolderName, folderName, fileName)
             if (!file.isFile) return@replace
             val content = file.readText().takeIf { it.isNotEmpty() } ?: return@replace
             val wasReversed = isContentReversed(book, chapter)
@@ -309,8 +311,22 @@ object BookHelp {
             // happened to create a sequence that looks like reader markup.
             val reversed = if (wasReversed) marker.readText().substringAfter('\n')
                 else reverseContentText(content)
-            writeText(book, chapter, folderName, fileName, reversed)
+            // Prepare the undo data before changing the cache. The fingerprint
+            // only becomes valid after the atomic content write succeeds.
             if (!wasReversed) marker.writeText(MD5Utils.md5Encode(reversed) + "\n" + content)
+            val atomicFile = AtomicFile(file)
+            var output: FileOutputStream? = null
+            try {
+                output = atomicFile.startWrite()
+                output.write(reversed.toByteArray(Charsets.UTF_8))
+                atomicFile.finishWrite(output)
+                if (file.readText() != reversed) throw IOException("Reversed content was not saved")
+            } catch (error: Throwable) {
+                atomicFile.failWrite(output)
+                if (!wasReversed) marker.delete()
+                throw error
+            }
+            if (wasReversed) marker.delete()
             saved = true
         }
         return saved

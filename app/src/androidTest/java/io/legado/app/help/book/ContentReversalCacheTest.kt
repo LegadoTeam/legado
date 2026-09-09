@@ -32,26 +32,41 @@ class ContentReversalCacheTest {
         assertEquals("downloaded again", BookHelp.getContent(book, chapter))
         assertFalse(BookHelp.isContentReversed(book, chapter))
         BookHelp.delContent(book, chapter)
+        val pendingDownload = BookHelp.contentSaveToken(book, chapter)
         assertFalse(BookHelp.reverseContent(book, chapter))
         assertFalse(BookHelp.isContentReversed(book, chapter))
+        assertTrue("A no-op must not invalidate the pending download",
+            BookHelp.saveContent(BookSource(), book, chapter, "pending content", pendingDownload))
     }
 
     @Test fun failedWriteDoesNotToggleStateOrReplaceTheOriginalCache() = withChapter { book, chapter ->
         val original = "甲乙😀"
         BookHelp.saveText(book, chapter, original)
         val file = File(BookHelp.cachePath, "${book.getFolderName()}/${chapter.getFileName()}")
+        val marker = File(file.path + ".reversed")
+        assertTrue(marker.mkdir())
+        try {
+            assertTrue("Failed undo-data writes must leave the content unchanged", runCatching {
+                BookHelp.reverseContent(book, chapter)
+            }.isFailure)
+            assertEquals(original, BookHelp.getContent(book, chapter))
+            assertFalse(BookHelp.isContentReversed(book, chapter))
+        } finally { assertTrue(marker.delete()) }
         for (checked in listOf(false, true)) {
             if (checked) assertTrue(BookHelp.reverseContent(book, chapter))
             val content = BookHelp.getContent(book, chapter)
-            assertTrue(file.setWritable(false, false))
+            // Emulated external storage ignores chmod; obstruct AtomicFile's
+            // staging path to produce a real, deterministic filesystem error.
+            val staging = File(file.path + ".new")
+            assertTrue(staging.mkdir())
             try {
-                assertTrue("Writing a read-only cache must fail", runCatching {
+                assertTrue("An obstructed atomic cache write must fail", runCatching {
                     BookHelp.reverseContent(book, chapter)
                 }.isFailure)
                 assertEquals(content, BookHelp.getContent(book, chapter))
                 assertEquals(checked, BookHelp.isContentReversed(book, chapter))
             } finally {
-                assertTrue(file.setWritable(true, true))
+                if (staging.exists()) assertTrue(staging.delete())
             }
         }
     }
