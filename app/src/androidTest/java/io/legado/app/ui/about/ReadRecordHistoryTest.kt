@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.Instrumentation
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.BitmapDrawable
@@ -14,6 +15,7 @@ import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.ImageView
 import androidx.appcompat.widget.PopupMenu
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.SearchView
 import androidx.core.view.isVisible
 import androidx.test.core.app.ActivityScenario
@@ -25,6 +27,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.R
 import io.legado.app.constant.AppConst
+import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
@@ -40,6 +43,8 @@ import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.storage.BackupConfig
 import io.legado.app.help.storage.Restore
 import io.legado.app.help.storage.writePreferenceSnapshot
+import io.legado.app.lib.theme.ThemeStore
+import io.legado.app.lib.theme.ThemeStorePrefKeys
 import io.legado.app.ui.book.read.ReadBookActivity
 import io.legado.app.utils.defaultSharedPreferences
 import io.legado.app.utils.GSON
@@ -148,6 +153,70 @@ class ReadRecordHistoryTest {
         screenshot("reading-history-enhanced")
         scenario!!.recreate()
         await { it.enhancedSummary.root.isVisible && it.enhancedSummary.tvTotalDuration.text.contains("1天4小时") }
+    }
+
+    @Test
+    fun emptyCoversFollowLightDarkAndCustomBackgrounds() {
+        val themePrefs = ThemeStore.prefs(context)
+        val backgroundKey = ThemeStorePrefKeys.KEY_BACKGROUND_COLOR
+        val savedBackground = themePrefs.all[backgroundKey]
+        val savedMode = prefs.getString(PreferKey.themeMode, null)
+        val savedNightMode = AppCompatDelegate.getDefaultNightMode()
+        fun centerColor(image: ImageView): Int {
+            val bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
+            return try {
+                image.draw(Canvas(bitmap))
+                bitmap.getPixel(bitmap.width / 2, bitmap.height / 2)
+            } finally { bitmap.recycle() }
+        }
+        try {
+            AppConfig.readRecordSimpleLayout = false
+            for ((name, background) in listOf("light" to Color.rgb(245, 245, 245),
+                "dark" to Color.rgb(32, 32, 32), "custom" to Color.rgb(231, 214, 185))) {
+                val dark = name == "dark"
+                prefs.edit().putString(PreferKey.themeMode, if (dark) "2" else "1").commit()
+                themePrefs.edit().putInt(backgroundKey, background).commit()
+                instrumentation.runOnMainSync {
+                    AppCompatDelegate.setDefaultNightMode(if (dark) AppCompatDelegate.MODE_NIGHT_YES
+                        else AppCompatDelegate.MODE_NIGHT_NO)
+                }
+                launch()
+                await { binding ->
+                    findRow(binding, "Archived second")?.enhanced?.ivCover?.drawable != null &&
+                        coverColor(binding.enhancedSummary.coverFirst) == Color.rgb(35, 148, 115) &&
+                        findRow(binding, book.name)?.enhanced?.ivCover?.let(::coverColor) == Color.rgb(35, 148, 115)
+                }
+                scenario!!.onActivity { activity ->
+                    val binding = activity.views
+                    val missing = findRow(binding, "Archived second")!!.enhanced.ivCover
+                    val fill = centerColor(missing)
+                    assertEquals("Summary card follows the selected background", background,
+                        binding.enhancedSummary.root.cardBackgroundColor.defaultColor)
+                    assertEquals("Row and summary use the same empty cover", fill,
+                        centerColor(binding.enhancedSummary.coverSecond))
+                    assertNotEquals("The cover must remain distinguishable", background, fill)
+                    assertNotEquals("Dark/custom covers must not stay white", Color.WHITE, fill)
+                    for (channel in listOf<(Int) -> Int>(Color::red, Color::green, Color::blue)) {
+                        assertTrue("Cover stays close to its background", kotlin.math.abs(channel(fill) - channel(background)) <= 21)
+                    }
+                    assertEquals("Real covers retain their original pixels", Color.rgb(35, 148, 115),
+                        centerColor(findRow(binding, book.name)!!.enhanced.ivCover))
+                }
+                screenshot("reading-history-covers-$name")
+                scenario!!.close()
+                scenario = null
+            }
+        } finally {
+            scenario?.close()
+            scenario = null
+            themePrefs.edit().apply {
+                if (savedBackground is Int) putInt(backgroundKey, savedBackground) else remove(backgroundKey)
+            }.commit()
+            prefs.edit().apply {
+                if (savedMode != null) putString(PreferKey.themeMode, savedMode) else remove(PreferKey.themeMode)
+            }.commit()
+            instrumentation.runOnMainSync { AppCompatDelegate.setDefaultNightMode(savedNightMode) }
+        }
     }
 
     @Test
