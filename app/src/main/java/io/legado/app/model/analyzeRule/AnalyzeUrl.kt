@@ -652,8 +652,7 @@ class AnalyzeUrl(
                 ?: throw IllegalArgumentException("dnsIp requires a valid HTTP URL")
         }
         val cronetInterceptor = if (
-            AppConfig.isCronet &&
-            (urlTimeoutConfigured || followRedirects != null || dnsAddresses != null)
+            urlTimeoutConfigured || followRedirects != null || dnsAddresses != null
         ) {
             Cronet.interceptor
         } else {

@@ -54,7 +54,7 @@ class CronetInitializationContractTest {
         assertTrue(helper.contains("CronetLoader.installWithRetry()"))
         assertTrue(config.contains("val isCronet: Boolean"))
         assertTrue(config.contains("get() = appCtx.getPrefBoolean(PreferKey.cronet)"))
-        assertTrue(httpHelper.contains("if (AppConfig.isCronet)"))
+        assertFalse(httpHelper.contains("if (AppConfig.isCronet)"))
     }
 
     @Test
