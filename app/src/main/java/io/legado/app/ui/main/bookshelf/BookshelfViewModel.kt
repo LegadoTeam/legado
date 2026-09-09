@@ -2,6 +2,7 @@ package io.legado.app.ui.main.bookshelf
 
 import android.app.Application
 import androidx.lifecycle.MutableLiveData
+import com.google.gson.JsonObject
 import com.google.gson.stream.JsonWriter
 import io.legado.app.R
 import io.legado.app.base.BaseViewModel
@@ -29,8 +30,10 @@ import io.legado.app.utils.fromJsonArray
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.isJsonArray
-import io.legado.app.utils.printOnDebug
 import io.legado.app.utils.toastOnUi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import java.io.File
@@ -186,34 +189,40 @@ class BookshelfViewModel(application: Application) : BaseViewModel(application) 
 
     private fun importBookshelfByJson(json: String, groupId: Long) {
         execute {
-            val bookSourceParts = appDb.bookSourceDao.allEnabledPart
-            val semaphore = Semaphore(AppConfig.threadCount)
-            GSON.fromJsonArray<Map<String, String?>>(json).getOrThrow().forEach { bookInfo ->
-                val name = bookInfo["name"] ?: ""
-                val author = bookInfo["author"] ?: ""
-                if (name.isEmpty() || appDb.bookDao.has(name, author)) {
-                    return@forEach
-                }
-                semaphore.withPermit {
-                    WebBook.preciseSearch(
-                        this, bookSourceParts, name, author,
-                        semaphore = semaphore
-                    ).onSuccess {
-                        val book = it.first
-                        if (groupId > 0) {
-                            book.group = groupId
-                        }
-                        book.savePreservingCustomCoverUrl()
-                    }.onError { e ->
-                        context.toastOnUi(e.localizedMessage)
-                    }
-                }
-            }
+            importBookshelfJson(json, groupId)
         }.onError {
-            it.printOnDebug()
-        }.onFinally {
+            AppLog.put("导入书单失败\n${it.localizedMessage}", it, true)
+        }.onSuccess {
             context.toastOnUi(R.string.success)
         }
     }
 
+}
+
+/** The file picker and system sharing use the same enabled-source matching. */
+internal suspend fun importBookshelfJson(json: String, groupId: Long) = coroutineScope {
+    val books = GSON.fromJsonArray<JsonObject>(json).getOrThrow().map { book ->
+        val name = book.get("name")
+        val author = book.get("author")
+        require(name != null && name.isJsonPrimitive && name.asJsonPrimitive.isString)
+        require(author == null || author.isJsonNull ||
+            author.isJsonPrimitive && author.asJsonPrimitive.isString)
+        name.asString.also { require(it.isNotBlank()) } to
+            author?.takeUnless { it.isJsonNull }?.asString.orEmpty()
+    }.distinct()
+    val sources = appDb.bookSourceDao.allEnabledPart
+    val semaphore = Semaphore(AppConfig.threadCount)
+    books.map { (name, author) ->
+        async {
+            semaphore.withPermit {
+                if (appDb.bookDao.has(name, author)) return@withPermit
+                val book = sources.firstNotNullOfOrNull { part ->
+                    part.getBookSource()?.let { WebBook.preciseSearchAwait(it, name, author).getOrNull() }
+                } ?: throw NoStackTraceException("没有搜索到<$name>$author")
+                if (groupId > 0) book.group = groupId
+                book.savePreservingCustomCoverUrl()
+            }
+        }
+    }.awaitAll()
+    Unit
 }

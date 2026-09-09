@@ -67,6 +67,8 @@ on:
       - 'app/src/main/java/io/legado/app/ui/highlight/**'
       - 'app/src/androidTest/java/io/legado/app/ui/highlight/**'
       - 'app/src/androidTest/java/io/legado/app/ui/association/**'
+      - 'app/src/main/java/io/legado/app/ui/association/**'
+      - 'app/src/main/java/io/legado/app/ui/main/bookshelf/BookshelfViewModel.kt'
       - 'app/src/main/java/io/legado/app/ui/about/ReadRecordActivity.kt'
       - 'app/src/main/java/io/legado/app/data/dao/ReadRecordDao.kt'
       - 'app/src/main/java/io/legado/app/data/entities/ReadRecord*'
