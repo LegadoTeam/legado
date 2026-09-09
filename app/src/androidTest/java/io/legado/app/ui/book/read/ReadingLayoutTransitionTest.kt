@@ -13,6 +13,7 @@ import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.swipeUp
+import androidx.test.espresso.matcher.RootMatchers.withDecorView
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -140,6 +141,7 @@ class ReadingLayoutTransitionTest {
         scenario.onActivity { ReadStyleDialog().showNow(it.supportFragmentManager, "layout-style") }
         val bounds = Rect()
         lateinit var styleView: View
+        lateinit var styleRoot: View
         try {
             await {
                 var visible = false
@@ -151,13 +153,14 @@ class ReadingLayoutTransitionTest {
                         bounds.width() > 20 && bounds.height() > 20
                     if (visible && view != null) {
                         styleView = view
+                        styleRoot = checkNotNull(dialog?.dialog?.window?.decorView)
                     }
                 }
                 visible
             }
             // Espresso waits for the focused dialog and calculates the current screen coordinates.
             // This remains a real touch, required by CircleImageView's circular hit area.
-            onView(sameInstance(styleView)).perform(click())
+            onView(sameInstance(styleView)).inRoot(withDecorView(sameInstance(styleRoot))).perform(click())
             await { ReadBookConfig.styleSelect == index }
         } finally {
             scenario.onActivity { activity ->
