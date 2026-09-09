@@ -1628,10 +1628,14 @@ object ReadBook : CoroutineScope by MainScope() {
         if (pendingPdfJump?.let { it.bookUrl == book?.bookUrl && it.chapterIndex == durChapterIndex } == true) return
         if (hasPendingHighlightJump()) return
         val book = book ?: return
+        // The shared writer may still be queued when the reader switches books or pages.
+        val durChapterIndex = durChapterIndex
+        val durChapterPos = durChapterPos
+        val bookSource = bookSource
+        val durTime = System.currentTimeMillis()
         executor.execute {
             kotlin.runCatching {
                 book.lastCheckCount = 0
-                val durTime = System.currentTimeMillis()
                 book.durChapterTime = durTime
                 val chapterChanged = book.durChapterIndex != durChapterIndex
                 book.durChapterIndex = durChapterIndex
