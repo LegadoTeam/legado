@@ -1078,10 +1078,13 @@ class TextChapterLayout(
         }
         val widthsArray = allocateFloatArray(text.length)
         textPaint.getTextWidthsCompat(text, widthsArray, reviewCharWidth)
+        val chapterStart = chapterPosition()
         // Compress the glyph advance before adding the separate capsule/icon space.
         val compressor = if (isTitle) null else punctuationCompressor
-        compressor?.beginParagraph(text, widthsArray, punctuationCompressMode)
-        val chapterStart = chapterPosition()
+        val metricOverrides = if (highlightSpacing.hasTextMetrics) BooleanArray(text.length) {
+            highlightSpacing[chapterStart + it]?.metricStyle != null
+        } else null
+        compressor?.beginParagraph(text, widthsArray, punctuationCompressMode, metricOverrides)
         val (leftInset, rightInset) = highlightLineInsets(chapterStart, chapterStart + text.length)
         val availableLineWidth = (visibleWidth - leftInset - rightInset).coerceAtLeast(1)
         for (index in text.indices) {

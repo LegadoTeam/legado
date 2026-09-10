@@ -112,6 +112,22 @@ class HighlightGroupUiTest {
                 loaded
             }
             onView(withId(R.id.btn_style)).inRoot(isDialog()).perform(click())
+            instrumentation.runOnMainSync {
+                val sheet = WindowInspector.getGlobalWindowViews().single { it.hasWindowFocus() }
+                    .findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+                com.google.android.material.bottomsheet.BottomSheetBehavior.from(sheet).state =
+                    com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+            }
+            await {
+                var expanded = false
+                instrumentation.runOnMainSync {
+                    val sheet = WindowInspector.getGlobalWindowViews().single { it.hasWindowFocus() }
+                        .findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+                    expanded = com.google.android.material.bottomsheet.BottomSheetBehavior.from(sheet).state ==
+                        com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+                }
+                expanded
+            }
         }
         fun edit(id: Int, value: Int?) {
             onView(withId(id)).inRoot(isDialog()).perform(scrollTo(), click())

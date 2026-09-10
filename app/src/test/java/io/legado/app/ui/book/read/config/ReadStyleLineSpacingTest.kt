@@ -60,7 +60,8 @@ class ReadStyleLineSpacingTest {
 
         assertTrue(provider.contains("lineSpacingExtra = ReadBookConfig.lineSpacingExtra / 10f"))
         assertTrue(layout.contains("durY += lineHeight * lineSpacingExtra"))
-        assertTrue(layout.contains("durY += textHeight * lineSpacing"))
+        assertTrue(layout.contains("val lineHeight = lineHeights[lineIndex]"))
+        assertTrue(layout.contains("durY += lineHeight * lineSpacing"))
     }
 
     private fun projectFile(pathInApp: String): File {

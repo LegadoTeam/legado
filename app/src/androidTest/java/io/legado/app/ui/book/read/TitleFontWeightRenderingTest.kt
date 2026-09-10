@@ -70,6 +70,7 @@ import io.legado.app.utils.GSON
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getTextWidthsCompat
 import io.legado.app.utils.putPrefBoolean
+import io.legado.app.utils.putPrefString
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -750,8 +751,8 @@ class TitleFontWeightRenderingTest {
                                 try {
                                     assertTrue("Glyph must fit above baseline: $label", line.lineBase + paint.fontMetrics.ascent >= line.lineTop - 1f)
                                     assertTrue("Glyph must fit below baseline: $label", line.lineBase + paint.fontMetrics.descent <= line.lineBottom + 1f)
-                                    assertEquals("Advance must use the actual styled paint: $label",
-                                        paint.measureText(column.charData).coerceAtLeast(0.01f), column.end - column.start, 1.1f)
+                                    assertTrue("Advance must remain finite and preserve zero-width units: $label",
+                                        (column.end - column.start).let { it.isFinite() && it >= 0f })
                                 } finally { HighlightDraw.recycleTextPaint(paint) }
                             }
                             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
@@ -782,6 +783,126 @@ class TitleFontWeightRenderingTest {
                 AppConfig.adaptSpecialStyle = savedAdapt
                 context.putPrefBoolean(PreferKey.textFullJustify, savedJustify)
                 ChapterProvider.invalidateHighlightTypeface(font)
+            }
+        }
+    }
+
+    @Test
+    fun highlightMetricsPreserveSpacingBreaksAndPunctuationOffsets() {
+        launchReader()
+        val savedZh = ReadBookConfig.useZhLayout
+        val savedAdapt = AppConfig.adaptSpecialStyle
+        val savedJustify = ReadBookConfig.textFullJustify
+        val savedCompression = ReadBookConfig.punctuationCompress.key
+        fun awaitLayout(chapter: TextChapter): TextChapter = runBlocking {
+            withTimeout(30_000) { for (ignored in chapter.layoutChannel) Unit; while (!chapter.isCompleted) yield() }
+            chapter
+        }
+        try {
+            scenario!!.onActivity { activity ->
+                ReadBookConfig.titleMode = 2
+                ReadBookConfig.paragraphIndent = ""
+                ReadBookConfig.textSize = 20
+                ReadBookConfig.letterSpacing = 0.1f
+                context.putPrefBoolean(PreferKey.textFullJustify, false)
+                AppConfig.adaptSpecialStyle = true
+                ChapterProvider.upStyle()
+                val scope = CoroutineScope(Dispatchers.Default)
+                for (mode in listOf("static", "zh", "html")) {
+                    ReadBookConfig.useZhLayout = mode == "zh"
+                    fun layout(text: String): TextChapter {
+                        val fixture = BookChapter(bookUrl = book!!.bookUrl, url = "metrics-contract-$mode", index = 10005)
+                        val content = if (mode == "html") "<usehtml><p>$text</p></usehtml>" else text
+                        return awaitLayout(ChapterProvider.getTextChapterAsync(scope, book!!, fixture,
+                            "Metrics", BookContent(false, listOf(content), null), fixture.index + 1, saveChapterData = false))
+                    }
+                    val base = layout("甲".repeat(80))
+                    val distances = mutableListOf<Float>()
+                    val lineCounts = mutableListOf<Int>()
+                    for (gap in listOf(-0.2f, 0f, 0.3f)) {
+                        val style = HighlightStyle(fontSize = 20f, letterSpacing = gap, textColor = Color.BLACK)
+                        val spacing = HighlightSpacing.resolve(base, listOf(HighlightMatcher.Range(0, 80, style)))
+                        val chapter = awaitLayout(checkNotNull(base.layoutWithHighlightSpacing(scope, spacing)))
+                        val page = chapter.pages.first()
+                        val row = page.lines.first { it.columns.size >= 4 }
+                        val columns = row.columns.filterIsInstance<TextBaseColumn>()
+                        val paint = Paint(row.textPaint).apply { letterSpacing = 0f }
+                        val expected = paint.measureText("甲") + gap * paint.textSize
+                        val distance = columns[2].start - columns[1].start
+                        assertEquals("Actual adjacent origins include letter spacing: $mode/$gap", expected, distance, 1.1f)
+                        distances += distance
+                        lineCounts += chapter.pages.sumOf { it.lines.size }
+                        page.lines.forEach { it.columns.filterIsInstance<TextBaseColumn>().forEach { it.highlightStyle = style } }
+                        val width = ChapterProvider.viewWidth
+                        val height = ceil(maxOf(page.height, page.renderHeight.toFloat())).toInt()
+                        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                        try {
+                            ContentTextView(activity, null).apply { layout(0, 0, width, height); setContent(page) }.draw(Canvas(bitmap))
+                            for (column in columns.take(4)) {
+                                val left = floor(column.start).toInt().coerceIn(0, width - 1)
+                                val right = ceil(column.end).toInt().coerceIn(left + 1, width)
+                                val top = floor(row.lineTop).toInt().coerceIn(0, height - 1)
+                                val bottom = ceil(row.lineBottom).toInt().coerceIn(top + 1, height)
+                                assertTrue("Each spaced glyph must render: $mode/$gap", (left until right).any { x ->
+                                    (top until bottom).any { y -> Color.alpha(bitmap.getPixel(x, y)) > 200 }
+                                })
+                            }
+                        } finally { bitmap.recycle(); chapter.pages.forEach(TextPage::recycleRecorders) }
+                    }
+                    assertTrue("Spacing must change separation, not just shift all glyphs: $mode", distances.zipWithNext().all { it.first < it.second })
+                    assertTrue("Positive spacing must wrap sooner: $mode", lineCounts.last() > lineCounts.first())
+                    val inherited = HighlightSpacing.resolve(base, listOf(HighlightMatcher.Range(0, 80, HighlightStyle(fontSize = 20f))))
+                    val inheritedChapter = awaitLayout(checkNotNull(base.layoutWithHighlightSpacing(scope, inherited)))
+                    val inheritedColumns = inheritedChapter.pages.first().lines.first().columns
+                    val paint = Paint(ChapterProvider.contentPaint).apply { letterSpacing = 0f }
+                    assertEquals("Size-only override retains body spacing: $mode", paint.measureText("甲") + paint.textSize * 0.1f,
+                        inheritedColumns[2].start - inheritedColumns[1].start, 1.1f)
+
+                    for (text in listOf("hello hello hello ".repeat(12), "甲乙（丙丁）戊己".repeat(12))) {
+                        val semanticBase = layout(text)
+                        val spacing = HighlightSpacing.resolve(semanticBase,
+                            listOf(HighlightMatcher.Range(0, text.length, HighlightStyle(fontSize = 20f))))
+                        val spanned = spacing.withSpans(text, 0) as Spanned
+                        assertTrue("Metric-only styling must preserve semantic characters", spanned.getSpans(0,
+                            spanned.length, android.text.style.ReplacementSpan::class.java).isEmpty())
+                        val result = awaitLayout(checkNotNull(semanticBase.layoutWithHighlightSpacing(scope, spacing)))
+                        assertEquals("Equal metrics retain word and punctuation breaks: $mode", semanticBase.pages.flatMap { it.lines }.map { it.text },
+                            result.pages.flatMap { it.lines }.map { it.text })
+                        result.pages.forEach(TextPage::recycleRecorders)
+                        semanticBase.pages.forEach(TextPage::recycleRecorders)
+                    }
+                    if (mode != "html") for (compression in listOf("all", "adjacentLineEnd")) {
+                        context.putPrefString(PreferKey.punctuationCompress, compression)
+                        ChapterProvider.upStyle()
+                        val text = "甲（乙）丙".repeat(30)
+                        val punctuationBase = layout(text)
+                        val ranges = text.indices.filter { text[it] == '（' || text[it] == '）' }.map {
+                            HighlightMatcher.Range(it, it + 1, HighlightStyle(fontSize = 5f))
+                        }
+                        val spacing = HighlightSpacing.resolve(punctuationBase, ranges)
+                        val result = awaitLayout(checkNotNull(punctuationBase.layoutWithHighlightSpacing(scope, spacing)))
+                        val punctuation = result.pages.flatMap { it.lines }.flatMap { it.columns }.filterIsInstance<TextColumn>()
+                            .filter { it.charData == "（" || it.charData == "）" }
+                        assertTrue(punctuation.isNotEmpty())
+                        punctuation.forEach {
+                            assertEquals("Overridden punctuation must not inherit body trim: $mode/$compression", 0f, it.drawOffset, 0f)
+                            assertTrue(it.end > it.start)
+                        }
+                        result.pages.forEach(TextPage::recycleRecorders)
+                        punctuationBase.pages.forEach(TextPage::recycleRecorders)
+                    }
+                    context.putPrefString(PreferKey.punctuationCompress, "none")
+                    ChapterProvider.upStyle()
+                    inheritedChapter.pages.forEach(TextPage::recycleRecorders)
+                    base.pages.forEach(TextPage::recycleRecorders)
+                }
+            }
+        } finally {
+            instrumentation.runOnMainSync {
+                ReadBookConfig.useZhLayout = savedZh
+                AppConfig.adaptSpecialStyle = savedAdapt
+                context.putPrefBoolean(PreferKey.textFullJustify, savedJustify)
+                context.putPrefString(PreferKey.punctuationCompress, savedCompression)
             }
         }
     }

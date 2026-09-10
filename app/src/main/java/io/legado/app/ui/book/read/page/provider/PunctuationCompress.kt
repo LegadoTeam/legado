@@ -138,12 +138,16 @@ internal class PunctuationCompressor(private val paint: TextPaint) {
      * 字距可为负,补偿量最大可达裁剪量的一半,反推会把没压的判成压了
      */
     private var compressedAt = BooleanArray(0)
+    private var excludedPositions: BooleanArray? = null
 
     /**
      * 段落排版开始,重置挤压记录并执行与行位置无关的挤压
      * 挤压后的字宽同时供断行与列排布使用,断行能多排下被挤压让出的宽度
      */
-    fun beginParagraph(text: String, widths: FloatArray, mode: PunctuationCompressMode) {
+    fun beginParagraph(text: String, widths: FloatArray, mode: PunctuationCompressMode,
+        excludedPositions: BooleanArray? = null) {
+        // ponytail: metric overrides stay uncompressed; per-style trim measurement can restore compression.
+        this.excludedPositions = excludedPositions
         if (compressedAt.size < text.length) {
             compressedAt = BooleanArray(text.length)
         } else {
@@ -211,6 +215,7 @@ internal class PunctuationCompressor(private val paint: TextPaint) {
             if (PunctuationCompressRule.classOf(index) != PunctuationCompressRule.classClose) {
                 return false
             }
+            if (excludedPositions?.getOrNull(position) == true) return false
             measure(index)
             if (trims[index] <= minTrim) return false
             //段落内已挤压过的不再压
@@ -244,6 +249,7 @@ internal class PunctuationCompressor(private val paint: TextPaint) {
     }
 
     private fun compressAt(index: Int, widths: FloatArray, position: Int) {
+        if (excludedPositions?.getOrNull(position) == true) return
         measure(index)
         if (trims[index] <= minTrim) return
         //同一个字只压一次
