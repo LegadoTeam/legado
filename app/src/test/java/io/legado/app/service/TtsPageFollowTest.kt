@@ -38,7 +38,7 @@ class TtsPageFollowTest {
         assertTrue(service.contains("private val playbackSessionId = AtomicLong()"))
         assertTrue(service.contains("speakCurrent("))
         assertTrue(service.contains("TextToSpeech.QUEUE_FLUSH"))
-        assertTrue(service.contains("utteranceId(sessionId, index)"))
+        assertTrue(service.contains("utteranceId(sessionId, index, position, last)"))
         assertTrue(service.contains("callbackHandler.post"))
         assertTrue(service.contains("if (sessionId != playbackSessionId.get()) return"))
         assertTrue(service.contains("if (sessionId == playbackSessionId.get()) block()"))

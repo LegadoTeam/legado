@@ -55,6 +55,14 @@
             android:key="streamReadAloudAudio"
             app:iconSpaceReserved="false" />
 
+        <io.legado.app.lib.prefs.NameListPreference
+            android:key="readAloudStart"
+            android:title="@string/read_aloud_start"
+            android:defaultValue="sentence"
+            android:entries="@array/read_aloud_start_entries"
+            android:entryValues="@array/read_aloud_start_values"
+            app:iconSpaceReserved="false" />
+
         <io.legado.app.lib.prefs.Preference
             android:key="readAloudControls"
             android:title="@string/read_aloud_controls"

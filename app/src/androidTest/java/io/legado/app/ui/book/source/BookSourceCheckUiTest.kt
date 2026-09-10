@@ -25,8 +25,10 @@ import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.R
+import io.legado.app.constant.BookType
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
+import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookSource
 import io.legado.app.databinding.ItemBookSourceBinding
 import io.legado.app.help.config.LocalConfig
@@ -106,6 +108,69 @@ class BookSourceCheckUiTest {
         CheckSource.checkInfo = savedFlags[3]
         CheckSource.checkCategory = savedFlags[4]
         CheckSource.checkContent = savedFlags[5]
+    }
+
+    @Test fun bookshelfCountsTrackCurrentSourcesAndShelfChangesWithoutLosingSelection() {
+        val books = (0..4).map { index -> Book(
+            bookUrl = "https://count.invalid/$id/$index", name = "Count $id $index",
+            origin = sources[if (index == 2) 1 else 0].bookSourceUrl,
+            type = BookType.text or when (index) {
+                3 -> BookType.notShelf
+                4 -> BookType.local
+                else -> 0
+            }
+        ) }
+        try {
+            scenario!!.onActivity { it.findViewById<SearchView>(R.id.search_view).setQuery("group:$group", false) }
+            awaitItems(sources.take(2).map { it.bookSourceUrl })
+            awaitBookshelfCounts(0, 0)
+            scenario!!.onActivity {
+                val list = it.findViewById<RecyclerView>(R.id.recycler_view)
+                ItemBookSourceBinding.bind(list.findViewHolderForAdapterPosition(0)!!.itemView).cbBookSource.performClick()
+            }
+            appDb.bookDao.insert(*books.toTypedArray())
+            awaitBookshelfCounts(2, 1)
+            screenshot("source-bookshelf-two-and-one")
+            books[0].origin = sources[1].bookSourceUrl
+            appDb.bookDao.update(books[0])
+            awaitBookshelfCounts(1, 2)
+            appDb.bookDao.delete(books[1])
+            awaitBookshelfCounts(0, 2)
+            scenario!!.onActivity {
+                val adapter = it.findViewById<RecyclerView>(R.id.recycler_view).adapter as BookSourceAdapter
+                assertEquals(listOf(sources[0].bookSourceUrl), adapter.selection.map { source -> source.bookSourceUrl })
+                assertEquals(sources.take(2).map { source -> source.bookSourceUrl }, adapter.getItems().map { source -> source.bookSourceUrl })
+            }
+            books[3].type = BookType.text
+            appDb.bookDao.update(books[3])
+            awaitBookshelfCounts(1, 2)
+            books[2].type = BookType.text or BookType.notShelf
+            appDb.bookDao.update(books[2])
+            awaitBookshelfCounts(1, 1)
+            scenario!!.onActivity { it.findViewById<SearchView>(R.id.search_view).setQuery(sources[0].bookSourceUrl, false) }
+            awaitItems(listOf(sources[0].bookSourceUrl))
+            scenario!!.recreate()
+            awaitItems(listOf(sources[0].bookSourceUrl))
+            awaitBookshelfCounts(1)
+            appDb.bookDao.delete(books[3])
+            awaitBookshelfCounts(0)
+            screenshot("source-bookshelf-zero-filtered-recreated")
+        } finally {
+            appDb.bookDao.delete(*books.toTypedArray())
+        }
+    }
+
+    private fun awaitBookshelfCounts(vararg expected: Int) = waitUntil {
+        var matches = false
+        scenario!!.onActivity { activity ->
+            val list = activity.findViewById<RecyclerView>(R.id.recycler_view)
+            matches = expected.indices.all { index ->
+                val row = list.findViewHolderForAdapterPosition(index)?.itemView
+                row != null && ItemBookSourceBinding.bind(row).tvBookshelfCount.text.toString() ==
+                    context.getString(R.string.source_bookshelf_count, expected[index])
+            } && !list.hasPendingAdapterUpdates() && !list.isComputingLayout
+        }
+        matches
     }
 
     @Test fun statusFilterIntersectsGroupAndSurvivesRecreation() {

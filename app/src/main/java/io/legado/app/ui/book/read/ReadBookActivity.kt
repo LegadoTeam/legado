@@ -1678,9 +1678,15 @@ class ReadBookActivity : BaseReadBookActivity(),
                 // 跨章：打开朗读所在章节并精确定位到朗读字符位置。
                 // openChapter 会先脱离跟随, 故在加载完成回调里再恢复跟随。
                 val durChapterPos = chapterStart.coerceAtLeast(0)
+                val bookUrl = ReadBook.book?.bookUrl
                 ReadBook.openChapter(speakingChapterIndex, durChapterPos) {
-                    ReadAloud.restoreReadAloudFollow()
-                    upTextChapterAloudSpan(chapterStart)
+                    if (BaseReadAloudService.isRun && ReadBook.book?.bookUrl == bookUrl &&
+                        ReadBook.durChapterIndex == speakingChapterIndex &&
+                        ReadAloud.readAloudChapterIndex == speakingChapterIndex
+                    ) {
+                        ReadAloud.restoreReadAloudFollow()
+                        upTextChapterAloudSpan(ReadAloud.readAloudChapterStart)
+                    }
                 }
             }
 
@@ -2409,21 +2415,21 @@ class ReadBookActivity : BaseReadBookActivity(),
                             ReadBook.openChapter(index, line.chapterPosition, false) {
                                 ReadBook.readAloud(
                                     startPos = line.pagePosition,
-                                    rewindToSentenceStart = true
+                                    rewindToSentenceStart = AppConfig.readAloudStartAtSentence
                                 )
                             }
                         } else {
                             ReadBook.durChapterPos = line.chapterPosition
                             ReadBook.readAloud(
                                 startPos = line.pagePosition,
-                                rewindToSentenceStart = true
+                                rewindToSentenceStart = AppConfig.readAloudStartAtSentence
                             )
                         }
                     } else {
-                        ReadBook.readAloud(rewindToSentenceStart = true)
+                        ReadBook.readAloud(rewindToSentenceStart = AppConfig.readAloudStartAtSentence)
                     }
                 } else {
-                    ReadBook.readAloud(rewindToSentenceStart = true)
+                    ReadBook.readAloud(rewindToSentenceStart = AppConfig.readAloudStartAtSentence)
                 }
             }
 
@@ -2438,18 +2444,18 @@ class ReadBookActivity : BaseReadBookActivity(),
                             ReadBook.openChapter(index, line.chapterPosition, false) {
                                 ReadBook.readAloud(
                                     startPos = line.pagePosition,
-                                    rewindToSentenceStart = true
+                                    rewindToSentenceStart = AppConfig.readAloudStartAtSentence
                                 )
                             }
                         } else {
                             ReadBook.durChapterPos = line.chapterPosition
                             ReadBook.readAloud(
                                 startPos = line.pagePosition,
-                                rewindToSentenceStart = true
+                                rewindToSentenceStart = AppConfig.readAloudStartAtSentence
                             )
                         }
                     } else {
-                        ReadBook.readAloud(rewindToSentenceStart = true)
+                        ReadBook.readAloud(rewindToSentenceStart = AppConfig.readAloudStartAtSentence)
                     }
                 } else {
                     ReadAloud.resume(this)
@@ -2988,7 +2994,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                 scheduleAloudFollowCheck()
                 return@observeEventSticky
             }
-            lifecycleScope.launch(IO) {
+            lifecycleScope.launch(Main.immediate) {
                 if (BaseReadAloudService.shouldApplySpeechProgressToVisibleReader(
                         isSpeechPlaying = BaseReadAloudService.isPlay()
                     )
@@ -2997,9 +3003,15 @@ class ReadBookActivity : BaseReadBookActivity(),
                         ReadBook.durChapterPos = chapterStart
                         val pageIndex = ReadBook.durPageIndex
                         val aloudSpanStart = chapterStart - textChapter.getReadLength(pageIndex)
-                        textChapter.getPage(pageIndex)
-                            ?.upPageAloudSpan(aloudSpanStart)
-                        upContent()
+                        val page = textChapter.getPage(pageIndex)
+                        page?.upPageAloudSpan(aloudSpanStart)
+                        if (readView.isTouching && readView.curPage.textPage === page) {
+                            // Same-page speech ranges must not cancel the user's pending swipe.
+                            readView.curPage.invalidateContentView()
+                            readView.submitRenderTask()
+                        } else {
+                            upContent()
+                        }
                     }
                 }
             }

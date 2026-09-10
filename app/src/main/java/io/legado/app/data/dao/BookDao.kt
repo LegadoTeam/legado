@@ -67,6 +67,9 @@ interface BookDao {
     )
     fun flowBookshelfBooks(): Flow<List<BookshelfBook>>
 
+    @Query("SELECT origin FROM books WHERE type & ${BookType.notShelf} = 0 AND type & ${BookType.local} = 0")
+    fun flowBookshelfSourceOrigins(): Flow<List<String>>
+
     @Query("SELECT * FROM books WHERE type & ${BookType.audio} > 0")
     fun flowAudio(): Flow<List<Book>>
 
