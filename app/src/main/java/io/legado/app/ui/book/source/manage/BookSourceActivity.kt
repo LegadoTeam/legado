@@ -213,6 +213,7 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
         menu.findItem(R.id.menu_show_source_check_status).isChecked = showCheckStatus
+        menu.findItem(R.id.menu_block_source_navigation).isChecked = AppConfig.blockSourceNavigation
         groupMenu = menu.findItem(R.id.menu_group).subMenu
         val sortSubMenu = menu.findItem(R.id.action_sort).subMenu!!
         sortSubMenu.findItem(R.id.menu_sort_desc).isChecked = !sortAscending
@@ -314,6 +315,10 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
             }
 
             R.id.menu_help -> showHelp("SourceMBookHelp")
+            R.id.menu_block_source_navigation -> {
+                AppConfig.blockSourceNavigation = !AppConfig.blockSourceNavigation
+                item.isChecked = AppConfig.blockSourceNavigation
+            }
             R.id.menu_show_source_check_status -> {
                 showCheckStatus = !showCheckStatus
                 AppConfig.showSourceCheckStatus = showCheckStatus

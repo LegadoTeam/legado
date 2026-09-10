@@ -38,6 +38,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     var showSourceCheckStatus: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.showSourceCheckStatus, false)
         set(value) = appCtx.putPrefBoolean(PreferKey.showSourceCheckStatus, value)
+    var blockSourceNavigation: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.blockSourceNavigation, false)
+        set(value) = appCtx.putPrefBoolean(PreferKey.blockSourceNavigation, value)
     var useAntiAlias = appCtx.getPrefBoolean(PreferKey.antiAlias)
     var userAgent: String = getPrefUserAgent()
     var customHosts = appCtx.getPrefString(PreferKey.customHosts)
