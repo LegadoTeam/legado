@@ -14,7 +14,7 @@ data class ReaderInfoValues(
 
 sealed interface ReaderInfoPart {
     data class Text(val value: String) : ReaderInfoPart
-    data class BatteryIcon(val level: Int) : ReaderInfoPart
+    data class BatteryIcon(val level: Int, val showLevel: Boolean = false) : ReaderInfoPart
 }
 
 object ReaderInfoTemplate {
@@ -23,6 +23,7 @@ object ReaderInfoTemplate {
     const val TIME = "{时间}"
     const val BATTERY = "{电量}"
     const val BATTERY_ICON = "{电量图标}"
+    const val BATTERY_NUMBER_ICON = "{电量图标数值}"
     const val PAGE = "{页码}"
     const val TOTAL_PAGES = "{总页数}"
     const val READ_PROGRESS = "{阅读进度}"
@@ -30,7 +31,7 @@ object ReaderInfoTemplate {
     const val TOTAL_CHAPTERS = "{章节总数}"
 
     val placeholders = listOf(
-        BOOK_NAME, CHAPTER_TITLE, TIME, BATTERY, BATTERY_ICON,
+        BOOK_NAME, CHAPTER_TITLE, TIME, BATTERY, BATTERY_ICON, BATTERY_NUMBER_ICON,
         PAGE, TOTAL_PAGES, READ_PROGRESS, CHAPTER, TOTAL_CHAPTERS,
     )
 
@@ -44,12 +45,12 @@ object ReaderInfoTemplate {
             text.append(value)
         }
 
-        fun appendBatteryIcon() {
+        fun appendBatteryIcon(showLevel: Boolean = false) {
             if (text.isNotEmpty()) {
                 parts.add(ReaderInfoPart.Text(text.toString()))
                 text.clear()
             }
-            parts.add(ReaderInfoPart.BatteryIcon(battery))
+            parts.add(ReaderInfoPart.BatteryIcon(battery, showLevel))
         }
 
         while (index < template.length) {
@@ -97,6 +98,7 @@ object ReaderInfoTemplate {
                 token == TIME -> appendText(values.time)
                 token == BATTERY -> appendText("$battery%")
                 token == BATTERY_ICON -> appendBatteryIcon()
+                token == BATTERY_NUMBER_ICON -> appendBatteryIcon(showLevel = true)
                 token == PAGE -> appendText(values.page)
                 token == TOTAL_PAGES -> appendText(values.totalPages)
                 token == READ_PROGRESS -> appendText(values.readProgress)
