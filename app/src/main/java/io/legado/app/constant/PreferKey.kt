@@ -50,6 +50,7 @@ object PreferKey {
     const val hideNavigationBar = "hideNavigationBar"
     const val precisionSearch = "precisionSearch"
     const val searchResultFilter = "searchResultFilter"
+    const val readAloudStart = "readAloudStart"
     const val readAloudByPage = "readAloudByPage"
     const val readAloudFollowManualPage = "readAloudFollowManualPage"
     const val readAloudControlsRealtime = "readAloudControlsRealtime"

@@ -31,6 +31,12 @@ data class TextColumn(
             }
             field = value
         }
+    override var isReadAloud: Boolean = false
+        set(value) {
+            if (field != value) textLine.invalidate()
+            field = value
+        }
+
     override var isSearchResult: Boolean = false
         set(value) {
             if (field != value) {
@@ -65,13 +71,13 @@ data class TextColumn(
         val textPaint = textLine.textPaint
         val style = highlightStyle
         val styleTextColor = style?.textColor ?: 0
-        val baseTextColor = if (textLine.isReadAloud || isSearchResult) {
+        val baseTextColor = if (isReadAloud || isSearchResult) {
             ReadBookConfig.textAccentColor
         } else {
             textLine.textColor
         }
         val textColor = when {
-            textLine.isReadAloud || isSearchResult -> ReadBookConfig.textAccentColor
+            isReadAloud || isSearchResult -> ReadBookConfig.textAccentColor
             styleTextColor != 0 -> styleTextColor
             else -> textLine.textColor
         }

@@ -729,6 +729,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val readAloudByMediaButton
         get() = appCtx.getPrefBoolean(PreferKey.readAloudByMediaButton, false)
 
+    val readAloudStartAtSentence
+        get() = appCtx.getPrefString(PreferKey.readAloudStart, "sentence") != "page"
+
     val readAloudFollowManualPage
         get() = appCtx.getPrefBoolean(PreferKey.readAloudFollowManualPage, false)
 
