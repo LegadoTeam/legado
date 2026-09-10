@@ -15,7 +15,9 @@ data class HighlightStyle(
     val emphasis: Deco? = null,
     val shadow: Shadow? = null,
     val fontPath: String = "",
-    val pillPaddingScale: Float? = null
+    val pillPaddingScale: Float? = null,
+    val fontSize: Float? = null,
+    val letterSpacing: Float? = null
 ) {
     data class Underline(
         val kind: Kind = Kind.SOLID,
@@ -92,26 +94,37 @@ data class HighlightStyle(
     val resolvedPillPaddingScale: Float
         get() = pillPaddingScale?.takeIf { it.isFinite() }?.coerceIn(0.25f, 2f) ?: 1f
 
+    val resolvedFontSize: Float?
+        get() = fontSize?.takeIf { it.isFinite() }?.coerceIn(5f, 100f)
+
+    val resolvedLetterSpacing: Float?
+        get() = letterSpacing?.takeIf { it.isFinite() }?.coerceIn(-0.5f, 1f)
+
+    val changesTextMetrics: Boolean
+        get() = resolvedFontSize != null || resolvedLetterSpacing != null
+
     val isEmpty: Boolean
         get() = fill == 0 && textColor == 0 && !bold && !italic &&
             underline == null && strike == null && box == null && emphasis == null &&
-            shadow == null && resolvedFontPath.isEmpty()
+            shadow == null && resolvedFontPath.isEmpty() && !changesTextMetrics
 
     val needsPerColumnDraw: Boolean
         get() = textColor != 0 || bold || italic || underline != null || strike != null ||
-            box != null || emphasis != null || shadow != null || resolvedFontPath.isNotEmpty()
+            box != null || emphasis != null || shadow != null || resolvedFontPath.isNotEmpty() || changesTextMetrics
 
     fun normalized(): HighlightStyle {
         val normalizedUnderline = underline?.normalized()
         val normalizedShadow = shadow?.normalized()
         val normalizedPadding = pillPaddingScale?.let { resolvedPillPaddingScale }
         return if (normalizedUnderline === underline && normalizedShadow === shadow &&
-            normalizedPadding == pillPaddingScale
+            normalizedPadding == pillPaddingScale && resolvedFontSize == fontSize &&
+            resolvedLetterSpacing == letterSpacing
         ) {
             this
         } else {
             copy(underline = normalizedUnderline, shadow = normalizedShadow,
-                pillPaddingScale = normalizedPadding)
+                pillPaddingScale = normalizedPadding, fontSize = resolvedFontSize,
+                letterSpacing = resolvedLetterSpacing)
         }
     }
 
@@ -130,7 +143,9 @@ data class HighlightStyle(
                 box = other.box ?: current.box,
                 emphasis = other.emphasis ?: current.emphasis,
                 shadow = other.shadow ?: current.shadow,
-                fontPath = other.resolvedFontPath.ifEmpty { current.resolvedFontPath }
+                fontPath = other.resolvedFontPath.ifEmpty { current.resolvedFontPath },
+                fontSize = other.resolvedFontSize ?: current.resolvedFontSize,
+                letterSpacing = other.resolvedLetterSpacing ?: current.resolvedLetterSpacing
             )
         }
     }

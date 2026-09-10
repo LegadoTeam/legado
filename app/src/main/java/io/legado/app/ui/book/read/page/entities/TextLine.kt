@@ -122,7 +122,7 @@ data class TextLine(
     val hasOverflowTextStyle: Boolean
         get() = styledColumnCount > 0 && textColumns.any {
             (it as? TextBaseColumn)?.highlightStyle?.let { style ->
-                style.shadow != null || style.resolvedFontPath.isNotEmpty()
+                style.shadow != null || style.resolvedFontPath.isNotEmpty() || style.changesTextMetrics
             } == true
         }
     val canvasRecorder = CanvasRecorderFactory.create()
@@ -483,12 +483,12 @@ data class TextLine(
             }
             val fill = style.fill
             val shape = style.resolvedFillShape
-            val textSize = (first as? TextHtmlColumn)?.mTextSize ?: baseTextSize
+            val textSize = HighlightDraw.textSize((first as? TextHtmlColumn)?.mTextSize ?: baseTextSize, style)
             var endIndex = index + 1
             while (endIndex < columns.size) {
                 val next = columns[endIndex] as? TextBaseColumn ?: break
                 val nextStyle = next.highlightStyle ?: break
-                val nextTextSize = (next as? TextHtmlColumn)?.mTextSize ?: baseTextSize
+                val nextTextSize = HighlightDraw.textSize((next as? TextHtmlColumn)?.mTextSize ?: baseTextSize, nextStyle)
                 if (
                     nextStyle.fill == fill &&
                     nextStyle.resolvedFillShape == shape &&
@@ -593,23 +593,22 @@ data class TextLine(
                 continue
             }
             val sizeSensitive = strike != null || box != null
-            val textSize = if (sizeSensitive) {
-                (first as? TextHtmlColumn)?.mTextSize ?: baseTextSize
-            } else {
-                baseTextSize
-            }
+            val textSize = HighlightDraw.textSize(
+                if (sizeSensitive) (first as? TextHtmlColumn)?.mTextSize ?: baseTextSize else baseTextSize, style)
             var endIndex = index + 1
             while (endIndex < columns.size) {
                 val next = columns[endIndex] as? TextBaseColumn ?: break
                 val nextStyle = next.highlightStyle
                 val sameTextSize = !sizeSensitive ||
-                    ((next as? TextHtmlColumn)?.mTextSize ?: baseTextSize) == textSize
+                    HighlightDraw.textSize((next as? TextHtmlColumn)?.mTextSize ?: baseTextSize, nextStyle) == textSize
                 if (
                     nextStyle != null &&
                     nextStyle.underline == underline &&
                     nextStyle.strike == strike &&
                     nextStyle.box == box &&
                     nextStyle.textColor == style.textColor &&
+                    (!(style.changesTextMetrics || nextStyle.changesTextMetrics) ||
+                        nextStyle.resolvedFontPath == style.resolvedFontPath) &&
                     sameTextSize
                 ) {
                     endIndex++
@@ -620,14 +619,19 @@ data class TextLine(
             val last = columns[endIndex - 1] as TextBaseColumn
             val fallbackColor = style.textColor.takeIf { it != 0 } ?: textColor
             val metricScale = textSize / baseTextSize
+            val customMetrics = if (style.changesTextMetrics) {
+                val base = Paint(textPaint).apply { this.textSize = (first as? TextHtmlColumn)?.mTextSize ?: baseTextSize }
+                val paint = HighlightDraw.obtainTextPaint(base, style, fallbackColor, first.charData)
+                try { paint.fontMetrics } finally { HighlightDraw.recycleTextPaint(paint) }
+            } else null
             HighlightDraw.drawRun(
                 canvas,
                 first.start,
                 last.end,
                 baseline,
                 height,
-                fontMetrics.ascent * metricScale,
-                fontMetrics.descent * metricScale,
+                customMetrics?.ascent ?: (fontMetrics.ascent * metricScale),
+                customMetrics?.descent ?: (fontMetrics.descent * metricScale),
                 underline.takeIf { underlineBeforeText },
                 strike.takeIf { !underlineBeforeText },
                 box.takeIf { !underlineBeforeText },

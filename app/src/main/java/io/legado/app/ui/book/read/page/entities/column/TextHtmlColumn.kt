@@ -100,7 +100,7 @@ data class TextHtmlColumn(
         }
         val styledPaint = style?.takeIf {
             it.textColor != 0 || it.bold || it.italic || it.shadow != null ||
-                it.resolvedFontPath.isNotEmpty()
+                it.resolvedFontPath.isNotEmpty() || it.changesTextMetrics
         }?.let { HighlightDraw.obtainTextPaint(textPaint, it, textColor, charData) }
         drawText(canvas, y, styledPaint ?: textPaint)
         styledPaint?.let(HighlightDraw::recycleTextPaint)

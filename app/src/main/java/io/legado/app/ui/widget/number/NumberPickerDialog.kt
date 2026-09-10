@@ -13,6 +13,7 @@ class NumberPickerDialog(context: Context, private val isDecimalMode: Boolean = 
     private var maxValue: Int? = null
     private var minValue: Int? = null
     private var value: Int? = null
+    private var displayedValues: Array<String>? = null
 
     init {
         builder.setView(R.layout.dialog_number_picker)
@@ -35,6 +36,11 @@ class NumberPickerDialog(context: Context, private val isDecimalMode: Boolean = 
 
     fun setValue(value: Int): NumberPickerDialog {
         this.value = value
+        return this
+    }
+
+    fun setDisplayedValues(values: Array<String>): NumberPickerDialog {
+        displayedValues = values
         return this
     }
 
@@ -75,6 +81,7 @@ class NumberPickerDialog(context: Context, private val isDecimalMode: Boolean = 
                     ((minValue!! + i) / 10.0).toString()
                 }
             }
+            displayedValues?.let { np.displayedValues = it }
         }
     }
 }

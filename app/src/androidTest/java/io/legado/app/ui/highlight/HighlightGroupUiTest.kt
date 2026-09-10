@@ -24,6 +24,7 @@ import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.closeSoftKeyboard
 import androidx.test.espresso.action.ViewActions.replaceText
+import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.action.ViewActions.pressBack as backAction
 import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.assertion.ViewAssertions.matches
@@ -96,6 +97,68 @@ class HighlightGroupUiTest {
         scenario?.close()
         dao.deleteAll()
         if (savedRules.isNotEmpty()) dao.insert(*savedRules.toTypedArray())
+    }
+
+    @Test fun fontSizeAndNegativeSpacingPersistAndResetThroughTheActualStyleDialog() {
+        fun openStyle() {
+            onView(allOf(withId(R.id.iv_edit), hasSibling(withText("[Characters] Alice")))).perform(click())
+            await {
+                var loaded = false
+                instrumentation.runOnMainSync {
+                    loaded = WindowInspector.getGlobalWindowViews().any {
+                        it.hasWindowFocus() && it.findViewById<View>(R.id.btn_ok)?.isEnabled == true
+                    }
+                }
+                loaded
+            }
+            onView(withId(R.id.btn_style)).inRoot(isDialog()).perform(click())
+            instrumentation.runOnMainSync {
+                val sheet = WindowInspector.getGlobalWindowViews().single { it.hasWindowFocus() }
+                    .findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+                com.google.android.material.bottomsheet.BottomSheetBehavior.from(sheet).state =
+                    com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+            }
+            await {
+                var expanded = false
+                instrumentation.runOnMainSync {
+                    val sheet = WindowInspector.getGlobalWindowViews().single { it.hasWindowFocus() }
+                        .findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+                    expanded = com.google.android.material.bottomsheet.BottomSheetBehavior.from(sheet).state ==
+                        com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+                }
+                expanded
+            }
+        }
+        fun edit(id: Int, value: Int?) {
+            onView(withId(id)).inRoot(isDialog()).perform(scrollTo(), click())
+            if (value != null) instrumentation.runOnMainSync {
+                val picker = WindowInspector.getGlobalWindowViews().single { it.hasWindowFocus() }
+                    .findViewById<NumberPicker>(R.id.number_picker)
+                picker.value = value
+                if (id == R.id.tv_highlight_letter_spacing) assertEquals("-20%", picker.displayedValues[value])
+            }
+            onView(withId(if (value == null) android.R.id.button3 else android.R.id.button1))
+                .inRoot(isDialog()).perform(click())
+        }
+        fun save() {
+            onView(withId(R.id.tv_highlight_font_size)).inRoot(isDialog()).perform(backAction())
+            onView(withId(R.id.btn_ok)).inRoot(isDialog()).perform(click())
+        }
+        openStyle()
+        edit(R.id.tv_highlight_font_size, 42)
+        edit(R.id.tv_highlight_letter_spacing, 30)
+        screenshot("highlight-font-metrics-settings")
+        save()
+        await { dao.all.first().styleObj().let { it.fontSize == 42f && it.letterSpacing == -0.2f } }
+        scenario!!.recreate()
+        awaitRules(dao.all)
+        openStyle()
+        onView(withId(R.id.tv_highlight_font_size)).inRoot(isDialog()).perform(scrollTo())
+            .check(matches(withText(context.getString(R.string.text_size) + " · 42")))
+        edit(R.id.tv_highlight_font_size, null)
+        edit(R.id.tv_highlight_letter_spacing, null)
+        save()
+        await { dao.all.first().styleObj().let { it.fontSize == null && it.letterSpacing == null } }
     }
 
     @Test fun pillMarginEditsPersistAndResetThroughTheActualStyleDialog() {
@@ -414,7 +477,15 @@ class HighlightGroupUiTest {
         lateinit var window: Window
         lateinit var bitmap: Bitmap
         scenario!!.onActivity { activity ->
-            window = groupDialog(activity)?.dialog?.window ?: activity.window
+            fun focusedWindow(fragment: androidx.fragment.app.Fragment): Window? {
+                if (!fragment.isAdded) return null
+                return (fragment as? androidx.fragment.app.DialogFragment)?.dialog?.window
+                    ?.takeIf { it.decorView.hasWindowFocus() }
+                    ?: fragment.childFragmentManager.fragments.firstNotNullOfOrNull(::focusedWindow)
+            }
+            window = activity.supportFragmentManager.fragments.firstNotNullOfOrNull(::focusedWindow)
+                ?: activity.window
+            if (name == "highlight-font-metrics-settings") assertTrue(window !== activity.window)
             val decor = window.decorView
             assertTrue(decor.isHardwareAccelerated)
             bitmap = Bitmap.createBitmap(decor.width, decor.height, Bitmap.Config.ARGB_8888)
