@@ -35,6 +35,8 @@ import io.legado.app.utils.runCatchingCancellable
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.withContext
+import io.legado.app.help.source.SuppressSourceNavigation
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -322,7 +324,7 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
     }
 
     private fun search(operation: Long) {
-        task = viewModelScope.launch(searchPool!!) {
+        task = viewModelScope.launch(searchPool!! + SuppressSourceNavigation) {
             flow {
                 for (bs in bookSourceParts) {
                     bs.getBookSource()?.let {
@@ -576,7 +578,7 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
     }
 
     private fun refreshList(books: List<SearchBook>, operation: Long) {
-        task = viewModelScope.launch(searchPool!!) {
+        task = viewModelScope.launch(searchPool!! + SuppressSourceNavigation) {
             flow {
                 for (searchBook in books) {
                     emit(searchBook)
@@ -681,7 +683,7 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
         changeSourceTask?.cancel()
         changeSourceCancelable.value = true
         changeSourceLoading.value = true
-        changeSourceTask = execute {
+        changeSourceTask = execute(context = IO + SuppressSourceNavigation) {
             if (book.isWebFile) {
                 val source = appDb.bookSourceDao.getBookSource(book.origin)
                     ?: throw NoStackTraceException("书源不存在")
@@ -722,17 +724,18 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
         changeSourceCancelable.value = true
     }
 
-    suspend fun getToc(book: Book): Result<Pair<List<BookChapter>, BookSource>> {
-        return runCatchingCancellable {
-            val source = appDb.bookSourceDao.getBookSource(book.origin)
-                ?: throw NoStackTraceException("书源不存在")
-            if (book.tocUrl.isEmpty()) {
-                WebBook.getBookInfoAwait(source, book)
+    suspend fun getToc(book: Book): Result<Pair<List<BookChapter>, BookSource>> =
+        withContext(SuppressSourceNavigation) {
+            runCatchingCancellable {
+                val source = appDb.bookSourceDao.getBookSource(book.origin)
+                    ?: throw NoStackTraceException("书源不存在")
+                if (book.tocUrl.isEmpty()) {
+                    WebBook.getBookInfoAwait(source, book)
+                }
+                val toc = WebBook.getChapterListAwait(source, book).getOrThrow()
+                Pair(toc, source)
             }
-            val toc = WebBook.getChapterListAwait(source, book).getOrThrow()
-            Pair(toc, source)
         }
-    }
 
     fun disableSource(searchBook: SearchBook) {
         execute {
@@ -788,7 +791,7 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
         changeSourceTask?.cancel()
         changeSourceCancelable.value = false
         changeSourceLoading.value = true
-        changeSourceTask = execute {
+        changeSourceTask = execute(context = IO + SuppressSourceNavigation) {
             currentResults().forEach {
                 if (it.origin != deleteAfterChange.origin && it.type == bookType) {
                     val book = it.toBook()

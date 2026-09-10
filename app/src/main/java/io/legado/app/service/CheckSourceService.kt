@@ -21,6 +21,7 @@ import io.legado.app.exception.TocEmptyException
 import io.legado.app.help.IntentData
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.source.exploreKinds
+import io.legado.app.help.source.SuppressSourceNavigation
 import io.legado.app.model.CheckSource
 import io.legado.app.model.CheckSourceResult
 import io.legado.app.model.CheckSourceStatus
@@ -43,6 +44,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.htmlunit.corejs.javascript.WrappedException
 import splitties.init.appCtx
@@ -278,7 +280,7 @@ class CheckSourceService : BaseService() {
         var succeeded = true
         kotlin.runCatching {
             withTimeout(CheckSource.timeout) {
-                doCheckSource(source, sessionId)
+                withContext(SuppressSourceNavigation) { doCheckSource(source, sessionId) }
             }
         }.onFailure {
             currentCoroutineContext().ensureActive()

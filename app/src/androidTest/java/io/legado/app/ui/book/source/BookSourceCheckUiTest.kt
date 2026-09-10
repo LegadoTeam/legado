@@ -10,6 +10,18 @@ import android.widget.Spinner
 import androidx.core.net.toUri
 import androidx.appcompat.widget.SearchView
 import androidx.test.core.app.ActivityScenario
+import androidx.recyclerview.widget.RecyclerView
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.Espresso.openActionBarOverflowOrOptionsMenu
+import androidx.test.espresso.UiController
+import androidx.test.espresso.ViewAction
+import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.matcher.RootMatchers.isPlatformPopup
+import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
+import androidx.test.espresso.matcher.ViewMatchers.withId
+import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.R
@@ -54,6 +66,7 @@ class BookSourceCheckUiTest {
     private val savedHelp = LocalConfig.all["bookSourceHelpVersion"]
     private val preferences = context.defaultSharedPreferences
     private val savedShowStatus = preferences.all[PreferKey.showSourceCheckStatus] as? Boolean
+    private val savedBlockNavigation = preferences.all[PreferKey.blockSourceNavigation] as? Boolean
     private val savedIgnore = HashMap(BackupConfig.ignoreConfig)
     private val savedLastBackup = LocalConfig.lastBackup
     private var archive: File? = null
@@ -63,6 +76,7 @@ class BookSourceCheckUiTest {
 
     @Before fun setup() {
         preferences.edit().remove(PreferKey.showSourceCheckStatus).commit()
+        preferences.edit().remove(PreferKey.blockSourceNavigation).commit()
         LocalConfig.edit().putInt("bookSourceHelpVersion", 1).commit()
         appDb.bookSourceDao.insert(*sources.toTypedArray())
         scenario = ActivityScenario.launch(BookSourceActivity::class.java)
@@ -80,6 +94,8 @@ class BookSourceCheckUiTest {
         preferences.edit().apply {
             if (savedShowStatus == null) remove(PreferKey.showSourceCheckStatus)
             else putBoolean(PreferKey.showSourceCheckStatus, savedShowStatus)
+            if (savedBlockNavigation == null) remove(PreferKey.blockSourceNavigation)
+            else putBoolean(PreferKey.blockSourceNavigation, savedBlockNavigation)
         }.commit()
         BackupConfig.ignoreConfig.clear()
         BackupConfig.ignoreConfig.putAll(savedIgnore)
@@ -118,12 +134,45 @@ class BookSourceCheckUiTest {
         assertStatusVisibility(false)
     }
 
-    @Test fun defaultHiddenStatusToggleIsIncludedInRealSettingsBackup(): Unit = runBlocking {
+    @Test fun defaultOffStatusAndNavigationTogglesAreIncludedInRealSettingsBackup(): Unit = runBlocking {
         scenario!!.onActivity {
             it.findViewById<SearchView>(R.id.search_view).setQuery("group:$group", false)
         }
         awaitItems(sources.take(2).map { it.bookSourceUrl })
         assertFalse(AppConfig.showSourceCheckStatus)
+        assertFalse(AppConfig.blockSourceNavigation)
+        scenario!!.onActivity {
+            val menu = it.findViewById<TitleBar>(R.id.title_bar).menu
+            val ids = (0 until menu.size()).map { index -> menu.getItem(index).itemId }
+            val navigation = ids.indexOf(R.id.menu_block_source_navigation)
+            assertEquals(ids.indexOf(R.id.menu_show_source_check_status) + 1, navigation)
+            assertEquals(navigation + 1, ids.indexOf(R.id.menu_help))
+            assertNotNull(menu.findItem(R.id.menu_block_source_navigation).icon)
+        }
+        openActionBarOverflowOrOptionsMenu(context)
+        onView(withId(R.id.recycler_view)).inRoot(isPlatformPopup()).perform(object : ViewAction {
+            override fun getConstraints() = isAssignableFrom(RecyclerView::class.java)
+            override fun getDescription() = "Scroll the overflow menu to its final settings"
+            override fun perform(uiController: UiController, view: View) {
+                val recycler = view as RecyclerView
+                recycler.scrollToPosition(checkNotNull(recycler.adapter).itemCount - 1)
+                uiController.loopMainThreadUntilIdle()
+            }
+        })
+        val navigationItem = onView(withText(R.string.block_source_navigation)).inRoot(isPlatformPopup())
+        navigationItem.check(matches(isDisplayed()))
+        checkNotNull(instrumentation.uiAutomation.takeScreenshot()).useBitmap { bitmap ->
+            val directory = File(context.getExternalFilesDir(null), "ui-regression").apply { mkdirs() }
+            File(directory, "source-navigation-menu.png").outputStream().use {
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+        }
+        navigationItem.perform(click())
+        scenario!!.onActivity {
+            assertTrue(it.findViewById<TitleBar>(R.id.title_bar).menu
+                .findItem(R.id.menu_block_source_navigation).isChecked)
+        }
+        assertTrue(AppConfig.blockSourceNavigation)
         assertStatusVisibility(false)
         screenshot("source-check-default-hidden")
         toggleStatus()
@@ -150,13 +199,18 @@ class BookSourceCheckUiTest {
             val entry = checkNotNull(zip.getEntry("config.xml"))
             val xml = zip.getInputStream(entry).bufferedReader().use { it.readText() }
             assertTrue(xml.contains("name=\"showSourceCheckStatus\" value=\"true\""))
+            assertTrue(xml.contains("name=\"blockSourceNavigation\" value=\"true\""))
         }
         AppConfig.showSourceCheckStatus = false
+        AppConfig.blockSourceNavigation = false
         Restore.restoreOrThrow(context, backup.toUri(), lanTransfer = true)
         assertTrue(AppConfig.showSourceCheckStatus)
+        assertTrue(AppConfig.blockSourceNavigation)
         scenario = ActivityScenario.launch(BookSourceActivity::class.java)
         scenario!!.onActivity {
             assertEquals(View.VISIBLE, it.findViewById<Spinner>(R.id.check_status_filter).visibility)
+            assertTrue(it.findViewById<TitleBar>(R.id.title_bar).menu
+                .findItem(R.id.menu_block_source_navigation).isChecked)
         }
     }
 
