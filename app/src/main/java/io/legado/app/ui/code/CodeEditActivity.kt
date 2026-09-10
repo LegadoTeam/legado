@@ -115,6 +115,12 @@ class CodeEditActivity :
     private var themeIndex = -1
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        // SavedStateHandle is available only after BaseActivity has called super.onCreate.
+        if (!isInitialized) {
+            viewModel.initSora()
+            isInitialized = true
+        }
+        upTheme(if (isDark) AppConfig.editThemeDark else AppConfig.editTheme)
         onBackPressedDispatcher.addCallback(this) { finish() }
         softKeyboardTool.attachToWindow(window)
         editor.colorScheme = TextMateColorScheme2.create(ThemeRegistry.getInstance()) //先设置颜色,避免一开始的白屏
@@ -723,21 +729,6 @@ class CodeEditActivity :
         if (editNonPrintable != null) {
             editor.nonPrintablePaintingFlags = editNonPrintable
         }
-    }
-
-    override fun initTheme() {
-        super.initTheme()
-        if (!isInitialized) {
-            viewModel.initSora()
-            isInitialized = true
-        }
-        val index = if (isDark) {
-            AppConfig.editThemeDark
-        } else {
-            AppConfig.editTheme
-        }
-        upTheme(index)
-        themeIndex = index
     }
 
     override fun upTheme(index: Int) {
