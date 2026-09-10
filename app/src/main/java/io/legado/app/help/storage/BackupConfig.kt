@@ -167,7 +167,12 @@ object BackupConfig {
         PreferKey.coverShowAuthorN,
         PreferKey.coverHorizontal,
         PreferKey.coverTitleAdaptive,
-        PreferKey.coverKeepPunctuation
+        PreferKey.coverKeepPunctuation,
+        PreferKey.coverCustomFontSize,
+        PreferKey.coverTitleLargeSize,
+        PreferKey.coverTitleSmallSize,
+        PreferKey.coverAuthorLargeSize,
+        PreferKey.coverAuthorSmallSize
     )
 
     fun keyIsNotIgnore(key: String): Boolean {

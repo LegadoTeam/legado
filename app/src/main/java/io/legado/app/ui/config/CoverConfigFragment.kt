@@ -27,6 +27,7 @@ import io.legado.app.utils.readUri
 import io.legado.app.utils.removePref
 import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.showDialogFragment
+import io.legado.app.utils.startActivity
 import io.legado.app.utils.toastOnUi
 import splitties.init.appCtx
 import java.io.FileOutputStream
@@ -109,6 +110,9 @@ class CoverConfigFragment : PreferenceFragment(),
     @SuppressLint("PrivateResource")
     override fun onPreferenceTreeClick(preference: Preference): Boolean {
         when (preference.key) {
+            ConfigTag.COVER_FONT_CONFIG -> startActivity<ConfigActivity> {
+                putExtra("configTag", ConfigTag.COVER_FONT_CONFIG)
+            }
             "coverRule" -> showDialogFragment(CoverRuleConfigDialog())
             in coverKeys ->
                 if (getPrefString(preference.key).isNullOrEmpty()) {

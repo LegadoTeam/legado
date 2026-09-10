@@ -7,13 +7,21 @@ import android.os.SystemClock
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.view.View
+import android.widget.NumberPicker
 import java.io.File
 import android.widget.FrameLayout
 import androidx.core.content.FileProvider
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.UiController
+import androidx.test.espresso.ViewAction
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.matcher.ViewMatchers.withText
+import androidx.test.espresso.matcher.ViewMatchers.withId
+import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.constant.PreferKey
@@ -23,11 +31,15 @@ import io.legado.app.ui.about.AboutActivity
 import io.legado.app.ui.config.ConfigActivity
 import io.legado.app.ui.config.ConfigTag
 import io.legado.app.ui.config.CoverConfigFragment
+import io.legado.app.ui.config.CoverFontConfigFragment
 import io.legado.app.ui.file.HandleFileActivity
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.R
 import io.legado.app.utils.defaultSharedPreferences
 import io.legado.app.utils.externalFiles
+import io.legado.app.lib.theme.backgroundColor
+import io.legado.app.lib.theme.accentColor
+import org.hamcrest.Matcher
 import org.junit.After
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -56,6 +68,11 @@ class CoverTitleAdaptiveUiTest {
             .putBoolean(PreferKey.coverHorizontal, false)
             .putBoolean(PreferKey.coverTitleAdaptive, true)
             .putBoolean(PreferKey.coverKeepPunctuation, true)
+            .putBoolean(PreferKey.coverCustomFontSize, false)
+            .putInt(PreferKey.coverTitleLargeSize, 100)
+            .putInt(PreferKey.coverTitleSmallSize, 100)
+            .putInt(PreferKey.coverAuthorLargeSize, 100)
+            .putInt(PreferKey.coverAuthorSmallSize, 100)
             .commit()
         AppConfig.useDefaultCover = false
         BookCover.upDefaultCover()
@@ -94,6 +111,130 @@ class CoverTitleAdaptiveUiTest {
                 adaptive.contentEquals(fixed))
             assertTrue("both renders contain visible cover pixels", adaptive.any { it != 0 } && fixed.any { it != 0 })
         }
+    }
+
+    @Test
+    fun customSizesChangeActualPixelsAndDisablingRestoresBothOriginalStyles() {
+        for (horizontal in listOf(false, true)) for (adaptive in listOf(false, true)) {
+            preferences.edit().putBoolean(PreferKey.coverHorizontal, horizontal)
+                .putBoolean(PreferKey.coverTitleAdaptive, adaptive)
+                .putBoolean(PreferKey.coverCustomFontSize, false)
+                .putBoolean(PreferKey.coverShowAuthor, true).commit()
+            val original = renderText("风雪长夜里的第一卷山海传奇", "长名字作者示例")
+            preferences.edit().putBoolean(PreferKey.coverCustomFontSize, true)
+                .putInt(PreferKey.coverTitleLargeSize, 145).putInt(PreferKey.coverTitleSmallSize, 150)
+                .putInt(PreferKey.coverAuthorLargeSize, 130).putInt(PreferKey.coverAuthorSmallSize, 150).commit()
+            val changed = renderText("风雪长夜里的第一卷山海传奇", "长名字作者示例")
+            assertFalse("custom sizes must change pixels: horizontal=$horizontal adaptive=$adaptive",
+                original.contentEquals(changed))
+            screenshot("cover-custom-$horizontal-$adaptive")
+            preferences.edit().putBoolean(PreferKey.coverCustomFontSize, false).commit()
+            val restored = renderText("风雪长夜里的第一卷山海传奇", "长名字作者示例")
+            assertArrayEquals("disabled sizes preserve the original style exactly", original, restored)
+            screenshot("cover-original-$horizontal-$adaptive")
+        }
+    }
+
+    @Test
+    fun eachTitleAndAuthorSizeReachesHorizontalAndVerticalRendering() {
+        val samples = listOf(
+            Triple(PreferKey.coverTitleLargeSize, "山海", "作者"),
+            Triple(PreferKey.coverTitleSmallSize, "风雪长夜里的第一卷山海传奇天地悠悠", "作者"),
+            Triple(PreferKey.coverAuthorLargeSize, "山海", "作者"),
+            Triple(PreferKey.coverAuthorSmallSize, "山海", "这是一位名字特别长的作者用来检查字号"),
+        )
+        for (horizontal in listOf(false, true)) for ((key, title, author) in samples) {
+            preferences.edit().putBoolean(PreferKey.coverHorizontal, horizontal)
+                .putBoolean(PreferKey.coverTitleAdaptive, true)
+                .putBoolean(PreferKey.coverShowAuthor, true)
+                .putBoolean(PreferKey.coverCustomFontSize, true).apply {
+                    samples.forEach { putInt(it.first, 100) }
+                }.commit()
+            val original = renderText(title, author)
+            preferences.edit().putInt(key, 160).commit()
+            val changed = renderText(title, author)
+            assertFalse("$key must affect actual pixels: horizontal=$horizontal", original.contentEquals(changed))
+        }
+    }
+
+    @Test
+    fun fontSizeMenuPersistsAllFourPickersAcrossRecreation() {
+        scenario?.close()
+        scenario = null
+        val sizes = listOf(PreferKey.coverTitleLargeSize to R.string.cover_title_large_size,
+            PreferKey.coverTitleSmallSize to R.string.cover_title_small_size,
+            PreferKey.coverAuthorLargeSize to R.string.cover_author_large_size,
+            PreferKey.coverAuthorSmallSize to R.string.cover_author_small_size)
+        ActivityScenario.launch<ConfigActivity>(Intent(context, ConfigActivity::class.java)
+            .putExtra("configTag", ConfigTag.COVER_CONFIG)).use { settings ->
+            settings.onActivity {
+                (it.supportFragmentManager.findFragmentByTag(ConfigTag.COVER_CONFIG) as CoverConfigFragment)
+                    .scrollToPreference(ConfigTag.COVER_FONT_CONFIG)
+            }
+            onView(withText(R.string.cover_font_config)).perform(click())
+            onView(withText(R.string.cover_custom_font_size)).perform(click())
+            sizes.forEachIndexed { index, (_, label) ->
+                onView(withText(label)).perform(click())
+                onView(withId(R.id.number_picker)).perform(object : ViewAction {
+                    override fun getDescription() = "select cover font percentage"
+                    override fun getConstraints(): Matcher<View> = isAssignableFrom(NumberPicker::class.java)
+                    override fun perform(uiController: UiController, view: View) {
+                        (view as NumberPicker).value = 110 + index * 10
+                        uiController.loopMainThreadUntilIdle()
+                    }
+                })
+                onView(withId(android.R.id.button1)).perform(click())
+            }
+            var before: ConfigActivity? = null
+            instrumentation.runOnMainSync {
+                before = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED)
+                    .filterIsInstance<ConfigActivity>().single()
+                before!!.recreate()
+            }
+            val deadline = SystemClock.uptimeMillis() + 5000
+            var restored: ConfigActivity? = null
+            while (restored == null && SystemClock.uptimeMillis() < deadline) {
+                instrumentation.runOnMainSync {
+                    restored = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED)
+                        .filterIsInstance<ConfigActivity>().firstOrNull { it !== before &&
+                            it.supportFragmentManager.findFragmentByTag(ConfigTag.COVER_FONT_CONFIG) is CoverFontConfigFragment }
+                }
+                SystemClock.sleep(50)
+            }
+            assertTrue("font settings activity recreated", restored != null)
+            assertTrue(preferences.getBoolean(PreferKey.coverCustomFontSize, false))
+            sizes.forEachIndexed { index, (key, _) -> assertEquals(110 + index * 10, preferences.getInt(key, 0)) }
+            screenshot("cover-font-settings-restored")
+            instrumentation.runOnMainSync { restored!!.finish() }
+        }
+    }
+
+    private fun renderText(title: String, author: String): IntArray {
+        instrumentation.runOnMainSync {
+            BookCover.upDefaultCover()
+            cover!!.load(path = null, name = title, author = author)
+            cover!!.invalidate()
+        }
+        val field = CoverImageView::class.java.getDeclaredField("currentNameBitmap").apply { isAccessible = true }
+        val deadline = SystemClock.uptimeMillis() + 5000
+        while (SystemClock.uptimeMillis() < deadline) {
+            var pixels: IntArray? = null
+            instrumentation.runOnMainSync {
+                val view = cover!!
+                if (view.width <= 0 || view.height <= 0) return@runOnMainSync
+                val expected = coverBitmapCacheKey(title, author, view.width, view.height,
+                    BookCover.drawBookNameHorizontal, BookCover.drawBookAuthor,
+                    context.backgroundColor, context.accentColor, BookCover.adaptiveTitleSize, BookCover.fontSizes)
+                val ready = (field.get(view) as? Pair<*, *>)?.first == expected
+                val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+                view.draw(Canvas(bitmap))
+                if (ready) pixels = bitmap.getPixels()
+                bitmap.recycle()
+            }
+            if (pixels != null) return pixels!!
+            SystemClock.sleep(50)
+        }
+        error("requested cover settings did not render")
     }
 
     @Test
