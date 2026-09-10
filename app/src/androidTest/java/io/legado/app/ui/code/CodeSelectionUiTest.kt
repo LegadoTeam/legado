@@ -172,15 +172,45 @@ class CodeSelectionUiTest {
         awaitEditor { selection(it) == "before" && actions(it).isShowing }
     }
 
-    private fun launchEditor(readOnly: Boolean = false) {
+    @Test fun savedDraftUsesTheCallersRequestedTransport() {
+        val large = "中文 draft 🌍\n".repeat(2_000)
+        for ((fileMode, expected) in listOf(true to large, false to large, true to "短文本")) {
+            var returnedFile: String? = null
+            try {
+                launchEditor(forResult = true, fileMode = fileMode)
+                withEditor { it.setText(expected) }
+                awaitEditor { it.text.toString() == expected }
+                onView(withId(R.id.menu_save)).perform(click())
+                val result = scenario!!.result
+                assertEquals(Activity.RESULT_OK, result.resultCode)
+                val data = checkNotNull(result.resultData)
+                returnedFile = data.getStringExtra("textFile")
+                if (fileMode && expected == large) {
+                    assertFalse("Large drafts must stay out of the result Bundle", data.hasExtra("text"))
+                    assertNotNull(returnedFile)
+                    assertEquals(expected, CodeTextTransfer.read(context, returnedFile!!))
+                } else {
+                    assertNull(returnedFile)
+                    assertEquals(expected, data.getStringExtra("text"))
+                }
+            } finally {
+                CodeTextTransfer.delete(context, returnedFile)
+                scenario?.close()
+                scenario = null
+            }
+        }
+    }
+
+    private fun launchEditor(readOnly: Boolean = false, forResult: Boolean = false, fileMode: Boolean = false) {
         val intent = Intent(context, CodeEditActivity::class.java).putExtra("title", "Code selection regression")
+            .putExtra("useTextFile", fileMode)
         if (readOnly) {
             CacheManager.putMemory(cacheKey, source)
             intent.putExtra("cacheKey", cacheKey)
         } else {
             intent.putExtra("text", source)
         }
-        scenario = ActivityScenario.launch(intent)
+        scenario = if (forResult) ActivityScenario.launchActivityForResult(intent) else ActivityScenario.launch(intent)
         awaitEditor { it.isShown && it.width > 0 && it.text.toString() == source && it.hasFocus() }
         // The activity restores its initial cursor after 360ms; start gestures after that real callback.
         val restored = CountDownLatch(1)
