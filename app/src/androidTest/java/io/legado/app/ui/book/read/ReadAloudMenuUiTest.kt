@@ -391,8 +391,9 @@ class ReadAloudMenuUiTest {
         scenario!!.onActivity { activity ->
             val dialog = activity.supportFragmentManager.findFragmentByTag("aloud-start-config") as ReadAloudConfigDialog
             dialog.childFragmentManager.executePendingTransactions()
-            val screen = (dialog.childFragmentManager.fragments.single() as
-                ReadAloudConfigDialog.ReadAloudPreferenceFragment).preferenceScreen
+            val fragment = dialog.childFragmentManager.fragments.single() as
+                ReadAloudConfigDialog.ReadAloudPreferenceFragment
+            val screen = fragment.preferenceScreen
             val category = screen.getPreference(0) as androidx.preference.PreferenceGroup
             for (index in 0 until category.preferenceCount) {
                 when (category.getPreference(index).key) {
@@ -400,11 +401,16 @@ class ReadAloudMenuUiTest {
                     "readAloudControls" -> controlsOrder = index
                 }
             }
+            fragment.scrollToPreference(PreferKey.readAloudStart)
             category.findPreference<androidx.preference.Preference>(PreferKey.readAloudStart)!!.performClick()
         }
+        assertTrue(startOrder >= 0)
         assertEquals("Initial start appears immediately above playback controls", startOrder + 1, controlsOrder)
+        onView(withText(R.string.read_aloud_start_page)).inRoot(isDialog()).check(matches(isDisplayed()))
+        screenshot("aloud-start-options-default-sentence")
         onView(withText(R.string.read_aloud_start_page)).inRoot(isDialog()).perform(click())
         assertFalse(AppConfig.readAloudStartAtSentence)
+        onView(withText(R.string.read_aloud_start)).check(matches(isDisplayed()))
         screenshot("aloud-start-page-choice")
         pressBack()
         val directory = File(context.cacheDir, "aloud-start-backup-${System.nanoTime()}")
@@ -431,8 +437,11 @@ class ReadAloudMenuUiTest {
                 val fragment = dialog.childFragmentManager.fragments.single() as ReadAloudConfigDialog.ReadAloudPreferenceFragment
                 val preference = fragment.findPreference<androidx.preference.ListPreference>(PreferKey.readAloudStart)!!
                 assertEquals("page", preference.value)
+                fragment.scrollToPreference(PreferKey.readAloudStart)
                 preference.performClick()
             }
+            onView(withText(R.string.read_aloud_start_sentence)).inRoot(isDialog()).check(matches(isDisplayed()))
+            screenshot("aloud-start-options-restored-page")
             onView(withText(R.string.read_aloud_start_sentence)).inRoot(isDialog()).perform(click())
             assertTrue(AppConfig.readAloudStartAtSentence)
             screenshot("aloud-start-sentence-choice")
@@ -472,10 +481,11 @@ class ReadAloudMenuUiTest {
             field("ttsInitFinish").setBoolean(service, true)
         }
         val listener = field("ttsUtteranceListener").get(service) as UtteranceProgressListener
+        var previousId: String? = null
         try {
-            for (mode in listOf("sentence", "page")) {
+            for (splitByPage in listOf(false, true)) for (mode in listOf("sentence", "page")) {
                 prefs.edit().putString(PreferKey.readAloudStart, mode)
-                    .putBoolean(PreferKey.readAloudByPage, false).commit()
+                    .putBoolean(PreferKey.readAloudByPage, splitByPage).commit()
                 recorder.calls.clear()
                 var expected = 0
                 var requested = 0
@@ -494,6 +504,14 @@ class ReadAloudMenuUiTest {
                         recorder.calls.last().id.split(':')[2].toInt() == service.contentList.lastIndex
                 }
                 val calls = synchronized(recorder.calls) { recorder.calls.toList() }
+                previousId?.let { staleId ->
+                    listener.onStart(staleId)
+                    listener.onRangeStart(staleId, 123, 124, 0)
+                    instrumentation.waitForIdleSync()
+                    assertEquals("Old queued callbacks cannot move the new session", expected,
+                        ReadAloud.readAloudChapterStart)
+                }
+                previousId = calls.first().id
                 assertEquals(expected, calls.first().position)
                 assertEquals(ReadBook.curTextChapter!!.getPageIndexByCharIndex(expected), service.pageIndex)
                 assertEquals(TextToSpeech.QUEUE_FLUSH, calls.first().mode)
@@ -515,13 +533,14 @@ class ReadAloudMenuUiTest {
                 await("a range on the same page updates the real cursor and highlighted characters") {
                     ReadAloud.readAloudChapterStart == samePagePosition && exactAloudStart(samePagePosition)
                 }
-                screenshot("aloud-start-$mode-exact-character")
+                screenshot("aloud-start-$mode-split-$splitByPage-exact-character")
                 val next = calls[1]
-                assertFalse("First chunk ends at a page boundary inside this paragraph", calls.first().last)
+                assertEquals("Only explicit page segmentation ends this speech paragraph", splitByPage, calls.first().last)
                 val paragraphBefore = service.nowSpeak
                 listener.onDone(calls.first().id)
                 instrumentation.waitForIdleSync()
-                assertEquals("A page chunk does not finish the paragraph", paragraphBefore, service.nowSpeak)
+                assertEquals("Only a final page chunk advances the paragraph",
+                    paragraphBefore + if (splitByPage) 1 else 0, service.nowSpeak)
                 // A range-less engine reports onStart for the already queued next page.
                 listener.onStart(next.id)
                 await("range-less engine follows the next queued page at its actual start") {
@@ -533,8 +552,8 @@ class ReadAloudMenuUiTest {
                 assertEquals("Page following preserves the queued speech session", session,
                     (field("playbackSessionId").get(service) as AtomicLong).get())
                 assertFalse(BaseReadAloudService.pause)
-                screenshot("aloud-start-$mode-next-page")
-                File(context.getExternalFilesDir("ui-regression"), "aloud-start-$mode-queue.txt").writeText(
+                screenshot("aloud-start-$mode-split-$splitByPage-next-page")
+                File(context.getExternalFilesDir("ui-regression"), "aloud-start-$mode-split-$splitByPage-queue.txt").writeText(
                     "requested=$requested, actual=$expected, session=$session, stops=$stops\n" +
                         calls.joinToString("\n") { "${it.id}: mode=${it.mode}, length=${it.text.length}" })
             }
@@ -547,7 +566,9 @@ class ReadAloudMenuUiTest {
     private fun exactAloudStart(position: Int): Boolean {
         val chapter = ReadBook.curTextChapter ?: return false
         val page = chapter.getPageByReadPos(position) ?: return false
-        val line = page.lines.firstOrNull { position in it.chapterIndices } ?: return false
+        val line = page.lines.firstOrNull {
+            position >= it.chapterPosition && position < it.chapterPosition + it.charSize
+        } ?: return false
         if (!page.hasReadAloudSpan || !line.isReadAloud) return false
         var offset = line.chapterPosition
         return page.lines.takeWhile { it !== line }.none { it.isReadAloud } && line.columns.all { column ->

@@ -105,17 +105,21 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
         speakJob?.cancel()
         val startSpeak = nowSpeak
         val startParagraphPos = paragraphStartPos
+        val speechChapter = textChapter ?: return
+        val paragraphs = speechChapter.getParagraphs(readAloudByPage)
+        val pageStarts = speechChapter.pages.map { it.chapterPosition }
+        val queuedContent = contentList
         speakJob = execute {
             LogUtils.d(TAG, "朗读列表大小 ${contentList.size}")
             LogUtils.d(TAG, "朗读页数 ${textChapter?.pageSize}")
             if (textToSpeech == null) throw NoStackTraceException("tts is null")
-            val contentList = contentList
+            val contentList = queuedContent
             var isAddedText = false
             for (i in startSpeak until contentList.size) {
                 ensureActive()
                 if (!isCurrentPlayback(sessionId)) return@execute
                 val paragraphText = contentList[i]
-                val paragraph = checkNotNull(textChapter).getParagraphs(readAloudByPage)[i]
+                val paragraph = paragraphs[i]
                 val firstOffset = if (i == startSpeak) startParagraphPos else 0
                 val text = paragraphText.substring(firstOffset)
                 if (text.matches(AppPattern.notReadAloudRegex)) continue
@@ -123,8 +127,7 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
                 val textEnd = chunkStart + text.length
                 // Queue page boundaries ahead of playback: engines without range callbacks still
                 // report the next page's real start, without an application pause or queue flush.
-                val boundaries = checkNotNull(textChapter).pages.map { it.chapterPosition }
-                    .filter { it > chunkStart && it < textEnd } + textEnd
+                val boundaries = pageStarts.filter { it > chunkStart && it < textEnd } + textEnd
                 for (chunkEnd in boundaries) {
                     val chunk = paragraphText.substring(
                         chunkStart - paragraph.chapterPosition, chunkEnd - paragraph.chapterPosition

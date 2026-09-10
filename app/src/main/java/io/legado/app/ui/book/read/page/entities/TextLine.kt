@@ -131,9 +131,8 @@ data class TextLine(
     var styledColumnCount = 0
     var isReadAloud: Boolean = false
         set(value) {
-            if (field != value) {
-                invalidate()
-            }
+            if (field == value) return
+            invalidate()
             columns.filterIsInstance<TextBaseColumn>().forEach { it.isReadAloud = value }
             if (value) {
                 textPage.hasReadAloudSpan = true

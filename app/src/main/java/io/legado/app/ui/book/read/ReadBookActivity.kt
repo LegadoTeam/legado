@@ -2968,7 +2968,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                 scheduleAloudFollowCheck()
                 return@observeEventSticky
             }
-            lifecycleScope.launch(IO) {
+            lifecycleScope.launch(Main.immediate) {
                 if (BaseReadAloudService.shouldApplySpeechProgressToVisibleReader(
                         isSpeechPlaying = BaseReadAloudService.isPlay()
                     )

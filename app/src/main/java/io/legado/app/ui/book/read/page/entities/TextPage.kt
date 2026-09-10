@@ -221,29 +221,25 @@ data class TextPage(
      * @param aloudSpanStart 朗读文字开始位置
      */
     fun upPageAloudSpan(aloudSpanStart: Int) {
-        removePageAloudSpan()
         var lineStart = 0
-        for (index in textLines.indices) {
-            val textLine = textLines[index]
-            val lineLength = textLine.text.length + if (textLine.isParagraphEnd) 1 else 0
-            if (aloudSpanStart >= lineStart && aloudSpanStart < lineStart + lineLength) {
-                for (i in index until textLines.size) {
-                    if (textLines[i].isParagraphEnd) {
-                        textLines[i].isReadAloud = true
-                        break
-                    } else {
-                        textLines[i].isReadAloud = true
-                    }
-                }
+        var inParagraph = false
+        hasReadAloudSpan = false
+        for (line in textLines) {
+            val lineLength = line.text.length + if (line.isParagraphEnd) 1 else 0
+            val startsHere = aloudSpanStart >= lineStart && aloudSpanStart < lineStart + lineLength
+            if (startsHere) inParagraph = true
+            line.isReadAloud = inParagraph
+            if (inParagraph) hasReadAloudSpan = true
+            if (inParagraph) {
                 var columnStart = lineStart
-                for (column in textLine.columns) {
-                    if (column is TextBaseColumn && columnStart + column.positionLength <= aloudSpanStart) {
-                        column.isReadAloud = false
+                for (column in line.columns) {
+                    if (column is TextBaseColumn) {
+                        column.isReadAloud = !startsHere || columnStart + column.positionLength > aloudSpanStart
                     }
                     columnStart += column.positionLength
                 }
-                break
             }
+            if (line.isParagraphEnd) inParagraph = false
             lineStart += lineLength
         }
     }
