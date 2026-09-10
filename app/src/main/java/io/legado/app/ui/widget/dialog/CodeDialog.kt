@@ -100,12 +100,10 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
             }
             if (code != null) {
                 originalCode = code
+                if (!showingAlternate) binding.codeView.setText(code)
                 if (sourcePreview) {
                     clearAlternateCode()
-                    binding.codeView.setText(code)
                     callback()?.onCodeSave(code, requestId)
-                } else if (!showingAlternate) {
-                    binding.codeView.setText(code)
                 }
             }
             if (!showingAlternate) {
