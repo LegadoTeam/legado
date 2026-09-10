@@ -10,6 +10,7 @@ import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.normalizeFileName
 import io.legado.app.utils.renameGroupExact
+import io.legado.app.utils.moveRelativeTo
 import io.legado.app.utils.stackTraceStr
 import io.legado.app.utils.toastOnUi
 import java.io.File
@@ -54,13 +55,16 @@ class RssSourceViewModel(application: Application) : BaseViewModel(application) 
         execute { appDb.rssSourceDao.update(*rssSource) }
     }
 
-    fun upOrder() {
+    fun move(sourceUrl: String, targetUrl: String, after: Boolean) {
         execute {
-            val sources = appDb.rssSourceDao.all
-            for ((index: Int, source: RssSource) in sources.withIndex()) {
-                source.customOrder = index + 1
+            appDb.runInTransaction {
+                val current = appDb.rssSourceDao.all
+                val reordered = moveRelativeTo(current, sourceUrl, targetUrl, after) { it.sourceUrl }
+                if (reordered == current) return@runInTransaction
+                appDb.rssSourceDao.update(*reordered.mapIndexed { index, item ->
+                    item.copy(customOrder = index)
+                }.toTypedArray())
             }
-            appDb.rssSourceDao.update(*sources.toTypedArray())
         }
     }
 

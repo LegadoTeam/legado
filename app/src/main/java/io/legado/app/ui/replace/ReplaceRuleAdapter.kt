@@ -174,31 +174,33 @@ class ReplaceRuleAdapter(context: Context, var callBack: CallBack) :
         }
     }
 
+    private var dragStartPosition = RecyclerView.NO_POSITION
+    private var draggedKey: Long? = null
+
     override fun swap(srcPosition: Int, targetPosition: Int): Boolean {
-        val srcItem = getItem(srcPosition)
-        val targetItem = getItem(targetPosition)
-        if (srcItem != null && targetItem != null) {
-            if (srcItem.order == targetItem.order) {
-                callBack.upOrder()
-            } else {
-                val srcOrder = srcItem.order
-                srcItem.order = targetItem.order
-                targetItem.order = srcOrder
-                movedItems.add(srcItem)
-                movedItems.add(targetItem)
-            }
+        val source = getItem(srcPosition) ?: return false
+        if (getItem(targetPosition) == null) return false
+        if (dragStartPosition == RecyclerView.NO_POSITION) {
+            dragStartPosition = srcPosition
+            draggedKey = source.id
+        } else if (source.id != draggedKey) {
+            return false
         }
         swapItem(srcPosition, targetPosition)
         return true
     }
 
-    private val movedItems = linkedSetOf<ReplaceRule>()
-
     override fun onClearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
-        if (movedItems.isNotEmpty()) {
-            callBack.update(*movedItems.toTypedArray())
-            movedItems.clear()
-        }
+        val start = dragStartPosition
+        val key = draggedKey
+        dragStartPosition = RecyclerView.NO_POSITION
+        draggedKey = null
+        val end = viewHolder.bindingAdapterPosition
+        if (start == RecyclerView.NO_POSITION || end == RecyclerView.NO_POSITION || start == end) return
+        val moved = getItem(end)?.takeIf { it.id == key } ?: return
+        val after = end > start
+        val target = getItem(if (after) end - 1 else end + 1) ?: return
+        callBack.move(moved.id, target.id, after)
     }
 
     val dragSelectCallback: DragSelectTouchHelper.Callback =
@@ -234,7 +236,7 @@ class ReplaceRuleAdapter(context: Context, var callBack: CallBack) :
         fun edit(rule: ReplaceRule)
         fun toTop(rule: ReplaceRule)
         fun toBottom(rule: ReplaceRule)
-        fun upOrder()
+        fun move(ruleId: Long, targetId: Long, after: Boolean)
         fun upCountView()
     }
 }

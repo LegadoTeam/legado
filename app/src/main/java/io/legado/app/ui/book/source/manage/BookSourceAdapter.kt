@@ -324,32 +324,33 @@ class BookSourceAdapter(
         return lastHost != curHost
     }
 
+    private var dragStartPosition = RecyclerView.NO_POSITION
+    private var draggedKey: String? = null
+
     override fun swap(srcPosition: Int, targetPosition: Int): Boolean {
-        val srcItem = getItem(srcPosition)
-        val targetItem = getItem(targetPosition)
-        if (srcItem != null && targetItem != null) {
-            val srcOrder = srcItem.customOrder
-            srcItem.customOrder = targetItem.customOrder
-            targetItem.customOrder = srcOrder
-            movedItems.add(srcItem)
-            movedItems.add(targetItem)
+        val source = getItem(srcPosition) ?: return false
+        if (getItem(targetPosition) == null) return false
+        if (dragStartPosition == RecyclerView.NO_POSITION) {
+            dragStartPosition = srcPosition
+            draggedKey = source.bookSourceUrl
+        } else if (source.bookSourceUrl != draggedKey) {
+            return false
         }
         swapItem(srcPosition, targetPosition)
         return true
     }
 
-    private val movedItems = hashSetOf<BookSourcePart>()
-
     override fun onClearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
-        if (movedItems.isNotEmpty()) {
-            val sortNumberSet = hashSetOf<Int>()
-            movedItems.forEach {
-                sortNumberSet.add(it.customOrder)
-            }
-            val resetAll = movedItems.size > sortNumberSet.size
-            callBack.upOrder(if (resetAll) getItems() else movedItems.toList(), resetAll)
-            movedItems.clear()
-        }
+        val start = dragStartPosition
+        val key = draggedKey
+        dragStartPosition = RecyclerView.NO_POSITION
+        draggedKey = null
+        val end = viewHolder.bindingAdapterPosition
+        if (start == RecyclerView.NO_POSITION || end == RecyclerView.NO_POSITION || start == end) return
+        val moved = getItem(end)?.takeIf { it.bookSourceUrl == key } ?: return
+        val after = end > start
+        val target = getItem(if (after) end - 1 else end + 1) ?: return
+        callBack.move(moved.bookSourceUrl, target.bookSourceUrl, after)
     }
 
     val dragSelectCallback: DragSelectTouchHelper.Callback =
@@ -387,7 +388,7 @@ class BookSourceAdapter(
         fun toBottom(bookSource: BookSourcePart)
         fun searchBook(bookSource: BookSourcePart)
         fun debug(bookSource: BookSourcePart)
-        fun upOrder(items: List<BookSourcePart>, resetAll: Boolean)
+        fun move(sourceUrl: String, targetUrl: String, after: Boolean)
         fun enable(enable: Boolean, bookSource: BookSourcePart)
         fun enableExplore(enable: Boolean, bookSource: BookSourcePart)
         fun upCountView()

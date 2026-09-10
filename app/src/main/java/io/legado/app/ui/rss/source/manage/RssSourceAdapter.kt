@@ -190,31 +190,33 @@ class RssSourceAdapter(context: Context, val callBack: CallBack) :
         }
     }
 
+    private var dragStartPosition = RecyclerView.NO_POSITION
+    private var draggedKey: String? = null
+
     override fun swap(srcPosition: Int, targetPosition: Int): Boolean {
-        val srcItem = getItem(srcPosition)
-        val targetItem = getItem(targetPosition)
-        if (srcItem != null && targetItem != null) {
-            if (srcItem.customOrder == targetItem.customOrder) {
-                callBack.upOrder()
-            } else {
-                val srcOrder = srcItem.customOrder
-                srcItem.customOrder = targetItem.customOrder
-                targetItem.customOrder = srcOrder
-                movedItems.add(srcItem)
-                movedItems.add(targetItem)
-            }
+        val source = getItem(srcPosition) ?: return false
+        if (getItem(targetPosition) == null) return false
+        if (dragStartPosition == RecyclerView.NO_POSITION) {
+            dragStartPosition = srcPosition
+            draggedKey = source.sourceUrl
+        } else if (source.sourceUrl != draggedKey) {
+            return false
         }
         swapItem(srcPosition, targetPosition)
         return true
     }
 
-    private val movedItems = hashSetOf<RssSource>()
-
     override fun onClearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
-        if (movedItems.isNotEmpty()) {
-            callBack.update(*movedItems.toTypedArray())
-            movedItems.clear()
-        }
+        val start = dragStartPosition
+        val key = draggedKey
+        dragStartPosition = RecyclerView.NO_POSITION
+        draggedKey = null
+        val end = viewHolder.bindingAdapterPosition
+        if (start == RecyclerView.NO_POSITION || end == RecyclerView.NO_POSITION || start == end) return
+        val moved = getItem(end)?.takeIf { it.sourceUrl == key } ?: return
+        val after = end > start
+        val target = getItem(if (after) end - 1 else end + 1) ?: return
+        callBack.move(moved.sourceUrl, target.sourceUrl, after)
     }
 
     val dragSelectCallback: DragSelectTouchHelper.Callback =
@@ -250,7 +252,7 @@ class RssSourceAdapter(context: Context, val callBack: CallBack) :
         fun update(vararg source: RssSource)
         fun toTop(source: RssSource)
         fun toBottom(source: RssSource)
-        fun upOrder()
+        fun move(sourceUrl: String, targetUrl: String, after: Boolean)
         fun upCountView()
     }
 }

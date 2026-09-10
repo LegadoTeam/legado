@@ -6,6 +6,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.help.config.ReplacePreviewConfig
 import io.legado.app.utils.renameGroupExact
+import io.legado.app.utils.moveRelativeTo
 
 /**
  * 替换规则数据修改
@@ -60,13 +61,16 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
         }
     }
 
-    fun upOrder() {
+    fun move(ruleId: Long, targetId: Long, after: Boolean) {
         execute {
-            val rules = appDb.replaceRuleDao.all
-            for ((index, rule) in rules.withIndex()) {
-                rule.order = index + 1
+            appDb.runInTransaction {
+                val current = appDb.replaceRuleDao.all
+                val reordered = moveRelativeTo(current, ruleId, targetId, after) { it.id }
+                if (reordered == current) return@runInTransaction
+                appDb.replaceRuleDao.update(*reordered.mapIndexed { index, item ->
+                    item.copy(order = index)
+                }.toTypedArray())
             }
-            appDb.replaceRuleDao.update(*rules.toTypedArray())
         }
     }
 

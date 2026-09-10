@@ -457,8 +457,8 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
         viewModel.toBottom(rule)
     }
 
-    override fun upOrder() {
+    override fun move(ruleId: Long, targetId: Long, after: Boolean) {
         setResult(RESULT_OK)
-        viewModel.upOrder()
+        viewModel.move(ruleId, targetId, after)
     }
 }

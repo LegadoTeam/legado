@@ -1,5 +1,22 @@
 package io.legado.app.utils
 
+internal fun <T, K> moveRelativeTo(
+    allItems: List<T>,
+    movedKey: K,
+    targetKey: K,
+    after: Boolean,
+    keySelector: (T) -> K,
+): List<T> {
+    if (movedKey == targetKey) return allItems
+    val from = allItems.indexOfFirst { keySelector(it) == movedKey }
+    if (from < 0 || allItems.none { keySelector(it) == targetKey }) return allItems
+    return allItems.toMutableList().apply {
+        val item = removeAt(from)
+        val target = indexOfFirst { keySelector(it) == targetKey }
+        add(target + if (after) 1 else 0, item)
+    }
+}
+
 internal fun <T, K> mergeFilteredOrder(
     allItems: List<T>,
     orderedItems: List<T>,
