@@ -18,6 +18,7 @@ import io.legado.app.help.http.decompressed
 import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.source.SourceHelp
+import io.legado.app.model.ReadBook
 import io.legado.app.model.RuleUpdate
 import io.legado.app.model.jsSource.JsSourceConfig
 import io.legado.app.utils.inputStream
@@ -27,6 +28,9 @@ import io.legado.app.utils.isJsonObject
 import io.legado.app.utils.isUri
 import io.legado.app.utils.runCatchingCancellable
 import io.legado.app.utils.splitNotBlank
+import kotlinx.coroutines.Dispatchers.Main
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
 
 
@@ -51,8 +55,9 @@ internal fun resolveImportBookSourceStatus(
 internal fun resolveImportSourceSelection(
     status: ImportBookSourceStatus,
     manualSelection: Boolean?,
+    selectExisting: Boolean = false,
 ): Boolean {
-    return manualSelection ?: status.shouldSelect
+    return manualSelection ?: (selectExisting || status.shouldSelect)
 }
 
 class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
@@ -62,6 +67,9 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
     val errorLiveData = MutableLiveData<String>()
     val successLiveData = MutableLiveData<Int>()
     val sourceUpdatePending = MutableLiveData(false)
+    val importFinished = MutableLiveData(false)
+    private var reimportBookUrl: String? = null
+    private var reimportSourceUrl: String? = null
 
     val allSources = arrayListOf<BookSource>()
     private val sourceCandidates = arrayListOf<BookSourceImportCandidate>()
@@ -115,7 +123,9 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
             return count
         }
 
-    fun importSelect(finally: () -> Unit) {
+    fun importSelect(finally: () -> Unit = {}) {
+        if (sourceUpdatePending.value == true || importFinished.value == true) return
+        sourceUpdatePending.value = true
         execute {
             val group = groupName?.trim()
             val keepName = AppConfig.importKeepName
@@ -153,16 +163,36 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
                     selectSource.add(source)
                 }
             }
-            SourceHelp.insertBookSource(*selectSource.toTypedArray())
-            ContentProcessor.upReplaceRules()
+            // Once confirmed, finish publication even if the dialog is destroyed after the DB write.
+            withContext(NonCancellable) {
+                SourceHelp.insertBookSource(*selectSource.toTypedArray())
+                ContentProcessor.upReplaceRules()
+                val source = reimportSourceUrl?.takeIf { url ->
+                    selectSource.any { it.bookSourceUrl == url }
+                }?.let { appDb.bookSourceDao.getBookSource(it) }
+                withContext(Main) {
+                    val current = ReadBook.book
+                    if (source != null && current != null && current.bookUrl == reimportBookUrl &&
+                        current.origin == reimportSourceUrl) {
+                        ReadBook.bookSource = source
+                    }
+                    importFinished.value = true
+                }
+            }
+        }.onError {
+            errorLiveData.value = "ImportError:${it.localizedMessage}"
+            AppLog.put("ImportError:${it.localizedMessage}", it)
         }.onFinally {
+            sourceUpdatePending.value = false
             finally.invoke()
         }
     }
 
-    fun importSource(text: String) {
+    fun importSource(text: String, reimportBookUrl: String? = null, reimportSourceUrl: String? = null) {
         if (importStarted) return
         importStarted = true
+        this.reimportBookUrl = reimportBookUrl
+        this.reimportSourceUrl = reimportSourceUrl
         executeLazy {
             val mText = text.trim()
             when {
@@ -302,7 +332,8 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
                 checkSources.add(localSource)
                 selectStatus.add(
                     canImportSource(index) &&
-                        resolveImportSourceSelection(status, manualSelection)
+                        resolveImportSourceSelection(status, manualSelection,
+                            selectExisting = reimportSourceUrl == allSources[index].bookSourceUrl)
                 )
                 newSourceStatus.add(status.isNew)
                 updateSourceStatus.add(status.isUpdate)
@@ -344,7 +375,8 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
             allSources[index] = candidate.source(useSourceReplacement)
             checkSources[index] = localSource
             selectStatus[index] = canImportSource(index) &&
-                resolveImportSourceSelection(editedStatus, manualSelections[index])
+                resolveImportSourceSelection(editedStatus, manualSelections[index],
+                    selectExisting = reimportSourceUrl == allSources[index].bookSourceUrl)
             newSourceStatus[index] = editedStatus.isNew
             updateSourceStatus[index] = editedStatus.isUpdate
             successLiveData.value = allSources.size

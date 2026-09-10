@@ -294,4 +294,11 @@ class ImportBookSourceStateTest {
         requireNotNull(file) { "Project file not found: $pathInApp" }
         return file.readText()
     }
+    @Test
+    fun `reimport explicitly selects same timestamp source while allowing cancellation`() {
+        val same = ImportBookSourceStatus(isNew = false, isUpdate = false)
+        assertTrue(resolveImportSourceSelection(same, manualSelection = null, selectExisting = true))
+        assertFalse(resolveImportSourceSelection(same, manualSelection = false, selectExisting = true))
+    }
+
 }

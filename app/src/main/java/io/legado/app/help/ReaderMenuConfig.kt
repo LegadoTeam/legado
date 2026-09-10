@@ -49,6 +49,7 @@ data class ReaderMenuConfig(
             "delRubyTag",
             "delHTag",
             "imageStyle",
+            "reimportSource",
             "updateToc",
             "effectiveReplaces",
             "log",
