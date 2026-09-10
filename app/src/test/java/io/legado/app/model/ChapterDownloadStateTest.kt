@@ -12,6 +12,30 @@ import org.junit.Test
 
 class ChapterDownloadStateTest {
     @Test
+    fun `shelf resource intent survives borrowing failure and replacement but stays in range`() {
+        val state = ChapterDownloadState()
+        state.enqueue(2..4, refreshResources = true)
+        assertFalse(state.requestsResourceRefresh(1))
+        assertFalse(state.requestsResourceRefresh(5))
+        val old = state.claimRead(2).first
+        state.invalidate(listOf(2))
+        assertFalse(state.isCurrent(old))
+        assertTrue(state.requestsResourceRefresh(2))
+        val owner = state.claimRead(2).first
+        assertFalse(state.finish(old, Result.success("obsolete")))
+        state.finish(owner, Result.failure(IllegalStateException("offline")))
+        assertTrue(state.requestsResourceRefresh(2))
+        val retry = state.claimManual(2)!!
+        state.finish(retry, Result.success("text only"), manualComplete = { false })
+        assertTrue(state.requestsResourceRefresh(2))
+        state.finish(state.claimManual(2)!!, Result.success("complete resources"))
+        assertFalse(state.requestsResourceRefresh(2))
+        assertTrue(state.requestsResourceRefresh(3))
+        state.stopManual()
+        assertFalse(state.requestsResourceRefresh(3))
+    }
+
+    @Test
     fun `refresh replaces only target owners and preserves explicit caching`() = runBlocking {
         val state = ChapterDownloadState()
         state.enqueue(listOf(1, 2, 4))
@@ -72,10 +96,29 @@ class ChapterDownloadStateTest {
         val state = ChapterDownloadState()
         val read = state.claimRead(1).first
         state.enqueue(listOf(1))
-        state.finish(read, Result.success("text with images"), manualComplete = false)
+        state.finish(read, Result.success("text with images"), manualComplete = { false })
         assertEquals(listOf(1), state.waitingIndexes())
         state.finish(state.claimManual(1)!!, Result.success("text with images"))
         assertTrue(state.isIdle)
+    }
+
+    @Test
+    fun `completion checks shelf intent atomically and resumes readers outside the lock`() = runBlocking {
+        val state = ChapterDownloadState()
+        val ticket = state.claimRead(1).first
+        val waiter = async(Dispatchers.Unconfined) {
+            val result = ticket.result.await()
+            assertFalse("Reader continuation must not run under the download lock", Thread.holdsLock(state))
+            result!!.getOrThrow()
+        }
+        state.enqueue(listOf(1), refreshResources = true)
+        state.finish(ticket, Result.success("old resources"), manualComplete = {
+            assertTrue("Shelf intent must be checked under the enqueue lock", Thread.holdsLock(state))
+            !state.requestsResourceRefresh(1)
+        })
+        assertEquals("old resources", waiter.await())
+        assertEquals(listOf(1), state.waitingIndexes())
+        assertTrue(state.requestsResourceRefresh(1))
     }
 
     @Test

@@ -560,6 +560,7 @@ class CodeSelectionUiTest {
                     override fun terminateToken(text: CharSequence) = text
                 })
                 assertNull(dialog.binding.codeView.adapter)
+                assertFalse("Code preview must not invoke prose spell checking", dialog.binding.codeView.isSuggestionsEnabled)
             }
             val focusStart = SystemClock.uptimeMillis()
             onView(withId(R.id.code_view)).inRoot(isDialog()).perform(click())
@@ -604,6 +605,7 @@ class CodeSelectionUiTest {
                 view.setText("prefix target")
                 view.setSelection(view.length())
                 assertTrue(view.enoughToFilter())
+                assertFalse("Code completion must not enable prose spell checking", view.isSuggestionsEnabled)
                 assertTrue("An installed completion adapter must still tokenize", tokenCalls > 0)
                 view.dismissDropDown()
             }

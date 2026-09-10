@@ -375,6 +375,13 @@ object BookHelp {
         }
     }
 
+    internal fun resourcesOutdated(book: Book, chapter: BookChapter): Boolean {
+        val fileName = contentSaveFileName(book, chapter) ?: chapter.getFileName()
+        val file = downloadDir.getFile(cacheFolderName, book.getFolderName(), fileName + ".resources")
+        val accepted = runCatching { file.readText().toLong() }.getOrDefault(0L)
+        return accepted != ResourceThemeGeneration.current()
+    }
+
     @Synchronized
     internal fun imageSaveVersion(book: Book, src: String): Long =
         imageVersions[getImage(book, src).absolutePath] ?: 0L
@@ -384,6 +391,7 @@ object BookHelp {
         chapters: List<PendingResourceChapter>,
         images: Map<String, File>,
         imageTokens: Map<String, Long>,
+        generation: Long? = null,
     ) = contentSaveFence.exclusive { synchronized(this) {
         if (chapters.any { !isContentSaveCurrent(it.token) || it.token.folderName != book.getFolderName() ||
                 it.token.key.bookUrl != book.bookUrl || it.token.key.chapterIndex != it.chapter.index } ||
@@ -400,6 +408,13 @@ object BookHelp {
             files[File(current.path + ".reversed")] = null
             files[File(target.path + ".reversed")] = null
             files[target] = pending.file
+            if (generation != null) {
+                if (current != target) files[File(current.path + ".resources")] = null
+                files[File(target.path + ".resources")] =
+                    File(pending.file.parentFile, "generation-${pending.chapter.index}").apply {
+                        writeText(generation.toString())
+                    }
+            }
         }
         images.forEach { (src, file) -> files[getImage(book, src)] = file }
         replaceResourceFiles(files) {
@@ -423,6 +438,7 @@ object BookHelp {
             val path = getImage(book, src).absolutePath
             imageVersions[path] = (imageVersions[path] ?: 0L) + 1L
         }
+        chapters.map { it.copy(token = contentSaveToken(book, it.chapter)) }
     } }
 
     private fun contentSaveFileName(book: Book, bookChapter: BookChapter): String? {
