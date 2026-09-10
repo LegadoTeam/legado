@@ -171,6 +171,8 @@ class CodeView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
     }
 
     init {
+        // Code is an editor: EmojiCompat reprocesses the entire document after each edit.
+        setEmojiCompatEnabled(false)
         if (mAutoCompleteTokenizer == null) {
             mAutoCompleteTokenizer = KeywordTokenizer()
         }

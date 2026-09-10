@@ -895,6 +895,7 @@ class CodeSelectionUiTest {
                 })
                 assertNull(dialog.binding.codeView.adapter)
                 assertFalse("Code preview must not invoke prose spell checking", dialog.binding.codeView.isSuggestionsEnabled)
+                assertFalse("Code preview must not run EmojiCompat over the whole document", dialog.binding.codeView.isEmojiCompatEnabled)
             }
             val focusStart = SystemClock.uptimeMillis()
             onView(withId(R.id.code_view)).inRoot(isDialog()).perform(click())
