@@ -1020,6 +1020,99 @@ class CodeSelectionUiTest {
         }
     }
 
+
+    @Test fun reportedRssPreviewMeasuresOpeningImeAndEditsWithItsActualIcon() {
+        // Pin the reporter's public sample without executing any source JavaScript.
+        val connection = java.net.URL("https://github.com/user-attachments/files/32066159/shareRssSource.json")
+            .openConnection().apply { connectTimeout = 15_000; readTimeout = 15_000 }
+        val bytes = connection.getInputStream().use { it.readBytes() }
+        val digest = java.security.MessageDigest.getInstance("SHA-256").digest(bytes)
+            .joinToString("") { "%02x".format(it.toInt() and 255) }
+        assertEquals("0893a7bf2af946735d331d1e37acdf3aa3bf05f3b5beb45181f736e15509f9a9", digest)
+        val rss = GSON.fromJson(bytes.toString(Charsets.UTF_8), Array<RssSource>::class.java).single()
+        val actual = GSON.toJson(rss)
+        val withoutIcon = GSON.toJson(rss.copy(sourceIcon = ""))
+        launchEditor()
+        val artifacts = checkNotNull(context.getExternalFilesDir("ui-regression"))
+        val report = StringBuilder("sampleSha256=$digest\n")
+        try {
+            for ((label, code) in listOf("actual" to actual, "without-icon" to withoutIcon)) {
+                val dialog = CodeDialog(code, disableEdit = false)
+                var expected = code
+                val opened = SystemClock.uptimeMillis()
+                scenario!!.onActivity { dialog.show(it.supportFragmentManager, "reported-rss-$label") }
+                try {
+                    await {
+                        var ready = false
+                        instrumentation.runOnMainSync {
+                            ready = dialog.dialog?.window?.decorView?.hasWindowFocus() == true &&
+                                dialog.binding.codeView.layout != null
+                        }
+                        ready
+                    }
+                    report.append("$label; characters=${code.length}; openMs=${SystemClock.uptimeMillis() - opened}\n")
+                    val focusStarted = SystemClock.uptimeMillis()
+                    onView(withId(R.id.code_view)).inRoot(isDialog()).perform(click())
+                    await {
+                        var visible = false
+                        instrumentation.runOnMainSync {
+                            visible = ViewCompat.getRootWindowInsets(dialog.binding.codeView)
+                                ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+                        }
+                        visible
+                    }
+                    report.append("$label; focusImeMs=${SystemClock.uptimeMillis() - focusStarted}\n")
+                    for (offset in listOf(15, code.length / 2, code.length - 3)) {
+                        val frame = CountDownLatch(1)
+                        val started = SystemClock.uptimeMillis()
+                        var editMs = 0L
+                        var selectionMs = 0L
+                        instrumentation.runOnMainSync {
+                            val view = dialog.binding.codeView
+                            val selectStarted = SystemClock.uptimeMillis()
+                            view.setSelection(offset)
+                            selectionMs = SystemClock.uptimeMillis() - selectStarted
+                            view.viewTreeObserver.registerFrameCommitCallback { frame.countDown() }
+                            val input = checkNotNull(view.onCreateInputConnection(EditorInfo()))
+                            val editStarted = SystemClock.uptimeMillis()
+                            assertTrue(input.commitText("x", 1))
+                            editMs = SystemClock.uptimeMillis() - editStarted
+                            view.postInvalidateOnAnimation()
+                        }
+                        assertTrue("$label input did not commit a frame", frame.await(15, TimeUnit.SECONDS))
+                        expected = expected.substring(0, offset) + "x" + expected.substring(offset)
+                        instrumentation.runOnMainSync {
+                            assertEquals(expected, dialog.currentOriginalCode())
+                            assertEquals(offset + 1, dialog.binding.codeView.selectionEnd)
+                        }
+                        report.append("$label; offset=$offset; selectMs=$selectionMs; editMs=$editMs; frameMs=${SystemClock.uptimeMillis() - started}\n")
+                        val deleteStarted = SystemClock.uptimeMillis()
+                        instrumentation.runOnMainSync {
+                            val input = checkNotNull(dialog.binding.codeView.onCreateInputConnection(EditorInfo()))
+                            assertTrue(input.sendKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DEL)))
+                            assertTrue(input.sendKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DEL)))
+                        }
+                        expected = expected.removeRange(offset, offset + 1)
+                        await {
+                            var matches = false
+                            instrumentation.runOnMainSync { matches = dialog.currentOriginalCode() == expected }
+                            matches
+                        }
+                        report.append("$label; offset=$offset; keyDeleteMs=${SystemClock.uptimeMillis() - deleteStarted}\n")
+                    }
+                    checkNotNull(instrumentation.uiAutomation.takeScreenshot()).let { bitmap ->
+                        try { File(artifacts, "reported-rss-$label.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) } }
+                        finally { bitmap.recycle() }
+                    }
+                } finally {
+                    closeSoftKeyboard()
+                    instrumentation.runOnMainSync { dialog.dismissAllowingStateLoss() }
+                    instrumentation.waitForIdleSync()
+                }
+            }
+        } finally { File(artifacts, "reported-rss-preview.txt").writeText(report.toString()) }
+    }
+
     private fun launchEditor(readOnly: Boolean = false, forResult: Boolean = false, fileMode: Boolean = false) {
         val intent = Intent(context, CodeEditActivity::class.java).putExtra("title", "Code selection regression")
             .putExtra("useTextFile", fileMode)
