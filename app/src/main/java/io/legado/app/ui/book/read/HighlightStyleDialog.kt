@@ -18,6 +18,7 @@ import io.legado.app.help.HighlightStyle.Kind
 import io.legado.app.help.HighlightStyle.Shadow
 import io.legado.app.help.HighlightStyle.Underline
 import io.legado.app.help.HighlightStyles
+import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.ui.font.FontSelectDialog
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.ui.widget.number.NumberPickerDialog
@@ -61,6 +62,21 @@ class HighlightStyleDialog : BottomSheetDialogFragment(),
         buildChannels()
         binding.llHighlightFont.setOnClickListener {
             showDialogFragment<FontSelectDialog>()
+        }
+        binding.tvHighlightFontSize.setOnClickListener {
+            NumberPickerDialog(requireContext()).setTitle(getString(R.string.text_size))
+                .setMinValue(5).setMaxValue(100)
+                .setValue(currentStyle().resolvedFontSize?.roundToInt() ?: ReadBookConfig.textSize)
+                .setCustomButton(R.string.btn_default_s) { apply(currentStyle().copy(fontSize = null)) }
+                .show { apply(currentStyle().copy(fontSize = it.toFloat())) }
+        }
+        binding.tvHighlightLetterSpacing.setOnClickListener {
+            NumberPickerDialog(requireContext()).setTitle(getString(R.string.text_letter_spacing))
+                .setMinValue(0).setMaxValue(150)
+                .setDisplayedValues(Array(151) { "${it - 50}%" })
+                .setValue(((currentStyle().resolvedLetterSpacing ?: ReadBookConfig.letterSpacing) * 100).roundToInt() + 50)
+                .setCustomButton(R.string.btn_default_s) { apply(currentStyle().copy(letterSpacing = null)) }
+                .show { apply(currentStyle().copy(letterSpacing = (it - 50) / 100f)) }
         }
         refresh()
     }
@@ -315,6 +331,10 @@ class HighlightStyleDialog : BottomSheetDialogFragment(),
             }
         }
         val fontPath = style.resolvedFontPath
+        binding.tvHighlightFontSize.text = getString(R.string.text_size) + " · " +
+            (style.resolvedFontSize?.roundToInt()?.toString() ?: getString(R.string.btn_default_s))
+        binding.tvHighlightLetterSpacing.text = getString(R.string.text_letter_spacing) + " · " +
+            (style.resolvedLetterSpacing?.let { "${(it * 100).roundToInt()}%" } ?: getString(R.string.btn_default_s))
         binding.tvHighlightFontValue.text = if (fontPath.isEmpty()) {
             getString(R.string.default_font)
         } else {
