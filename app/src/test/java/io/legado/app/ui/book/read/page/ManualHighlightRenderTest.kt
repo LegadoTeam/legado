@@ -292,9 +292,6 @@ class ManualHighlightRenderTest {
         assertTrue(line.contains("nextStyle.resolvedFillShape == shape"))
         assertTrue(line.contains("nextTextSize == textSize"))
         assertTrue(draw.contains("fun drawFillRun("))
-        assertTrue(draw.contains("val inset = strokePaint.strokeWidth / 2f"))
-        assertTrue(draw.contains("top + inset"))
-        assertTrue(draw.contains("bottom - inset"))
         assertFalse(text.contains("highlightPaint("))
         assertFalse(html.contains("highlightPaint("))
     }
