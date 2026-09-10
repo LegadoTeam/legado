@@ -369,11 +369,25 @@ class CodeSelectionUiTest {
                 nativeMenu.contains(point[0].toInt(), point[1].toInt()))
             return point
         }
-        onView(withId(R.id.editText)).perform(GeneralSwipeAction(Swipe.SLOW, { view ->
-            scrollPoint(view, 0.25f)
-        }, { view ->
-            scrollPoint(view, 2.25f)
-        }, Press.FINGER))
+        var from = floatArrayOf()
+        var to = floatArrayOf()
+        withEditor {
+            from = scrollPoint(it, 0.25f)
+            to = scrollPoint(it, 2.25f)
+        }
+        val down = SystemClock.uptimeMillis()
+        fun touch(action: Int, point: FloatArray) {
+            val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, point[0], point[1], 0)
+            event.source = InputDevice.SOURCE_TOUCHSCREEN
+            try { assertTrue(instrumentation.uiAutomation.injectInputEvent(event, true)) }
+            finally { event.recycle() }
+        }
+        // Move before a long press can select text, then stop before lifting to avoid a fling.
+        touch(MotionEvent.ACTION_DOWN, from)
+        touch(MotionEvent.ACTION_MOVE, to)
+        SystemClock.sleep(150)
+        touch(MotionEvent.ACTION_MOVE, to)
+        touch(MotionEvent.ACTION_UP, to)
         var scrollState = ""
         await(message = { scrollState }) {
             var ready = false
