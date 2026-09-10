@@ -23,6 +23,7 @@ import io.legado.app.help.http.SSLHelper
 import io.legado.app.help.http.StrResponse
 import io.legado.app.help.source.SourceHelp
 import io.legado.app.help.source.SourceVerificationHelp
+import io.legado.app.help.source.shouldSuppressSourceNavigation
 import io.legado.app.help.source.VerificationResult
 import io.legado.app.help.source.getSourceType
 import io.legado.app.help.book.BookHelp
@@ -125,6 +126,7 @@ interface JsExtensions : JsEncodeUtils {
 
     fun getSource(): BaseSource?
     fun getTag(): String?
+    fun getSourceNavigationContext(): CoroutineContext = EmptyCoroutineContext
 
     /**
      * 当前批量正文下载上下文,非批量流程返回 null。
@@ -165,7 +167,8 @@ interface JsExtensions : JsEncodeUtils {
     }
 
     private val context: CoroutineContext
-        get() = rhinoContextOrNull?.coroutineContext ?: EmptyCoroutineContext
+        get() = (rhinoContextOrNull?.coroutineContext ?: EmptyCoroutineContext) +
+            getSourceNavigationContext()
 
     /**
      * 访问网络,返回String
@@ -384,6 +387,7 @@ interface JsExtensions : JsEncodeUtils {
      */
     @JavascriptInterface
     fun openVideoPlayer(url: String, title: String, isFloat: Boolean) {
+        if (!canOpenSourceUi()) return
         SourceHelp.openVideoPlayer(getSource(), url, title, isFloat)
     }
 
@@ -398,6 +402,7 @@ interface JsExtensions : JsEncodeUtils {
 
     fun startBrowser(url: String, title: String, html: String?) {
         rhinoContext.ensureActive()
+        if (!canOpenSourceUi()) return
         SourceVerificationHelp.startBrowser(getSource(), url, title, html=html)
     }
 
@@ -414,6 +419,7 @@ interface JsExtensions : JsEncodeUtils {
 
     fun startBrowserAwait(url: String, title: String, refetchAfterSuccess: Boolean, html: String?): StrResponse {
         rhinoContext.ensureActive()
+        if (!canOpenSourceUi()) throw NoStackTraceException("已阻止当前操作中的书源网页跳转")
         return when (val result = SourceVerificationHelp.getVerificationResult(
             getSource(), url, title, true, refetchAfterSuccess, html, context
         )) {
@@ -1242,6 +1248,7 @@ interface JsExtensions : JsEncodeUtils {
     fun openUrl(url: String, mimeType: String? = null) {
         require(url.length < 64 * 1024) { "openUrl parameter url too long" }
         rhinoContextOrNull?.ensureActive()
+        if (!canOpenSourceUi()) return
         if (url.startsWith("legado://") || url.startsWith("yuedu://")) {
             appCtx.startActivity<OnLineImportActivity> {
                 data = url.toUri()
@@ -1272,6 +1279,7 @@ interface JsExtensions : JsEncodeUtils {
         config: String?
     ) {
         rhinoContextOrNull?.ensureActive()
+        if (!canOpenSourceUi()) return
         val activity = LifecycleHelp.getTopActivity() as? AppCompatActivity ?: return
         val source = getSource() ?: return
         activity.runOnUiThread {
@@ -1286,6 +1294,12 @@ interface JsExtensions : JsEncodeUtils {
                 BottomWebViewDialog(source.getKey(), 0, url, html, preloadJs, config)
             )
         }
+    }
+
+    private fun canOpenSourceUi(): Boolean {
+        if (!shouldSuppressSourceNavigation(AppConfig.blockSourceNavigation, context)) return true
+        Debug.log(getTag(), "已阻止当前操作中的书源网页或视频跳转")
+        return false
     }
 
     fun singleFlight(

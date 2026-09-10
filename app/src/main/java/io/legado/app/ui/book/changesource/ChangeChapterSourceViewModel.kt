@@ -14,6 +14,8 @@ import io.legado.app.help.book.matchChapterSource
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.webBook.WebBook
 import kotlinx.coroutines.Dispatchers.Main
+import kotlinx.coroutines.Dispatchers.IO
+import io.legado.app.help.source.SuppressSourceNavigation
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -225,7 +227,7 @@ class ChangeChapterSourceViewModel(application: Application) :
     ) {
         contentTask?.cancel()
         contentLoading.value = true
-        contentTask = execute {
+        contentTask = execute(context = IO + SuppressSourceNavigation) {
             val bookSource = appDb.bookSourceDao.getBookSource(book.origin)
                 ?: throw NoStackTraceException("书源不存在")
             WebBook.getContentAwait(bookSource, book, chapter, nextChapterUrl, false)
@@ -323,7 +325,7 @@ class ChangeChapterSourceViewModel(application: Application) :
         if (batchCaching.value == true) return
         cacheCommitStarted = false
         batchCaching.value = true
-        cacheTask = execute {
+        cacheTask = execute(context = IO + SuppressSourceNavigation) {
             val bookSource = appDb.bookSourceDao.getBookSource(sourceBook.origin)
                 ?: throw NoStackTraceException("书源不存在")
             val contents = sourceChapters.map { (chapter, nextChapterUrl) ->
