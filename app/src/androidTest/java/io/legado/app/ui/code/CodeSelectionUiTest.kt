@@ -9,6 +9,9 @@ import android.content.ClipData
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.os.SystemClock
+import android.os.Parcel
+import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityManager
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewConfiguration
@@ -941,6 +944,78 @@ class CodeSelectionUiTest {
                 view.dismissDropDown()
             }
         } finally {
+            instrumentation.runOnMainSync { dialog.dismissAllowingStateLoss() }
+        }
+    }
+
+    @Test fun nativePreviewReportsActualAccessibilityPayloadDuringRepeatedDeletion() {
+        launchEditor()
+        var expected = "{\"jsLib\":\"" + "var value = '中文'; ".repeat(4_500) + "\"}"
+        val dialog = CodeDialog(expected, disableEdit = false)
+        val report = StringBuilder("characters=${expected.length}\n")
+        val artifacts = checkNotNull(context.getExternalFilesDir("ui-regression"))
+        scenario!!.onActivity { dialog.show(it.supportFragmentManager, "native-accessibility-cost") }
+        try {
+            await {
+                var ready = false
+                instrumentation.runOnMainSync { ready = dialog.dialog?.window?.decorView?.hasWindowFocus() == true }
+                ready
+            }
+            onView(withId(R.id.code_view)).inRoot(isDialog()).perform(click())
+            await {
+                var visible = false
+                instrumentation.runOnMainSync {
+                    visible = ViewCompat.getRootWindowInsets(dialog.binding.codeView)
+                        ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+                }
+                visible
+            }
+            assertTrue(context.getSystemService(AccessibilityManager::class.java).isEnabled)
+            repeat(4) { iteration ->
+                val before = expected
+                val cursor = before.length - 2
+                val frame = CountDownLatch(1)
+                var editMs = 0L
+                var committedAt = 0L
+                instrumentation.runOnMainSync { dialog.binding.codeView.setSelection(cursor) }
+                val started = SystemClock.uptimeMillis()
+                val event = instrumentation.uiAutomation.executeAndWaitForEvent({
+                    instrumentation.runOnMainSync {
+                        val view = dialog.binding.codeView
+                        assertTrue(view.isHardwareAccelerated)
+                        view.viewTreeObserver.registerFrameCommitCallback {
+                            committedAt = SystemClock.uptimeMillis()
+                            frame.countDown()
+                        }
+                        val editStarted = SystemClock.uptimeMillis()
+                        assertTrue(checkNotNull(view.onCreateInputConnection(EditorInfo())).deleteSurroundingText(1, 0))
+                        editMs = SystemClock.uptimeMillis() - editStarted
+                        view.postInvalidateOnAnimation()
+                    }
+                }, { received ->
+                    received.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED &&
+                        received.packageName?.toString() == context.packageName &&
+                        received.fromIndex == cursor - 1 && received.removedCount == 1 && received.addedCount == 0
+                }, 10_000)
+                try {
+                    assertTrue("Deleted text never reached a committed frame", frame.await(10, TimeUnit.SECONDS))
+                    expected = before.removeRange(cursor - 1, cursor)
+                    val parcel = Parcel.obtain()
+                    val bytes = try { event.writeToParcel(parcel, 0); parcel.dataSize() } finally { parcel.recycle() }
+                    report.append("delete=$iteration; parcelBytes=$bytes; beforeChars=${event.beforeText?.length}; " +
+                        "textChars=${event.text.firstOrNull()?.length}; editMs=$editMs; frameMs=${committedAt - started}\n")
+                    File(artifacts, "native-preview-accessibility.txt").writeText(report.toString())
+                    assertEquals("Accessibility must retain the pre-edit text", before, event.beforeText?.toString())
+                    assertEquals("Accessibility must expose the edited text", expected, event.text.single().toString())
+                    instrumentation.runOnMainSync {
+                        assertEquals(expected, dialog.currentOriginalCode())
+                        assertEquals(cursor - 1, dialog.binding.codeView.selectionStart)
+                        assertEquals(cursor - 1, dialog.binding.codeView.selectionEnd)
+                    }
+                } finally { event.recycle() }
+            }
+        } finally {
+            File(artifacts, "native-preview-accessibility.txt").writeText(report.toString())
             instrumentation.runOnMainSync { dialog.dismissAllowingStateLoss() }
         }
     }
