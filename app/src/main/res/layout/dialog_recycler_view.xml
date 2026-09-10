@@ -37,6 +37,14 @@
 
     </androidx.appcompat.widget.Toolbar>
 
+    <androidx.appcompat.widget.SearchView
+        android:id="@+id/source_import_search"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        app:iconifiedByDefault="false"
+        app:queryHint="@string/search" />
+
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
