@@ -198,6 +198,9 @@ class CodeView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
                 event.keyCode == KeyEvent.KEYCODE_MOVE_END
     }
 
+    // AutoCompleteTextView checks this after every edit, even without an installed adapter.
+    override fun enoughToFilter(): Boolean = adapter != null && super.enoughToFilter()
+
     override fun onSelectionChanged(selStart: Int, selEnd: Int) {
         super.onSelectionChanged(selStart, selEnd)
         updateSelectionVisibilityOffset(selStart, selEnd)

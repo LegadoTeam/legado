@@ -11,6 +11,11 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewConfiguration
 import android.webkit.WebView
+import android.view.inputmethod.EditorInfo
+import android.widget.ArrayAdapter
+import android.widget.MultiAutoCompleteTextView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.children
 import androidx.core.content.FileProvider
@@ -50,6 +55,7 @@ import io.legado.app.ui.association.ImportRssSourceDialog
 import io.legado.app.ui.association.ImportRssSourceViewModel
 import io.legado.app.ui.widget.dialog.CodeDialog
 import io.legado.app.utils.GSON
+import io.legado.app.ui.widget.code.KeywordTokenizer
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Test
@@ -522,6 +528,81 @@ class CodeSelectionUiTest {
         assertEquals(Activity.RESULT_OK, scenario!!.result.resultCode)
         assertEquals(edited, scenario!!.result.resultData.getStringExtra("text"))
         assertEquals(cursor, scenario!!.result.resultData.getIntExtra("cursorPosition", -1))
+    }
+
+    @Test fun nativePreviewTypesLongCodeWithoutRunningUnusedCompletion() {
+        launchEditor()
+        val code = "{\"jsLib\":\"" + "var value = '中文'; ".repeat(12_000) + "\"}"
+        val dialog = CodeDialog(code, disableEdit = false)
+        val timings = linkedMapOf<String, Long>()
+        var tokenCalls = 0
+        scenario!!.onActivity { dialog.show(it.supportFragmentManager, "native-input-cost") }
+        try {
+            await {
+                var ready = false
+                instrumentation.runOnMainSync { ready = dialog.dialog?.window?.decorView?.hasWindowFocus() == true }
+                ready
+            }
+            instrumentation.runOnMainSync {
+                dialog.binding.codeView.setTokenizer(object : MultiAutoCompleteTextView.Tokenizer {
+                    override fun findTokenStart(text: CharSequence, cursor: Int): Int {
+                        tokenCalls++
+                        return KeywordTokenizer().findTokenStart(text, cursor)
+                    }
+                    override fun findTokenEnd(text: CharSequence, cursor: Int) = text.length
+                    override fun terminateToken(text: CharSequence) = text
+                })
+                assertNull(dialog.binding.codeView.adapter)
+            }
+            val focusStart = SystemClock.uptimeMillis()
+            onView(withId(R.id.code_view)).inRoot(isDialog()).perform(click())
+            await {
+                var visible = false
+                instrumentation.runOnMainSync {
+                    visible = ViewCompat.getRootWindowInsets(dialog.binding.codeView)
+                        ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+                }
+                visible
+            }
+            timings["focusAndImeMs"] = SystemClock.uptimeMillis() - focusStart
+            val offset = code.length - 2
+            val frame = CountDownLatch(1)
+            val inputStart = SystemClock.uptimeMillis()
+            instrumentation.runOnMainSync {
+                val view = dialog.binding.codeView
+                val selectionStart = SystemClock.uptimeMillis()
+                view.setSelection(offset)
+                timings["selectionMs"] = SystemClock.uptimeMillis() - selectionStart
+                assertTrue(view.isHardwareAccelerated)
+                view.viewTreeObserver.registerFrameCommitCallback { frame.countDown() }
+                assertTrue(checkNotNull(view.onCreateInputConnection(EditorInfo())).commitText("中", 1))
+                view.postInvalidateOnAnimation()
+            }
+            assertTrue("The typed character never reached a committed frame", frame.await(10, TimeUnit.SECONDS))
+            timings["inputAndFrameMs"] = SystemClock.uptimeMillis() - inputStart
+            instrumentation.runOnMainSync {
+                assertEquals(code.substring(0, offset) + "中" + code.substring(offset), dialog.currentOriginalCode())
+                assertEquals(0, tokenCalls)
+            }
+            val artifacts = checkNotNull(context.getExternalFilesDir("ui-regression"))
+            File(artifacts, "native-preview-input.txt").writeText("characters=${code.length}\ntokenCalls=$tokenCalls\n$timings\n")
+            checkNotNull(instrumentation.uiAutomation.takeScreenshot()).let { bitmap ->
+                try { File(artifacts, "native-preview-input.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) } }
+                finally { bitmap.recycle() }
+            }
+            assertTrue("Typing still stalls the native preview: $timings", timings.getValue("inputAndFrameMs") < 1_000)
+            instrumentation.runOnMainSync {
+                val view = dialog.binding.codeView
+                view.setAdapter(ArrayAdapter(context, android.R.layout.simple_list_item_1, listOf("target")))
+                view.setText("prefix target")
+                view.setSelection(view.length())
+                assertTrue(view.enoughToFilter())
+                assertTrue("An installed completion adapter must still tokenize", tokenCalls > 0)
+                view.dismissDropDown()
+            }
+        } finally {
+            instrumentation.runOnMainSync { dialog.dismissAllowingStateLoss() }
+        }
     }
 
     private fun launchEditor(readOnly: Boolean = false, forResult: Boolean = false, fileMode: Boolean = false) {
