@@ -86,6 +86,8 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
     private val layoutListener = ViewTreeObserver.OnGlobalLayoutListener { updatePositionBar() }
     val requestId: String?
         get() = arguments?.getString("requestId")
+    private val sourcePreview: Boolean
+        get() = arguments?.getBoolean("showReplaceRules") == true
 
     private val editorLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val context = requireContext().applicationContext
@@ -99,6 +101,10 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
             if (code != null) {
                 originalCode = code
                 if (!showingAlternate) binding.codeView.setText(code)
+                if (sourcePreview) {
+                    clearAlternateCode()
+                    callback()?.onCodeSave(code, requestId)
+                }
             }
             if (!showingAlternate) {
                 result.data?.takeIf { it.hasExtra("cursorPosition") }
@@ -206,7 +212,7 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
         showingAlternate = show
         updateEditorAction()
         binding.toolBar.menu.findItem(R.id.menu_save)?.isVisible =
-            saveEnabled && !show && searchView.isIconified
+            saveEnabled && (!show || sourcePreview) && searchView.isIconified
         if (!searchView.isIconified) showCurrentMatch()
         binding.codeView.post { updatePositionBar() }
     }
@@ -265,9 +271,7 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
                 }
                 R.id.menu_fullscreen_edit -> openEditor()
                 R.id.menu_save -> if (!replaceRuleRefreshPending) {
-                    binding.codeView.text?.toString()?.let { code ->
-                        callback()?.onCodeSave(code, requestId)
-                    }
+                    callback()?.onCodeSave(currentOriginalCode(), requestId)
                     dismiss()
                 }
             }
@@ -278,9 +282,9 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
     private fun openEditor() {
         if (!saveEnabled || replaceRuleRefreshPending || editorPending) return
         val context = requireContext().applicationContext
-        val code = binding.codeView.text.toString()
-        val cursor = binding.codeView.selectionStart.coerceAtLeast(0)
-        editorReadOnly = showingAlternate
+        editorReadOnly = showingAlternate && !sourcePreview
+        val code = if (editorReadOnly) binding.codeView.text.toString() else currentOriginalCode()
+        val cursor = if (showingAlternate && sourcePreview) 0 else binding.codeView.selectionStart.coerceAtLeast(0)
         editorPending = true
         updateEditorAction()
         try {
@@ -314,8 +318,9 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
     private fun setSearchOpen(open: Boolean) {
         binding.toolBar.menu.findItem(R.id.menu_search_previous).isVisible = open
         binding.toolBar.menu.findItem(R.id.menu_search_next).isVisible = open
+        binding.toolBar.menu.findItem(R.id.menu_fullscreen_edit).isVisible = saveEnabled && !open
         binding.toolBar.menu.findItem(R.id.menu_save).isVisible =
-            saveEnabled && !showingAlternate && !open
+            saveEnabled && (!showingAlternate || sourcePreview) && !open
         if (!open) setSearchActionsEnabled(false)
     }
 

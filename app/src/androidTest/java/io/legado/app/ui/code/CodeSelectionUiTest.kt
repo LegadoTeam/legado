@@ -44,6 +44,8 @@ import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.component.EditorTextActionWindow
 import io.legado.app.R
 import io.legado.app.help.CacheManager
+import io.legado.app.data.appDb
+import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.RssSource
 import io.legado.app.data.entities.rule.SearchRule
@@ -234,9 +236,12 @@ class CodeSelectionUiTest {
         val id = UUID.randomUUID().toString()
         val script = "// 中文 🌍 original draft\n".repeat(2_000)
         val savedReplacement = AppConfig.importReplaceSource
-        AppConfig.importReplaceSource = false
+        val rule = ReplaceRule(name = "Preview editor $id", pattern = "#edited",
+            replacement = "#edited-once", isRegex = false, scopeSource = true, scopeContent = false)
+        appDb.replaceRuleDao.insert(rule)
         try {
-            for (rss in listOf(false, true)) {
+            for ((rss, replacements) in listOf(false to false, true to false, false to true, true to true)) {
+                AppConfig.importReplaceSource = replacements
                 val urls = listOf("https://preview-$id.invalid/first", "https://preview-$id.invalid/second")
                 val sources = if (rss) urls.mapIndexed { index, url ->
                     RssSource(sourceUrl = url, sourceName = "Preview $index", jsLib = script, ruleArticles = "article")
@@ -292,14 +297,10 @@ class CodeSelectionUiTest {
                             preview!!.setReplaceRuleRefreshPending(true)
                             assertFalse(preview!!.binding.toolBar.menu.findItem(R.id.menu_fullscreen_edit).isEnabled)
                             preview!!.setReplaceRuleRefreshPending(false)
-                            preview!!.binding.toolBar.showOverflowMenu()
+                            assertEquals(replacements, preview!!.binding.cbSourceReplacementPreview.isChecked)
+                            assertTrue(preview!!.binding.toolBar.menu.findItem(R.id.menu_save).isVisible)
                         }
-                        await {
-                            var shown = false
-                            instrumentation.runOnMainSync { shown = preview!!.binding.toolBar.isOverflowMenuShowing }
-                            shown
-                        }
-                        onView(withText(R.string.view_in_code_editor)).inRoot(isPlatformPopup()).perform(click())
+                        onView(withId(R.id.menu_fullscreen_edit)).inRoot(isDialog()).perform(click())
                         var inputPath: String? = null
                         await {
                             var ready = false
@@ -351,9 +352,15 @@ class CodeSelectionUiTest {
                         await {
                             var ready = false
                             instrumentation.runOnMainSync {
+                                val expected = if (replacements) edited.replace("#edited", "#edited-once") else edited
                                 ready = preview!!.currentOriginalCode() == edited &&
+                                    preview!!.binding.codeView.text.toString() == expected &&
                                     preview!!.dialog?.window?.decorView?.hasWindowFocus() == true &&
                                     preview!!.binding.toolBar.menu.findItem(R.id.menu_fullscreen_edit).isEnabled
+                                if (ready) {
+                                    assertEquals(replacements, preview!!.binding.cbSourceReplacementPreview.isChecked)
+                                    assertTrue(preview!!.binding.toolBar.menu.findItem(R.id.menu_save).isVisible)
+                                }
                             }
                             ready
                         }
@@ -361,18 +368,12 @@ class CodeSelectionUiTest {
                         instrumentation.waitForIdleSync()
                         checkNotNull(instrumentation.uiAutomation.takeScreenshot()).let { bitmap ->
                             try {
-                                File(context.getExternalFilesDir("ui-regression"), "source-preview-editor-return-$rss.png")
+                                File(context.getExternalFilesDir("ui-regression"), "source-preview-editor-return-$rss-$replacements.png")
                                     .outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
                             } finally { bitmap.recycle() }
                         }
                         // Discard a second edit: only the cursor may return, never the discarded draft.
-                        instrumentation.runOnMainSync { preview!!.binding.toolBar.showOverflowMenu() }
-                        await {
-                            var shown = false
-                            instrumentation.runOnMainSync { shown = preview!!.binding.toolBar.isOverflowMenuShowing }
-                            shown
-                        }
-                        onView(withText(R.string.view_in_code_editor)).inRoot(isPlatformPopup()).perform(click())
+                        onView(withId(R.id.menu_fullscreen_edit)).inRoot(isDialog()).perform(click())
                         await {
                             var ready = false
                             instrumentation.runOnMainSync {
@@ -397,23 +398,62 @@ class CodeSelectionUiTest {
                             }
                             ready
                         }
+                        if (replacements) {
+                            // A malformed draft stays editable; it must not overwrite the valid candidate.
+                            val invalid = "] invalid source draft"
+                            for (draft in listOf(invalid, edited)) {
+                                onView(withId(R.id.menu_fullscreen_edit)).inRoot(isDialog()).perform(click())
+                                await {
+                                    var ready = false
+                                    instrumentation.runOnMainSync {
+                                        editorActivity = ActivityLifecycleMonitorRegistry.getInstance()
+                                            .getActivitiesInStage(Stage.RESUMED).filterIsInstance<CodeEditActivity>().firstOrNull()
+                                        val editor = editorActivity?.findViewById<CodeEditor>(R.id.editText)
+                                        ready = editor != null && editor.isEditable && editor.hasWindowFocus()
+                                    }
+                                    ready
+                                }
+                                instrumentation.runOnMainSync {
+                                    val editor = editorActivity!!.findViewById<CodeEditor>(R.id.editText)
+                                    editor.text.replace(0, editor.text.length, draft)
+                                }
+                                onView(withId(R.id.menu_save)).perform(click())
+                                await {
+                                    var ready = false
+                                    instrumentation.runOnMainSync {
+                                        ready = preview!!.currentOriginalCode() == draft &&
+                                            preview!!.dialog?.window?.decorView?.hasWindowFocus() == true &&
+                                            preview!!.binding.toolBar.menu.findItem(R.id.menu_fullscreen_edit).isEnabled
+                                        if (ready) {
+                                            val expected = if (draft == invalid) draft else edited.replace("#edited", "#edited-once")
+                                            assertEquals(expected, preview!!.binding.codeView.text.toString())
+                                            val raw = if (rss) ViewModelProvider(parent!!)[ImportRssSourceViewModel::class.java].originalSourceJson(1)
+                                                else ViewModelProvider(parent!!)[ImportBookSourceViewModel::class.java].originalSourceJson(1)
+                                            assertEquals(edited, raw)
+                                        }
+                                    }
+                                    ready
+                                }
+                            }
+                        }
                         onView(withId(R.id.menu_save)).inRoot(isDialog()).perform(click())
+                        val expectedUrl = urls[1] + if (replacements) "#edited-once" else "#edited"
                         await {
                             var ready = false
                             instrumentation.runOnMainSync {
                                 if (rss) {
                                     val actual = ViewModelProvider(parent!!)[ImportRssSourceViewModel::class.java].allSources
-                                    ready = actual.size == 2 && actual[1].sourceUrl == urls[1] + "#edited"
+                                    ready = actual.size == 2 && actual[1].sourceUrl == expectedUrl
                                     if (ready) { assertEquals(urls[0], actual[0].sourceUrl); assertEquals(script, actual[1].jsLib) }
                                 } else {
                                     val actual = ViewModelProvider(parent!!)[ImportBookSourceViewModel::class.java].allSources
-                                    ready = actual.size == 2 && actual[1].bookSourceUrl == urls[1] + "#edited"
+                                    ready = actual.size == 2 && actual[1].bookSourceUrl == expectedUrl
                                     if (ready) { assertEquals(urls[0], actual[0].bookSourceUrl); assertEquals(script, actual[1].jsLib) }
                                 }
                             }
                             ready
                         }
-                        if (rss) {
+                        if (rss && !replacements) {
                             val derived = edited.replace("#edited", "#replacement-only")
                             val readOnlyPreview = CodeDialog(edited, false, "1", derived, showAlternate = true)
                             instrumentation.runOnMainSync {
@@ -428,14 +468,9 @@ class CodeSelectionUiTest {
                             }
                             instrumentation.runOnMainSync {
                                 assertTrue(readOnlyPreview.binding.cbSourceReplacementPreview.isChecked)
-                                readOnlyPreview.binding.toolBar.showOverflowMenu()
+                                assertFalse(readOnlyPreview.binding.toolBar.menu.findItem(R.id.menu_save).isVisible)
                             }
-                            await {
-                                var shown = false
-                                instrumentation.runOnMainSync { shown = readOnlyPreview.binding.toolBar.isOverflowMenuShowing }
-                                shown
-                            }
-                            onView(withText(R.string.view_in_code_editor)).inRoot(isPlatformPopup()).perform(click())
+                            onView(withId(R.id.menu_fullscreen_edit)).inRoot(isDialog()).perform(click())
                             await {
                                 var ready = false
                                 instrumentation.runOnMainSync {
@@ -465,6 +500,7 @@ class CodeSelectionUiTest {
             }
         } finally {
             AppConfig.importReplaceSource = savedReplacement
+            appDb.replaceRuleDao.delete(rule)
         }
     }
 
