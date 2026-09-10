@@ -1146,11 +1146,12 @@ object ReadBook : CoroutineScope by MainScope() {
     private fun curPageChanged(
         pageChanged: Boolean = false,
         syncReadAloudFollow: Boolean = false,
-        restartReadAloudFromVisiblePage: Boolean = false
+        restartReadAloudFromVisiblePage: Boolean = false,
+        updateReadAloud: Boolean = true
     ) {
         callBack?.pageChanged()
         curTextChapter?.let {
-            if (BaseReadAloudService.isRun && it.isCompleted) {
+            if (updateReadAloud && BaseReadAloudService.isRun && it.isCompleted) {
                 if (!syncReadAloudFollow) {
                     if (!restartReadAloudFromVisiblePage) {
                         ReadAloud.detachReadAloudFollow()
@@ -1381,6 +1382,7 @@ object ReadBook : CoroutineScope by MainScope() {
                     chapter,
                     resetPageOffset,
                     readPositionVersion = readPositionVersion,
+                    success = success,
                 )
             }
         }.onError {
@@ -1464,6 +1466,7 @@ object ReadBook : CoroutineScope by MainScope() {
                 semaphore,
                 resetPageOffset = resetPageOffset,
                 readPositionVersion = readPositionVersion,
+                success = success,
             )
         } else {
             val msg = if (book.isLocal) "无内容" else "没有书源"
@@ -1521,6 +1524,8 @@ object ReadBook : CoroutineScope by MainScope() {
         if (canceled || chapter.index !in durChapterIndex - 1..durChapterIndex + 1) {
             return
         }
+        // Restoring visual follow during layout must not create a new speech session.
+        val updateReadAloud = BaseReadAloudService.shouldSyncSpeechNavigation()
         val shouldResetPageOffset = resetPageOffset &&
             shouldApplyReadPositionReset(readPositionVersion)
         chapterLoadingJobs[chapter.index]?.cancel()
@@ -1577,7 +1582,8 @@ object ReadBook : CoroutineScope by MainScope() {
                         )
                     }
                     curPageChanged(
-                        syncReadAloudFollow = BaseReadAloudService.shouldSyncSpeechNavigation()
+                        syncReadAloudFollow = BaseReadAloudService.shouldSyncSpeechNavigation(),
+                        updateReadAloud = updateReadAloud
                     )
                     callBack?.contentLoadFinish()
                 }
@@ -1652,6 +1658,8 @@ object ReadBook : CoroutineScope by MainScope() {
             removeLoading(chapter.index)
             if (chapter.index !in durChapterIndex - 1..durChapterIndex + 1) return
         }
+        // Restoring visual follow during layout must not create a new speech session.
+        val updateReadAloud = BaseReadAloudService.shouldSyncSpeechNavigation()
         val shouldResetPageOffset = resetPageOffset &&
             shouldApplyReadPositionReset(readPositionVersion)
         kotlin.runCatching {
@@ -1704,7 +1712,8 @@ object ReadBook : CoroutineScope by MainScope() {
                         )
                     }
                     curPageChanged(
-                        syncReadAloudFollow = BaseReadAloudService.shouldSyncSpeechNavigation()
+                        syncReadAloudFollow = BaseReadAloudService.shouldSyncSpeechNavigation(),
+                        updateReadAloud = updateReadAloud
                     )
                     callBack?.contentLoadFinish()
                 }
