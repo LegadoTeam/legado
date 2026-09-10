@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="import_remember_group">Remember last group</string>
+    <string name="import_select_results">Select results (%1$d/%2$d); %3$d selected in total</string>
+    <string name="import_unselect_results">Deselect results (%1$d/%2$d); %3$d selected in total</string>
+    <string name="import_no_results">No matching sources</string>
+</resources>

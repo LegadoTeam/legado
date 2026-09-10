@@ -30,8 +30,9 @@ import splitties.init.appCtx
 
 class ImportRssSourceViewModel(app: Application) : BaseViewModel(app) {
     private val importRequestGate = RssSourceImportRequestGate()
-    var isAddGroup = false
-    var groupName: String? = null
+    var isAddGroup = AppConfig.importRememberGroup && AppConfig.importLastGroupAdd
+    var groupName: String? = AppConfig.importLastGroup.takeIf { AppConfig.importRememberGroup }
+    var searchQuery = ""
     val errorLiveData = MutableLiveData<String>()
     val successLiveData = MutableLiveData<Int>()
     val sourceUpdatePending = MutableLiveData(false)

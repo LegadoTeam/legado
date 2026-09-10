@@ -2,7 +2,6 @@ package io.legado.app.ui.association
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.DialogInterface
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
@@ -43,13 +42,6 @@ class ImportDictRuleDialog() : BaseDialogFragment(R.layout.dialog_recycler_view)
     override fun onStart() {
         super.onStart()
         setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-    }
-
-    override fun onDismiss(dialog: DialogInterface) {
-        super.onDismiss(dialog)
-        if (arguments?.getBoolean("finishOnDismiss") == true) {
-            activity?.finish()
-        }
     }
 
     @SuppressLint("NotifyDataSetChanged")
