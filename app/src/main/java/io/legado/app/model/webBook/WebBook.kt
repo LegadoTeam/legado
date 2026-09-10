@@ -13,6 +13,7 @@ import io.legado.app.help.book.removeAllBookType
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.http.StrResponse
 import io.legado.app.help.source.getBookType
+import io.legado.app.help.source.SuppressSourceNavigation
 import io.legado.app.model.Debug
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
@@ -25,6 +26,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Semaphore
 import kotlin.coroutines.CoroutineContext
 
@@ -54,9 +56,9 @@ object WebBook {
         page: Int? = 1,
         filter: ((name: String, author: String, kind: String?) -> Boolean)? = null,
         shouldBreak: ((size: Int) -> Boolean)? = null
-    ): ArrayList<SearchBook> {
+    ): ArrayList<SearchBook> = withContext(SuppressSourceNavigation) {
         if (bookSource.isJsSource()) {
-            return JsSourceBook.searchAwait(bookSource, key, page, filter)
+            return@withContext JsSourceBook.searchAwait(bookSource, key, page, filter)
         }
         val searchUrl = bookSource.searchUrl
         if (searchUrl.isNullOrBlank()) {
@@ -98,7 +100,7 @@ object WebBook {
             }
         }
         checkRedirect(bookSource, res)
-        return BookList.analyzeBookList(
+        BookList.analyzeBookList(
             bookSource = bookSource,
             ruleData = ruleData,
             analyzeUrl = analyzeUrl,

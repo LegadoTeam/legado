@@ -6,6 +6,7 @@ import com.google.gson.internal.LinkedTreeMap
 import com.script.CompiledScript
 import com.script.buildScriptBindings
 import com.script.rhino.RhinoScriptEngine
+import com.script.rhino.runScriptWithContext
 import io.legado.app.constant.AppPattern.JS_PATTERN
 import io.legado.app.constant.AppPattern.WebJS_PATTERN
 import io.legado.app.data.entities.BaseBook
@@ -182,12 +183,12 @@ class AnalyzeRule(
         if (isMainThread) {
             error("webJs must be called on a background thread")
         }
-        return runBlocking {
+        return runBlocking(coroutineContext) {
             BackstageWebView(
                 url = baseUrl,
                 html = content.toString(),
                 javaScript = jsStr,
-                headerMap = getSource()?.getHeaderMap(true),
+                headerMap = runScriptWithContext(coroutineContext) { getSource()?.getHeaderMap(true) },
                 tag = getSource()?.getKey(),
                 cacheFirst = true,
                 timeout = 10000,
