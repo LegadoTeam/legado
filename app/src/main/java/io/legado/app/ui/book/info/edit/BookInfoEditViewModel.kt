@@ -46,7 +46,7 @@ class BookInfoEditViewModel(application: Application) : BaseViewModel(applicatio
             }
             if (ReadManga.book?.bookUrl == book.bookUrl) ReadManga.book = book
             if (AudioPlay.book?.bookUrl == book.bookUrl) AudioPlay.book = book
-            this.book = book
+            this@BookInfoEditViewModel.book = book
         }.onSuccess {
             saved.value = true
         }.onError {
