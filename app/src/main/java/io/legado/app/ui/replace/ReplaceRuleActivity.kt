@@ -304,7 +304,7 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
                 }
                 setResult(RESULT_OK)
             }
-            showAsDropDown(binding.titleBar.toolbar, 0, 4.dpToPx(), Gravity.END)
+            showAsDropDown(this@ReplaceRuleActivity.binding.titleBar.toolbar, 0, 4.dpToPx(), Gravity.END)
         }
     }
 
