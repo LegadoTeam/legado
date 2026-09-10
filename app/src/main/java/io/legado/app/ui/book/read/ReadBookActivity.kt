@@ -356,6 +356,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         super.onActivityCreated(savedInstanceState)
         viewModel.resourceRefreshing.observe(this) { loading ->
             if (binding.readView.pageFactory.isRefreshingResources != loading) {
+                if (loading) binding.readView.updateScrollReadPosition()
                 binding.readView.pageFactory.isRefreshingResources = loading
                 upContent()
             }

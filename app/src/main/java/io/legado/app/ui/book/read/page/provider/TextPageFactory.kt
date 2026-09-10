@@ -15,14 +15,17 @@ class TextPageFactory(dataSource: DataSource) : PageFactory<TextPage>(dataSource
         get() = if (isRefreshingResources) appCtx.getString(R.string.data_loading) else ReadBook.msg
 
     override fun hasPrev(): Boolean = with(dataSource) {
+        if (isRefreshingResources) return@with false
         return hasPrevChapter() || pageIndex > 0
     }
 
     override fun hasNext(): Boolean = with(dataSource) {
+        if (isRefreshingResources) return@with false
         return hasNextChapter() || (currentChapter != null && currentChapter?.isLastIndex(pageIndex) != true)
     }
 
     override fun hasNextPlus(): Boolean = with(dataSource) {
+        if (isRefreshingResources) return@with false
         return hasNextChapter() || pageIndex < (currentChapter?.pageSize ?: 1) - 2
     }
 

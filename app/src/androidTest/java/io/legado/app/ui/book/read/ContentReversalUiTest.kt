@@ -12,6 +12,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
+import androidx.test.espresso.action.GeneralSwipeAction
+import androidx.test.espresso.action.Press
+import androidx.test.espresso.action.Swipe
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.longClick
 import androidx.test.espresso.action.ViewActions.closeSoftKeyboard
@@ -42,6 +45,7 @@ import io.legado.app.model.ImageProvider
 import fi.iki.elonen.NanoHTTPD
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.page.ReadView
+import io.legado.app.ui.book.read.page.ContentTextView
 import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.ui.book.read.page.entities.column.ImageColumn
 import io.legado.app.ui.book.read.page.entities.column.ReviewColumn
@@ -220,7 +224,14 @@ class ContentReversalUiTest {
             }
             fun expectResourceFailure(action: () -> Unit) {
                 var layout = ReadBook.curTextChapter
-                val savedPosition = ReadBook.durChapterPos
+                val scroll = ReadBook.pageAnim() == PageAnim.scrollPageAnim
+                val savedChapter = ReadBook.durChapterIndex
+                val savedPage = ReadBook.durPageIndex
+                var savedPosition = ReadBook.durChapterPos
+                if (scroll) scenario!!.onActivity {
+                    savedPosition = checkNotNull(it.findViewById<ReadView>(R.id.read_view)
+                        .getReadPosition()).second.chapterPosition
+                }
                 val contents = refreshChapters.map { BookHelp.getContent(book, it) }
                 val metadata = refreshChapters.map {
                     appDb.bookChapterDao.getChapter(book.bookUrl, it.index)!!.let { saved ->
@@ -255,10 +266,30 @@ class ContentReversalUiTest {
                         reader.postOnAnimation { frame.countDown() }
                     }
                     assertTrue("Reader frames must continue while HTTP is blocked", frame.await(2, TimeUnit.SECONDS))
-                    if (ReadBook.pageAnim() == PageAnim.scrollPageAnim) {
-                        closeReaderMenu()
-                        screenshot("resource-refresh-loading-scroll")
+                    closeReaderMenu()
+                    if (scroll) {
+                        dragReader(0.5f, 0.7f, 0.5f, 0.3f)
+                        dragReader(0.5f, 0.3f, 0.5f, 0.7f)
+                    } else {
+                        dragReader(0.8f, 0.5f, 0.2f, 0.5f)
+                        dragReader(0.2f, 0.5f, 0.8f, 0.5f)
                     }
+                    scenario!!.onActivity {
+                        val reader = it.findViewById<ReadView>(R.id.read_view)
+                        assertTrue(showsLoading(it))
+                        assertFalse(reader.pageFactory.moveToNext(true))
+                        assertFalse(reader.pageFactory.moveToPrev(true))
+                        assertEquals(savedChapter, ReadBook.durChapterIndex)
+                        assertEquals(savedPage, ReadBook.durPageIndex)
+                        assertEquals(savedPosition, ReadBook.durChapterPos)
+                        val content = reader.curPage.findViewById<ContentTextView>(R.id.content_text_view)
+                        assertEquals("The loading message must not move when swiped", 0,
+                            ContentTextView::class.java.getDeclaredField("pageOffset")
+                                .apply { isAccessible = true }.getInt(content))
+                        assertTrue("Blocked paging must not show an end-of-book Snackbar",
+                            it.findViewById<View>(com.google.android.material.R.id.snackbar_text)?.isShown != true)
+                    }
+                    screenshot(if (scroll) "resource-refresh-loading-scroll" else "resource-refresh-loading")
                     if (failBody.get() == 3) {
                         scenario!!.recreate()
                         await("restored reader still shows the pending refresh") {
@@ -302,6 +333,10 @@ class ContentReversalUiTest {
                 }
                 assertSame("A failed refresh must retain the rendered chapter", layout, ReadBook.curTextChapter)
                 assertEquals(savedPosition, ReadBook.durChapterPos)
+                if (scroll) scenario!!.onActivity {
+                    assertEquals("Failure restores the visible character from before loading", savedPosition,
+                        it.findViewById<ReadView>(R.id.read_view).getReadPosition()?.second?.chapterPosition)
+                }
                 refreshChapters.forEachIndexed { index, chapter ->
                     assertEquals("Cached body $index", contents[index], BookHelp.getContent(book, chapter))
                     assertArrayEquals("Cached image $index", imageBytes[index],
@@ -376,6 +411,15 @@ class ContentReversalUiTest {
                 it.findViewById<ReadView>(R.id.read_view).isScroll &&
                     !it.findViewById<ReadView>(R.id.read_view).curPage.textPage.isMsgPage
             }
+            closeReaderMenu()
+            dragReader(0.5f, 0.7f, 0.5f, 0.5f)
+            var scrollPosition = 0
+            scenario!!.onActivity {
+                scrollPosition = checkNotNull(it.findViewById<ReadView>(R.id.read_view)
+                    .getReadPosition()).second.chapterPosition
+                assertTrue("Start the refresh with unsaved scrolling within the page",
+                    scrollPosition > ReadBook.durChapterPos)
+            }
             val outside = listOf(0, 6).associateWith { BookHelp.getContent(book, refreshChapters[it]) }
             bodyVersion.set(4)
             imageColor.set(Color.BLUE)
@@ -414,7 +458,7 @@ class ContentReversalUiTest {
                             ?.getVariable("refreshVersion") == "Version 4"
                 }
             }
-            assertEquals(position, ReadBook.durChapterPos)
+            assertEquals(scrollPosition, ReadBook.durChapterPos)
             listOf(0, 6).forEach {
                 assertEquals(outside[it], BookHelp.getContent(book, refreshChapters[it]))
                 assertEquals(0, bodyRequests.get(it))
@@ -431,7 +475,8 @@ class ContentReversalUiTest {
             closeReaderMenu()
             screenshot("resource-refresh-blue-image")
             File(checkNotNull(context.getExternalFilesDir("ui-regression")), "resource-refresh.txt")
-                .writeText("chapter=3 position=$position range=1..5 outside=0,6 preserved; " +
+                .writeText("chapter=3 position=$position scrollPosition=$scrollPosition range=1..5 outside=0,6 preserved; " +
+                    "blockedSwipes=horizontal-both-directions,scroll-both-directions; " +
                     "failurePaths=theme-body,theme-image,range-body,range-image; " +
                     "bodyRequests=${(0..6).map { bodyRequests.get(it) }} " +
                     "imageRequests=${(0..6).map { imageRequests.get(it) }}")
@@ -683,6 +728,18 @@ class ContentReversalUiTest {
         throw AssertionError("Timed out waiting for $description; chapter=${ReadBook.durChapterIndex}, " +
             "book=${ReadBook.book?.bookUrl}, url=${chapter?.chapter?.url}, complete=${chapter?.isCompleted}, $pageState, " +
             "cached=${BookHelp.getContent(book, chapters[ReadBook.durChapterIndex.coerceIn(0, 1)])}")
+    }
+
+    private fun dragReader(fromX: Float, fromY: Float, toX: Float, toY: Float) {
+        fun coordinates(x: Float, y: Float): (View) -> FloatArray = { view ->
+            val location = IntArray(2)
+            view.getLocationOnScreen(location)
+            floatArrayOf(location[0] + view.width * x, location[1] + view.height * y)
+        }
+        onView(withId(R.id.read_view)).perform(GeneralSwipeAction(Swipe.SLOW,
+            coordinates(fromX, fromY), coordinates(toX, toY), Press.FINGER))
+        scenario!!.onActivity { it.findViewById<ReadView>(R.id.read_view).pageDelegate?.abortAnim() }
+        awaitDraw()
     }
 
     private fun awaitDraw() {
