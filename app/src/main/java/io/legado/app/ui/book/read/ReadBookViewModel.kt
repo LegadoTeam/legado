@@ -40,6 +40,7 @@ import io.legado.app.service.BaseReadAloudService
 import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.ui.book.searchContent.SearchResult
 import io.legado.app.ui.book.toc.TocActivityResult
+import io.legado.app.utils.GSON
 import io.legado.app.utils.DocumentUtils
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.isContentScheme
@@ -64,6 +65,8 @@ import java.io.FileInputStream
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
 
+data class ReaderSourceReimport(val bookUrl: String, val sourceUrl: String, val json: String)
+
 /**
  * 阅读界面数据处理
  */
@@ -76,6 +79,9 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
     private var changeSourceCoroutine: Coroutine<*>? = null
     private var resourceRefreshCoroutine: Coroutine<*>? = null
     val resourceRefreshing = MutableLiveData(false)
+    val pendingSourceReimport = MutableLiveData<ReaderSourceReimport?>()
+    internal var sourceReimportLoading = false
+        private set
 
     init {
         AppConfig.detectClickArea()
@@ -401,6 +407,27 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
             book?.delete()
         }.onSuccess {
             success?.invoke()
+        }
+    }
+
+    fun prepareSourceReimport() {
+        val book = ReadBook.book?.takeUnless { it.isLocal } ?: return
+        if (sourceReimportLoading || pendingSourceReimport.value != null) return
+        val bookUrl = book.bookUrl
+        val sourceUrl = book.origin
+        sourceReimportLoading = true
+        execute {
+            appDb.bookSourceDao.getBookSource(sourceUrl)?.let { GSON.toJson(it) }
+        }.onSuccess { json ->
+            if (ReadBook.book?.bookUrl != bookUrl || ReadBook.book?.origin != sourceUrl) {
+                return@onSuccess
+            }
+            if (json == null) context.toastOnUi(R.string.error_no_source)
+            else pendingSourceReimport.value = ReaderSourceReimport(bookUrl, sourceUrl, json)
+        }.onError {
+            context.toastOnUi(it.localizedMessage)
+        }.onFinally {
+            sourceReimportLoading = false
         }
     }
 
