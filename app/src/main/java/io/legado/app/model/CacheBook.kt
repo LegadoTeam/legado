@@ -322,7 +322,7 @@ object CacheBook {
             val chapter = appDb.bookChapterDao.getChapter(requestBook.bookUrl, index)
             val skip = synchronized(downloads) {
                 (chapter == null || chapter.isVolume ||
-                    (BookHelp.hasImageContent(requestBook, chapter) && !needsResourceRefresh(requestBook, chapter)))
+                    (!needsResourceRefresh(requestBook, chapter) && BookHelp.hasImageContent(requestBook, chapter)))
                     .also { if (it) downloads.discardWaiting(index) }
             }
             if (skip) {
@@ -347,10 +347,10 @@ object CacheBook {
                             }.single().content
                         }
                     } else {
-                        (BookHelp.getContent(requestBook, chapter)
-                            ?: WebBook.getContentAwait(source, requestBook, chapter)).also {
-                            BookHelp.saveImages(source, requestBook, chapter, it, 1)
-                        }
+                        val content = BookHelp.getContent(requestBook, chapter)
+                            ?: WebBook.getContentAwait(source, requestBook, chapter)
+                        BookHelp.saveImages(source, requestBook, chapter, content, 1)
+                        content
                     }
                     val currentContent = BookHelp.getContent(requestBook, chapter) ?: content
                     if (!refreshingResources) onSuccess(ticket, requestBook, chapter, currentContent,

@@ -33,7 +33,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -156,10 +156,15 @@ class ContentReversalCacheTest {
                     preferences.edit().putInt(PreferKey.preDownloadNum, preload).commit()
                     val before = tocRequests.get()
                     shelf.upToc(listOf(book), false, policy)
-                    withTimeout(30_000) {
+                    val completed = withTimeoutOrNull(30_000) {
                         while (tocRequests.get() == before || shelf.isUpdate(book.bookUrl) || jobField.get(shelf) != null ||
                             CacheBook.cacheBookMap[book.bookUrl]?.isRun() == true) delay(20)
+                        true
                     }
+                    assertTrue("Shelf ${book.name}, preload=$preload policy=$policy: " +
+                        "toc=${tocRequests.get() - before}, updating=${shelf.isUpdate(book.bookUrl)}, " +
+                        "tocJob=${jobField.get(shelf)}, cache=${CacheBook.cacheBookMap[book.bookUrl]?.isRun()}, " +
+                        "bodies=${(0..9).map { bodies.get(it) }}", completed == true)
                 }
                 refreshShelf(first, 0, TocUpdatePolicy.ALLOW_PRE_DOWNLOAD)
                 refreshShelf(first, 2, TocUpdatePolicy.SKIP_PRE_DOWNLOAD)
