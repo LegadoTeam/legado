@@ -280,10 +280,12 @@ class ReadAloudMenuUiTest {
         assertTrue(positions[0] < positions[1] && positions[1] < positions[2])
         screenshot("aloud-independent-switches")
         onView(withText(R.string.read_aloud_controls_pause)).inRoot(isDialog()).perform(click())
-        pressBack()
+        onView(withText(R.string.read_aloud_controls_pause)).inRoot(isDialog())
+            .perform(androidx.test.espresso.action.ViewActions.pressBack())
         scenario!!.onActivity { ReadAloudControlsDialog().showNow(it.supportFragmentManager, "controls-reopen") }
         assertFalse("Opening settings must retain explicit false", prefs.getBoolean(PreferKey.readAloudControlsPause, true))
-        pressBack()
+        onView(withText(R.string.read_aloud_controls_pause)).inRoot(isDialog())
+            .perform(androidx.test.espresso.action.ViewActions.pressBack())
         scenario!!.onActivity {
             playbackFlag("isRun", true)
             BaseReadAloudService.restoreReadAloudFollow()
