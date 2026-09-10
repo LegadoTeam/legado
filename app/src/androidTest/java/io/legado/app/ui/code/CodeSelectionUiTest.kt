@@ -25,7 +25,6 @@ import androidx.core.view.children
 import androidx.core.content.FileProvider
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.Lifecycle
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
@@ -95,10 +94,17 @@ class CodeSelectionUiTest {
     private val selectedText = source.substring(source.indexOf("function"), source.indexOf("\nconst after"))
 
     @After fun cleanUp() {
-        scenario?.takeIf { it.state != Lifecycle.State.DESTROYED }?.onActivity { activity ->
-            // A failed edit assertion must not leave the discard dialog blocking later tests.
-            activity.findViewById<CodeEditor>(R.id.editText).takeIf { it.isShown }
-                ?.setText(ViewModelProvider(activity)[CodeEditViewModel::class.java].initialText)
+        instrumentation.runOnMainSync {
+            // Read lifecycle and reset the draft in one main-thread turn: a finished result can
+            // arrive before onDestroy, racing a separate scenario.state / onActivity pair.
+            val monitor = ActivityLifecycleMonitorRegistry.getInstance()
+            listOf(Stage.CREATED, Stage.STARTED, Stage.RESUMED, Stage.PAUSED, Stage.STOPPED)
+                .flatMap(monitor::getActivitiesInStage).filterIsInstance<CodeEditActivity>()
+                .filterNot { it.isFinishing }.forEach { activity ->
+                    // A failed edit assertion must not leave a discard dialog blocking later tests.
+                    activity.findViewById<CodeEditor>(R.id.editText).takeIf { it.isShown }
+                        ?.setText(ViewModelProvider(activity)[CodeEditViewModel::class.java].initialText)
+                }
         }
         scenario?.close()
         CacheManager.deleteMemory(cacheKey)

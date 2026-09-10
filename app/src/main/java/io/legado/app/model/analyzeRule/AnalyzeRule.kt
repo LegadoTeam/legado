@@ -1,13 +1,12 @@
 package io.legado.app.model.analyzeRule
 
-import com.script.rhino.runScriptWithContext
-
 import android.text.TextUtils
 import androidx.annotation.Keep
 import com.google.gson.internal.LinkedTreeMap
 import com.script.CompiledScript
 import com.script.buildScriptBindings
 import com.script.rhino.RhinoScriptEngine
+import com.script.rhino.runScriptWithContext
 import io.legado.app.constant.AppPattern.JS_PATTERN
 import io.legado.app.constant.AppPattern.WebJS_PATTERN
 import io.legado.app.data.entities.BaseBook

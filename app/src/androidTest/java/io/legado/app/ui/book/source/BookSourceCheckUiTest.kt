@@ -6,10 +6,17 @@ import android.os.Looper
 import android.os.SystemClock
 import android.view.PixelCopy
 import android.view.View
+import android.view.MenuItem
 import android.widget.Spinner
 import androidx.core.net.toUri
 import androidx.appcompat.widget.SearchView
 import androidx.test.core.app.ActivityScenario
+import androidx.test.espresso.Espresso.onData
+import androidx.test.espresso.Espresso.openActionBarOverflowOrOptionsMenu
+import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.matcher.RootMatchers.isPlatformPopup
+import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.R
@@ -35,6 +42,10 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.hamcrest.Matchers.allOf
+import org.hamcrest.Matchers.equalTo
+import org.hamcrest.Matchers.hasProperty
+import org.hamcrest.Matchers.instanceOf
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
@@ -136,8 +147,21 @@ class BookSourceCheckUiTest {
             assertEquals(ids.indexOf(R.id.menu_show_source_check_status) + 1, navigation)
             assertEquals(navigation + 1, ids.indexOf(R.id.menu_help))
             assertNotNull(menu.findItem(R.id.menu_block_source_navigation).icon)
-            menu.performIdentifierAction(R.id.menu_block_source_navigation, 0)
-            assertTrue(menu.findItem(R.id.menu_block_source_navigation).isChecked)
+        }
+        openActionBarOverflowOrOptionsMenu(context)
+        val navigationItem = onData(allOf(instanceOf(MenuItem::class.java),
+            hasProperty("itemId", equalTo(R.id.menu_block_source_navigation)))).inRoot(isPlatformPopup())
+        navigationItem.check(matches(isDisplayed()))
+        checkNotNull(instrumentation.uiAutomation.takeScreenshot()).useBitmap { bitmap ->
+            val directory = File(context.getExternalFilesDir(null), "ui-regression").apply { mkdirs() }
+            File(directory, "source-navigation-menu.png").outputStream().use {
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+        }
+        navigationItem.perform(click())
+        scenario!!.onActivity {
+            assertTrue(it.findViewById<TitleBar>(R.id.title_bar).menu
+                .findItem(R.id.menu_block_source_navigation).isChecked)
         }
         assertTrue(AppConfig.blockSourceNavigation)
         assertStatusVisibility(false)
