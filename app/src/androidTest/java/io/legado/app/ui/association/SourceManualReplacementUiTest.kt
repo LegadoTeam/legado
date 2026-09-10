@@ -133,17 +133,34 @@ class SourceManualReplacementUiTest {
                     val model = main { if (rss) host.feed else host.book }
                     assertTrue("The query must still be held: rss=$rss manual=$manual recreate=$recreate",
                         main { if (rss) host.feed.sourceUpdatePending.value == true else host.book.sourceUpdatePending.value == true })
+                    val activity = main { host.parent.requireActivity() }
+                    // ActivityScenario waits for an idle main thread before dispatching these
+                    // transitions, which cannot happen while this held query animates progress.
                     if (recreate) {
-                        host.scenario.recreate()
-                        host.findParent()
+                        main { activity.recreate() }
+                        await("The system must recreate the preview while its query is held") {
+                            main {
+                                ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED)
+                                    .filterIsInstance<FileAssociationActivity>().find { it !== activity }
+                                    ?.supportFragmentManager?.fragments?.filterIsInstance<DialogFragment>()
+                                    ?.find { if (rss) it is ImportRssSourceDialog else it is ImportBookSourceDialog }
+                                    ?.let { host.parent = it; it.isResumed && it.view != null } == true
+                            }
+                        }
                         assertSame(model, main { if (rss) host.feed else host.book })
                     } else {
-                        host.scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+                        main { assertTrue(activity.moveTaskToBack(true)) }
+                        await("The system must stop the preview while its query is held") {
+                            main { ActivityLifecycleMonitorRegistry.getInstance().getLifecycleStageOf(activity) == Stage.STOPPED }
+                        }
                     }
+                    assertTrue("Lifecycle transition must precede query release: rss=$rss manual=$manual recreate=$recreate",
+                        main { if (rss) host.feed.sourceUpdatePending.value == true else host.book.sourceUpdatePending.value == true })
                     release.countDown()
                     await("The retained comparison must finish") {
                         main { if (rss) host.feed.sourceUpdatePending.value != true else host.book.sourceUpdatePending.value != true }
                     }
+                    main { assertNull(if (rss) host.feed.errorLiveData.value else host.book.errorLiveData.value) }
                     if (!recreate) host.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
                     val menu: DialogFragment = if (manual) host.child<ManualReplaceRulesDialog>() else host.child<EffectiveReplacesDialog>()
                     main {
