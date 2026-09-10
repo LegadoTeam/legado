@@ -3,6 +3,7 @@ package io.legado.app.help.source
 import android.app.Activity
 import android.app.Instrumentation
 import android.content.Intent
+import android.util.Log
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -29,6 +30,7 @@ import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.UUID
+import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 
 @RunWith(AndroidJUnit4::class)
@@ -98,13 +100,26 @@ class SourceNavigationUiTest {
                 source.header = "@js:java.openUrl('https://navigation.invalid/header'); '{\"X-Navigation\":\"ok\"}'"
                 for (blocked in listOf(true, false)) {
                     AppConfig.blockSourceNavigation = blocked
-                    val response = rule.getString("""@webjs:
+                    Log.i("SourceNavigationTest", "webjs start blocked=$blocked")
+                    val response = try { rule.getString("""@webjs:
+                        console.info('navigation webjs: started');
                         java.openUrl('https://navigation.invalid/java');
                         source.openUrl('https://navigation.invalid/source');
+                        console.info('navigation webjs: before login');
                         source.login();
+                        console.info('navigation webjs: after login');
                         source.put('navigationTest', 'stored');
+                        console.info('navigation webjs: stored');
                         source.get('navigationTest') + ':' + document.querySelector('p').textContent + ':' + source.get('navigationLogin');
-                    """.trimIndent())
+                    """.trimIndent()) } catch (error: Throwable) {
+                        File(context.getExternalFilesDir("ui-regression"), "source-navigation-timeout-threads.txt")
+                            .writeText("blocked=$blocked; starts=${starts.size}\n" +
+                                Thread.getAllStackTraces().entries.joinToString("\n\n") { (thread, stack) ->
+                                    "${thread.name}: ${thread.state}\n${stack.joinToString("\n")}"
+                                })
+                        throw error
+                    }
+                    Log.i("SourceNavigationTest", "webjs completed blocked=$blocked response=$response")
                     assertEquals("stored:Background:ok", response)
                     assertEquals(if (blocked) 0 else 4, starts.size)
                     starts.forEach { assertEquals(SourceType.book, it.getIntExtra("sourceType", -1)) }

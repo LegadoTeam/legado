@@ -1,5 +1,6 @@
 package io.legado.app.ui.association
 
+import android.app.ActivityManager
 import android.content.ClipData
 import android.content.Intent
 import android.graphics.Bitmap
@@ -161,7 +162,15 @@ class SourceManualReplacementUiTest {
                         main { if (rss) host.feed.sourceUpdatePending.value != true else host.book.sourceUpdatePending.value != true }
                     }
                     main { assertNull(if (rss) host.feed.errorLiveData.value else host.book.errorLiveData.value) }
-                    if (!recreate) host.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+                    if (!recreate) {
+                        main {
+                            activity.getSystemService(ActivityManager::class.java).appTasks
+                                .single { it.taskInfo.taskId == activity.taskId }.moveToFront()
+                        }
+                        await("The application task must return to the foreground") {
+                            main { ActivityLifecycleMonitorRegistry.getInstance().getLifecycleStageOf(activity) == Stage.RESUMED }
+                        }
+                    }
                     val menu: DialogFragment = if (manual) host.child<ManualReplaceRulesDialog>() else host.child<EffectiveReplacesDialog>()
                     main {
                         // Replacement is unchecked, so the restored effective list must remain empty.
