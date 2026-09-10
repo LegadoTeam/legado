@@ -19,4 +19,15 @@
     <string formatted="false" name="read_aloud_controls_reset_summary">清除拖动位置；贴边开启时仍贴靠边缘</string>
     <string name="read_aloud_back_short">原进度</string>
     <string name="read_aloud_here_short">从本页听</string>
+    <string name="read_aloud_start">首次朗读起始设置</string>
+    <string name="read_aloud_start_page">页首开始朗读</string>
+    <string name="read_aloud_start_sentence">句首开始朗读</string>
+    <string-array name="read_aloud_start_entries">
+        <item>@string/read_aloud_start_page</item>
+        <item>@string/read_aloud_start_sentence</item>
+    </string-array>
+    <string-array name="read_aloud_start_values" translatable="false">
+        <item>page</item>
+        <item>sentence</item>
+    </string-array>
 </resources>

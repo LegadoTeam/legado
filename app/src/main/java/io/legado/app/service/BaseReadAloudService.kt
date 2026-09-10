@@ -79,9 +79,8 @@ import splitties.systemservices.wifiManager
 
 internal fun shouldRewindReadAloudToSentenceStart(
     rewindToSentenceStart: Boolean,
-    readAloudByPage: Boolean,
     toLast: Boolean
-): Boolean = rewindToSentenceStart && !readAloudByPage && !toLast
+): Boolean = rewindToSentenceStart && !toLast
 
 internal fun findReadAloudSentenceStart(text: String, visibleOffset: Int): Int {
     if (text.isEmpty()) return 0
@@ -372,54 +371,27 @@ abstract class BaseReadAloudService : BaseService(),
                 .split("\n")
                 .filter { it.isNotEmpty() }
             var readAloudNumber = textChapter.getReadLength(pageIndex) + startPos
-            var pos = startPos
-            val page = textChapter.getPage(pageIndex)!!
-            if (pos > 0) {
-                for (paragraph in page.paragraphs) {
-                    val tmp = pos - paragraph.length - 1
-                    if (tmp < 0) break
-                    pos = tmp
-                }
-            }
-            var nowSpeak = textChapter.getParagraphNum(readAloudNumber + 1, readAloudByPage) - 1
-            if (shouldRewindReadAloudToSentenceStart(
-                    rewindToSentenceStart,
-                    readAloudByPage,
-                    toLast
-                )
-            ) {
-                val paragraph = textChapter.paragraphs[nowSpeak]
+            if (shouldRewindReadAloudToSentenceStart(rewindToSentenceStart, toLast)) {
+                val paragraphIndex = textChapter.getParagraphNum(readAloudNumber + 1, false) - 1
+                val paragraph = textChapter.paragraphs[paragraphIndex]
                 val sentenceStart = findReadAloudSentenceStart(
-                    paragraph.text,
-                    readAloudNumber - paragraph.chapterPosition
+                    paragraph.text, readAloudNumber - paragraph.chapterPosition
                 )
                 readAloudNumber = paragraph.chapterPosition + sentenceStart
-                pos = sentenceStart
-            } else if (!readAloudByPage && startPos == 0 && !toLast) {
-                pos = page.chapterPosition -
-                        textChapter.paragraphs[nowSpeak].chapterPosition
             }
-            val readAloudChapterStart = readAloudNumber
-            var consumedToLast = false
-            if (toLast) {
-                consumedToLast = true
-                readAloudNumber = textChapter.getLastParagraphPosition()
-                nowSpeak = contentList.lastIndex
-                if (page.paragraphs.size == 1) {
-                    pos = page.chapterPosition -
-                            textChapter.paragraphs[nowSpeak].chapterPosition
-                }
-            }
+            if (toLast) readAloudNumber = textChapter.getLastParagraphPosition()
+            val nowSpeak = textChapter.getParagraphNum(readAloudNumber + 1, readAloudByPage) - 1
+            val pos = readAloudNumber - textChapter.getParagraphs(readAloudByPage)[nowSpeak].chapterPosition
             val prepared = PreparedReadAloud(
                 textChapter = textChapter,
-                pageIndex = pageIndex,
+                pageIndex = textChapter.getPageIndexByCharIndex(readAloudNumber),
                 readAloudNumber = readAloudNumber,
                 readAloudByPage = readAloudByPage,
                 contentList = contentList,
                 nowSpeak = nowSpeak,
-                readAloudChapterStart = readAloudChapterStart,
+                readAloudChapterStart = readAloudNumber,
                 paragraphStartPos = pos,
-                consumedToLast = consumedToLast
+                consumedToLast = toLast
             )
             ensureActive()
             withContext(Main.immediate) {
@@ -517,7 +489,7 @@ abstract class BaseReadAloudService : BaseService(),
                     ReadBook.moveToPrevPage(syncReadAloudFollow = true)
                 }
             }
-            upTtsProgress(readAloudNumber + 1)
+            upTtsProgress(readAloudNumber)
             play()
         } else {
             toLast = true
@@ -543,7 +515,7 @@ abstract class BaseReadAloudService : BaseService(),
                     ReadBook.moveToNextPage(syncReadAloudFollow = true)
                 }
             }
-            upTtsProgress(readAloudNumber + 1)
+            upTtsProgress(readAloudNumber)
             play()
         } else {
             nextChapter()
