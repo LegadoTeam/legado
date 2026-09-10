@@ -560,6 +560,7 @@ object Restore {
             if (BackupConfig.keyIsNotIgnore(PreferKey.coverFont) && PreferKey.coverFont !in map) {
                 edit.remove(PreferKey.coverFont)
             }
+            if (PreferKey.myMoreItems !in map) edit.remove(PreferKey.myMoreItems)
             if (PreferKey.autoBackup !in map) edit.putBoolean(PreferKey.autoBackup, true)
             if (PreferKey.autoBackupWebDav !in map) edit.putBoolean(PreferKey.autoBackupWebDav, true)
             if (PreferKey.autoBackupIntervalDays !in map) edit.putInt(PreferKey.autoBackupIntervalDays, 1)
