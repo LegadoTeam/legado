@@ -468,6 +468,16 @@ object Restore {
                     (!lanTransfer || key !in lanTransferIgnoredPrefKeys)
                 ) {
                     when (key) {
+                        "readRecordSort" -> (value as? Int)?.let {
+                            LocalConfig.edit().putInt(key, it.coerceIn(0, 2)).apply()
+                        }
+                        PreferKey.readRecordCover,
+                        PreferKey.readRecordCoverDark -> {
+                            val coverPath = (value as? String)?.let {
+                                remapRestoredCoverPath(it, File(path), appCtx.externalFiles)
+                            }
+                            if (coverPath == null) edit.remove(key) else edit.putString(key, coverPath)
+                        }
                         PreferKey.webDavPassword -> {
                             kotlin.runCatching {
                                 aes.decryptStr(value.toString())
@@ -534,6 +544,10 @@ object Restore {
             if ("readRecordSimpleLayout" !in map) edit.putBoolean("readRecordSimpleLayout", true)
             if ("readRecordUseDays" !in map) edit.putBoolean("readRecordUseDays", false)
             if ("readRecordShowSeconds" !in map) edit.putBoolean("readRecordShowSeconds", true)
+            if ("readRecordFixedCard" !in map) edit.putBoolean("readRecordFixedCard", true)
+            for (key in listOf(PreferKey.readRecordCover, PreferKey.readRecordCoverDark)) {
+                if (key !in map && BackupConfig.keyIsNotIgnore(key)) edit.remove(key)
+            }
             if (!BackupConfig.ignoreReadConfig && PreferKey.mangaRightToLeft !in map) {
                 edit.putBoolean(PreferKey.mangaRightToLeft, false)
             }
