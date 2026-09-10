@@ -120,6 +120,7 @@
 
     <io.legado.app.lib.theme.view.ThemeEditText
         android:id="@+id/content_view"
+        android:saveEnabled="false"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:gravity="top|start"
