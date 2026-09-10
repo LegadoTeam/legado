@@ -27,12 +27,9 @@ class FileAssociationLoadingStateTest {
 
     @Test
     fun `folder selection does not leave loading visible`() {
-        val importBook = source.substringAfter("private fun importBook(uri: Uri)")
-            .substringBefore("private fun importBook(treeUri: Uri?, uri: Uri)")
-        val folderSelection = importBook.substringAfter("if (treeUriStr.isNullOrEmpty())")
-            .substringBefore("} else {")
+        val folderSelection = source.substringAfter("private fun chooseBookDirectory()")
 
-        assertFalse(importBook.contains("binding.rotateLoading.visible()"))
+        assertFalse(folderSelection.contains("binding.rotateLoading.visible()"))
         assertTrue(folderSelection.contains("binding.rotateLoading.gone()"))
         assertTrue(
             folderSelection.indexOf("binding.rotateLoading.gone()") <
@@ -42,15 +39,14 @@ class FileAssociationLoadingStateTest {
 
     @Test
     fun `copy attempt owns loading lifecycle`() {
-        val importBook = source.substringAfter("private fun importBook(treeUri: Uri?, uri: Uri)")
-        val failureBlock = importBook.substringAfter("}.onFailure {")
-
-        assertTrue(importBook.contains("binding.rotateLoading.visible()"))
-        assertTrue(failureBlock.contains("binding.rotateLoading.gone()"))
-        assertTrue(
-            failureBlock.indexOf("binding.rotateLoading.gone()") <
-                    failureBlock.indexOf("when (it)")
-        )
+        val observer = source.substringAfter("viewModel.importingLocalBooks.observe(this)")
+            .substringBefore("viewModel.importedLocalBooks.observe(this)")
+        val copy = readProjectFile("src/main/java/io/legado/app/ui/association/FileAssociationViewModel.kt")
+            .substringAfter("fun importLocalBooks(directory: Uri)")
+            .substringBefore("private fun reportSharedImportError")
+        assertTrue(observer.contains("if (importing) binding.rotateLoading.visible() else binding.rotateLoading.gone()"))
+        assertTrue(copy.contains("importingLocalBooks.value = true"))
+        assertTrue(copy.contains(".onFinally { importingLocalBooks.value = false }"))
     }
 
     private fun readProjectFile(pathInApp: String): String {

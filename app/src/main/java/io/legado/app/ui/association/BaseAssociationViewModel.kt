@@ -20,46 +20,50 @@ abstract class BaseAssociationViewModel(application: Application) : BaseViewMode
             jsonPath.parse(it).read("$")
         }
 
+        val type = jsonImportType(map)
+        if (type == null) errorLive.postValue("格式不对")
+        else successLive.postValue(type to uri.toString())
+    }
+}
+
+internal fun jsonImportType(map: Map<String, *>): String? =
         when {
             map["type"] == HighlightRuleFile.TYPE ->
-                successLive.postValue("highlightRule" to uri.toString())
+                "highlightRule"
 
             map.containsKey("bookSourceUrl") ->
-                successLive.postValue("bookSource" to uri.toString())
+                "bookSource"
 
             map.containsKey("sourceUrl") ->
-                successLive.postValue("rssSource" to uri.toString())
+                "rssSource"
 
             map.containsKey("pattern") && map.containsKey("style") &&
                 map.containsKey("uuid") && !map.containsKey("replacement") ->
-                successLive.postValue("highlightRule" to uri.toString())
+                "highlightRule"
 
             map.containsKey("pattern") && (map.containsKey("style") || map.containsKey("uuid")) ->
-                errorLive.postValue("格式不对")
+                null
 
             map.containsKey("pattern") ->
-                successLive.postValue("replaceRule" to uri.toString())
+                "replaceRule"
 
             map.containsKey("themeName") ->
-                successLive.postValue("theme" to uri.toString())
+                "theme"
 
             map.containsKey("showRule") ->
-                successLive.postValue("dictRule" to uri.toString())
+                "dictRule"
 
             map.containsKey("name") && map.containsKey("rule") ->
-                successLive.postValue("txtRule" to uri.toString())
+                "txtRule"
 
             map.containsKey("cron") && map.containsKey("script") ->
-                successLive.postValue("autoTask" to uri.toString())
+                "autoTask"
 
             map.containsKey("name") && map.containsKey("url") ->
-                successLive.postValue("httpTts" to uri.toString())
+                "httpTts"
 
             map.containsKey("name") && map.containsKey("author") ->
-                successLive.postValue("bookshelf" to uri.toString())
+                "bookshelf"
 
-            else -> errorLive.postValue("格式不对")
+            else -> null
         }
-    }
-
-}

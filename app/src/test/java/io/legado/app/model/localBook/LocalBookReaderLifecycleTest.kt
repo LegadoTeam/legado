@@ -106,18 +106,16 @@ class LocalBookReaderLifecycleTest {
         )
 
         val associationSource = readProjectFile(
-            "src/main/java/io/legado/app/ui/association/FileAssociationActivity.kt"
+            "src/main/java/io/legado/app/ui/association/SharedLocalBookImport.kt"
         )
-        assertInvalidationBeforeOutput(
-            associationSource,
-            "LocalBook.withParserCacheInvalidated(doc.uri, name)",
-            "contentResolver.openOutputStream(doc.uri)"
-        )
-        assertInvalidationBeforeOutput(
-            associationSource,
-            "LocalBook.withParserCacheInvalidated(Uri.fromFile(file), name)",
-            "FileOutputStream(file)"
-        )
+        // Sharing now creates a new destination; it must never overwrite a cached book.
+        assertTrue(associationSource.contains("tree.findFile(candidate(suffix)) != null"))
+        assertTrue(associationSource.contains("appDb.bookDao.getBookByFileName(candidate(suffix)) != null"))
+        assertTrue(associationSource.indexOf("tree.createFile(") <
+            associationSource.indexOf("contentResolver.openOutputStream(copy.uri)"))
+        assertTrue(associationSource.contains("while (appDb.bookDao.has(copy.path) || !copy.createNewFile())"))
+        assertTrue(associationSource.indexOf("copy.createNewFile()") <
+            associationSource.indexOf("copy.outputStream()", associationSource.indexOf("copy.createNewFile()")))
     }
 
     @Test
