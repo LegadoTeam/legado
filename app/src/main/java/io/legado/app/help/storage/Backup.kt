@@ -394,6 +394,15 @@ object Backup {
         currentCoroutineContext().ensureActive()
         val zipFileName = getNowZipFileName()
         val paths = ArrayList(selectedBackupFileNames(enabledContentKeys::contains))
+        if (BackupConfig.settingContentKey in enabledContentKeys &&
+            BackupConfig.keyIsNotIgnore(PreferKey.coverFont)
+        ) {
+            appCtx.getPrefString(PreferKey.coverFont)?.takeIf { it.isNotBlank() }?.let { fontPath ->
+                val fontBackup = File(backupPath, BookCover.fontBackupFileName)
+                File(fontPath).copyTo(fontBackup, overwrite = true)
+                paths.add(BookCover.fontBackupFileName)
+            }
+        }
         if (lanTransfer) {
             paths.removeAll(listOf("servers.json", DirectLinkUpload.ruleFileName))
         }

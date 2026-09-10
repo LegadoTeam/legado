@@ -7,6 +7,8 @@ import android.os.SystemClock
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Rect
 import android.view.View
 import android.widget.NumberPicker
 import java.io.File
@@ -26,6 +28,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.constant.PreferKey
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.model.BookCover
 import io.legado.app.ui.about.AboutActivity
 import io.legado.app.ui.config.ConfigActivity
@@ -64,11 +67,14 @@ class CoverTitleAdaptiveUiTest {
         preferences.edit()
             .putBoolean(PreferKey.useDefaultCover, false)
             .putBoolean(PreferKey.coverShowName, true)
+            .putBoolean(PreferKey.coverShowNameN, true)
             .putBoolean(PreferKey.coverShowAuthor, false)
+            .putBoolean(PreferKey.coverShowAuthorN, false)
             .putBoolean(PreferKey.coverHorizontal, false)
             .putBoolean(PreferKey.coverTitleAdaptive, true)
             .putBoolean(PreferKey.coverKeepPunctuation, true)
             .putBoolean(PreferKey.coverCustomFontSize, false)
+            .remove(PreferKey.coverFont)
             .putInt(PreferKey.coverTitleLargeSize, 100)
             .putInt(PreferKey.coverTitleSmallSize, 100)
             .putInt(PreferKey.coverAuthorLargeSize, 100)
@@ -119,7 +125,8 @@ class CoverTitleAdaptiveUiTest {
             preferences.edit().putBoolean(PreferKey.coverHorizontal, horizontal)
                 .putBoolean(PreferKey.coverTitleAdaptive, adaptive)
                 .putBoolean(PreferKey.coverCustomFontSize, false)
-                .putBoolean(PreferKey.coverShowAuthor, true).commit()
+                .putBoolean(PreferKey.coverShowAuthor, true)
+                .putBoolean(PreferKey.coverShowAuthorN, true).commit()
             val original = renderText("风雪长夜里的第一卷山海传奇", "长名字作者示例")
             preferences.edit().putBoolean(PreferKey.coverCustomFontSize, true)
                 .putInt(PreferKey.coverTitleLargeSize, 145).putInt(PreferKey.coverTitleSmallSize, 150)
@@ -147,6 +154,7 @@ class CoverTitleAdaptiveUiTest {
             preferences.edit().putBoolean(PreferKey.coverHorizontal, horizontal)
                 .putBoolean(PreferKey.coverTitleAdaptive, true)
                 .putBoolean(PreferKey.coverShowAuthor, true)
+                .putBoolean(PreferKey.coverShowAuthorN, true)
                 .putBoolean(PreferKey.coverCustomFontSize, true).apply {
                     samples.forEach { putInt(it.first, 100) }
                 }.commit()
@@ -155,6 +163,103 @@ class CoverTitleAdaptiveUiTest {
             val changed = renderText(title, author)
             assertFalse("$key must affect actual pixels: horizontal=$horizontal", original.contentEquals(changed))
         }
+    }
+
+    @Test
+    fun equalCustomNumbersGiveEqualGlyphGeometryInEveryLayout() {
+        for (horizontal in listOf(false, true)) for (adaptive in listOf(false, true)) {
+            preferences.edit().putBoolean(PreferKey.coverHorizontal, horizontal)
+                .putBoolean(PreferKey.coverTitleAdaptive, adaptive)
+                .putBoolean(PreferKey.coverShowAuthor, true)
+                .putBoolean(PreferKey.coverShowAuthorN, true)
+                .putBoolean(PreferKey.coverCustomFontSize, true)
+                .putInt(PreferKey.coverTitleLargeSize, 100).putInt(PreferKey.coverTitleSmallSize, 100)
+                .putInt(PreferKey.coverAuthorLargeSize, 100).putInt(PreferKey.coverAuthorSmallSize, 100).commit()
+            for (author in listOf(false, true)) {
+                fun glyphs(text: String) = glyphBounds(renderText(
+                    if (author) "" else text, if (author) text else "", textOnly = true))
+                val reference = glyphs("H").single()
+                val repeated = glyphs("H ".repeat(if (author) 12 else 6).trim())
+                assertTrue("long text must render repeated glyphs", repeated.size >= 3)
+                repeated.forEach { glyph ->
+                    val label = "equal glyph size: horizontal=$horizontal adaptive=$adaptive author=$author"
+                    // Fractional baselines and centered alignment can shift raster edges by one pixel.
+                    assertTrue("$label width ${reference.width()} vs ${glyph.width()}",
+                        kotlin.math.abs(reference.width() - glyph.width()) <= 1)
+                    assertTrue("$label height ${reference.height()} vs ${glyph.height()}",
+                        kotlin.math.abs(reference.height() - glyph.height()) <= 1)
+                }
+            }
+            screenshot("cover-equal-size-$horizontal-$adaptive")
+        }
+    }
+
+    private fun glyphBounds(pixels: IntArray): List<Rect> {
+        val width = cover!!.width
+        val height = pixels.size / width
+        val visited = BooleanArray(pixels.size)
+        val queue = IntArray(pixels.size)
+        val bounds = mutableListOf<Rect>()
+        for (start in pixels.indices) {
+            if (visited[start] || Color.alpha(pixels[start]) < 128) continue
+            var head = 0
+            var tail = 0
+            queue[tail++] = start
+            visited[start] = true
+            val rect = Rect(start % width, start / width, start % width + 1, start / width + 1)
+            while (head < tail) {
+                val index = queue[head++]
+                val x = index % width
+                val y = index / width
+                rect.union(x, y, x + 1, y + 1)
+                for (dy in -1..1) for (dx in -1..1) {
+                    val nx = x + dx
+                    val ny = y + dy
+                    if (nx !in 0 until width || ny !in 0 until height) continue
+                    val next = ny * width + nx
+                    if (!visited[next] && Color.alpha(pixels[next]) >= 128) {
+                        visited[next] = true
+                        queue[tail++] = next
+                    }
+                }
+            }
+            // Ignore the ellipsis dots in a truncated horizontal author.
+            if (rect.height() >= 8) bounds.add(rect)
+        }
+        return bounds
+    }
+
+    @Test
+    fun selectedFontChangesTitleAndAuthorPixelsAndDefaultRestoresEveryLayout() {
+        val font = File("/system/fonts/NotoSerif-Regular.ttf")
+        assertTrue("the emulator provides the serif font fixture", font.isFile)
+        val readerFont = ReadBookConfig.textFont
+        val readerTitleFont = ReadBookConfig.titleFont
+        val systemTypeface = AppConfig.systemTypefaces
+        preferences.edit().putBoolean(PreferKey.coverShowAuthor, true)
+            .putBoolean(PreferKey.coverShowAuthorN, true).commit()
+        for (horizontal in listOf(false, true)) for (adaptive in listOf(false, true)) {
+            preferences.edit().putBoolean(PreferKey.coverHorizontal, horizontal)
+                .putBoolean(PreferKey.coverTitleAdaptive, adaptive).commit()
+            for (author in listOf(false, true)) {
+                val title = if (author) "" else "Cover Style ABC"
+                val authorName = if (author) "Author ABC" else ""
+                preferences.edit().remove(PreferKey.coverFont).commit()
+                val original = renderText(title, authorName, textOnly = true)
+                preferences.edit().putString(PreferKey.coverFont, font.absolutePath).commit()
+                val changed = renderText(title, authorName, textOnly = true)
+                assertFalse("selected font reaches horizontal=$horizontal adaptive=$adaptive author=$author",
+                    original.contentEquals(changed))
+                assertTrue(BookCover.fontCacheKey.isNotEmpty())
+                preferences.edit().remove(PreferKey.coverFont).commit()
+                assertArrayEquals("default restores the original font and pixels", original,
+                    renderText(title, authorName, textOnly = true))
+                assertEquals("", BookCover.fontCacheKey)
+            }
+        }
+        assertEquals(readerFont, ReadBookConfig.textFont)
+        assertEquals(readerTitleFont, ReadBookConfig.titleFont)
+        assertEquals(systemTypeface, AppConfig.systemTypefaces)
     }
 
     @Test
@@ -172,8 +277,10 @@ class CoverTitleAdaptiveUiTest {
                     .scrollToPreference(ConfigTag.COVER_FONT_CONFIG)
             }
             onView(withText(R.string.cover_font_config)).perform(click())
+            scrollCoverStylePreference(PreferKey.coverCustomFontSize)
             onView(withText(R.string.cover_custom_font_size)).perform(click())
-            sizes.forEachIndexed { index, (_, label) ->
+            sizes.forEachIndexed { index, (key, label) ->
+                scrollCoverStylePreference(key)
                 onView(withText(label)).perform(click())
                 onView(withId(R.id.number_picker)).perform(object : ViewAction {
                     override fun getDescription() = "select cover font percentage"
@@ -209,7 +316,7 @@ class CoverTitleAdaptiveUiTest {
         }
     }
 
-    private fun renderText(title: String, author: String): IntArray {
+    private fun renderText(title: String, author: String, textOnly: Boolean = false): IntArray {
         instrumentation.runOnMainSync {
             BookCover.upDefaultCover()
             cover!!.load(path = null, name = title, author = author)
@@ -224,12 +331,14 @@ class CoverTitleAdaptiveUiTest {
                 if (view.width <= 0 || view.height <= 0) return@runOnMainSync
                 val expected = coverBitmapCacheKey(title, author, view.width, view.height,
                     BookCover.drawBookNameHorizontal, BookCover.drawBookAuthor,
-                    context.backgroundColor, context.accentColor, BookCover.adaptiveTitleSize, BookCover.fontSizes)
+                    context.backgroundColor, context.accentColor, BookCover.adaptiveTitleSize,
+                    BookCover.fontSizes, BookCover.fontCacheKey)
                 // The text cache can be ready while Glide is still loading the cover background.
                 val ready = view.drawable != null && (field.get(view) as? Pair<*, *>)?.first == expected
                 val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
                 view.draw(Canvas(bitmap))
-                if (ready) pixels = bitmap.getPixels()
+                if (ready) pixels = if (textOnly)
+                    ((field.get(view) as Pair<*, *>).second as Bitmap).getPixels() else bitmap.getPixels()
                 bitmap.recycle()
             }
             if (pixels != null) return pixels!!
@@ -306,7 +415,8 @@ class CoverTitleAdaptiveUiTest {
         scenario?.close()
         scenario = null
         ActivityScenario.launch<ConfigActivity>(Intent(context, ConfigActivity::class.java)
-            .putExtra("configTag", ConfigTag.COVER_CONFIG)).use {
+            .putExtra("configTag", ConfigTag.COVER_FONT_CONFIG)).use {
+            scrollCoverStylePreference(PreferKey.coverTitleAdaptive)
             onView(withText(R.string.cover_title_adaptive)).perform(click())
             assertFalse(preferences.getBoolean(PreferKey.coverTitleAdaptive, true))
             assertFalse(BookCover.adaptiveTitleSize)
@@ -316,6 +426,16 @@ class CoverTitleAdaptiveUiTest {
             assertTrue(BookCover.adaptiveTitleSize)
             screenshot("cover-title-setting-on")
         }
+    }
+
+    private fun scrollCoverStylePreference(key: String) {
+        instrumentation.runOnMainSync {
+            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED)
+                .filterIsInstance<ConfigActivity>().single()
+            (activity.supportFragmentManager.findFragmentByTag(ConfigTag.COVER_FONT_CONFIG)
+                as CoverFontConfigFragment).scrollToPreference(key)
+        }
+        instrumentation.waitForIdleSync()
     }
 
     private fun screenshot(name: String) {

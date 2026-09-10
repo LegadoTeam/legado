@@ -29,6 +29,7 @@ object PreferKey {
     const val coverHorizontal = "coverHorizontal"
     const val coverTitleAdaptive = "coverTitleAdaptive"
     const val coverKeepPunctuation = "coverKeepPunctuation"
+    const val coverFont = "coverFont"
     const val coverCustomFontSize = "coverCustomFontSize"
     const val coverTitleLargeSize = "coverTitleLargeSize"
     const val coverTitleSmallSize = "coverTitleSmallSize"
