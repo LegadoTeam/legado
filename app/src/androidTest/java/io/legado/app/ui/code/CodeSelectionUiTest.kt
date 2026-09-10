@@ -25,6 +25,7 @@ import androidx.core.view.children
 import androidx.core.content.FileProvider
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.Lifecycle
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
@@ -91,6 +92,10 @@ class CodeSelectionUiTest {
     private val selectedText = source.substring(source.indexOf("function"), source.indexOf("\nconst after"))
 
     @After fun cleanUp() {
+        scenario?.takeIf { it.state != Lifecycle.State.DESTROYED }?.onActivity { activity ->
+            // A failed edit assertion must not leave the discard dialog blocking later tests.
+            activity.findViewById<CodeEditor>(R.id.editText).takeIf { it.isShown }?.setText(activity.viewModel.initialText)
+        }
         scenario?.close()
         CacheManager.deleteMemory(cacheKey)
     }
@@ -222,9 +227,15 @@ class CodeSelectionUiTest {
 
     @Test fun nativeCopyCutPasteAndSelectAllUseTheCurrentSelection() {
         launchEditor()
-        val clipboard = context.getSystemService(ClipboardManager::class.java)
+        lateinit var clipboard: ClipboardManager
+        withEditor {
+            clipboard = it.context.getSystemService(ClipboardManager::class.java)
+            clipboard.setPrimaryClip(ClipData.newPlainText("before copy", "clipboard sentinel"))
+        }
+        awaitEditor { it.hasWindowFocus() && clipboard.primaryClip?.getItemAt(0)?.text?.toString() == "clipboard sentinel" }
         selectFunction()
         clickNativeAction(android.R.string.copy)
+        awaitEditor { !it.cursor.isSelected && clipboard.primaryClip?.getItemAt(0)?.text?.toString() == selectedText }
         withEditor {
             assertEquals(selectedText, clipboard.primaryClip!!.getItemAt(0).text.toString())
             assertEquals(source, it.text.toString())
@@ -233,7 +244,7 @@ class CodeSelectionUiTest {
         selectFunction()
         clickNativeAction(android.R.string.cut)
         val withoutFunction = source.replace(selectedText, "")
-        awaitEditor { it.text.toString() == withoutFunction }
+        awaitEditor { it.text.toString() == withoutFunction && clipboard.primaryClip?.getItemAt(0)?.text?.toString() == selectedText }
         withEditor {
             assertEquals(selectedText, clipboard.primaryClip!!.getItemAt(0).text.toString())
             it.setText(source)
@@ -307,10 +318,15 @@ class CodeSelectionUiTest {
         launchEditor()
         val code = (0..80).joinToString("\n") { "const line$it = $it;" }
         scenario!!.onActivity { activity ->
-            activity.findViewById<CodeEditor>(R.id.editText).setText(code)
+            activity.findViewById<CodeEditor>(R.id.editText).apply {
+                setText(code)
+                // The hosted emulator reports a hardware keyboard; allow the phone's IME path.
+                setDisableSoftKbdIfHardKbdAvailable(false)
+            }
             CodeEditActivity::class.java.getDeclaredMethod("search").apply { isAccessible = true }.invoke(activity)
         }
         onView(withId(R.id.editText)).perform(click())
+        withEditor { it.showSoftInput() }
         awaitEditor { ViewCompat.getRootWindowInsets(it)?.isVisible(WindowInsetsCompat.Type.ime()) == true }
         var selected = ""
         var offset = 0
