@@ -20,6 +20,7 @@ import io.legado.app.data.entities.updateSnapshot
 import io.legado.app.data.entities.saveWithCover
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.HighlightAnchor
+import io.legado.app.help.HighlightMatcher
 import io.legado.app.help.HighlightRuleMatcher
 import io.legado.app.help.HighlightStyle
 import io.legado.app.help.HighlightTextBuilder
@@ -47,6 +48,7 @@ import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.ui.book.read.page.entities.column.ImageColumn
 import io.legado.app.ui.book.read.page.entities.TextPage
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
+import io.legado.app.ui.book.read.page.provider.HighlightSpacing
 import io.legado.app.ui.book.read.page.provider.LayoutProgressListener
 import io.legado.app.utils.GSON
 import io.legado.app.utils.postEvent
@@ -64,6 +66,7 @@ import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.collect
@@ -279,6 +282,7 @@ object ReadBook : CoroutineScope by MainScope() {
         }
 
     fun loadHighlights(book: Book) {
+        invalidateHighlightSpacing()
         highlights = appDb.bookHighlightDao.getByBook(book.bookUrl)
         highlightsVersion++
     }
@@ -390,9 +394,140 @@ object ReadBook : CoroutineScope by MainScope() {
     }
 
     private fun invalidateHighlightRuleMatches() {
+        invalidateHighlightSpacing()
         prevTextChapter?.invalidateHighlightRuleMatches()
         curTextChapter?.invalidateHighlightRuleMatches()
         nextTextChapter?.invalidateHighlightRuleMatches()
+    }
+
+    private fun invalidateHighlightSpacing() {
+        listOfNotNull(prevTextChapter, curTextChapter, nextTextChapter).forEach {
+            it.highlightSpacingJob?.cancel()
+            it.highlightSpacingJob = null
+            it.highlightSpacingRequest = null
+        }
+    }
+
+    fun highlightRangesOfChapter(chapter: TextChapter): List<HighlightMatcher.Range> {
+        val rules = ruleMatchesOfChapter(chapter).map {
+            HighlightMatcher.Range(it.start, it.end, it.style, it.applyToTitle, it.applyToBody)
+        }
+        val titleLength = chapter.layoutTitleLength
+        val manual = if (titleLength >= 0) {
+            anchoredHighlightsOfChapter(chapter, titleLength).map { (highlight, anchor) ->
+                HighlightMatcher.Range(anchor.start + titleLength, anchor.end + titleLength,
+                    highlight.styleObj())
+            }
+        } else emptyList()
+        return rules + manual
+    }
+
+    private fun highlightLayoutState() = listOf(
+        ReadBookConfig.config.copy(), ReadBookConfig.useZhLayout,
+        ReadBookConfig.textFullJustify, ReadBookConfig.hangingPunctuation,
+        ReadBookConfig.punctuationCompress, AppConfig.adaptSpecialStyle,
+        book?.getPageAnim(), book?.getImageStyle(),
+        listOf(ChapterProvider.titlePaint, ChapterProvider.titleNumberPaint,
+            ChapterProvider.contentPaint).map {
+            listOf(it, it.textSize, it.textScaleX, it.textSkewX, it.letterSpacing,
+                it.typeface, it.color, it.flags, it.fontFeatureSettings)
+        },
+        ChapterProvider.viewWidth, ChapterProvider.viewHeight, ChapterProvider.doublePage,
+        ChapterProvider.visibleWidth, ChapterProvider.visibleHeight,
+        ChapterProvider.paddingLeft, ChapterProvider.paddingTop, ChapterProvider.paddingRight,
+        ChapterProvider.paddingBottom,
+        ChapterProvider.lineSpacingExtra, ChapterProvider.titleLineSpacingExtra,
+        ChapterProvider.paragraphSpacing, ChapterProvider.titleTopSpacing,
+        ChapterProvider.titleBottomSpacing, ChapterProvider.indentCharWidth,
+    )
+
+    /** Whether styles can be applied to the currently visible, coherent layout. */
+    fun upHighlightSpacing(chapter: TextChapter, ranges: List<HighlightMatcher.Range>): Boolean {
+        val currentBook = book ?: return true
+        if (!chapter.isCompleted || chapter.isTransient || !chapter.isForBook(currentBook) ||
+            !isActiveTextChapter(chapter)
+        ) return true
+        if (chapter.highlightSpacingJob?.isActive == true ||
+            (chapter.highlightRuleMatchesJob?.isActive == true &&
+                chapter.highlightRuleMatchesVersion != highlightRulesVersion)
+        ) return false
+        if (chapter.highlightSpacing.isEmpty && ranges.none {
+                it.style.fill != 0 && it.style.resolvedFillShape == HighlightStyle.FillShape.PILL
+            }) return true
+        // Always measure from the original advances; measuring the replacement compounds padding.
+        val base = chapter.highlightSpacingBase ?: chapter
+        // Completed lines receive review columns on Main. Snapshot their advances here.
+        val spacing = HighlightSpacing.resolve(base, ranges)
+        if (spacing == chapter.highlightSpacing) return true
+        val manualVersion = highlightsVersion
+        val ruleVersion = highlightRulesVersion
+        val bookUrl = currentBook.bookUrl
+        val chapterUrl = chapter.chapter.url
+        val chapterIndex = chapter.chapter.index
+        val contentToken = BookHelp.contentSaveToken(currentBook, chapter.chapter)
+        val layoutState = highlightLayoutState()
+        lateinit var job: Job
+        fun isCurrent() = book === currentBook && book?.bookUrl == bookUrl &&
+            chapter.chapter.url == chapterUrl && chapter.chapter.index == chapterIndex &&
+            isActiveTextChapter(chapter) && chapter.highlightSpacingJob === job &&
+            highlightsVersion == manualVersion && highlightRulesVersion == ruleVersion &&
+            BookHelp.isContentSaveCurrent(contentToken)
+        job = launch(start = CoroutineStart.LAZY) {
+            var retry = false
+            try {
+                if (!isCurrent() || layoutState != highlightLayoutState()) return@launch
+                chapter.highlightSpacingRequest = spacing
+                val replacement = if (spacing.isEmpty) base else coroutineScope {
+                    val result = base.layoutWithHighlightSpacing(this, spacing)
+                        ?: return@coroutineScope null
+                    for (page in result.layoutChannel) {
+                        ensureActive()
+                        if (!isCurrent()) throw CancellationException("Highlight layout was superseded")
+                    }
+                    result
+                } ?: return@launch
+                val sameText = withContext(Default) { chapterText(base) == chapterText(replacement) }
+                if (!isCurrent()) return@launch
+                if (layoutState != highlightLayoutState()) {
+                    retry = true
+                    return@launch
+                }
+                check(sameText && base.layoutTitleLength == replacement.layoutTitleLength) {
+                    "Highlight spacing changed canonical chapter text"
+                }
+                if (!replacement.isCompleted) return@launch
+                // Review counts can arrive while layout runs without changing highlight versions.
+                if (HighlightSpacing.resolve(base, ranges) != spacing) {
+                    retry = true
+                    return@launch
+                }
+                replacement.highlightRuleMatches = chapter.highlightRuleMatches
+                replacement.highlightRuleMatchesVersion = chapter.highlightRuleMatchesVersion
+                replacement.highlightRuleMatchesBookUrl = chapter.highlightRuleMatchesBookUrl
+                replacement.manualHighlightAnchors = chapter.manualHighlightAnchors
+                replacement.manualHighlightAnchorsVersion = chapter.manualHighlightAnchorsVersion
+                replacement.manualHighlightAnchorsTitleLength = chapter.manualHighlightAnchorsTitleLength
+                // Publish a complete chapter on Main. Keep the latest durChapterPos, including
+                // any user navigation that happened while the replacement was being laid out.
+                if (prevTextChapter === chapter) prevTextChapter = replacement
+                if (curTextChapter === chapter) curTextChapter = replacement
+                if (nextTextChapter === chapter) nextTextChapter = replacement
+                callBack?.upContent(chapterIndex - durChapterIndex, resetPageOffset = false)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                AppLog.put("Highlight spacing layout failed", error)
+            } finally {
+                if (chapter.highlightSpacingJob === job) {
+                    chapter.highlightSpacingJob = null
+                    chapter.highlightSpacingRequest = null
+                    if (retry) upHighlightSpacing(chapter, highlightRangesOfChapter(chapter))
+                }
+            }
+        }
+        chapter.highlightSpacingJob = job
+        job.start()
+        return false
     }
 
     fun highlightsOfChapter(
@@ -476,6 +611,7 @@ object ReadBook : CoroutineScope by MainScope() {
                 compareBy(BookHighlight::chapterIndex, BookHighlight::chapterPos, BookHighlight::time)
             )
         highlightsVersion++
+        invalidateHighlightSpacing()
         callBack?.upContent(resetPageOffset = false)
     }
 
@@ -484,6 +620,7 @@ object ReadBook : CoroutineScope by MainScope() {
         if (!highlight.isForBook(book)) return
         highlights = highlights.map { if (it.time == highlight.time) highlight else it }
         highlightsVersion++
+        invalidateHighlightSpacing()
         callBack?.upContent(resetPageOffset = false)
     }
 
@@ -492,6 +629,7 @@ object ReadBook : CoroutineScope by MainScope() {
         if (!highlight.isForBook(book)) return
         highlights = highlights.filter { it.time != highlight.time }
         highlightsVersion++
+        invalidateHighlightSpacing()
         callBack?.upContent(resetPageOffset = false)
     }
 
