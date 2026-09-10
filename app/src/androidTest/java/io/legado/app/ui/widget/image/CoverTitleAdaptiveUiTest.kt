@@ -130,8 +130,8 @@ class CoverTitleAdaptiveUiTest {
             screenshot("cover-custom-$horizontal-$adaptive")
             preferences.edit().putBoolean(PreferKey.coverCustomFontSize, false).commit()
             val restored = renderText("风雪长夜里的第一卷山海传奇", "长名字作者示例")
-            assertArrayEquals("disabled sizes preserve the original style exactly", original, restored)
             screenshot("cover-original-$horizontal-$adaptive")
+            assertArrayEquals("disabled sizes preserve the original style exactly", original, restored)
         }
     }
 
@@ -225,7 +225,8 @@ class CoverTitleAdaptiveUiTest {
                 val expected = coverBitmapCacheKey(title, author, view.width, view.height,
                     BookCover.drawBookNameHorizontal, BookCover.drawBookAuthor,
                     context.backgroundColor, context.accentColor, BookCover.adaptiveTitleSize, BookCover.fontSizes)
-                val ready = (field.get(view) as? Pair<*, *>)?.first == expected
+                // The text cache can be ready while Glide is still loading the cover background.
+                val ready = view.drawable != null && (field.get(view) as? Pair<*, *>)?.first == expected
                 val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
                 view.draw(Canvas(bitmap))
                 if (ready) pixels = bitmap.getPixels()
