@@ -94,7 +94,8 @@ class CodeSelectionUiTest {
     @After fun cleanUp() {
         scenario?.takeIf { it.state != Lifecycle.State.DESTROYED }?.onActivity { activity ->
             // A failed edit assertion must not leave the discard dialog blocking later tests.
-            activity.findViewById<CodeEditor>(R.id.editText).takeIf { it.isShown }?.setText(activity.viewModel.initialText)
+            activity.findViewById<CodeEditor>(R.id.editText).takeIf { it.isShown }
+                ?.setText(ViewModelProvider(activity)[CodeEditViewModel::class.java].initialText)
         }
         scenario?.close()
         CacheManager.deleteMemory(cacheKey)
@@ -925,6 +926,8 @@ class CodeSelectionUiTest {
 
     private fun screenshot(name: String) {
         instrumentation.waitForIdleSync()
+        // FloatingActionMode briefly hides the toolbar while the selection geometry moves.
+        instrumentation.uiAutomation.waitForIdle(500, 5_000)
         val committed = CountDownLatch(1)
         scenario!!.onActivity { activity ->
             val root = activity.window.decorView
