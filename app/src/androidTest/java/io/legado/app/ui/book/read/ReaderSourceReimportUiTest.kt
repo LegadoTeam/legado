@@ -25,6 +25,8 @@ import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import fi.iki.elonen.NanoHTTPD
 import io.legado.app.R
 import io.legado.app.constant.BookType
@@ -204,6 +206,7 @@ class ReaderSourceReimportUiTest {
         openReimport()
         val oldVm = main { importer() }
         val oldDialog = main { dialog() }
+        val oldActivity = main { it }
         val blocked = CountDownLatch(1)
         val release = CountDownLatch(1)
         val error = AtomicReference<Throwable?>()
@@ -221,16 +224,27 @@ class ReaderSourceReimportUiTest {
                 assertTrue(confirm.performClick())
                 assertTrue("Import must be pending before recreation", oldVm.sourceUpdatePending.value == true)
                 assertFalse(oldVm.importFinished.value == true)
+                // ActivityScenario.recreate/onActivity wait for idle, which drains this deliberately
+                // blocked import's loading animation. Recreate and inspect through the real lifecycle.
+                oldActivity.recreate()
             }
-            scenario.recreate()
-            await("recreated importer uses the retained operation") {
-                it.supportFragmentManager.fragments.filterIsInstance<ImportBookSourceDialog>().singleOrNull()
-                    ?.takeIf { f -> f !== oldDialog }?.let { f ->
-                        scenarioDialog = f
-                        ViewModelProvider(f)[ImportBookSourceViewModel::class.java] === oldVm &&
-                            oldVm.sourceUpdatePending.value == true && oldVm.importFinished.value != true
-                    } == true
-            }
+            var restoredPending = false
+            val deadline = SystemClock.uptimeMillis() + 15000
+            do {
+                instrumentation.runOnMainSync {
+                    val activity = ActivityLifecycleMonitorRegistry.getInstance()
+                        .getActivitiesInStage(Stage.RESUMED).filterIsInstance<ReadBookActivity>()
+                        .singleOrNull { it !== oldActivity }
+                    val fragment = activity?.supportFragmentManager?.fragments
+                        ?.filterIsInstance<ImportBookSourceDialog>()?.singleOrNull()
+                    restoredPending = fragment != null && fragment !== oldDialog &&
+                        ViewModelProvider(fragment)[ImportBookSourceViewModel::class.java] === oldVm &&
+                        oldVm.sourceUpdatePending.value == true && oldVm.importFinished.value != true
+                    if (restoredPending) scenarioDialog = fragment
+                }
+                if (!restoredPending) SystemClock.sleep(50)
+            } while (!restoredPending && SystemClock.uptimeMillis() < deadline)
+            assertTrue("Recreated importer must retain the still-pending operation", restoredPending)
         } finally { release.countDown(); writer.join(5000) }
         error.get()?.let { throw AssertionError("DB fixture failed", it) }
         await("successful import publishes and dismisses the recreated dialog") {
