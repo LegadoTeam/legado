@@ -184,6 +184,13 @@ class CoverStylePreviewUiTest {
     private fun scroll(settings: ActivityScenario<ConfigActivity>, key: String) {
         settings.onActivity { fragment(it).scrollToPreference(key) }
         instrumentation.waitForIdleSync()
+        if (key == "coverPreview") {
+            settings.onActivity {
+                val list = fragment(it).listView
+                list.scrollBy(0, list.computeVerticalScrollRange())
+            }
+            instrumentation.waitForIdleSync()
+        }
     }
 
     private fun previews(settings: ActivityScenario<ConfigActivity>): List<IntArray> {

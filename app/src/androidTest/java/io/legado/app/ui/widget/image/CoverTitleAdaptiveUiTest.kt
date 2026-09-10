@@ -179,7 +179,10 @@ class CoverTitleAdaptiveUiTest {
                 fun glyphs(text: String) = glyphBounds(renderText(
                     if (author) "" else text, if (author) text else "", textOnly = true))
                 val reference = glyphs("H").single()
-                val repeated = glyphs("H ".repeat(if (author) 12 else 6).trim())
+                // Keep the ellipsis outline separate from the final H when measuring components.
+                val sample = if (horizontal && author) "H    " else "H "
+                val repeated = glyphs(sample.repeat(if (author) 12 else 6).trim())
+                screenshot("cover-equal-glyphs-$horizontal-$adaptive-$author")
                 assertTrue("long text must render repeated glyphs", repeated.size >= 3)
                 repeated.forEach { glyph ->
                     val label = "equal glyph size: horizontal=$horizontal adaptive=$adaptive author=$author"

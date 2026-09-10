@@ -347,7 +347,10 @@ object Backup {
                 .writeText(GSON.toJson(it))
         }
         currentCoroutineContext().ensureActive()
-        val preferenceSnapshot = appCtx.defaultSharedPreferences.all
+        val preferenceSnapshot = HashMap<String, Any?>(appCtx.defaultSharedPreferences.all)
+        (preferenceSnapshot[PreferKey.coverFont] as? String)?.takeIf { it.isNotBlank() }?.let {
+            if (!File(it).exists()) preferenceSnapshot[PreferKey.coverFont] = ""
+        }
         writePreferenceSnapshot(appCtx, backupPath, "config") {
             putInt("readRecordSort", LocalConfig.getInt("readRecordSort", 0))
             preferenceSnapshot.forEach { (key, value) ->
@@ -400,7 +403,9 @@ object Backup {
         ) {
             (preferenceSnapshot[PreferKey.coverFont] as? String)?.takeIf { it.isNotBlank() }?.let { fontPath ->
                 val fontBackup = File(backupPath, BookCover.fontBackupFileName)
-                File(fontPath).copyTo(fontBackup, overwrite = true)
+                val fontFile = File(fontPath)
+                check(fontFile.isFile) { "Invalid cover font: $fontPath" }
+                fontFile.copyTo(fontBackup, overwrite = true)
                 paths.add(BookCover.fontBackupFileName)
             }
         }

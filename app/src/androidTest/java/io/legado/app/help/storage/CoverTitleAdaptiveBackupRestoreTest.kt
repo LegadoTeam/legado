@@ -80,6 +80,49 @@ class CoverTitleAdaptiveBackupRestoreTest {
     }
 
     @Test
+    fun deletedInstalledFontDoesNotPreventCompleteSettingsBackupAndRestoresDefault() {
+        val directory = File(context.cacheDir, "cover-deleted-font-backup-${UUID.randomUUID()}")
+        val unpacked = File(directory, "unpacked")
+        val font = File(context.externalFiles, "font/deleted-cover-${UUID.randomUUID()}.ttf")
+        val sourceFont = File("/system/fonts").listFiles().orEmpty().first { it.extension == "ttf" }
+        try {
+            font.parentFile!!.mkdirs()
+            sourceFont.copyTo(font)
+            preferences.edit().putString(PreferKey.coverFont, font.path)
+                .putBoolean(PreferKey.onlyLatestBackup, true)
+                .putBoolean(PreferKey.coverHorizontal, true)
+                .putInt(PreferKey.threadCount, 7).commit()
+            assertTrue(font.delete())
+            BackupConfig.contentKeys.forEach { BackupConfig.ignoreConfig[it] = true }
+            BackupConfig.ignoreConfig[BackupConfig.settingContentKey] = false
+            runBlocking(Dispatchers.IO) {
+                Backup.backupLocked(context, directory.path, uploadWebDav = false)
+            }
+            unpacked.mkdirs()
+            ZipFile(File(directory, "backup.zip")).use { zip ->
+                org.junit.Assert.assertNull(zip.getEntry(BookCover.fontBackupFileName))
+                selectedBackupFileNames { it == BackupConfig.settingContentKey }.forEach {
+                    org.junit.Assert.assertNotNull("complete settings archive: $it", zip.getEntry(it))
+                }
+                File(unpacked, "config.xml").writeBytes(zip.getInputStream(zip.getEntry("config.xml")).use { it.readBytes() })
+            }
+            // Restore must replace a currently selected readable font with the backed-up default.
+            preferences.edit().putString(PreferKey.coverFont, sourceFont.path)
+                .putBoolean(PreferKey.coverHorizontal, false).putInt(PreferKey.threadCount, 3).commit()
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { BookCover.upDefaultCover() }
+            org.junit.Assert.assertNotNull(BookCover.fontTypeface)
+            runBlocking(Dispatchers.IO) { Restore.restoreLocked(unpacked.path) }
+            assertEquals("", preferences.getString(PreferKey.coverFont, null))
+            org.junit.Assert.assertNull(BookCover.fontTypeface)
+            assertTrue(preferences.getBoolean(PreferKey.coverHorizontal, false))
+            assertEquals(7, preferences.getInt(PreferKey.threadCount, 0))
+        } finally {
+            font.delete()
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun coverStyleBackupRestoresEveryOptionAndFontFileWithoutOriginalPath() {
         val directory = File(context.cacheDir, "cover-style-backup-${UUID.randomUUID()}")
         val unpacked = File(directory, "unpacked")
@@ -132,6 +175,7 @@ class CoverTitleAdaptiveBackupRestoreTest {
             runBlocking(Dispatchers.IO) { Restore.restoreLocked(unpacked.path) }
             assertEquals("", preferences.getString(PreferKey.coverFont, null))
             assertFalse(preferences.getBoolean(PreferKey.coverHorizontal, true))
+            preferences.edit().putString(PreferKey.coverFont, restoredFont.path).commit()
             runBlocking(Dispatchers.IO) { Backup.backupLocked(context, directory.path, uploadWebDav = false) }
             ZipFile(File(directory, "backup.zip")).use { zip ->
                 org.junit.Assert.assertNull(zip.getEntry(BookCover.fontBackupFileName))
