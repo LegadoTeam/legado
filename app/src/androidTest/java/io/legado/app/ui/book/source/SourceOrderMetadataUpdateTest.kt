@@ -3,6 +3,7 @@ package io.legado.app.ui.book.source
 import android.os.SystemClock
 import android.widget.CompoundButton
 import androidx.appcompat.widget.SearchView
+import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -13,8 +14,10 @@ import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.data.entities.RssSource
 import io.legado.app.ui.replace.ReplaceRuleActivity
 import io.legado.app.ui.replace.ReplaceRuleAdapter
+import io.legado.app.ui.replace.ReplaceRuleViewModel
 import io.legado.app.ui.rss.source.manage.RssSourceActivity
 import io.legado.app.ui.rss.source.manage.RssSourceAdapter
+import io.legado.app.ui.rss.source.manage.RssSourceViewModel
 import io.legado.app.utils.GSON
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -46,7 +49,8 @@ class SourceOrderMetadataUpdateTest {
                     add(indexOf(stale[2].sourceUrl) + 1, stale[0].sourceUrl)
                 }
                 scenario.onActivity { activity ->
-                    activity.viewModel.move(stale[0].sourceUrl, stale[2].sourceUrl, true)
+                    ViewModelProvider(activity)[RssSourceViewModel::class.java]
+                        .move(stale[0].sourceUrl, stale[2].sourceUrl, true)
                     activity.findViewById<SearchView>(R.id.search_view).setQuery("group:$group", false)
                 }
                 waitUntil("RSS move committed") {
@@ -90,10 +94,10 @@ class SourceOrderMetadataUpdateTest {
                 }
                 waitUntil("RSS switch enabled") { appDb.rssSourceDao.getByKey(stale[0].sourceUrl)?.enabled == true }
                 assertState(setOf(stale[0].sourceUrl))
-                scenario.onActivity { it.viewModel.enableSelection(stale) }
+                scenario.onActivity { ViewModelProvider(it)[RssSourceViewModel::class.java].enableSelection(stale) }
                 waitUntil("RSS selection enabled") { keys.all { appDb.rssSourceDao.getByKey(it)?.enabled == true } }
                 assertState(keys)
-                scenario.onActivity { it.viewModel.disableSelection(stale) }
+                scenario.onActivity { ViewModelProvider(it)[RssSourceViewModel::class.java].disableSelection(stale) }
                 waitUntil("RSS selection disabled") { keys.all { appDb.rssSourceDao.getByKey(it)?.enabled == false } }
                 assertState(emptySet())
             }
@@ -125,7 +129,8 @@ class SourceOrderMetadataUpdateTest {
                     add(indexOf(stale[2].id) + 1, stale[0].id)
                 }
                 scenario.onActivity { activity ->
-                    activity.viewModel.move(stale[0].id, stale[2].id, true)
+                    ViewModelProvider(activity)[ReplaceRuleViewModel::class.java]
+                        .move(stale[0].id, stale[2].id, true)
                     activity.findViewById<SearchView>(R.id.search_view).setQuery("group:$group", false)
                 }
                 waitUntil("replacement move committed") {
@@ -168,10 +173,10 @@ class SourceOrderMetadataUpdateTest {
                 }
                 waitUntil("replacement switch enabled") { appDb.replaceRuleDao.findById(stale[0].id)?.isEnabled == true }
                 assertState(setOf(stale[0].id))
-                scenario.onActivity { it.viewModel.enableSelection(stale) }
+                scenario.onActivity { ViewModelProvider(it)[ReplaceRuleViewModel::class.java].enableSelection(stale) }
                 waitUntil("replacement selection enabled") { keys.all { appDb.replaceRuleDao.findById(it)?.isEnabled == true } }
                 assertState(keys)
-                scenario.onActivity { it.viewModel.disableSelection(stale) }
+                scenario.onActivity { ViewModelProvider(it)[ReplaceRuleViewModel::class.java].disableSelection(stale) }
                 waitUntil("replacement selection disabled") { keys.all { appDb.replaceRuleDao.findById(it)?.isEnabled == false } }
                 assertState(emptySet())
             }
