@@ -346,7 +346,11 @@ class SharedFileImportTest {
             openReader(book)
             books.add(book)
             awaitReader(book)
-            assertTrue(ReadBook.curTextChapter!!.pages.any { it.text.contains(chapter) })
+            val renderedPages = ReadBook.curTextChapter!!.pages.map { it.text }
+            screenshot("share-reader-zip")
+            assertEquals(chapter, File(path).readText())
+            assertTrue("Expected archive text <$chapter>; rendered pages: $renderedPages",
+                renderedPages.any { it.contains(chapter) })
             closeReaders()
         }
     }

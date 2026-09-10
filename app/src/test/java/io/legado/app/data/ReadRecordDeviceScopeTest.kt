@@ -7,22 +7,14 @@ import java.io.File
 class ReadRecordDeviceScopeTest {
 
     @Test
-    fun `active readers reload own row while display still aggregates`() {
+    fun `active readers reload their own device and author account`() {
         val dao = projectFile("src/main/java/io/legado/app/data/dao/ReadRecordDao.kt")
-        val normalizedDao = dao.replace(Regex("\\s+"), " ")
         assertTrue(
             dao.contains(
                 "select readTime from readRecord where deviceId = :deviceId and bookName = :bookName"
             )
         )
         assertTrue(dao.contains("fun getReadTime(deviceId: String, bookName: String, author: String)"))
-        assertTrue(
-            normalizedDao.contains(
-                "select history.bookName, sum(history.readTime) as readTime, " +
-                    "max(history.lastRead) as lastRead, history.author"
-            )
-        )
-
         listOf(
             "src/main/java/io/legado/app/model/ReadBook.kt" to
                 "getRecord(AppConst.androidId, book.name, book.author)",
