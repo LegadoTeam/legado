@@ -158,7 +158,15 @@ class SourceManualReplacementUiTest {
                     main {
                         assertEquals(1, host.parent.childFragmentManager.fragments.count { it.javaClass == menu.javaClass })
                     }
-                    screenshot("source-rule-pending-$rss-$manual-$recreate")
+                    val frame = java.util.concurrent.CountDownLatch(1)
+                    main {
+                        val decor = checkNotNull(menu.dialog?.window).decorView
+                        assertTrue("Restored rule dialog must be visible", decor.isShown)
+                        decor.viewTreeObserver.registerFrameCommitCallback { frame.countDown() }
+                        decor.invalidate()
+                    }
+                    assertTrue("Restored rule dialog must render", frame.await(15, java.util.concurrent.TimeUnit.SECONDS))
+                    screenshot("source-rule-pending-$rss-$manual-$recreate", main { checkNotNull(menu.dialog?.window) })
                 }
             }
         }
@@ -440,14 +448,25 @@ class SourceManualReplacementUiTest {
         while (SystemClock.uptimeMillis() < end) { if (condition()) return; SystemClock.sleep(50) }
         assertTrue(message, condition())
     }
-    private fun screenshot(name: String) {
+    private fun screenshot(name: String, window: android.view.Window? = null) {
         instrumentation.waitForIdleSync()
-        checkNotNull(instrumentation.uiAutomation.takeScreenshot()).let { bitmap ->
-            try {
-                File(context.getExternalFilesDir("ui-regression"), "$name.png").outputStream().use {
-                    assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
-                }
-            } finally { bitmap.recycle() }
+        val bitmap = if (window == null) checkNotNull(instrumentation.uiAutomation.takeScreenshot()) else main {
+            Bitmap.createBitmap(window.decorView.width, window.decorView.height, Bitmap.Config.ARGB_8888)
         }
+        try {
+            if (window != null) {
+                val copied = java.util.concurrent.CountDownLatch(1)
+                var result = android.view.PixelCopy.ERROR_UNKNOWN
+                main {
+                    android.view.PixelCopy.request(window, bitmap, { result = it; copied.countDown() },
+                        android.os.Handler(android.os.Looper.getMainLooper()))
+                }
+                assertTrue("Restored dialog buffer must be copied", copied.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                assertEquals(android.view.PixelCopy.SUCCESS, result)
+            }
+            File(context.getExternalFilesDir("ui-regression"), "$name.png").outputStream().use {
+                assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+            }
+        } finally { bitmap.recycle() }
     }
 }
