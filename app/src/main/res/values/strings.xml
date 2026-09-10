@@ -1833,4 +1833,6 @@
     <string name="book_memo_clear_confirm">Clear this book memo?</string>
     <string name="book_memo_discard">Discard unsaved changes and close?</string>
     <string name="book_memo_save_failed">Could not save memo: %1$s</string>
+    <string name="view_in_code_editor">View in editor</string>
+    <string name="code_editor_result_error">Could not read the editor result. The preview has been kept.</string>
 </resources>

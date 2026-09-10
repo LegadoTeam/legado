@@ -25,6 +25,11 @@
         app:showAsAction="always" />
 
     <item
+        android:id="@+id/menu_fullscreen_edit"
+        android:title="@string/view_in_code_editor"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_replace_rule"
         android:title="@string/menu_replace_rule"
         android:visible="false"
