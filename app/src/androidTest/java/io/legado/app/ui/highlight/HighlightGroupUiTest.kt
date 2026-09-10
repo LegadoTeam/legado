@@ -15,6 +15,7 @@ import android.view.ViewGroup
 import android.view.Window
 import android.view.inspector.WindowInspector
 import android.widget.ListView
+import android.widget.NumberPicker
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
@@ -23,6 +24,7 @@ import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.closeSoftKeyboard
 import androidx.test.espresso.action.ViewActions.replaceText
+import androidx.test.espresso.action.ViewActions.pressBack as backAction
 import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isDialog
@@ -44,6 +46,7 @@ import io.legado.app.data.entities.HighlightRuleFile
 import io.legado.app.databinding.ItemHighlightRuleBinding
 import io.legado.app.help.IntentData
 import io.legado.app.help.DirectLinkUpload
+import io.legado.app.help.HighlightStyle
 import io.legado.app.ui.file.HandleFileActivity
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.widget.TitleBar
@@ -71,7 +74,10 @@ class HighlightGroupUiTest {
     private var savedRules = emptyList<HighlightRule>()
     private var scenario: ActivityScenario<HighlightRuleActivity>? = null
     private val fixtures = listOf(
-        HighlightRule(name = "Alice", pattern = "Alice", group = "Characters", order = 0),
+        HighlightRule(name = "Alice", pattern = "Alice", group = "Characters", order = 0).apply {
+            applyStyle(HighlightStyle(fill = 0xFF209050.toInt(),
+                fillShape = HighlightStyle.FillShape.PILL, pillPaddingScale = 1.25f))
+        },
         HighlightRule(name = "Bob", pattern = "Bob", group = "Characters", order = 1),
         HighlightRule(name = "Quote", pattern = "Quote", group = "Quotes", order = 2),
         HighlightRule(name = "Named group", pattern = "Named", group = namedUngrouped, order = 3),
@@ -90,6 +96,56 @@ class HighlightGroupUiTest {
         scenario?.close()
         dao.deleteAll()
         if (savedRules.isNotEmpty()) dao.insert(*savedRules.toTypedArray())
+    }
+
+    @Test fun pillMarginEditsPersistAndResetThroughTheActualStyleDialog() {
+        fun margin(value: Int) = context.getString(R.string.highlight_pill_padding_value, value)
+        fun openStyle() {
+            onView(allOf(withId(R.id.iv_edit), hasSibling(withText("[Characters] Alice"))))
+                .perform(click())
+            await {
+                var loaded = false
+                instrumentation.runOnMainSync {
+                    loaded = WindowInspector.getGlobalWindowViews().any {
+                        it.hasWindowFocus() && it.findViewById<View>(R.id.btn_ok)?.isEnabled == true
+                    }
+                }
+                loaded
+            }
+            onView(withId(R.id.btn_style)).inRoot(isDialog()).perform(click())
+        }
+        fun saveStyle() {
+            onView(withText(R.string.highlight_bg_color)).inRoot(isDialog()).perform(backAction())
+            onView(withId(R.id.btn_ok)).inRoot(isDialog()).perform(click())
+        }
+        openStyle()
+        onView(withText(margin(125))).inRoot(isDialog()).perform(click())
+        instrumentation.runOnMainSync {
+            val picker = WindowInspector.getGlobalWindowViews().single { it.hasWindowFocus() }
+                .findViewById<NumberPicker>(R.id.number_picker)
+            assertEquals(25, picker.minValue)
+            assertEquals(200, picker.maxValue)
+            picker.value = 150
+        }
+        onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+        onView(withText(margin(150))).inRoot(isDialog()).check(matches(isDisplayed()))
+        onView(withText(R.string.highlight_bg_color)).inRoot(isDialog()).perform(click(), click())
+        onView(withText(margin(150))).inRoot(isDialog()).check(matches(isDisplayed()))
+        val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+        try {
+            File(context.getExternalFilesDir("ui-regression"), "highlight-pill-margin-settings.png")
+                .outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+        } finally { bitmap.recycle() }
+        saveStyle()
+        await { dao.all.first().styleObj().resolvedPillPaddingScale == 1.5f }
+        scenario!!.recreate()
+        awaitRules(dao.all)
+        openStyle()
+        onView(withText(margin(150))).inRoot(isDialog()).perform(click())
+        onView(withId(android.R.id.button3)).inRoot(isDialog()).perform(click())
+        onView(withText(margin(100))).inRoot(isDialog()).check(matches(isDisplayed()))
+        saveStyle()
+        await { dao.all.first().styleObj().pillPaddingScale == null }
     }
 
     @Test fun filterRenameMoveAndDeleteUseRealDialogsAndPreserveOtherRules() {

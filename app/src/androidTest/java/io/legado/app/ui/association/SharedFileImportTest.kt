@@ -197,7 +197,7 @@ class SharedFileImportTest {
     @Test(timeout = 120_000) fun rawAndTypedHighlightFilesUseTheHighlightPreviewWhileReplacementFilesKeepTheirRoute() {
         for (typed in listOf(false, true)) {
             val rule = HighlightRule(name = "Shared highlight $typed", pattern = "target-$id-$typed",
-                style = "{\"bold\":true,\"textColor\":123456}", group = "Share group",
+                style = """{"bold":true,"textColor":123456,"fill":123456,"fillShape":"PILL","pillPaddingScale":1.5}""", group = "Share group",
                 applyToTitle = true, applyToBody = false, isEnabled = false)
             rules.add(rule)
             val file = File(directory, "unrelated-$typed.json").apply {
@@ -236,7 +236,8 @@ class SharedFileImportTest {
         val source = BookSource("https://shared-backup-$id.invalid", "Backup source")
         val book = Book(bookUrl = "${source.bookSourceUrl}/book", origin = source.bookSourceUrl,
             name = "Backup book $id", author = "Author", durChapterIndex = 7)
-        val rule = HighlightRule(name = "Backup rule $id", pattern = id, style = "{\"bold\":true}")
+        val rule = HighlightRule(name = "Backup rule $id", pattern = id,
+            style = """{"bold":true,"fill":123456,"fillShape":"PILL","pillPaddingScale":1.75}""")
         sources.add(source); books.add(book); rules.add(rule)
         appDb.bookSourceDao.insert(source)
         appDb.bookDao.insert(book)
