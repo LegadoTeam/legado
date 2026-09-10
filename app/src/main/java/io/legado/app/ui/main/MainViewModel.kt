@@ -197,8 +197,10 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
             startUpTocJob()
             return
         }
-        if (tocUpdateRequests.isIdle() && cacheBookJob == null && !CacheBookService.isRun) {
+        if (tocUpdateRequests.isIdle() && !CacheBookService.isRun) {
             //所有目录更新完再开始缓存章节
+            // A finished/finishing worker may still have a Job reference. Restart through
+            // cacheBook(), which cancels it and lets the shared download queue resume.
             cacheBook()
         }
     }
@@ -306,7 +308,7 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
             book.durChapterIndex.plus(AppConfig.preDownloadNum)
         )
         val cacheBook = CacheBook.getOrCreate(source, book)
-        cacheBook.addDownload(book.durChapterIndex, endIndex)
+        cacheBook.addDownload(book.durChapterIndex, endIndex, refreshResources = true)
     }
 
     /**
