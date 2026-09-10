@@ -17,7 +17,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.pressBack
-import androidx.test.espresso.contrib.RecyclerViewActions
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions.matches
@@ -411,8 +410,14 @@ class SharedFileImportTest {
             assertEquals(previousBook, ReadBook.book?.bookUrl)
             items.forEach { assertFalse(appDb.bookDao.has(it.preview!!.name, it.preview.author)) }
             val omitted = items.indexOfFirst { it.file.name.startsWith("omit-") }
-            onView(withId(R.id.recycler_view)).inRoot(isDialog())
-                .perform(RecyclerViewActions.actionOnItemAtPosition<RecyclerView.ViewHolder>(omitted, click()))
+            scenario.onActivity { activity ->
+                activity.supportFragmentManager.findFragmentByTag("sharedLocalBooks")!!.requireView()
+                    .findViewById<RecyclerView>(R.id.recycler_view).scrollToPosition(omitted)
+            }
+            val omittedBook = items[omitted].preview!!
+            val label = if (omittedBook.author.isBlank()) omittedBook.name
+                else "${omittedBook.name} / ${omittedBook.author}"
+            onView(withText(label)).inRoot(isDialog()).perform(click())
             assertEquals(4, model.selectedLocalBooks.size)
             scenario.recreate()
             awaitLocalPreview(scenario)
