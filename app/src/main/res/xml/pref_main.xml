@@ -163,7 +163,7 @@
     <io.legado.app.lib.prefs.Preference
         android:icon="@drawable/ic_more_vert"
         android:key="myMore"
-        android:title="@string/more"
+        android:title="@string/reader_menu_more"
         app:iconSpaceReserved="false" />
 
 </androidx.preference.PreferenceScreen>

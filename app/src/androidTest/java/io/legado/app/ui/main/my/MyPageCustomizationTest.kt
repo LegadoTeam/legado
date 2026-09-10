@@ -107,7 +107,7 @@ class MyPageCustomizationTest {
             screenshot("my-customization-more")
             instrumentation.runOnMainSync {
                 val fragment = moreActivity!!.supportFragmentManager.findFragmentByTag(ConfigTag.MY_MORE) as MyPreferenceFragment
-                assertEquals(context.getString(R.string.more), moreActivity!!.title)
+                assertEquals(context.getString(R.string.reader_menu_more), moreActivity!!.title)
                 assertEquals(prefs.getBoolean(PreferKey.webService, false),
                     fragment.findPreference<io.legado.app.lib.prefs.SwitchPreference>(PreferKey.webService)!!.isChecked)
                 moreActivity!!.finish()

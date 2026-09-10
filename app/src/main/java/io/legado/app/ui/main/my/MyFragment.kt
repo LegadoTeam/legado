@@ -114,7 +114,7 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
             putPrefBoolean(PreferKey.webService, WebService.isRun)
             putPrefBoolean(PreferKey.mcpService, McpService.isRun)
             addPreferencesFromResource(R.xml.pref_main)
-            if (isMore) activity?.setTitle(R.string.more)
+            if (isMore) activity?.setTitle(R.string.reader_menu_more)
             val available = mutableListOf<Preference>()
             fun collect(group: PreferenceGroup) {
                 repeat(group.preferenceCount) { index ->
