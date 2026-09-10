@@ -117,6 +117,79 @@ class SourceManualReplacementUiTest {
     @Test fun bookManualAndEffectiveMenusUseRawCandidates() = manualFlow(false)
     @Test fun rssManualAndEffectiveMenusUseRawCandidates() = manualFlow(true)
 
+    @Test fun replacementMenusResumeAfterRecreationOrBackgroundWhileComparisonIsPending() {
+        AppConfig.manualSourceReplaceRule = true
+        AppConfig.importReplaceSource = false
+        for (rss in listOf(false, true)) for (manual in listOf(false, true)) for (recreate in listOf(false, true)) {
+            withImport(rss) { host ->
+                val code = host.open(0)
+                main {
+                    code.binding.cbSourceReplacementPreview.isChecked = false
+                    code.binding.codeView.setText(GSON.toJson(source(rss, 0, "Edited Seed0")))
+                }
+                withBlockedSourceRules { entered, release ->
+                    host.menu(if (manual) R.id.menu_manual_replace_rule else R.id.menu_effective_replaces, code)
+                    assertTrue("The real source-rule query must be held", entered.await(15, java.util.concurrent.TimeUnit.SECONDS))
+                    val model = main { if (rss) host.feed else host.book }
+                    assertTrue(main { if (rss) host.feed.sourceUpdatePending.value == true else host.book.sourceUpdatePending.value == true })
+                    if (recreate) {
+                        host.scenario.recreate()
+                        host.findParent()
+                        assertSame(model, main { if (rss) host.feed else host.book })
+                    } else {
+                        host.scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+                    }
+                    release.countDown()
+                    await("The retained comparison must finish") {
+                        main { if (rss) host.feed.sourceUpdatePending.value != true else host.book.sourceUpdatePending.value != true }
+                    }
+                    if (!recreate) host.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+                    val menu: DialogFragment = if (manual) host.child<ManualReplaceRulesDialog>() else host.child<EffectiveReplacesDialog>()
+                    main {
+                        assertEquals(if (manual) rules.take(4).map { it.id } else listOf(rules[0].id), ruleIds(menu))
+                        val restored = host.parent.childFragmentManager.fragments.filterIsInstance<CodeDialog>().single()
+                        assertTrue(restored.currentOriginalCode().contains("Edited Seed0"))
+                        assertNull(if (rss) host.feed.pendingReplacementDialog else host.book.pendingReplacementDialog)
+                    }
+                    host.scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+                    host.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+                    main {
+                        assertEquals(1, host.parent.childFragmentManager.fragments.count { it.javaClass == menu.javaClass })
+                    }
+                    screenshot("source-rule-pending-$rss-$manual-$recreate")
+                }
+            }
+        }
+    }
+
+    private fun withBlockedSourceRules(action: (java.util.concurrent.CountDownLatch, java.util.concurrent.CountDownLatch) -> Unit) {
+        val delegate = appDb.replaceRuleDao
+        val field = appDb.javaClass.declaredFields.single { it.name.contains("replaceRuleDao", ignoreCase = true) }
+        field.isAccessible = true
+        val original = field.get(appDb)
+        val entered = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val proxy = java.lang.reflect.Proxy.newProxyInstance(
+            io.legado.app.data.dao.ReplaceRuleDao::class.java.classLoader,
+            arrayOf(io.legado.app.data.dao.ReplaceRuleDao::class.java),
+        ) { _, method, args ->
+            if (method.name == "findEnabledBySourceScope") {
+                entered.countDown()
+                check(release.await(30, java.util.concurrent.TimeUnit.SECONDS)) { "Source-rule comparison was not released" }
+            }
+            try { method.invoke(delegate, *(args ?: emptyArray())) }
+            catch (error: java.lang.reflect.InvocationTargetException) { throw error.targetException }
+        }
+        try {
+            // Gate the generated DAO only in this test; every query still runs on the real database.
+            field.set(appDb, if (original is Lazy<*>) lazyOf(proxy) else proxy)
+            action(entered, release)
+        } finally {
+            release.countDown()
+            field.set(appDb, original)
+        }
+    }
+
     private fun manualFlow(rss: Boolean) {
         AppConfig.manualSourceReplaceRule = true
         AppConfig.importReplaceSource = false

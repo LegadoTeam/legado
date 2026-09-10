@@ -360,11 +360,13 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
         }.start()
     }
 
+    var pendingReplacementDialog: Pair<Boolean, Int>? = null
+
     fun refreshSourceReplacements(
         index: Int = -1,
         source: BookSource? = null,
         ids: List<Long>? = null,
-        onReady: () -> Unit = {},
+        openDialog: Boolean? = null,
     ): Boolean {
         if (sourceUpdatePending.value == true || (index != -1 && index !in sourceCandidates.indices)) return false
         val previousCandidates = sourceCandidates.toList()
@@ -399,8 +401,8 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
                     applyCandidateSources()
                 },
             ) {
+                if (comparisonSucceeded && openDialog != null) pendingReplacementDialog = openDialog to index
                 sourceUpdatePending.value = false
-                if (comparisonSucceeded) onReady()
             }
         }.onError {
             errorLiveData.value = "ImportError:${it.localizedMessage}"

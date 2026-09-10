@@ -159,6 +159,7 @@ class ImportRssSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_view
                 pendingReplacementRefresh == null
             ) {
                 syncOpenCodeDialog()
+                showPendingReplacementDialog()
             }
         }
         val source = arguments?.getString("source")
@@ -335,6 +336,18 @@ class ImportRssSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_view
         parseSingleRssSourceJson(code).also { require(it.sourceUrl.isNotBlank()) }
     }.getOrNull()
 
+    override fun onResume() {
+        super.onResume()
+        showPendingReplacementDialog()
+    }
+
+    private fun showPendingReplacementDialog() {
+        if (!isResumed || childFragmentManager.isStateSaved || viewModel.sourceUpdatePending.value == true) return
+        val (manual, index) = viewModel.pendingReplacementDialog ?: return
+        viewModel.pendingReplacementDialog = null
+        showSourceReplacements(manual, index)
+    }
+
     private fun showSourceReplacements(manual: Boolean, index: Int = -1) {
         if (!isAdded || childFragmentManager.isStateSaved || viewModel.sourceUpdatePending.value == true) return
         if (manual) {
@@ -351,7 +364,7 @@ class ImportRssSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_view
             toastOnUi(R.string.wrong_format)
             return
         }
-        viewModel.refreshSourceReplacements(index, source) { showSourceReplacements(manual, index) }
+        viewModel.refreshSourceReplacements(index, source, openDialog = manual)
     }
 
     override fun onManualSourceRulesSelected(ids: List<Long>, requestId: String?) {
