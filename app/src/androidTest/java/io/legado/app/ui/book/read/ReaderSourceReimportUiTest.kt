@@ -72,10 +72,11 @@ class ReaderSourceReimportUiTest {
     private val context = instrumentation.targetContext
     private val prefs = context.defaultSharedPreferences
     private val prefKeys = listOf(PreferKey.readerMenuConfig, PreferKey.preDownloadNum,
-        PreferKey.clickActionMC, PreferKey.cronet, PreferKey.autoBackup, PreferKey.importReplaceSource,
+        PreferKey.clickActionMC, PreferKey.cronet, PreferKey.autoBackup, PreferKey.onlyLatestBackup, PreferKey.importReplaceSource,
         PreferKey.importRememberGroup, PreferKey.importLastGroup, PreferKey.importLastGroupAdd,
         PreferKey.importKeepName, PreferKey.importKeepGroup, PreferKey.importKeepEnable)
     private val savedPrefs = prefKeys.associateWith { prefs.all[it] }
+    private val savedLastBackup = LocalConfig.all["lastBackup"]
     private val savedHelp = listOf("readHelpVersion", "readMenuHelpVersion").associateWith { LocalConfig.all[it] }
     private val savedRules = appDb.replaceRuleDao.findEnabledBySourceScope()
     private val savedBackupConfig = HashMap(BackupConfig.ignoreConfig)
@@ -94,7 +95,8 @@ class ReaderSourceReimportUiTest {
     private val source = BookSource(bookSourceUrl = "https://reimport.invalid/$id",
         bookSourceName = "Reimport fixture", bookSourceGroup = "Keep group", lastUpdateTime = 12345L,
         ruleContent = ContentRule(content = "#before@text"))
-    private val book = Book(bookUrl = "https://reimport.invalid/book/$id", origin = source.bookSourceUrl,
+    private val book = Book(bookUrl = "https://reimport.invalid/book/$id",
+        tocUrl = "https://reimport.invalid/book/$id/toc", origin = source.bookSourceUrl,
         name = "Reimport $id", author = "Fixture", type = BookType.text, totalChapterNum = 3,
         canUpdate = false).apply { setPageAnim(PageAnim.noAnim); setUseReplaceRule(false) }
     private val replacement = ReplaceRule(name = "Reimport rule $id", pattern = "#before@text",
@@ -106,6 +108,7 @@ class ReaderSourceReimportUiTest {
     @Before fun setUp() {
         prefs.edit().putInt(PreferKey.preDownloadNum, 0).putInt(PreferKey.clickActionMC, 0)
             .putBoolean(PreferKey.cronet, false).putBoolean(PreferKey.autoBackup, false)
+            .putBoolean(PreferKey.onlyLatestBackup, true)
             .putBoolean(PreferKey.importReplaceSource, true).putBoolean(PreferKey.importRememberGroup, false)
             .putBoolean(PreferKey.importKeepName, true).putBoolean(PreferKey.importKeepGroup, true)
             .putBoolean(PreferKey.importKeepEnable, true).commit()
@@ -155,6 +158,9 @@ class ReaderSourceReimportUiTest {
         LocalConfig.edit().apply { savedHelp.forEach { (key, value) ->
             if (value == null) remove(key) else putInt(key, value as Int)
         } }.commit()
+        LocalConfig.edit().apply {
+            if (savedLastBackup == null) remove("lastBackup") else putLong("lastBackup", savedLastBackup as Long)
+        }.commit()
         backupDir.deleteRecursively()
     }
 
@@ -241,6 +247,57 @@ class ReaderSourceReimportUiTest {
         screenshot("reader-reimport-next-http-chapter")
     }
 
+    @Test fun completedOldImporterCannotReplaceAnotherBooksActiveSource() {
+        val otherSource = source.copy(bookSourceUrl = source.bookSourceUrl + "/other", bookSourceName = "Other source")
+        val otherBook = book.copy(bookUrl = book.bookUrl + "/other", origin = otherSource.bookSourceUrl,
+            name = "Other book $id", totalChapterNum = 1)
+        val otherChapter = chapters[0].copy(bookUrl = otherBook.bookUrl)
+        appDb.bookSourceDao.insert(otherSource)
+        appDb.bookDao.insert(otherBook)
+        appDb.bookChapterDao.insert(otherChapter)
+        BookHelp.saveText(otherBook, otherChapter, "Other book remains unchanged.")
+        var otherScenario: ActivityScenario<ReadBookActivity>? = null
+        try {
+            openReimport()
+            val pendingVm = main { importer() }
+            // The user can open another reader while this importer remains on the back stack.
+            otherScenario = ActivityScenario.launch(Intent(context, ReadBookActivity::class.java)
+                .putExtra("bookUrl", otherBook.bookUrl).putExtra("inBookshelf", true))
+            val deadline = SystemClock.uptimeMillis() + 15000
+            var ready = false
+            do {
+                checkNotNull(otherScenario).onActivity {
+                    ready = ReadBook.book?.bookUrl == otherBook.bookUrl && it.isInitFinish &&
+                        ReadBook.curTextChapter?.chapter?.bookUrl == otherBook.bookUrl &&
+                        ReadBook.curTextChapter?.isCompleted == true
+                }
+                if (!ready) SystemClock.sleep(50)
+            } while (!ready && SystemClock.uptimeMillis() < deadline)
+            assertTrue("Second real reader must complete before the old import", ready)
+            val position = listOf(ReadBook.durChapterIndex, ReadBook.durChapterPos)
+            // Execute the retained confirmation with the original dialog VM, as an already queued
+            // operation would complete after the current book changes.
+            instrumentation.runOnMainSync { pendingVm.importSelect() }
+            val importDeadline = SystemClock.uptimeMillis() + 15000
+            while (pendingVm.importFinished.value != true && SystemClock.uptimeMillis() < importDeadline) {
+                SystemClock.sleep(50)
+            }
+            assertTrue(pendingVm.importFinished.value == true)
+            assertEquals("#after@text", appDb.bookSourceDao.getBookSource(source.bookSourceUrl)!!.ruleContent?.content)
+            assertEquals(otherBook.bookUrl, ReadBook.book?.bookUrl)
+            assertEquals(otherSource.bookSourceUrl, ReadBook.bookSource?.bookSourceUrl)
+            assertEquals("#before@text", ReadBook.bookSource?.ruleContent?.content)
+            assertEquals(position, listOf(ReadBook.durChapterIndex, ReadBook.durChapterPos))
+        } finally {
+            otherScenario?.close()
+            BookHelp.delContent(otherBook, otherChapter)
+            CacheBook.cacheBookMap.remove(otherBook.bookUrl)?.stop()
+            appDb.bookChapterDao.delByBook(otherBook.bookUrl)
+            appDb.bookDao.delete(otherBook)
+            appDb.bookSourceDao.delete(otherSource)
+        }
+    }
+
     @Test fun menuConfigurationAndSettingsBackupPreserveReimportAction() {
         openOverflow()
         onView(withText(R.string.reader_menu_all_features)).inRoot(isPlatformPopup()).perform(click())
@@ -262,7 +319,9 @@ class ReaderSourceReimportUiTest {
         scenario.close()
         val expected = loadReaderMenuConfig(context)
         runBlocking(Dispatchers.IO) {
+            backupDir.mkdirs()
             BackupConfig.contentKeys.forEach { BackupConfig.ignoreConfig[it] = it != BackupConfig.settingContentKey }
+            BackupConfig.ignoreConfig["readConfig"] = false
             Backup.backupLocked(context, backupDir.path, uploadWebDav = false)
             saveReaderMenuConfig(context, ReaderMenuConfig.default())
             Restore.restoreOrThrow(context, File(backupDir, "backup.zip").toUri(), lanTransfer = true)

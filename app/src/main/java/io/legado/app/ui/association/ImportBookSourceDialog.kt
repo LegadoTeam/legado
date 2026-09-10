@@ -114,11 +114,13 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
         binding.tvOk.isEnabled = false
         binding.tvOk.setOnClickListener {
             if (viewModel.sourceUpdatePending.value == true) return@setOnClickListener
-            val waitDialog = WaitDialog(requireContext())
-            waitDialog.show()
-            viewModel.importSelect {
-                waitDialog.dismiss()
-                if (arguments?.getString("reimportBookUrl") == null) {
+            if (arguments?.getString("reimportBookUrl") != null) {
+                viewModel.importSelect()
+            } else {
+                val waitDialog = WaitDialog(requireContext())
+                waitDialog.show()
+                viewModel.importSelect {
+                    waitDialog.dismiss()
                     dismissAllowingStateLoss()
                 }
             }
