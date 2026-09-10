@@ -14,7 +14,9 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.R
 import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.data.appDb
+import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookSource
+import io.legado.app.databinding.ItemBookSourceBinding
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.data.entities.RssSource
@@ -64,6 +66,8 @@ class SourceDragOrderUiTest {
         val rules = books.mapIndexed { i, item -> ReplaceRule(id = firstRuleId + i,
             name = item.bookSourceName, group = item.bookSourceGroup, order = item.customOrder,
             pattern = "original $i", replacement = "replacement $i", scope = "scope $i") }
+        val countBook = Book(bookUrl = "https://count-drag.invalid/$id", name = "Count drag $id",
+            origin = books[if (descending) 4 else 0].bookSourceUrl)
         var scenario: ActivityScenario<out Activity>? = null
         try {
             LocalConfig.edit().putInt("bookSourceHelpVersion", 1).commit()
@@ -93,7 +97,25 @@ class SourceDragOrderUiTest {
             screenshot("drag-${kind.name}-$descending-before")
 
             // Move out and back while holding the same pointer: no persisted reorder or renumbering.
-            drag(scenario, 0, 2, returnToStart = true)
+            drag(scenario, 0, 2, returnToStart = true) {
+                if (kind == Kind.BOOK) {
+                    appDb.bookDao.insert(countBook)
+                    waitUntil("live count follows the held source row") {
+                        var updated = false
+                        scenario!!.onActivity { activity ->
+                            val list = activity.findViewById<RecyclerView>(R.id.recycler_view)
+                            val adapter = list.adapter as RecyclerAdapter<*, *>
+                            val row = list.findViewHolderForAdapterPosition(2)?.itemView
+                            updated = (adapter.getItem(2) as? BookSourcePart)?.bookSourceUrl == countBook.origin &&
+                                row != null && ItemBookSourceBinding.bind(row).tvBookshelfCount.text.toString() ==
+                                context.getString(R.string.source_bookshelf_count, 1)
+                        }
+                        updated
+                    }
+                    assertEquals("Count changes do not persist a drag before release", before, databaseKeys(kind))
+                    appDb.bookDao.delete(countBook)
+                }
+            }
             awaitItems(scenario, visible)
             assertEquals(before, databaseKeys(kind))
             assertEquals(rawOrders, databaseOrders(kind))
@@ -136,6 +158,7 @@ class SourceDragOrderUiTest {
             screenshot("drag-${kind.name}-$descending-reopened")
         } finally {
             scenario?.close()
+            appDb.bookDao.delete(countBook)
             when (kind) {
                 Kind.BOOK -> {
                     appDb.bookSourceDao.delete(*books.toTypedArray())
