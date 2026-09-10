@@ -57,7 +57,9 @@ class ImportBookAdapter(context: Context, val callBack: CallBack) :
                     tvDate.text = AppConst.dateFormat.format(item.lastModified)
                     cbSelect.isChecked = selected.contains(item)
                 }
-                tvName.text = item.name
+                tvName.text = item.preview?.let { book ->
+                    if (book.author.isBlank()) book.name else "${book.name} / ${book.author}"
+                } ?: item.name
             } else {
                 cbSelect.isChecked = selected.contains(item)
             }

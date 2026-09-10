@@ -101,6 +101,19 @@ class ImportBookActivity : BaseImportBookActivity<ImportBookViewModel>(),
             R.id.menu_select_folder -> selectFolder.launch()
             R.id.menu_scan_folder -> scanFolder()
             R.id.menu_import_file_name -> alertImportFileName()
+            R.id.menu_local_book_save_path -> AlertDialog.Builder(this)
+                .setTitle(R.string.local_book_save_path)
+                .setMessage(AppConfig.defaultBookTreeUri ?: File(filesDir, "books").path)
+                .setPositiveButton(R.string.select_folder) { _, _ ->
+                    localBookTreeSelect.launch {
+                        title = getString(R.string.local_book_save_path)
+                        mode = HandleFileContract.DIR_SYS
+                    }
+                }
+                .setNegativeButton(R.string.shared_local_books_private) { _, _ ->
+                    AppConfig.defaultBookTreeUri = Uri.fromFile(File(filesDir, "books")).toString()
+                }
+                .show()
             R.id.menu_sort_name -> upSort(0)
             R.id.menu_sort_size -> upSort(1)
             R.id.menu_sort_time -> upSort(2)
