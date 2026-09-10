@@ -752,6 +752,8 @@ class TextChapterLayout(
             )
         }
         val tempPaint = TextPaint(textPaint)
+        val clusterWidths = FloatArray(spanned.length)
+        textPaint.getTextWidths(spanned, 0, spanned.length, clusterWidths)
         for (lineIndex in 0 until staticLayout.lineCount) {
             val lineStart = staticLayout.getLineStart(lineIndex)
             val lineEnd = staticLayout.getLineEnd(lineIndex)
@@ -780,20 +782,27 @@ class TextChapterLayout(
             val columns = mutableListOf<BaseColumn>()
             var charIndex = lineStart
             while (charIndex < lineEnd) {
-                val char = spanned[charIndex].toString()
+                var nextChar = charIndex + 1
+                if (spanned.getSpans(charIndex, nextChar, ReplacementSpan::class.java).isEmpty()) {
+                    // Keep the same shaped clusters as plain text, including on Android 6–9.
+                    while (nextChar < lineEnd && clusterWidths[nextChar] == 0f &&
+                        !isZeroWidthChar(spanned[nextChar]) && spanned[nextChar] != '\n' &&
+                        spanned.getSpans(nextChar, nextChar + 1, ReplacementSpan::class.java).isEmpty()) nextChar++
+                }
+                val char = spanned.subSequence(charIndex, nextChar).toString()
                 lineText.append(char)
                 if (char == "\n") {
                     textLine.isParagraphEnd = true
                     durY += lineHeight * paragraphSpacing / 10f //段距
-                    charIndex++
+                    charIndex = nextChar
                     continue
                 }
                 val charX = staticLayout.getPrimaryHorizontal(charIndex)
                 val textSize = extractTextSize(spanned, charIndex, textPaint.textSize)
                 val textColor = extractTextColor(spanned, charIndex)
                 val linkUrl = extractLinkUrl(spanned, charIndex)
-                val charRight = if (charIndex + 1 < lineEnd) {
-                    staticLayout.getPrimaryHorizontal(charIndex + 1)
+                val charRight = if (nextChar < lineEnd) {
+                    staticLayout.getPrimaryHorizontal(nextChar)
                 } else {
                     tempPaint.textSize = textSize
                     val inset = highlightSpacing[chapterStart + charIndex]
@@ -901,7 +910,7 @@ class TextChapterLayout(
                     applyHighlightSpacing(columns[index], textLine, chapterStart + charIndex,
                         isFirst = index == 0)
                 }
-                charIndex++
+                charIndex = nextChar
                 if (charIndex == lineEnd && lineIndex == staticLayout.lineCount - 1) {
                     textLine.isParagraphEnd = true
                     durY += lineHeight * paragraphSpacing / 10f //段距
@@ -1626,7 +1635,8 @@ class TextChapterLayout(
 
     private fun isZeroWidthChar(char: Char): Boolean {
         val code = char.code
-        return code == 8203 || code == 8204 || code == 8205 || code == 8288
+        // ZWJ stays in its glyph cluster; drawing the following emoji separately creates overlap.
+        return code == 8203 || code == 8204 || code == 8288
     }
 
 }

@@ -879,6 +879,9 @@ class TitleFontWeightRenderingTest {
                     val base = awaitLayout(ChapterProvider.getTextChapterAsync(scope, book!!, fixture,
                         "Metrics", BookContent(false, listOf(content), null), fixture.index + 1, saveChapterData = false))
                     val original = canonical(base)
+                    assertEquals("Base layout must keep each ZWJ emoji in one column: $mode", 8,
+                        base.pages.flatMap { it.lines }.flatMap { it.columns }.filterIsInstance<TextBaseColumn>()
+                            .count { it.charData == "👩‍💻" })
                     val legacy = HighlightStyle(fontPath = font)
                     assertTrue(HighlightSpacing.resolve(base,
                         listOf(HighlightMatcher.Range(0, original.length, legacy))).isEmpty)
@@ -890,6 +893,9 @@ class TitleFontWeightRenderingTest {
                         val chapter = awaitLayout(checkNotNull(base.layoutWithHighlightSpacing(scope, spacing)))
                         val label = "$mode justify=$justify size=$size gap=$gap"
                         assertEquals(label, original, canonical(chapter))
+                        assertEquals("Metric layout must preserve complete glyph clusters: $label", 8,
+                            chapter.pages.flatMap { it.lines }.flatMap { it.columns }.filterIsInstance<TextBaseColumn>()
+                                .count { it.charData == "👩‍💻" })
                         if (size > 20) {
                             assertTrue(label, chapter.pages.sumOf { it.lines.size } > base.pages.sumOf { it.lines.size })
                             assertTrue(label, chapter.pages.first().lines.first().height > base.pages.first().lines.first().height)
@@ -906,6 +912,17 @@ class TitleFontWeightRenderingTest {
                                     assertTrue("Glyph must fit below baseline: $label", line.lineBase + paint.fontMetrics.descent <= line.lineBottom + 1f)
                                     assertTrue("Advance must remain finite and preserve zero-width units: $label",
                                         (column.end - column.start).let { it.isFinite() && it >= 0f })
+                                    if (column.charData == "👩‍💻") {
+                                        val glyphHeight = ceil(line.height).toInt()
+                                        val actual = Bitmap.createBitmap(width, glyphHeight, Bitmap.Config.ARGB_8888)
+                                        val expected = Bitmap.createBitmap(width, glyphHeight, Bitmap.Config.ARGB_8888)
+                                        try {
+                                            column.draw(view, Canvas(actual))
+                                            val offset = if (Build.VERSION.SDK_INT >= 35) paint.letterSpacing * paint.textSize * 0.5f else 0f
+                                            Canvas(expected).drawText("👩‍💻", column.start + offset, line.lineBase - line.lineTop, paint)
+                                            assertTrue("Rendered emoji must match one complete native glyph run: $label", actual.sameAs(expected))
+                                        } finally { actual.recycle(); expected.recycle() }
+                                    }
                                 } finally { HighlightDraw.recycleTextPaint(paint) }
                             }
                             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)

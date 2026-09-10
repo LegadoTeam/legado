@@ -477,7 +477,15 @@ class HighlightGroupUiTest {
         lateinit var window: Window
         lateinit var bitmap: Bitmap
         scenario!!.onActivity { activity ->
-            window = groupDialog(activity)?.dialog?.window ?: activity.window
+            fun focusedWindow(fragment: androidx.fragment.app.Fragment): Window? {
+                if (!fragment.isAdded) return null
+                return (fragment as? androidx.fragment.app.DialogFragment)?.dialog?.window
+                    ?.takeIf { it.decorView.hasWindowFocus() }
+                    ?: fragment.childFragmentManager.fragments.firstNotNullOfOrNull(::focusedWindow)
+            }
+            window = activity.supportFragmentManager.fragments.firstNotNullOfOrNull(::focusedWindow)
+                ?: activity.window
+            if (name == "highlight-font-metrics-settings") assertTrue(window !== activity.window)
             val decor = window.decorView
             assertTrue(decor.isHardwareAccelerated)
             bitmap = Bitmap.createBitmap(decor.width, decor.height, Bitmap.Config.ARGB_8888)
