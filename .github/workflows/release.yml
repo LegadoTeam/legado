@@ -68,7 +68,7 @@ jobs:
       - name: Unify Version Name
         run: |
           echo "统一版本号"
-          sed "/def version/c def version = \"${{ env.VERSION }}\"" $GITHUB_WORKSPACE/app/build.gradle  -i
+          sed "/^def version =/c def version = \"${{ env.VERSION }}\"" $GITHUB_WORKSPACE/app/build.gradle  -i
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6.3.0
