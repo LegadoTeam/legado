@@ -15,7 +15,7 @@ interface ReadRecordDao {
     val all: List<ReadRecord>
 
     @Query(
-        """select distinct bookName, author from readRecord
+        """select distinct bookName, case when author = '' then coalesce(resolvedAuthor, '') else author end as author from readRecord
             order by bookName collate localized, author collate localized"""
     )
     fun flowBooks(): Flow<List<ReadRecordBook>>
@@ -23,16 +23,19 @@ interface ReadRecordDao {
     @get:Query(
         """
         select history.bookName, sum(history.readTime) as readTime,
-            max(history.lastRead) as lastRead, history.author,
+            max(history.lastRead) as lastRead,
+            case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end as author,
             snapshot.lastChapterTitle, snapshot.lastChapterIndex,
             snapshot.lastChapterPos, snapshot.coverUrl
         from readRecord history
-        join readRecord snapshot on snapshot.bookName = history.bookName and snapshot.author = history.author
-            and snapshot.deviceId = (select deviceId from readRecord
-                where bookName = history.bookName and author = history.author
-                order by lastRead desc, deviceId limit 1)
-        group by history.bookName, history.author
-        order by history.bookName collate localized, history.author collate localized"""
+        join readRecord snapshot on snapshot.rowid = (select rowid from readRecord
+                where bookName = history.bookName and
+                    (case when author = '' then coalesce(resolvedAuthor, '') else author end) =
+                    (case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end)
+                order by lastRead desc, deviceId, author limit 1)
+        group by history.bookName,
+            case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end
+        order by history.bookName collate localized, author collate localized"""
     )
     val allShow: List<ReadRecordShow>
 
@@ -42,18 +45,21 @@ interface ReadRecordDao {
     @Query(
         """
         select history.bookName, sum(history.readTime) as readTime,
-            max(history.lastRead) as lastRead, history.author,
+            max(history.lastRead) as lastRead,
+            case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end as author,
             snapshot.lastChapterTitle, snapshot.lastChapterIndex,
             snapshot.lastChapterPos, snapshot.coverUrl
         from readRecord history
-        join readRecord snapshot on snapshot.bookName = history.bookName and snapshot.author = history.author
-            and snapshot.deviceId = (select deviceId from readRecord
-                where bookName = history.bookName and author = history.author
-                order by lastRead desc, deviceId limit 1)
-        group by history.bookName, history.author
+        join readRecord snapshot on snapshot.rowid = (select rowid from readRecord
+                where bookName = history.bookName and
+                    (case when author = '' then coalesce(resolvedAuthor, '') else author end) =
+                    (case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end)
+                order by lastRead desc, deviceId, author limit 1)
+        group by history.bookName,
+            case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end
         having history.bookName like '%' || :searchKey || '%'
-            or history.author like '%' || :searchKey || '%'
-        order by history.bookName collate localized, history.author collate localized"""
+            or (case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end) like '%' || :searchKey || '%'
+        order by history.bookName collate localized, author collate localized"""
     )
     fun search(searchKey: String): List<ReadRecordShow>
 
@@ -79,7 +85,8 @@ interface ReadRecordDao {
     @Query("delete from readRecord")
     fun clear()
 
-    @Query("delete from readRecord where bookName = :bookName and author = :author")
+    @Query("""delete from readRecord where bookName = :bookName and
+        (case when author = '' then coalesce(resolvedAuthor, '') else author end) = :author""")
     fun deleteByBook(bookName: String, author: String)
 
     @Query("select * from readRecord where bookName = :bookName and author = :author")
@@ -91,17 +98,6 @@ interface ReadRecordDao {
         val authors = ReadRecordAuthors.decode(author)
         if (!ReadRecordAuthors.isCombined(author) || authors.size < 2 || removedAuthor !in authors) return
         val remaining = (authors - removedAuthor).reduce(ReadRecordAuthors::merge)
-        mergeAuthorRecords(bookName, author, remaining)
-    }
-
-    /** The first subsequent reading supplies the author for this title's unknown history. */
-    @Transaction
-    fun mergeUnknownAuthor(bookName: String, author: String) {
-        if (author.isBlank() || ReadRecordAuthors.isCombined(author)) return
-        mergeAuthorRecords(bookName, "", author)
-    }
-
-    private fun mergeAuthorRecords(bookName: String, author: String, remaining: String) {
         getRecords(bookName, author).forEach { original ->
             val renamed = original.copy(author = remaining)
             val current = getRecord(original.deviceId, bookName, remaining)
@@ -114,4 +110,16 @@ interface ReadRecordDao {
             insert(saved)
         }
     }
+
+    /** The first subsequent reading supplies the author for this title's unknown history. */
+    @Transaction
+    fun resolveUnknownAuthor(bookName: String, author: String) {
+        if (author.isBlank() || ReadRecordAuthors.isCombined(author)) return
+        assignUnknownAuthor(bookName, author)
+    }
+
+    @Query("""update readRecord set resolvedAuthor = :author
+        where bookName = :bookName and author = '' and resolvedAuthor is null""")
+    fun assignUnknownAuthor(bookName: String, author: String)
+
 }

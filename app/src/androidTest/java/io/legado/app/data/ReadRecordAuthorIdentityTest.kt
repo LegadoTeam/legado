@@ -87,7 +87,7 @@ class ReadRecordAuthorIdentityTest {
                 .build()
             try {
                 val dao = database.readRecordDao
-                assertEquals(110, database.openHelper.writableDatabase.version)
+                assertEquals(111, database.openHelper.writableDatabase.version)
                 assertEquals(legacy.toSet(), dao.all.toSet())
                 assertEquals(1350L, dao.allTime)
                 assertNull(dao.getRecord("phone", "Same", "Author A"))
@@ -110,7 +110,7 @@ class ReadRecordAuthorIdentityTest {
     }
 
     @Test
-    fun migrate109To110PreservesLargeHistoryAndIndexesBothActualDaoQueries() {
+    fun migrate109To111PreservesLargeHistoryAndIndexesBothActualDaoQueries() {
         val name = "read-record-index-migration-${UUID.randomUUID()}"
         val records = (0 until 6375).map { index ->
             ReadRecord(deviceId = "phone", bookName = "History $index", author = "Author $index",
@@ -165,7 +165,7 @@ class ReadRecordAuthorIdentityTest {
                 }, Executor { it.run() }).build()
             try {
                 val sqlite = database.openHelper.writableDatabase
-                assertEquals(110, sqlite.version)
+                assertEquals(111, sqlite.version)
                 assertEquals(records.toSet(), database.readRecordDao.all.toSet())
                 for (search in listOf(false, true)) {
                     val start = android.os.SystemClock.elapsedRealtime()
@@ -321,13 +321,16 @@ class ReadRecordAuthorIdentityTest {
             assertEquals(original, dao.all.toSet())
             known.copy(lastRead = 100, lastChapterTitle = "Reading now", lastChapterIndex = 10)
                 .saveWithCover(currentBook, 1000)
-            val expectedLocal = known.copy(readTime = 10000, lastRead = 100,
+            val expectedLocal = known.copy(readTime = 3000, lastRead = 100,
                 lastChapterTitle = "Reading now", lastChapterIndex = 10)
-            val expectedRemote = remoteKnown.copy(readTime = 16000)
-            assertEquals(setOf(expectedLocal, expectedRemote, other, otherTitle, combined), dao.all.toSet())
+            val expectedRemote = remoteKnown
+            assertEquals(setOf(expectedLocal, expectedRemote, unknown.copy(resolvedAuthor = "A"),
+                remote.copy(resolvedAuthor = "A"), other, otherTitle, combined), dao.all.toSet())
             assertEquals(total + 1000, dao.allTime)
-            assertNull(dao.getRecord(known.deviceId, name, ""))
-            assertNull(dao.getRecord("remote", name, ""))
+            assertEquals(26000L, dao.allShow.single { it.bookName == name && it.author == "A" }.readTime)
+            assertFalse(dao.allShow.any { it.bookName == name && it.author.isEmpty() })
+            assertEquals("A", dao.getRecord(known.deviceId, name, "")!!.resolvedAuthor)
+            assertEquals("A", dao.getRecord("remote", name, "")!!.resolvedAuthor)
             // Reading a second known author must never steal the first reader's merged time.
             other.copy(lastRead = 110).saveWithCover(currentBook.copy(author = "B"), 500)
             assertEquals(expectedLocal, dao.getRecord(known.deviceId, name, "A"))
@@ -337,6 +340,72 @@ class ReadRecordAuthorIdentityTest {
         } finally {
             dao.clear()
             dao.insert(*saved.toTypedArray())
+        }
+    }
+
+    @Test
+    fun authorAttributionSurvivesRepeatedOldBackupRestoreWithoutRecountingTime() {
+        val dao = appDb.readRecordDao
+        val saved = dao.all
+        val name = "Author restore ${UUID.randomUUID()}"
+        val directory = File(context.cacheDir, "author-attribution-${UUID.randomUUID()}").apply { mkdirs() }
+        val local = ReadRecord(deviceId = AppConst.androidId, bookName = name, readTime = 7000,
+            lastRead = 100, lastChapterTitle = "Original blank", lastChapterIndex = 1)
+        val remote = local.copy(deviceId = "remote", readTime = 11000, lastRead = 200,
+            lastChapterTitle = "Remote blank", lastChapterIndex = 2)
+        val book = Book(bookUrl = "author-restore:$name", name = name, author = "A")
+        val archive = File(directory, "readRecord.json")
+        fun restore() = runBlocking(Dispatchers.IO) { Restore.restoreLocked(directory.absolutePath, lanTransfer = true) }
+        try {
+            val oldJson = GSON.toJsonTree(listOf(local, remote)).asJsonArray
+            oldJson.forEach { it.asJsonObject.remove("resolvedAuthor") }
+            archive.writeText(GSON.toJson(oldJson))
+            dao.clear()
+            restore()
+            assertEquals(18000L, dao.allTime)
+            assertEquals("", dao.allShow.single().author)
+            local.copy(author = "A", lastRead = 300).saveWithCover(book, 1000)
+            var total = 19000L
+            assertEquals(total, dao.allTime)
+            assertEquals(total, dao.allShow.single().readTime)
+            repeat(2) {
+                val before = dao.all.toSet()
+                restore()
+                assertEquals("An unchanged backup must not resurrect consumed time", before, dao.all.toSet())
+                assertEquals(total, dao.allTime)
+                local.copy(author = "A", lastRead = 400 + it.toLong()).saveWithCover(book, 500)
+                total += 500
+                assertEquals(total, dao.allShow.single().readTime)
+            }
+            local.copy(author = "B", lastRead = 500).saveWithCover(book.copy(author = "B"), 250)
+            assertEquals(20000L, dao.allShow.single { it.author == "A" }.readTime)
+            assertEquals(250L, dao.allShow.single { it.author == "B" }.readTime)
+            assertEquals("A", dao.getRecord(local.deviceId, name, "")!!.resolvedAuthor)
+            assertEquals("A", dao.getRecord("remote", name, "")!!.resolvedAuthor)
+            // A queued blank-author snapshot and a cover-only save must preserve the claim.
+            local.copy(lastRead = 600, lastChapterTitle = "Latest blank").saveWithCover(book.copy(author = ""), 100)
+            val blank = dao.getRecord(local.deviceId, name, "")!!
+            blank.copy(resolvedAuthor = null).saveWithCover(book.copy(author = ""))
+            assertEquals(20350L, dao.allTime)
+            val shown = dao.allShow.single { it.author == "A" }
+            assertEquals(20100L, shown.readTime)
+            assertEquals("Latest blank", shown.lastChapterTitle)
+            assertEquals(shown, dao.search("A").single { it.author == "A" })
+            assertEquals(setOf("A", "B"), runBlocking { dao.flowBooks().first().map { it.author }.toSet() })
+            val assigned = dao.all.toSet()
+            archive.writeText(GSON.toJson(prepareReadRecordBackup(assigned.toList(),
+                context.getExternalFilesDir(null)!!, directory, false)))
+            dao.clear()
+            restore()
+            assertEquals("The selected author must travel with a new backup", assigned, dao.all.toSet())
+            assertEquals(20350L, dao.allTime)
+            dao.deleteByBook(name, "A")
+            assertEquals(250L, dao.allTime)
+            assertEquals("B", dao.all.single().author)
+        } finally {
+            dao.clear()
+            dao.insert(*saved.toTypedArray())
+            directory.deleteRecursively()
         }
     }
 
@@ -392,9 +461,10 @@ class ReadRecordAuthorIdentityTest {
                     type.getDeclaredMethod("upReadTime").invoke(model)
                     awaitWrites()
                     val resolved = dao.getRecord(AppConst.androidId, name, "Resolved author")!!
-                    assertTrue(resolved.readTime in (unknown.readTime + 1000)..(unknown.readTime + 10_000))
+                    assertTrue(resolved.readTime in 1000L..10_000L)
+                    assertEquals(unknown.readTime + resolved.readTime, dao.allShow.single { it.author == "Resolved author" }.readTime)
                     assertEquals("Resolved chapter", resolved.lastChapterTitle)
-                    assertNull(dao.getRecord(AppConst.androidId, name, ""))
+                    assertEquals("Resolved author", dao.getRecord(AppConst.androidId, name, "")!!.resolvedAuthor)
                 } finally {
                     awaitWrites()
                     bookField.set(model, oldBook)
@@ -494,12 +564,13 @@ class ReadRecordAuthorIdentityTest {
                     }
                     for ((author, total) in expected) {
                         assertEquals("${type.simpleName}: every interval survives", total,
-                            dao.getRecord(first.deviceId, name, author)!!.readTime)
+                            dao.allShow.single { it.bookName == name && it.author == author }.readTime -
+                                if (author == "A") remote.readTime else 0L)
                     }
                     assertEquals("Chapter 2000", dao.getRecord(first.deviceId, name, "A")!!.lastChapterTitle)
                     assertEquals("Chapter 3000", dao.getRecord(first.deviceId, name, "B")!!.lastChapterTitle)
                     assertEquals(remote, dao.getRecord("remote", name, "A"))
-                    assertNull(dao.getRecord(first.deviceId, name, ""))
+                    assertEquals("A", dao.getRecord(first.deviceId, name, "")!!.resolvedAuthor)
                 } finally {
                     globalExecutor.submit {}.get(10, TimeUnit.SECONDS)
                     bookField.set(model, oldBook)

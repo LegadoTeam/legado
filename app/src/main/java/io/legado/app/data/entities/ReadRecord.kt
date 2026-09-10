@@ -15,8 +15,8 @@ import io.legado.app.utils.fromJsonArray
     primaryKeys = ["deviceId", "bookName", "author"],
     indices = [Index(
         name = "index_readRecord_snapshot",
-        value = ["bookName", "author", "lastRead", "deviceId"],
-        orders = [Index.Order.ASC, Index.Order.ASC, Index.Order.DESC, Index.Order.ASC],
+        value = ["bookName", "author", "lastRead", "deviceId", "resolvedAuthor"],
+        orders = [Index.Order.ASC, Index.Order.ASC, Index.Order.DESC, Index.Order.ASC, Index.Order.ASC],
     )],
 )
 data class ReadRecord(
@@ -38,6 +38,8 @@ data class ReadRecord(
     @ColumnInfo(defaultValue = "0")
     var lastChapterPos: Int = 0,
     var coverUrl: String? = null,
+    /** Keep the original blank-author account stable when restoring older backups. */
+    var resolvedAuthor: String? = null,
 )
 
 fun ReadRecord.updateSnapshot(
@@ -57,14 +59,17 @@ fun ReadRecord.saveWithCover(book: Book?, elapsed: Long? = null) {
     refreshChapterTitle(snapshotBook)
     var saved = this
     appDb.runInTransaction {
+        if (elapsed != null && snapshotBook != null) appDb.readRecordDao.resolveUnknownAuthor(bookName, author)
+        val current = appDb.readRecordDao.getRecord(deviceId, bookName, author)
         if (elapsed != null) {
-            if (snapshotBook != null) appDb.readRecordDao.mergeUnknownAuthor(bookName, author)
-            val current = appDb.readRecordDao.getRecord(deviceId, bookName, author)
             // A reader can revisit this identity before an earlier interval reaches the queue.
             // Add the interval to the stored total instead of replacing it with a stale total.
             val snapshot = current?.takeIf { it.lastRead > lastRead } ?: this
-            saved = snapshot.copy(readTime = (current?.readTime ?: 0L) + elapsed.coerceAtLeast(0L))
+            saved = snapshot.copy(
+                readTime = (current?.readTime ?: 0L) + elapsed.coerceAtLeast(0L),
+            )
         }
+        saved = saved.copy(resolvedAuthor = current?.resolvedAuthor ?: saved.resolvedAuthor)
         appDb.readRecordDao.insert(saved)
     }
     ReadRecordCoverCache.request(saved.copy(), snapshotBook?.getCoverSourceOrigin())
