@@ -500,7 +500,7 @@ class TitleFontWeightRenderingTest {
                                 }
                             }
                             assertTrue("Both real Chinese glyphs must be rendered", ink > 50)
-                            if (withSpace) {
+                            run {
                                 val band = HighlightGeometry.fillBand(line.lineBase - line.lineTop, textSize,
                                     line.height, HighlightStyle.FillShape.PILL, 1f.dpToPx())
                                 val middle = (line.lineTop + (band.top + band.bottom) / 2f).toInt()
@@ -513,9 +513,9 @@ class TitleFontWeightRenderingTest {
                                 }
                                 val centerEdges = edges(background, middle)
                                 val shoulderEdges = edges(background, shoulder)
-                                assertTrue("Left cap must be visibly curved: size=$size scale=$paddingScale icon=$iconScale",
+                                assertTrue("Left cap must be visibly curved: size=$size scale=$paddingScale icon=$iconScale space=$withSpace",
                                     shoulderEdges.first - centerEdges.first >= 2)
-                                assertTrue("Right cap must be visibly curved: size=$size scale=$paddingScale icon=$iconScale",
+                                assertTrue("Right cap must be visibly curved: size=$size scale=$paddingScale icon=$iconScale space=$withSpace",
                                     centerEdges.second - shoulderEdges.second >= 2)
                                 val flatCenter = edges(flattened, middle)
                                 val flatShoulder = edges(flattened, shoulder)
