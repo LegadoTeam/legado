@@ -11,6 +11,7 @@ import androidx.appcompat.widget.Toolbar
 import androidx.core.content.FileProvider
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.Lifecycle
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
@@ -180,6 +181,7 @@ class SourceImportFilterUiTest {
             host.setGroup("Imported group", false)
             host.click(R.id.tv_ok)
             await("Edited $rss source was not imported") { storedGroup(rss, editedUrl) == "Imported group" }
+            host.awaitFinished()
         }
         assertNull(storedGroup(rss, candidateUrls[0]))
         assertNull(storedGroup(rss, candidateUrls[1]))
@@ -210,6 +212,7 @@ class SourceImportFilterUiTest {
                 host.query(context.getString(R.string.no_group), 0)
                 host.query(context.getString(R.string.need_login), *if (rss) intArrayOf(1) else intArrayOf(0, 1))
                 host.click(R.id.tv_cancel)
+                host.awaitFinished()
             }
         }
     }
@@ -406,6 +409,10 @@ class SourceImportFilterUiTest {
         }
 
         fun recreate() { scenario.recreate(); findParent(); awaitReady() }
+
+        fun awaitFinished() = await("Dismissed import host must finish") {
+            scenario.state == Lifecycle.State.DESTROYED
+        }
 
         fun group(expected: String?, add: Boolean) = main {
             assertEquals(expected, if (rss) feed.groupName else book.groupName)

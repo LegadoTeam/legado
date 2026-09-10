@@ -106,9 +106,14 @@ abstract class BaseDialogFragment(
     }
 
     override fun onDismiss(dialog: DialogInterface) {
+        val host = activity
         showRequested = false
         super.onDismiss(dialog)
         onDismissListener?.onDismiss(dialog)
+        // Destroying the dialog view for recreation also calls onDismiss.
+        if (arguments?.getBoolean("finishOnDismiss") == true && host?.isChangingConfigurations == false) {
+            host.finish()
+        }
     }
 
     fun <T> execute(
