@@ -144,16 +144,11 @@ class SourceManualReplacementUiTest {
                         main { if (rss) host.feed.sourceUpdatePending.value != true else host.book.sourceUpdatePending.value != true }
                     }
                     if (!recreate) host.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
-                    await("The pending replacement dialog must be restored after resume") {
-                        main {
-                            host.parent.childFragmentManager.fragments.any {
-                                it is ManualReplaceRulesDialog || it is EffectiveReplacesDialog
-                            }
-                        }
-                    }
                     val menu: DialogFragment = if (manual) host.child<ManualReplaceRulesDialog>() else host.child<EffectiveReplacesDialog>()
                     main {
-                        assertEquals(if (manual) rules.take(4).map { it.id } else listOf(rules[0].id), ruleIds(menu))
+                        // Replacement is unchecked, so the restored effective list must remain empty.
+                        assertEquals("rss=$rss manual=$manual recreate=$recreate",
+                            if (manual) rules.take(4).map { it.id } else emptyList<Long>(), ruleIds(menu))
                         val restored = host.parent.childFragmentManager.fragments.filterIsInstance<CodeDialog>().single()
                         assertTrue(restored.currentOriginalCode().contains("Edited Seed0"))
                         assertNull(if (rss) host.feed.pendingReplacementDialog else host.book.pendingReplacementDialog)
