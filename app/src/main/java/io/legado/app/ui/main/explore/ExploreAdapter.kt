@@ -182,16 +182,18 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                     exploreInfoMapList.put(sourceUrl, it)
                 }
             }
-            val sourceJsExtensions by lazy {
-                SourceLoginJsExtensions(context as? AppCompatActivity, source,
-                    callback = object : SourceLoginJsExtensions.Callback {
-                        override fun upUiData(data: Map<String, Any?>?) {
-                        }
+            val sourceUiCallback = object : SourceLoginJsExtensions.Callback {
+                override fun upUiData(data: Map<String, Any?>?) {
+                }
 
-                        override fun reUiView(deltaUp: Boolean) {
-                            refreshExplore(item, exIndex, binding)
-                        }
-                    })
+                override fun reUiView(deltaUp: Boolean) {
+                    refreshExplore(item, exIndex, binding)
+                }
+            }
+            // The JS bridge holds callbacks weakly; the live controls own this one.
+            flexbox.tag = sourceUiCallback
+            val sourceJsExtensions by lazy {
+                SourceLoginJsExtensions(context as? AppCompatActivity, source, callback = sourceUiCallback)
             }
             kinds.forEach { kind ->
                 val type = kind.type
@@ -616,6 +618,7 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
 
     @Synchronized
     private fun recyclerFlexbox(flexbox: FlexboxLayout) {
+        flexbox.tag = null
         val children = flexbox.children.toList()
         if (children.isEmpty()) return
         flexbox.removeAllViews()
