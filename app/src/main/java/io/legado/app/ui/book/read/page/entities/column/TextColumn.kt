@@ -20,6 +20,7 @@ data class TextColumn(
     override val charData: String,
     /**标点挤压后字形在列内的绘制偏移,裁掉的是字框内的空白*/
     val drawOffset: Float = 0f,
+    override val isParagraphIndent: Boolean = false,
 ) : TextBaseColumn {
 
     override var textLine: TextLine = emptyTextLine

@@ -14,7 +14,8 @@ object HighlightMatcher {
         val charSize: Int,
         val columnCharLengths: List<Int>,
         val isParagraphEnd: Boolean,
-        val isTitle: Boolean = false
+        val isTitle: Boolean = false,
+        val paragraphIndentColumns: List<Boolean> = emptyList()
     )
 
     fun resolve(
@@ -27,11 +28,13 @@ object HighlightMatcher {
         for (line in lines) {
             var columnPosition = lineBase
             val columnStyles = ArrayList<HighlightStyle?>(line.columnCharLengths.size)
-            for (length in line.columnCharLengths) {
+            for ((index, length) in line.columnCharLengths.withIndex()) {
                 val columnStart = columnPosition
                 val columnEnd = columnPosition + length
                 var style: HighlightStyle? = null
                 for (range in ranges) {
+                    // Indentation keeps its chapter offsets, but has no highlight of its own.
+                    if (line.paragraphIndentColumns.getOrNull(index) == true) continue
                     if (line.isTitle && !range.applyToTitle ||
                         !line.isTitle && !range.applyToBody
                     ) continue

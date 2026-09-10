@@ -859,7 +859,8 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                     charSize = line.charSize,
                     columnCharLengths = line.columns.map { it.positionLength },
                     isParagraphEnd = line.isParagraphEnd,
-                    isTitle = line.isTitle
+                    isTitle = line.isTitle,
+                    paragraphIndentColumns = line.columns.map { (it as? TextBaseColumn)?.isParagraphIndent == true }
                 )
             }
             val styles = HighlightMatcher.resolve(

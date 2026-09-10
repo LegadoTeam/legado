@@ -11,6 +11,21 @@ import org.junit.Test
 class HighlightMatcherTest {
 
     @Test
+    fun `synthetic indent stays unstyled without shifting body or following paragraph`() {
+        val style = HighlightStyle(fill = 11, underline = HighlightStyle.Underline(),
+            strike = HighlightStyle.Deco(), box = HighlightStyle.Deco(), emphasis = HighlightStyle.Deco())
+        val lines = listOf(
+            LineSpec(6, listOf(1, 1, 2, 1, 1), true,
+                paragraphIndentColumns = listOf(true, true, false, false, false)),
+            LineSpec(2, listOf(1, 1), false)
+        )
+        val styles = HighlightMatcher.resolve(10, lines,
+            listOf(Range(10, 18, style), Range(15, 16, HighlightStyle(textColor = 22))))
+        assertEquals(listOf(null, null, style, style, style.copy(textColor = 22)), styles[0])
+        assertEquals(listOf(style, null), styles[1])
+    }
+
+    @Test
     fun `half-open range colors only intersecting columns`() {
         val lines = listOf(LineSpec(3, listOf(1, 1, 1), false))
         val result = HighlightMatcher.resolve(

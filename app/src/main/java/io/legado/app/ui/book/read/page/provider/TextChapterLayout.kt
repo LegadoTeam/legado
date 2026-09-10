@@ -1255,7 +1255,7 @@ class TextChapterLayout(
                     //最后一行、单行
                     addCharsToLineNatural(
                         book, lineStartX, textLine, words,
-                        titleStartX ?: 0f, !isTitle && lineIndex == 0,
+                        titleStartX ?: 0f, !isTitle && lineIndex == 0 && isFirstLine,
                         widths, srcList, clickList,
                         if (lineIndex == 0) hangingWidth else 0f, drawOffsets, availableLineWidth
                     )
@@ -1365,7 +1365,8 @@ class TextChapterLayout(
                     TextColumn(
                         charData = ChapterProvider.indentChar,
                         start = absStartX + xStart,
-                        end = absStartX + xEnd
+                        end = absStartX + xEnd,
+                        isParagraphIndent = true
                     )
                 )
             } else {
@@ -1475,7 +1476,8 @@ class TextChapterLayout(
             }
             addCharToLine(
                 book, absStartX, textLine, words[index], drawOffsets?.get(index) ?: 0f,
-                xStart, xEnd, index + 1 == words.size, srcList, clickList
+                xStart, xEnd, index + 1 == words.size, srcList, clickList,
+                isParagraphIndent = kind == LineColumnLayout.kindIndent
             )
         }
         exceed(absStartX, textLine, words, lineWidth)
@@ -1495,7 +1497,8 @@ class TextChapterLayout(
         xEnd: Float,
         isLineEnd: Boolean,
         srcList: LinkedList<String>?,
-        clickList: LinkedList<String?>?
+        clickList: LinkedList<String?>?,
+        isParagraphIndent: Boolean = false
     ) {
         val column = when {
             !srcList.isNullOrEmpty() && (char == srcReplaceStr || char == reviewStr) -> {
@@ -1522,7 +1525,8 @@ class TextChapterLayout(
                     start = absStartX + xStart,
                     end = absStartX + xEnd,
                     charData = char,
-                    drawOffset = drawOffset
+                    drawOffset = drawOffset,
+                    isParagraphIndent = isParagraphIndent
                 )
             }
         }
