@@ -261,6 +261,65 @@ class BackupOptionsTest {
         assertTrue(requests.isEmpty())
     }
 
+    @Test fun actualArchiveRestoresAllHistoryOptionsAndBothFallbackImages() = runBlocking(Dispatchers.IO) {
+        val id = UUID.randomUUID().toString()
+        val day = File(context.externalFiles, "covers/history-day-$id.png")
+        val night = File(context.externalFiles, "covers/history-night-$id.png")
+        try {
+            for ((file, color) in listOf(day to android.graphics.Color.RED, night to android.graphics.Color.BLUE)) {
+                file.parentFile!!.mkdirs()
+                Bitmap.createBitmap(32, 48, Bitmap.Config.ARGB_8888).apply {
+                    eraseColor(color)
+                    file.outputStream().use { compress(Bitmap.CompressFormat.PNG, 100, it) }
+                    recycle()
+                }
+            }
+            val dayBytes = day.readBytes()
+            val nightBytes = night.readBytes()
+            BackupConfig.ignoreConfig[BackupConfig.otherCoverContentKey] = false
+            preferences.edit().putBoolean("enableReadRecord", false)
+                .putBoolean("readRecordSimpleLayout", false).putBoolean("readRecordUseDays", true)
+                .putBoolean("readRecordShowSeconds", false).putBoolean("readRecordFixedCard", false)
+                // The archive must be portable across application package names and storage roots.
+                .putString(PreferKey.readRecordCover, "/old-install/covers/${day.name}")
+                .putString(PreferKey.readRecordCoverDark, "/old-install/covers/${night.name}").commit()
+            LocalConfig.edit().putInt("readRecordSort", 2).commit()
+            Backup.backupLocked(context, directory.path, uploadWebDav = false)
+            val archive = File(directory, "backup.zip")
+            ZipFile(archive).use { zip ->
+                assertArrayEquals(dayBytes, zip.getInputStream(zip.getEntry("covers/${day.name}")).use { it.readBytes() })
+                assertArrayEquals(nightBytes, zip.getInputStream(zip.getEntry("covers/${night.name}")).use { it.readBytes() })
+            }
+            day.delete()
+            night.delete()
+            preferences.edit().putBoolean("enableReadRecord", true)
+                .putBoolean("readRecordSimpleLayout", true).putBoolean("readRecordUseDays", false)
+                .putBoolean("readRecordShowSeconds", true).putBoolean("readRecordFixedCard", true)
+                .remove(PreferKey.readRecordCover).remove(PreferKey.readRecordCoverDark).commit()
+            LocalConfig.edit().putInt("readRecordSort", 0).commit()
+            Restore.restoreOrThrow(context, archive.toUri(), lanTransfer = true)
+            assertFalse(AppConfig.enableReadRecord)
+            assertFalse(AppConfig.readRecordSimpleLayout)
+            assertTrue(AppConfig.readRecordUseDays)
+            assertFalse(AppConfig.readRecordShowSeconds)
+            assertFalse(AppConfig.readRecordFixedCard)
+            assertEquals(2, LocalConfig.getInt("readRecordSort", -1))
+            assertEquals(day.path, preferences.getString(PreferKey.readRecordCover, null))
+            assertEquals(night.path, preferences.getString(PreferKey.readRecordCoverDark, null))
+            assertArrayEquals(dayBytes, day.readBytes())
+            assertArrayEquals(nightBytes, night.readBytes())
+            val legacy = File(directory, "legacy-history")
+            writePreferenceSnapshot(context, legacy.path, "config") { }
+            Restore.restoreLocked(legacy.path)
+            assertTrue(AppConfig.readRecordFixedCard)
+            assertFalse(preferences.contains(PreferKey.readRecordCover))
+            assertFalse(preferences.contains(PreferKey.readRecordCoverDark))
+        } finally {
+            day.delete()
+            night.delete()
+        }
+    }
+
     @Test fun actualArchiveRestoresExplicitAutoSettingsAndLegacyMissingKeysUseDefaults() = runBlocking(Dispatchers.IO) {
         preferences.edit().putBoolean(PreferKey.autoBackup, false).commit()
         Backup.backupLocked(context, directory.path, uploadWebDav = false)

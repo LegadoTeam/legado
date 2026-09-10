@@ -157,6 +157,8 @@ object BackupConfig {
     )
 
     private val coverPrefKeys = arrayOf(
+        PreferKey.readRecordCover,
+        PreferKey.readRecordCoverDark,
         PreferKey.useDefaultCover,
         PreferKey.loadCoverOnlyWifi,
         PreferKey.coverShowName,

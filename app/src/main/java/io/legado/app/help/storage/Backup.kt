@@ -348,6 +348,7 @@ object Backup {
         }
         currentCoroutineContext().ensureActive()
         writePreferenceSnapshot(appCtx, backupPath, "config") {
+            putInt("readRecordSort", LocalConfig.getInt("readRecordSort", 0))
             appCtx.defaultSharedPreferences.all.forEach { (key, value) ->
                 if (BackupConfig.keyIsNotIgnore(key) &&
                     (!lanTransfer || key !in lanTransferIgnoredPrefKeys)
