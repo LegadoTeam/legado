@@ -134,6 +134,7 @@ data class TextLine(
             if (field != value) {
                 invalidate()
             }
+            columns.filterIsInstance<TextBaseColumn>().forEach { it.isReadAloud = value }
             if (value) {
                 textPage.hasReadAloudSpan = true
             }
@@ -301,7 +302,7 @@ data class TextLine(
         if (styledColumnCount > 0) {
             drawHighlightRuns(canvas, underlineBeforeText = true)
         }
-        if (checkFastDraw()) {
+        if (checkFastDraw() && (!isReadAloud || columns.filterIsInstance<TextBaseColumn>().all { it.isReadAloud })) {
             fastDrawTextLine(view, canvas)
         } else {
             for (i in columns.indices) {
@@ -318,7 +319,13 @@ data class TextLine(
             underlinePaint.set(ChapterProvider.contentPaint)
             underlinePaint.strokeWidth = 1.dpToPx().toFloat()
             val lineY = height - 1.dpToPx()
-            canvas.drawLine(lineStart + indentWidth, lineY, lineEnd, lineY, underlinePaint)
+            if (searchResultColumnCount > 0) {
+                canvas.drawLine(lineStart + indentWidth, lineY, lineEnd, lineY, underlinePaint)
+            } else {
+                columns.filterIsInstance<TextBaseColumn>().filter { it.isReadAloud }.forEach {
+                    canvas.drawLine(it.start, lineY, it.end, lineY, underlinePaint)
+                }
+            }
             PaintPool.recycle(underlinePaint)
         }
 

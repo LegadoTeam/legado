@@ -227,13 +227,6 @@ data class TextPage(
             val textLine = textLines[index]
             val lineLength = textLine.text.length + if (textLine.isParagraphEnd) 1 else 0
             if (aloudSpanStart >= lineStart && aloudSpanStart < lineStart + lineLength) {
-                for (i in index - 1 downTo 0) {
-                    if (textLines[i].isParagraphEnd) {
-                        break
-                    } else {
-                        textLines[i].isReadAloud = true
-                    }
-                }
                 for (i in index until textLines.size) {
                     if (textLines[i].isParagraphEnd) {
                         textLines[i].isReadAloud = true
@@ -241,6 +234,13 @@ data class TextPage(
                     } else {
                         textLines[i].isReadAloud = true
                     }
+                }
+                var columnStart = lineStart
+                for (column in textLine.columns) {
+                    if (column is TextBaseColumn && columnStart + column.positionLength <= aloudSpanStart) {
+                        column.isReadAloud = false
+                    }
+                    columnStart += column.positionLength
                 }
                 break
             }

@@ -114,38 +114,38 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
             for (i in startSpeak until contentList.size) {
                 ensureActive()
                 if (!isCurrentPlayback(sessionId)) return@execute
-                var text = contentList[i]
-                if (startParagraphPos > 0 && i == startSpeak) {
-                    text = text.substring(startParagraphPos)
-                }
-                if (text.matches(AppPattern.notReadAloudRegex)) {
-                    continue
-                }
-                if (!isAddedText) {
+                val paragraphText = contentList[i]
+                val paragraph = checkNotNull(textChapter).getParagraphs(readAloudByPage)[i]
+                val firstOffset = if (i == startSpeak) startParagraphPos else 0
+                val text = paragraphText.substring(firstOffset)
+                if (text.matches(AppPattern.notReadAloudRegex)) continue
+                var chunkStart = paragraph.chapterPosition + firstOffset
+                val textEnd = chunkStart + text.length
+                // Queue page boundaries ahead of playback: engines without range callbacks still
+                // report the next page's real start, without an application pause or queue flush.
+                val boundaries = checkNotNull(textChapter).pages.map { it.chapterPosition }
+                    .filter { it > chunkStart && it < textEnd } + textEnd
+                for (chunkEnd in boundaries) {
+                    val chunk = paragraphText.substring(
+                        chunkStart - paragraph.chapterPosition, chunkEnd - paragraph.chapterPosition
+                    )
                     val result = speakCurrent(
-                        sessionId,
-                        text,
-                        TextToSpeech.QUEUE_FLUSH,
-                        i
+                        sessionId, chunk,
+                        if (isAddedText) TextToSpeech.QUEUE_ADD else TextToSpeech.QUEUE_FLUSH,
+                        i, chunkStart, chunkEnd == textEnd
                     ) ?: return@execute
                     if (result == TextToSpeech.ERROR) {
-                        AppLog.put("tts出错 尝试重新初始化")
-                        clearTTS()
-                        initTts()
-                        return@execute
+                        if (!isAddedText) {
+                            AppLog.put("tts出错 尝试重新初始化")
+                            clearTTS()
+                            initTts()
+                            return@execute
+                        }
+                        AppLog.put("tts朗读出错:$chunk")
                     }
-                } else {
-                    val result = speakCurrent(
-                        sessionId,
-                        text,
-                        TextToSpeech.QUEUE_ADD,
-                        i
-                    ) ?: return@execute
-                    if (result == TextToSpeech.ERROR) {
-                        AppLog.put("tts朗读出错:$text")
-                    }
+                    isAddedText = true
+                    chunkStart = chunkEnd
                 }
-                isAddedText = true
             }
             LogUtils.d(TAG, "朗读内容添加完成")
             if (!isAddedText && isCurrentPlayback(sessionId)) {
@@ -220,8 +220,9 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
                     if (contentList[nowSpeak].matches(AppPattern.notReadAloudRegex)) {
                         nextParagraph()
                     }
-                    moveToSpeechPage(readAloudNumber)
-                    upTtsProgress(readAloudNumber + 1)
+                    val position = utterancePosition(s)
+                    moveToSpeechPage(position)
+                    upTtsProgress(position)
                 }
             }
         }
@@ -229,7 +230,7 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
         override fun onDone(s: String) {
             dispatchCurrentCallback(s) {
                 LogUtils.d(TAG, "onDone utteranceId:$s")
-                nextParagraph()
+                if (s.substringAfterLast(':') != "false") nextParagraph()
             }
         }
 
@@ -243,10 +244,9 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
                     rangeCallbackLogged = true
                     AppLog.putDebug("$TAG $msg")
                 }
-                val position = readAloudNumber + start
-                if (moveToSpeechPage(position)) {
-                    upTtsProgress(position)
-                }
+                val position = utterancePosition(utteranceId) + start
+                moveToSpeechPage(position)
+                upTtsProgress(position)
             }
         }
 
@@ -256,20 +256,20 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
                     TAG,
                     "onError nowSpeak:$nowSpeak pageIndex:$pageIndex utteranceId:$utteranceId errorCode:$errorCode"
                 )
-                nextParagraph()
+                if (utteranceId?.substringAfterLast(':') != "false") nextParagraph()
             }
         }
 
         private fun nextParagraph() {
             //跳过全标点段落
             do {
-                readAloudNumber += contentList[nowSpeak].length + 1 - paragraphStartPos
                 paragraphStartPos = 0
                 nowSpeak++
                 if (nowSpeak >= contentList.size) {
                     nextChapter(auto = true)
                     return
                 }
+                readAloudNumber = checkNotNull(textChapter).getParagraphs(readAloudByPage)[nowSpeak].chapterPosition
             } while (contentList[nowSpeak].matches(AppPattern.notReadAloudRegex))
         }
 
@@ -277,7 +277,7 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
         override fun onError(s: String) {
             dispatchCurrentCallback(s) {
                 LogUtils.d(TAG, "onError nowSpeak:$nowSpeak pageIndex:$pageIndex s:$s")
-                nextParagraph()
+                if (s.substringAfterLast(':') != "false") nextParagraph()
             }
         }
 
@@ -293,21 +293,26 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
 
     }
 
-    private fun utteranceId(sessionId: Long, index: Int): String {
-        return "${AppConst.APP_TAG}:$sessionId:$index"
+    private fun utterancePosition(id: String?): Int =
+        id?.split(':', limit = 5)?.getOrNull(3)?.toIntOrNull() ?: readAloudNumber
+
+    private fun utteranceId(sessionId: Long, index: Int, position: Int, last: Boolean): String {
+        return "${AppConst.APP_TAG}:$sessionId:$index:$position:$last"
     }
 
     private fun speakCurrent(
         sessionId: Long,
         text: String,
         queueMode: Int,
-        index: Int
+        index: Int,
+        position: Int,
+        last: Boolean
     ): Int? {
         synchronized(this) {
             if (!isCurrentPlayback(sessionId)) return null
             val tts = textToSpeech ?: return TextToSpeech.ERROR
             return tts.runCatching {
-                speak(text, queueMode, null, utteranceId(sessionId, index))
+                speak(text, queueMode, null, utteranceId(sessionId, index, position, last))
             }.getOrElse {
                 AppLog.put("tts出错\n${it.localizedMessage}", it, true)
                 TextToSpeech.ERROR

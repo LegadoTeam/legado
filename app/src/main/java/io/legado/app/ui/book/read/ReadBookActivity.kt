@@ -2389,21 +2389,21 @@ class ReadBookActivity : BaseReadBookActivity(),
                             ReadBook.openChapter(index, line.chapterPosition, false) {
                                 ReadBook.readAloud(
                                     startPos = line.pagePosition,
-                                    rewindToSentenceStart = true
+                                    rewindToSentenceStart = AppConfig.readAloudStartAtSentence
                                 )
                             }
                         } else {
                             ReadBook.durChapterPos = line.chapterPosition
                             ReadBook.readAloud(
                                 startPos = line.pagePosition,
-                                rewindToSentenceStart = true
+                                rewindToSentenceStart = AppConfig.readAloudStartAtSentence
                             )
                         }
                     } else {
-                        ReadBook.readAloud(rewindToSentenceStart = true)
+                        ReadBook.readAloud(rewindToSentenceStart = AppConfig.readAloudStartAtSentence)
                     }
                 } else {
-                    ReadBook.readAloud(rewindToSentenceStart = true)
+                    ReadBook.readAloud(rewindToSentenceStart = AppConfig.readAloudStartAtSentence)
                 }
             }
 
@@ -2418,18 +2418,18 @@ class ReadBookActivity : BaseReadBookActivity(),
                             ReadBook.openChapter(index, line.chapterPosition, false) {
                                 ReadBook.readAloud(
                                     startPos = line.pagePosition,
-                                    rewindToSentenceStart = true
+                                    rewindToSentenceStart = AppConfig.readAloudStartAtSentence
                                 )
                             }
                         } else {
                             ReadBook.durChapterPos = line.chapterPosition
                             ReadBook.readAloud(
                                 startPos = line.pagePosition,
-                                rewindToSentenceStart = true
+                                rewindToSentenceStart = AppConfig.readAloudStartAtSentence
                             )
                         }
                     } else {
-                        ReadBook.readAloud(rewindToSentenceStart = true)
+                        ReadBook.readAloud(rewindToSentenceStart = AppConfig.readAloudStartAtSentence)
                     }
                 } else {
                     ReadAloud.resume(this)
