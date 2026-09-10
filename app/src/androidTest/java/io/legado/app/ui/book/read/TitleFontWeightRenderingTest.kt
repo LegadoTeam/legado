@@ -767,9 +767,19 @@ class TitleFontWeightRenderingTest {
                     } else base
                     val lines = chapter.pages.flatMap { it.lines }
                     val columns = lines.flatMap { it.columns }.filterIsInstance<TextBaseColumn>()
-                    assertEquals("Generated indent widths stay unchanged: $label", baseLines.flatMap { it.columns }
-                        .filterIsInstance<TextBaseColumn>().filter { it.isParagraphIndent }.map { it.end - it.start },
-                        columns.filter { it.isParagraphIndent }.map { it.end - it.start })
+                    fun bodyStarts(rows: List<TextLine>) = rows.filter { line ->
+                        line.columns.any { (it as? TextBaseColumn)?.isParagraphIndent == true }
+                    }.map { line ->
+                        val first = line.columns.first { (it as? TextBaseColumn)?.isParagraphIndent != true }
+                        // A wider hanging quote consumes more blank indent, while the body stays aligned.
+                        (if (line.hangingPunctuation) first.end else first.start) - line.columns.first().start
+                    }
+                    val originalStarts = bodyStarts(baseLines)
+                    val actualStarts = bodyStarts(lines)
+                    assertEquals("Paragraph indent count: $label", originalStarts.size, actualStarts.size)
+                    originalStarts.zip(actualStarts).forEach { (expected, actual) ->
+                        assertEquals("Body stays aligned after hanging punctuation: $label", expected, actual, 0.02f)
+                    }
                     assertEquals(label, if (mode == "html") 0 else indentCount * 2,
                         columns.count { it.isParagraphIndent })
                     assertTrue("Image must be laid out: $label", lines.any { line -> line.columns.any { it is ImageColumn } })
