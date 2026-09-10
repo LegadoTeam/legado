@@ -7,7 +7,6 @@ import android.graphics.BitmapFactory
 import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
 import androidx.core.view.isVisible
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ActivityScenario
@@ -25,7 +24,6 @@ import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.google.android.material.snackbar.Snackbar
 import io.legado.app.R
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.BookType
@@ -216,6 +214,10 @@ class ContentReversalUiTest {
                 onView(allOf(withContentDescription(R.string.refresh), isDisplayed())).perform(longClick())
                 onView(withText(R.string.menu_refresh_resources)).inRoot(isPlatformPopup()).perform(click())
             }
+            fun showsLoading(activity: ReadBookActivity): Boolean {
+                val page = activity.findViewById<ReadView>(R.id.read_view).curPage.textPage
+                return page.isMsgPage && page.text == context.getString(R.string.data_loading)
+            }
             fun expectResourceFailure(action: () -> Unit) {
                 var layout = ReadBook.curTextChapter
                 val savedPosition = ReadBook.durChapterPos
@@ -236,26 +238,31 @@ class ContentReversalUiTest {
                     assertTrue("The refresh must fetch in the background", entered.await(5, TimeUnit.SECONDS))
                     await("loading notice before the blocked request completes") {
                         ViewModelProvider(it)[ReadBookViewModel::class.java].resourceRefreshing.value == true &&
-                            it.findViewById<TextView>(com.google.android.material.R.id.snackbar_text)?.let { text ->
-                                text.isShown && text.text == context.getString(R.string.data_loading)
-                            } == true
+                            showsLoading(it)
                     }
-                    assertSame("Loading must keep the old rendered chapter", layout, ReadBook.curTextChapter)
+                    assertSame("Loading must retain the old chapter for failure recovery", layout, ReadBook.curTextChapter)
                     assertEquals(savedPosition, ReadBook.durChapterPos)
                     val frame = CountDownLatch(1)
                     scenario!!.onActivity {
                         val reader = it.findViewById<ReadView>(R.id.read_view)
-                        assertFalse("The loading notice must not replace readable text", reader.curPage.textPage.isMsgPage)
+                        assertTrue("Refresh uses the existing centered message page", reader.curPage.textPage.isMsgPage)
+                        assertTrue(listOf(reader.pageFactory.curPage, reader.pageFactory.prevPage,
+                            reader.pageFactory.nextPage, reader.pageFactory.nextPlusPage).all { page ->
+                            page.isMsgPage && page.text == context.getString(R.string.data_loading)
+                        })
+                        assertTrue("No second loading Snackbar is shown",
+                            it.findViewById<View>(com.google.android.material.R.id.snackbar_text)?.isShown != true)
                         reader.postOnAnimation { frame.countDown() }
                     }
                     assertTrue("Reader frames must continue while HTTP is blocked", frame.await(2, TimeUnit.SECONDS))
+                    if (ReadBook.pageAnim() == PageAnim.scroll) {
+                        closeReaderMenu()
+                        screenshot("resource-refresh-loading-scroll")
+                    }
                     if (failBody.get() == 3) {
                         scenario!!.recreate()
                         await("restored reader still shows the pending refresh") {
-                            it.isInitFinish && !it.findViewById<ReadView>(R.id.read_view).curPage.textPage.isMsgPage &&
-                                it.findViewById<TextView>(com.google.android.material.R.id.snackbar_text)?.let { text ->
-                                    text.isShown && text.text == context.getString(R.string.data_loading)
-                                } == true
+                            it.isInitFinish && showsLoading(it)
                         }
                         layout = ReadBook.curTextChapter
                         assertEquals(savedPosition, ReadBook.durChapterPos)
@@ -267,15 +274,9 @@ class ContentReversalUiTest {
                                 .apply { isAccessible = true }
                             (field.get(model) as io.legado.app.help.coroutine.Coroutine<*>)
                                 .invokeOnCompletion { oldCompleted.countDown() }
-                            // The same Snackbar queue is used by first/last-page notices.
-                            Snackbar.make(it.findViewById(R.id.read_view), R.string.no_prev_page,
-                                Snackbar.LENGTH_INDEFINITE).show()
+                            ReadBook.callBack?.upContent()
                         }
-                        await("another reader notice replaced loading") {
-                            it.findViewById<TextView>(com.google.android.material.R.id.snackbar_text)?.let { text ->
-                                text.isShown && text.text == context.getString(R.string.no_prev_page)
-                            } == true
-                        }
+                        await("a content rebind keeps the refresh message") { showsLoading(it) }
                         val repeatedEntered = CountDownLatch(1)
                         refreshGate.set(repeatedEntered to repeatedRelease)
                         action()
@@ -284,10 +285,9 @@ class ContentReversalUiTest {
                         assertTrue("The old refresh must actually finish cancellation", oldCompleted.await(5, TimeUnit.SECONDS))
                         await("the successor retains its loading notice after old completion") {
                             ViewModelProvider(it)[ReadBookViewModel::class.java].resourceRefreshing.value == true &&
-                                it.findViewById<TextView>(com.google.android.material.R.id.snackbar_text)?.let { text ->
-                                    text.isShown && text.text == context.getString(R.string.data_loading)
-                                } == true
+                                showsLoading(it)
                         }
+                        closeReaderMenu()
                         screenshot("resource-refresh-loading")
                     }
                 } finally {
@@ -298,7 +298,7 @@ class ContentReversalUiTest {
                 await("resource failure reported without replacing cached resources") {
                     AppLog.logs.count { it.second.startsWith("刷新资源失败\n") } > failures &&
                         ViewModelProvider(it)[ReadBookViewModel::class.java].resourceRefreshing.value == false &&
-                        it.findViewById<View>(com.google.android.material.R.id.snackbar_text)?.isShown != true
+                        !it.findViewById<ReadView>(R.id.read_view).curPage.textPage.isMsgPage
                 }
                 assertSame("A failed refresh must retain the rendered chapter", layout, ReadBook.curTextChapter)
                 assertEquals(savedPosition, ReadBook.durChapterPos)
@@ -368,6 +368,14 @@ class ContentReversalUiTest {
                 assertFalse(viewModel.resourceThemeChanged(book))
             }
 
+            scenario!!.onActivity {
+                ReadBook.book!!.setPageAnim(PageAnim.scroll)
+                it.upPageAnim()
+            }
+            await("scroll reader ready for full resource refresh") {
+                it.findViewById<ReadView>(R.id.read_view).isScroll &&
+                    !it.findViewById<ReadView>(R.id.read_view).curPage.textPage.isMsgPage
+            }
             val outside = listOf(0, 6).associateWith { BookHelp.getContent(book, refreshChapters[it]) }
             bodyVersion.set(4)
             imageColor.set(Color.BLUE)
