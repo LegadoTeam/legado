@@ -56,7 +56,8 @@ internal fun copySharedLocalBook(file: FileDoc, directory: Uri): Uri {
     if (directory.isContentScheme()) {
         val tree = checkNotNull(DocumentFile.fromTreeUri(appCtx, directory))
         var suffix = 1
-        while (tree.findFile(candidate(suffix)) != null) suffix++
+        while (tree.findFile(candidate(suffix)) != null ||
+            appDb.bookDao.getBookByFileName(candidate(suffix)) != null) suffix++
         val copy = checkNotNull(tree.createFile(FileUtils.getMimeType(name), candidate(suffix)))
         try {
             file.openInputStream().getOrThrow().use { input ->
@@ -72,7 +73,7 @@ internal fun copySharedLocalBook(file: FileDoc, directory: Uri): Uri {
     check(tree.isDirectory || tree.mkdirs())
     var suffix = 1
     var copy = File(tree, candidate(suffix))
-    while (!copy.createNewFile()) copy = File(tree, candidate(++suffix))
+    while (appDb.bookDao.has(copy.path) || !copy.createNewFile()) copy = File(tree, candidate(++suffix))
     try {
         file.openInputStream().getOrThrow().use { input -> copy.outputStream().use(input::copyTo) }
     } catch (error: Throwable) {

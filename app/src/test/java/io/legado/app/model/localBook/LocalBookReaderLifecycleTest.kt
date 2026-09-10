@@ -109,10 +109,11 @@ class LocalBookReaderLifecycleTest {
             "src/main/java/io/legado/app/ui/association/SharedLocalBookImport.kt"
         )
         // Sharing now creates a new destination; it must never overwrite a cached book.
-        assertTrue(associationSource.contains("while (tree.findFile(candidate(suffix)) != null) suffix++"))
+        assertTrue(associationSource.contains("tree.findFile(candidate(suffix)) != null"))
+        assertTrue(associationSource.contains("appDb.bookDao.getBookByFileName(candidate(suffix)) != null"))
         assertTrue(associationSource.indexOf("tree.createFile(") <
             associationSource.indexOf("contentResolver.openOutputStream(copy.uri)"))
-        assertTrue(associationSource.contains("while (!copy.createNewFile())"))
+        assertTrue(associationSource.contains("while (appDb.bookDao.has(copy.path) || !copy.createNewFile())"))
         assertTrue(associationSource.indexOf("copy.createNewFile()") <
             associationSource.indexOf("copy.outputStream()", associationSource.indexOf("copy.createNewFile()")))
     }

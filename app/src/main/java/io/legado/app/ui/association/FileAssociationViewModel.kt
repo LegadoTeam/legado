@@ -225,7 +225,18 @@ class FileAssociationViewModel(application: Application, private val savedState:
             val copies = linkedMapOf<Uri, Book>()
             pendingLocalBooks.forEach { item ->
                 kotlin.runCatching {
-                    copies[copySharedLocalBook(item.file, directory)] = checkNotNull(item.preview)
+                    val uri = copySharedLocalBook(item.file, directory)
+                    val preview = checkNotNull(item.preview)
+                        .copy(bookUrl = FileDoc.fromUri(uri, false).toString())
+                    item.preview.coverUrl?.let { coverPath ->
+                        val cover = File(coverPath)
+                        if (coverPath == LocalBook.getCoverPath(item.preview) && cover.isFile) {
+                            val destination = File(LocalBook.getCoverPath(preview))
+                            cover.copyTo(destination, overwrite = true)
+                            preview.coverUrl = destination.path
+                        }
+                    }
+                    copies[uri] = preview
                 }.onFailure { AppLog.put("复制分享书籍失败\n${it.localizedMessage}", it) }
             }
             val (_, books) = LocalBook.importFiles(copies.keys.toList(), copies)
@@ -251,6 +262,9 @@ class FileAssociationViewModel(application: Application, private val savedState:
         sharedImportFile?.delete()
         (localBookBatch.value.orEmpty() + pendingLocalBooks).distinctBy { it.file.uri }.forEach {
             LocalBook.withParserCacheInvalidated(it.file.uri, it.file.name) { }
+            it.preview?.let { preview ->
+                if (preview.coverUrl == LocalBook.getCoverPath(preview)) File(preview.coverUrl!!).delete()
+            }
         }
         stagingDirectory?.deleteRecursively()
         super.onCleared()

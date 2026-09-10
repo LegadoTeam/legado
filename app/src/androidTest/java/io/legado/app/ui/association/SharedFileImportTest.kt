@@ -445,6 +445,10 @@ class SharedFileImportTest {
         AppConfig.bookImportFileName = "name='Shared identity $id';author='Shared author';"
         val existingFile = File(directory, "books/one.txt").apply { writeText("EXISTING BOOK") }
         val existing = LocalBook.importFile(Uri.fromFile(existingFile)).also(books::add)
+        val missingOriginal = Book(bookUrl = File(directory, "books/two.txt").path,
+            originName = "two.txt", name = "Missing original $id", author = "Preserved author")
+        appDb.bookDao.insert(missingOriginal)
+        books.add(missingOriginal)
         val originals = listOf("one.txt", "two.txt", "three.txt").mapIndexed { index, name ->
             File(directory, name).apply { writeText("SHARED COPY $index $id") }
         }
@@ -479,6 +483,8 @@ class SharedFileImportTest {
             }
             assertEquals("EXISTING BOOK", existingFile.readText())
             assertEquals(existing, appDb.bookDao.getBook(existing.bookUrl))
+            assertEquals(missingOriginal.name, appDb.bookDao.getBook(missingOriginal.bookUrl)!!.name)
+            assertFalse(File(missingOriginal.bookUrl).exists())
             assertFalse(File(directory, "books/ignore.png").exists())
         }
     }
