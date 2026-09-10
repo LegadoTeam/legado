@@ -1098,11 +1098,15 @@ class TextChapterLayout(
         val availableLineWidth = (visibleWidth - leftInset - rightInset).coerceAtLeast(1)
         for (index in text.indices) {
             highlightSpacing[chapterStart + index]?.let { inset ->
-                widthsArray[index] = (inset.contentWidth ?: widthsArray[index]) + inset.before + inset.after
+                widthsArray[index] = inset.contentWidth ?: widthsArray[index]
             }
         }
-        val measuredText = highlightSpacing.withSpans(text, chapterStart)
+        // Only the punctuation glyph hangs into the indent; extra edge space stays in the line.
         val hangingWidth = hangingPunctuationWidth(text, widthsArray, isTitle, isFirstLine)
+        for (index in text.indices) {
+            highlightSpacing[chapterStart + index]?.let { widthsArray[index] += it.before + it.after }
+        }
+        val measuredText = highlightSpacing.withSpans(text, chapterStart)
         val usesRightTitleReviewInset =
             isTitle && rightTitleMayHaveReview && !emptyContent && !isVolumeTitle &&
             imageStyle?.uppercase() != Book.imgStyleSingle &&

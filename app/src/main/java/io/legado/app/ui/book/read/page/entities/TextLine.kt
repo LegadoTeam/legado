@@ -492,6 +492,8 @@ data class TextLine(
                 if (
                     nextStyle.fill == fill &&
                     nextStyle.resolvedFillShape == shape &&
+                    (if (style.resolvedHorizontalPadding != null || nextStyle.resolvedHorizontalPadding != null)
+                        nextStyle == style else true) &&
                     (shape != HighlightStyle.FillShape.PILL ||
                         nextStyle.resolvedPillPaddingScale == style.resolvedPillPaddingScale) &&
                     nextTextSize == textSize
@@ -512,8 +514,9 @@ data class TextLine(
             val padding = if (shape == HighlightStyle.FillShape.PILL) {
                 (band.bottom - band.top) / 2f * style.resolvedPillPaddingScale
             } else 0f
-            var left = first.start - padding
-            var right = last.end + padding
+            val extra = (style.resolvedHorizontalPadding ?: 0f).dpToPx()
+            var left = first.start - padding - extra
+            var right = last.end + padding + extra
             var leftRadius = padding
             var rightRadius = padding
             if (padding > 0f) {
@@ -607,6 +610,8 @@ data class TextLine(
                     nextStyle.strike == strike &&
                     nextStyle.box == box &&
                     nextStyle.textColor == style.textColor &&
+                    (if (style.resolvedHorizontalPadding != null || nextStyle.resolvedHorizontalPadding != null)
+                        nextStyle == style else true) &&
                     (!(style.changesTextMetrics || nextStyle.changesTextMetrics) ||
                         nextStyle.resolvedFontPath == style.resolvedFontPath) &&
                     sameTextSize
@@ -626,8 +631,8 @@ data class TextLine(
             } else null
             HighlightDraw.drawRun(
                 canvas,
-                first.start,
-                last.end,
+                first.start - (style.resolvedHorizontalPadding ?: 0f).dpToPx(),
+                last.end + (style.resolvedHorizontalPadding ?: 0f).dpToPx(),
                 baseline,
                 height,
                 customMetrics?.ascent ?: (fontMetrics.ascent * metricScale),

@@ -452,7 +452,7 @@ object ReadBook : CoroutineScope by MainScope() {
                 chapter.highlightRuleMatchesVersion != highlightRulesVersion)
         ) return false
         if (chapter.highlightSpacing.isEmpty && ranges.none {
-                it.style.changesTextMetrics ||
+                it.style.changesTextMetrics || it.style.resolvedHorizontalPadding != null ||
                     it.style.fill != 0 && it.style.resolvedFillShape == HighlightStyle.FillShape.PILL
             }) return true
         // Always measure from the original advances; measuring the replacement compounds padding.

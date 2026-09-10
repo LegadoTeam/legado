@@ -20,6 +20,7 @@ import io.legado.app.ui.book.read.HighlightFillPreviewDrawable
 import io.legado.app.ui.book.read.HighlightStyleDialog
 import io.legado.app.utils.GSON
 import io.legado.app.utils.getCompatColor
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.toastOnUi
@@ -158,6 +159,9 @@ class HighlightRuleEditDialog : BaseDialogFragment(R.layout.dialog_highlight_rul
     }
 
     private fun upPreview() {
+        val preview = binding.tvStylePreview
+        val padding = (12f + (editingStyle.resolvedHorizontalPadding ?: 0f)).dpToPx().toInt()
+        preview.setPadding(padding, preview.paddingTop, padding, preview.paddingBottom)
         binding.tvStylePreview.background = if (editingStyle.fill != 0) {
             HighlightFillPreviewDrawable(editingStyle, binding.tvStylePreview.textSize)
         } else {

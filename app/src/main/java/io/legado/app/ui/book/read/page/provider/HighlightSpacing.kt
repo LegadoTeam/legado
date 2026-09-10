@@ -113,10 +113,13 @@ data class HighlightSpacing(
             val textSize get() = HighlightDraw.textSize(baseTextSize, style)
             var metrics: Insets? = null
             val padding get(): Float {
+                val style = checkNotNull(style)
+                val extra = (style.resolvedHorizontalPadding ?: 0f).dpToPx()
+                if (style.fill == 0 || style.resolvedFillShape != HighlightStyle.FillShape.PILL) return extra
                 // The full PILL band is 0.9em above and 0.16em below the baseline, plus
                 // 2dp on each side. HTML fallback metrics can unclip it after reflow.
                 val fullBandHeight = textSize * 1.06f + 4f.dpToPx()
-                return fullBandHeight / 2f * checkNotNull(style).resolvedPillPaddingScale
+                return fullBandHeight / 2f * style.resolvedPillPaddingScale + extra
             }
             val advance get(): Float {
                 metrics?.contentWidth?.let { return it }
@@ -198,11 +201,14 @@ data class HighlightSpacing(
                 while (i < paragraph.size) {
                     val first = paragraph[i]
                     val style = first.style
-                    if (first.column !is TextBaseColumn || style == null || style.fill == 0 ||
-                        style.resolvedFillShape != HighlightStyle.FillShape.PILL) { i++; continue }
+                    if (first.column !is TextBaseColumn || style == null ||
+                        style.resolvedHorizontalPadding == null &&
+                        (style.fill == 0 || style.resolvedFillShape != HighlightStyle.FillShape.PILL)) { i++; continue }
+                    val explicit = style.resolvedHorizontalPadding != null
                     var end = i + 1
                     while (end < paragraph.size && paragraph[end].column is TextBaseColumn &&
-                        paragraph[end].style?.let { it.fill == style.fill &&
+                        paragraph[end].style?.let { if (explicit || it.resolvedHorizontalPadding != null) it == style
+                        else it.fill == style.fill &&
                             it.resolvedFillShape == style.resolvedFillShape &&
                             it.resolvedPillPaddingScale == style.resolvedPillPaddingScale } == true &&
                         paragraph[end].textSize == first.textSize) end++
@@ -210,6 +216,25 @@ data class HighlightSpacing(
                     // coverage disjoint even when measured advances end on fractional pixels.
                     val padding = paragraph.subList(i, end).maxOf { it.padding } + 1f
                     edgePadding = maxOf(edgePadding, padding)
+                    if (explicit) {
+                        // Reserve the shape's entire footprint at actual run boundaries. Only
+                        // boundary Unicode cells get spans, so interior shaping/word breaks stay intact.
+                        val last = paragraph[end - 1]
+                        val before = result[first.position] ?: Insets(first.column.positionLength)
+                        result[first.position] = before.copy(before = maxOf(before.before, padding))
+                        val after = result[last.position] ?: Insets(last.column.positionLength)
+                        result[last.position] = after.copy(after = maxOf(after.after, padding))
+                        val line = last.line
+                        if (end == paragraph.size && line.isParagraphEnd &&
+                            ChapterProvider.getReviewCount(line.paragraphNum, line.isReviewTitle,
+                                line.reviewTitleOffset, chapter.chapter.index) > 0) {
+                            val width = ChapterProvider.getReviewWidth(line.isReviewTitle)
+                            result[last.position] = result.getValue(last.position).copy(
+                                after = padding + width, reviewGap = padding, reviewWidth = width)
+                        }
+                        i = end
+                        continue
+                    }
                     var distance = 0f
                     for (left in i - 1 downTo 0) {
                         val cell = paragraph[left]
