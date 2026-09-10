@@ -353,15 +353,25 @@ class CodeSelectionUiTest {
         assertNativeMenu()
         assertNativeMenuClearOfTools()
         screenshot("code-selection-native-ime-search-bottom")
-        onView(withId(R.id.editText)).perform(GeneralSwipeAction(Swipe.SLOW, { view ->
-            val position = IntArray(2)
-            view.getLocationOnScreen(position)
-            floatArrayOf(position[0] + view.width * 0.9f, position[1] + view.height * 0.4f)
-        }, { view ->
+        val nativeWindow = Rect()
+        onView(withText(android.R.string.copy)).inRoot(isPlatformPopup()).check { view, failure ->
+            if (failure != null) throw failure
+            visibleScreenBounds(view!!.rootView, nativeWindow)
+        }
+        fun scrollPoint(view: View, rowsFromBottom: Float): FloatArray {
             val editor = view as CodeEditor
             val position = IntArray(2)
             view.getLocationOnScreen(position)
-            floatArrayOf(position[0] + view.width * 0.9f, position[1] + view.height * 0.4f - editor.rowHeight)
+            val point = floatArrayOf(position[0] + view.width * 0.9f,
+                position[1] + view.height - editor.rowHeight * rowsFromBottom)
+            assertFalse("The scroll gesture must avoid the native popup window $nativeWindow",
+                nativeWindow.contains(point[0].toInt(), point[1].toInt()))
+            return point
+        }
+        onView(withId(R.id.editText)).perform(GeneralSwipeAction(Swipe.SLOW, { view ->
+            scrollPoint(view, 0.5f)
+        }, { view ->
+            scrollPoint(view, 1.5f)
         }, Press.FINGER))
         awaitEditor { it.offsetY > offset && selection(it) == selected && it.text.toString() == code }
         // FloatingActionMode deliberately hides a moving toolbar briefly before positioning it.
@@ -959,6 +969,8 @@ class CodeSelectionUiTest {
         }
         await { !popup.isAttachedToWindow }
         // Popup removal reaches InputDispatcher asynchronously; do not inject into its stale window.
+        // Accessibility idle alone does not synchronize the removed input window.
+        SystemClock.sleep(ViewConfiguration.getDoubleTapTimeout().toLong() + 50)
         instrumentation.uiAutomation.waitForIdle(500, 5_000)
     }
 
