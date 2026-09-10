@@ -96,7 +96,8 @@ data class HighlightSpacing(
             for (page in chapter.pages) {
                 val styles = HighlightMatcher.resolve(chapter.getReadLength(page.index), page.lines.map { line ->
                     HighlightMatcher.LineSpec(line.charSize, line.columns.map { it.positionLength },
-                        line.isParagraphEnd, line.isTitle)
+                        line.isParagraphEnd, line.isTitle,
+                        line.columns.map { (it as? TextBaseColumn)?.isParagraphIndent == true })
                 }, ranges)
                 page.lines.forEachIndexed { row, line ->
                     var position = line.chapterPosition
