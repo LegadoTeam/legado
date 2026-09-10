@@ -26,10 +26,14 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.R
 import io.legado.app.constant.BookType
 import io.legado.app.constant.PageAnim
+import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.help.HighlightGeometry
+import io.legado.app.help.HighlightMatcher
+import io.legado.app.help.HighlightTextBuilder
+import io.legado.app.help.book.BookContent
 import io.legado.app.help.HighlightStyle
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.config.AppConfig
@@ -44,6 +48,9 @@ import io.legado.app.ui.book.read.page.ContentTextView
 import io.legado.app.ui.book.read.page.HighlightDraw
 import io.legado.app.ui.book.read.page.ReadView
 import io.legado.app.ui.book.read.page.entities.TextLine
+import io.legado.app.ui.book.read.page.entities.TextChapter
+import io.legado.app.ui.book.read.page.entities.column.TextBaseColumn
+import io.legado.app.ui.book.read.page.provider.HighlightSpacing
 import io.legado.app.ui.book.read.page.entities.TextPage
 import io.legado.app.ui.book.read.page.entities.column.TextColumn
 import io.legado.app.ui.book.read.page.entities.column.BaseColumn
@@ -54,6 +61,12 @@ import io.legado.app.ui.book.read.page.provider.LineColumnLayout
 import io.legado.app.utils.GSON
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getTextWidthsCompat
+import io.legado.app.utils.putPrefBoolean
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -392,6 +405,8 @@ class TitleFontWeightRenderingTest {
         imageFile.parentFile!!.mkdirs()
         imageFile.writeText(svg)
         val savedOptimize = AppConfig.optimizeRender
+        val savedZhLayout = ReadBookConfig.useZhLayout
+        val savedAdaptStyle = AppConfig.adaptSpecialStyle
         var hardwareView: ContentTextView? = null
         try {
             scenario!!.onActivity { activity ->
@@ -409,9 +424,6 @@ class TitleFontWeightRenderingTest {
                     val textSize = ChapterProvider.contentPaint.textSize
                     val iconWidth = ceil(ChapterProvider.getReviewWidth(false))
                     val rowText = if (withSpace) " 顶上 " else "顶上"
-                    val advances = FloatArray(rowText.length).also {
-                        ChapterProvider.contentPaint.getTextWidthsCompat(rowText, it, ChapterProvider.getReviewWidth(false))
-                    }
                     val lineHeight = ceil(textSize * 2.1f)
                     assertNotNull("The author's SVG must decode through the real review icon provider: $caseLabel",
                         ChapterProvider.getReviewIconBitmap(88, iconWidth.toInt(), lineHeight.toInt()))
@@ -420,30 +432,69 @@ class TitleFontWeightRenderingTest {
                         iconWidth.toInt(), decodedImage.width)
                     assertEquals("The decoded SVG must keep its aspect ratio: $caseLabel",
                         80f / 90f, decodedImage.width.toFloat() / decodedImage.height, 0.03f)
-                    val top = ChapterProvider.paddingTop.toFloat()
-                    val height = ceil(top + lineHeight * 3).toInt()
-                    val start = floor((width - 2 * iconWidth - advances.sum()) / 2)
-                    assertTrue("All text and icons must fit inside the page: $caseLabel", start > 0)
-                    val page = TextPage(text = List(3) { rowText }.joinToString("\n"), height = height.toFloat())
-                    for (kind in 0..2) {
-                        fun icon(x: Float): BaseColumn = when (kind) {
-                            0 -> ReviewColumn(x, x + iconWidth, 88)
-                            1 -> ImageColumn(x, x + iconWidth, src)
-                            else -> ImageColumn(x, x + iconWidth,
-                                """$src,{"style":"text","reviewCount":"88","click":"review"}""")
+                    ReadBookConfig.titleMode = 2
+                    ReadBookConfig.paragraphIndent = ""
+                    ReadBookConfig.useZhLayout = optimized
+                    AppConfig.adaptSpecialStyle = true
+                    val fixtureChapter = BookChapter(bookUrl = book!!.bookUrl,
+                        url = "highlight-spacing-fixture", index = 10000, title = "Spacing")
+                    ChapterProvider.setReviewProviders({ _, id -> if (id == 1) 88 else 0 },
+                        null, fixtureChapter.index)
+                    val plainImage = """<img src='$src,{"style":"text"}'>"""
+                    val reviewImage = """<img src='$src,{"style":"TEXT","reviewCount":"88","click":"review"}'>"""
+                    val contents = listOf(plainImage + rowText,
+                        plainImage + rowText + plainImage,
+                        "<usehtml><p>$reviewImage$rowText$reviewImage</p></usehtml>")
+                    fun awaitLayout(chapter: TextChapter): TextChapter = runBlocking {
+                        withTimeout(30_000) {
+                            for (ignored in chapter.layoutChannel) Unit
+                            while (!chapter.isCompleted) yield()
                         }
-                        val y = top + lineHeight * kind
-                        val line = TextLine(text = rowText, startX = start + iconWidth,
-                            lineTop = y, lineBase = y + textSize * 1.35f, lineBottom = y + lineHeight)
-                        line.addColumn(icon(start))
-                        var textX = start + iconWidth
-                        rowText.forEachIndexed { index, char ->
-                            line.addColumn(TextColumn(textX, textX + advances[index], char.toString()))
-                            textX += advances[index]
-                        }
-                        line.addColumn(icon(textX))
-                        page.addLine(line)
+                        chapter
                     }
+                    fun canonical(chapter: TextChapter) = HighlightTextBuilder.build(
+                        chapter.pages.flatMap { it.lines }.map {
+                            HighlightTextBuilder.LineInput(it.text, it.isParagraphEnd)
+                        })
+                    val scope = CoroutineScope(Dispatchers.Default)
+                    val base = awaitLayout(ChapterProvider.getTextChapterAsync(scope, book!!,
+                        fixtureChapter, fixtureChapter.title, BookContent(false, contents, null),
+                        fixtureChapter.index + 1, saveChapterData = false))
+                    val fill = Color.rgb(32, 144, 80)
+                    val style = HighlightStyle(bold = true, fill = fill,
+                        fillShape = HighlightStyle.FillShape.PILL, pillPaddingScale = paddingScale)
+                    val ranges = Regex("顶上").findAll(canonical(base)).map {
+                        HighlightMatcher.Range(it.range.first, it.range.last + 1, style)
+                    }.toList()
+                    val spacing = HighlightSpacing.resolve(base, ranges)
+                    assertTrue("Actual layout must reserve capsule space: $caseLabel", spacing.columns.isNotEmpty())
+                    val spaced = awaitLayout(checkNotNull(base.layoutWithHighlightSpacing(scope, spacing)))
+                    assertEquals("Spacing must preserve canonical anchors: $caseLabel", canonical(base), canonical(spaced))
+                    assertEquals("Spacing must preserve title boundary: $caseLabel", base.layoutTitleLength, spaced.layoutTitleLength)
+                    assertEquals("Spacing must be idempotent against the retained baseline: $caseLabel",
+                        spacing, HighlightSpacing.resolve(checkNotNull(spaced.highlightSpacingBase), ranges))
+                    assertEquals("All three real layout rows must fit this fixture: $caseLabel", 1, spaced.pageSize)
+                    val page = spaced.pages.single()
+                    val baselinePage = base.pages.single()
+                    assertEquals("TEXT, native review and HTML rows must remain present: $caseLabel", 3, page.lines.size)
+                    assertTrue("The first row must use a real native review column: $caseLabel",
+                        page.lines.first().columns.last() is ReviewColumn)
+                    assertTrue("The last row must use real HTML text columns: $caseLabel", page.lines.last().isHtml)
+                    val originalColumns = base.pages.flatMap { it.lines }.flatMap { it.columns }
+                    val spacedColumns = spaced.pages.flatMap { it.lines }.flatMap { it.columns }
+                    assertEquals("Spacing must preserve logical columns: $caseLabel", originalColumns.size, spacedColumns.size)
+                    originalColumns.zip(spacedColumns).forEach { (before, after) ->
+                        assertEquals("Spacing must preserve image and glyph widths: $caseLabel",
+                            before.end - before.start, after.end - after.start, 0.001f)
+                    }
+                    page.lines.forEach { line ->
+                        assertTrue("Reserved slots must fit the content width: $caseLabel",
+                            line.columns.last().end <= width - ChapterProvider.paddingRight + 1f)
+                        line.columns.filter { it is ImageColumn || it is ReviewColumn }.forEach {
+                            assertTrue("Touch coordinates must follow the drawn image: $caseLabel", it.isTouch((it.start + it.end) / 2f))
+                        }
+                    }
+                    val height = ceil(maxOf(page.height, baselinePage.height)).toInt()
                     page.upRenderHeight()
                     page.isCompleted = true
                     val view = ContentTextView(activity, null).apply {
@@ -452,8 +503,7 @@ class TitleFontWeightRenderingTest {
                     }
                     val columns = page.lines.flatMap { it.columns }
                     val positions = columns.map { it.start to it.end }
-                    val textColumns = columns.filterIsInstance<TextColumn>().filter { it.charData != " " }
-                    val fill = Color.rgb(32, 144, 80)
+                    val textColumns = columns.filterIsInstance<TextBaseColumn>().filter { it.charData != " " }
                     fun render(color: Int, withFill: Boolean): Bitmap {
                         textColumns.forEach {
                             it.highlightStyle = HighlightStyle(textColor = color, bold = true,
@@ -463,6 +513,15 @@ class TitleFontWeightRenderingTest {
                         return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                             .also { view.draw(Canvas(it)) }
                     }
+                    val baselineView = ContentTextView(activity, null).apply {
+                        layout(0, 0, width, height)
+                        setContent(baselinePage)
+                    }
+                    baselinePage.lines.flatMap { it.columns }.filterIsInstance<TextBaseColumn>().forEach {
+                        it.highlightStyle = HighlightStyle(textColor = 1, bold = true)
+                    }
+                    val baselineIcons = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                        .also { baselineView.draw(Canvas(it)) }
                     val icons = render(1, false)
                     val glyphs = render(Color.BLACK, false)
                     val background = render(1, true)
@@ -472,8 +531,8 @@ class TitleFontWeightRenderingTest {
                     try {
                         // Negative control: the original expanded capsule behind the same SVG pixels.
                         val canvas = Canvas(legacy)
-                        for (line in page.lines) {
-                            val highlighted = line.columns.filterIsInstance<TextColumn>()
+                        for (line in baselinePage.lines) {
+                            val highlighted = line.columns.filterIsInstance<TextBaseColumn>()
                                 .filter { it.charData != " " }
                             val band = HighlightGeometry.fillBand(line.lineBase - line.lineTop,
                                 textSize, line.height, HighlightStyle.FillShape.PILL, 1f.dpToPx())
@@ -491,8 +550,8 @@ class TitleFontWeightRenderingTest {
                                 restore()
                             }
                         }
-                        canvas.drawBitmap(icons, 0f, 0f, null)
-                        Canvas(flattened).drawBitmap(icons, 0f, 0f, null)
+                        canvas.drawBitmap(baselineIcons, 0f, 0f, null)
+                        Canvas(flattened).drawBitmap(baselineIcons, 0f, 0f, null)
                         for ((name, bitmap) in listOf("fixed" to result, "flattened" to flattened)) {
                             File(context.getExternalFilesDir("ui-regression"),
                                 "highlight-transparent-$size-$optimized-$withSpace-$paddingScale-$iconScale-$name.png").outputStream().use {
@@ -503,14 +562,12 @@ class TitleFontWeightRenderingTest {
                             for (icon in listOf(line.columns.first(), line.columns.last())) {
                                 var transparent = 0
                                 var visibleInk = 0
-                                var oldOverlap = 0
                                 for (y in ceil(line.lineTop).toInt() until floor(line.lineBottom).toInt()) {
                                     for (x in icon.start.toInt() until icon.end.toInt()) {
                                         val before = icons.getPixel(x, y)
                                         if (Color.alpha(before) == 0) transparent++
                                         // Thin SVG strokes at small sizes are primarily antialiased.
                                         if (Color.alpha(before) >= 128) visibleInk++
-                                        if (legacy.getPixel(x, y) != before) oldOverlap++
                                         assertEquals("SVG changed: $caseLabel row=$row ($x,$y)",
                                             before, background.getPixel(x, y))
                                     }
@@ -519,11 +576,9 @@ class TitleFontWeightRenderingTest {
                                     transparent > 100)
                                 assertTrue("The real SVG must draw visible ink: $caseLabel row=$row x=${icon.start} count=$visibleInk",
                                     visibleInk > 10)
-                                assertTrue("The original cap must overlap the real transparent SVG: $caseLabel row=$row x=${icon.start}",
-                                    oldOverlap > 0)
                             }
                             var ink = 0
-                            val highlighted = line.columns.filterIsInstance<TextColumn>()
+                            val highlighted = line.columns.filterIsInstance<TextBaseColumn>()
                                 .filter { it.charData != " " }
                             for (y in ceil(line.lineTop).toInt() until floor(line.lineBottom).toInt()) {
                                 for (x in highlighted.first().start.toInt() until highlighted.last().end.toInt()) {
@@ -551,13 +606,33 @@ class TitleFontWeightRenderingTest {
                                     shoulderEdges.first - centerEdges.first >= 2)
                                 assertTrue("Right cap must be visibly curved: $caseLabel row=$row middle=$centerEdges shoulder=$shoulderEdges",
                                     centerEdges.second - shoulderEdges.second >= 2)
-                                val flatCenter = edges(flattened, middle)
-                                val flatShoulder = edges(flattened, shoulder)
-                                assertTrue("The previously clipped capsule must fail the curvature check: $caseLabel row=$row middle=$flatCenter shoulder=$flatShoulder",
-                                    flatShoulder.first - flatCenter.first < 2 || flatCenter.second - flatShoulder.second < 2)
                             }
                         }
-                        assertEquals("Adaptive caps must not move text or review columns: $caseLabel", positions,
+                        if (!withSpace) {
+                            val line = baselinePage.lines[1]
+                            val band = HighlightGeometry.fillBand(line.lineBase - line.lineTop,
+                                textSize, line.height, HighlightStyle.FillShape.PILL, 1f.dpToPx())
+                            val middle = (line.lineTop + (band.top + band.bottom) / 2f).toInt()
+                            val shoulder = (line.lineTop + band.top + (band.bottom - band.top) * 0.08f).toInt()
+                            fun oldEdges(y: Int): Pair<Int, Int> {
+                                val xs = ceil(line.columns.first().end).toInt() until floor(line.columns.last().start).toInt()
+                                fun filled(x: Int) = Color.alpha(flattened.getPixel(x, y)) > 30 &&
+                                    flattened.getPixel(x, y) != baselineIcons.getPixel(x, y)
+                                return xs.first(::filled) to xs.last(::filled)
+                            }
+                            val centerEdges = oldEdges(middle)
+                            val shoulderEdges = oldEdges(shoulder)
+                            assertTrue("Unspaced clipped caps must fail the same curvature check: $caseLabel",
+                                shoulderEdges.first - centerEdges.first < 2 || centerEdges.second - shoulderEdges.second < 2)
+                            for (icon in listOf(line.columns.first(), line.columns.last())) {
+                                var overlap = 0
+                                for (y in ceil(line.lineTop).toInt() until floor(line.lineBottom).toInt())
+                                    for (x in ceil(icon.start).toInt() until floor(icon.end).toInt())
+                                        if (legacy.getPixel(x, y) != baselineIcons.getPixel(x, y)) overlap++
+                                assertTrue("Unspaced expanded caps must overlap the SVG: $caseLabel", overlap > 0)
+                            }
+                        }
+                        assertEquals("Drawing must not mutate laid-out columns: $caseLabel", positions,
                             columns.map { it.start to it.end })
                         if (optimized && size == 50 && withSpace && paddingScale == 2f) {
                             view.setBackgroundColor(Color.WHITE)
@@ -566,8 +641,9 @@ class TitleFontWeightRenderingTest {
                             hardwareView = view
                         }
                     } finally {
-                        listOf(icons, glyphs, background, result, legacy, flattened).forEach(Bitmap::recycle)
+                        listOf(icons, glyphs, background, result, legacy, flattened, baselineIcons).forEach(Bitmap::recycle)
                         page.recycleRecorders()
+                        baselinePage.recycleRecorders()
                     }
                 }
             }
@@ -576,6 +652,101 @@ class TitleFontWeightRenderingTest {
             instrumentation.runOnMainSync {
                 hardwareView?.let { (it.parent as? ViewGroup)?.removeView(it) }
                 AppConfig.optimizeRender = savedOptimize
+                ReadBookConfig.useZhLayout = savedZhLayout
+                AppConfig.adaptSpecialStyle = savedAdaptStyle
+                ChapterProvider.clearReviewProviders()
+                ImageProvider.remove(imageFile.absolutePath)
+            }
+            imageFile.delete()
+        }
+    }
+
+    @Test
+    fun capsuleSpacingWrapsAndRepaginatesWithoutChangingTextOrAccumulatingInsets() {
+        launchReader()
+        val src = "https://fixture.invalid/issue1255-wrapping.svg"
+        val imageFile = BookHelp.getImage(book!!, src)
+        imageFile.parentFile!!.mkdirs()
+        imageFile.writeText(instrumentation.context.assets.open("issue1255-transparent-cat.svg")
+            .bufferedReader().use { it.readText() })
+        val savedZhLayout = ReadBookConfig.useZhLayout
+        val savedAdapt = AppConfig.adaptSpecialStyle
+        val savedJustify = ReadBookConfig.textFullJustify
+        try {
+            scenario!!.onActivity {
+                ReadBookConfig.titleMode = 2
+                ReadBookConfig.paragraphIndent = ""
+                ReadBookConfig.textSize = 20
+                ReadBookConfig.reviewIconScale = 100
+                AppConfig.adaptSpecialStyle = true
+                ChapterProvider.upStyle()
+                val chapter = BookChapter(bookUrl = book!!.bookUrl, url = "spacing-wrap", index = 10001)
+                ChapterProvider.setReviewProviders({ _, _ -> 88 }, null, chapter.index)
+                val paint = ChapterProvider.contentPaint
+                val image = """<img src='$src,{"style":"text"}'>"""
+                // Leave less than one glyph of spare width before reserving the capsule and review slot.
+                val count = ((ChapterProvider.visibleWidth - paint.measureText("顶上") -
+                    paint.measureText(ChapterProvider.srcReplaceStr)) / paint.measureText("前")).toInt() - 1
+                assertTrue(count > 1)
+                val paragraph = "前".repeat(count) + image + "顶上"
+                fun canonical(chapter: TextChapter) = HighlightTextBuilder.build(chapter.pages
+                    .flatMap { it.lines }.map { HighlightTextBuilder.LineInput(it.text, it.isParagraphEnd) })
+                fun awaitLayout(chapter: TextChapter): TextChapter = runBlocking {
+                    withTimeout(30_000) {
+                        for (ignored in chapter.layoutChannel) Unit
+                        while (!chapter.isCompleted) yield()
+                    }
+                    chapter
+                }
+                for (zhLayout in listOf(false, true)) for (justify in listOf(false, true)) {
+                    ReadBookConfig.useZhLayout = zhLayout
+                    context.putPrefBoolean(PreferKey.textFullJustify, justify)
+                    val scope = CoroutineScope(Dispatchers.Default)
+                    val base = awaitLayout(ChapterProvider.getTextChapterAsync(scope, book!!,
+                        chapter, "Spacing", BookContent(false, List(90) { paragraph }, null),
+                        chapter.index + 1, saveChapterData = false))
+                    val originalText = canonical(base)
+                    val style = HighlightStyle(fill = Color.GREEN,
+                        fillShape = HighlightStyle.FillShape.PILL, pillPaddingScale = 2f)
+                    val ranges = Regex("顶上").findAll(originalText).map {
+                        HighlightMatcher.Range(it.range.first, it.range.last + 1, style)
+                    }.toList()
+                    val spacing = HighlightSpacing.resolve(base, ranges)
+                    val spaced = awaitLayout(checkNotNull(base.layoutWithHighlightSpacing(scope, spacing)))
+                    val repeated = awaitLayout(checkNotNull(spaced.layoutWithHighlightSpacing(scope, spacing)))
+                    val restored = awaitLayout(checkNotNull(spaced.layoutWithHighlightSpacing(scope, HighlightSpacing())))
+                    val caseLabel = "zh=$zhLayout justify=$justify"
+                    assertEquals("Canonical text must survive wrapping: $caseLabel", originalText, canonical(spaced))
+                    assertEquals("Canonical text must survive removing the style: $caseLabel", originalText, canonical(restored))
+                    assertTrue("Extra measured advance must wrap lines: $caseLabel",
+                        spaced.pages.sumOf { it.lines.size } > base.pages.sumOf { it.lines.size })
+                    assertTrue("Wrapped lines must repaginate: $caseLabel", spaced.pageSize > base.pageSize)
+                    fun geometry(chapter: TextChapter) = chapter.pages.flatMap { it.lines }.map { line ->
+                        line.chapterPosition to line.columns.map { it.start to it.end }
+                    }
+                    assertEquals("Repeated layout must not add space again: $caseLabel", geometry(spaced), geometry(repeated))
+                    assertEquals("Removing capsule styling must restore original layout: $caseLabel", geometry(base), geometry(restored))
+                    val anchor = ranges[40].start
+                    val anchoredPage = checkNotNull(spaced.getPageByReadPos(anchor))
+                    assertTrue("Saved character position must select the same paragraph: $caseLabel",
+                        anchoredPage.lines.any { anchor in it.chapterIndices })
+                    assertEquals("Matched text must remain unchanged: $caseLabel", "顶上", canonical(spaced).substring(anchor, anchor + 2))
+                    spaced.pages.flatMap { it.lines }.forEach { line ->
+                        assertTrue("Wrapped text and native icons must fit the page: $caseLabel",
+                            line.columns.last().end <= ChapterProvider.viewWidth - ChapterProvider.paddingRight + 1f)
+                        line.columns.filter { it is ImageColumn || it is ReviewColumn }.forEach { column ->
+                            assertTrue(column.isTouch((column.start + column.end) / 2f))
+                        }
+                    }
+                    listOf(base, spaced, repeated, restored).forEach { it.pages.forEach(TextPage::recycleRecorders) }
+                }
+            }
+        } finally {
+            instrumentation.runOnMainSync {
+                ReadBookConfig.useZhLayout = savedZhLayout
+                AppConfig.adaptSpecialStyle = savedAdapt
+                context.putPrefBoolean(PreferKey.textFullJustify, savedJustify)
+                ChapterProvider.clearReviewProviders()
                 ImageProvider.remove(imageFile.absolutePath)
             }
             imageFile.delete()

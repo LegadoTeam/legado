@@ -87,6 +87,11 @@ data class TextLine(
     var isReviewTrailingInsetApplied: Boolean = false,
     var hangingPunctuation: Boolean = false,
     var compressedPunctuation: Boolean = false,
+    var highlightReviewGap: Float? = null,
+    var highlightReviewWidth: Float = 0f,
+    var highlightLeadingSpace: Float = 0f,
+    var highlightTrailingSpace: Float = 0f,
+    var hasHighlightSpacing: Boolean = false,
 ) {
 
     val columns: List<BaseColumn> get() = textColumns
