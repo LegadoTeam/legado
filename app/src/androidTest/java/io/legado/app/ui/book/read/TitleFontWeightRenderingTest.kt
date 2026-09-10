@@ -622,7 +622,7 @@ class TitleFontWeightRenderingTest {
     }
 
     private fun dismissSettings() {
-        onView(withId(R.id.ll_title_font_weight)).inRoot(isDialog()).perform(pressBack())
+        onView(withId(R.id.ll_title_font_weight)).inRoot(isDialog()).perform(scrollTo(), pressBack())
         onView(withId(R.id.tv_tip)).inRoot(isDialog()).perform(pressBack())
     }
 
