@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.core.net.toUri
 import androidx.lifecycle.MutableLiveData
 import com.google.gson.JsonObject
+import com.google.gson.JsonElement
 import io.legado.app.R
 import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppLog
@@ -30,7 +31,22 @@ internal data class HighlightRuleImportItem(
 )
 
 internal fun parseHighlightRuleFile(text: String): List<HighlightRule> {
-    val root = GSONStrict.fromJsonObject<JsonObject>(text).getOrThrow()
+    val parsed = GSONStrict.fromJsonObject<JsonElement>(text).getOrThrow()
+    val root = if (parsed.isJsonArray) {
+        parsed.asJsonArray.forEach { element ->
+            require(element.isJsonObject)
+            val rule = element.asJsonObject
+            require(rule.has("pattern") && rule.has("style") && rule.has("uuid"))
+            require(!rule.has("replacement"))
+        }
+        JsonObject().apply {
+            addProperty("type", HighlightRuleFile.TYPE)
+            add("rules", parsed)
+        }
+    } else {
+        require(parsed.isJsonObject)
+        parsed.asJsonObject
+    }
     val rules = root.get("rules")
     require(rules != null && rules.isJsonArray)
     rules.asJsonArray.forEach { element ->

@@ -17,6 +17,21 @@ import java.io.File
 class HighlightRuleImportTest {
 
     @Test
+    fun `raw backup arrays retain styles and never accept replacement rules`() {
+        val rule = HighlightRule(uuid = UUID_A, name = "raw", pattern = "target",
+            style = "{\"bold\":true}", group = "Group", applyToTitle = true)
+        val imported = parseHighlightRuleFile(GSON.toJson(listOf(rule))).single()
+        assertEquals(GSON.toJson(rule), GSON.toJson(imported))
+        listOf(
+            """[{"pattern":"x","replacement":"y"}]""",
+            """[{"uuid":"$UUID_A","pattern":"x","style":"{}","replacement":"y"}]""",
+            """[{"uuid":"$UUID_A","pattern":"x","style":"{}"},{"pattern":"y"}]""",
+        ).forEach { json ->
+            assertThrows(Exception::class.java) { parseHighlightRuleFile(json) }
+        }
+    }
+
+    @Test
     fun `typed file round trip keeps complete rule configuration`() {
         val source = HighlightRule(
             id = 41,

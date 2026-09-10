@@ -10,6 +10,9 @@ import io.legado.app.constant.AppPattern.bookFileRegex
 import io.legado.app.constant.AppPattern.jsFileRegex
 import io.legado.app.data.entities.Book
 import io.legado.app.model.localBook.LocalBook
+import io.legado.app.help.storage.Restore
+import io.legado.app.help.storage.selectedBackupFileNames
+import io.legado.app.ui.main.bookshelf.importBookshelfJson
 import io.legado.app.utils.*
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.io.File
@@ -19,6 +22,9 @@ class FileAssociationViewModel(application: Application) : BaseAssociationViewMo
     val onLineImportLive = MutableLiveData<Uri>()
     val openBookLiveData = MutableLiveData<Book>()
     val notSupportedLiveData = MutableLiveData<Pair<Uri, String>>()
+    val importingData = MutableLiveData(false)
+    val importedData = MutableLiveData(false)
+    var pendingBookUri: Uri? = null
     private var sharedImportFile: File? = null
     private var initialIntentDispatched = false
 
@@ -32,17 +38,7 @@ class FileAssociationViewModel(application: Application) : BaseAssociationViewMo
         execute {
             //如果是普通的url，需要根据返回的内容判断是什么
             if (uri.isContentScheme() || uri.isFileScheme()) {
-                val fileDoc = FileDoc.fromUri(uri, false)
-                val fileName = fileDoc.name
-                if (fileName.matches(AppPattern.archiveFileRegex)) {
-                    ArchiveUtils.deCompress(fileDoc, ArchiveUtils.TEMP_PATH) {
-                        it.matches(bookFileRegex)
-                    }.forEach {
-                        dispatch(FileDoc.fromFile(it))
-                    }
-                } else {
-                    dispatch(fileDoc)
-                }
+                dispatchFile(FileDoc.fromUri(uri, false))
             } else {
                 onLineImportLive.postValue(uri)
             }
@@ -56,8 +52,10 @@ class FileAssociationViewModel(application: Application) : BaseAssociationViewMo
 
     fun dispatchSharedUri(uri: Uri) {
         execute {
-            require(uri.isContentScheme() && uri.canRead())
-            importJson(uri)
+            require(uri.isContentScheme())
+            // Provider ownership can allow reading without an explicit URI grant.
+            uri.inputStream(context).getOrThrow().use { }
+            dispatchFile(FileDoc.fromUri(uri, false))
         }.onError {
             reportSharedImportError(it)
         }
@@ -87,6 +85,42 @@ class FileAssociationViewModel(application: Application) : BaseAssociationViewMo
 
     fun reportInvalidSharedContent() {
         errorLive.value = context.getString(R.string.wrong_format)
+    }
+
+    private fun dispatchFile(fileDoc: FileDoc) {
+        if (fileDoc.name.matches(AppPattern.archiveFileRegex)) {
+            val backupNames = selectedBackupFileNames { true }.toSet()
+            if (fileDoc.name.endsWith(".zip", true) &&
+                ArchiveUtils.getArchiveFilesName(fileDoc) { it in backupNames }.isNotEmpty()
+            ) {
+                successLive.postValue("backup" to fileDoc.uri.toString())
+            } else {
+                ArchiveUtils.deCompress(fileDoc, ArchiveUtils.TEMP_PATH) {
+                    it.matches(bookFileRegex)
+                }.forEach { dispatch(FileDoc.fromFile(it)) }
+            }
+        } else {
+            dispatch(fileDoc)
+        }
+    }
+
+    fun importData(type: String, source: String) {
+        if (importingData.value == true || importedData.value == true) return
+        importingData.value = true
+        execute {
+            when (type) {
+                "bookshelf" -> importBookshelfJson(Uri.parse(source).readText(context), 0)
+                "backup" -> Restore.restoreOrThrow(context, Uri.parse(source))
+                else -> error("Unsupported import")
+            }
+        }.onSuccess {
+            importedData.value = true
+        }.onError {
+            errorLive.value = it.localizedMessage ?: context.getString(R.string.wrong_format)
+            AppLog.put("导入分享数据失败\n${it.localizedMessage}", it)
+        }.onFinally {
+            importingData.value = false
+        }
     }
 
     private fun dispatch(fileDoc: FileDoc) {
