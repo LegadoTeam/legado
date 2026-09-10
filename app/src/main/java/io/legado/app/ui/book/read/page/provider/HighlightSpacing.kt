@@ -115,7 +115,9 @@ data class HighlightSpacing(val columns: Map<Int, Insets> = emptyMap()) {
                             it.resolvedFillShape == style.resolvedFillShape &&
                             it.resolvedPillPaddingScale == style.resolvedPillPaddingScale } == true &&
                         paragraph[end].textSize == first.textSize) end++
-                    val padding = paragraph.subList(i, end).maxOf { it.padding }
+                    // A physical pixel between the cap and image keeps their antialiased
+                    // coverage disjoint even when measured advances end on fractional pixels.
+                    val padding = paragraph.subList(i, end).maxOf { it.padding } + 1f
                     var distance = 0f
                     for (left in i - 1 downTo 0) {
                         val cell = paragraph[left]

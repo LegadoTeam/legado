@@ -425,7 +425,8 @@ object ReadBook : CoroutineScope by MainScope() {
     private fun highlightLayoutState() = listOf(
         ReadBookConfig.config.copy(), ReadBookConfig.useZhLayout,
         ReadBookConfig.textFullJustify, ReadBookConfig.hangingPunctuation,
-        ReadBookConfig.punctuationCompress, AppConfig.adaptSpecialStyle, book?.getPageAnim(),
+        ReadBookConfig.punctuationCompress, AppConfig.adaptSpecialStyle,
+        book?.getPageAnim(), book?.getImageStyle(),
         listOf(ChapterProvider.titlePaint, ChapterProvider.titleNumberPaint,
             ChapterProvider.contentPaint).map {
             listOf(it, it.textSize, it.textScaleX, it.textSkewX, it.letterSpacing,
@@ -440,17 +441,24 @@ object ReadBook : CoroutineScope by MainScope() {
         ChapterProvider.titleBottomSpacing, ChapterProvider.indentCharWidth,
     )
 
-    fun upHighlightSpacing(chapter: TextChapter, ranges: List<HighlightMatcher.Range>) {
-        val currentBook = book ?: return
+    /** Whether styles can be applied to the currently visible, coherent layout. */
+    fun upHighlightSpacing(chapter: TextChapter, ranges: List<HighlightMatcher.Range>): Boolean {
+        val currentBook = book ?: return true
         if (!chapter.isCompleted || chapter.isTransient || !chapter.isForBook(currentBook) ||
-            !isActiveTextChapter(chapter) || chapter.highlightSpacingJob?.isActive == true ||
-            chapter.highlightRuleMatchesJob?.isActive == true
-        ) return
+            !isActiveTextChapter(chapter)
+        ) return true
+        if (chapter.highlightSpacingJob?.isActive == true ||
+            (chapter.highlightRuleMatchesJob?.isActive == true &&
+                chapter.highlightRuleMatchesVersion != highlightRulesVersion)
+        ) return false
         if (chapter.highlightSpacing.columns.isEmpty() && ranges.none {
                 it.style.fill != 0 && it.style.resolvedFillShape == HighlightStyle.FillShape.PILL
-            }) return
+            }) return true
         // Always measure from the original advances; measuring the replacement compounds padding.
         val base = chapter.highlightSpacingBase ?: chapter
+        // Completed lines receive review columns on Main. Snapshot their advances here.
+        val spacing = HighlightSpacing.resolve(base, ranges)
+        if (spacing == chapter.highlightSpacing) return true
         val manualVersion = highlightsVersion
         val ruleVersion = highlightRulesVersion
         val bookUrl = currentBook.bookUrl
@@ -467,12 +475,7 @@ object ReadBook : CoroutineScope by MainScope() {
         job = launch(start = CoroutineStart.LAZY) {
             var retry = false
             try {
-                // Completed lines still receive review columns on Main; snapshot their advances
-                // here, then let TextChapterLayout do the full replacement layout on IO.
-                val spacing = HighlightSpacing.resolve(base, ranges)
-                if (!isCurrent() || layoutState != highlightLayoutState() ||
-                    spacing == chapter.highlightSpacing
-                ) return@launch
+                if (!isCurrent() || layoutState != highlightLayoutState()) return@launch
                 chapter.highlightSpacingRequest = spacing
                 val replacement = if (spacing.columns.isEmpty()) base else coroutineScope {
                     val result = base.layoutWithHighlightSpacing(this, spacing)
@@ -484,9 +487,15 @@ object ReadBook : CoroutineScope by MainScope() {
                     result
                 } ?: return@launch
                 val sameText = withContext(Default) { chapterText(base) == chapterText(replacement) }
-                if (!isCurrent() || layoutState != highlightLayoutState() || !sameText ||
-                    !replacement.isCompleted || base.layoutTitleLength != replacement.layoutTitleLength
-                ) return@launch
+                if (!isCurrent()) return@launch
+                if (layoutState != highlightLayoutState()) {
+                    retry = true
+                    return@launch
+                }
+                check(sameText && base.layoutTitleLength == replacement.layoutTitleLength) {
+                    "Highlight spacing changed canonical chapter text"
+                }
+                if (!replacement.isCompleted) return@launch
                 // Review counts can arrive while layout runs without changing highlight versions.
                 if (HighlightSpacing.resolve(base, ranges) != spacing) {
                     retry = true
@@ -518,6 +527,7 @@ object ReadBook : CoroutineScope by MainScope() {
         }
         chapter.highlightSpacingJob = job
         job.start()
+        return false
     }
 
     fun highlightsOfChapter(

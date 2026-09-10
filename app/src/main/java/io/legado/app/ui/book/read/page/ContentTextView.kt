@@ -852,7 +852,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
             }
             val pageEnd = pageBase + pageLength
             val chapterRanges = ReadBook.highlightRangesOfChapter(chapter)
-            ReadBook.upHighlightSpacing(chapter, chapterRanges)
+            if (!ReadBook.upHighlightSpacing(chapter, chapterRanges)) continue
             val ranges = chapterRanges.filter { it.start < pageEnd && it.end > pageBase }
             val lineSpecs = page.lines.map { line ->
                 HighlightMatcher.LineSpec(
