@@ -19,6 +19,7 @@ import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isPlatformPopup
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -46,7 +47,6 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.hamcrest.Matchers.instanceOf
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
@@ -151,7 +151,7 @@ class BookSourceCheckUiTest {
         }
         openActionBarOverflowOrOptionsMenu(context)
         onView(withId(R.id.recycler_view)).inRoot(isPlatformPopup()).perform(object : ViewAction {
-            override fun getConstraints() = instanceOf(RecyclerView::class.java)
+            override fun getConstraints() = isAssignableFrom(RecyclerView::class.java)
             override fun getDescription() = "Scroll the overflow menu to its final settings"
             override fun perform(uiController: UiController, view: View) {
                 val recycler = view as RecyclerView
