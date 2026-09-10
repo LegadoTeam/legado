@@ -24,7 +24,7 @@ class ManualReplaceRuleContractTest {
     @Test
     fun `manual mode keeps candidate and reader contracts separated from global rules`() {
         val dao = source("app/src/main/java/io/legado/app/data/dao/ReplaceRuleDao.kt")
-        assertTrue(dao.contains("WHERE scopeTitle = 1 OR scopeContent = 1"))
+        assertTrue(dao.contains("NOT (scopeSource = 1 AND scopeTitle = 0 AND scopeContent = 0)"))
         assertTrue(dao.contains("ORDER BY sortOrder ASC"))
 
         val processor = source("app/src/main/java/io/legado/app/help/book/ContentProcessor.kt")

@@ -737,10 +737,6 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     val replaceEnableDefault get() = appCtx.getPrefBoolean(PreferKey.replaceEnableDefault, true)
 
-    var manualSourceReplaceRule: Boolean
-        get() = appCtx.getPrefBoolean(PreferKey.manualSourceReplaceRule, false)
-        set(value) = appCtx.putPrefBoolean(PreferKey.manualSourceReplaceRule, value)
-
     var manualReplaceRule: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.manualReplaceRule, false)
         set(value) = appCtx.putPrefBoolean(PreferKey.manualReplaceRule, value)

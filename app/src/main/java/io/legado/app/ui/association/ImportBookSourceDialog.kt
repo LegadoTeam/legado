@@ -244,7 +244,7 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
             findItem(R.id.menu_remember_source_group)
                 ?.isChecked = AppConfig.importRememberGroup
             findItem(R.id.menu_replace_source)
-                ?.isChecked = viewModel.useSourceReplacement
+                ?.isChecked = viewModel.automaticSourceReplacement
         }
         updateGroupMenu()
     }
@@ -359,15 +359,13 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
         binding.toolBar.menu.findItem(R.id.menu_effective_replaces).isEnabled = importEnabled
         binding.toolBar.menu.findItem(R.id.menu_replace_rule).isEnabled = importEnabled
         binding.toolBar.menu.findItem(R.id.menu_manual_replace_rule).apply {
-            isVisible = AppConfig.manualSourceReplaceRule
-            isEnabled = importEnabled
+            isEnabled = importEnabled && !viewModel.automaticSourceReplacement
         }
-        binding.toolBar.menu.findItem(R.id.menu_replace_source).isVisible = !AppConfig.manualSourceReplaceRule
         binding.toolBar.menu.apply {
             findItem(R.id.menu_select_new_source)?.isEnabled = importEnabled
             findItem(R.id.menu_select_update_source)?.isEnabled = importEnabled
             findItem(R.id.menu_replace_source)?.apply {
-                isChecked = viewModel.useSourceReplacement
+                isChecked = viewModel.automaticSourceReplacement
                 isEnabled = importEnabled
             }
         }
@@ -396,7 +394,7 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
     private fun showSourceReplacements(manual: Boolean, index: Int = -1) {
         if (!isAdded || childFragmentManager.isStateSaved || viewModel.sourceUpdatePending.value == true) return
         if (manual) {
-            if (!AppConfig.manualSourceReplaceRule) return
+            if (viewModel.automaticSourceReplacement) return
             showDialogFragment(ManualReplaceRulesDialog(viewModel.selectedManualRuleIds(index), index.toString()))
         } else {
             showDialogFragment(EffectiveReplacesDialog(viewModel.effectiveRuleIds(index)))
@@ -471,6 +469,8 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
 
     override fun isReplaceRuleRefreshPending(): Boolean =
         pendingReplacementRefresh != null || viewModel.sourceUpdatePending.value == true
+
+    override fun isManualSourceReplacementEnabled(): Boolean = !viewModel.automaticSourceReplacement
 
     override fun getCodeAlternate(requestId: String?): String? {
         val index = requestId?.toIntOrNull() ?: return null

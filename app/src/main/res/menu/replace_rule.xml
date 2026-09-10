@@ -62,6 +62,7 @@
 
     <item
         android:id="@+id/menu_manual_replace_rule"
+        android:checkable="true"
         android:icon="@drawable/ic_find_replace"
         android:title="@string/manual_replace_rule"
         app:showAsAction="never" />

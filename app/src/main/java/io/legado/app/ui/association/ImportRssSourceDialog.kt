@@ -234,7 +234,7 @@ class ImportRssSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_view
             findItem(R.id.menu_remember_source_group)
                 ?.isChecked = AppConfig.importRememberGroup
             findItem(R.id.menu_replace_source)
-                ?.isChecked = viewModel.useSourceReplacement
+                ?.isChecked = viewModel.automaticSourceReplacement
             findItem(R.id.menu_select_new_source)?.isVisible = false // 暂不支持
             findItem(R.id.menu_select_update_source)?.isVisible = false // 暂不支持
         }
@@ -351,7 +351,7 @@ class ImportRssSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_view
     private fun showSourceReplacements(manual: Boolean, index: Int = -1) {
         if (!isAdded || childFragmentManager.isStateSaved || viewModel.sourceUpdatePending.value == true) return
         if (manual) {
-            if (!AppConfig.manualSourceReplaceRule) return
+            if (viewModel.automaticSourceReplacement) return
             showDialogFragment(ManualReplaceRulesDialog(viewModel.selectedManualRuleIds(index), index.toString()))
         } else {
             showDialogFragment(EffectiveReplacesDialog(viewModel.effectiveRuleIds(index)))
@@ -432,18 +432,18 @@ class ImportRssSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_view
         binding.toolBar.menu.findItem(R.id.menu_effective_replaces).isEnabled = importEnabled
         binding.toolBar.menu.findItem(R.id.menu_replace_rule).isEnabled = importEnabled
         binding.toolBar.menu.findItem(R.id.menu_manual_replace_rule).apply {
-            isVisible = AppConfig.manualSourceReplaceRule
-            isEnabled = importEnabled
+            isEnabled = importEnabled && !viewModel.automaticSourceReplacement
         }
-        binding.toolBar.menu.findItem(R.id.menu_replace_source).isVisible = !AppConfig.manualSourceReplaceRule
         binding.toolBar.menu.findItem(R.id.menu_replace_source)?.apply {
-            isChecked = viewModel.useSourceReplacement
+            isChecked = viewModel.automaticSourceReplacement
             isEnabled = importEnabled
         }
     }
 
     override fun isReplaceRuleRefreshPending(): Boolean =
         pendingReplacementRefresh != null || viewModel.sourceUpdatePending.value == true
+
+    override fun isManualSourceReplacementEnabled(): Boolean = !viewModel.automaticSourceReplacement
 
     override fun getCodeAlternate(requestId: String?): String? {
         val index = requestId?.toIntOrNull() ?: return null

@@ -189,11 +189,11 @@ class ImportBookSourceStateTest {
         val viewModel = readProjectFile(
             "src/main/java/io/legado/app/ui/association/ImportBookSourceViewModel.kt"
         )
-        val setReplacement = viewModel.substringAfter("fun setUseSourceReplacement")
-            .substringBefore("private suspend fun importSourceUrl")
-        assertTrue(setReplacement.contains("automaticSourceReplacement = previousMode"))
-        assertTrue(setReplacement.contains("AppConfig.importReplaceSource = previousMode"))
-        assertTrue(setReplacement.contains("applyCandidateSources()"))
+        val refreshReplacement = viewModel.substringAfter("fun refreshSourceReplacements")
+            .substringBefore("private fun selectedRules")
+        assertTrue(refreshReplacement.contains("automaticSourceReplacement = previousMode"))
+        assertTrue(refreshReplacement.contains("AppConfig.importReplaceSource = automatic"))
+        assertTrue(refreshReplacement.contains("applyCandidateSources()"))
         val setSelection = viewModel.substringAfter("fun setSelection")
             .substringBefore("fun updateSource")
         assertTrue(

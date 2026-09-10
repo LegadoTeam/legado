@@ -140,7 +140,6 @@ object PreferKey {
     const val readRecordCoverDark = "readRecordCoverDark"
     const val replaceEnableDefault = "replaceEnableDefault"
     const val manualReplaceRule = "manualReplaceRule"
-    const val manualSourceReplaceRule = "manualSourceReplaceRule"
     const val showBrightnessView = "showBrightnessView"
     const val autoClearExpired = "autoClearExpired"
     const val autoChangeSource = "autoChangeSource"

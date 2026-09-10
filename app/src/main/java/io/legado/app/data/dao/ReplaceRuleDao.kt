@@ -93,7 +93,7 @@ interface ReplaceRuleDao {
 
     @Query(
         "SELECT * FROM replace_rules " +
-            "WHERE scopeTitle = 1 OR scopeContent = 1 " +
+            "WHERE NOT (scopeSource = 1 AND scopeTitle = 0 AND scopeContent = 0) " +
             "ORDER BY sortOrder ASC"
     )
     fun findManualCandidates(): List<ReplaceRule>

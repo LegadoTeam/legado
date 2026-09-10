@@ -46,7 +46,6 @@ import io.legado.app.ui.book.read.EffectiveReplacesDialog
 import io.legado.app.ui.book.read.ManualReplaceRulesDialog
 import io.legado.app.ui.replace.ReplaceRuleActivity
 import io.legado.app.ui.code.CodeEditActivity
-import io.legado.app.ui.widget.PopupAction
 import io.legado.app.ui.widget.dialog.CodeDialog
 import io.legado.app.utils.GSON
 import io.legado.app.utils.defaultSharedPreferences
@@ -67,7 +66,7 @@ class SourceManualReplacementUiTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
     private val prefs = context.defaultSharedPreferences
-    private val keys = listOf(PreferKey.manualReplaceRule, PreferKey.manualSourceReplaceRule,
+    private val keys = listOf(PreferKey.manualReplaceRule,
         PreferKey.importReplaceSource, PreferKey.autoBackup, PreferKey.importRememberGroup)
     private val savedPrefs = keys.associateWith { prefs.all[it] }
     private val savedRules = appDb.replaceRuleDao.all
@@ -92,7 +91,7 @@ class SourceManualReplacementUiTest {
     )
 
     @Before fun setup() {
-        prefs.edit().remove(PreferKey.manualReplaceRule).remove(PreferKey.manualSourceReplaceRule)
+        prefs.edit().remove(PreferKey.manualReplaceRule)
             .putBoolean(PreferKey.importReplaceSource, true).putBoolean(PreferKey.autoBackup, false)
             .putBoolean(PreferKey.importRememberGroup, false).commit()
         savedRules.forEach { appDb.replaceRuleDao.insert(it.copy(isEnabled = false)) }
@@ -118,7 +117,6 @@ class SourceManualReplacementUiTest {
     @Test fun rssManualAndEffectiveMenusUseRawCandidates() = manualFlow(true)
 
     @Test fun replacementMenusResumeAfterRecreationOrBackgroundWhileComparisonIsPending() {
-        AppConfig.manualSourceReplaceRule = true
         AppConfig.importReplaceSource = false
         for (rss in listOf(false, true)) for (manual in listOf(false, true)) for (recreate in listOf(false, true)) {
             withImport(rss) { host ->
@@ -172,7 +170,10 @@ class SourceManualReplacementUiTest {
         }
     }
 
-    private fun withBlockedSourceRules(action: (java.util.concurrent.CountDownLatch, java.util.concurrent.CountDownLatch) -> Unit) {
+    private fun withBlockedSourceRules(
+        fail: Boolean = false,
+        action: (java.util.concurrent.CountDownLatch, java.util.concurrent.CountDownLatch) -> Unit,
+    ) {
         val delegate = appDb.replaceRuleDao
         val field = appDb.javaClass.declaredFields.single { it.name.contains("replaceRuleDao", ignoreCase = true) }
         field.isAccessible = true
@@ -186,6 +187,7 @@ class SourceManualReplacementUiTest {
             if (method.name == "findEnabledBySourceScope") {
                 entered.countDown()
                 check(release.await(30, java.util.concurrent.TimeUnit.SECONDS)) { "Source-rule comparison was not released" }
+                check(!fail) { "Injected source-rule read failure" }
             }
             try { method.invoke(delegate, *(args ?: emptyArray())) }
             catch (error: java.lang.reflect.InvocationTargetException) { throw error.targetException }
@@ -201,7 +203,6 @@ class SourceManualReplacementUiTest {
     }
 
     private fun manualFlow(rss: Boolean) {
-        AppConfig.manualSourceReplaceRule = true
         AppConfig.importReplaceSource = false
         withImport(rss) { host ->
             host.names("Seed0", "Seed1")
@@ -300,25 +301,97 @@ class SourceManualReplacementUiTest {
         }
     }
 
-    @Test fun independentFlagsPreserveLegacyValueAndBackup() = runBlocking {
+    @Test fun automaticSourceOptionControlsManualMenus() {
+        for (rss in listOf(false, true)) withImport(rss) { host ->
+            host.names("Seed++0", "Seed+1")
+            host.manualEnabled(false)
+            var code = host.open(0)
+            host.manualEnabled(false, code)
+            main { code.dismiss() }
+            host.ready()
+            host.menu(R.id.menu_replace_source)
+            host.ready()
+            host.names("Seed0", "Seed1")
+            host.manualEnabled(true)
+            code = host.open(0)
+            host.manualEnabled(true, code)
+            main { code.dismiss() }
+            host.ready()
+
+            host.menu(R.id.menu_manual_replace_rule)
+            val manual = host.child<ManualReplaceRulesDialog>()
+            clickRule(manual, 0)
+            main { manual.requireView().findViewById<View>(R.id.tv_ok).performClick() }
+            host.ready()
+            host.names("Seed+0", "Seed+1")
+            assertFalse(AppConfig.importReplaceSource)
+            host.menu(R.id.menu_effective_replaces)
+            val effective = host.child<EffectiveReplacesDialog>()
+            main { assertEquals(listOf(rules[0].id), ruleIds(effective)); effective.dismiss() }
+            host.ready()
+
+            // Switching modes rebuilds from the raw source and retains the manual selection.
+            host.menu(R.id.menu_replace_source)
+            host.ready()
+            host.names("Seed++0", "Seed+1")
+            host.manualEnabled(false)
+            code = host.open(0)
+            host.manualEnabled(false, code)
+            main { code.dismiss() }
+            host.ready()
+            host.menu(R.id.menu_replace_source)
+            host.ready()
+            host.names("Seed+0", "Seed+1")
+            host.manualEnabled(true)
+            assertFalse(AppConfig.manualReplaceRule)
+            main { host.view<View>(R.id.tv_cancel).performClick() }
+            AppConfig.importReplaceSource = true
+        }
+    }
+
+    @Test fun failedModeSwitchKeepsManualResultAndPreferences() {
+        AppConfig.importReplaceSource = false
+        for (rss in listOf(false, true)) withImport(rss) { host ->
+            host.menu(R.id.menu_manual_replace_rule)
+            val manual = host.child<ManualReplaceRulesDialog>()
+            clickRule(manual, 0)
+            main { manual.requireView().findViewById<View>(R.id.tv_ok).performClick() }
+            host.ready()
+            host.names("Seed+0", "Seed+1")
+            withBlockedSourceRules(fail = true) { entered, release ->
+                host.menu(R.id.menu_replace_source)
+                assertTrue(entered.await(15, java.util.concurrent.TimeUnit.SECONDS))
+                release.countDown()
+                host.ready()
+                host.names("Seed+0", "Seed+1")
+                assertFalse(AppConfig.importReplaceSource)
+                host.manualEnabled(true)
+            }
+            host.menu(R.id.menu_replace_source)
+            host.ready()
+            host.names("Seed++0", "Seed+1")
+            main { host.view<View>(R.id.tv_cancel).performClick() }
+            AppConfig.importReplaceSource = false
+        }
+    }
+
+    @Test fun legacyManualFlagAndBackupRemainUnchanged() = runBlocking {
         assertFalse(AppConfig.manualReplaceRule)
-        assertFalse(AppConfig.manualSourceReplaceRule)
         prefs.edit().putBoolean(PreferKey.manualReplaceRule, true).commit()
         ActivityScenario.launch(ReplaceRuleActivity::class.java).use { scenario ->
             assertTrue(AppConfig.manualReplaceRule)
-            assertFalse(AppConfig.manualSourceReplaceRule)
+            openActionBarOverflowOrOptionsMenu(context)
+            scenario.onActivity {
+                val item = it.findViewById<Toolbar>(R.id.toolbar).menu.findItem(R.id.menu_manual_replace_rule)
+                assertTrue(item.isCheckable)
+                assertTrue(item.isChecked)
+                assertFalse(item.hasSubMenu())
+            }
+            screenshot("source-manual-legacy-switch")
+            onView(withText(R.string.manual_replace_rule)).inRoot(isPlatformPopup()).perform(click())
+            assertFalse(AppConfig.manualReplaceRule)
             openActionBarOverflowOrOptionsMenu(context)
             onView(withText(R.string.manual_replace_rule)).inRoot(isPlatformPopup()).perform(click())
-            onView(withId(R.id.recycler_view)).inRoot(isPlatformPopup()).check { view, error ->
-                if (error != null) throw error
-                val items = ((view as RecyclerView).adapter as PopupAction.Adapter).getItems()
-                assertEquals(listOf(PreferKey.manualReplaceRule, PreferKey.manualSourceReplaceRule), items.map { it.value })
-                assertEquals(listOf(true, false), items.map { it.checked })
-                assertTrue(items.all { it.checkable && it.icon == null })
-            }
-            screenshot("source-manual-two-switches")
-            onView(withText(R.string.manual_source_replacement)).inRoot(isPlatformPopup()).perform(click())
-            assertTrue(AppConfig.manualSourceReplaceRule)
             assertTrue(AppConfig.manualReplaceRule)
         }
         BackupConfig.contentKeys.forEach { BackupConfig.ignoreConfig[it] = it != BackupConfig.settingContentKey }
@@ -326,26 +399,24 @@ class SourceManualReplacementUiTest {
         ZipFile(archive).use { zip ->
             val xml = zip.getInputStream(checkNotNull(zip.getEntry("config.xml"))).bufferedReader().use { it.readText() }
             assertTrue(xml.contains("name=\"manualReplaceRule\" value=\"true\""))
-            assertTrue(xml.contains("name=\"manualSourceReplaceRule\" value=\"true\""))
         }
         AppConfig.manualReplaceRule = false
-        AppConfig.manualSourceReplaceRule = false
         Restore.restoreOrThrow(context, archive.toUri(), lanTransfer = true)
         assertTrue(AppConfig.manualReplaceRule)
-        assertTrue(AppConfig.manualSourceReplaceRule)
-        for (readerManual in listOf(false, true)) for (sourceManual in listOf(false, true)) {
+        for (readerManual in listOf(false, true)) for (sourceAutomatic in listOf(false, true)) {
             AppConfig.manualReplaceRule = readerManual
-            AppConfig.manualSourceReplaceRule = sourceManual
+            AppConfig.importReplaceSource = sourceAutomatic
             val book = Book(bookUrl = "https://reader-$id.invalid", name = "Reader $id", origin = "Origin $id")
             book.setUseReplaceRule(true)
             val chapter = BookChapter(bookUrl = book.bookUrl, url = "chapter", title = "Seed title")
             val processed = ReadBook.processChapterContent(book, chapter, "Seed body")
             assertEquals(if (readerManual) "Seed title" else "Seed+ title", processed.first)
             val text = processed.second.toString()
-            assertEquals("Reader flag is independent of source flag", !readerManual, text.contains("Body+"))
+            assertEquals("Source import mode must not change reader behavior", !readerManual, text.contains("Body+"))
             assertEquals(readerManual, text.contains("Seed body"))
             for (rss in listOf(false, true)) withImport(rss) { host ->
-                if (sourceManual) host.names("Seed0", "Seed1") else host.names("Seed++0", "Seed+1")
+                if (sourceAutomatic) host.names("Seed++0", "Seed+1") else host.names("Seed0", "Seed1")
+                host.manualEnabled(!sourceAutomatic)
                 main { host.view<View>(R.id.tv_cancel).performClick() }
             }
         }
@@ -417,6 +488,17 @@ class SourceManualReplacementUiTest {
                 override fun describeTo(description: Description) { description.appendText("menu $id") }
                 override fun matchesSafely(item: Any) = item is MenuItem && item.itemId == id
             }).inRoot(isPlatformPopup()).perform(click())
+        }
+        fun manualEnabled(enabled: Boolean, dialog: DialogFragment = parent) = main {
+            val toolbar = dialog.requireView().findViewById<Toolbar>(R.id.tool_bar)
+            val item = toolbar.menu.findItem(R.id.menu_manual_replace_rule)
+            assertTrue("Manual source replacement remains visible", item.isVisible)
+            assertEquals(enabled, item.isEnabled)
+            if (dialog == parent) {
+                val automatic = toolbar.menu.findItem(R.id.menu_replace_source)
+                assertTrue(automatic.isVisible)
+                assertEquals(!enabled, automatic.isChecked)
+            }
         }
         fun open(index: Int): CodeDialog {
             await("Source row missing") { main { view<RecyclerView>(R.id.recycler_view).let {

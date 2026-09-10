@@ -15,7 +15,6 @@ import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.databinding.DialogCodeViewBinding
 import io.legado.app.help.IntentData
-import io.legado.app.help.config.AppConfig
 import io.legado.app.help.findTextRanges
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.code.CodeEditActivity
@@ -225,7 +224,7 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
         binding.toolBar.menu.findItem(R.id.menu_replace_rule).isVisible =
             arguments?.getBoolean("showReplaceRules") == true
         binding.toolBar.menu.findItem(R.id.menu_effective_replaces).isVisible = sourcePreview
-        binding.toolBar.menu.findItem(R.id.menu_manual_replace_rule).isVisible = sourcePreview && AppConfig.manualSourceReplaceRule
+        binding.toolBar.menu.findItem(R.id.menu_manual_replace_rule).isVisible = sourcePreview
         binding.toolBar.menu.findItem(R.id.menu_fullscreen_edit).isVisible = canSave
         searchView = binding.toolBar.menu.findItem(R.id.menu_search).actionView as SearchView
         val navigationWidth = 96.dpToPx()
@@ -275,7 +274,8 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
                 R.id.menu_effective_replaces -> if (!replaceRuleRefreshPending) {
                     callback()?.onShowSourceReplacements(currentOriginalCode(), requestId, false)
                 }
-                R.id.menu_manual_replace_rule -> if (!replaceRuleRefreshPending) {
+                R.id.menu_manual_replace_rule -> if (!replaceRuleRefreshPending &&
+                    callback()?.isManualSourceReplacementEnabled() == true) {
                     callback()?.onShowSourceReplacements(currentOriginalCode(), requestId, true)
                 }
                 R.id.menu_fullscreen_edit -> openEditor()
@@ -321,8 +321,8 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
         binding.toolBar.menu.findItem(R.id.menu_save).isEnabled = !pending
         binding.toolBar.menu.findItem(R.id.menu_effective_replaces).isEnabled = !pending
         binding.toolBar.menu.findItem(R.id.menu_manual_replace_rule).apply {
-            isEnabled = !pending
-            isVisible = sourcePreview && AppConfig.manualSourceReplaceRule
+            isEnabled = !pending && callback()?.isManualSourceReplacementEnabled() == true
+            isVisible = sourcePreview
         }
         binding.cbSourceReplacementPreview.isEnabled = !pending
         binding.codeView.keyListener = if (pending || showingAlternate) null else editKeyListener
@@ -481,6 +481,8 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
         fun onOpenReplaceRules() = Unit
 
         fun onShowSourceReplacements(code: String, requestId: String?, manual: Boolean) = Unit
+
+        fun isManualSourceReplacementEnabled(): Boolean = false
 
         fun getCodeAlternate(requestId: String?): String? = null
 
