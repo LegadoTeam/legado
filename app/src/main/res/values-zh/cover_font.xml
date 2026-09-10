@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="cover_font_config">封面字号</string>
+    <string name="cover_font_config">默认书名样式设置</string>
+    <string name="cover_font_select">书名字体设置</string>
+    <string name="cover_preview_short">短书名封面预览：开源阅读，作者开源阅读LegadoTeam</string>
+    <string name="cover_preview_long">长书名封面预览：开源阅读可以看小说、看漫画、听书，作者开源阅读</string>
     <string name="cover_custom_font_size">自定义字号</string>
-    <string name="cover_custom_font_size_summary">按默认字号的百分比调整。小字号用于较长文字或后续行列；关闭后恢复原有封面样式。</string>
+    <string name="cover_custom_font_size_summary">大、小字号使用同一标准，相同数值显示为相同大小，100% 为标准大字号。小字号用于较长文字或后续行列；关闭后恢复原有封面样式。</string>
     <string name="cover_title_large_size">书名大字号</string>
     <string name="cover_title_small_size">书名小字号</string>
     <string name="cover_author_large_size">作者大字号</string>

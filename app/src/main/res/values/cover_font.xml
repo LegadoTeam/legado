@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="cover_font_config">Cover font sizes</string>
+    <string name="cover_font_config">Default title style</string>
+    <string name="cover_font_select">Cover title font</string>
+    <string name="cover_preview_short">Short title cover preview: 开源阅读, by 开源阅读LegadoTeam</string>
+    <string name="cover_preview_long">Long title cover preview: 开源阅读可以看小说、看漫画、听书, by 开源阅读</string>
     <string name="cover_custom_font_size">Customize font sizes</string>
-    <string name="cover_custom_font_size_summary">Percentages of the default sizes. Small sizes are used for longer text or later rows and columns. Turn off to restore the original cover style.</string>
+    <string name="cover_custom_font_size_summary">Large and small sizes share one scale: equal numbers give equal text sizes. 100% uses the standard large size. Small sizes apply to longer text or later rows and columns. Turn off to restore the original cover style.</string>
     <string name="cover_title_large_size">Title large size</string>
     <string name="cover_title_small_size">Title small size</string>
     <string name="cover_author_large_size">Author large size</string>
