@@ -53,6 +53,11 @@ class FileAssociationActivity :
         viewModel.localBookDestination.observe(this) { requested ->
             if (requested) chooseBookDirectory()
         }
+        viewModel.importingLocalBooks.observe(this) { importing ->
+            if (viewModel.localBookBatch.value.isNullOrEmpty()) {
+                if (importing) binding.rotateLoading.visible() else binding.rotateLoading.gone()
+            }
+        }
         viewModel.importedLocalBooks.observe(this) { if (it) finish() }
         viewModel.onLineImportLive.observe(this) {
             binding.rotateLoading.gone()
