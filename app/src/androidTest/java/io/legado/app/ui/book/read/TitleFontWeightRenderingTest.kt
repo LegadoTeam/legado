@@ -8,13 +8,18 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.os.Build
 import android.os.SystemClock
+import android.text.Spanned
+import android.text.style.TtsSpan
 import android.view.View
 import android.view.ViewGroup
+import android.widget.TextView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.pressBack
 import androidx.test.espresso.action.ViewActions.scrollTo
+import androidx.test.espresso.action.ViewActions.replaceText
+import androidx.test.espresso.action.ViewActions.closeSoftKeyboard
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.isCompletelyDisplayed
@@ -38,6 +43,8 @@ import io.legado.app.help.HighlightStyle
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
+import io.legado.app.help.config.ReadTipConfig
+import io.legado.app.help.config.ReaderInfoTemplate
 import io.legado.app.help.config.parseReadConfigObject
 import io.legado.app.model.ReadBook
 import io.legado.app.model.ImageProvider
@@ -47,6 +54,7 @@ import io.legado.app.ui.book.read.config.ReadStyleDialog
 import io.legado.app.ui.book.read.page.ContentTextView
 import io.legado.app.ui.book.read.page.HighlightDraw
 import io.legado.app.ui.book.read.page.ReadView
+import io.legado.app.ui.book.read.page.BatteryLevelSpan
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.ui.book.read.page.entities.column.TextBaseColumn
@@ -1008,6 +1016,80 @@ class TitleFontWeightRenderingTest {
     }
 
     @Test
+    fun numberedBatteryCanBeChosenRenderedUpdatedAndRestored() {
+        ReadTipConfig.headerMode = 1
+        ReadTipConfig.tipHeaderLeftTemplate = ""
+        ReadTipConfig.tipHeaderMiddleTemplate = ReaderInfoTemplate.BATTERY_ICON
+        ReadTipConfig.tipHeaderRightTemplate = ReaderInfoTemplate.BATTERY
+        launchReader()
+        scenario!!.onActivity { ReadStyleDialog().showNow(it.supportFragmentManager, "battery-style") }
+        onView(withId(R.id.tv_tip)).inRoot(isDialog()).perform(scrollTo(), click())
+        onView(withId(R.id.ll_header_left)).inRoot(isDialog()).perform(scrollTo(), click())
+        onView(withId(R.id.edit_template)).inRoot(isDialog()).perform(replaceText(""), closeSoftKeyboard())
+        onView(withText(ReaderInfoTemplate.BATTERY_NUMBER_ICON)).inRoot(isDialog()).perform(scrollTo(), click())
+        onView(withId(R.id.edit_template)).inRoot(isDialog())
+            .check(matches(withText(ReaderInfoTemplate.BATTERY_NUMBER_ICON)))
+        screenshot("battery-number-template-choice")
+        onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+        dismissSettings()
+        awaitReader { it.bottomDialog == 0 && ReadTipConfig.tipHeaderLeftTemplate == ReaderInfoTemplate.BATTERY_NUMBER_ICON }
+        scenario!!.onActivity { activity ->
+            val readView = activity.findViewById<ReadView>(R.id.read_view)
+            val imageDir = context.getExternalFilesDir("ui-regression")
+            // Check the legacy icon on real Android Paint, independent of helper signatures.
+            val ordinarySpan = BatteryLevelSpan(50)
+            val legacyPaint = Paint().apply { textSize = 20f }
+            val defaultWidth = ordinarySpan.getSize(legacyPaint, "", 0, 0, null)
+            legacyPaint.typeface = Typeface.MONOSPACE
+            assertEquals(defaultWidth, ordinarySpan.getSize(legacyPaint, "", 0, 0, null))
+            legacyPaint.textSize = 40f
+            assertTrue(ordinarySpan.getSize(legacyPaint, "", 0, 0, null) > defaultWidth)
+            val widths = mutableListOf<Int>()
+            var previous: IntArray? = null
+            for (level in listOf(0, 7, 85, 100)) {
+                readView.upBattery(level)
+                val view = readView.curPage.findViewById<TextView>(R.id.tv_header_left)
+                val text = view.text as Spanned
+                val span = text.getSpans(0, text.length, BatteryLevelSpan::class.java).single()
+                assertEquals(BatteryLevelSpan(level, true), span)
+                assertEquals("$level%", text.getSpans(0, text.length, TtsSpan::class.java)
+                    .single().args.getString(TtsSpan.ARG_TEXT))
+                val ordinary = readView.curPage.findViewById<TextView>(R.id.tv_header_middle).text as Spanned
+                assertEquals(BatteryLevelSpan(level), ordinary.getSpans(0, ordinary.length, BatteryLevelSpan::class.java).single())
+                assertEquals("$level%", readView.curPage.findViewById<TextView>(R.id.tv_header_right).text.toString())
+                val paint = Paint(view.paint).apply { color = Color.BLACK }
+                val fm = Paint.FontMetricsInt()
+                val width = span.getSize(paint, text, 0, text.length, fm)
+                widths.add(width)
+                val bitmap = Bitmap.createBitmap(width + 4, fm.bottom - fm.top + 4, Bitmap.Config.ARGB_8888)
+                val pixels = IntArray(bitmap.width * bitmap.height)
+                try {
+                    span.draw(Canvas(bitmap), text, 0, text.length, 2f, 0, 2 - fm.top, bitmap.height, paint)
+                    bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+                    assertTrue("Even zero battery must draw its outline and readable number", pixels.count { Color.alpha(it) > 100 } > 8)
+                    previous?.let { assertFalse("Live battery values must change actual pixels", it.contentEquals(pixels)) }
+                    File(imageDir, "battery-number-$level.png").outputStream().use {
+                        assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+                    }
+                } finally { bitmap.recycle() }
+                previous = pixels
+            }
+            assertEquals("Changing digit count must not move neighbouring reader information", 1, widths.distinct().size)
+        }
+        screenshot("battery-number-reader")
+        ReadBookConfig.saveNow()
+        scenario!!.recreate()
+        awaitReader { !it.findViewById<ReadView>(R.id.read_view).curPage.textPage.isMsgPage }
+        assertEquals(ReaderInfoTemplate.BATTERY_NUMBER_ICON, ReadTipConfig.tipHeaderLeftTemplate)
+        scenario!!.onActivity {
+            it.findViewById<ReadView>(R.id.read_view).upBattery(85)
+            val text = it.findViewById<ReadView>(R.id.read_view).curPage.findViewById<TextView>(R.id.tv_header_left).text as Spanned
+            assertEquals(BatteryLevelSpan(85, true), text.getSpans(0, text.length, BatteryLevelSpan::class.java).single())
+        }
+        screenshot("battery-number-reader-restored")
+    }
+
+    @Test
     fun informationPanelChangesOnlyTitleAndRestoresTheSelectedValue() {
         ReadBookConfig.textBold = 1
         launchReader()
@@ -1084,7 +1166,7 @@ class TitleFontWeightRenderingTest {
     }
 
     private fun dismissSettings() {
-        onView(withId(R.id.ll_title_font_weight)).inRoot(isDialog()).perform(pressBack())
+        onView(withId(R.id.ll_title_font_weight)).inRoot(isDialog()).perform(scrollTo(), pressBack())
         onView(withId(R.id.tv_tip)).inRoot(isDialog()).perform(pressBack())
     }
 

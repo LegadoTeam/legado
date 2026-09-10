@@ -18,6 +18,19 @@ class ReaderInfoTemplateTest {
     )
 
     @Test
+    fun `number icon is optional repeatable and clamps live values`() {
+        for ((level, expected) in listOf(-1 to 0, 7 to 7, 85 to 85, 120 to 100)) {
+            assertEquals(listOf(ReaderInfoPart.BatteryIcon(expected, true),
+                ReaderInfoPart.Text(" "), ReaderInfoPart.BatteryIcon(expected),
+                ReaderInfoPart.Text(" $expected% "), ReaderInfoPart.BatteryIcon(expected, true)),
+                ReaderInfoTemplate.parse("{电量图标数值} {电量图标} {电量} {电量图标数值}",
+                    values.copy(battery = level)))
+        }
+        assertEquals(ReaderInfoPart.Text("{{电量图标数值}}"),
+            ReaderInfoTemplate.parse("{{电量图标数值}}", values).single())
+    }
+
+    @Test
     fun `parse mixed literal text placeholders and battery icon`() {
         assertEquals(
             listOf(
