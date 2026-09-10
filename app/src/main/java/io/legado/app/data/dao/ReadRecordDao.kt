@@ -4,6 +4,8 @@ import androidx.room.*
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.ReadRecordBook
 import io.legado.app.data.entities.ReadRecordShow
+import io.legado.app.data.entities.ReadRecordAuthors
+import io.legado.app.data.entities.mergeRestoredReadRecord
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -79,4 +81,26 @@ interface ReadRecordDao {
 
     @Query("delete from readRecord where bookName = :bookName and author = :author")
     fun deleteByBook(bookName: String, author: String)
+
+    @Query("select * from readRecord where bookName = :bookName and author = :author")
+    fun getRecords(bookName: String, author: String): List<ReadRecord>
+
+    /** A user removes an obsolete label; the legacy row's undivided duration stays intact. */
+    @Transaction
+    fun removeLegacyAuthor(bookName: String, author: String, removedAuthor: String) {
+        val authors = ReadRecordAuthors.decode(author)
+        if (!ReadRecordAuthors.isCombined(author) || authors.size < 2 || removedAuthor !in authors) return
+        val remaining = (authors - removedAuthor).reduce(ReadRecordAuthors::merge)
+        getRecords(bookName, author).forEach { original ->
+            val renamed = original.copy(author = remaining)
+            val current = getRecord(original.deviceId, bookName, remaining)
+            val saved = if (current == null) renamed else {
+                mergeRestoredReadRecord(current, renamed, localDevice = true).copy(
+                    readTime = Math.addExact(current.readTime, renamed.readTime),
+                )
+            }
+            delete(original)
+            insert(saved)
+        }
+    }
 }
