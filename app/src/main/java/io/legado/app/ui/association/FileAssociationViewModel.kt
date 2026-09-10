@@ -36,7 +36,9 @@ class FileAssociationViewModel(application: Application, private val savedState:
     val selectedLocalBooks = linkedSetOf<Uri>()
     var pendingLocalBooks: List<ImportBook> = emptyList()
     private var openSingleLocalBook = false
-    private var localBookDirectory: Uri? = null
+    var importAfterDirectorySelection: Boolean
+        get() = savedState["importAfterDirectorySelection"] ?: true
+        private set(value) { savedState["importAfterDirectorySelection"] = value }
     var choosingLocalBookDirectory: Boolean
         get() = savedState["choosingLocalBookDirectory"] ?: false
         set(value) { savedState["choosingLocalBookDirectory"] = value }
@@ -58,10 +60,9 @@ class FileAssociationViewModel(application: Application, private val savedState:
                 val items = books.map { ImportBook(FileDoc.fromFile(File(it.bookUrl)), false, it) }
                 stagingDirectory = staging
                 openSingleLocalBook = savedState["openSingleLocalBook"] ?: false
-                localBookDirectory = savedState.get<String>("localBookDirectory")?.let(Uri::parse)
                 selectedLocalBooks.addAll(savedState.get<ArrayList<String>>("selectedLocalBooks").orEmpty().map(Uri::parse))
                 pendingLocalBooks = items.filter { it.file.uri in selectedLocalBooks }
-                if (!openSingleLocalBook && localBookDirectory != null) localBookBatch.value = items
+                if (!openSingleLocalBook) localBookBatch.value = items
                 if (savedState.get<Boolean>("localBookDestination") == true) localBookDestination.value = true
                 initialIntentDispatched = true
             }.onFailure { AppLog.put("恢复分享书籍预览失败", it) }
@@ -240,8 +241,8 @@ class FileAssociationViewModel(application: Application, private val savedState:
             openSingleLocalBook = openSingle
             updateLocalSelection(items.map { it.file.uri })
             pendingLocalBooks = items
-            savedState["localBookDestination"] = true
-            localBookDestination.value = true
+            if (openSingle) requestLocalBookDirectory(true)
+            else localBookBatch.value = items
         }
     }
 
@@ -255,18 +256,21 @@ class FileAssociationViewModel(application: Application, private val savedState:
         if (importingLocalBooks.value == true || localBookDestination.value == true) return
         pendingLocalBooks = localBookBatch.value.orEmpty().filter { it.file.uri in selectedLocalBooks }
         if (pendingLocalBooks.isNotEmpty()) {
-            importLocalBooks(checkNotNull(localBookDirectory))
+            requestLocalBookDirectory(true)
         }
+    }
+
+    fun requestLocalBookDirectory(importAfter: Boolean) {
+        importAfterDirectorySelection = importAfter
+        savedState["localBookDestination"] = true
+        localBookDestination.value = true
     }
 
     fun selectLocalBookDirectory(directory: Uri) {
         choosingLocalBookDirectory = false
-        localBookDirectory = directory
-        savedState["localBookDirectory"] = directory.toString()
         savedState["localBookDestination"] = false
         localBookDestination.value = false
-        if (openSingleLocalBook) importLocalBooks(directory)
-        else localBookBatch.value = pendingLocalBooks
+        if (importAfterDirectorySelection) importLocalBooks(directory)
     }
 
     fun importBook(uri: Uri) {

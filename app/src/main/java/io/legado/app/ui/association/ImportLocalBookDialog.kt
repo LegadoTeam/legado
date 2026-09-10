@@ -4,6 +4,7 @@ import android.content.DialogInterface
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
+import android.view.MenuItem
 import androidx.fragment.app.activityViewModels
 import androidx.recyclerview.widget.LinearLayoutManager
 import io.legado.app.R
@@ -30,6 +31,14 @@ class ImportLocalBookDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         binding.toolBar.setBackgroundColor(primaryColor)
         binding.toolBar.setTitle(R.string.local_book)
+        binding.toolBar.menu.add(0, R.id.menu_local_book_save_path, 0, R.string.local_book_save_path)
+            .setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+        binding.toolBar.setOnMenuItemClickListener {
+            if (it.itemId == R.id.menu_local_book_save_path) {
+                viewModel.requestLocalBookDirectory(false)
+                true
+            } else false
+        }
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = adapter
         val items = viewModel.localBookBatch.value.orEmpty()
@@ -46,6 +55,7 @@ class ImportLocalBookDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
             isCancelable = !importing
             binding.recyclerView.isEnabled = !importing
             binding.tvCancel.isEnabled = !importing
+            binding.toolBar.menu.findItem(R.id.menu_local_book_save_path).isEnabled = !importing
             binding.rotateLoading.visibility = if (importing) View.VISIBLE else View.GONE
             upCountView()
         }

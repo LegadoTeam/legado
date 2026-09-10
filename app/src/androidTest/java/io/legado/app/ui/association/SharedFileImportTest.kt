@@ -11,6 +11,8 @@ import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import android.os.SystemClock
+import android.os.Bundle
+import android.view.View
 import androidx.core.content.FileProvider
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.ViewModelProvider
@@ -18,18 +20,21 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.Espresso.openActionBarOverflowOrOptionsMenu
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
+import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import fi.iki.elonen.NanoHTTPD
 import io.legado.app.R
+import io.legado.app.base.BaseDialogFragment
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
@@ -47,6 +52,7 @@ import io.legado.app.help.storage.BackupConfig
 import io.legado.app.model.ReadBook
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.ui.book.read.ReadBookActivity
+import io.legado.app.ui.book.import.local.ImportBookActivity
 import io.legado.app.ui.file.HandleFileActivity
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.utils.GSON
@@ -356,7 +362,7 @@ class SharedFileImportTest {
                 val model = ViewModelProvider(activity)[FileAssociationViewModel::class.java]
                 assertEquals(1, model.pendingLocalBooks.size)
                 assertTrue(model.choosingLocalBookDirectory)
-                assertNull(activity.supportFragmentManager.findFragmentByTag("sharedLocalBooks"))
+                assertNotNull(activity.supportFragmentManager.findFragmentByTag("sharedLocalBooks"))
                 return Instrumentation.ActivityResult(Activity.RESULT_OK,
                     Intent().setData(Uri.fromFile(File(directory, "books"))))
             }
@@ -364,14 +370,16 @@ class SharedFileImportTest {
         instrumentation.addMonitor(monitor)
         try {
             launchShare(file, "text/plain").use { scenario ->
-                onView(withText(R.string.shared_local_books_storage)).inRoot(isDialog()).check(matches(isDisplayed()))
-                onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
                 awaitLocalPreview(scenario)
+                assertEquals(0, folderRequests.get())
                 scenario.recreate()
                 scenario.onActivity { activity ->
                     assertEquals(1, activity.supportFragmentManager.fragments.filterIsInstance<ImportLocalBookDialog>().size)
                 }
                 confirmLocalPreview(scenario)
+                onView(withText(R.string.shared_local_books_storage)).inRoot(isDialog()).check(matches(isDisplayed()))
+                screenshot("share-local-folder-after-confirmation")
+                onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
                 val copied = File(directory, "books/${file.name}")
                 await { copied.exists() && appDb.bookDao.has(copied.path) }
                 val book = appDb.bookDao.getBook(copied.path)!!
@@ -384,6 +392,84 @@ class SharedFileImportTest {
                 closeReaders()
             }
         } finally { instrumentation.removeMonitor(monitor) }
+    }
+
+    @Test(timeout = 120_000) fun saveFolderMenusUpdateTheSharedSettingWithoutMovingExistingBooks() {
+        AppConfig.importBookPath = directory.path
+        val oldFile = File(directory, "books/old-menu-$id.txt").apply { writeText("ORIGINAL MENU BOOK") }
+        val oldBook = LocalBook.importFile(Uri.fromFile(oldFile)).also(books::add)
+        val newDirectory = File(directory, "changed").apply { mkdirs() }
+        val finalDirectory = File(directory, "preview-changed").apply { mkdirs() }
+        var destination = newDirectory
+        val requests = AtomicInteger()
+        val monitor = object : Instrumentation.ActivityMonitor() {
+            override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? {
+                if (intent.component?.className != HandleFileActivity::class.java.name) return null
+                assertEquals(HandleFileContract.DIR_SYS, intent.getIntExtra("mode", -1))
+                requests.incrementAndGet()
+                return Instrumentation.ActivityResult(Activity.RESULT_OK, Intent().setData(Uri.fromFile(destination)))
+            }
+        }
+        instrumentation.addMonitor(monitor)
+        try {
+            ActivityScenario.launch<ImportBookActivity>(Intent(context, ImportBookActivity::class.java)).use {
+                openActionBarOverflowOrOptionsMenu(context)
+                onView(withText(R.string.local_book_save_path)).perform(click())
+                onView(withText(R.string.local_book_save_path)).inRoot(isDialog()).check(matches(isDisplayed()))
+                screenshot("local-import-save-folder-menu")
+                onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+                await { AppConfig.defaultBookTreeUri == Uri.fromFile(newDirectory).toString() }
+            }
+            destination = finalDirectory
+            val source = File(directory, "menu-share-$id.txt").apply { writeText("MENU SHARED BOOK") }
+            launchShare(source, "text/plain").use { scenario ->
+                awaitLocalPreview(scenario)
+                onView(withContentDescription(androidx.appcompat.R.string.abc_action_menu_overflow_description))
+                    .inRoot(isDialog()).perform(click())
+                onView(withText(R.string.local_book_save_path)).perform(click())
+                screenshot("share-local-preview-save-folder-menu")
+                onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+                await { AppConfig.defaultBookTreeUri == Uri.fromFile(finalDirectory).toString() }
+                assertTrue(finalDirectory.listFiles()!!.isEmpty())
+                confirmLocalPreview(scenario)
+                val copy = File(finalDirectory, source.name)
+                await { appDb.bookDao.has(copy.path) }
+                books.add(appDb.bookDao.getBook(copy.path)!!)
+                assertArrayEquals(source.readBytes(), copy.readBytes())
+            }
+            assertEquals(2, requests.get())
+            assertEquals("ORIGINAL MENU BOOK", oldFile.readText())
+            assertEquals(oldBook, appDb.bookDao.getBook(oldBook.bookUrl))
+        } finally { instrumentation.removeMonitor(monitor) }
+    }
+
+    @Test(timeout = 120_000) fun baseDialogKeepsItsTagForQueuedDuplicateRequestsAndRecreation() {
+        val file = File(directory, "dialog-tag-$id.txt").apply { writeText("DIALOG TEST") }
+        launchShare(file, "text/plain").use { scenario ->
+            awaitLocalPreview(scenario)
+            scenario.onActivity { activity ->
+                val manager = activity.supportFragmentManager
+                val dialog = SharedImportTagTestDialog()
+                dialog.show(manager, "retainedTag")
+                dialog.show(manager, "retainedTag")
+                manager.executePendingTransactions()
+                assertSame(dialog, manager.findFragmentByTag("retainedTag"))
+                assertEquals(1, manager.fragments.filterIsInstance<SharedImportTagTestDialog>().size)
+            }
+            scenario.recreate()
+            scenario.onActivity { activity ->
+                val manager = activity.supportFragmentManager
+                val dialog = manager.findFragmentByTag("retainedTag") as SharedImportTagTestDialog
+                dialog.show(manager, "retainedTag")
+                manager.executePendingTransactions()
+                assertEquals(1, manager.fragments.filterIsInstance<SharedImportTagTestDialog>().size)
+                dialog.dismissNow()
+                dialog.show(manager, "retainedTag")
+                manager.executePendingTransactions()
+                assertSame(dialog, manager.findFragmentByTag("retainedTag"))
+                dialog.dismissNow()
+            }
+        }
     }
 
     @Test(timeout = 120_000) fun archivePreviewsEverySupportedTypeAndOnlyImportsTheSelection() {
@@ -727,4 +813,8 @@ class SharedFileImportTest {
             } > 100
         } finally { bitmap.recycle() }
     }
+}
+
+class SharedImportTagTestDialog : BaseDialogFragment(R.layout.dialog_recycler_view) {
+    override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) = Unit
 }

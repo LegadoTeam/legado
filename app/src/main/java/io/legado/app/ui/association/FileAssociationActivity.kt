@@ -47,7 +47,7 @@ class FileAssociationActivity :
         viewModel.localBookBatch.observe(this) {
             binding.rotateLoading.gone()
             if (supportFragmentManager.findFragmentByTag("sharedLocalBooks") == null) {
-                ImportLocalBookDialog().show(supportFragmentManager.beginTransaction(), "sharedLocalBooks")
+                ImportLocalBookDialog().show(supportFragmentManager, "sharedLocalBooks")
             }
         }
         viewModel.localBookDestination.observe(this) { requested ->
@@ -191,14 +191,15 @@ class FileAssociationActivity :
 
     private fun chooseBookDirectory() {
         val configured = AppConfig.defaultBookTreeUri
-        if (!configured.isNullOrBlank()) {
+        if (!configured.isNullOrBlank() && viewModel.importAfterDirectorySelection) {
             viewModel.selectLocalBookDirectory(Uri.parse(configured))
             return
         }
         binding.rotateLoading.gone()
         androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle(R.string.select_book_folder)
-            .setMessage(R.string.shared_local_books_storage)
+            .setMessage(getString(R.string.shared_local_books_storage) +
+                if (viewModel.importAfterDirectorySelection) "" else "\n\n${configured ?: privateBookDirectory().path}")
             .setPositiveButton(R.string.select_folder) { _, _ ->
                 viewModel.choosingLocalBookDirectory = true
                 localBookTreeSelect.launch {
@@ -207,6 +208,7 @@ class FileAssociationActivity :
                 }
             }
             .setNegativeButton(R.string.shared_local_books_private) { _, _ ->
+                if (!viewModel.importAfterDirectorySelection) AppConfig.defaultBookTreeUri = privateBookDirectory().toString()
                 viewModel.selectLocalBookDirectory(privateBookDirectory())
             }
             .setOnCancelListener { viewModel.selectLocalBookDirectory(privateBookDirectory()) }

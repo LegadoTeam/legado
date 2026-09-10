@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="local_book_save_path">本地导入保存路径</string>
     <string name="shared_local_books_storage">书籍将复制到所选目录。也可使用应用私有目录，原文件保持不变。</string>
     <string name="shared_local_books_private">使用应用默认路径</string>
     <string name="shared_local_books_mixed_types">压缩包内存在多种可导入类型，无法统一导入，请分别导入。</string>
