@@ -846,35 +846,14 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                 }
                 continue
             }
-            val titleLength = chapter.layoutTitleLength
             val pageBase = chapter.getReadLength(page.index)
             val pageLength = page.lines.sumOf {
                 it.charSize + if (it.isParagraphEnd) 1 else 0
             }
             val pageEnd = pageBase + pageLength
-            val ruleRanges = ReadBook.ruleMatchesOfChapter(chapter)
-                .asSequence()
-                .filter { it.start < pageEnd && it.end > pageBase }
-                .map {
-                    HighlightMatcher.Range(
-                        it.start,
-                        it.end,
-                        it.style,
-                        it.applyToTitle,
-                        it.applyToBody
-                    )
-                }
-                .toList()
-            val manualRanges = if (titleLength >= 0) {
-                ReadBook.anchoredHighlightsOfChapter(chapter, titleLength).map { (highlight, anchor) ->
-                    HighlightMatcher.Range(
-                        anchor.start + titleLength,
-                        anchor.end + titleLength,
-                        highlight.styleObj()
-                    )
-                }
-            } else emptyList()
-            val ranges = ruleRanges + manualRanges
+            val chapterRanges = ReadBook.highlightRangesOfChapter(chapter)
+            if (!ReadBook.upHighlightSpacing(chapter, chapterRanges)) continue
+            val ranges = chapterRanges.filter { it.start < pageEnd && it.end > pageBase }
             val lineSpecs = page.lines.map { line ->
                 HighlightMatcher.LineSpec(
                     charSize = line.charSize,

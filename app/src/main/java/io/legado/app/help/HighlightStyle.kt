@@ -14,7 +14,8 @@ data class HighlightStyle(
     val box: Deco? = null,
     val emphasis: Deco? = null,
     val shadow: Shadow? = null,
-    val fontPath: String = ""
+    val fontPath: String = "",
+    val pillPaddingScale: Float? = null
 ) {
     data class Underline(
         val kind: Kind = Kind.SOLID,
@@ -88,6 +89,9 @@ data class HighlightStyle(
     val resolvedFontPath: String
         get() = fontPath.orEmpty()
 
+    val resolvedPillPaddingScale: Float
+        get() = pillPaddingScale?.takeIf { it.isFinite() }?.coerceIn(0.25f, 2f) ?: 1f
+
     val isEmpty: Boolean
         get() = fill == 0 && textColor == 0 && !bold && !italic &&
             underline == null && strike == null && box == null && emphasis == null &&
@@ -100,10 +104,14 @@ data class HighlightStyle(
     fun normalized(): HighlightStyle {
         val normalizedUnderline = underline?.normalized()
         val normalizedShadow = shadow?.normalized()
-        return if (normalizedUnderline === underline && normalizedShadow === shadow) {
+        val normalizedPadding = pillPaddingScale?.let { resolvedPillPaddingScale }
+        return if (normalizedUnderline === underline && normalizedShadow === shadow &&
+            normalizedPadding == pillPaddingScale
+        ) {
             this
         } else {
-            copy(underline = normalizedUnderline, shadow = normalizedShadow)
+            copy(underline = normalizedUnderline, shadow = normalizedShadow,
+                pillPaddingScale = normalizedPadding)
         }
     }
 
@@ -113,6 +121,7 @@ data class HighlightStyle(
             return current.copy(
                 fill = if (other.fill != 0) other.fill else current.fill,
                 fillShape = if (other.fill != 0) other.fillShape else current.fillShape,
+                pillPaddingScale = if (other.fill != 0) other.pillPaddingScale else current.pillPaddingScale,
                 textColor = if (other.textColor != 0) other.textColor else current.textColor,
                 bold = other.bold || current.bold,
                 italic = other.italic || current.italic,

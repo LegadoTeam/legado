@@ -20,8 +20,10 @@ import io.legado.app.help.HighlightStyle.Underline
 import io.legado.app.help.HighlightStyles
 import io.legado.app.ui.font.FontSelectDialog
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
+import io.legado.app.ui.widget.number.NumberPickerDialog
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.showDialogFragment
+import kotlin.math.roundToInt
 
 class HighlightStyleDialog : BottomSheetDialogFragment(),
     ShadowEditDialog.Callback,
@@ -265,6 +267,16 @@ class HighlightStyleDialog : BottomSheetDialogFragment(),
                     currentStyle().underline?.let {
                         UnderlineEditDialog.show(childFragmentManager, it)
                     }
+                } else if (channel.labelRes == R.string.highlight_bg_color) {
+                    NumberPickerDialog(requireContext())
+                        .setTitle(getString(R.string.highlight_pill_padding))
+                        .setMinValue(25)
+                        .setMaxValue(200)
+                        .setValue((currentStyle().resolvedPillPaddingScale * 100).roundToInt())
+                        .setCustomButton(R.string.btn_default_s) {
+                            apply(currentStyle().copy(pillPaddingScale = null))
+                        }
+                        .show { apply(currentStyle().copy(pillPaddingScale = it / 100f)) }
                 }
             }
             binding.llChannels.addView(row.root)
@@ -291,9 +303,16 @@ class HighlightStyleDialog : BottomSheetDialogFragment(),
             val extra = channel.extra?.invoke(style)
             row.tvExtra.visibility = if (extra != null && enabled) View.VISIBLE else View.GONE
             row.tvExtra.text = extra.orEmpty()
-            val tuneVisible = channel.labelRes == R.string.highlight_underline && enabled
+            val pill = channel.labelRes == R.string.highlight_bg_color &&
+                style.resolvedFillShape == FillShape.PILL
+            val tuneVisible = enabled && (channel.labelRes == R.string.highlight_underline || pill)
             row.tvTune.visibility = if (tuneVisible) View.VISIBLE else View.GONE
-            if (tuneVisible) row.tvTune.text = getString(R.string.highlight_underline_adjust)
+            if (tuneVisible) row.tvTune.text = if (pill) {
+                getString(R.string.highlight_pill_padding_value,
+                    (style.resolvedPillPaddingScale * 100).roundToInt())
+            } else {
+                getString(R.string.highlight_underline_adjust)
+            }
         }
         val fontPath = style.resolvedFontPath
         binding.tvHighlightFontValue.text = if (fontPath.isEmpty()) {

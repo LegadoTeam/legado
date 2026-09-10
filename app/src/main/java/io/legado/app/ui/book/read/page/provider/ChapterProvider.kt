@@ -501,10 +501,11 @@ object ChapterProvider {
         reviewColumn: ReviewColumn,
         textLine: TextLine,
     ): Boolean {
-        val width = getReviewWidth(textLine.isReviewTitle)
+        val width = if (textLine.highlightReviewGap != null) textLine.highlightReviewWidth
+            else getReviewWidth(textLine.isReviewTitle)
         val textEnd = textLine.columns.lastOrNull { it !is ReviewColumn }?.end
             ?: textLine.lineEnd
-        val start = ReviewColumnGeometry.start(
+        val start = textLine.highlightReviewGap?.let { textEnd + it } ?: ReviewColumnGeometry.start(
             textEnd = textEnd,
             width = width,
             viewWidth = viewWidth,

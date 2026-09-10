@@ -11,6 +11,7 @@ import io.legado.app.help.HighlightRuleMatcher
 import io.legado.app.help.book.BookContent
 import io.legado.app.ui.book.read.page.provider.LayoutProgressListener
 import io.legado.app.ui.book.read.page.provider.TextChapterLayout
+import io.legado.app.ui.book.read.page.provider.HighlightSpacing
 import io.legado.app.utils.fastBinarySearchBy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -42,6 +43,14 @@ data class TextChapter(
     val pages: List<TextPage> get() = textPages
 
     private var layout: TextChapterLayout? = null
+
+    var highlightSpacing = HighlightSpacing()
+    var highlightSpacingBase: TextChapter? = null
+    var highlightSpacingJob: Job? = null
+    var highlightSpacingRequest: HighlightSpacing? = null
+
+    fun layoutWithHighlightSpacing(scope: CoroutineScope, spacing: HighlightSpacing): TextChapter? =
+        (highlightSpacingBase ?: this).layout?.withHighlightSpacing(scope, spacing)
 
     @Volatile
     var layoutTitleLength: Int = UNKNOWN_LAYOUT_TITLE_LENGTH
@@ -354,6 +363,7 @@ data class TextChapter(
     }
 
     fun cancelLayout() {
+        highlightSpacingJob?.cancel()
         invalidateHighlightRuleMatches()
         layout?.cancel()
         listener = null

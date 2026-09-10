@@ -24,7 +24,9 @@ object HighlightDraw {
             style = Paint.Style.FILL
         },
         val wavePath: Path = Path(),
-        val fillPath: Path = Path()
+        val fillPath: Path = Path(),
+        val pillBorderPath: Path = Path(),
+        val pillRadii: FloatArray = FloatArray(8)
     )
 
     private val drawState = object : ThreadLocal<DrawState>() {
@@ -76,7 +78,9 @@ object HighlightDraw {
         top: Float,
         bottom: Float,
         fill: Int,
-        shape: HighlightStyle.FillShape
+        shape: HighlightStyle.FillShape,
+        pillLeftRadius: Float = (bottom - top) / 2f,
+        pillRightRadius: Float = pillLeftRadius
     ) {
         if (x1 <= x0 || bottom <= top) return
         val state = drawState.get()!!
@@ -131,25 +135,38 @@ object HighlightDraw {
             }
 
             HighlightStyle.FillShape.PILL -> {
-                val radius = (bottom - top) / 2f
+                val radiusY = (bottom - top) / 2f
+                val radiusScale = minOf(1f, (x1 - x0) / (pillLeftRadius + pillRightRadius).coerceAtLeast(1f))
+                val leftRadius = pillLeftRadius.coerceAtLeast(0f) * radiusScale
+                val rightRadius = pillRightRadius.coerceAtLeast(0f) * radiusScale
+                val radii = state.pillRadii
+                fun setRadii(inset: Float) {
+                    val left = (leftRadius - inset).coerceAtLeast(0f)
+                    val right = (rightRadius - inset).coerceAtLeast(0f)
+                    val scale = minOf(1f, (x1 - x0 - inset * 2f) / (left + right).coerceAtLeast(1f))
+                    for (corner in 0..3) {
+                        radii[corner * 2] = (if (corner == 0 || corner == 3) left else right) * scale
+                        radii[corner * 2 + 1] = (radiusY - inset).coerceAtLeast(0f)
+                    }
+                }
+                setRadii(0f)
+                state.fillPath.reset()
+                state.fillPath.addRoundRect(x0, top, x1, bottom, radii, Path.Direction.CW)
                 fillPaint.color = scaleAlpha(fill, 0.35f)
-                canvas.drawRoundRect(x0, top, x1, bottom, radius, radius, fillPaint)
-                val strokePaint = state.strokePaint
-                strokePaint.strokeWidth = 1f.dpToPx()
-                strokePaint.pathEffect = null
-                strokePaint.color = fill
-                val inset = strokePaint.strokeWidth / 2f
-                if (x1 - x0 > inset * 2f && bottom - top > inset * 2f) {
-                    val strokeRadius = (radius - inset).coerceAtLeast(0f)
-                    canvas.drawRoundRect(
-                        x0 + inset,
-                        top + inset,
-                        x1 - inset,
-                        bottom - inset,
-                        strokeRadius,
-                        strokeRadius,
-                        strokePaint
+                canvas.drawPath(state.fillPath, fillPaint)
+                val border = 1f.dpToPx()
+                if (x1 - x0 > border * 2f && bottom - top > border * 2f) {
+                    // Two nested ellipses keep the entire border inside the accepted bounds.
+                    // A stroked, horizontally compressed ellipse can extend farther into the ink.
+                    state.pillBorderPath.set(state.fillPath)
+                    state.pillBorderPath.fillType = Path.FillType.EVEN_ODD
+                    setRadii(border)
+                    state.pillBorderPath.addRoundRect(
+                        x0 + border, top + border, x1 - border, bottom - border,
+                        radii, Path.Direction.CW
                     )
+                    fillPaint.color = fill
+                    canvas.drawPath(state.pillBorderPath, fillPaint)
                 }
             }
         }
