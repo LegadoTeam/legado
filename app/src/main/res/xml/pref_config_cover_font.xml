@@ -1,5 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:defaultValue="false"
+        android:key="coverHorizontal"
+        android:title="@string/cover_horizontal"
+        android:summary="@string/cover_horizontal_summary"
+        app:allowDividerAbove="false"
+        app:allowDividerBelow="false"
+        app:iconSpaceReserved="false" />
+
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:defaultValue="true"
+        android:key="coverTitleAdaptive"
+        android:title="@string/cover_title_adaptive"
+        android:summary="@string/cover_title_adaptive_summary"
+        app:allowDividerAbove="false"
+        app:allowDividerBelow="false"
+        app:iconSpaceReserved="false" />
+
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:defaultValue="false"
+        android:key="coverKeepPunctuation"
+        android:title="@string/cover_keep_punctuation"
+        android:summary="@string/cover_keep_punctuation_summary"
+        app:allowDividerAbove="false"
+        app:allowDividerBelow="false"
+        app:iconSpaceReserved="false" />
+
+    <io.legado.app.lib.prefs.Preference
+        android:key="coverFont"
+        android:title="@string/cover_font_select" />
 
     <io.legado.app.lib.prefs.SwitchPreference
         android:key="coverCustomFontSize"
@@ -26,5 +58,9 @@
         android:key="coverAuthorSmallSize"
         android:dependency="coverCustomFontSize"
         android:title="@string/cover_author_small_size" />
+
+    <io.legado.app.ui.config.CoverPreviewPreference
+        android:key="coverPreview"
+        android:persistent="false" />
 
 </androidx.preference.PreferenceScreen>

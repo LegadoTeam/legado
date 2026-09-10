@@ -168,6 +168,7 @@ object BackupConfig {
         PreferKey.coverHorizontal,
         PreferKey.coverTitleAdaptive,
         PreferKey.coverKeepPunctuation,
+        PreferKey.coverFont,
         PreferKey.coverCustomFontSize,
         PreferKey.coverTitleLargeSize,
         PreferKey.coverTitleSmallSize,

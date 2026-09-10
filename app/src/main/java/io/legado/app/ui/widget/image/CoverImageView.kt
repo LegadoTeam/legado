@@ -69,6 +69,7 @@ internal fun coverBitmapCacheKey(
     accentColor: Int,
     adaptiveTitle: Boolean = true,
     fontSizes: CoverFontSizes? = null,
+    fontCacheKey: String = "",
 ): String = buildString {
     append(name.length).append(':').append(name)
     append('|')
@@ -83,6 +84,7 @@ internal fun coverBitmapCacheKey(
     append('|').append(if (adaptiveTitle) 's' else 'f')
     append('|').append(backgroundColor).append(',').append(accentColor)
     if (fontSizes != null) append('|').append(fontSizes)
+    append('|').append(fontCacheKey.length).append(':').append(fontCacheKey)
 }
 
 /**
@@ -157,6 +159,8 @@ class CoverImageView @JvmOverloads constructor(
             val backgroundColor = appCtx.backgroundColor
             val accentColor = appCtx.accentColor
             val fontSizes = BookCover.fontSizes
+            val fontTypeface = BookCover.fontTypeface
+            val fontCacheKey = BookCover.fontCacheKey
             val cacheKey = coverBitmapCacheKey(
                 currentName,
                 currentAuthor,
@@ -168,13 +172,15 @@ class CoverImageView @JvmOverloads constructor(
                 accentColor,
                 BookCover.adaptiveTitleSize,
                 fontSizes,
+                fontCacheKey,
             )
             val cacheBitmap = getNameBitmap(cacheKey)
             if (cacheBitmap != null) {
                 canvas.drawBitmap(cacheBitmap, 0f, 0f, null)
                 return
             }
-            drawNameAuthor(currentName, currentAuthor, backgroundColor, accentColor, false, fontSizes)
+            drawNameAuthor(currentName, currentAuthor, backgroundColor, accentColor, false,
+                fontSizes, fontTypeface, fontCacheKey)
         }
     }
 
@@ -206,6 +212,8 @@ class CoverImageView @JvmOverloads constructor(
         accentColor: Int = appCtx.accentColor,
         asyncAwait: Boolean = true,
         fontSizes: CoverFontSizes? = BookCover.fontSizes,
+        fontTypeface: Typeface? = BookCover.fontTypeface,
+        fontCacheKey: String = BookCover.fontCacheKey,
     ) {
         generateCoverAsync(
             name,
@@ -217,6 +225,8 @@ class CoverImageView @JvmOverloads constructor(
             BookCover.adaptiveTitleSize,
             asyncAwait,
             fontSizes,
+            fontTypeface,
+            fontCacheKey,
         )
     }
     private fun generateCoverAsync(
@@ -229,6 +239,8 @@ class CoverImageView @JvmOverloads constructor(
         adaptiveTitle: Boolean,
         asyncAwait: Boolean,
         fontSizes: CoverFontSizes?,
+        fontTypeface: Typeface?,
+        fontCacheKey: String,
     ) {
         currentJob?.cancel()
         val requestedBitmapPath = bitmapPath
@@ -262,6 +274,7 @@ class CoverImageView @JvmOverloads constructor(
                     accentColor,
                     adaptiveTitle,
                     fontSizes,
+                    fontCacheKey,
                 )
                 if (getNameBitmap(cacheKey) != null) {
                     postInvalidate()
@@ -278,6 +291,7 @@ class CoverImageView @JvmOverloads constructor(
                     accentColor,
                     adaptiveTitle,
                     fontSizes,
+                    fontTypeface,
                 )
                 ensureActive()
                 needNameBitmap.put(requestedBitmapPath.toString(), true)
@@ -302,6 +316,7 @@ class CoverImageView @JvmOverloads constructor(
         accentColor: Int,
         adaptiveTitle: Boolean,
         fontSizes: CoverFontSizes?,
+        fontTypeface: Typeface?,
     ): Bitmap {
         val viewWidth = renderWidth.toFloat()
         val viewHeight = renderHeight.toFloat()
@@ -321,11 +336,12 @@ class CoverImageView @JvmOverloads constructor(
                 viewHeight,
                 adaptiveTitle,
                 fontSizes,
+                fontTypeface,
             )
             return bitmap
         }
         val namePaint = TextPaint().apply {
-            typeface = Typeface.DEFAULT_BOLD
+            typeface = fontTypeface ?: Typeface.DEFAULT_BOLD
             isAntiAlias = true
             textAlign = Paint.Align.CENTER
         }
@@ -334,8 +350,8 @@ class CoverImageView @JvmOverloads constructor(
             namePaint.textSize = viewWidth / 7
             fontSizes?.let { namePaint.textSize *= it.titleLarge / 100f }
             if (adaptiveTitle && name.size * namePaint.textHeight > viewHeight * 0.6f) {
-                namePaint.textSize = viewWidth / 9
-                fontSizes?.let { namePaint.textSize *= it.titleSmall / 100f }
+                namePaint.textSize = fontSizes?.let { viewWidth / 7 * it.titleSmall / 100f }
+                    ?: (viewWidth / 9)
             }
             namePaint.strokeWidth = namePaint.textSize / 6
             name.forEachIndexed { index, char ->
@@ -351,24 +367,24 @@ class CoverImageView @JvmOverloads constructor(
                     if ((name.size - index - 1) == 1) {
                         startY -= namePaint.textHeight / 5
                         if (!adaptiveTitle) {
-                            namePaint.textSize = viewWidth / 9
-                            fontSizes?.let { namePaint.textSize *= it.titleSmall / 100f }
+                            namePaint.textSize = fontSizes?.let { viewWidth / 7 * it.titleSmall / 100f }
+                                ?: (viewWidth / 9)
                         }
                         return@forEachIndexed
                     }
                     startX += namePaint.textSize
                     line++
                     if (!adaptiveTitle) {
-                        namePaint.textSize = viewWidth / 10
-                        fontSizes?.let { namePaint.textSize *= it.titleSmall / 100f }
+                        namePaint.textSize = fontSizes?.let { viewWidth / 7 * it.titleSmall / 100f }
+                            ?: (viewWidth / 10)
                     }
                     startY = viewHeight * 0.2f + namePaint.textHeight * line
                 } else if (startY > viewHeight * 0.8 && (name.size - index - 1) > 2) {
                     startX += namePaint.textSize
                     line++
                     if (!adaptiveTitle) {
-                        namePaint.textSize = viewWidth / 10
-                        fontSizes?.let { namePaint.textSize *= it.titleSmall / 100f }
+                        namePaint.textSize = fontSizes?.let { viewWidth / 7 * it.titleSmall / 100f }
+                            ?: (viewWidth / 10)
                     }
                     startY = viewHeight * 0.2f + namePaint.textHeight * line
                 }
@@ -378,14 +394,14 @@ class CoverImageView @JvmOverloads constructor(
             return bitmap
         }
         val authorPaint = TextPaint(namePaint).apply {
-            typeface = Typeface.DEFAULT
+            typeface = fontTypeface ?: Typeface.DEFAULT
         }
         author?.toStringArray()?.let { author ->
             authorPaint.textSize = viewWidth / 10
             fontSizes?.let {
                 authorPaint.textSize *= it.authorLarge / 100f
                 if (author.size * authorPaint.textHeight > viewHeight * 0.65f) {
-                    authorPaint.textSize = viewWidth / 16 * it.authorSmall / 100f
+                    authorPaint.textSize = viewWidth / 10 * it.authorSmall / 100f
                 }
             }
             authorPaint.strokeWidth = authorPaint.textSize / 5
@@ -419,10 +435,11 @@ class CoverImageView @JvmOverloads constructor(
         viewHeight: Float,
         adaptiveTitle: Boolean,
         fontSizes: CoverFontSizes?,
+        fontTypeface: Typeface?,
     ) {
         val basePaint = TextPaint().apply {
             isAntiAlias = true
-            typeface = Typeface.DEFAULT_BOLD
+            typeface = fontTypeface ?: Typeface.DEFAULT_BOLD
         }
         name?.takeIf { it.isNotEmpty() }?.let { title ->
             val titleWidth = (viewWidth * 0.78f).toInt().coerceAtLeast(1)
@@ -435,11 +452,11 @@ class CoverImageView @JvmOverloads constructor(
             var titleLayout = horizontalTitleLayout(title, titlePaint, titleWidth)
             if (titleLayout.lineCount > 1 || titlePaint.measureText(title) > titleWidth) {
                 val firstLineEnd = titleLayout.getLineEnd(0)
-                titlePaint.textSize = viewWidth / 9
-                fontSizes?.let { titlePaint.textSize *= it.titleSmall / 100f }
+                titlePaint.textSize = fontSizes?.let { viewWidth / 7 * it.titleSmall / 100f }
+                    ?: (viewWidth / 9)
                 titlePaint.strokeWidth = titlePaint.textSize / 6
                 val displayTitle = if (adaptiveTitle) title else SpannableString(title).apply {
-                    val ratio = fontSizes?.let { 9f / 7f * it.titleLarge / it.titleSmall } ?: (9f / 7f)
+                    val ratio = fontSizes?.let { it.titleLarge.toFloat() / it.titleSmall } ?: (9f / 7f)
                     setSpan(RelativeSizeSpan(ratio), 0, firstLineEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                 }
                 titleLayout = horizontalTitleLayout(displayTitle, titlePaint, titleWidth)
@@ -461,17 +478,24 @@ class CoverImageView @JvmOverloads constructor(
         author?.takeIf { it.isNotEmpty() }?.let { authorText ->
             val authorWidth = viewWidth * 0.65f
             val authorPaint = TextPaint(basePaint).apply {
-                typeface = Typeface.DEFAULT
+                typeface = fontTypeface ?: Typeface.DEFAULT
                 textAlign = Paint.Align.RIGHT
                 textSize = viewWidth / 10
                 fontSizes?.let { textSize *= it.authorLarge / 100f }
                 strokeWidth = textSize / 5
             }
-            val smallSize = fontSizes?.let { viewWidth / 16 * it.authorSmall / 100f } ?: (viewWidth / 16)
+            val smallSize = fontSizes?.let { viewWidth / 10 * it.authorSmall / 100f } ?: (viewWidth / 16)
+            if (fontSizes != null && authorPaint.measureText(authorText) > authorWidth &&
+                smallSize > authorPaint.textSize
+            ) {
+                authorPaint.textSize = smallSize
+                authorPaint.strokeWidth = authorPaint.textSize / 5
+            }
             while (authorPaint.textSize > smallSize &&
                 authorPaint.measureText(authorText) > authorWidth
             ) {
-                authorPaint.textSize -= 0.5f
+                authorPaint.textSize = if (fontSizes == null) authorPaint.textSize - 0.5f
+                    else maxOf(smallSize, authorPaint.textSize - 0.5f)
                 authorPaint.strokeWidth = authorPaint.textSize / 5
             }
             val displayAuthor = TextUtils.ellipsize(
