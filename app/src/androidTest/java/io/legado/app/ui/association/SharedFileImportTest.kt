@@ -492,7 +492,7 @@ class SharedFileImportTest {
         } finally { pdf.close() }
         val contents = linkedMapOf(
             "alpha-$id.txt" to "ALPHA $id".toByteArray(),
-            "omit-$id.txt" to "OMITTED $id".toByteArray(),
+            "omit-$id.pdf" to pdfFile.readBytes(),
             "nested/gamma-$id.TXT" to "GAMMA $id".toByteArray(),
             "batch-$id.epub" to instrumentation.context.assets.open("issue1074-containers-fragments.epub").use { it.readBytes() },
             pdfFile.name to pdfFile.readBytes(),
@@ -501,6 +501,10 @@ class SharedFileImportTest {
         writeArchive(archive, contents)
         val original = archive.readBytes()
         val previousBook = ReadBook.book?.bookUrl
+        lateinit var previewCover: File
+        lateinit var omittedCover: File
+        lateinit var coverBytes: ByteArray
+        lateinit var acceptedCover: File
         launchShare(archive, "application/zip").use { scenario ->
             awaitLocalPreview(scenario)
             lateinit var model: FileAssociationViewModel
@@ -511,6 +515,11 @@ class SharedFileImportTest {
             assertEquals(previousBook, ReadBook.book?.bookUrl)
             items.forEach { assertFalse(appDb.bookDao.has(it.preview!!.name, it.preview.author)) }
             val omitted = items.indexOfFirst { it.file.name.startsWith("omit-") }
+            previewCover = File(checkNotNull(items.single { it.file.name == pdfFile.name }.preview!!.coverUrl))
+            omittedCover = File(checkNotNull(items[omitted].preview!!.coverUrl))
+            assertTrue(previewCover.length() > 0)
+            assertTrue(omittedCover.length() > 0)
+            coverBytes = previewCover.readBytes()
             scenario.onActivity { activity ->
                 activity.supportFragmentManager.findFragmentByTag("sharedLocalBooks")!!.requireView()
                     .findViewById<RecyclerView>(R.id.recycler_view).scrollToPosition(omitted)
@@ -537,12 +546,34 @@ class SharedFileImportTest {
                 assertEquals(item.preview!!.name, book.name)
                 assertArrayEquals(contents.entries.single { File(it.key).name == item.file.name }.value,
                     File(book.bookUrl).readBytes())
+                if (item.file.name == pdfFile.name) {
+                    assertEquals(LocalBook.getCoverPath(book), book.coverUrl)
+                    acceptedCover = File(book.coverUrl!!)
+                    assertNotEquals(previewCover.path, acceptedCover.path)
+                }
             }
             assertFalse(appDb.bookDao.has(items[omitted].preview!!.name, items[omitted].preview!!.author))
             assertFalse(File(directory, "books/${items[omitted].file.name}").exists())
             assertArrayEquals(original, archive.readBytes())
             assertEquals(File(directory, "books").path, AppConfig.defaultBookTreeUri)
         }
+        await { !previewCover.exists() && !omittedCover.exists() }
+        assertArrayEquals(coverBytes, acceptedCover.readBytes())
+        lateinit var cancelledCover: File
+        launchShare(pdfFile, "application/pdf").use { scenario ->
+            awaitLocalPreview(scenario)
+            scenario.onActivity {
+                val preview = ViewModelProvider(it)[FileAssociationViewModel::class.java]
+                    .localBookBatch.value!!.single().preview!!
+                cancelledCover = File(preview.coverUrl!!)
+                assertTrue(cancelledCover.length() > 0)
+                assertFalse(appDb.bookDao.has(preview.name, preview.author))
+            }
+            onView(withId(R.id.tv_cancel)).inRoot(isDialog()).perform(click())
+        }
+        await { !cancelledCover.exists() }
+        assertArrayEquals(coverBytes, acceptedCover.readBytes())
+        assertArrayEquals(original, archive.readBytes())
     }
 
     @Test(timeout = 120_000) fun multipleSharesKeepAllThreeIdentityConflictsAndOriginalFiles() {
