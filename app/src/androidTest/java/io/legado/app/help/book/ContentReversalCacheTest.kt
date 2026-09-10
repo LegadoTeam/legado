@@ -115,7 +115,12 @@ class ContentReversalCacheTest {
             base = "http://127.0.0.1:${server.listeningPort}"
             val source = BookSource(bookSourceUrl = "$base/source", bookSourceName = "Resource generation fixture")
             source.getTocRule().apply { chapterList = "a"; chapterName = "text"; chapterUrl = "href" }
-            source.getContentRule().content = "@js:chapter.putVariable('acceptedVersion', result.substring(result.lastIndexOf('version='))); result + '\\nbook=' + book.name"
+            source.getContentRule().content = """
+                @js:
+                if (result.indexOf('version=') < 0) throw new Error('Missing fixture body');
+                chapter.putVariable('acceptedVersion', result.substring(result.lastIndexOf('version=')));
+                result + '\nbook=' + book.name
+            """.trimIndent()
             val books = listOf(first, second)
             val chapters = books.mapIndexed { id, book ->
                 book.origin = source.bookSourceUrl
