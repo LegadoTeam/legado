@@ -2,19 +2,23 @@ package io.legado.app.ui.association
 
 import android.content.ClipData
 import android.content.Intent
+import android.net.Uri
 import android.graphics.Bitmap
 import android.os.SystemClock
 import android.view.View
+import android.view.MenuItem
 import android.widget.TextView
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.core.content.FileProvider
 import androidx.fragment.app.DialogFragment
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.Lifecycle
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.Espresso.onData
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.assertion.ViewAssertions.matches
@@ -37,12 +41,16 @@ import io.legado.app.ui.widget.dialog.CodeDialog
 import io.legado.app.utils.GSON
 import io.legado.app.utils.defaultSharedPreferences
 import org.hamcrest.Matchers.not
+import org.hamcrest.Description
+import org.hamcrest.TypeSafeMatcher
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.net.InetAddress
+import java.net.ServerSocket
 import java.util.UUID
 
 @RunWith(AndroidJUnit4::class)
@@ -87,6 +95,68 @@ class SourceImportFilterUiTest {
     @Test fun bookFilteringKeepsCandidatesThroughEditReplacementAndRecreation() = filtering(false)
 
     @Test fun rssFilteringKeepsCandidatesThroughEditReplacementAndRecreation() = filtering(true)
+
+    @Test fun onlineAutoImportKeepsOnePreviewAndItsStateAfterRecreation() {
+        for (rss in listOf(false, true)) {
+            val candidates = listOf(
+                source(rss, url("auto-$rss/hidden"), "Hidden", "Other", ""),
+                source(rss, url("auto-$rss/keep"), "Keep", "Wanted", ""),
+            )
+            val body = GSON.toJson(candidates).toByteArray(Charsets.UTF_8)
+            ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { server ->
+                server.soTimeout = 15_000
+                val worker = Thread {
+                    server.accept().use { client ->
+                        client.soTimeout = 10_000
+                        val reader = client.getInputStream().bufferedReader()
+                        while (!reader.readLine().isNullOrEmpty()) Unit
+                        client.getOutputStream().apply {
+                            write(("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n" +
+                                "Content-Length: ${body.size}\r\nConnection: close\r\n\r\n")
+                                .toByteArray(Charsets.US_ASCII))
+                            write(body)
+                            flush()
+                        }
+                    }
+                }.apply { isDaemon = true; start() }
+                val uri = Uri.parse("legado://import/auto").buildUpon()
+                    .appendQueryParameter("src", "http://127.0.0.1:${server.localPort}/source.json").build()
+                val intent = Intent(context, OnLineImportActivity::class.java)
+                    .setAction(Intent.ACTION_VIEW).setData(uri)
+                ActivityScenario.launch<OnLineImportActivity>(intent).use { scenario ->
+                    val host = ImportHost(scenario, rss)
+                    host.findParent()
+                    host.awaitReady()
+                    host.query("Keep", 1)
+                    host.rowClick(0, R.id.cb_source_name)
+                    host.selection(true, false)
+                    val preview = host.open(0, 1)
+                    val edited = GSON.toJson(source(rss, url("auto-$rss/edited"), "Kept edit", "Wanted", ""))
+                    main { preview.binding.codeView.setText(edited) }
+                    onView(withId(R.id.menu_save)).inRoot(isDialog()).perform(click())
+                    host.awaitReady()
+                    host.query("Kept edit", 1)
+                    host.recreate()
+                    scenario.onActivity { activity ->
+                        assertEquals(1, activity.supportFragmentManager.fragments
+                            .filterIsInstance<DialogFragment>().size)
+                    }
+                    host.assertQuery("Kept edit", 1)
+                    host.selection(true, false)
+                    val restored = host.open(0, 1)
+                    main {
+                        assertEquals(edited, restored.currentOriginalCode())
+                        restored.dismiss()
+                    }
+                    host.awaitReady()
+                    screenshot("source-filter-auto-restored-$rss")
+                    host.click(R.id.tv_cancel)
+                    host.awaitFinished()
+                }
+                worker.join(1_000)
+            }
+        }
+    }
 
     private fun filtering(rss: Boolean) {
         val candidateUrls = (0..2).map { url("$rss/candidate-$it") }
@@ -305,11 +375,11 @@ class SourceImportFilterUiTest {
             val host = ImportHost(scenario, rss)
             host.findParent()
             host.awaitReady()
-            action(host)
+            try { action(host) } finally { host.closeMenus() }
         }
     }
 
-    private inner class ImportHost(val scenario: ActivityScenario<FileAssociationActivity>, val rss: Boolean) {
+    private inner class ImportHost(val scenario: ActivityScenario<out FragmentActivity>, val rss: Boolean) {
         lateinit var parent: DialogFragment
         private val book get() = ViewModelProvider(parent)[ImportBookSourceViewModel::class.java]
         private val feed get() = ViewModelProvider(parent)[ImportRssSourceViewModel::class.java]
@@ -393,7 +463,14 @@ class SourceImportFilterUiTest {
             val title = main { toolbar().menu.findItem(id).title.toString() }
             main { toolbar().showOverflowMenu() }
             await("Import overflow missing") { main { toolbar().isOverflowMenuShowing } }
-            onView(withText(title)).inRoot(isPlatformPopup()).perform(click())
+            onData(object : TypeSafeMatcher<Any>() {
+                override fun describeTo(description: Description) { description.appendText(title) }
+                override fun matchesSafely(item: Any) = item is MenuItem && item.itemId == id
+            }).inRoot(isPlatformPopup()).perform(click())
+        }
+
+        fun closeMenus() = main {
+            if (::parent.isInitialized) parent.view?.findViewById<Toolbar>(R.id.tool_bar)?.dismissPopupMenus()
         }
 
         fun open(position: Int, originalIndex: Int): CodeDialog {
