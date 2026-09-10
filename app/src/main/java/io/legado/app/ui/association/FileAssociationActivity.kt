@@ -6,58 +6,34 @@ import android.os.Bundle
 import androidx.activity.viewModels
 import androidx.core.content.IntentCompat
 import androidx.core.os.postDelayed
-import androidx.documentfile.provider.DocumentFile
 import androidx.fragment.app.DialogFragment
-import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
-import io.legado.app.constant.AppLog
 import io.legado.app.databinding.ActivityTranslucenceBinding
-import io.legado.app.exception.InvalidBooksDirException
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.permission.Permissions
 import io.legado.app.lib.permission.PermissionsCompat
-import io.legado.app.model.localBook.LocalBook
 import io.legado.app.ui.autoTask.ImportAutoTaskDialog
 import io.legado.app.ui.file.HandleFileContract
-import io.legado.app.utils.FileUtils
 import io.legado.app.utils.buildMainHandler
-import io.legado.app.utils.canRead
-import io.legado.app.utils.checkWrite
-import io.legado.app.utils.getFile
 import io.legado.app.utils.isContentScheme
-import io.legado.app.utils.readUri
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.startActivityForBook
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
-import kotlinx.coroutines.Dispatchers.IO
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import splitties.init.appCtx
 import java.io.File
-import java.io.FileOutputStream
 
 class FileAssociationActivity :
     VMBaseActivity<ActivityTranslucenceBinding, FileAssociationViewModel>() {
 
     private val localBookTreeSelect = registerForActivityResult(HandleFileContract()) {
-        (viewModel.pendingBookUri ?: intent.data ?: IntentCompat.getParcelableExtra(
-            intent, Intent.EXTRA_STREAM, Uri::class.java
-        ))?.let { uri ->
-            it.uri?.let { treeUri ->
-                AppConfig.defaultBookTreeUri = treeUri.toString()
-                importBook(treeUri, uri)
-            } ?: let {
-                val storageHelp = String(assets.open("storageHelp.md").readBytes())
-                toastOnUi(storageHelp)
-                importBook(null, uri)
-            }
-        }
+        val destination = it.uri ?: privateBookDirectory()
+        if (it.uri != null) AppConfig.defaultBookTreeUri = destination.toString()
+        viewModel.selectLocalBookDirectory(destination)
     }
-
     override val binding by viewBinding(ActivityTranslucenceBinding::inflate)
 
     override val viewModel by viewModels<FileAssociationViewModel>()
@@ -68,8 +44,30 @@ class FileAssociationActivity :
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         binding.rotateLoading.visible()
-        viewModel.importBookLiveData.observe(this) { uri ->
-            importBook(uri)
+        viewModel.localBookBatch.observe(this) {
+            binding.rotateLoading.gone()
+            if (supportFragmentManager.findFragmentByTag("sharedLocalBooks") == null) {
+                ImportLocalBookDialog().show(supportFragmentManager, "sharedLocalBooks")
+            }
+        }
+        viewModel.localBookDestination.observe(this) { requested ->
+            if (requested && !viewModel.choosingLocalBookDirectory) chooseBookDirectory()
+        }
+        viewModel.importingLocalBooks.observe(this) { importing ->
+            if (viewModel.localBookBatch.value.isNullOrEmpty()) {
+                if (importing) binding.rotateLoading.visible() else binding.rotateLoading.gone()
+            }
+        }
+        viewModel.importedLocalBooks.observe(this) { if (it) finish() }
+        viewModel.mixedLocalTypes.observe(this) { mixed ->
+            if (mixed) {
+                binding.rotateLoading.gone()
+                alert(title = getString(R.string.wrong_format),
+                    message = getString(R.string.shared_local_books_mixed_types)) {
+                    yesButton { finish() }
+                    onCancelled { finish() }
+                }
+            }
         }
         viewModel.onLineImportLive.observe(this) {
             binding.rotateLoading.gone()
@@ -115,7 +113,7 @@ class FileAssociationActivity :
                 message = appCtx.getString(R.string.file_not_supported, data.second)
             ) {
                 yesButton {
-                    importBook(data.first)
+                    viewModel.importBook(data.first)
                 }
                 noButton {
                     finish()
@@ -138,6 +136,9 @@ class FileAssociationActivity :
     private fun dispatchIntent(intent: Intent) {
         binding.rotateLoading.visible()
         when (intent.action) {
+            Intent.ACTION_SEND_MULTIPLE -> viewModel.dispatchSharedUris(
+                IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
+            )
             Intent.ACTION_SEND -> if (isSupportedSharedImportMimeType(intent.type)) {
                 dispatchSharedIntent(intent)
             } else {
@@ -169,7 +170,7 @@ class FileAssociationActivity :
     }
 
     private fun dispatchUri(uri: Uri, block: () -> Unit) {
-        if (uri.isContentScheme() && uri.canRead()) {
+        if (uri.isContentScheme()) {
             block()
         } else {
             PermissionsCompat.Builder()
@@ -186,101 +187,33 @@ class FileAssociationActivity :
         }
     }
 
-    private fun importBook(uri: Uri) {
-        viewModel.pendingBookUri = uri
-        if (uri.isContentScheme()) {
-            val treeUriStr = AppConfig.defaultBookTreeUri
-            if (treeUriStr.isNullOrEmpty()) {
-                binding.rotateLoading.gone()
+    private fun privateBookDirectory(): Uri = Uri.fromFile(File(filesDir, "books"))
+
+    private fun chooseBookDirectory() {
+        val configured = AppConfig.defaultBookTreeUri
+        if (!configured.isNullOrBlank() && viewModel.importAfterDirectorySelection) {
+            viewModel.selectLocalBookDirectory(Uri.parse(configured))
+            return
+        }
+        binding.rotateLoading.gone()
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(R.string.select_book_folder)
+            .setMessage(getString(R.string.shared_local_books_storage) +
+                if (viewModel.importAfterDirectorySelection) "" else "\n\n${configured ?: privateBookDirectory().path}")
+            .setPositiveButton(R.string.select_folder) { _, _ ->
+                viewModel.choosingLocalBookDirectory = true
                 localBookTreeSelect.launch {
                     title = getString(R.string.select_book_folder)
                     mode = HandleFileContract.DIR_SYS
                 }
-            } else {
-                importBook(Uri.parse(treeUriStr), uri)
             }
-        } else {
-            importBook(null, uri)
-        }
-    }
-
-    private fun importBook(treeUri: Uri?, uri: Uri) {
-        binding.rotateLoading.visible()
-        lifecycleScope.launch {
-            runCatching {
-                withContext(IO) {
-                    if (treeUri == null) {
-                        viewModel.importBook(uri)
-                    } else if (treeUri.isContentScheme()) {
-                        val treeDoc =
-                            DocumentFile.fromTreeUri(this@FileAssociationActivity, treeUri)
-                        if (!treeDoc!!.checkWrite()) {
-                            throw InvalidBooksDirException(
-                                "请重新设置书籍保存位置\nPermission Denial"
-                            )
-                        }
-                        readUri(uri) { fileDoc, inputStream ->
-                            val name = fileDoc.name
-                            var doc = treeDoc.findFile(name)
-                            if (doc == null || fileDoc.lastModified > doc.lastModified()) {
-                                if (doc == null) {
-                                    doc = treeDoc.createFile(FileUtils.getMimeType(name), name)
-                                        ?: throw InvalidBooksDirException(
-                                            "请重新设置书籍保存位置\nPermission Denial"
-                                        )
-                                }
-                                LocalBook.withParserCacheInvalidated(doc.uri, name) {
-                                    contentResolver.openOutputStream(doc.uri)!!.use { oStream ->
-                                        inputStream.copyTo(oStream)
-                                        oStream.flush()
-                                    }
-                                }
-                            }
-                            viewModel.importBook(doc.uri)
-                        }
-                    } else {
-                        val treeFile = File(treeUri.path ?: treeUri.toString())
-                        if (!treeFile.checkWrite()) {
-                            throw InvalidBooksDirException(
-                                "请重新设置书籍保存位置\nPermission Denial"
-                            )
-                        }
-                        readUri(uri) { fileDoc, inputStream ->
-                            val name = fileDoc.name
-                            val file = treeFile.getFile(name)
-                            if (!file.exists() || fileDoc.lastModified > file.lastModified()) {
-                                LocalBook.withParserCacheInvalidated(Uri.fromFile(file), name) {
-                                    FileOutputStream(file).use { oStream ->
-                                        inputStream.copyTo(oStream)
-                                        oStream.flush()
-                                    }
-                                }
-                            }
-                            viewModel.importBook(Uri.fromFile(file))
-                        }
-                    }
-                }
-            }.onFailure {
-                binding.rotateLoading.gone()
-                when (it) {
-                    is InvalidBooksDirException -> localBookTreeSelect.launch {
-                        title = getString(R.string.select_book_folder)
-                        mode = HandleFileContract.DIR_SYS
-                    }
-
-                    else -> {
-                        val msg = "导入书籍失败\n${it.localizedMessage}"
-                        AppLog.put(msg, it)
-                        toastOnUi(msg)
-                        handler.postDelayed(2000) {
-                            finish()
-                        }
-                    }
-                }
+            .setNegativeButton(R.string.shared_local_books_private) { _, _ ->
+                if (!viewModel.importAfterDirectorySelection) AppConfig.defaultBookTreeUri = privateBookDirectory().toString()
+                viewModel.selectLocalBookDirectory(privateBookDirectory())
             }
-        }
+            .setOnCancelListener { viewModel.selectLocalBookDirectory(privateBookDirectory()) }
+            .show()
     }
-
 }
 
 internal fun isSupportedSharedImportMimeType(mimeType: String?): Boolean =
@@ -291,4 +224,12 @@ internal fun isSupportedSharedImportMimeType(mimeType: String?): Boolean =
         mimeType.equals("application/pdf", ignoreCase = true) ||
         mimeType.equals("application/zip", ignoreCase = true) ||
         mimeType.equals("application/x-zip-compressed", ignoreCase = true) ||
+        mimeType.equals("application/x-rar-compressed", ignoreCase = true) ||
+        mimeType.equals("application/vnd.rar", ignoreCase = true) ||
+        mimeType.equals("application/x-7z-compressed", ignoreCase = true) ||
+        mimeType.equals("application/mobi", ignoreCase = true) ||
+        mimeType.equals("application/x-mobipocket-ebook", ignoreCase = true) ||
+        mimeType.equals("application/azw", ignoreCase = true) ||
+        mimeType.equals("application/azw3", ignoreCase = true) ||
+        mimeType.equals("application/x-mobi8-ebook", ignoreCase = true) ||
         mimeType.equals("application/octet-stream", ignoreCase = true)
