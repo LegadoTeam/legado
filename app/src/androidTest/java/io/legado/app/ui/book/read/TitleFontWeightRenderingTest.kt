@@ -686,6 +686,123 @@ class TitleFontWeightRenderingTest {
     }
 
     @Test
+    fun wrappedFillOnlyCapsKeepVisibleEndsWithZeroPageMargins() {
+        launchReader()
+        val savedOptimize = AppConfig.optimizeRender
+        val savedZhLayout = ReadBookConfig.useZhLayout
+        val savedAdapt = AppConfig.adaptSpecialStyle
+        val savedJustify = ReadBookConfig.textFullJustify
+        val savedColor = ReadBookConfig.textColor
+        try {
+            scenario!!.onActivity { activity ->
+                ReadBookConfig.titleMode = 2
+                ReadBookConfig.paragraphIndent = ""
+                ReadBookConfig.paddingLeft = 0
+                ReadBookConfig.paddingRight = 0
+                ReadBookConfig.textSize = 32
+                context.putPrefBoolean(PreferKey.textFullJustify, true)
+                AppConfig.adaptSpecialStyle = true
+                ChapterProvider.clearReviewProviders()
+                ChapterProvider.upStyle()
+                val text = "顶上多恐怖吗".repeat(6)
+                val chapter = BookChapter(bookUrl = book!!.bookUrl, url = "capsule-page-edges", index = 10002)
+                fun canonical(chapter: TextChapter) = HighlightTextBuilder.build(chapter.pages
+                    .flatMap { it.lines }.map { HighlightTextBuilder.LineInput(it.text, it.isParagraphEnd) })
+                fun awaitLayout(chapter: TextChapter): TextChapter = runBlocking {
+                    withTimeout(30_000) {
+                        for (ignored in chapter.layoutChannel) Unit
+                        while (!chapter.isCompleted) yield()
+                    }
+                    chapter
+                }
+                for (mode in listOf("static", "zh", "html")) for (optimized in listOf(false, true)) {
+                    ReadBookConfig.useZhLayout = mode == "zh"
+                    AppConfig.optimizeRender = optimized
+                    val scope = CoroutineScope(Dispatchers.Default)
+                    val content = if (mode == "html") "<usehtml><p>$text</p></usehtml>" else text
+                    val base = awaitLayout(ChapterProvider.getTextChapterAsync(scope, book!!, chapter,
+                        "Edges", BookContent(false, listOf(content), null), chapter.index + 1, saveChapterData = false))
+                    val fill = Color.rgb(32, 144, 80)
+                    val style = HighlightStyle(fill = fill, fillShape = HighlightStyle.FillShape.PILL)
+                    val spacing = HighlightSpacing.resolve(base, listOf(HighlightMatcher.Range(0, canonical(base).length, style)))
+                    assertTrue("Pure text has no image/review token insets", spacing.columns.isEmpty())
+                    assertFalse("Paragraph margins alone still require a layout", spacing.isEmpty)
+                    val spaced = awaitLayout(checkNotNull(base.layoutWithHighlightSpacing(scope, spacing)))
+                    assertEquals(canonical(base), canonical(spaced))
+                    val caseLabel = "mode=$mode optimized=$optimized"
+                    assertTrue("Fixture must soft-wrap: $caseLabel", spaced.pages.sumOf { it.lines.size } > 1)
+                    for (page in spaced.pages) {
+                        val width = ChapterProvider.viewWidth
+                        val height = ceil(maxOf(page.height, page.renderHeight.toFloat())).toInt()
+                        val view = ContentTextView(activity, null).apply {
+                            layout(0, 0, width, height)
+                            setContent(page)
+                        }
+                        val columns = page.lines.flatMap { it.columns }.filterIsInstance<TextBaseColumn>()
+                        val positions = columns.map { it.start to it.end }
+                        fun render(color: Int, fill: Int): Bitmap {
+                            ReadBookConfig.durConfig.setCurTextColor(color)
+                            columns.forEach { it.highlightStyle = style.copy(fill = fill) }
+                            page.lines.forEach { line ->
+                                line.invalidate()
+                                assertEquals("Keep actual whole-line drawing when supported: $caseLabel",
+                                    optimized && mode != "html", line.checkFastDraw())
+                            }
+                            return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                                .also { view.draw(Canvas(it)) }
+                        }
+                        val glyphs = render(Color.BLACK, 0)
+                        val background = render(1, fill)
+                        val result = render(Color.BLACK, fill)
+                        try {
+                            File(context.getExternalFilesDir("ui-regression"),
+                                "highlight-wrapped-zero-margin-$mode-$optimized-${page.index}.png").outputStream().use {
+                                assertTrue(result.compress(Bitmap.CompressFormat.PNG, 100, it))
+                            }
+                            var ink = 0
+                            for (y in 0 until height) for (x in 0 until width) {
+                                if (Color.alpha(glyphs.getPixel(x, y)) < 240) continue
+                                ink++
+                                assertTrue("Reflowed glyph must stay inside the border: $caseLabel ($x,$y)",
+                                    Color.alpha(background.getPixel(x, y)) in 70..110)
+                            }
+                            assertTrue(ink > 50)
+                            for (line in page.lines) {
+                                val band = HighlightGeometry.fillBand(line.lineBase - line.lineTop,
+                                    line.textPaint.textSize, line.height, HighlightStyle.FillShape.PILL, 1f.dpToPx())
+                                val middle = (line.lineTop + (band.top + band.bottom) / 2f).toInt()
+                                val shoulder = (line.lineTop + band.top + (band.bottom - band.top) * 0.08f).toInt()
+                                fun edges(y: Int): Pair<Int, Int> {
+                                    fun filled(x: Int) = Color.alpha(background.getPixel(x, y)) > 30
+                                    return (0 until width).first(::filled) to (0 until width).last(::filled)
+                                }
+                                val mid = edges(middle)
+                                val top = edges(shoulder)
+                                assertTrue("Left wrap cap must remain visible: $caseLabel mid=$mid top=$top", top.first - mid.first >= 2)
+                                assertTrue("Right wrap cap must remain visible: $caseLabel mid=$mid top=$top", mid.second - top.second >= 2)
+                                assertTrue("Both end caps must fit the page: $caseLabel", mid.first > 0 && mid.second < width - 1)
+                            }
+                            assertEquals(positions, columns.map { it.start to it.end })
+                        } finally {
+                            listOf(glyphs, background, result).forEach(Bitmap::recycle)
+                            page.recycleRecorders()
+                        }
+                    }
+                    base.pages.forEach(TextPage::recycleRecorders)
+                }
+            }
+        } finally {
+            instrumentation.runOnMainSync {
+                AppConfig.optimizeRender = savedOptimize
+                ReadBookConfig.useZhLayout = savedZhLayout
+                AppConfig.adaptSpecialStyle = savedAdapt
+                context.putPrefBoolean(PreferKey.textFullJustify, savedJustify)
+                ReadBookConfig.durConfig.setCurTextColor(savedColor)
+            }
+        }
+    }
+
+    @Test
     fun capsuleControllerRestoresItsBaselineAndRejectsQueuedWorkAfterBookSwitch() {
         launchReader()
         awaitReader { ReadBook.curTextChapter?.highlightRuleMatchesJob?.isActive != true }

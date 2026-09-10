@@ -43,6 +43,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import java.util.LinkedList
 import kotlin.math.roundToInt
+import kotlin.math.ceil
 import android.util.Size
 import androidx.core.text.HtmlCompat
 import io.legado.app.constant.AppPattern.noWordCountRegex
@@ -224,6 +225,14 @@ class TextChapterLayout(
         (textPages.lastOrNull()?.lines?.lastOrNull()?.run {
             chapterPosition + charSize + if (isParagraphEnd) 1 else 0
         } ?: 0) + stringBuilder.length
+
+    private fun highlightLineInsets(start: Int, end: Int): Pair<Int, Int> {
+        val padding = ceil(highlightSpacing.edgePadding(start, end)).toInt()
+        // Existing page margins already provide space for the cap. Reserve only the deficit,
+        // on every soft-wrapped line, so a different break cannot consume it again.
+        return (padding - paddingLeft).coerceAtLeast(0) to
+            (padding - paddingRight).coerceAtLeast(0)
+    }
 
     private fun applyHighlightSpacing(column: BaseColumn, line: TextLine, position: Int,
         isFirst: Boolean = line.columns.isEmpty()) {
@@ -718,7 +727,8 @@ class TextChapterLayout(
         val spanned = htmlContent.parseAsHtml(HtmlCompat.FROM_HTML_MODE_COMPACT, tagHandler = textViewTagHandler)
         val chapterStart = chapterPosition()
         val measuredSpanned = highlightSpacing.withSpans(spanned, chapterStart)
-        val width = visibleWidth
+        val (leftInset, rightInset) = highlightLineInsets(chapterStart, chapterStart + spanned.length)
+        val width = (visibleWidth - leftInset - rightInset).coerceAtLeast(1)
         val textPaint = contentPaint
         val textColor = ReadBookConfig.textColor
         if (textPaint.color != textColor) {
@@ -754,11 +764,11 @@ class TextChapterLayout(
             )
             val lineText = StringBuilder()
             val lineLeft = staticLayout.getLineLeft(lineIndex)
-            textLine.startX = absStartX + lineLeft //x坐标
             val mLineTop = staticLayout.getLineTop(lineIndex).toFloat()
             val mLineBottom = staticLayout.getLineBottom(lineIndex).toFloat()
             val lineHeight = mLineBottom - mLineTop
             prepareNextPageIfNeed(durY + lineHeight)
+            textLine.startX = absStartX + leftInset + lineLeft //x坐标
             if (doublePage) {
                 textLine.isLeftLine = absStartX < viewWidth / 2
             }
@@ -826,8 +836,8 @@ class TextChapterLayout(
                                 ImageProvider.cacheImage(book, source, ReadBook.bookSource)
                                 columns.add(
                                     ImageColumn(
-                                        start = absStartX + charX,
-                                        end = absStartX + charRight,
+                                        start = absStartX + leftInset + charX,
+                                        end = absStartX + leftInset + charRight,
                                         src = source,
                                         click = click
                                     )
@@ -861,8 +871,8 @@ class TextChapterLayout(
                     if (char == HR_PLACE_CHAR) {
                         columns.add(
                             TextHtmlColumn(
-                                absStartX.toFloat(),
-                                (absStartX + width - paddingRight).toFloat(),
+                                (absStartX + leftInset).toFloat(),
+                                (absStartX + leftInset + width - paddingRight).toFloat(),
                                 HR_PLACE_STR,
                                 textSize,
                                 textColor,
@@ -875,8 +885,8 @@ class TextChapterLayout(
                 if (needAddText) {
                     columns.add(
                         TextHtmlColumn(
-                            absStartX + charX,
-                            absStartX + charRight,
+                            absStartX + leftInset + charX,
+                            absStartX + leftInset + charRight,
                             char,
                             textSize,
                             textColor,
@@ -896,7 +906,7 @@ class TextChapterLayout(
             }
             textLine.text = lineText.toString()
             if (textFullJustify && !textLine.isParagraphEnd) {
-                justifyHtmlLine(columns, textLine, visibleWidth)
+                justifyHtmlLine(columns, textLine, width)
             } else {
                 textLine.addColumns(columns)
             }
@@ -1069,6 +1079,8 @@ class TextChapterLayout(
         val compressor = if (isTitle) null else punctuationCompressor
         compressor?.beginParagraph(text, widthsArray, punctuationCompressMode)
         val chapterStart = chapterPosition()
+        val (leftInset, rightInset) = highlightLineInsets(chapterStart, chapterStart + text.length)
+        val availableLineWidth = (visibleWidth - leftInset - rightInset).coerceAtLeast(1)
         for (index in text.indices) {
             highlightSpacing[chapterStart + index]?.let { inset ->
                 widthsArray[index] = (inset.contentWidth ?: widthsArray[index]) + inset.before + inset.after
@@ -1082,9 +1094,9 @@ class TextChapterLayout(
             text.indices.none { highlightSpacing[chapterStart + it]?.reviewGap != null }
         // 章评统计异步返回时先稳定换行，出现图标后只平移标题列。
         val textLayoutWidth = if (usesRightTitleReviewInset) {
-            (visibleWidth - rightTitleReviewInset).toInt().coerceAtLeast(1)
+            (availableLineWidth - rightTitleReviewInset).toInt().coerceAtLeast(1)
         } else {
-            visibleWidth
+            availableLineWidth
         }
         val layout = if (useZhLayout) {
             val (words, widths) = measureTextSplit(text, widthsArray)
@@ -1162,6 +1174,7 @@ class TextChapterLayout(
                 isReviewTrailingInsetApplied = usesRightTitleReviewInset && rightTitleHasReview,
             )
             prepareNextPageIfNeed(durY + textHeight)
+            val lineStartX = absStartX + leftInset
             val lineStart = layout.getLineStart(lineIndex)
             val lineEnd = layout.getLineEnd(lineIndex)
             textLine.chapterPosition = chapterStart + lineStart
@@ -1185,16 +1198,16 @@ class TextChapterLayout(
                 !isTitle -> null
                 emptyContent || isVolumeTitle ||
                         imageStyle?.uppercase() == Book.imgStyleSingle -> {
-                    (visibleWidth - desiredWidth) / 2
+                    (availableLineWidth - desiredWidth) / 2
                 }
-                isMiddleTitle -> (visibleWidth - desiredWidth) / 2
+                isMiddleTitle -> (availableLineWidth - desiredWidth) / 2
                 isRightTitle -> {
                     val trailingInset = if (textLine.isReviewTrailingInsetApplied) {
                         textLine.reviewTrailingInset
                     } else {
                         0f
                     }
-                    (visibleWidth - desiredWidth - trailingInset).coerceAtLeast(0f)
+                    (availableLineWidth - desiredWidth - trailingInset).coerceAtLeast(0f)
                 }
                 else -> null
             }
@@ -1202,30 +1215,31 @@ class TextChapterLayout(
                 0 if layout.lineCount > 1 && !isTitle && isFirstLine -> {
                     //多行的第一行 非标题
                     addCharsToLineFirst(
-                        book, absStartX, textLine, words, textPaint,
-                        desiredWidth, widths, srcList, clickList, hangingWidth, drawOffsets
+                        book, lineStartX, textLine, words, textPaint,
+                        desiredWidth, widths, srcList, clickList, hangingWidth, drawOffsets,
+                        availableLineWidth
                     )
                 }
                 layout.lineCount - 1 -> {
                     //最后一行、单行
                     addCharsToLineNatural(
-                        book, absStartX, textLine, words,
+                        book, lineStartX, textLine, words,
                         titleStartX ?: 0f, !isTitle && lineIndex == 0,
                         widths, srcList, clickList,
-                        if (lineIndex == 0) hangingWidth else 0f, drawOffsets
+                        if (lineIndex == 0) hangingWidth else 0f, drawOffsets, availableLineWidth
                     )
                 }
                 else -> {
                     if (titleStartX != null) {
                         addCharsToLineNatural(
-                            book, absStartX, textLine, words,
-                            titleStartX, false, widths, srcList, clickList
+                            book, lineStartX, textLine, words,
+                            titleStartX, false, widths, srcList, clickList, lineWidth = availableLineWidth
                         )
                     } else {
                         //中间行
                         addCharsToLineMiddle(
-                            book, absStartX, textLine, words, textPaint,
-                            desiredWidth, 0f, widths, srcList, clickList, drawOffsets
+                            book, lineStartX, textLine, words, textPaint,
+                            desiredWidth, 0f, widths, srcList, clickList, drawOffsets, availableLineWidth
                         )
                     }
                 }
@@ -1296,18 +1310,19 @@ class TextChapterLayout(
         clickList: LinkedList<String?>?,
         hangingWidth: Float,
         /**挤压过的标点在列内的绘制偏移,与 words 同下标*/
-        drawOffsets: FloatArray?
+        drawOffsets: FloatArray?,
+        lineWidth: Int = visibleWidth,
     ) {
         if (!textFullJustify) {
             addCharsToLineNatural(
                 book, absStartX, textLine, words,
-                0f, true, textWidths, srcList, clickList, hangingWidth, drawOffsets
+                0f, true, textWidths, srcList, clickList, hangingWidth, drawOffsets, lineWidth
             )
             return
         }
         textLine.indentSize = paragraphIndent.length
         val wordStart = LineColumnLayout.justifiedFirst(
-            words, textWidths, visibleWidth.toFloat(), desiredWidth,
+            words, textWidths, lineWidth.toFloat(), desiredWidth,
             paragraphIndent.length, indentCharWidth, hangingWidth,
             onIndentWidth = { textLine.indentWidth = it },
             onJustify = { startX, gap, isWordSpacing ->
@@ -1333,7 +1348,7 @@ class TextChapterLayout(
             }
         }
         if (words.size > wordStart) {
-            exceed(absStartX, textLine, words.subList(wordStart, words.size))
+            exceed(absStartX, textLine, words.subList(wordStart, words.size), lineWidth)
         }
     }
 
@@ -1374,18 +1389,19 @@ class TextChapterLayout(
         srcList: LinkedList<String>?,
         clickList: LinkedList<String?>?,
         /**挤压过的标点在列内的绘制偏移,与 words 同下标*/
-        drawOffsets: FloatArray?
+        drawOffsets: FloatArray?,
+        lineWidth: Int = visibleWidth,
     ) {
         if (!textFullJustify) {
             addCharsToLineNatural(
                 book, absStartX, textLine, words,
                 startX, false, textWidths, srcList,
-                clickList, drawOffsets = drawOffsets
+                clickList, drawOffsets = drawOffsets, lineWidth = lineWidth
             )
             return
         }
         LineColumnLayout.justified(
-            words, textWidths, visibleWidth.toFloat(), desiredWidth, startX,
+            words, textWidths, lineWidth.toFloat(), desiredWidth, startX,
             onJustify = { x, gap, isWordSpacing ->
                 applyJustify(textLine, textPaint, absStartX, x, gap, isWordSpacing)
             }
@@ -1396,7 +1412,7 @@ class TextChapterLayout(
                 clickList
             )
         }
-        exceed(absStartX, textLine, words)
+        exceed(absStartX, textLine, words, lineWidth)
     }
 
     /**
@@ -1414,7 +1430,8 @@ class TextChapterLayout(
         clickList: LinkedList<String?>?,
         hangingWidth: Float = 0f,
         /**挤压过的标点在列内的绘制偏移,与 words 同下标*/
-        drawOffsets: FloatArray? = null
+        drawOffsets: FloatArray? = null,
+        lineWidth: Int = visibleWidth,
     ) {
         textLine.startX = absStartX + startX
         LineColumnLayout.natural(
@@ -1430,7 +1447,7 @@ class TextChapterLayout(
                 xStart, xEnd, index + 1 == words.size, srcList, clickList
             )
         }
-        exceed(absStartX, textLine, words)
+        exceed(absStartX, textLine, words, lineWidth)
     }
 
     /**
@@ -1486,10 +1503,10 @@ class TextChapterLayout(
     /**
      * 超出边界处理
      */
-    private fun exceed(absStartX: Int, textLine: TextLine, words: List<String>) {
+    private fun exceed(absStartX: Int, textLine: TextLine, words: List<String>, lineWidth: Int) {
         var size = words.size
         if (size < 2) return
-        val visibleEnd = absStartX + visibleWidth
+        val visibleEnd = absStartX + lineWidth
         val columns = textLine.columns
         var offset = 0
         val endColumn = if (words.last() == " ") {

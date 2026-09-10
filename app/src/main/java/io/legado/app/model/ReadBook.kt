@@ -451,7 +451,7 @@ object ReadBook : CoroutineScope by MainScope() {
             (chapter.highlightRuleMatchesJob?.isActive == true &&
                 chapter.highlightRuleMatchesVersion != highlightRulesVersion)
         ) return false
-        if (chapter.highlightSpacing.columns.isEmpty() && ranges.none {
+        if (chapter.highlightSpacing.isEmpty && ranges.none {
                 it.style.fill != 0 && it.style.resolvedFillShape == HighlightStyle.FillShape.PILL
             }) return true
         // Always measure from the original advances; measuring the replacement compounds padding.
@@ -477,7 +477,7 @@ object ReadBook : CoroutineScope by MainScope() {
             try {
                 if (!isCurrent() || layoutState != highlightLayoutState()) return@launch
                 chapter.highlightSpacingRequest = spacing
-                val replacement = if (spacing.columns.isEmpty()) base else coroutineScope {
+                val replacement = if (spacing.isEmpty) base else coroutineScope {
                     val result = base.layoutWithHighlightSpacing(this, spacing)
                         ?: return@coroutineScope null
                     for (page in result.layoutChannel) {

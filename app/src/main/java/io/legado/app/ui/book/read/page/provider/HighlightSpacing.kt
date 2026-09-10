@@ -5,7 +5,6 @@ import android.graphics.Paint
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ReplacementSpan
-import io.legado.app.help.HighlightGeometry
 import io.legado.app.help.HighlightMatcher
 import io.legado.app.help.HighlightStyle
 import io.legado.app.ui.book.read.page.entities.TextChapter
@@ -19,7 +18,17 @@ import io.legado.app.utils.dpToPx
 import kotlin.math.ceil
 
 /** Extra advances only; no characters are inserted into the chapter's anchor text. */
-data class HighlightSpacing(val columns: Map<Int, Insets> = emptyMap()) {
+data class HighlightSpacing(
+    val columns: Map<Int, Insets> = emptyMap(),
+    val paragraphEdges: List<ParagraphEdge> = emptyList(),
+) {
+    data class ParagraphEdge(val start: Int, val end: Int, val padding: Float)
+
+    val isEmpty get() = columns.isEmpty() && paragraphEdges.isEmpty()
+
+    fun edgePadding(start: Int, end: Int): Float = paragraphEdges.asSequence()
+        .filter { it.start < end && it.end > start }.maxOfOrNull { it.padding } ?: 0f
+
     data class Insets(
         val length: Int,
         val before: Float = 0f,
@@ -66,9 +75,10 @@ data class HighlightSpacing(val columns: Map<Int, Insets> = emptyMap()) {
             val style: HighlightStyle?) {
             val textSize get() = (column as? TextHtmlColumn)?.mTextSize ?: line.textPaint.textSize
             val padding get(): Float {
-                val band = HighlightGeometry.fillBand(line.lineBase - line.lineTop,
-                    textSize, line.height, HighlightStyle.FillShape.PILL, 1f.dpToPx())
-                return (band.bottom - band.top) / 2f * checkNotNull(style).resolvedPillPaddingScale
+                // The full PILL band is 0.9em above and 0.16em below the baseline, plus
+                // 2dp on each side. HTML fallback metrics can unclip it after reflow.
+                val fullBandHeight = textSize * 1.06f + 4f.dpToPx()
+                return fullBandHeight / 2f * checkNotNull(style).resolvedPillPaddingScale
             }
             val advance get(): Float {
                 val text = (column as? TextBaseColumn)?.charData ?: return column.end - column.start
@@ -80,6 +90,7 @@ data class HighlightSpacing(val columns: Map<Int, Insets> = emptyMap()) {
 
         fun resolve(chapter: TextChapter, ranges: List<HighlightMatcher.Range>): HighlightSpacing {
             val result = linkedMapOf<Int, Insets>()
+            val edges = mutableListOf<ParagraphEdge>()
             val paragraphs = mutableListOf<List<Cell>>()
             var cells = mutableListOf<Cell>()
             for (page in chapter.pages) {
@@ -104,6 +115,7 @@ data class HighlightSpacing(val columns: Map<Int, Insets> = emptyMap()) {
             // an originally separated image and capsule onto the same line on the second layout.
             for (paragraph in paragraphs) {
                 var i = 0
+                var edgePadding = 0f
                 while (i < paragraph.size) {
                     val first = paragraph[i]
                     val style = first.style
@@ -118,6 +130,7 @@ data class HighlightSpacing(val columns: Map<Int, Insets> = emptyMap()) {
                     // A physical pixel between the cap and image keeps their antialiased
                     // coverage disjoint even when measured advances end on fractional pixels.
                     val padding = paragraph.subList(i, end).maxOf { it.padding } + 1f
+                    edgePadding = maxOf(edgePadding, padding)
                     var distance = 0f
                     for (left in i - 1 downTo 0) {
                         val cell = paragraph[left]
@@ -163,8 +176,13 @@ data class HighlightSpacing(val columns: Map<Int, Insets> = emptyMap()) {
                     }
                     i = end
                 }
+                if (edgePadding > 0f) {
+                    val tail = paragraph.last()
+                    edges.add(ParagraphEdge(paragraph.first().position,
+                        tail.position + tail.column.positionLength, edgePadding))
+                }
             }
-            return HighlightSpacing(result)
+            return HighlightSpacing(result, edges)
         }
     }
 }
