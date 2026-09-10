@@ -343,6 +343,35 @@ class BackupOptionsTest {
         assertTrue(requests.isEmpty())
     }
 
+    @Test fun actualArchivePreservesAllReadAloudControlsIncludingExplicitFalse() = runBlocking(Dispatchers.IO) {
+        val values = linkedMapOf<String, Any>(
+            PreferKey.readAloudControlsRealtime to false,
+            PreferKey.readAloudControlsPause to false,
+            PreferKey.readAloudControlsPosition to false,
+            PreferKey.readAloudControlsAutoHide to true,
+            PreferKey.readAloudControlsDrag to true,
+            PreferKey.readAloudControlsDock to true,
+            PreferKey.readAloudControlsWidth to 185,
+            PreferKey.readAloudControlsSize to 60,
+            PreferKey.readAloudControlsOpacity to 75,
+            PreferKey.readAloudControlsThreshold to 250,
+            PreferKey.readAloudControlsX to .25f,
+            PreferKey.readAloudControlsY to .65f,
+        )
+        preferences.edit().apply { values.forEach { (key, value) -> putValue(key, value) } }.commit()
+        values.keys.forEach { assertTrue(BackupConfig.keyIsNotIgnore(it)) }
+        Backup.backupLocked(context, directory.path, uploadWebDav = false)
+        val archive = File(directory, "backup.zip")
+        ZipFile(archive).use { zip ->
+            val config = zip.getInputStream(zip.getEntry("config.xml")).bufferedReader().use { it.readText() }
+            values.keys.forEach { assertTrue("Archive contains $it", config.contains(it)) }
+        }
+        preferences.edit().apply { values.keys.forEach { remove(it) } }.commit()
+        Restore.restoreOrThrow(context, archive.toUri(), lanTransfer = true)
+        values.forEach { (key, value) -> assertEquals("Restored $key with its original type", value, preferences.all[key]) }
+        assertTrue(requests.isEmpty())
+    }
+
     private fun launchSettings() {
         scenario = ActivityScenario.launch(Intent(context, ConfigActivity::class.java)
             .putExtra("configTag", ConfigTag.BACKUP_CONFIG))

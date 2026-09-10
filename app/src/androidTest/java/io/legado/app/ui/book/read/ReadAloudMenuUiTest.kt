@@ -10,14 +10,18 @@ import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.GeneralLocation
 import androidx.test.espresso.action.GeneralSwipeAction
 import androidx.test.espresso.action.Press
 import androidx.test.espresso.action.Swipe
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.longClick
+import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.withId
+import androidx.test.espresso.matcher.ViewMatchers.withText
+import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.R
@@ -36,6 +40,7 @@ import io.legado.app.model.localBook.TextFile
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.service.TTSReadAloudService
 import io.legado.app.ui.book.read.config.ClickActionConfigDialog
+import io.legado.app.ui.book.read.config.ReadAloudControlsDialog
 import io.legado.app.ui.book.read.page.ReadView
 import io.legado.app.utils.defaultSharedPreferences
 import io.legado.app.utils.dpToPx
@@ -60,6 +65,8 @@ class ReadAloudMenuUiTest {
     private val prefs = context.defaultSharedPreferences
     private val savedMenuHelp = LocalConfig.all["readMenuHelpVersion"]
     private val savedPreferences = listOf(PreferKey.readAloudControlsPause,
+        PreferKey.readAloudControlsRealtime, PreferKey.readAloudControlsPosition,
+        PreferKey.readAloudControlsAutoHide, PreferKey.readAloudFollowManualPage,
         PreferKey.readAloudControlsDrag, PreferKey.readAloudControlsDock, PreferKey.readAloudControlsWidth,
         PreferKey.readAloudControlsX, PreferKey.readAloudControlsY,
         PreferKey.readAloudWakeLock, PreferKey.ttsTimer).associateWith { prefs.all[it] }
@@ -75,7 +82,11 @@ class ReadAloudMenuUiTest {
         .isIgnoringBatteryOptimizations(context.packageName)
 
     @Before fun setUp() {
-        prefs.edit().putBoolean(PreferKey.readAloudControlsPause, true).commit()
+        prefs.edit().putBoolean(PreferKey.readAloudControlsPause, true)
+            .putBoolean(PreferKey.readAloudControlsRealtime, false)
+            .putBoolean(PreferKey.readAloudControlsPosition, true)
+            .putBoolean(PreferKey.readAloudControlsAutoHide, false)
+            .putBoolean(PreferKey.readAloudFollowManualPage, false).commit()
         LocalConfig.edit().putInt("readMenuHelpVersion", 1).commit()
         val file = File.createTempFile("aloud-menu-", ".txt", context.cacheDir).also { textFile = it }
         file.writeText((0..60).joinToString("\n") { "Reader content line $it for the playback menu regression." })
@@ -141,7 +152,7 @@ class ReadAloudMenuUiTest {
 
     @Test fun movablePausedControlLongPressStopsTheService() = verifyLongPressStops(paused = true, movable = true, width = 85)
 
-    private fun verifyLongPressStops(paused: Boolean, movable: Boolean, width: Int) {
+    private fun startReadAloudService(paused: Boolean, movable: Boolean = false, width: Int = 288): TTSReadAloudService {
         serviceStarted = true
         // Grant for this disposable instrumentation session; revocation kills the target process.
         shell("pm grant ${context.packageName} $notificationPermission")
@@ -171,6 +182,11 @@ class ReadAloudMenuUiTest {
             BaseReadAloudService.isRun && BaseReadAloudService.pause == paused &&
                 it.findViewById<View>(R.id.iv_pause_aloud).isShown
         }
+        return checkNotNull(service)
+    }
+
+    private fun verifyLongPressStops(paused: Boolean, movable: Boolean, width: Int) {
+        val service = startReadAloudService(paused, movable, width)
         onView(withId(R.id.iv_pause_aloud)).perform(click())
         await("short tap changes pause state") { BaseReadAloudService.isRun && BaseReadAloudService.pause != paused }
         onView(withId(R.id.iv_pause_aloud)).perform(click())
@@ -198,14 +214,14 @@ class ReadAloudMenuUiTest {
                 !BaseReadAloudService.isRun && readAloudService() == null
             }
             scenario!!.onActivity {
-                assertEquals(Lifecycle.State.DESTROYED, service!!.lifecycle.currentState)
+                assertEquals(Lifecycle.State.DESTROYED, service.lifecycle.currentState)
                 assertTrue("Stopped service remains paused", BaseReadAloudService.pause)
                 assertFalse("Stopped controls disappear", it.findViewById<View>(R.id.read_aloud_float_bar_container).isVisible)
             }
         } finally {
             screenshot("$label-after")
             File(context.getExternalFilesDir("ui-regression"), "$label-state.txt").writeText(
-                "width=$width, shortTapToggled=true, shortTapRestored=true, running=${BaseReadAloudService.isRun}, paused=${BaseReadAloudService.pause}, lifecycle=${service!!.lifecycle.currentState}")
+                "width=$width, shortTapToggled=true, shortTapRestored=true, running=${BaseReadAloudService.isRun}, paused=${BaseReadAloudService.pause}, lifecycle=${service.lifecycle.currentState}")
         }
     }
 
@@ -242,6 +258,164 @@ class ReadAloudMenuUiTest {
             }
             await("controls return after menu closes") { it.findViewById<View>(R.id.iv_pause_aloud).isShown }
         }
+    }
+
+    @Test fun independentSwitchesDefaultOnAndPreserveExplicitPauseOff() {
+        prefs.edit().remove(PreferKey.readAloudControlsRealtime).remove(PreferKey.readAloudControlsPause)
+            .remove(PreferKey.readAloudControlsPosition).commit()
+        scenario!!.onActivity { ReadAloudControlsDialog().showNow(it.supportFragmentManager, "controls-defaults") }
+        onView(withText(R.string.read_aloud_controls_realtime)).inRoot(isDialog()).check(matches(isDisplayed()))
+        onView(withText(R.string.read_aloud_controls_pause)).inRoot(isDialog()).check(matches(isDisplayed()))
+        onView(withText(R.string.read_aloud_controls_position)).inRoot(isDialog()).check(matches(isDisplayed()))
+        assertTrue(prefs.getBoolean(PreferKey.readAloudControlsRealtime, false))
+        assertTrue(prefs.getBoolean(PreferKey.readAloudControlsPause, false))
+        assertTrue(prefs.getBoolean(PreferKey.readAloudControlsPosition, false))
+        val positions = ArrayList<Int>()
+        for (title in listOf(R.string.read_aloud_controls_realtime, R.string.read_aloud_controls_pause,
+            R.string.read_aloud_controls_position)) {
+            onView(withText(title)).inRoot(isDialog()).check { view, _ ->
+                positions += IntArray(2).also(view::getLocationOnScreen)[1]
+            }
+        }
+        assertTrue(positions[0] < positions[1] && positions[1] < positions[2])
+        screenshot("aloud-independent-switches")
+        onView(withText(R.string.read_aloud_controls_pause)).inRoot(isDialog()).perform(click())
+        onView(withText(R.string.read_aloud_controls_pause)).inRoot(isDialog())
+            .perform(androidx.test.espresso.action.ViewActions.pressBack())
+        scenario!!.onActivity { ReadAloudControlsDialog().showNow(it.supportFragmentManager, "controls-reopen") }
+        assertFalse("Opening settings must retain explicit false", prefs.getBoolean(PreferKey.readAloudControlsPause, true))
+        onView(withText(R.string.read_aloud_controls_pause)).inRoot(isDialog())
+            .perform(androidx.test.espresso.action.ViewActions.pressBack())
+        scenario!!.onActivity {
+            playbackFlag("isRun", true)
+            BaseReadAloudService.restoreReadAloudFollow()
+            it.showReadAloudControls()
+        }
+        await("pause switch hides the attached control") {
+            !it.findViewById<View>(R.id.read_aloud_float_bar_container).isVisible
+        }
+        scenario!!.onActivity { BaseReadAloudService.detachReadAloudFollow() }
+        await("position control is independent of pause switch") { it.findViewById<View>(R.id.ll_back_to_speech).isShown }
+        prefs.edit().putBoolean(PreferKey.readAloudControlsPosition, false)
+            .putBoolean(PreferKey.readAloudControlsPause, true).commit()
+        await("position switch hides the detached control") {
+            !it.findViewById<View>(R.id.read_aloud_float_bar_container).isVisible
+        }
+        scenario!!.onActivity { BaseReadAloudService.restoreReadAloudFollow() }
+        await("pause control is independent of position switch") { it.findViewById<View>(R.id.iv_pause_aloud).isShown }
+    }
+
+    @Test fun returningToLiveSpeechRestoresFollowButDisabledRealtimeKeepsManualReturn() {
+        val service = startReadAloudService(paused = false)
+        scenario!!.onActivity {
+            val chapter = checkNotNull(ReadBook.curTextChapter)
+            assertTrue(chapter.pageSize >= 3)
+            val speechStart = chapter.getPage(0)!!.lines.first { line -> !line.isTitle }.chapterPosition + 1
+            BaseReadAloudService.updateReadAloudChapterIndex(ReadBook.durChapterIndex)
+            service.upTtsProgress(speechStart)
+        }
+        await("service progress highlights the actual first page") {
+            ReadBook.durPageIndex == 0 && ReadBook.curTextChapter!!.getPage(0)!!.hasReadAloudSpan
+        }
+        for (paused in listOf(false, true)) {
+            scenario!!.onActivity { if (paused) ReadAloud.pause(it) else ReadAloud.resume(it) }
+            await("requested playback state") { BaseReadAloudService.pause == paused }
+            prefs.edit().putBoolean(PreferKey.readAloudControlsRealtime, true).commit()
+            swipePage(next = true)
+            await("manual departure stays detached after navigation (paused=$paused)") {
+                ReadBook.durPageIndex == 1 && !ReadAloud.followReadAloudPosition &&
+                    it.findViewById<View>(R.id.ll_back_to_speech).isShown
+            }
+            prefs.edit().putBoolean(PreferKey.readAloudControlsPause, false).commit()
+            swipePage(next = false)
+            await("return restores follow and highlight without overriding pause switch") {
+                ReadBook.durPageIndex == 0 && ReadAloud.followReadAloudPosition &&
+                    ReadBook.curTextChapter!!.getPage(0)!!.hasReadAloudSpan &&
+                    !it.findViewById<View>(R.id.read_aloud_float_bar_container).isVisible
+            }
+            assertEquals("Restoring follow must not change playback state", paused, BaseReadAloudService.pause)
+            prefs.edit().putBoolean(PreferKey.readAloudControlsPause, true).commit()
+            await("pause control reappears on its own switch") { it.findViewById<View>(R.id.iv_pause_aloud).isShown }
+            screenshot("aloud-realtime-return-paused-$paused")
+        }
+        prefs.edit().putBoolean(PreferKey.readAloudControlsRealtime, false).commit()
+        swipePage(next = true)
+        await("leave with realtime off") { ReadBook.durPageIndex == 1 && !ReadAloud.followReadAloudPosition }
+        swipePage(next = false)
+        await("realtime off keeps manual return at the speech page") {
+            ReadBook.durPageIndex == 0 && !ReadAloud.followReadAloudPosition &&
+                it.findViewById<View>(R.id.ll_back_to_speech).isShown
+        }
+        screenshot("aloud-realtime-off-manual-return")
+        onView(withId(R.id.ll_back_to_speech)).perform(click())
+        await("original position action still restores follow") {
+            ReadAloud.followReadAloudPosition && ReadBook.curTextChapter!!.getPage(0)!!.hasReadAloudSpan
+        }
+        prefs.edit().putBoolean(PreferKey.readAloudControlsRealtime, true).commit()
+        swipePage(next = true)
+        await("reader is ahead of the speech cursor") { ReadBook.durPageIndex == 1 && !ReadAloud.followReadAloudPosition }
+        scenario!!.onActivity {
+            val nextSpeechStart = ReadBook.curTextChapter!!.getPage(1)!!.lines.first().chapterPosition + 1
+            service.upTtsProgress(nextSpeechStart)
+        }
+        await("speech progress catches the displayed page and restores following") {
+            ReadBook.durPageIndex == 1 && ReadAloud.followReadAloudPosition &&
+                ReadBook.curTextChapter!!.getPage(1)!!.hasReadAloudSpan
+        }
+        assertTrue("Paused cursor updates must not start playback", BaseReadAloudService.pause)
+    }
+
+    @Test fun scrollingBackRestoresRealtimeWithoutResettingTheViewport() {
+        scenario!!.onActivity {
+            ReadBook.book!!.setPageAnim(PageAnim.scrollPageAnim)
+            it.upPageAnim()
+            ReadBook.loadContent(resetPageOffset = true)
+        }
+        await("scroll reader layout") {
+            it.findViewById<ReadView>(R.id.read_view).isScroll &&
+                ReadBook.curTextChapter?.isCompleted == true &&
+                it.findViewById<ReadView>(R.id.read_view).curPage.textPage.textChapter === ReadBook.curTextChapter
+        }
+        val service = startReadAloudService(paused = true)
+        var firstPageHeight = 0
+        scenario!!.onActivity {
+            val chapter = ReadBook.curTextChapter!!
+            firstPageHeight = chapter.getPage(0)!!.height.toInt()
+            BaseReadAloudService.updateReadAloudChapterIndex(ReadBook.durChapterIndex)
+            service.upTtsProgress(chapter.getPage(0)!!.lines.first { line -> !line.isTitle }.chapterPosition + 1)
+            prefs.edit().putBoolean(PreferKey.readAloudControlsRealtime, true).commit()
+            it.findViewById<ReadView>(R.id.read_view).curPage.scroll(-firstPageHeight - 1)
+            assertFalse("Detach must not be restored before the scroll finishes", ReadAloud.followReadAloudPosition)
+        }
+        await("scrolled page remains detached") {
+            ReadBook.durPageIndex == 1 && !ReadAloud.followReadAloudPosition &&
+                it.findViewById<View>(R.id.ll_back_to_speech).isShown
+        }
+        var returnedLineTop = 0f
+        scenario!!.onActivity {
+            val view = it.findViewById<ReadView>(R.id.read_view)
+            view.curPage.scroll(firstPageHeight - 19)
+            returnedLineTop = view.getReadAloudPos()!!.second.lineTop
+        }
+        await("scrolling back restores live state") {
+            ReadAloud.followReadAloudPosition && ReadBook.durPageIndex == 0 &&
+                ReadBook.curTextChapter!!.getPage(0)!!.hasReadAloudSpan &&
+                it.findViewById<View>(R.id.iv_pause_aloud).isShown
+        }
+        scenario!!.onActivity {
+            assertEquals("Automatic following preserves the returned scroll offset", returnedLineTop,
+                it.findViewById<ReadView>(R.id.read_view).getReadAloudPos()!!.second.lineTop, .01f)
+        }
+        screenshot("aloud-realtime-scroll-return")
+    }
+
+    private fun swipePage(next: Boolean) {
+        // Start within the page so Android's edge-back gesture does not consume the swipe.
+        val offset = if (next) .3f else -.3f
+        onView(withId(R.id.read_view)).perform(GeneralSwipeAction(Swipe.FAST,
+            { view -> GeneralLocation.CENTER.calculateCoordinates(view).also { it[0] += view.width * offset } },
+            { view -> GeneralLocation.CENTER.calculateCoordinates(view).also { it[0] -= view.width * offset } },
+            Press.FINGER))
     }
 
     private fun playbackFlag(name: String, value: Boolean) {

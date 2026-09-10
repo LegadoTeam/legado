@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string formatted="false" name="read_aloud_controls_realtime">显示朗读实时状态</string>
+    <string formatted="false" name="read_aloud_controls_position">显示原进度/从本页听控件</string>
     <string formatted="false" name="read_aloud_controls">朗读播放控件设置</string>
     <string formatted="false" name="read_aloud_controls_pause">显示暂停/继续控件</string>
     <string formatted="false" name="read_aloud_controls_auto_hide">自动隐藏</string>
