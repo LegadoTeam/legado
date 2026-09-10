@@ -20,6 +20,10 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
         }
     }
 
+    fun enable(id: Long, enable: Boolean) {
+        execute { appDb.replaceRuleDao.enable(id, enable) }
+    }
+
     fun delete(rule: ReplaceRule) {
         execute {
             appDb.replaceRuleDao.delete(rule)
@@ -61,8 +65,8 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
         }
     }
 
-    fun move(ruleId: Long, targetId: Long, after: Boolean) {
-        execute {
+    fun move(ruleId: Long, targetId: Long, after: Boolean, onFinally: () -> Unit = {}) {
+        executeLazy {
             appDb.runInTransaction {
                 val current = appDb.replaceRuleDao.all
                 val reordered = moveRelativeTo(current, ruleId, targetId, after) { it.id }
@@ -71,24 +75,18 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
                     item.copy(order = index)
                 }.toTypedArray())
             }
-        }
+        }.onFinally { onFinally() }.start()
     }
 
     fun enableSelection(rules: List<ReplaceRule>) {
         execute {
-            val array = Array(rules.size) {
-                rules[it].copy(isEnabled = true)
-            }
-            appDb.replaceRuleDao.update(*array)
+            appDb.replaceRuleDao.enable(true, rules)
         }
     }
 
     fun disableSelection(rules: List<ReplaceRule>) {
         execute {
-            val array = Array(rules.size) {
-                rules[it].copy(isEnabled = false)
-            }
-            appDb.replaceRuleDao.update(*array)
+            appDb.replaceRuleDao.enable(false, rules)
         }
     }
 

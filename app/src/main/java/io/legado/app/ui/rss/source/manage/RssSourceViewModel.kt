@@ -55,8 +55,12 @@ class RssSourceViewModel(application: Application) : BaseViewModel(application) 
         execute { appDb.rssSourceDao.update(*rssSource) }
     }
 
-    fun move(sourceUrl: String, targetUrl: String, after: Boolean) {
-        execute {
+    fun enable(sourceUrl: String, enable: Boolean) {
+        execute { appDb.rssSourceDao.enable(sourceUrl, enable) }
+    }
+
+    fun move(sourceUrl: String, targetUrl: String, after: Boolean, onFinally: () -> Unit = {}) {
+        executeLazy {
             appDb.runInTransaction {
                 val current = appDb.rssSourceDao.all
                 val reordered = moveRelativeTo(current, sourceUrl, targetUrl, after) { it.sourceUrl }
@@ -65,24 +69,18 @@ class RssSourceViewModel(application: Application) : BaseViewModel(application) 
                     item.copy(customOrder = index)
                 }.toTypedArray())
             }
-        }
+        }.onFinally { onFinally() }.start()
     }
 
     fun enableSelection(sources: List<RssSource>) {
         execute {
-            val array = Array(sources.size) {
-                sources[it].copy(enabled = true)
-            }
-            appDb.rssSourceDao.update(*array)
+            appDb.rssSourceDao.enable(true, sources)
         }
     }
 
     fun disableSelection(sources: List<RssSource>) {
         execute {
-            val array = Array(sources.size) {
-                sources[it].copy(enabled = false)
-            }
-            appDb.rssSourceDao.update(*array)
+            appDb.rssSourceDao.enable(false, sources)
         }
     }
 
@@ -156,10 +154,7 @@ class RssSourceViewModel(application: Application) : BaseViewModel(application) 
     }
 
     fun disable(rssSource: RssSource) {
-        execute {
-            rssSource.enabled = false
-            appDb.rssSourceDao.update(rssSource)
-        }
+        enable(rssSource.sourceUrl, false)
     }
 
 }

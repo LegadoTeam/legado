@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import io.legado.app.constant.AppPattern
 import io.legado.app.data.entities.ReplaceRule
@@ -130,6 +131,16 @@ interface ReplaceRuleDao {
 
     @Query("UPDATE replace_rules SET isEnabled = :enable")
     fun enableAll(enable: Boolean)
+
+    @Query("UPDATE replace_rules SET isEnabled = :enable WHERE id = :id")
+    fun enable(id: Long, enable: Boolean)
+
+    @Transaction
+    fun enable(enable: Boolean, rules: List<ReplaceRule>) {
+        for (rule in rules) {
+            enable(rule.id, enable)
+        }
+    }
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insert(vararg replaceRule: ReplaceRule): List<Long>

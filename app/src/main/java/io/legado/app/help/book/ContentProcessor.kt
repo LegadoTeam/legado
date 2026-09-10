@@ -196,7 +196,7 @@ class ContentProcessor private constructor(
                         }
                     } catch (e: RegexTimeoutException) {
                         item.isEnabled = false
-                        appDb.replaceRuleDao.update(item)
+                        appDb.replaceRuleDao.enable(item.id, false)
                         mContent = item.name + e.stackTraceStr
                     } catch (_: CancellationException) {
                     } catch (e: Exception) {

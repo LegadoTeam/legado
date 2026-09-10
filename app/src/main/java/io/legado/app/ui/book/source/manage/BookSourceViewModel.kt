@@ -61,8 +61,8 @@ class BookSourceViewModel(application: Application) : BaseViewModel(application)
         execute { appDb.bookSourceDao.update(*bookSource) }
     }
 
-    fun move(sourceUrl: String, targetUrl: String, after: Boolean) {
-        execute {
+    fun move(sourceUrl: String, targetUrl: String, after: Boolean, onFinally: () -> Unit = {}) {
+        executeLazy {
             appDb.runInTransaction {
                 val current = appDb.bookSourceDao.allPart
                 val reordered = moveRelativeTo(current, sourceUrl, targetUrl, after) { it.bookSourceUrl }
@@ -71,7 +71,7 @@ class BookSourceViewModel(application: Application) : BaseViewModel(application)
                     source.copy(customOrder = index)
                 })
             }
-        }
+        }.onFinally { onFinally() }.start()
     }
 
     fun enable(enable: Boolean, items: List<BookSourcePart>) {

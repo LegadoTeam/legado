@@ -96,8 +96,7 @@ class RssSourceAdapter(context: Context, val callBack: CallBack) :
         binding.apply {
             swtEnabled.setOnUserCheckedChangeListener { checked ->
                 getItem(holder.layoutPosition)?.let {
-                    it.enabled = checked
-                    callBack.update(it)
+                    callBack.enable(checked, it)
                 }
             }
             cbSource.setOnUserCheckedChangeListener { checked ->
@@ -192,14 +191,24 @@ class RssSourceAdapter(context: Context, val callBack: CallBack) :
 
     private var dragStartPosition = RecyclerView.NO_POSITION
     private var draggedKey: String? = null
+    private var draggedHolder: RecyclerView.ViewHolder? = null
+
+    override fun canStartDrag() = !listUpdatesPaused
+
+    override fun onDragStarted(viewHolder: RecyclerView.ViewHolder) {
+        if (listUpdatesPaused) return
+        val position = viewHolder.bindingAdapterPosition
+        val source = getItem(position) ?: return
+        pauseListUpdates()
+        dragStartPosition = position
+        draggedKey = source.sourceUrl
+        draggedHolder = viewHolder
+    }
 
     override fun swap(srcPosition: Int, targetPosition: Int): Boolean {
         val source = getItem(srcPosition) ?: return false
         if (getItem(targetPosition) == null) return false
-        if (dragStartPosition == RecyclerView.NO_POSITION) {
-            dragStartPosition = srcPosition
-            draggedKey = source.sourceUrl
-        } else if (source.sourceUrl != draggedKey) {
+        if (draggedHolder == null || source.sourceUrl != draggedKey) {
             return false
         }
         swapItem(srcPosition, targetPosition)
@@ -207,16 +216,29 @@ class RssSourceAdapter(context: Context, val callBack: CallBack) :
     }
 
     override fun onClearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
+        if (viewHolder !== draggedHolder) return
         val start = dragStartPosition
         val key = draggedKey
         dragStartPosition = RecyclerView.NO_POSITION
         draggedKey = null
+        draggedHolder = null
+        fun finish() {
+            resumeListUpdates()
+            callBack.reload()
+        }
         val end = viewHolder.bindingAdapterPosition
-        if (start == RecyclerView.NO_POSITION || end == RecyclerView.NO_POSITION || start == end) return
-        val moved = getItem(end)?.takeIf { it.sourceUrl == key } ?: return
+        val moved = getItem(end)?.takeIf { it.sourceUrl == key }
+        if (start == RecyclerView.NO_POSITION || end == RecyclerView.NO_POSITION || start == end || moved == null) {
+            finish()
+            return
+        }
         val after = end > start
-        val target = getItem(if (after) end - 1 else end + 1) ?: return
-        callBack.move(moved.sourceUrl, target.sourceUrl, after)
+        val target = getItem(if (after) end - 1 else end + 1)
+        if (target == null) {
+            finish()
+            return
+        }
+        callBack.move(moved.sourceUrl, target.sourceUrl, after, ::finish)
     }
 
     val dragSelectCallback: DragSelectTouchHelper.Callback =
@@ -249,10 +271,11 @@ class RssSourceAdapter(context: Context, val callBack: CallBack) :
     interface CallBack {
         fun del(source: RssSource)
         fun edit(source: RssSource)
-        fun update(vararg source: RssSource)
+        fun enable(enable: Boolean, source: RssSource)
         fun toTop(source: RssSource)
         fun toBottom(source: RssSource)
-        fun move(sourceUrl: String, targetUrl: String, after: Boolean)
+        fun move(sourceUrl: String, targetUrl: String, after: Boolean, onFinally: () -> Unit)
+        fun reload()
         fun upCountView()
     }
 }

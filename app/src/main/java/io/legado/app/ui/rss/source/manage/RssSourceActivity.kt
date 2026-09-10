@@ -413,8 +413,8 @@ class RssSourceActivity : VMBaseActivity<ActivityRssSourceBinding, RssSourceView
         }
     }
 
-    override fun update(vararg source: RssSource) {
-        viewModel.update(*source)
+    override fun enable(enable: Boolean, source: RssSource) {
+        viewModel.enable(source.sourceUrl, enable)
     }
 
     override fun toTop(source: RssSource) {
@@ -425,8 +425,10 @@ class RssSourceActivity : VMBaseActivity<ActivityRssSourceBinding, RssSourceView
         viewModel.bottomSource(source)
     }
 
-    override fun move(sourceUrl: String, targetUrl: String, after: Boolean) {
-        viewModel.move(sourceUrl, targetUrl, after)
+    override fun move(sourceUrl: String, targetUrl: String, after: Boolean, onFinally: () -> Unit) {
+        viewModel.move(sourceUrl, targetUrl, after, onFinally)
     }
+
+    override fun reload() = upSourceFlow(binding.titleBar.findViewById<SearchView>(R.id.search_view).query.toString())
 
 }

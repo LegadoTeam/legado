@@ -42,8 +42,9 @@ class SourceDragOrderUiTest {
     @Test fun descendingBookDragPreservesHiddenOrder() = verifyDrag(Kind.BOOK, true)
     @Test fun filteredRssDragPreservesHiddenOrder() = verifyDrag(Kind.RSS)
     @Test fun filteredReplaceDragPreservesHiddenOrder() = verifyDrag(Kind.REPLACE)
+    @Test fun heldBookDragWithDeletedTargetDoesNotMoveAnotherSource() = verifyDrag(Kind.BOOK, removeTarget = true)
 
-    private fun verifyDrag(kind: Kind, descending: Boolean = false) {
+    private fun verifyDrag(kind: Kind, descending: Boolean = false, removeTarget: Boolean = false) {
         val id = UUID.randomUUID().toString()
         val group = "Drag $id"
         val orders = listOf(100, 100, 400, 700, 900, 900)
@@ -79,7 +80,7 @@ class SourceDragOrderUiTest {
             val visible = fixtureKeys.filterIndexed { index, _ -> index % 2 == 0 }
                 .let { if (descending) it.reversed() else it }
             val before = databaseKeys(kind)
-            val metadata = databaseMetadata(kind)
+            var metadata = databaseMetadata(kind)
             val rawOrders = databaseOrders(kind)
             scenario = launch(kind)
             if (descending) scenario.onActivity { activity ->
@@ -97,17 +98,32 @@ class SourceDragOrderUiTest {
             assertEquals(before, databaseKeys(kind))
             assertEquals(rawOrders, databaseOrders(kind))
 
-            drag(scenario, 0, 2)
             val moved = visible.first()
             val target = visible.last()
-            val expected = before.toMutableList().apply {
+            val dragScenario = checkNotNull(scenario)
+            drag(scenario, 0, 2, whileHeld = {
+                val version = listUpdateVersion(dragScenario)
+                // A real Room invalidation reaches the manager while the pointer still owns A.
+                updateComment(kind, visible[1], "Refreshed while dragging")
+                if (removeTarget) appDb.bookSourceDao.delete(target)
+                metadata = databaseMetadata(kind)
+                waitUntil("Room publication during held $kind drag") {
+                    listUpdateVersion(dragScenario) > version
+                }
+                awaitItems(dragScenario, visible.drop(1) + moved)
+                assertEquals(if (removeTarget) before.filter { it != target } else before, databaseKeys(kind))
+                screenshot("drag-${kind.name}-$descending-held-refresh-$removeTarget")
+            })
+            val expected = if (removeTarget) before.filter { it != target } else before.toMutableList().apply {
                 remove(moved)
                 add(indexOf(target) + if (descending) 0 else 1, moved)
             }
             waitUntil("persisted $kind drag order") { databaseKeys(kind) == expected }
-            assertEquals(before.filter { it != moved }, databaseKeys(kind).filter { it != moved })
+            assertEquals(before.filter { it != moved && (!removeTarget || it != target) },
+                databaseKeys(kind).filter { it != moved })
+            if (removeTarget) assertEquals(rawOrders.filterKeys { it != target }, databaseOrders(kind))
             assertEquals(metadata, databaseMetadata(kind))
-            awaitItems(scenario, visible.drop(1) + moved)
+            awaitItems(scenario, if (removeTarget) visible.filter { it != target } else visible.drop(1) + moved)
             screenshot("drag-${kind.name}-$descending-after")
             filter(scenario, "")
             awaitItems(scenario, if (descending) expected.reversed() else expected)
@@ -164,6 +180,24 @@ class SourceDragOrderUiTest {
         Kind.REPLACE -> appDb.replaceRuleDao.all.associate { it.id.toString() to it.order }
     }
 
+    private fun updateComment(kind: Kind, key: String, comment: String) = when (kind) {
+        Kind.BOOK -> appDb.bookSourceDao.update(checkNotNull(appDb.bookSourceDao.getBookSource(key))
+            .copy(bookSourceComment = comment))
+        Kind.RSS -> appDb.rssSourceDao.update(checkNotNull(appDb.rssSourceDao.getByKey(key))
+            .copy(sourceComment = comment))
+        Kind.REPLACE -> appDb.replaceRuleDao.update(checkNotNull(appDb.replaceRuleDao.findById(key.toLong()))
+            .copy(replacement = comment))
+    }
+
+    private fun listUpdateVersion(scenario: ActivityScenario<out Activity>): Long {
+        var version = -1L
+        scenario.onActivity { activity ->
+            version = (activity.findViewById<RecyclerView>(R.id.recycler_view).adapter as RecyclerAdapter<*, *>)
+                .listUpdateVersion
+        }
+        return version
+    }
+
     private fun databaseMetadata(kind: Kind): Map<String, String> = when (kind) {
         Kind.BOOK -> appDb.bookSourceDao.all.associate {
             it.bookSourceUrl to GSON.toJson(it.copy(customOrder = 0))
@@ -204,7 +238,7 @@ class SourceDragOrderUiTest {
     }
 
     private fun drag(scenario: ActivityScenario<out Activity>, from: Int, to: Int,
-                     returnToStart: Boolean = false) {
+                     returnToStart: Boolean = false, whileHeld: () -> Unit = {}) {
         var x = 0f
         var startY = 0f
         var endY = 0f
@@ -251,6 +285,7 @@ class SourceDragOrderUiTest {
                 }
                 atTarget
             }
+            whileHeld()
             if (returnToStart) move(endY, returnY)
         } catch (failure: Throwable) {
             screenshot("drag-held-failure-${SystemClock.uptimeMillis()}")

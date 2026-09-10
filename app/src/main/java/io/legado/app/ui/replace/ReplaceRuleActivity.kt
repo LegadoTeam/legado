@@ -426,9 +426,9 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
         )
     }
 
-    override fun update(vararg rule: ReplaceRule) {
+    override fun enable(enable: Boolean, rule: ReplaceRule) {
         setResult(RESULT_OK)
-        viewModel.update(*rule)
+        viewModel.enable(rule.id, enable)
     }
 
     override fun delete(rule: ReplaceRule) {
@@ -457,8 +457,10 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
         viewModel.toBottom(rule)
     }
 
-    override fun move(ruleId: Long, targetId: Long, after: Boolean) {
+    override fun move(ruleId: Long, targetId: Long, after: Boolean, onFinally: () -> Unit) {
         setResult(RESULT_OK)
-        viewModel.move(ruleId, targetId, after)
+        viewModel.move(ruleId, targetId, after, onFinally)
     }
+
+    override fun reload() = observeReplaceRuleData(searchView.query.toString())
 }
