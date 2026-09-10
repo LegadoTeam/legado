@@ -396,6 +396,7 @@ class SharedFileImportTest {
                 ready = activity.supportFragmentManager.fragments.filterIsInstance<DialogFragment>()
                     .any { dialog ->
                         dialog.dialog?.isShowing == true &&
+                            dialog.dialog?.window?.decorView?.hasWindowFocus() == true &&
                             (dialog.view?.findViewById<RecyclerView>(R.id.recycler_view)?.adapter?.itemCount ?: 1) > 0
                     }
             }
