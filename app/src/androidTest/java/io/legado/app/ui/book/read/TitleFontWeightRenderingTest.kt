@@ -716,18 +716,20 @@ class TitleFontWeightRenderingTest {
                 ChapterProvider.clearReviewProviders()
                 val fixture = BookChapter(bookUrl = book!!.bookUrl, url = "highlight-indent", index = 10003)
                 val decoration = Color.MAGENTA
-                val style = HighlightStyle(underline = HighlightStyle.Underline(color = decoration),
+                val fullStyle = HighlightStyle(underline = HighlightStyle.Underline(color = decoration),
                     strike = HighlightStyle.Deco(decoration), box = HighlightStyle.Deco(decoration),
-                    emphasis = HighlightStyle.Deco(decoration))
+                    emphasis = HighlightStyle.Deco(Color.CYAN))
                 for (mode in listOf("static", "zh", "html")) for (justify in listOf(false, true))
                     for (indentCount in listOf(0, 2, 4)) {
                     val indent = ChapterProvider.indentChar.repeat(indentCount)
+                    val style = fullStyle.copy(underline = fullStyle.underline.takeUnless { justify })
                     ReadBookConfig.paragraphIndent = indent
                     ReadBookConfig.useZhLayout = mode == "zh"
                     context.putPrefBoolean(PreferKey.textFullJustify, justify)
                     ChapterProvider.upStyle()
                     val text = "“正文　 内部空格仍应高亮，段落需要自动换行。".repeat(5)
-                    val img = "<img src='${image.absolutePath},{\"style\":\"text\"}'>"
+                    val src = "${image.absolutePath},{\"style\":\"text\"}"
+                    val img = if (mode == "html") "<img src='$src'>" else """<img src="$src">"""
                     val contents = if (mode == "html") listOf("<usehtml><p>　 $img$text</p></usehtml>")
                         else listOf(indent + img + text, indent + text)
                     val chapter = ChapterProvider.getTextChapterAsync(CoroutineScope(Dispatchers.Default),
@@ -771,14 +773,19 @@ class TitleFontWeightRenderingTest {
                                 Color.alpha(it) > 100 && Color.red(it) > 180 &&
                                     Color.blue(it) > 180 && Color.green(it) < 100
                             } > 20)
+                            if (justify) assertTrue("Emphasis dots must actually draw: $label", pixels.count {
+                                Color.alpha(it) > 100 && Color.red(it) < 100 &&
+                                    Color.blue(it) > 180 && Color.green(it) > 180
+                            } > 3)
                             for (line in page.lines) for (column in line.columns.filterIsInstance<TextBaseColumn>()) {
                                 if (!column.isParagraphIndent) continue
                                 for (y in ceil(line.lineTop).toInt().coerceAtLeast(0) until line.lineBottom.toInt().coerceAtMost(height))
                                     for (x in ceil(column.start + 3).toInt().coerceAtLeast(0) until (column.end - 3).toInt().coerceAtMost(width)) {
                                         val pixel = bitmap.getPixel(x, y)
                                         assertFalse("Decoration leaked into indent: $label ($x,$y)",
-                                            Color.alpha(pixel) > 100 && Color.red(pixel) > 180 &&
-                                                Color.blue(pixel) > 180 && Color.green(pixel) < 100)
+                                            Color.alpha(pixel) > 100 && Color.blue(pixel) > 180 &&
+                                                (Color.red(pixel) > 180 && Color.green(pixel) < 100 ||
+                                                    Color.red(pixel) < 100 && Color.green(pixel) > 180))
                                     }
                             }
                             if (page.index == 0 && indentCount == 2) File(context.getExternalFilesDir("ui-regression"),
