@@ -66,6 +66,7 @@ internal data class RssSourceImportCandidate(
     val replaced: RssSource? = null,
     val replacedJson: String? = null,
     val replacementError: String? = null,
+    val effectiveRuleIds: List<Long> = emptyList(),
 ) {
     fun source(useReplacement: Boolean): RssSource =
         if (useReplacement) replaced ?: original else original
@@ -87,10 +88,13 @@ internal fun prepareRssSourceImportCandidate(
         return RssSourceImportCandidate(source, originalJson, source)
     }
 
+    val effectiveRuleIds = arrayListOf<Long>()
     var replacedJson = originalJson
     try {
         matchingRules.forEach { rule ->
-            replacedJson = applySourceImportReplacement(replacedJson, rule)
+            val next = applySourceImportReplacement(replacedJson, rule)
+            if (next != replacedJson) effectiveRuleIds.add(rule.id)
+            replacedJson = next
         }
         val replaced = parseSingleRssSourceJson(replacedJson).also { it.requireSourceUrl() }
         return RssSourceImportCandidate(
@@ -98,6 +102,7 @@ internal fun prepareRssSourceImportCandidate(
             originalJson,
             replaced,
             replacedJson,
+            effectiveRuleIds = effectiveRuleIds,
         )
     } catch (error: kotlinx.coroutines.CancellationException) {
         throw error
@@ -107,6 +112,7 @@ internal fun prepareRssSourceImportCandidate(
             originalJson,
             replacedJson = replacedJson,
             replacementError = error.localizedMessage ?: error.javaClass.simpleName,
+            effectiveRuleIds = effectiveRuleIds,
         )
     }
 }
@@ -116,12 +122,13 @@ internal fun refreshRssSourceImportCandidates(
     editedIndex: Int,
     editedSource: RssSource?,
     rules: List<ReplaceRule>,
+    manualRuleIds: Map<Int, List<Long>>? = null,
 ): List<RssSourceImportCandidate> {
-    require(editedIndex in candidates.indices)
+    require(editedIndex == -1 || editedIndex in candidates.indices)
     return candidates.mapIndexed { index, candidate ->
         prepareRssSourceImportCandidate(
             if (index == editedIndex) editedSource ?: candidate.original else candidate.original,
-            rules,
+            if (manualRuleIds == null) rules else rules.filter { it.id in manualRuleIds[index].orEmpty() },
         )
     }
 }
