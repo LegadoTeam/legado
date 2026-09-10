@@ -42,6 +42,17 @@ class BookSourceAdapter(
     private val handler = buildMainHandler()
     var showSourceHost = false
     var showCheckStatus = false
+    private var bookshelfCounts = emptyMap<String, Int>()
+
+    fun updateBookshelfCounts(counts: Map<String, Int>) {
+        val previous = bookshelfCounts
+        bookshelfCounts = counts
+        getItems().forEachIndexed { index, source ->
+            if (previous[source.bookSourceUrl] != counts[source.bookSourceUrl]) {
+                notifyItemChanged(index, Bundle().apply { putBoolean("bookshelfCount", true) })
+            }
+        }
+    }
 
     val selection: List<BookSourcePart>
         get() {
@@ -112,6 +123,7 @@ class BookSourceAdapter(
                 cbBookSource.text = item.getDisPlayNameGroup()
                 swtEnabled.isChecked = item.enabled
                 cbBookSource.isChecked = selected.contains(item)
+                upBookshelfCount(binding, item)
                 upCheckSourceMessage(binding, item)
                 upShowExplore(ivExplore, item)
                 tvJsBadge.gone(!item.hasJs)
@@ -125,6 +137,7 @@ class BookSourceAdapter(
                             "upName" -> cbBookSource.text = item.getDisPlayNameGroup()
                             "upExplore" -> upShowExplore(ivExplore, item)
                             "upJs" -> tvJsBadge.gone(!item.hasJs)
+                            "bookshelfCount" -> upBookshelfCount(binding, item)
                             "selected" -> cbBookSource.isChecked = selected.contains(item)
                             "checkSourceMessage" -> upCheckSourceMessage(binding, item)
                             "upSourceHost" -> upSourceHost(binding, holder.layoutPosition)
@@ -232,6 +245,12 @@ class BookSourceAdapter(
                 iv.contentDescription = context.getString(R.string.tag_explore_disabled)
             }
         }
+    }
+
+    private fun upBookshelfCount(binding: ItemBookSourceBinding, item: BookSourcePart) {
+        binding.tvBookshelfCount.text = context.getString(
+            R.string.source_bookshelf_count, bookshelfCounts[item.bookSourceUrl] ?: 0
+        )
     }
 
     private fun upCheckSourceMessage(
