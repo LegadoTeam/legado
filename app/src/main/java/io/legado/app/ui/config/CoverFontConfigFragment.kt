@@ -35,6 +35,7 @@ class CoverFontConfigFragment : PreferenceFragment(), SharedPreferences.OnShared
     }
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
+        if (!isAdded) return
         if (key !in sizes && key != PreferKey.coverCustomFontSize) return
         key?.let(::updateSummary)
         BookCover.upDefaultCover()
