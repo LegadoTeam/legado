@@ -1,6 +1,8 @@
 package io.legado.app.ui.autoTask
 
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
+import io.legado.app.ui.association.jsonImportType
 import org.junit.Test
 import java.io.File
 
@@ -22,7 +24,8 @@ class AutoTaskImportContractTest {
         )
 
         assertTrue(base.contains("map.containsKey(\"cron\") && map.containsKey(\"script\")"))
-        assertTrue(base.contains("successLive.postValue(\"autoTask\" to uri.toString())"))
+        assertEquals("autoTask", jsonImportType(mapOf("cron" to "0 * * * *", "script" to "test")))
+        assertTrue(base.contains("successLive.postValue(type to uri.toString())"))
         assertTrue(online.contains("\"/autoTask\" -> showDialogFragment("))
         assertTrue(online.contains("\"/auto\" -> viewModel.determineType("))
         assertTrue(online.contains("\"autoTask\" -> showDialogFragment("))
