@@ -2,7 +2,7 @@
 <resources>
     <string name="local_book_save_path">本地导入保存路径</string>
     <string name="shared_local_books_storage">书籍将复制到所选目录。也可使用应用私有目录，原文件保持不变。</string>
-    <string name="shared_local_books_private">使用应用默认路径</string>
-    <string name="shared_local_books_mixed_types">压缩包内存在多种可导入类型，无法统一导入，请分别导入。</string>
+    <string name="shared_local_books_private">应用默认路径</string>
+    <string name="shared_local_books_mixed_types">待导入文件包含不同类型的数据，请按类型分别导入。</string>
     <string name="shared_local_books_copied">已复制并加入书架 %1$d 本，失败 %2$d 本。原文件已保留。</string>
 </resources>

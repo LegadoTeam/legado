@@ -688,47 +688,70 @@ class SharedFileImportTest {
         }
     }
 
-    @Test(timeout = 120_000) fun openWithCopiesToPrivateStorageAfterDefaultDismissOrCancelledPicker() {
-        prefs.edit().remove(PreferKey.defaultBookTreeUri).commit()
-        for (choice in listOf("default", "dismiss", "picker")) {
-            val file = File(directory, "private-$choice-$id.txt").apply {
-                writeText("PRIVATE COPY $choice $id\n".repeat(20))
-            }
-            val monitor = object : Instrumentation.ActivityMonitor() {
-                override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? =
-                    if (intent.component?.className == HandleFileActivity::class.java.name)
-                        Instrumentation.ActivityResult(Activity.RESULT_CANCELED, null) else null
-            }
-            instrumentation.addMonitor(monitor)
-            try {
-                val intent = Intent(Intent.ACTION_VIEW).setDataAndType(providerUri(file), "text/plain")
-                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    .setComponent(ComponentName(context, FileAssociationActivity::class.java))
-                ActivityScenario.launch<FileAssociationActivity>(intent).use { scenario ->
-                    onView(withText(R.string.shared_local_books_storage)).inRoot(isDialog()).check(matches(isDisplayed()))
-                    scenario.onActivity {
-                        assertNull(it.supportFragmentManager.findFragmentByTag("sharedLocalBooks"))
-                    }
-                    if (choice == "default") screenshot("share-local-private-folder")
-                    when (choice) {
-                        "default" -> onView(withId(android.R.id.button2)).inRoot(isDialog()).perform(click())
-                        "dismiss" -> pressBack()
-                        else -> onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
-                    }
-                    await { ReadBook.book?.originName == file.name }
-                    val book = ReadBook.book!!.also(books::add)
-                    val copy = File(book.bookUrl)
-                    assertEquals(File(context.filesDir, "books").canonicalFile, copy.parentFile!!.canonicalFile)
-                    assertArrayEquals(file.readBytes(), copy.readBytes())
-                    assertTrue(file.isFile)
-                    awaitReader(book)
-                    assertTrue(ReadBook.curTextChapter!!.pages.any { it.text.contains("PRIVATE COPY $choice") })
-                    closeReaders()
-                    assertTrue(copy.delete())
-                    assertNull(AppConfig.defaultBookTreeUri)
-                }
-            } finally { instrumentation.removeMonitor(monitor) }
+    @Test(timeout = 120_000) fun cancelledPathReturnsToPreviewAndExplicitDefaultIsSharedWithOpenWith() {
+        val privateDirectory = File(context.filesDir, "books")
+        val monitor = object : Instrumentation.ActivityMonitor() {
+            override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? =
+                if (intent.component?.className == HandleFileActivity::class.java.name)
+                    Instrumentation.ActivityResult(Activity.RESULT_CANCELED, null) else null
         }
+        instrumentation.addMonitor(monitor)
+        try {
+            for (firstOpen in listOf(false, true)) for (choice in listOf("dismiss", "picker")) {
+                prefs.edit().remove(PreferKey.defaultBookTreeUri).commit()
+                // Exercise both directions: SHARE remembers the default for VIEW and vice versa.
+                for (round in 0..1) {
+                    val open = if (round == 0) firstOpen else !firstOpen
+                    val file = File(directory, "private-$firstOpen-$choice-$round-$id.txt").apply {
+                        writeText("PRIVATE COPY $choice $id\n".repeat(20))
+                    }
+                    val copy = File(privateDirectory, file.name)
+                    val scenario = if (open) {
+                        val intent = Intent(Intent.ACTION_VIEW).setDataAndType(providerUri(file), "text/plain")
+                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            .setComponent(ComponentName(context, FileAssociationActivity::class.java))
+                        ActivityScenario.launch<FileAssociationActivity>(intent)
+                    } else launchShare(file, "text/plain")
+                    scenario.use {
+                        if (!open) confirmLocalPreview(scenario)
+                        if (round == 0) {
+                            onView(withText(R.string.shared_local_books_storage)).inRoot(isDialog()).check(matches(isDisplayed()))
+                            if (open) scenario.onActivity {
+                                assertNull(it.supportFragmentManager.findFragmentByTag("sharedLocalBooks"))
+                            }
+                            if (choice == "dismiss") pressBack()
+                            else onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+                            awaitLocalPreview(scenario)
+                            scenario.onActivity {
+                                val model = ViewModelProvider(it)[FileAssociationViewModel::class.java]
+                                assertFalse(model.localBookDestination.value == true)
+                                assertFalse(model.choosingLocalBookDirectory)
+                                assertFalse(model.importingLocalBooks.value == true)
+                            }
+                            assertFalse(copy.exists())
+                            assertFalse(appDb.bookDao.has(copy.path))
+                            assertNull(AppConfig.defaultBookTreeUri)
+                            scenario.recreate()
+                            confirmLocalPreview(scenario)
+                            onView(withText(R.string.shared_local_books_storage)).inRoot(isDialog()).check(matches(isDisplayed()))
+                            screenshot("share-local-explicit-path-$firstOpen-$choice")
+                            onView(withId(android.R.id.button2)).inRoot(isDialog()).perform(click())
+                        }
+                        await { copy.isFile && appDb.bookDao.has(copy.path) }
+                        val book = appDb.bookDao.getBook(copy.path)!!.also(books::add)
+                        assertEquals(Uri.fromFile(privateDirectory).toString(), AppConfig.defaultBookTreeUri)
+                        assertArrayEquals(file.readBytes(), copy.readBytes())
+                        assertTrue(file.isFile)
+                        if (open) {
+                            awaitReader(book)
+                            assertTrue(ReadBook.curTextChapter!!.pages.any { it.text.contains("PRIVATE COPY $choice") })
+                            closeReaders()
+                        }
+                        assertTrue(copy.delete())
+                    }
+                }
+            }
+        } finally { instrumentation.removeMonitor(monitor) }
     }
 
     private fun providerUri(file: File): Uri =
