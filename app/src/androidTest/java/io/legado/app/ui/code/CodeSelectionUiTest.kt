@@ -12,6 +12,8 @@ import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewConfiguration
+import android.view.InputDevice
+import android.view.MotionEvent
 import android.webkit.WebView
 import android.view.inputmethod.EditorInfo
 import android.widget.ArrayAdapter
@@ -30,7 +32,9 @@ import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.NoMatchingViewException
 import androidx.test.espresso.action.GeneralClickAction
+import androidx.test.espresso.action.GeneralSwipeAction
 import androidx.test.espresso.action.Press
+import androidx.test.espresso.action.Swipe
 import androidx.test.espresso.action.Tap
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions.matches
@@ -39,8 +43,10 @@ import androidx.test.espresso.matcher.ViewMatchers.isCompletelyDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.RootMatchers.isPlatformPopup
 import androidx.test.espresso.matcher.RootMatchers.isDialog
+import androidx.test.espresso.matcher.RootMatchers.withDecorView
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
+import androidx.test.espresso.matcher.ViewMatchers.hasDescendant
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
@@ -269,6 +275,69 @@ class CodeSelectionUiTest {
             assertEquals(selectedText, selection(it))
         }
         onView(withText(android.R.string.copy)).check(doesNotExist())
+    }
+
+    @Test fun longPressDragStillExtendsTheSelectionBeforeShowingNativeActions() {
+        launchEditor()
+        val from = editorPoint(2, 11)
+        val to = editorPoint(3, 15)
+        val down = SystemClock.uptimeMillis()
+        fun touch(action: Int, point: FloatArray) {
+            val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, point[0], point[1], 0)
+            event.source = InputDevice.SOURCE_TOUCHSCREEN
+            try { assertTrue(instrumentation.uiAutomation.injectInputEvent(event, true)) }
+            finally { event.recycle() }
+        }
+        touch(MotionEvent.ACTION_DOWN, from)
+        SystemClock.sleep(ViewConfiguration.getLongPressTimeout().toLong() + 100)
+        awaitEditor { selection(it) == "message" }
+        touch(MotionEvent.ACTION_MOVE, to)
+        touch(MotionEvent.ACTION_UP, to)
+        awaitEditor {
+            it.cursor.left == source.indexOf("message") &&
+                selection(it).contains("\n  return") && it.text.toString() == source
+        }
+        assertNativeMenu()
+        screenshot("code-selection-native-drag")
+    }
+
+    @Test fun nativeMenuStaysClearOfKeyboardAndSearchToolsNearTheBottomAfterScrolling() {
+        launchEditor()
+        val code = (0..80).joinToString("\n") { "const line$it = $it;" }
+        scenario!!.onActivity { activity ->
+            activity.findViewById<CodeEditor>(R.id.editText).setText(code)
+            CodeEditActivity::class.java.getDeclaredMethod("search").apply { isAccessible = true }.invoke(activity)
+        }
+        onView(withId(R.id.editText)).perform(click())
+        awaitEditor { ViewCompat.getRootWindowInsets(it)?.isVisible(WindowInsetsCompat.Type.ime()) == true }
+        var selected = ""
+        var offset = 0
+        withEditor {
+            val end = it.lastVisibleLine - 1
+            assertTrue("The fixture must leave room for a multiline selection", end >= it.firstVisibleLine + 2)
+            it.setSelectionRegion(end - 2, 0, end, 10, false)
+            selected = selection(it)
+            offset = it.offsetY
+        }
+        assertNativeMenu()
+        assertNativeMenuClearOfTools()
+        screenshot("code-selection-native-ime-search-bottom")
+        onView(withId(R.id.editText)).perform(GeneralSwipeAction(Swipe.SLOW, { view ->
+            val position = IntArray(2)
+            view.getLocationOnScreen(position)
+            floatArrayOf(position[0] + view.width * 0.9f, position[1] + view.height * 0.4f)
+        }, { view ->
+            val editor = view as CodeEditor
+            val position = IntArray(2)
+            view.getLocationOnScreen(position)
+            floatArrayOf(position[0] + view.width * 0.9f, position[1] + view.height * 0.4f - editor.rowHeight)
+        }, Press.FINGER))
+        awaitEditor { it.offsetY > offset && selection(it) == selected && it.text.toString() == code }
+        // FloatingActionMode deliberately hides a moving toolbar briefly before positioning it.
+        SystemClock.sleep(500)
+        assertNativeMenu()
+        assertNativeMenuClearOfTools()
+        screenshot("code-selection-native-ime-search-scrolled")
     }
 
     @Test fun savedDraftUsesTheCallersRequestedTransport() {
@@ -717,6 +786,17 @@ class CodeSelectionUiTest {
         }, Press.FINGER))
     }
 
+    private fun editorPoint(line: Int, column: Int): FloatArray {
+        var point = floatArrayOf()
+        withEditor {
+            val location = IntArray(2)
+            it.getLocationOnScreen(location)
+            point = floatArrayOf(location[0] + it.getCharOffsetX(line, column) + it.dpUnit,
+                location[1] + it.getCharOffsetY(line, column) - it.rowHeight / 2f)
+        }
+        return point
+    }
+
     @Suppress("DEPRECATION")
     private fun shareAndAssert(expected: String) {
         val chooser = AtomicReference<Intent?>()
@@ -751,6 +831,32 @@ class CodeSelectionUiTest {
             assertFalse("The editor toolbar must not overlap Android's menu", actions(it).isShowing)
             assertFalse(actions(it).isEnabled)
         }
+    }
+
+    private fun assertNativeMenuClearOfTools() {
+        val menuBounds = Rect()
+        onView(withText(android.R.string.copy)).inRoot(isPlatformPopup()).check { view, failure ->
+            if (failure != null) throw failure
+            val nativeTextId = context.resources.getIdentifier("floating_toolbar_menu_item_text", "id", "android")
+            assertEquals("The selection action must be rendered by Android", nativeTextId, view!!.id)
+            val panel = view.parent.parent as View
+            assertTrue(panel.getGlobalVisibleRect(menuBounds))
+        }
+        val toolBounds = Rect()
+        onView(withId(R.id.recycler_view))
+            .inRoot(withDecorView(hasDescendant(withId(R.id.recycler_view))))
+            .check { view, failure ->
+                if (failure != null) throw failure
+                assertTrue(view!!.getGlobalVisibleRect(toolBounds))
+            }
+        assertFalse("Native menu $menuBounds overlaps keyboard tools $toolBounds", Rect.intersects(menuBounds, toolBounds))
+        val keyboardBounds = Rect(toolBounds)
+        scenario!!.onActivity { activity ->
+            assertTrue(activity.findViewById<View>(R.id.search_group).getGlobalVisibleRect(toolBounds))
+            assertFalse("Native menu $menuBounds overlaps search tools $toolBounds", Rect.intersects(menuBounds, toolBounds))
+        }
+        File(context.getExternalFilesDir("ui-regression"), "code-selection-native-menu-bounds.txt")
+            .appendText("menu=$menuBounds; keyboard=$keyboardBounds; search=$toolBounds\n")
     }
 
     private fun dismissNativeMenu() {
