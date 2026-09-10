@@ -257,7 +257,7 @@ object CacheBook {
         ): Boolean {
             if (!BookHelp.isContentSaveCurrent(contentToken)) return false
             if (!downloads.finish(ticket, Result.success(content),
-                    manualComplete = notifyReader && !needsResourceRefresh(requestBook, chapter)) {
+                    manualComplete = { notifyReader && !needsResourceRefresh(requestBook, chapter) }) {
                 successDownloadSet.add(chapter.primaryStr())
                 errorDownloadMap.remove(chapter.primaryStr())
             }) return false

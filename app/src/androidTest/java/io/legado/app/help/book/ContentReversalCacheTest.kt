@@ -259,7 +259,7 @@ class ContentReversalCacheTest {
                 val owner = async(IO) { cache.downloadAwait(chapter) }
                 try {
                     assertTrue(entered.await(5, TimeUnit.SECONDS))
-                    val waiter = async(IO) { cache.downloadAwait(chapter) }
+                    val waiter = async(IO, start = CoroutineStart.UNDISPATCHED) { cache.downloadAwait(chapter) }
                     release.countDown()
                     assertEquals(owner.await(), waiter.await())
                     assertEquals(beforeBodies + 1, bodies.get(7))

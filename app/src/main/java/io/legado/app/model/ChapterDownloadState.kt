@@ -96,7 +96,7 @@ internal class ChapterDownloadState {
         result: Result<String>? = null,
         retryManual: Boolean = true,
         fallback: Boolean = false,
-        manualComplete: Boolean = true,
+        manualComplete: () -> Boolean = { true },
         onFinished: () -> Unit = {},
     ): Boolean {
         synchronized(this) {
@@ -105,8 +105,9 @@ internal class ChapterDownloadState {
             running.remove(ticket.index)
             if (result?.isSuccess == true) {
                 batchFallback.remove(ticket.index)
-                // A reader fetched text; explicit caching still needs to download its images.
-                if (ticket.manualRequested && !manualComplete) waiting.add(ticket.index)
+                // Evaluate under the enqueue lock: a new shelf refresh cannot be lost between
+                // checking its intent and finishing an ordinary text/image request.
+                if (ticket.manualRequested && !manualComplete()) waiting.add(ticket.index)
                 else resourceRefresh.remove(ticket.index)
             } else {
                 if (retryManual && ticket.manualRequested) waiting.add(ticket.index)

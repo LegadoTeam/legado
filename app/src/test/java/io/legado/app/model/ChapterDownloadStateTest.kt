@@ -26,7 +26,7 @@ class ChapterDownloadStateTest {
         state.finish(owner, Result.failure(IllegalStateException("offline")))
         assertTrue(state.requestsResourceRefresh(2))
         val retry = state.claimManual(2)!!
-        state.finish(retry, Result.success("text only"), manualComplete = false)
+        state.finish(retry, Result.success("text only"), manualComplete = { false })
         assertTrue(state.requestsResourceRefresh(2))
         state.finish(state.claimManual(2)!!, Result.success("complete resources"))
         assertFalse(state.requestsResourceRefresh(2))
@@ -96,10 +96,29 @@ class ChapterDownloadStateTest {
         val state = ChapterDownloadState()
         val read = state.claimRead(1).first
         state.enqueue(listOf(1))
-        state.finish(read, Result.success("text with images"), manualComplete = false)
+        state.finish(read, Result.success("text with images"), manualComplete = { false })
         assertEquals(listOf(1), state.waitingIndexes())
         state.finish(state.claimManual(1)!!, Result.success("text with images"))
         assertTrue(state.isIdle)
+    }
+
+    @Test
+    fun `completion checks shelf intent atomically and resumes readers outside the lock`() = runBlocking {
+        val state = ChapterDownloadState()
+        val ticket = state.claimRead(1).first
+        val waiter = async(Dispatchers.Unconfined) {
+            val result = ticket.result.await()
+            assertFalse("Reader continuation must not run under the download lock", Thread.holdsLock(state))
+            result!!.getOrThrow()
+        }
+        state.enqueue(listOf(1), refreshResources = true)
+        state.finish(ticket, Result.success("old resources"), manualComplete = {
+            assertTrue("Shelf intent must be checked under the enqueue lock", Thread.holdsLock(state))
+            !state.requestsResourceRefresh(1)
+        })
+        assertEquals("old resources", waiter.await())
+        assertEquals(listOf(1), state.waitingIndexes())
+        assertTrue(state.requestsResourceRefresh(1))
     }
 
     @Test
