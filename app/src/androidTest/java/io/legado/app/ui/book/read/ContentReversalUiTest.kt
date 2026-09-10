@@ -47,6 +47,7 @@ import io.legado.app.ui.book.read.page.ReadView
 import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.ui.book.read.page.entities.column.ImageColumn
 import io.legado.app.ui.book.read.page.entities.column.ReviewColumn
+import io.legado.app.ui.book.read.page.entities.column.TextBaseColumn
 import io.legado.app.utils.defaultSharedPreferences
 import org.hamcrest.Matchers.allOf
 import org.junit.After
@@ -110,8 +111,8 @@ class ContentReversalUiTest {
     private val imageTag = "<img src=\"$imageSrc\">"
     private val reviewTag = "<img src=\"$reviewSrc\">"
     private val html = "<usehtml><b>HTML remains complete</b></usehtml>"
-    private val original = "甲乙😀$imageTag" + "丙丁$reviewTag" + "戊己\n$html"
-    private val reversed = "😀乙甲$imageTag" + "丁丙$reviewTag" + "己戊\n$html"
+    private val original = "甲乙😀$imageTag\n" + "　　《丙丁》$reviewTag" + "戊己\n$html"
+    private val reversed = "😀乙甲$imageTag\n" + "　　《丁丙》$reviewTag" + "己戊\n$html"
     private val secondContent = "Second chapter keeps its own state. 😀\nAnother paragraph."
     private var scenario: ActivityScenario<ReadBookActivity>? = null
 
@@ -644,6 +645,11 @@ class ContentReversalUiTest {
             assertNotNull("The legacy image must still create the native review bubble", review)
             assertEquals(37, review!!.count)
             assertFalse("The review bubble must stay inline", images[1].textLine.isImage)
+            val columns = images[1].textLine.columns
+            val preceding = columns[columns.indexOf(images[1]) - 1] as TextBaseColumn
+            assertEquals("Indentation must not move between text and its review bubble", "》", preceding.charData)
+            assertTrue("The bubble must remain adjacent to the final visible character",
+                images[1].start - preceding.end < preceding.end - preceding.start)
             assertTrue("The HTML unit must still produce formatted text",
                 chapter.pages.any { page -> page.lines.any { line -> line.isHtml } })
         }
