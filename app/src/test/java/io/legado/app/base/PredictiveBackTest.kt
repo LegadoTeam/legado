@@ -36,6 +36,10 @@ class PredictiveBackTest {
 
     @Test
     fun `activities intercept back before finish may defer closing`() {
+        // A callback may close a text-selection menu before invoking the guarded finish().
+        val guardedFinishCallback = Regex(
+            """onBackPressedDispatcher\.addCallback\(this\)\s*\{[^}]*\bfinish\(\)"""
+        )
         listOf(
             "src/main/java/io/legado/app/ui/rss/source/edit/RssSourceEditActivity.kt",
             "src/main/java/io/legado/app/ui/book/source/edit/BookSourceEditActivity.kt",
@@ -46,7 +50,7 @@ class PredictiveBackTest {
             "src/main/java/io/legado/app/ui/replace/edit/ReplaceEditActivity.kt",
         ).forEach { path ->
             val source = File(path).readText()
-            assertTrue(source.contains("onBackPressedDispatcher.addCallback(this) { finish() }"))
+            assertTrue(guardedFinishCallback.containsMatchIn(source))
             assertTrue(source.contains("override fun finish()"))
         }
     }

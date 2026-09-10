@@ -27,10 +27,8 @@ import androidx.core.view.isVisible
 import androidx.core.widget.addTextChangedListener
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.textfield.TextInputEditText
-import io.github.rosemoe.sora.event.ColorSchemeUpdateEvent
-import io.github.rosemoe.sora.event.InterceptTarget
-import io.github.rosemoe.sora.event.LongPressEvent
 import io.github.rosemoe.sora.event.PublishSearchResultEvent
+import io.github.rosemoe.sora.event.ColorSchemeUpdateEvent
 import io.github.rosemoe.sora.event.SelectionChangeEvent
 import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
 import io.github.rosemoe.sora.util.regex.RegexBackrefGrammar
@@ -102,6 +100,7 @@ class CodeEditActivity :
     private var safeEditorLoadTimeout: Runnable? = null
     private var safeEditorReadTimeout: Runnable? = null
     private var editorReady = false
+    private var textActions: CodeTextActions? = null
 
     private enum class SafeEditorStatus {
         IDLE,
@@ -121,7 +120,9 @@ class CodeEditActivity :
             isInitialized = true
         }
         upTheme(if (isDark) AppConfig.editThemeDark else AppConfig.editTheme)
-        onBackPressedDispatcher.addCallback(this) { finish() }
+        onBackPressedDispatcher.addCallback(this) {
+            if (textActions?.dismiss() != true) finish()
+        }
         softKeyboardTool.attachToWindow(window)
         editor.colorScheme = TextMateColorScheme2.create(ThemeRegistry.getInstance()) //先设置颜色,避免一开始的白屏
         viewModel.initData(intent) {
@@ -195,13 +196,7 @@ class CodeEditActivity :
         updateShareButton()
         editor.subscribeEvent(SelectionChangeEvent::class.java) { _, _ -> updateShareButton() }
         editor.subscribeEvent(ColorSchemeUpdateEvent::class.java) { _, _ -> updateShareButton() }
-        editor.subscribeEvent(LongPressEvent::class.java) { event, _ ->
-            val cursor = editor.cursor
-            if (cursor.isSelected && event.index in cursor.left until cursor.right) {
-                event.intercept(InterceptTarget.TARGET_EDITOR)
-                editor.postInLifecycle { actions.displayWindow() }
-            }
-        }
+        textActions = CodeTextActions(editor)
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -566,6 +561,7 @@ class CodeEditActivity :
     }
 
     override fun onDestroy() {
+        textActions?.dismiss()
         editorSearcher.stopSearch()
         editor.release()
         cancelSafeEditorRead(restoreEditing = false)

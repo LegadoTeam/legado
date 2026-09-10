@@ -2,6 +2,8 @@ package io.legado.app.ui.code
 
 import android.app.Activity
 import android.app.Instrumentation
+import android.app.SearchManager
+import android.content.ClipboardManager
 import android.content.Intent
 import android.content.ClipData
 import android.graphics.Bitmap
@@ -10,6 +12,8 @@ import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewConfiguration
+import android.view.InputDevice
+import android.view.MotionEvent
 import android.webkit.WebView
 import android.view.inputmethod.EditorInfo
 import android.widget.ArrayAdapter
@@ -21,26 +25,37 @@ import androidx.core.view.children
 import androidx.core.content.FileProvider
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.Lifecycle
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.closeSoftKeyboard
+import androidx.test.espresso.Espresso.pressBack
+import androidx.test.espresso.NoMatchingViewException
 import androidx.test.espresso.action.GeneralClickAction
+import androidx.test.espresso.action.GeneralSwipeAction
 import androidx.test.espresso.action.Press
+import androidx.test.espresso.action.Swipe
 import androidx.test.espresso.action.Tap
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.matcher.ViewMatchers.isCompletelyDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.RootMatchers.isPlatformPopup
 import androidx.test.espresso.matcher.RootMatchers.isDialog
+import androidx.test.espresso.matcher.RootMatchers.withDecorView
 import androidx.test.espresso.matcher.ViewMatchers.withText
+import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
+import androidx.test.espresso.matcher.ViewMatchers.hasDescendant
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import io.github.rosemoe.sora.widget.CodeEditor
+import io.github.rosemoe.sora.event.HandleStateChangeEvent
 import io.github.rosemoe.sora.widget.component.EditorTextActionWindow
 import io.legado.app.R
 import io.legado.app.help.CacheManager
@@ -62,6 +77,7 @@ import org.junit.After
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.hamcrest.Matchers.allOf
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
@@ -79,6 +95,11 @@ class CodeSelectionUiTest {
     private val selectedText = source.substring(source.indexOf("function"), source.indexOf("\nconst after"))
 
     @After fun cleanUp() {
+        scenario?.takeIf { it.state != Lifecycle.State.DESTROYED }?.onActivity { activity ->
+            // A failed edit assertion must not leave the discard dialog blocking later tests.
+            activity.findViewById<CodeEditor>(R.id.editText).takeIf { it.isShown }
+                ?.setText(ViewModelProvider(activity)[CodeEditViewModel::class.java].initialText)
+        }
         scenario?.close()
         CacheManager.deleteMemory(cacheKey)
     }
@@ -89,14 +110,14 @@ class CodeSelectionUiTest {
         val expectedLeft = source.indexOf("function")
         val expectedRight = source.indexOf("\nconst after")
         for ((line, column) in listOf(2 to 11, 3 to 5)) {
-            withEditor { actions(it).dismiss() }
+            dismissNativeMenu()
             // Separate independent long presses from the platform's double-tap gesture window.
             SystemClock.sleep(ViewConfiguration.getDoubleTapTimeout().toLong() + 50)
             press(Tap.LONG, line, column)
             try {
                 awaitEditor {
                     it.cursor.left == expectedLeft && it.cursor.right == expectedRight &&
-                        actions(it).isShowing && shareButton(it).isShown
+                        !actions(it).isEnabled && !actions(it).isShowing
                 }
             } catch (failure: AssertionError) {
                 val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
@@ -106,10 +127,11 @@ class CodeSelectionUiTest {
                 } finally { bitmap.recycle() }
                 withEditor {
                     throw AssertionError("Long press at $line:$column: selection=${it.cursor.left}..${it.cursor.right}, " +
-                        "expected=$expectedLeft..$expectedRight, panel=${actions(it).isShowing}, share=${shareButton(it).isShown}", failure)
+                        "expected=$expectedLeft..$expectedRight, panel=${actions(it).isShowing}", failure)
                 }
             }
             withEditor { assertEquals(source, it.text.toString()) }
+            assertNativeMenu()
         }
         screenshot("code-selection-preserved-share")
         shareAndAssert(selectedText)
@@ -132,16 +154,17 @@ class CodeSelectionUiTest {
         launchEditor(readOnly)
         for ((line, column, word) in listOf(Triple(0, 8, "before"), Triple(5, 8, "after"))) {
             selectFunction()
-            withEditor { actions(it).dismiss() }
+            dismissNativeMenu()
             press(Tap.LONG, line, column)
             awaitEditor {
-                selection(it) == word && actions(it).isShowing && shareButton(it).isShown
+                selection(it) == word && !actions(it).isEnabled && !actions(it).isShowing
             }
             withEditor {
                 assertEquals(source.indexOf(word), it.cursor.left)
                 assertEquals(source.indexOf(word) + word.length, it.cursor.right)
                 assertEquals(source, it.text.toString())
             }
+            assertNativeMenu()
             screenshot("code-selection-outside-$word-${if (readOnly) "readonly" else "editable"}")
             shareAndAssert(word)
         }
@@ -152,17 +175,17 @@ class CodeSelectionUiTest {
         withEditor {
             it.setSelection(0, 0)
             actions(it).dismiss()
-            assertFalse(shareButton(it).isVisible)
         }
         press(Tap.LONG, 2, 11)
         awaitEditor {
-            it.cursor.isSelected && selection(it) == "message" && actions(it).isShowing && shareButton(it).isShown
+            it.cursor.isSelected && selection(it) == "message" && !actions(it).isShowing
         }
+        assertNativeMenu()
         screenshot("code-selection-first-long-press")
-        withEditor { actions(it).dismiss() }
+        dismissNativeMenu()
         // A normal tap still clears the selection.
         press(Tap.SINGLE, 0, 2)
-        awaitEditor { !it.cursor.isSelected && !shareButton(it).isVisible }
+        awaitEditor { !it.cursor.isSelected && actions(it).isEnabled }
         withEditor { assertEquals(source, it.text.toString()) }
     }
 
@@ -171,10 +194,17 @@ class CodeSelectionUiTest {
         selectFunction()
         withEditor {
             assertFalse(it.isEditable)
+            assertTrue(actions(it).isShowing)
             assertFalse(actions(it).view.findViewById<View>(io.github.rosemoe.sora.R.id.panel_btn_cut).isVisible)
             assertFalse(actions(it).view.findViewById<View>(io.github.rosemoe.sora.R.id.panel_btn_paste).isVisible)
         }
         screenshot("code-selection-read-only-share")
+        shareAndAssert(selectedText)
+        press(Tap.LONG, 2, 11)
+        assertNativeMenu()
+        onView(withText(android.R.string.cut)).inRoot(isPlatformPopup()).check(doesNotExist())
+        onView(withText(android.R.string.paste)).inRoot(isPlatformPopup()).check(doesNotExist())
+        screenshot("code-selection-read-only-native")
         shareAndAssert(selectedText)
         withEditor { assertEquals(source, it.text.toString()) }
     }
@@ -195,12 +225,271 @@ class CodeSelectionUiTest {
         awaitEditor { selection(it) == "function" }
 
         press(Tap.LONG, 1, 3)
-        awaitEditor { selection(it) == "function" && actions(it).isShowing }
-        withEditor { actions(it).dismiss() }
+        awaitEditor { selection(it) == "function" && !actions(it).isShowing }
+        assertNativeMenu()
+        dismissNativeMenu()
         SystemClock.sleep(ViewConfiguration.getDoubleTapTimeout().toLong() + 50)
 
         press(Tap.LONG, 0, 8)
-        awaitEditor { selection(it) == "before" && actions(it).isShowing }
+        awaitEditor { selection(it) == "before" && !actions(it).isShowing }
+        assertNativeMenu()
+    }
+
+    @Test fun nativeCopyCutPasteAndSelectAllUseTheCurrentSelection() {
+        launchEditor()
+        lateinit var clipboard: ClipboardManager
+        withEditor {
+            clipboard = it.context.getSystemService(ClipboardManager::class.java)
+            clipboard.setPrimaryClip(ClipData.newPlainText("before copy", "clipboard sentinel"))
+        }
+        awaitEditor { it.hasWindowFocus() && clipboard.primaryClip?.getItemAt(0)?.text?.toString() == "clipboard sentinel" }
+        selectFunction(native = true)
+        clickNativeAction(android.R.string.copy)
+        awaitEditor { !it.cursor.isSelected && clipboard.primaryClip?.getItemAt(0)?.text?.toString() == selectedText }
+        withEditor {
+            assertEquals(selectedText, clipboard.primaryClip!!.getItemAt(0).text.toString())
+            assertEquals(source, it.text.toString())
+            assertFalse(it.cursor.isSelected)
+        }
+        selectFunction(native = true)
+        clickNativeAction(android.R.string.cut)
+        val withoutFunction = source.replace(selectedText, "")
+        awaitEditor { it.text.toString() == withoutFunction && clipboard.primaryClip?.getItemAt(0)?.text?.toString() == selectedText }
+        withEditor {
+            assertEquals(selectedText, clipboard.primaryClip!!.getItemAt(0).text.toString())
+            it.setText(source)
+            clipboard.setPrimaryClip(ClipData.newPlainText("native paste", "replacement 中文"))
+        }
+        selectFunction(native = true)
+        clickNativeAction(android.R.string.paste)
+        awaitEditor { it.text.toString() == source.replace(selectedText, "replacement 中文") }
+        withEditor { it.setText(source) }
+        selectFunction(native = true)
+        clickNativeAction(android.R.string.selectAll)
+        awaitEditor { selection(it) == source }
+        screenshot("code-selection-native-select-all")
+    }
+
+    @Test fun nativeSearchSharesOnlySelectedTextAndBackKeepsTheEditorOpen() {
+        launchEditor()
+        selectFunction(native = true)
+        val search = AtomicReference<Intent?>()
+        val monitor = object : Instrumentation.ActivityMonitor() {
+            override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? {
+                if (intent.action != Intent.ACTION_WEB_SEARCH) return null
+                search.set(intent)
+                return Instrumentation.ActivityResult(Activity.RESULT_CANCELED, null)
+            }
+        }
+        instrumentation.addMonitor(monitor)
+        try {
+            clickNativeAction(R.string.search)
+            await { search.get() != null }
+            assertEquals(selectedText, search.get()!!.getStringExtra(SearchManager.QUERY))
+            withEditor { assertEquals(source, it.text.toString()) }
+        } finally {
+            instrumentation.removeMonitor(monitor)
+        }
+        press(Tap.LONG, 2, 11)
+        assertNativeMenu()
+        pressBack()
+        withEditor {
+            assertEquals(source, it.text.toString())
+            assertEquals(selectedText, selection(it))
+        }
+        onView(withText(android.R.string.copy)).check(doesNotExist())
+    }
+
+    @Test fun longPressDragExtendsTheSelectionAndReturnsToTheEditorToolbar() {
+        launchEditor()
+        val from = editorPoint(2, 11)
+        val to = editorPoint(3, 15)
+        val down = SystemClock.uptimeMillis()
+        fun touch(action: Int, point: FloatArray) {
+            val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, point[0], point[1], 0)
+            event.source = InputDevice.SOURCE_TOUCHSCREEN
+            try { assertTrue(instrumentation.uiAutomation.injectInputEvent(event, true)) }
+            finally { event.recycle() }
+        }
+        touch(MotionEvent.ACTION_DOWN, from)
+        SystemClock.sleep(ViewConfiguration.getLongPressTimeout().toLong() + 100)
+        awaitEditor { selection(it) == "message" }
+        touch(MotionEvent.ACTION_MOVE, to)
+        touch(MotionEvent.ACTION_UP, to)
+        awaitEditor {
+            it.cursor.left == source.indexOf("message") &&
+                selection(it).contains("\n  return") && it.text.toString() == source
+        }
+        assertEditorToolbar()
+        screenshot("code-selection-editor-drag")
+    }
+
+    @Test fun nativeMenuStaysClearOfKeyboardAndSearchToolsNearTheBottomAfterScrolling() {
+        launchEditor()
+        val code = (0..80).joinToString("\n") { "const line$it = $it;" }
+        scenario!!.onActivity { activity ->
+            activity.findViewById<CodeEditor>(R.id.editText).apply {
+                setText(code)
+                // The hosted emulator reports a hardware keyboard; allow the phone's IME path.
+                setDisableSoftKbdIfHardKbdAvailable(false)
+            }
+            CodeEditActivity::class.java.getDeclaredMethod("search").apply { isAccessible = true }.invoke(activity)
+        }
+        onView(withId(R.id.editText)).perform(click())
+        withEditor { it.showSoftInput() }
+        awaitEditor { ViewCompat.getRootWindowInsets(it)?.isVisible(WindowInsetsCompat.Type.ime()) == true }
+        var selected = ""
+        var offset = 0
+        var selectedLine = 0
+        withEditor {
+            val end = it.lastVisibleLine - 1
+            assertTrue("The fixture must leave room for a multiline selection", end >= it.firstVisibleLine + 2)
+            it.setSelectionRegion(end - 2, 0, end, 10, false)
+            selected = selection(it)
+            offset = it.offsetY
+            selectedLine = end - 1
+        }
+        assertEditorToolbar()
+        dismissEditorToolbar()
+        press(Tap.LONG, selectedLine, 3)
+        assertNativeMenu()
+        assertNativeMenuClearOfTools()
+        screenshot("code-selection-native-ime-search-bottom")
+        val nativeMenu = Rect()
+        onView(withText(android.R.string.copy)).inRoot(isPlatformPopup()).check { view, failure ->
+            if (failure != null) throw failure
+            // Android's popup window also reserves transparent space for its closed overflow panel.
+            visibleScreenBounds(view!!.parent.parent as View, nativeMenu)
+        }
+        fun scrollPoint(view: View, rowsFromBottom: Float): FloatArray {
+            val editor = view as CodeEditor
+            val position = IntArray(2)
+            view.getLocationOnScreen(position)
+            val point = floatArrayOf(position[0] + view.width * 0.9f,
+                position[1] + view.height - editor.rowHeight * rowsFromBottom)
+            assertFalse("The scroll gesture must avoid the visible native menu $nativeMenu",
+                nativeMenu.contains(point[0].toInt(), point[1].toInt()))
+            return point
+        }
+        var from = floatArrayOf()
+        var to = floatArrayOf()
+        withEditor {
+            from = scrollPoint(it, 0.25f)
+            to = scrollPoint(it, 2.25f)
+        }
+        val down = SystemClock.uptimeMillis()
+        fun touch(action: Int, point: FloatArray) {
+            val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, point[0], point[1], 0)
+            event.source = InputDevice.SOURCE_TOUCHSCREEN
+            try { assertTrue(instrumentation.uiAutomation.injectInputEvent(event, true)) }
+            finally { event.recycle() }
+        }
+        // Move before a long press can select text, then stop before lifting to avoid a fling.
+        touch(MotionEvent.ACTION_DOWN, from)
+        touch(MotionEvent.ACTION_MOVE, to)
+        SystemClock.sleep(150)
+        touch(MotionEvent.ACTION_MOVE, to)
+        touch(MotionEvent.ACTION_UP, to)
+        var scrollState = ""
+        await(message = { scrollState }) {
+            var ready = false
+            withEditor {
+                scrollState = "Scroll ${it.offsetY} > $offset; selection=${selection(it)}; expected=$selected"
+                ready = it.offsetY > offset && selection(it) == selected && it.text.toString() == code
+            }
+            ready
+        }
+        // FloatingActionMode deliberately hides a moving toolbar briefly before positioning it.
+        SystemClock.sleep(500)
+        assertNativeMenu()
+        assertNativeMenuClearOfTools()
+        screenshot("code-selection-native-ime-search-scrolled")
+    }
+
+    @Test fun draggingEitherSelectionHandleAfterLongPressRestoresEditorActions() {
+        launchEditor()
+        var heldType = -1
+        withEditor {
+            it.subscribeEvent(HandleStateChangeEvent::class.java) { event, _ ->
+                if (event.isHeld) heldType = event.handleType
+            }
+        }
+        for (rightHandle in listOf(true, false)) {
+            withEditor {
+                heldType = -1
+                it.setSelection(0, 0)
+            }
+            dismissEditorToolbar()
+            press(Tap.LONG, 2, 11)
+            awaitEditor { selection(it) == "message" }
+            assertNativeMenu()
+            var from = floatArrayOf()
+            var fixedEnd = -1
+            var handleHeight = 0f
+            withEditor {
+                val handle = if (rightHandle) it.rightHandleDescriptor else it.leftHandleDescriptor
+                val location = IntArray(2)
+                it.getLocationOnScreen(location)
+                assertFalse(handle.position.isEmpty)
+                from = floatArrayOf(location[0] + handle.position.centerX(),
+                    location[1] + handle.position.centerY())
+                handleHeight = handle.position.height()
+                fixedEnd = if (rightHandle) it.cursor.left else it.cursor.right
+            }
+            val to = if (rightHandle) editorPoint(3, 15) else editorPoint(1, 9)
+            // Sora places the caret one handle-height above the dragging finger.
+            to[1] += handleHeight
+            onView(withId(R.id.editText)).perform(GeneralSwipeAction(Swipe.SLOW, { from }, { to }, Press.FINGER))
+            awaitEditor {
+                !it.eventHandler.hasAnyHeldHandle() && selection(it).contains('\n') &&
+                    actions(it).isEnabled && actions(it).isShowing
+            }
+            var draggedSelection = ""
+            withEditor {
+                assertEquals(if (rightHandle) HandleStateChangeEvent.HANDLE_TYPE_RIGHT
+                    else HandleStateChangeEvent.HANDLE_TYPE_LEFT, heldType)
+                assertEquals(fixedEnd, if (rightHandle) it.cursor.left else it.cursor.right)
+                assertEquals(source, it.text.toString())
+                draggedSelection = selection(it)
+            }
+            assertEditorToolbar()
+            screenshot("code-selection-${if (rightHandle) "right" else "left"}-handle-editor-toolbar")
+            shareAndAssert(draggedSelection)
+        }
+    }
+
+    @Test fun ordinarySelectionKeepsEditorActionsUntilLongPressAndReturnsAfterTap() {
+        launchEditor()
+        selectFunction()
+        screenshot("code-selection-ordinary-editor-toolbar")
+        dismissEditorToolbar()
+        press(Tap.LONG, 2, 11)
+        assertNativeMenu()
+        withEditor { assertEquals(selectedText, selection(it)) }
+        screenshot("code-selection-long-press-native-toolbar")
+        dismissNativeMenu()
+        press(Tap.SINGLE, 0, 2)
+        awaitEditor { !it.cursor.isSelected && actions(it).isEnabled }
+        selectFunction()
+        assertEditorToolbar()
+        shareAndAssert(selectedText)
+    }
+
+    @Test fun longPressAtAnEmptyCaretShowsNativePasteAndInsertsClipboardText() {
+        launchEditor()
+        val clipboardText = "native caret paste 中文"
+        withEditor {
+            it.setText("")
+            it.context.getSystemService(ClipboardManager::class.java)
+                .setPrimaryClip(ClipData.newPlainText("caret paste", clipboardText))
+        }
+        press(Tap.LONG, 0, 0)
+        awaitEditor { !it.cursor.isSelected && !actions(it).isEnabled && !actions(it).isShowing }
+        onView(withText(android.R.string.paste)).inRoot(isPlatformPopup()).check(matches(isCompletelyDisplayed()))
+        onView(withText(android.R.string.copy)).inRoot(isPlatformPopup()).check(doesNotExist())
+        screenshot("code-selection-empty-native-paste")
+        clickNativeAction(android.R.string.paste)
+        awaitEditor { it.text.toString() == clipboardText && actions(it).isEnabled }
     }
 
     @Test fun savedDraftUsesTheCallersRequestedTransport() {
@@ -661,18 +950,18 @@ class CodeSelectionUiTest {
         }
         scenario = if (forResult) ActivityScenario.launchActivityForResult(intent) else ActivityScenario.launch(intent)
         awaitEditor { it.isShown && it.width > 0 && it.text.toString() == source && it.hasFocus() }
-        // The activity restores its initial cursor after 360ms; start gestures after that real callback.
-        val restored = CountDownLatch(1)
-        withEditor { it.postDelayed({ restored.countDown() }, 450) }
-        assertTrue(restored.await(5, TimeUnit.SECONDS))
         closeSoftKeyboard()
     }
 
-    private fun selectFunction() {
+    private fun selectFunction(native: Boolean = false) {
         withEditor { it.setSelectionRegion(1, 0, 4, 1, false) }
-        awaitEditor { selection(it) == selectedText && actions(it).isShowing && shareButton(it).isShown }
-        onView(withId(R.id.code_share_selection)).inRoot(isPlatformPopup())
-            .check(matches(isCompletelyDisplayed()))
+        awaitEditor { selection(it) == selectedText && actions(it).isEnabled && actions(it).isShowing }
+        assertEditorToolbar()
+        if (native) {
+            dismissEditorToolbar()
+            press(Tap.LONG, 2, 11)
+            assertNativeMenu()
+        }
     }
 
     private fun press(tap: Tap, line: Int, column: Int) {
@@ -690,6 +979,17 @@ class CodeSelectionUiTest {
         }, Press.FINGER))
     }
 
+    private fun editorPoint(line: Int, column: Int): FloatArray {
+        var point = floatArrayOf()
+        withEditor {
+            val location = IntArray(2)
+            it.getLocationOnScreen(location)
+            point = floatArrayOf(location[0] + it.getCharOffsetX(line, column) + it.dpUnit,
+                location[1] + it.getCharOffsetY(line, column) - it.rowHeight / 2f)
+        }
+        return point
+    }
+
     @Suppress("DEPRECATION")
     private fun shareAndAssert(expected: String) {
         val chooser = AtomicReference<Intent?>()
@@ -702,8 +1002,13 @@ class CodeSelectionUiTest {
         }
         instrumentation.addMonitor(monitor)
         try {
-            onView(withId(R.id.code_share_selection)).inRoot(isPlatformPopup())
-                .check(matches(isCompletelyDisplayed())).perform(click())
+            var native = false
+            withEditor { native = !actions(it).isEnabled }
+            if (native) {
+                clickNativeAction(R.string.share)
+            } else {
+                onView(withId(R.id.code_share_selection)).inRoot(isPlatformPopup()).perform(click())
+            }
             await { chooser.get() != null }
             val send = chooser.get()!!.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)!!
             assertEquals(Intent.ACTION_SEND, send.action)
@@ -717,7 +1022,95 @@ class CodeSelectionUiTest {
 
     private fun actions(editor: CodeEditor) = editor.getComponent(EditorTextActionWindow::class.java)
 
-    private fun shareButton(editor: CodeEditor) = actions(editor).view.findViewById<View>(R.id.code_share_selection)
+    private fun dismissEditorToolbar() {
+        lateinit var popup: View
+        withEditor {
+            popup = actions(it).view.rootView
+            actions(it).dismiss()
+        }
+        await { !popup.isAttachedToWindow }
+        // Popup removal reaches InputDispatcher asynchronously; do not inject into its stale window.
+        // Accessibility idle alone does not synchronize the removed input window.
+        SystemClock.sleep(ViewConfiguration.getDoubleTapTimeout().toLong() + 50)
+        instrumentation.uiAutomation.waitForIdle(500, 5_000)
+    }
+
+    private fun assertNativeMenu() {
+        // Sora's image-button popup has no text labels. This checks the actual platform popup.
+        onView(withText(android.R.string.copy)).inRoot(isPlatformPopup())
+            .check(matches(isCompletelyDisplayed()))
+        withEditor {
+            assertFalse("The editor toolbar must not overlap Android's menu", actions(it).isShowing)
+            assertFalse(actions(it).isEnabled)
+        }
+    }
+
+    private fun assertEditorToolbar() {
+        onView(withId(R.id.code_share_selection)).inRoot(isPlatformPopup())
+            .check(matches(isCompletelyDisplayed()))
+        withEditor {
+            assertTrue(actions(it).isEnabled)
+            assertTrue(actions(it).isShowing)
+        }
+        onView(withText(android.R.string.copy)).check(doesNotExist())
+    }
+
+    private fun assertNativeMenuClearOfTools() {
+        val menuBounds = Rect()
+        onView(withText(android.R.string.copy)).inRoot(isPlatformPopup()).check { view, failure ->
+            if (failure != null) throw failure
+            val nativeTextId = context.resources.getIdentifier("floating_toolbar_menu_item_text", "id", "android")
+            assertEquals("The selection action must be rendered by Android", nativeTextId, view!!.id)
+            val panel = view.parent.parent as View
+            visibleScreenBounds(panel, menuBounds)
+        }
+        val toolBounds = Rect()
+        onView(withId(R.id.recycler_view))
+            .inRoot(withDecorView(hasDescendant(withId(R.id.recycler_view))))
+            .check { view, failure ->
+                if (failure != null) throw failure
+                visibleScreenBounds(view!!, toolBounds)
+            }
+        assertFalse("Native menu $menuBounds overlaps keyboard tools $toolBounds", Rect.intersects(menuBounds, toolBounds))
+        val keyboardBounds = Rect(toolBounds)
+        scenario!!.onActivity { activity ->
+            visibleScreenBounds(activity.findViewById(R.id.search_group), toolBounds)
+            assertFalse("Native menu $menuBounds overlaps search tools $toolBounds", Rect.intersects(menuBounds, toolBounds))
+        }
+        File(context.getExternalFilesDir("ui-regression"), "code-selection-native-menu-bounds.txt")
+            .appendText("menu=$menuBounds; keyboard=$keyboardBounds; search=$toolBounds\n")
+    }
+
+    private fun visibleScreenBounds(view: View, bounds: Rect) {
+        // getGlobalVisibleRect is relative to this window's root, even for a PopupWindow.
+        assertTrue(view.getGlobalVisibleRect(bounds))
+        val origin = IntArray(2)
+        view.rootView.getLocationOnScreen(origin)
+        bounds.offset(origin[0], origin[1])
+    }
+
+    private fun dismissNativeMenu() {
+        var native = false
+        withEditor { native = !actions(it).isEnabled }
+        // Exercise the real Back callback for native mode; Sora's nonmodal toolbar has no Back action.
+        if (native) pressBack() else withEditor { actions(it).dismiss() }
+        withEditor { assertTrue(it.isShown) }
+    }
+
+    private fun clickNativeAction(label: Int) {
+        // Android keeps the overflow panel in the view tree while it is invisible.
+        val visibleAction = allOf(withText(label), isDisplayed())
+        try {
+            onView(visibleAction).inRoot(isPlatformPopup()).check(matches(isCompletelyDisplayed()))
+        } catch (_: NoMatchingViewException) {
+            val overflow = context.resources.getIdentifier(
+                "floating_toolbar_open_overflow_description", "string", "android"
+            )
+            assertNotEquals("Android's overflow accessibility label must exist", 0, overflow)
+            onView(withContentDescription(context.getString(overflow))).inRoot(isPlatformPopup()).perform(click())
+        }
+        onView(visibleAction).inRoot(isPlatformPopup()).check(matches(isCompletelyDisplayed())).perform(click())
+    }
 
     private fun selection(editor: CodeEditor) = editor.text.subSequence(editor.cursor.left, editor.cursor.right).toString()
 
@@ -746,16 +1139,16 @@ class CodeSelectionUiTest {
 
     private fun screenshot(name: String) {
         instrumentation.waitForIdleSync()
-        val committed = CountDownLatch(2)
+        // FloatingActionMode briefly hides the toolbar while the selection geometry moves.
+        instrumentation.uiAutomation.waitForIdle(500, 5_000)
+        val committed = CountDownLatch(1)
         scenario!!.onActivity { activity ->
-            val editor = activity.findViewById<CodeEditor>(R.id.editText)
-            listOf(activity.window.decorView, actions(editor).view.rootView).forEach { root ->
-                assertTrue(root.isHardwareAccelerated)
-                root.viewTreeObserver.registerFrameCommitCallback { committed.countDown() }
-                root.postInvalidateOnAnimation()
-            }
+            val root = activity.window.decorView
+            assertTrue(root.isHardwareAccelerated)
+            root.viewTreeObserver.registerFrameCommitCallback { committed.countDown() }
+            root.postInvalidateOnAnimation()
         }
-        assertTrue("Editor and text action panel frames were not committed", committed.await(5, TimeUnit.SECONDS))
+        assertTrue("Editor frame was not committed", committed.await(5, TimeUnit.SECONDS))
         val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
         try {
             File(context.getExternalFilesDir("ui-regression"), "$name.png").outputStream().use {

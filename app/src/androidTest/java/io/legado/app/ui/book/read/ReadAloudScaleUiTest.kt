@@ -54,6 +54,8 @@ class ReadAloudScaleUiTest {
     private val prefs = context.defaultSharedPreferences
     private val savedMenuHelp = LocalConfig.all["readMenuHelpVersion"]
     private val savedPrefs = listOf(PreferKey.readAloudControlsPause, PreferKey.readAloudControlsSize,
+        PreferKey.readAloudControlsRealtime, PreferKey.readAloudControlsPosition,
+        PreferKey.readAloudControlsAutoHide,
         PreferKey.readAloudControlsDrag, PreferKey.readAloudControlsDock, PreferKey.readAloudControlsOpacity,
         PreferKey.readAloudControlsX, PreferKey.readAloudControlsY, "readAloudControlsWidth")
         .associateWith { prefs.all[it] }
@@ -66,6 +68,10 @@ class ReadAloudScaleUiTest {
 
     @Before fun setUp() {
         prefs.edit().putBoolean(PreferKey.readAloudControlsPause, true)
+            // This fixture measures controls; independent follow/visibility behavior is tested separately.
+            .putBoolean(PreferKey.readAloudControlsRealtime, false)
+            .putBoolean(PreferKey.readAloudControlsPosition, true)
+            .putBoolean(PreferKey.readAloudControlsAutoHide, false)
             .putBoolean(PreferKey.readAloudControlsDrag, false)
             .putBoolean(PreferKey.readAloudControlsDock, false)
             .remove("readAloudControlsWidth").remove(PreferKey.readAloudControlsOpacity).commit()
