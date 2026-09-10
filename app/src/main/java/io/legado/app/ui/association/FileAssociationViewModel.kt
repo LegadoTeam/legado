@@ -62,7 +62,9 @@ class FileAssociationViewModel(application: Application, private val savedState:
                 openSingleLocalBook = savedState["openSingleLocalBook"] ?: false
                 selectedLocalBooks.addAll(savedState.get<ArrayList<String>>("selectedLocalBooks").orEmpty().map(Uri::parse))
                 pendingLocalBooks = items.filter { it.file.uri in selectedLocalBooks }
-                if (!openSingleLocalBook) localBookBatch.value = items
+                if (!openSingleLocalBook || savedState.get<Boolean>("localBookPreview") == true) {
+                    localBookBatch.value = items
+                }
                 if (savedState.get<Boolean>("localBookDestination") == true) localBookDestination.value = true
                 initialIntentDispatched = true
             }.onFailure { AppLog.put("恢复分享书籍预览失败", it) }
@@ -266,10 +268,18 @@ class FileAssociationViewModel(application: Application, private val savedState:
         localBookDestination.value = true
     }
 
-    fun selectLocalBookDirectory(directory: Uri) {
+    fun selectLocalBookDirectory(directory: Uri?) {
         choosingLocalBookDirectory = false
         savedState["localBookDestination"] = false
         localBookDestination.value = false
+        if (directory == null) {
+            // ACTION_VIEW initially skips confirmation; cancellation gives it a preview to retry.
+            if (localBookBatch.value == null && pendingLocalBooks.isNotEmpty()) {
+                savedState["localBookPreview"] = true
+                localBookBatch.value = pendingLocalBooks
+            }
+            return
+        }
         if (importAfterDirectorySelection) importLocalBooks(directory)
     }
 

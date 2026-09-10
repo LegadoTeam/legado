@@ -2,7 +2,7 @@
 <resources>
     <string name="local_book_save_path">Local import save folder</string>
     <string name="shared_local_books_storage">Books will be copied to the selected folder. You can use the app’s private folder; the original files will remain unchanged.</string>
-    <string name="shared_local_books_private">Use app folder</string>
-    <string name="shared_local_books_mixed_types">This archive contains different kinds of importable data. Import them separately.</string>
+    <string name="shared_local_books_private">App default folder</string>
+    <string name="shared_local_books_mixed_types">The selected files contain different kinds of importable data. Import each kind separately.</string>
     <string name="shared_local_books_copied">Copied and added %1$d books; %2$d failed. Original files were kept.</string>
 </resources>
