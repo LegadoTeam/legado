@@ -214,6 +214,7 @@ class ReaderSourceReimportUiTest {
             await("recreated importer uses the retained operation") {
                 it.supportFragmentManager.fragments.filterIsInstance<ImportBookSourceDialog>().singleOrNull()
                     ?.takeIf { f -> f !== oldDialog }?.let { f ->
+                        scenarioDialog = f
                         ViewModelProvider(f)[ImportBookSourceViewModel::class.java] === oldVm
                     } == true
             }
@@ -256,24 +257,19 @@ class ReaderSourceReimportUiTest {
         appDb.bookDao.insert(otherBook)
         appDb.bookChapterDao.insert(otherChapter)
         BookHelp.saveText(otherBook, otherChapter, "Other book remains unchanged.")
-        var otherScenario: ActivityScenario<ReadBookActivity>? = null
         try {
             openReimport()
             val pendingVm = main { importer() }
             // The user can open another reader while this importer remains on the back stack.
-            otherScenario = ActivityScenario.launch(Intent(context, ReadBookActivity::class.java)
-                .putExtra("bookUrl", otherBook.bookUrl).putExtra("inBookshelf", true))
-            val deadline = SystemClock.uptimeMillis() + 15000
-            var ready = false
-            do {
-                checkNotNull(otherScenario).onActivity {
-                    ready = ReadBook.book?.bookUrl == otherBook.bookUrl && it.isInitFinish &&
-                        ReadBook.curTextChapter?.chapter?.bookUrl == otherBook.bookUrl &&
-                        ReadBook.curTextChapter?.isCompleted == true
-                }
-                if (!ready) SystemClock.sleep(50)
-            } while (!ready && SystemClock.uptimeMillis() < deadline)
-            assertTrue("Second real reader must complete before the old import", ready)
+            main {
+                it.startActivity(Intent(it, ReadBookActivity::class.java)
+                    .putExtra("bookUrl", otherBook.bookUrl).putExtra("inBookshelf", true))
+            }
+            await("second real reader completes before the old import") {
+                ReadBook.book?.bookUrl == otherBook.bookUrl && it.isInitFinish &&
+                    ReadBook.curTextChapter?.chapter?.bookUrl == otherBook.bookUrl &&
+                    ReadBook.curTextChapter?.isCompleted == true
+            }
             val position = listOf(ReadBook.durChapterIndex, ReadBook.durChapterPos)
             // Execute the retained confirmation with the original dialog VM, as an already queued
             // operation would complete after the current book changes.
@@ -289,7 +285,6 @@ class ReaderSourceReimportUiTest {
             assertEquals("#before@text", ReadBook.bookSource?.ruleContent?.content)
             assertEquals(position, listOf(ReadBook.durChapterIndex, ReadBook.durChapterPos))
         } finally {
-            otherScenario?.close()
             BookHelp.delContent(otherBook, otherChapter)
             CacheBook.cacheBookMap.remove(otherBook.bookUrl)?.stop()
             appDb.bookChapterDao.delByBook(otherBook.bookUrl)
@@ -387,10 +382,22 @@ class ReaderSourceReimportUiTest {
     }
 
     private fun showMenu() {
+        awaitDraw()
         if (!main { it.findViewById<ReadMenu>(R.id.read_menu).isVisible }) {
             onView(withId(R.id.read_view)).perform(click())
         }
         await("reader menu visible") { it.findViewById<ReadMenu>(R.id.read_menu).isVisible }
+    }
+
+    private fun awaitDraw() {
+        instrumentation.waitForIdleSync()
+        val rendered = CountDownLatch(1)
+        scenario.onActivity {
+            val decor = it.window.decorView
+            decor.postOnAnimation { decor.postOnAnimation { rendered.countDown() } }
+        }
+        assertTrue(rendered.await(5, TimeUnit.SECONDS))
+        instrumentation.waitForIdleSync()
     }
 
     private fun openOverflow() {
