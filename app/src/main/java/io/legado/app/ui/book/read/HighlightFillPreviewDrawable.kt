@@ -35,7 +35,8 @@ class HighlightFillPreviewDrawable(
             band.top,
             band.bottom,
             style.fill,
-            shape
+            shape,
+            (band.bottom - band.top) / 2f * style.resolvedPillPaddingScale
         )
         canvas.restore()
     }

@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.Rect
 import android.graphics.Paint.FontMetrics
 import android.os.Build
 import androidx.annotation.Keep
@@ -480,6 +481,8 @@ data class TextLine(
                 if (
                     nextStyle.fill == fill &&
                     nextStyle.resolvedFillShape == shape &&
+                    (shape != HighlightStyle.FillShape.PILL ||
+                        nextStyle.resolvedPillPaddingScale == style.resolvedPillPaddingScale) &&
                     nextTextSize == textSize
                 ) {
                     endIndex++
@@ -495,14 +498,15 @@ data class TextLine(
                 shape,
                 1f.dpToPx()
             )
-            // Keep the end glyphs clear of the capsule's curved border.
-            val padding = if (shape == HighlightStyle.FillShape.PILL) (band.bottom - band.top) / 2f else 0f
-            val saved = canvas.save()
-            // Keep image/review columns clear even across a narrow unhighlighted space.
-            // Only inspect columns within the cap's actual reach.
+            val padding = if (shape == HighlightStyle.FillShape.PILL) {
+                (band.bottom - band.top) / 2f * style.resolvedPillPaddingScale
+            } else 0f
+            var left = first.start - padding
+            var right = last.end + padding
+            var leftRadius = padding
+            var rightRadius = padding
             if (padding > 0f) {
-                var left = first.start - padding
-                var right = last.end + padding
+                // Construct the complete caps inside the available space, including across spaces.
                 for (i in index - 1 downTo 0) {
                     val column = columns[i]
                     if (column.end <= left) break
@@ -519,18 +523,45 @@ data class TextLine(
                         break
                     }
                 }
-                canvas.clipRect(left, band.top, right, band.bottom)
+                val ink = Rect()
+                val border = 1f.dpToPx()
+                val basePaint = PaintPool.obtain()
+                for (i in index until endIndex) {
+                    val column = columns[i] as TextBaseColumn
+                    basePaint.set(if (column is TextHtmlColumn) ChapterProvider.contentPaint else textPaint)
+                    if (column is TextHtmlColumn) basePaint.textSize = column.mTextSize
+                    val paint = HighlightDraw.obtainTextPaint(basePaint, column.highlightStyle!!, 0, column.charData)
+                    paint.getTextBounds(column.charData, 0, column.charData.length, ink)
+                    if (!ink.isEmpty) {
+                        val offset = (column as? TextColumn)?.drawOffset ?: 0f
+                        val origin = column.start + offset +
+                            if (atLeastApi35) paint.letterSpacing * paint.textSize * 0.5f else 0f
+                        val inkTop = baseline + ink.top
+                        val inkBottom = baseline + ink.bottom
+                        leftRadius = minOf(leftRadius, HighlightGeometry.pillRadiusX(
+                            padding, origin + ink.left - left, inkTop, inkBottom,
+                            band.top, band.bottom, border
+                        ))
+                        rightRadius = minOf(rightRadius, HighlightGeometry.pillRadiusX(
+                            padding, right - origin - ink.right, inkTop, inkBottom,
+                            band.top, band.bottom, border
+                        ))
+                    }
+                    HighlightDraw.recycleTextPaint(paint)
+                }
+                PaintPool.recycle(basePaint)
             }
             HighlightDraw.drawFillRun(
                 canvas,
-                first.start - padding,
-                last.end + padding,
+                left,
+                right,
                 band.top,
                 band.bottom,
                 fill,
-                shape
+                shape,
+                leftRadius,
+                rightRadius
             )
-            canvas.restoreToCount(saved)
             index = endIndex
         }
     }

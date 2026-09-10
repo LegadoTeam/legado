@@ -273,6 +273,87 @@ class TitleFontWeightRenderingTest {
     }
 
     @Test
+    fun fillOnlyPillKeepsGlyphsInsideItsBorderWithActualWholeLineDrawing() {
+        launchReader()
+        val savedOptimize = AppConfig.optimizeRender
+        val savedColor = ReadBookConfig.textColor
+        try {
+            scenario!!.onActivity { activity ->
+                val width = activity.findViewById<ReadView>(R.id.read_view).curPage
+                    .findViewById<ContentTextView>(R.id.content_text_view).width
+                ReadBookConfig.textSize = 32
+                ChapterProvider.upStyle()
+                val paint = ChapterProvider.contentPaint
+                val textSize = paint.textSize
+                val top = ChapterProvider.paddingTop.toFloat()
+                val height = ceil(top + textSize * 2).toInt()
+                for (optimized in listOf(false, true)) for (scale in listOf(0.5f, 1f, 2f)) {
+                    AppConfig.optimizeRender = optimized
+                    val text = "顶上多恐怖吗"
+                    var x = (width - paint.measureText(text)) / 2f
+                    val line = TextLine(text = text, startX = x, lineTop = top,
+                        lineBase = top + textSize * 1.2f, lineBottom = height.toFloat())
+                    for (char in text) {
+                        val advance = paint.measureText(char.toString())
+                        line.addColumn(TextColumn(x, x + advance, char.toString()))
+                        x += advance
+                    }
+                    val page = TextPage(text = text, height = height.toFloat()).apply {
+                        addLine(line)
+                        upRenderHeight()
+                        isCompleted = true
+                    }
+                    val view = ContentTextView(activity, null).apply {
+                        layout(0, 0, width, height)
+                        setContent(page)
+                    }
+                    val columns = line.columns.filterIsInstance<TextColumn>()
+                    val positions = columns.map { it.start to it.end }
+                    fun render(color: Int, fill: Int): Bitmap {
+                        ReadBookConfig.durConfig.setCurTextColor(color)
+                        columns.forEach { it.highlightStyle = HighlightStyle(fill = fill,
+                            fillShape = HighlightStyle.FillShape.PILL, pillPaddingScale = scale) }
+                        line.invalidate()
+                        assertEquals("Fill alone must preserve the actual whole-line drawing path",
+                            optimized, line.checkFastDraw())
+                        return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                            .also { view.draw(Canvas(it)) }
+                    }
+                    val fill = Color.rgb(32, 144, 80)
+                    val glyphs = render(Color.BLACK, 0)
+                    val background = render(1, fill)
+                    val result = render(Color.BLACK, fill)
+                    try {
+                        File(context.getExternalFilesDir("ui-regression"),
+                            "highlight-pill-fill-only-$optimized-$scale.png").outputStream().use {
+                            assertTrue(result.compress(Bitmap.CompressFormat.PNG, 100, it))
+                        }
+                        var ink = 0
+                        for (y in 0 until height) for (pixelX in 0 until width) {
+                            if (Color.alpha(glyphs.getPixel(pixelX, y)) < 240) continue
+                            ink++
+                            assertTrue("Fast-drawn glyph crosses the capsule: optimized=$optimized scale=$scale ($pixelX,$y)",
+                                Color.alpha(background.getPixel(pixelX, y)) in 70..110)
+                            assertTrue("The highlight must not move the fast-drawn glyphs",
+                                Color.red(result.getPixel(pixelX, y)) < 20)
+                        }
+                        assertTrue("The fixture must draw actual Chinese glyphs", ink > 50)
+                        assertEquals(positions, columns.map { it.start to it.end })
+                    } finally {
+                        listOf(glyphs, background, result).forEach(Bitmap::recycle)
+                        page.recycleRecorders()
+                    }
+                }
+            }
+        } finally {
+            instrumentation.runOnMainSync {
+                AppConfig.optimizeRender = savedOptimize
+                ReadBookConfig.durConfig.setCurTextColor(savedColor)
+            }
+        }
+    }
+
+    @Test
     fun highlightPillLeavesTransparentReviewImagesClearOnBothSides() {
         launchReader()
         // The unmodified SVG supplied with https://github.com/LegadoTeam/legado/issues/1255.
@@ -287,11 +368,12 @@ class TitleFontWeightRenderingTest {
         try {
             scenario!!.onActivity { activity ->
                 ReadBookConfig.reviewIconSvg = svg
-                ReadBookConfig.reviewIconScale = 180
                 val width = activity.findViewById<ReadView>(R.id.read_view).curPage
                     .findViewById<ContentTextView>(R.id.content_text_view).width
-                for (optimized in listOf(false, true)) for (size in listOf(20, 50)) for (withSpace in listOf(false, true)) {
+                for ((paddingScale, iconScale) in listOf(0.5f to 100, 1f to 180, 2f to 200))
+                    for (optimized in listOf(false, true)) for (size in listOf(20, 50)) for (withSpace in listOf(false, true)) {
                     AppConfig.optimizeRender = optimized
+                    ReadBookConfig.reviewIconScale = iconScale
                     ReadBookConfig.textSize = size
                     ChapterProvider.upStyle()
                     ImageProvider.remove(imageFile.absolutePath)
@@ -345,7 +427,8 @@ class TitleFontWeightRenderingTest {
                     fun render(color: Int, withFill: Boolean): Bitmap {
                         textColumns.forEach {
                             it.highlightStyle = HighlightStyle(textColor = color, bold = true,
-                                fill = if (withFill) fill else 0, fillShape = HighlightStyle.FillShape.PILL)
+                                fill = if (withFill) fill else 0, fillShape = HighlightStyle.FillShape.PILL,
+                                pillPaddingScale = paddingScale)
                         }
                         return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                             .also { view.draw(Canvas(it)) }
@@ -355,6 +438,7 @@ class TitleFontWeightRenderingTest {
                     val background = render(1, true)
                     val result = render(Color.BLACK, true)
                     val legacy = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                    val flattened = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                     try {
                         // Negative control: the original expanded capsule behind the same SVG pixels.
                         val canvas = Canvas(legacy)
@@ -367,11 +451,21 @@ class TitleFontWeightRenderingTest {
                             HighlightDraw.drawFillRun(canvas, highlighted.first().start - padding,
                                 highlighted.last().end + padding, line.lineTop + band.top,
                                 line.lineTop + band.bottom, fill, HighlightStyle.FillShape.PILL)
+                            Canvas(flattened).apply {
+                                save()
+                                clipRect(line.columns.first().end, line.lineTop + band.top,
+                                    line.columns.last().start, line.lineTop + band.bottom)
+                                HighlightDraw.drawFillRun(this, highlighted.first().start - padding,
+                                    highlighted.last().end + padding, line.lineTop + band.top,
+                                    line.lineTop + band.bottom, fill, HighlightStyle.FillShape.PILL)
+                                restore()
+                            }
                         }
                         canvas.drawBitmap(icons, 0f, 0f, null)
-                        for ((name, bitmap) in listOf("fixed" to result, "original" to legacy)) {
+                        Canvas(flattened).drawBitmap(icons, 0f, 0f, null)
+                        for ((name, bitmap) in listOf("fixed" to result, "flattened" to flattened)) {
                             File(context.getExternalFilesDir("ui-regression"),
-                                "highlight-transparent-$size-$optimized-$withSpace-$name.png").outputStream().use {
+                                "highlight-transparent-$size-$optimized-$withSpace-$paddingScale-$iconScale-$name.png").outputStream().use {
                                 assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
                             }
                         }
@@ -406,17 +500,39 @@ class TitleFontWeightRenderingTest {
                                 }
                             }
                             assertTrue("Both real Chinese glyphs must be rendered", ink > 50)
+                            if (withSpace) {
+                                val band = HighlightGeometry.fillBand(line.lineBase - line.lineTop, textSize,
+                                    line.height, HighlightStyle.FillShape.PILL, 1f.dpToPx())
+                                val middle = (line.lineTop + (band.top + band.bottom) / 2f).toInt()
+                                val shoulder = (line.lineTop + band.top + (band.bottom - band.top) * 0.08f).toInt()
+                                fun edges(bitmap: Bitmap, y: Int): Pair<Int, Int> {
+                                    val xs = ceil(line.columns.first().end).toInt() until floor(line.columns.last().start).toInt()
+                                    fun filled(x: Int) = Color.alpha(bitmap.getPixel(x, y)) > 30 &&
+                                        bitmap.getPixel(x, y) != icons.getPixel(x, y)
+                                    return xs.first(::filled) to xs.last(::filled)
+                                }
+                                val centerEdges = edges(background, middle)
+                                val shoulderEdges = edges(background, shoulder)
+                                assertTrue("Left cap must be visibly curved: size=$size scale=$paddingScale icon=$iconScale",
+                                    shoulderEdges.first - centerEdges.first >= 2)
+                                assertTrue("Right cap must be visibly curved: size=$size scale=$paddingScale icon=$iconScale",
+                                    centerEdges.second - shoulderEdges.second >= 2)
+                                val flatCenter = edges(flattened, middle)
+                                val flatShoulder = edges(flattened, shoulder)
+                                assertTrue("The previously clipped capsule must fail the curvature check",
+                                    flatShoulder.first - flatCenter.first < 2 || flatCenter.second - flatShoulder.second < 2)
+                            }
                         }
-                        assertEquals("Highlight clipping must not move text or review columns", positions,
+                        assertEquals("Adaptive caps must not move text or review columns", positions,
                             columns.map { it.start to it.end })
-                        if (optimized && size == 50 && withSpace) {
+                        if (optimized && size == 50 && withSpace && paddingScale == 2f) {
                             view.setBackgroundColor(Color.WHITE)
                             activity.addContentView(view, ViewGroup.LayoutParams(width, height))
                             assertTrue("The final preview must use hardware rendering", view.isHardwareAccelerated)
                             hardwareView = view
                         }
                     } finally {
-                        listOf(icons, glyphs, background, result, legacy).forEach(Bitmap::recycle)
+                        listOf(icons, glyphs, background, result, legacy, flattened).forEach(Bitmap::recycle)
                         page.recycleRecorders()
                     }
                 }
