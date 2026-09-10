@@ -42,8 +42,11 @@ class ImportRssSourceViewModel(app: Application) : BaseViewModel(app) {
     val selectStatus = arrayListOf<Boolean>()
     private val sourceCandidates = arrayListOf<RssSourceImportCandidate>()
     private val manualSelections = arrayListOf<Boolean?>()
-    var useSourceReplacement = AppConfig.importReplaceSource
+    var automaticSourceReplacement = AppConfig.importReplaceSource
         private set
+    private val manualRuleIds = hashMapOf<Int, List<Long>>()
+    val useSourceReplacement: Boolean
+        get() = automaticSourceReplacement || manualRuleIds.isNotEmpty()
 
     val isSelectAll: Boolean
         get() {
@@ -124,7 +127,9 @@ class ImportRssSourceViewModel(app: Application) : BaseViewModel(app) {
     private fun prepareSourceCandidates() {
         executeLazy {
             val rules = appDb.replaceRuleDao.findEnabledBySourceScope()
-            allSources.map { prepareRssSourceImportCandidate(it, rules) }
+            allSources.mapIndexed { index, source ->
+                prepareRssSourceImportCandidate(source, selectedRules(index, rules))
+            }
         }.onSuccess { candidates ->
             sourceCandidates.clear()
             sourceCandidates.addAll(candidates)
@@ -142,22 +147,8 @@ class ImportRssSourceViewModel(app: Application) : BaseViewModel(app) {
     }
 
     fun setUseSourceReplacement(enabled: Boolean) {
-        if (enabled == useSourceReplacement || sourceUpdatePending.value == true) return
-        val previousMode = useSourceReplacement
-        useSourceReplacement = enabled
-        AppConfig.importReplaceSource = enabled
-        applyCandidateSources()
-        sourceUpdatePending.value = true
-        comparisonSource(
-            preserveManualSelections = true,
-            onError = {
-                useSourceReplacement = previousMode
-                AppConfig.importReplaceSource = previousMode
-                applyCandidateSources()
-            },
-        ) {
-            sourceUpdatePending.value = false
-        }
+        if (enabled == automaticSourceReplacement) return
+        refreshSourceReplacements(automatic = enabled)
     }
 
     private suspend fun importSourceAwait(text: String) {
@@ -253,9 +244,34 @@ class ImportRssSourceViewModel(app: Application) : BaseViewModel(app) {
         if (index in manualSelections.indices) manualSelections[index] = selected
     }
 
-    fun refreshSourceReplacements(index: Int, source: RssSource?): Boolean {
-        if (sourceUpdatePending.value == true || index !in sourceCandidates.indices) return false
+    var pendingReplacementDialog: Pair<Boolean, Int>? = null
+
+    fun refreshSourceReplacements(
+        index: Int = -1,
+        source: RssSource? = null,
+        ids: List<Long>? = null,
+        openDialog: Boolean? = null,
+        automatic: Boolean = automaticSourceReplacement,
+    ): Boolean {
+        if (sourceUpdatePending.value == true || (index != -1 && index !in sourceCandidates.indices)) return false
+        if (automatic && (ids != null || openDialog == true)) return false
         val previousCandidates = sourceCandidates.toList()
+        val previousIds = manualRuleIds.toMap()
+        val previousMode = automaticSourceReplacement
+        automaticSourceReplacement = automatic
+        fun restorePreviousState() {
+            automaticSourceReplacement = previousMode
+            sourceCandidates.clear()
+            sourceCandidates.addAll(previousCandidates)
+            manualRuleIds.clear()
+            manualRuleIds.putAll(previousIds)
+            applyCandidateSources()
+        }
+        if (ids != null) {
+            if (index == -1) sourceCandidates.indices.forEach { manualRuleIds[it] = ids }
+            else manualRuleIds[index] = ids
+        }
+        val selectedIds = manualRuleIds.toMap().takeUnless { automatic }
         sourceUpdatePending.value = true
         executeLazy {
             refreshRssSourceImportCandidates(
@@ -263,28 +279,45 @@ class ImportRssSourceViewModel(app: Application) : BaseViewModel(app) {
                 index,
                 source,
                 appDb.replaceRuleDao.findEnabledBySourceScope(),
+                selectedIds,
             )
         }.onSuccess { candidates ->
+            var comparisonSucceeded = true
             sourceCandidates.clear()
             sourceCandidates.addAll(candidates)
             applyCandidateSources()
             comparisonSource(
                 preserveManualSelections = true,
                 onError = {
-                    sourceCandidates.clear()
-                    sourceCandidates.addAll(previousCandidates)
-                    applyCandidateSources()
+                    comparisonSucceeded = false
+                    restorePreviousState()
                 },
             ) {
+                if (comparisonSucceeded) {
+                    AppConfig.importReplaceSource = automatic
+                    if (openDialog != null) pendingReplacementDialog = openDialog to index
+                }
                 sourceUpdatePending.value = false
             }
         }.onError {
             errorLiveData.value = "ImportError:${it.localizedMessage}"
             AppLog.put("ImportError:${it.localizedMessage}", it)
+            restorePreviousState()
             sourceUpdatePending.value = false
         }.start()
         return true
     }
+
+    private fun selectedRules(index: Int, rules: List<io.legado.app.data.entities.ReplaceRule>) =
+        if (automaticSourceReplacement) rules else rules.filter { it.id in manualRuleIds[index].orEmpty() }
+
+    fun selectedManualRuleIds(index: Int = -1): List<Long> = if (index >= 0) manualRuleIds[index].orEmpty()
+        else sourceCandidates.indices.map { manualRuleIds[it].orEmpty().toSet() }
+            .reduceOrNull { all, ids -> all.intersect(ids) }?.toList().orEmpty()
+
+    fun effectiveRuleIds(index: Int = -1): List<Long> = if (!useSourceReplacement) emptyList() else
+        (if (index >= 0) listOfNotNull(sourceCandidates.getOrNull(index)) else sourceCandidates)
+            .flatMap { it.effectiveRuleIds }.distinct()
 
     fun canImportSource(index: Int): Boolean =
         sourceCandidates.getOrNull(index)?.canImport(useSourceReplacement) != false

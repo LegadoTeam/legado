@@ -22,6 +22,7 @@ internal data class BookSourceImportCandidate(
     val replaced: BookSource? = null,
     val replacedJson: String? = null,
     val replacementError: String? = null,
+    val effectiveRuleIds: List<Long> = emptyList(),
 ) {
     fun source(useReplacement: Boolean): BookSource =
         if (useReplacement) replaced ?: original else original
@@ -44,14 +45,17 @@ internal fun prepareBookSourceImportCandidate(
         return BookSourceImportCandidate(source, originalJson, source)
     }
 
+    val effectiveRuleIds = arrayListOf<Long>()
     var replacedJson = originalJson
     try {
         matchingRules.forEach { rule ->
-            replacedJson = applySourceImportReplacement(replacedJson, rule)
+            val next = applySourceImportReplacement(replacedJson, rule)
+            if (next != replacedJson) effectiveRuleIds.add(rule.id)
+            replacedJson = next
         }
         val replaced = (parseBookSourceJson(replacedJson, allowSourceUrls = false)
                 as BookSourceImportJson.Sources).items.single()
-        return BookSourceImportCandidate(source, originalJson, replaced, replacedJson)
+        return BookSourceImportCandidate(source, originalJson, replaced, replacedJson, effectiveRuleIds = effectiveRuleIds)
     } catch (error: CancellationException) {
         throw error
     } catch (error: Exception) {
@@ -60,6 +64,7 @@ internal fun prepareBookSourceImportCandidate(
             originalJson,
             replacedJson = replacedJson,
             replacementError = error.localizedMessage ?: error.javaClass.simpleName,
+            effectiveRuleIds = effectiveRuleIds,
         )
     }
 }
@@ -69,12 +74,13 @@ internal fun refreshBookSourceImportCandidates(
     editedIndex: Int,
     editedSource: BookSource?,
     rules: List<ReplaceRule>,
+    manualRuleIds: Map<Int, List<Long>>? = null,
 ): List<BookSourceImportCandidate> {
-    require(editedIndex in candidates.indices)
+    require(editedIndex == -1 || editedIndex in candidates.indices)
     return candidates.mapIndexed { index, candidate ->
         prepareBookSourceImportCandidate(
             if (index == editedIndex) editedSource ?: candidate.original else candidate.original,
-            rules,
+            if (manualRuleIds == null) rules else rules.filter { it.id in manualRuleIds[index].orEmpty() },
         )
     }
 }
