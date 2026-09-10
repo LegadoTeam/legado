@@ -10,6 +10,7 @@ import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.RenderProcessGoneDetail
+import android.webkit.JavascriptInterface
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -20,6 +21,7 @@ import android.widget.LinearLayout
 import androidx.activity.addCallback
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
+import androidx.annotation.Keep
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.core.widget.addTextChangedListener
@@ -99,6 +101,7 @@ class CodeEditActivity :
     private var safeEditorReadGeneration = 0
     private var safeEditorLoadTimeout: Runnable? = null
     private var safeEditorReadTimeout: Runnable? = null
+    private var editorReady = false
 
     private enum class SafeEditorStatus {
         IDLE,
@@ -112,19 +115,29 @@ class CodeEditActivity :
     private var themeIndex = -1
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        // SavedStateHandle is available only after BaseActivity has called super.onCreate.
+        if (!isInitialized) {
+            viewModel.initSora()
+            isInitialized = true
+        }
+        upTheme(if (isDark) AppConfig.editThemeDark else AppConfig.editTheme)
         onBackPressedDispatcher.addCallback(this) { finish() }
         softKeyboardTool.attachToWindow(window)
         editor.colorScheme = TextMateColorScheme2.create(ThemeRegistry.getInstance()) //先设置颜色,避免一开始的白屏
         viewModel.initData(intent) {
+            if (isDestroyed) return@initData
             viewModel.title?.let {
                 binding.titleBar.title = it
             }
-            useSafeEditor = EditSafety.isCombiningHeavy(viewModel.initialText)
+            val text = viewModel.editorDraft?.text ?: viewModel.initialText
+            viewModel.editorDraft?.let { viewModel.cursorPosition = it.cursorPosition }
+            useSafeEditor = EditSafety.isCombiningHeavy(text)
             if (useSafeEditor) {
-                setupSafeEditor(viewModel.initialText)
+                setupSafeEditor(text)
             } else {
-                setupCodeEditor(viewModel.initialText)
+                setupCodeEditor(text)
             }
+            editorReady = true
             invalidateOptionsMenu()
         }
         initView()
@@ -149,10 +162,9 @@ class CodeEditActivity :
             setText(text)
             editable = viewModel.writable
             requestFocus()
-            postDelayed({
-                val pos = cursor.indexer.getCharPosition(viewModel.cursorPosition)
-                setSelection(pos.line, pos.column, true)
-            }, 360) // 延时等待长文本完成布局，再恢复光标位置
+            // Restore before accepting input; a delayed restore can overwrite a new selection.
+            val pos = cursor.indexer.getCharPosition(viewModel.cursorPosition.coerceIn(0, text.length))
+            setSelection(pos.line, pos.column, true)
         }
     }
 
@@ -211,6 +223,29 @@ class CodeEditActivity :
                 setSupportMultipleWindows(false)
                 blockNetworkLoads = true
             }
+            // This WebView only loads our network-disabled, locally generated editor document.
+            addJavascriptInterface(object {
+                @Keep
+                @JavascriptInterface
+                fun changed(text: String, cursor: Int, dirty: Boolean) {
+                    if (!isDestroyed) {
+                        viewModel.editorDraft = SafeEditorContent(text, cursor, dirty)
+                            .resolveAgainst(viewModel.initialText)
+                    }
+                }
+
+                @Keep
+                @JavascriptInterface
+                fun selected(cursor: Int) {
+                    if (!isDestroyed) {
+                        viewModel.editorDraft = viewModel.editorDraft?.let {
+                            // A clean textarea normalizes CRLF; preserve the source offset contract.
+                            if (it.dirty) it.copy(cursorPosition = cursor.coerceIn(0, it.text.length))
+                            else SafeEditorContent(it.text, cursor, false).resolveAgainst(viewModel.initialText)
+                        }
+                    }
+                }
+            }, "EditorDraft")
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView, url: String?) {
                     if (safeEditor !== view) return
@@ -319,7 +354,8 @@ class CodeEditActivity :
         val readOnly = if (viewModel.writable) "" else " readonly"
         val writable = viewModel.writable
         val wrap = if (AppConfig.editAutoWrap) "soft" else "off"
-        val cursorPosition = viewModel.cursorPosition.coerceAtLeast(0)
+        val cursorPosition = text.take(viewModel.cursorPosition.coerceIn(0, text.length))
+            .replace("\r\n", "\n").replace('\r', '\n').length
         return """
             <!doctype html>
             <html>
@@ -375,10 +411,20 @@ class CodeEditActivity :
                     var editor = document.getElementById("code");
                     editor.value = decodeBase64("$encodedText");
                     var initialValue = editor.value;
+                    var initialDraftDirty = ${viewModel.editorDraft?.dirty == true};
                     var editorWritable = $writable;
                     var initialCursor = Math.min(editor.value.length, $cursorPosition);
                     editor.setSelectionRange(initialCursor, initialCursor);
                     editor.focus();
+                    function rememberDraft() {
+                        EditorDraft.changed(editor.value, editor.selectionStart || 0,
+                            editor.value !== initialValue || initialDraftDirty);
+                    }
+                    editor.addEventListener("input", rememberDraft);
+                    document.addEventListener("selectionchange", function() {
+                        EditorDraft.selected(editor.selectionStart || 0);
+                    });
+                    rememberDraft();
 
                     window.__setEditorReadOnly = function(readOnly) {
                         if (readOnly) {
@@ -397,7 +443,7 @@ class CodeEditActivity :
                         return JSON.stringify({
                             text: editor.value,
                             cursorPosition: editor.selectionStart || 0,
-                            dirty: editor.value !== initialValue
+                            dirty: editor.value !== initialValue || initialDraftDirty
                         });
                     };
 
@@ -413,6 +459,7 @@ class CodeEditActivity :
                             var cursor = start + value.length;
                             editor.setSelectionRange(cursor, cursor);
                         }
+                        rememberDraft();
                         return true;
                     };
                 </script>
@@ -504,6 +551,18 @@ class CodeEditActivity :
         ) { result ->
             onResult(result == "true")
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        if (editorReady) {
+            if (!useSafeEditor) {
+                val text = editor.text.toString()
+                viewModel.editorDraft = SafeEditorContent(text, editor.cursor.left, text != viewModel.initialText)
+            }
+            runCatching { viewModel.persistEditorDraft() }
+                .onFailure { toastOnUi(it.localizedMessage) }
+        }
+        super.onSaveInstanceState(outState)
     }
 
     override fun onDestroy() {
@@ -668,21 +727,6 @@ class CodeEditActivity :
         if (editNonPrintable != null) {
             editor.nonPrintablePaintingFlags = editNonPrintable
         }
-    }
-
-    override fun initTheme() {
-        super.initTheme()
-        if (!isInitialized) {
-            viewModel.initSora()
-            isInitialized = true
-        }
-        val index = if (isDark) {
-            AppConfig.editThemeDark
-        } else {
-            AppConfig.editTheme
-        }
-        upTheme(index)
-        themeIndex = index
     }
 
     override fun upTheme(index: Int) {

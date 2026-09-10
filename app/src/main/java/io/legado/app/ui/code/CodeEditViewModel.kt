@@ -2,6 +2,7 @@ package io.legado.app.ui.code
 
 import android.app.Application
 import android.content.Intent
+import androidx.lifecycle.SavedStateHandle
 import com.script.ScriptException
 import com.script.rhino.RhinoScriptEngine
 import io.github.rosemoe.sora.langs.textmate.TextMateLanguage
@@ -25,7 +26,7 @@ import org.eclipse.tm4e.core.registry.IThemeSource
 import org.jsoup.Jsoup
 import splitties.init.appCtx
 
-class CodeEditViewModel(application: Application) : BaseViewModel(application) {
+class CodeEditViewModel(application: Application, private val savedState: SavedStateHandle) : BaseViewModel(application) {
     private val beautifyJs by lazy {
         appCtx.assets.open("scripts/beautify.min.js").bufferedReader().use { it.readText() }
     }
@@ -41,6 +42,8 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
     )
 
     var initialText = ""
+    @Volatile
+    internal var editorDraft: SafeEditorContent? = null
     var cursorPosition = 0
     internal var language: RuntimeObjectCompletionLanguage? = null
     private var languageName = "source.js"
@@ -73,6 +76,14 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
             } else {
                 initialText = intent.getStringExtra("text") ?: throw Exception("未获取到待编辑文本")
             }
+            if (intent.getBooleanExtra("readOnly", false)) writable = false
+            if (editorDraft == null) {
+                savedState.get<String>("editorDraftPath")?.let { path ->
+                    val text = CodeTextTransfer.read(context, path)
+                        ?: error(context.getString(R.string.code_editor_result_error))
+                    editorDraft = SafeEditorContent(text, savedState["editorDraftCursor"] ?: 0, text != initialText)
+                }
+            }
             if (isHtmlStr(initialText)) {
                 languageName = "text.html.basic"
             } else {
@@ -93,6 +104,20 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
             context.toastOnUi("error\n${it.localizedMessage}")
             it.printOnDebug()
         }
+    }
+
+    internal fun persistEditorDraft() {
+        val draft = editorDraft ?: return
+        val path = CodeTextTransfer.write(context, draft.text)
+        val previous = savedState.get<String>("editorDraftPath")
+        savedState["editorDraftPath"] = path
+        savedState["editorDraftCursor"] = draft.cursorPosition
+        CodeTextTransfer.delete(context, previous)
+    }
+
+    override fun onCleared() {
+        CodeTextTransfer.delete(context, savedState.get<String>("editorDraftPath"))
+        super.onCleared()
     }
 
     private fun isHtmlStr(text: String): Boolean {
