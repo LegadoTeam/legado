@@ -1720,4 +1720,6 @@
     <string name="book_memo_clear_confirm">清空这本书的备忘？</string>
     <string name="book_memo_discard">放弃未保存的修改并关闭？</string>
     <string name="book_memo_save_failed">备忘保存失败：%1$s</string>
+    <string name="view_in_code_editor">编辑器查看</string>
+    <string name="code_editor_result_error">无法读取编辑器返回内容，已保留预览内容。</string>
 </resources>

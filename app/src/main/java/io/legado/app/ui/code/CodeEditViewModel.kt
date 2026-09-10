@@ -73,6 +73,7 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
             } else {
                 initialText = intent.getStringExtra("text") ?: throw Exception("未获取到待编辑文本")
             }
+            if (intent.getBooleanExtra("readOnly", false)) writable = false
             if (isHtmlStr(initialText)) {
                 languageName = "text.html.basic"
             } else {

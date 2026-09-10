@@ -1,11 +1,14 @@
 package io.legado.app.ui.widget.dialog
 
+import android.app.Activity.RESULT_OK
+import android.content.Intent
 import android.os.Bundle
 import android.text.method.KeyListener
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import android.widget.SeekBar
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.widget.SearchView
 import androidx.core.widget.doAfterTextChanged
 import io.legado.app.R
@@ -14,6 +17,9 @@ import io.legado.app.databinding.DialogCodeViewBinding
 import io.legado.app.help.IntentData
 import io.legado.app.help.findTextRanges
 import io.legado.app.lib.theme.primaryColor
+import io.legado.app.ui.code.CodeEditActivity
+import io.legado.app.ui.code.CodeTextTransfer
+import io.legado.app.ui.widget.code.EditSafety
 import io.legado.app.ui.widget.code.addJsPattern
 import io.legado.app.ui.widget.code.addJsonPattern
 import io.legado.app.ui.widget.code.addLegadoPattern
@@ -22,6 +28,7 @@ import io.legado.app.utils.disableEdit
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.gone
 import io.legado.app.utils.setLayout
+import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.visible
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 
@@ -72,10 +79,43 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
     private var replaceRuleRefreshPending = false
     private var originalCodeStateKey: String? = null
     private var alternateCodeStateKey: String? = null
+    private var editorTextPath: String? = null
+    private var editorPending = false
+    private var editorReadOnly = false
     private val scrollListener = ViewTreeObserver.OnScrollChangedListener { updatePositionBar() }
     private val layoutListener = ViewTreeObserver.OnGlobalLayoutListener { updatePositionBar() }
     val requestId: String?
         get() = arguments?.getString("requestId")
+
+    private val editorLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val context = requireContext().applicationContext
+        val outputPath = result.data?.getStringExtra("textFile")
+        try {
+            if (result.resultCode != RESULT_OK || editorReadOnly) return@registerForActivityResult
+            val code = result.data?.getStringExtra("text") ?: outputPath?.let {
+                CodeTextTransfer.read(context, it)
+                    ?: error(getString(R.string.code_editor_result_error))
+            }
+            if (code != null) {
+                originalCode = code
+                if (!showingAlternate) binding.codeView.setText(code)
+            }
+            if (!showingAlternate) {
+                result.data?.takeIf { it.hasExtra("cursorPosition") }
+                    ?.getIntExtra("cursorPosition", 0)?.let {
+                        binding.codeView.setSelection(it.coerceIn(0, binding.codeView.length()))
+                    }
+            }
+        } catch (error: Exception) {
+            toastOnUi(error.localizedMessage)
+        } finally {
+            CodeTextTransfer.delete(context, editorTextPath)
+            CodeTextTransfer.delete(context, outputPath)
+            editorTextPath = null
+            editorPending = false
+            updateEditorAction()
+        }
+    }
 
     override fun onStart() {
         super.onStart()
@@ -85,6 +125,9 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
+        editorTextPath = savedInstanceState?.getString("editorTextPath")
+        editorPending = savedInstanceState?.getBoolean("editorPending") == true
+        editorReadOnly = savedInstanceState?.getBoolean("editorReadOnly") == true
         binding.toolBar.setBackgroundColor(primaryColor)
         val disableEdit = arguments?.getBoolean("disableEdit") == true
         if (disableEdit) {
@@ -161,6 +204,7 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
             binding.codeView.keyListener = editKeyListener
         }
         showingAlternate = show
+        updateEditorAction()
         binding.toolBar.menu.findItem(R.id.menu_save)?.isVisible =
             saveEnabled && !show && searchView.isIconified
         if (!searchView.isIconified) showCurrentMatch()
@@ -173,6 +217,7 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
         binding.toolBar.menu.applyTint(requireContext())
         binding.toolBar.menu.findItem(R.id.menu_replace_rule).isVisible =
             arguments?.getBoolean("showReplaceRules") == true
+        binding.toolBar.menu.findItem(R.id.menu_fullscreen_edit).isVisible = canSave
         searchView = binding.toolBar.menu.findItem(R.id.menu_search).actionView as SearchView
         val navigationWidth = 96.dpToPx()
         val minimumWidth = 48.dpToPx()
@@ -211,12 +256,14 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
         }
         setSearchOpen(false)
         binding.toolBar.setOnMenuItemClickListener {
+            if (editorPending) return@setOnMenuItemClickListener true
             when (it.itemId) {
                 R.id.menu_search_previous -> moveToMatch(searchIndex - 1)
                 R.id.menu_search_next -> moveToMatch(searchIndex + 1)
                 R.id.menu_replace_rule -> if (!replaceRuleRefreshPending) {
                     callback()?.onOpenReplaceRules()
                 }
+                R.id.menu_fullscreen_edit -> openEditor()
                 R.id.menu_save -> if (!replaceRuleRefreshPending) {
                     binding.codeView.text?.toString()?.let { code ->
                         callback()?.onCodeSave(code, requestId)
@@ -226,6 +273,43 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
             }
             return@setOnMenuItemClickListener true
         }
+    }
+
+    private fun openEditor() {
+        if (!saveEnabled || replaceRuleRefreshPending || editorPending) return
+        val context = requireContext().applicationContext
+        val code = binding.codeView.text.toString()
+        val cursor = binding.codeView.selectionStart.coerceAtLeast(0)
+        editorReadOnly = showingAlternate
+        editorPending = true
+        updateEditorAction()
+        try {
+            val path = if (EditSafety.isTooLongForInline(code)) CodeTextTransfer.write(context, code) else null
+            editorTextPath = path
+            editorLauncher.launch(Intent(context, CodeEditActivity::class.java).apply {
+                putExtra("useTextFile", true)
+                if (path != null) putExtra("textFile", path) else putExtra("text", code)
+                putExtra("readOnly", editorReadOnly)
+                putExtra("cursorPosition", cursor)
+                putExtra("languageName", "source.json")
+            })
+        } catch (error: Exception) {
+            CodeTextTransfer.delete(context, editorTextPath)
+            editorTextPath = null
+            editorPending = false
+            updateEditorAction()
+            toastOnUi(error.localizedMessage)
+        }
+    }
+
+    private fun updateEditorAction() {
+        val pending = replaceRuleRefreshPending || editorPending
+        binding.toolBar.menu.findItem(R.id.menu_fullscreen_edit).isEnabled = !pending
+        binding.toolBar.menu.findItem(R.id.menu_replace_rule).isEnabled = !pending
+        binding.toolBar.menu.findItem(R.id.menu_save).isEnabled = !pending
+        binding.cbSourceReplacementPreview.isEnabled = !pending
+        binding.codeView.keyListener = if (pending || showingAlternate) null else editKeyListener
+        isCancelable = !pending
     }
 
     private fun setSearchOpen(open: Boolean) {
@@ -309,8 +393,6 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
 
     private fun updateAlternatePreview() {
         if (view == null) return
-        binding.toolBar.menu.findItem(R.id.menu_replace_rule).isEnabled =
-            !replaceRuleRefreshPending
         binding.cbSourceReplacementPreview.apply {
             if (alternateCode == null) {
                 if (showingAlternate) showAlternate(false)
@@ -320,16 +402,13 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
                 if (isChecked) showAlternate(true)
             }
         }
+        updateEditorAction()
     }
 
     fun setReplaceRuleRefreshPending(pending: Boolean) {
         replaceRuleRefreshPending = pending
         if (view == null) return
-        binding.toolBar.menu.findItem(R.id.menu_replace_rule).isEnabled = !pending
-        binding.toolBar.menu.findItem(R.id.menu_save).isEnabled = !pending
-        binding.cbSourceReplacementPreview.isEnabled = !pending
-        binding.codeView.keyListener = if (pending || showingAlternate) null else editKeyListener
-        isCancelable = !pending
+        updateEditorAction()
     }
 
     fun currentOriginalCode(): String = if (view == null) {
@@ -359,6 +438,9 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("editorTextPath", editorTextPath)
+        outState.putBoolean("editorPending", editorPending)
+        outState.putBoolean("editorReadOnly", editorReadOnly)
         outState.putInt("searchIndex", searchIndex)
         originalCodeStateKey = saveStateData(originalCodeStateKey, currentOriginalCode())
             .also { outState.putString("originalCode", it) }

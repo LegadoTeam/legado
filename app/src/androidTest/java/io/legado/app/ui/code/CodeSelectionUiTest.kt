@@ -3,12 +3,17 @@ package io.legado.app.ui.code
 import android.app.Activity
 import android.app.Instrumentation
 import android.content.Intent
+import android.content.ClipData
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.os.SystemClock
 import android.view.View
 import android.view.ViewConfiguration
 import androidx.core.view.isVisible
+import androidx.core.content.FileProvider
+import androidx.fragment.app.DialogFragment
+import androidx.lifecycle.ViewModelProvider
+import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.closeSoftKeyboard
@@ -20,13 +25,28 @@ import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.isCompletelyDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.RootMatchers.isPlatformPopup
+import androidx.test.espresso.matcher.RootMatchers.isDialog
+import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.component.EditorTextActionWindow
 import io.legado.app.R
 import io.legado.app.help.CacheManager
+import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.RssSource
+import io.legado.app.data.entities.rule.SearchRule
+import io.legado.app.help.config.AppConfig
+import io.legado.app.ui.association.FileAssociationActivity
+import io.legado.app.ui.association.ImportBookSourceDialog
+import io.legado.app.ui.association.ImportBookSourceViewModel
+import io.legado.app.ui.association.ImportRssSourceDialog
+import io.legado.app.ui.association.ImportRssSourceViewModel
+import io.legado.app.ui.widget.dialog.CodeDialog
+import io.legado.app.utils.GSON
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Test
@@ -198,6 +218,185 @@ class CodeSelectionUiTest {
                 scenario?.close()
                 scenario = null
             }
+        }
+    }
+
+    @Test fun sourcePreviewEditsReturnToTheSameBookAndRssCandidateWithoutLosingLongCode() {
+        val id = UUID.randomUUID().toString()
+        val script = "// 中文 🌍 original draft\n".repeat(2_000)
+        val savedReplacement = AppConfig.importReplaceSource
+        AppConfig.importReplaceSource = false
+        try {
+            for (rss in listOf(false, true)) {
+                val urls = listOf("https://preview-$id.invalid/first", "https://preview-$id.invalid/second")
+                val sources = if (rss) urls.mapIndexed { index, url ->
+                    RssSource(sourceUrl = url, sourceName = "Preview $index", jsLib = script, ruleArticles = "article")
+                } else urls.mapIndexed { index, url ->
+                    BookSource(bookSourceUrl = url, bookSourceName = "Preview $index", jsLib = script,
+                        searchUrl = "/search", ruleSearch = SearchRule(bookList = "article", name = "text"))
+                }
+                val file = File(context.cacheDir, "preview-editor-$id-$rss.json").apply {
+                    writeText(GSON.toJson(sources))
+                }
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileProvider", file)
+                val intent = Intent(context, FileAssociationActivity::class.java).apply {
+                    action = Intent.ACTION_SEND
+                    type = "application/json"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    clipData = ClipData.newRawUri(file.name, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                var editorActivity: CodeEditActivity? = null
+                try {
+                    ActivityScenario.launch<FileAssociationActivity>(intent).use { host ->
+                        var parent: DialogFragment? = null
+                        await {
+                            host.onActivity { activity ->
+                                parent = activity.supportFragmentManager.fragments.filterIsInstance<DialogFragment>()
+                                    .find { if (rss) it is ImportRssSourceDialog else it is ImportBookSourceDialog }
+                            }
+                            var ready = false
+                            instrumentation.runOnMainSync {
+                                ready = parent?.view?.findViewById<RecyclerView>(R.id.recycler_view)
+                                    ?.adapter?.itemCount == 2 && parent?.dialog?.window?.decorView?.hasWindowFocus() == true
+                            }
+                            ready
+                        }
+                        instrumentation.runOnMainSync {
+                            val list = parent!!.requireView().findViewById<RecyclerView>(R.id.recycler_view)
+                            checkNotNull(list.findViewHolderForAdapterPosition(1)).itemView
+                                .findViewById<View>(R.id.tv_open).performClick()
+                        }
+                        var preview: CodeDialog? = null
+                        await {
+                            var ready = false
+                            instrumentation.runOnMainSync {
+                                preview = parent!!.childFragmentManager.fragments.filterIsInstance<CodeDialog>().firstOrNull()
+                                ready = preview?.dialog?.window?.decorView?.hasWindowFocus() == true
+                            }
+                            ready
+                        }
+                        var original = ""
+                        instrumentation.runOnMainSync {
+                            assertEquals("1", preview!!.requestId)
+                            original = preview!!.currentOriginalCode()
+                            preview!!.setReplaceRuleRefreshPending(true)
+                            assertFalse(preview!!.binding.toolBar.menu.findItem(R.id.menu_fullscreen_edit).isEnabled)
+                            preview!!.setReplaceRuleRefreshPending(false)
+                            preview!!.binding.toolBar.showOverflowMenu()
+                        }
+                        onView(withText(R.string.view_in_code_editor)).perform(click())
+                        var inputPath: String? = null
+                        await {
+                            var ready = false
+                            instrumentation.runOnMainSync {
+                                editorActivity = ActivityLifecycleMonitorRegistry.getInstance()
+                                    .getActivitiesInStage(Stage.RESUMED).filterIsInstance<CodeEditActivity>().firstOrNull()
+                                val editor = editorActivity?.findViewById<CodeEditor>(R.id.editText)
+                                ready = editor != null && editor.text.toString() == original && editor.isShown
+                                if (ready) {
+                                    inputPath = editorActivity!!.intent.getStringExtra("textFile")
+                                    assertFalse(editorActivity!!.intent.hasExtra("text"))
+                                    assertTrue(editor!!.isEditable)
+                                }
+                            }
+                            ready
+                        }
+                        assertNotNull("Long previews must use the actual transfer file", inputPath)
+                        assertEquals(original, CodeTextTransfer.read(context, inputPath!!))
+                        val insertion = original.indexOf(urls[1]) + urls[1].length
+                        assertTrue(insertion > urls[1].length)
+                        val edited = original.substring(0, insertion) + "#edited" + original.substring(insertion)
+                        instrumentation.runOnMainSync {
+                            editorActivity!!.findViewById<CodeEditor>(R.id.editText).text.replace(insertion, insertion, "#edited")
+                        }
+                        onView(withId(R.id.menu_save)).perform(click())
+                        await {
+                            var ready = false
+                            instrumentation.runOnMainSync {
+                                ready = preview!!.currentOriginalCode() == edited &&
+                                    preview!!.dialog?.window?.decorView?.hasWindowFocus() == true &&
+                                    preview!!.binding.toolBar.menu.findItem(R.id.menu_fullscreen_edit).isEnabled
+                            }
+                            ready
+                        }
+                        assertFalse("The input transfer file must be removed after return", File(inputPath!!).exists())
+                        instrumentation.waitForIdleSync()
+                        checkNotNull(instrumentation.uiAutomation.takeScreenshot()).let { bitmap ->
+                            try {
+                                File(context.getExternalFilesDir("ui-regression"), "source-preview-editor-return-$rss.png")
+                                    .outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+                            } finally { bitmap.recycle() }
+                        }
+                        // Discard a second edit: only the cursor may return, never the discarded draft.
+                        instrumentation.runOnMainSync { preview!!.binding.toolBar.showOverflowMenu() }
+                        onView(withText(R.string.view_in_code_editor)).perform(click())
+                        await {
+                            var ready = false
+                            instrumentation.runOnMainSync {
+                                editorActivity = ActivityLifecycleMonitorRegistry.getInstance()
+                                    .getActivitiesInStage(Stage.RESUMED).filterIsInstance<CodeEditActivity>().firstOrNull()
+                                ready = editorActivity?.findViewById<CodeEditor>(R.id.editText)?.text?.toString() == edited
+                            }
+                            ready
+                        }
+                        instrumentation.runOnMainSync {
+                            editorActivity!!.findViewById<CodeEditor>(R.id.editText).text.replace(insertion, insertion, "discarded")
+                            editorActivity!!.finish()
+                        }
+                        onView(withText(R.string.no)).inRoot(isDialog()).perform(click())
+                        await {
+                            var ready = false
+                            instrumentation.runOnMainSync {
+                                ready = preview!!.dialog?.window?.decorView?.hasWindowFocus() == true &&
+                                    preview!!.binding.toolBar.menu.findItem(R.id.menu_fullscreen_edit).isEnabled
+                                if (ready) assertEquals(edited, preview!!.currentOriginalCode())
+                            }
+                            ready
+                        }
+                        onView(withId(R.id.menu_save)).inRoot(isDialog()).perform(click())
+                        await {
+                            var ready = false
+                            instrumentation.runOnMainSync {
+                                if (rss) {
+                                    val actual = ViewModelProvider(parent!!)[ImportRssSourceViewModel::class.java].allSources
+                                    ready = actual.size == 2 && actual[1].sourceUrl == urls[1] + "#edited"
+                                    if (ready) { assertEquals(urls[0], actual[0].sourceUrl); assertEquals(script, actual[1].jsLib) }
+                                } else {
+                                    val actual = ViewModelProvider(parent!!)[ImportBookSourceViewModel::class.java].allSources
+                                    ready = actual.size == 2 && actual[1].bookSourceUrl == urls[1] + "#edited"
+                                    if (ready) { assertEquals(urls[0], actual[0].bookSourceUrl); assertEquals(script, actual[1].jsLib) }
+                                }
+                            }
+                            ready
+                        }
+                    }
+                } finally {
+                    instrumentation.runOnMainSync { editorActivity?.takeUnless { it.isFinishing }?.finish() }
+                    file.delete()
+                }
+            }
+        } finally {
+            AppConfig.importReplaceSource = savedReplacement
+        }
+    }
+
+    @Test fun fileBackedReplacementPreviewIsReadOnlyInTheFullEditor() {
+        val code = "// replacement preview 中文 🌍\n".repeat(1_000)
+        val path = CodeTextTransfer.write(context, code)
+        try {
+            scenario = ActivityScenario.launchActivityForResult(Intent(context, CodeEditActivity::class.java).apply {
+                putExtra("textFile", path)
+                putExtra("useTextFile", true)
+                putExtra("readOnly", true)
+            })
+            awaitEditor { it.isShown && it.text.toString() == code }
+            withEditor { assertFalse(it.isEditable) }
+            scenario!!.onActivity { it.finish() }
+            assertEquals(Activity.RESULT_CANCELED, scenario!!.result.resultCode)
+            assertEquals(code, CodeTextTransfer.read(context, path))
+        } finally {
+            CodeTextTransfer.delete(context, path)
         }
     }
 
