@@ -721,9 +721,10 @@ class TitleFontWeightRenderingTest {
                     strike = HighlightStyle.Deco(decoration), box = HighlightStyle.Deco(decoration),
                     emphasis = HighlightStyle.Deco(Color.CYAN))
                 for (mode in listOf("static", "zh", "html")) for (justify in listOf(false, true))
-                    for (indentCount in listOf(0, 2, 4)) {
+                    for (indentCount in listOf(0, 2, 4)) for (metrics in listOf(false, true)) {
                     val indent = ChapterProvider.indentChar.repeat(indentCount)
-                    val style = fullStyle.copy(underline = fullStyle.underline.takeUnless { justify })
+                    val style = fullStyle.copy(underline = fullStyle.underline.takeUnless { justify },
+                        fontSize = 36f.takeIf { metrics }, letterSpacing = 0.2f.takeIf { metrics })
                     ReadBookConfig.paragraphIndent = indent
                     ReadBookConfig.useZhLayout = mode == "zh"
                     context.putPrefBoolean(PreferKey.textFullJustify, justify)
@@ -733,19 +734,42 @@ class TitleFontWeightRenderingTest {
                     val img = if (mode == "html") "<img src='$src'>" else """<img src="$src">"""
                     val contents = if (mode == "html") listOf("<usehtml><p>　 $img$text</p></usehtml>")
                         else listOf(indent + img + text, indent + text)
-                    val chapter = ChapterProvider.getTextChapterAsync(CoroutineScope(Dispatchers.Default),
+                    val scope = CoroutineScope(Dispatchers.Default)
+                    val base = ChapterProvider.getTextChapterAsync(scope,
                         book!!, fixture, "Indent", BookContent(false, contents, null), fixture.index + 1,
                         saveChapterData = false)
                     runBlocking { withTimeout(30_000) {
-                        for (ignored in chapter.layoutChannel) Unit
-                        while (!chapter.isCompleted) yield()
+                        for (ignored in base.layoutChannel) Unit
+                        while (!base.isCompleted) yield()
                     } }
-                    val label = "$mode justify=$justify indent=$indentCount"
-                    val lines = chapter.pages.flatMap { it.lines }
-                    val canonical = HighlightTextBuilder.build(lines.map {
+                    val label = "$mode justify=$justify indent=$indentCount metrics=$metrics"
+                    val baseLines = base.pages.flatMap { it.lines }
+                    val canonical = HighlightTextBuilder.build(baseLines.map {
                         HighlightTextBuilder.LineInput(it.text, it.isParagraphEnd) })
                     val ranges = listOf(HighlightMatcher.Range(0, canonical.length, style))
+                    val chapter = if (metrics) {
+                        val spacing = HighlightSpacing.resolve(base, ranges)
+                        for (line in baseLines) {
+                            var position = line.chapterPosition
+                            for (column in line.columns) {
+                                if ((column as? TextBaseColumn)?.isParagraphIndent == true) {
+                                    assertTrue("Indent must not receive font metrics: $label", spacing[position]?.metricStyle == null)
+                                }
+                                position += column.positionLength
+                            }
+                        }
+                        checkNotNull(base.layoutWithHighlightSpacing(scope, spacing)).also { result ->
+                            runBlocking { withTimeout(30_000) {
+                                for (ignored in result.layoutChannel) Unit
+                                while (!result.isCompleted) yield()
+                            } }
+                        }
+                    } else base
+                    val lines = chapter.pages.flatMap { it.lines }
                     val columns = lines.flatMap { it.columns }.filterIsInstance<TextBaseColumn>()
+                    assertEquals("Generated indent widths stay unchanged: $label", baseLines.flatMap { it.columns }
+                        .filterIsInstance<TextBaseColumn>().filter { it.isParagraphIndent }.map { it.end - it.start },
+                        columns.filter { it.isParagraphIndent }.map { it.end - it.start })
                     assertEquals(label, if (mode == "html") 0 else indentCount * 2,
                         columns.count { it.isParagraphIndent })
                     assertTrue("Image must be laid out: $label", lines.any { line -> line.columns.any { it is ImageColumn } })
@@ -790,7 +814,7 @@ class TitleFontWeightRenderingTest {
                                     }
                             }
                             if (page.index == 0 && indentCount == 2) File(context.getExternalFilesDir("ui-regression"),
-                                "highlight-indent-$mode-$justify.png").outputStream().use {
+                                "highlight-indent-$mode-$justify${if (metrics) "-metrics" else ""}.png").outputStream().use {
                                 assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
                             }
                         } finally { bitmap.recycle(); page.recycleRecorders() }
