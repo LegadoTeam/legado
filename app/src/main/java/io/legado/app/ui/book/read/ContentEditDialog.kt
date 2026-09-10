@@ -222,6 +222,7 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
         }
         viewModel.contentLiveData.observe(owner) { content ->
             if (!renderDraft(content) || editingDraft) return@observe
+            scheduleSearch(scrollToMatch = false)
             contentView.post {
                 if (!owner.lifecycle.currentState.isAtLeast(Lifecycle.State.CREATED)) {
                     return@post
@@ -293,8 +294,9 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
         // Save the canonical draft once; the EditText contains only its current presentation.
         outState.putString(STATE_DRAFT, viewModel.draftText)
         if (view == null) return
-        outState.putInt(STATE_SELECTION_START, rawSelection(binding.contentView.selectionStart, false))
-        outState.putInt(STATE_SELECTION_END, rawSelection(binding.contentView.selectionEnd, true))
+        val (start, end) = rawSelectionRange()
+        outState.putInt(STATE_SELECTION_START, start)
+        outState.putInt(STATE_SELECTION_END, end)
         outState.putString(STATE_SEARCH_QUERY, binding.searchInput.text?.toString())
         outState.putBoolean(STATE_SEARCH_VISIBLE, binding.searchBar.isVisible)
         outState.putBoolean(STATE_SEARCH_REGEX, binding.searchRegex.isChecked)
@@ -329,8 +331,7 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
                 R.id.menu_reset -> viewModel.initContent(editTarget, true)
                 R.id.menu_content_plain_text -> {
                     val contentView = binding.contentView
-                    val start = rawSelection(contentView.selectionStart, false)
-                    val end = rawSelection(contentView.selectionEnd, true)
+                    val (start, end) = rawSelectionRange()
                     val top = contentView.layout?.let { layout ->
                         rawSelection(layout.getLineStart(layout.getLineForVertical(contentView.scrollY)), false)
                     } ?: start
@@ -356,6 +357,15 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
 
     private fun rawSelection(offset: Int, afterImages: Boolean): Int =
         if (plainText) projection.rawOffset(offset, afterImages) else offset.coerceAtLeast(0)
+
+    private fun rawSelectionRange(): Pair<Int, Int> {
+        val contentView = binding.contentView
+        val end = rawSelection(contentView.selectionEnd, true)
+        // A caret at a hidden image must stay collapsed when showing or restoring raw text.
+        val start = if (contentView.selectionStart == contentView.selectionEnd) end
+            else rawSelection(contentView.selectionStart, false)
+        return start to end
+    }
 
     private fun setRawSelection(start: Int, end: Int) {
         val contentView = binding.contentView

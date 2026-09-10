@@ -142,6 +142,62 @@ class ContentEditSearchTest {
     }
 
     @Test
+    fun hiddenImageCaretStaysCollapsedWhenSwitchingAndRestoringRawMode() {
+        val image = "<img src=\"https://example.invalid/body.png\">"
+        val raw = "甲${image}乙"
+        onDialog {
+            val ui = it.binding
+            it.viewModel.updateDraft(raw)
+            ui.toolBar.menu.performIdentifierAction(R.id.menu_content_plain_text, 0)
+            ui.contentView.setSelection(1)
+            ui.toolBar.menu.performIdentifierAction(R.id.menu_content_plain_text, 0)
+            assertEquals(1 + image.length, ui.contentView.selectionStart)
+            assertEquals(ui.contentView.selectionStart, ui.contentView.selectionEnd)
+            ui.contentView.text!!.replace(ui.contentView.selectionStart, ui.contentView.selectionEnd, "新")
+            assertEquals("甲${image}新乙", it.viewModel.draftText)
+            it.viewModel.updateDraft(raw)
+            ui.toolBar.menu.performIdentifierAction(R.id.menu_content_plain_text, 0)
+            ui.contentView.setSelection(1)
+        }
+        // A preference change while the view is being recreated must not expand the saved caret.
+        context.defaultSharedPreferences.edit().putBoolean("contentEditPlainText", false).commit()
+        scenario!!.recreate()
+        onDialog {
+            val edit = it.binding.contentView
+            assertEquals(raw, edit.text.toString())
+            assertEquals(1 + image.length, edit.selectionStart)
+            assertEquals(edit.selectionStart, edit.selectionEnd)
+            edit.text!!.replace(edit.selectionStart, edit.selectionEnd, "新")
+            assertEquals("甲${image}新乙", it.viewModel.draftText)
+        }
+    }
+
+    @Test
+    fun resettingContentInvalidatesCompletedAndPendingSearches() {
+        onDialog {
+            it.binding.contentView.text!!.append("\nunique edited tail")
+            openSearch(it)
+            it.binding.searchInput.setText("unique edited tail")
+        }
+        awaitCount("1/1")
+        onDialog { it.binding.toolBar.menu.performIdentifierAction(R.id.menu_reset, 0) }
+        // This source-less fixture resets to empty; its old match is beyond the new draft.
+        awaitDialog { it.viewModel.draftText == "" && it.binding.searchCount.text.toString() == "0/0" }
+        onDialog {
+            assertFalse(it.binding.btnSearchNext.isEnabled)
+            it.binding.btnSearchNext.performClick()
+            it.viewModel.updateDraft("pending needle")
+            it.binding.searchInput.setText("needle")
+            it.viewModel.updateDraft("short")
+        }
+        awaitDialog(stableMillis = 300) { it.binding.searchCount.text.toString() == "0/0" }
+        onDialog {
+            assertFalse(it.binding.btnSearchNext.isEnabled)
+            assertEquals("short", it.binding.contentView.text.toString())
+        }
+    }
+
+    @Test
     fun literalRegexCaseAndCircularNavigationDoNotEditTheDraft() {
         var original = ""
         onDialog {
