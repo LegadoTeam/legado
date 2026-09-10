@@ -285,8 +285,10 @@ class ExploreRefreshUiTest {
             }
         } finally {
             screenshot("$name-after")
+            var recordedFrames = ""
+            scenario!!.onActivity { recordedFrames = frames.joinToString("\n") }
             File(context.getExternalFilesDir("ui-regression"), "$name-frames.txt")
-                .writeText(frames.joinToString("\n"))
+                .writeText(recordedFrames)
         }
     }
 
