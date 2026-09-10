@@ -19,6 +19,5 @@
     <item name="text_watcher" type="id" />
     <item name="toolbar_overflow_menu_state" type="id" />
     <item name="menu_show_explore_categories" type="id" />
-    <item name="code_share_selection" type="id" />
 
 </resources>
