@@ -191,7 +191,7 @@ class ImportBookSourceStateTest {
         )
         val setReplacement = viewModel.substringAfter("fun setUseSourceReplacement")
             .substringBefore("private suspend fun importSourceUrl")
-        assertTrue(setReplacement.contains("useSourceReplacement = previousMode"))
+        assertTrue(setReplacement.contains("automaticSourceReplacement = previousMode"))
         assertTrue(setReplacement.contains("AppConfig.importReplaceSource = previousMode"))
         assertTrue(setReplacement.contains("applyCandidateSources()"))
         val setSelection = viewModel.substringAfter("fun setSelection")

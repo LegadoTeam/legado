@@ -19,10 +19,14 @@ import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.openActionBarOverflowOrOptionsMenu
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.matcher.RootMatchers.isPlatformPopup
+import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
+import io.github.rosemoe.sora.widget.CodeEditor
 import io.legado.app.R
 import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.constant.PreferKey
@@ -41,6 +45,7 @@ import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.EffectiveReplacesDialog
 import io.legado.app.ui.book.read.ManualReplaceRulesDialog
 import io.legado.app.ui.replace.ReplaceRuleActivity
+import io.legado.app.ui.code.CodeEditActivity
 import io.legado.app.ui.widget.PopupAction
 import io.legado.app.ui.widget.dialog.CodeDialog
 import io.legado.app.utils.GSON
@@ -73,7 +78,7 @@ class SourceManualReplacementUiTest {
     private val urls = (0..1).map { "https://manual-$id.invalid/$it" }
     private val rules = listOf(
         ReplaceRule(id = 9123601, name = "Mixed source and body", pattern = "Seed", replacement = "Seed+",
-            scopeSource = true, scopeContent = true, isRegex = false, order = 1),
+            scopeSource = true, scopeTitle = true, scopeContent = true, isRegex = false, order = 1),
         ReplaceRule(id = 9123602, name = "Ordered scoped source", pattern = "+", replacement = "++",
             scope = "Seed0", scopeSource = true, scopeContent = false, isRegex = false, order = 2),
         ReplaceRule(id = 9123603, name = "Excluded source", pattern = "Seed0", replacement = "Wrong",
@@ -114,6 +119,7 @@ class SourceManualReplacementUiTest {
 
     private fun manualFlow(rss: Boolean) {
         AppConfig.manualSourceReplaceRule = true
+        AppConfig.importReplaceSource = false
         withImport(rss) { host ->
             host.names("Seed0", "Seed1")
             main {
@@ -169,6 +175,25 @@ class SourceManualReplacementUiTest {
             code = host.child()
             host.ready(code)
             main { assertTrue(code.currentOriginalCode().contains("Edited Seed0")) }
+            main { code.binding.cbSourceReplacementPreview.isChecked = false }
+            onView(withId(R.id.menu_fullscreen_edit)).inRoot(isDialog()).perform(click())
+            var editor: CodeEditor? = null
+            await("Manual source editor missing") {
+                main {
+                    editor = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED)
+                        .filterIsInstance<CodeEditActivity>().firstOrNull()?.findViewById(R.id.editText)
+                    editor?.text?.toString()?.contains("Edited Seed0") == true && editor?.isEditable == true
+                }
+            }
+            main {
+                val text = checkNotNull(editor).text
+                val index = text.toString().indexOf("Edited Seed0")
+                text.replace(index, index + "Edited".length, "Editor")
+            }
+            onView(withId(R.id.menu_save)).perform(click())
+            host.ready(code)
+            host.names("Editor Seed+0", "Seed+1")
+            main { assertTrue(code.currentOriginalCode().contains("Editor Seed0")) }
             main {
                 code.binding.cbSourceReplacementPreview.isChecked = false
                 code.binding.codeView.setText("{ invalid draft")
@@ -181,12 +206,12 @@ class SourceManualReplacementUiTest {
             screenshot("source-manual-invalid-$rss")
             main { code.dismiss() }
             host.ready()
-            host.names("Edited Seed+0", "Seed+1")
+            host.names("Editor Seed+0", "Seed+1")
             main { host.view<View>(R.id.tv_ok).performClick() }
             await("Import not persisted") {
                 val stored = if (rss) appDb.rssSourceDao.getByKey(urls[0])?.sourceName
                     else appDb.bookSourceDao.getBookSource(urls[0])?.bookSourceName
-                stored == "Edited Seed+0"
+                stored == "Editor Seed+0"
             }
             assertNull(if (rss) appDb.rssSourceDao.getByKey(urls[1]) else appDb.bookSourceDao.getBookSource(urls[1]))
         }
@@ -230,8 +255,10 @@ class SourceManualReplacementUiTest {
             AppConfig.manualSourceReplaceRule = sourceManual
             val book = Book(bookUrl = "https://reader-$id.invalid", name = "Reader $id", origin = "Origin $id")
             book.setUseReplaceRule(true)
-            val chapter = BookChapter(bookUrl = book.bookUrl, url = "chapter", title = "Chapter")
-            val text = ReadBook.processChapterContent(book, chapter, "Seed body").second.toString()
+            val chapter = BookChapter(bookUrl = book.bookUrl, url = "chapter", title = "Seed title")
+            val processed = ReadBook.processChapterContent(book, chapter, "Seed body")
+            assertEquals(if (readerManual) "Seed title" else "Seed+ title", processed.first)
+            val text = processed.second.toString()
             assertEquals("Reader flag is independent of source flag", !readerManual, text.contains("Body+"))
             assertEquals(readerManual, text.contains("Seed body"))
             for (rss in listOf(false, true)) withImport(rss) { host ->
