@@ -30,6 +30,13 @@ abstract class BaseAssociationViewModel(application: Application) : BaseViewMode
             map.containsKey("sourceUrl") ->
                 successLive.postValue("rssSource" to uri.toString())
 
+            map.containsKey("pattern") && map.containsKey("style") &&
+                map.containsKey("uuid") && !map.containsKey("replacement") ->
+                successLive.postValue("highlightRule" to uri.toString())
+
+            map.containsKey("pattern") && (map.containsKey("style") || map.containsKey("uuid")) ->
+                errorLive.postValue("格式不对")
+
             map.containsKey("pattern") ->
                 successLive.postValue("replaceRule" to uri.toString())
 
@@ -47,6 +54,9 @@ abstract class BaseAssociationViewModel(application: Application) : BaseViewMode
 
             map.containsKey("name") && map.containsKey("url") ->
                 successLive.postValue("httpTts" to uri.toString())
+
+            map.containsKey("name") && map.containsKey("author") ->
+                successLive.postValue("bookshelf" to uri.toString())
 
             else -> errorLive.postValue("格式不对")
         }

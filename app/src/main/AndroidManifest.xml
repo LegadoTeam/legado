@@ -430,6 +430,11 @@
 
                 <data android:mimeType="text/plain" />
                 <data android:mimeType="application/json" />
+                <data android:mimeType="application/epub+zip" />
+                <data android:mimeType="application/pdf" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/x-zip-compressed" />
+                <data android:mimeType="application/octet-stream" />
             </intent-filter>
             <!-- VIEW (Open with) action -->
             <!-- Works when an app knows the media type of a file, e.g. Gmail or Chrome. -->

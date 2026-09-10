@@ -48,13 +48,18 @@ class SharedImportAssociationTest {
     }
 
     @Test
-    fun `share import accepts only json compatible mime types`() {
+    fun `share import accepts supported json book and archive mime types`() {
         assertTrue(isSupportedSharedImportMimeType("text/plain"))
         assertTrue(isSupportedSharedImportMimeType("text/*"))
         assertTrue(isSupportedSharedImportMimeType("application/json"))
         assertTrue(isSupportedSharedImportMimeType("APPLICATION/JSON"))
         assertFalse(isSupportedSharedImportMimeType("application/javascript"))
-        assertFalse(isSupportedSharedImportMimeType("application/octet-stream"))
+        assertTrue(isSupportedSharedImportMimeType("application/octet-stream"))
+        assertTrue(isSupportedSharedImportMimeType("application/epub+zip"))
+        assertTrue(isSupportedSharedImportMimeType("application/pdf"))
+        assertTrue(isSupportedSharedImportMimeType("application/zip"))
+        assertTrue(isSupportedSharedImportMimeType("application/x-zip-compressed"))
+        assertFalse(isSupportedSharedImportMimeType("image/png"))
         assertFalse(isSupportedSharedImportMimeType(null))
     }
 
@@ -85,7 +90,7 @@ class SharedImportAssociationTest {
         assertTrue(shareFilter.contains("android:mimeType=\"application/json\""))
         assertFalse(shareFilter.contains("SEND_MULTIPLE"))
         assertFalse(shareFilter.contains("javascript"))
-        assertFalse(shareFilter.contains("application/octet-stream"))
+        assertTrue(shareFilter.contains("application/octet-stream"))
         assertTrue(activity.contains("IntentCompat.getParcelableExtra("))
         assertTrue(activity.contains("Intent.EXTRA_STREAM"))
         assertFalse(activity.contains("intent.clipData"))
@@ -101,8 +106,9 @@ class SharedImportAssociationTest {
         assertTrue(viewModel.contains("if (initialIntentDispatched) return false"))
         assertTrue(activity.contains("supportFragmentManager.fragments.any"))
         assertTrue(activity.contains("fragment is DialogFragment"))
-        assertTrue(sharedUri.contains("require(uri.isContentScheme() && uri.canRead())"))
-        assertTrue(sharedUri.contains("importJson(uri)"))
+        assertTrue(sharedUri.contains("require(uri.isContentScheme())"))
+        assertTrue(sharedUri.contains("uri.inputStream(context).getOrThrow().use { }"))
+        assertTrue(sharedUri.contains("dispatchFile(FileDoc.fromUri(uri, false))"))
         assertFalse(sharedUri.contains("dispatchIntent(uri)"))
         assertTrue(sharedText.contains("File.createTempFile("))
         assertTrue(sharedText.contains("context.cacheDir"))
