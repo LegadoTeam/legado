@@ -137,9 +137,11 @@ class FileAssociationViewModel(application: Application, private val savedState:
     private suspend fun dispatchFile(fileDoc: FileDoc, shared: Boolean = false) {
         if (fileDoc.name.matches(AppPattern.archiveFileRegex)) {
             val backupNames = selectedBackupFileNames { true }.toSet()
-            if (fileDoc.name.endsWith(".zip", true) &&
-                ArchiveUtils.getArchiveFilesName(fileDoc) { it in backupNames }.isNotEmpty()
-            ) {
+            val entries = if (fileDoc.name.endsWith(".zip", true)) {
+                ArchiveUtils.getArchiveFilesName(fileDoc) { it in backupNames || it.matches(bookFileRegex) }
+            } else emptyList()
+            // Backup archives contain records and media, never the local book files themselves.
+            if (entries.any { it in backupNames } && entries.none { it.matches(bookFileRegex) }) {
                 successLive.postValue("backup" to fileDoc.uri.toString())
             } else {
                 prepareLocalBooks(listOf(fileDoc.uri), false)

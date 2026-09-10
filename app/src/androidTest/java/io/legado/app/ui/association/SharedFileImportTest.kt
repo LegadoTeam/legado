@@ -502,7 +502,7 @@ class SharedFileImportTest {
         val rule = HighlightRule(name = "Mixed archive $id", pattern = id, style = "{\"bold\":true}")
         val archive = File(directory, "mixed-types-$id.zip")
         writeArchive(archive, linkedMapOf("book-$id.txt" to "BOOK $id".toByteArray(),
-            "renamed.json" to GSON.toJson(HighlightRuleFile(HighlightRuleFile.TYPE, listOf(rule))).toByteArray()))
+            "highlightRule.json" to GSON.toJson(HighlightRuleFile(HighlightRuleFile.TYPE, listOf(rule))).toByteArray()))
         val original = archive.readBytes()
         launchShare(archive, "application/zip").use { scenario ->
             onView(withText(R.string.shared_local_books_mixed_types)).inRoot(isDialog()).check(matches(isDisplayed()))
@@ -620,13 +620,15 @@ class SharedFileImportTest {
                 var ready = false
                 scenario.onActivity { activity ->
                     val model = ViewModelProvider(activity)[FileAssociationViewModel::class.java]
-                    val fragment = activity.supportFragmentManager.findFragmentByTag("sharedLocalBooks")
+                    val fragment = activity.supportFragmentManager.findFragmentByTag("sharedLocalBooks") as? DialogFragment
                     val recycler = fragment?.view?.findViewById<RecyclerView>(R.id.recycler_view)
                     state = "batch=${model.localBookBatch.value?.size}; selected=${model.selectedLocalBooks.size}; " +
                         "pending=${model.pendingLocalBooks.size}; destination=${model.localBookDestination.value}; " +
                         "error=${model.errorLive.value}; fragments=${activity.supportFragmentManager.fragments.map { it.javaClass.simpleName to it.tag }}; " +
-                        "view=${fragment?.view}; adapter=${recycler?.adapter}; count=${recycler?.adapter?.itemCount}"
-                    ready = (recycler?.adapter?.itemCount ?: 0) > 0
+                        "view=${fragment?.view}; adapter=${recycler?.adapter}; count=${recycler?.adapter?.itemCount}; " +
+                        "focus=${fragment?.dialog?.window?.decorView?.hasWindowFocus()}"
+                    ready = (recycler?.adapter?.itemCount ?: 0) > 0 && recycler?.isShown == true &&
+                        fragment?.dialog?.window?.decorView?.hasWindowFocus() == true
                 }
                 ready
             }
@@ -661,10 +663,15 @@ class SharedFileImportTest {
 
     private fun awaitReader(book: Book) {
         await {
+            var readerVisible = false
+            instrumentation.runOnMainSync {
+                readerVisible = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED)
+                    .filterIsInstance<ReadBookActivity>().any { it.window.decorView.hasWindowFocus() }
+            }
             ReadBook.book?.bookUrl == book.bookUrl &&
                 ReadBook.curTextChapter?.chapter?.bookUrl == book.bookUrl &&
                 ReadBook.curTextChapter?.isCompleted == true &&
-                ReadBook.curTextChapter?.pages?.isNotEmpty() == true
+                ReadBook.curTextChapter?.pages?.isNotEmpty() == true && readerVisible
         }
     }
 
@@ -700,6 +707,7 @@ class SharedFileImportTest {
 
     private fun screenshot(name: String) {
         instrumentation.waitForIdleSync()
+        instrumentation.uiAutomation.waitForIdle(100, 5000)
         val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
         File(context.getExternalFilesDir(null), "ui-regression/$name.png").apply {
             parentFile!!.mkdirs()
