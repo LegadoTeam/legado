@@ -33,11 +33,19 @@ import io.legado.app.utils.BitmapUtils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.getPrefBoolean
+import io.legado.app.utils.getPrefInt
 import io.legado.app.utils.getPrefString
 import kotlinx.coroutines.currentCoroutineContext
 import splitties.init.appCtx
 import java.io.File
 import androidx.core.graphics.drawable.toDrawable
+
+data class CoverFontSizes(
+    val titleLarge: Int,
+    val titleSmall: Int,
+    val authorLarge: Int,
+    val authorSmall: Int,
+)
 
 @Keep
 @Suppress("ConstPropertyName")
@@ -55,6 +63,9 @@ object BookCover {
     var adaptiveTitleSize = true
         private set
     var keepPunctuation = false
+        private set
+    @Volatile
+    var fontSizes: CoverFontSizes? = null
         private set
     lateinit var defaultDrawable: Drawable
         private set
@@ -80,6 +91,14 @@ object BookCover {
         drawBookNameHorizontal = appCtx.getPrefBoolean(PreferKey.coverHorizontal, false)
         adaptiveTitleSize = appCtx.getPrefBoolean(PreferKey.coverTitleAdaptive, true)
         keepPunctuation = appCtx.getPrefBoolean(PreferKey.coverKeepPunctuation, false)
+        fontSizes = if (appCtx.getPrefBoolean(PreferKey.coverCustomFontSize, false)) {
+            CoverFontSizes(
+                appCtx.getPrefInt(PreferKey.coverTitleLargeSize, 100).coerceIn(50, 200),
+                appCtx.getPrefInt(PreferKey.coverTitleSmallSize, 100).coerceIn(50, 200),
+                appCtx.getPrefInt(PreferKey.coverAuthorLargeSize, 100).coerceIn(50, 200),
+                appCtx.getPrefInt(PreferKey.coverAuthorSmallSize, 100).coerceIn(50, 200),
+            )
+        } else null
         defaultDrawable = runCatching {
             BitmapUtils.decodeBitmap(path!!, 600, 900)!!.toDrawable(appCtx.resources)
         }.getOrDefault(appCtx.resources.getDrawable(R.drawable.image_cover_default, null))

@@ -538,6 +538,11 @@ object Restore {
             ) {
                 edit.putBoolean(PreferKey.coverTitleAdaptive, true)
             }
+            if (BackupConfig.keyIsNotIgnore(PreferKey.coverCustomFontSize) &&
+                PreferKey.coverCustomFontSize !in map
+            ) {
+                edit.putBoolean(PreferKey.coverCustomFontSize, false)
+            }
             if (PreferKey.autoBackup !in map) edit.putBoolean(PreferKey.autoBackup, true)
             if (PreferKey.autoBackupWebDav !in map) edit.putBoolean(PreferKey.autoBackupWebDav, true)
             if (PreferKey.autoBackupIntervalDays !in map) edit.putInt(PreferKey.autoBackupIntervalDays, 1)
