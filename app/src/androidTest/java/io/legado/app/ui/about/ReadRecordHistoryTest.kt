@@ -144,7 +144,10 @@ class ReadRecordHistoryTest {
             it.enhancedSummary.root.parent === it.recyclerView }
         screenshot("reading-history-card-scrolls")
         scenario!!.onActivity { it.views.recyclerView.scrollBy(0, 1000) }
-        await { !it.enhancedSummary.root.getGlobalVisibleRect(Rect()) }
+        await { it.recyclerView.computeVerticalScrollOffset() > 0 &&
+            (!it.enhancedSummary.root.isAttachedToWindow ||
+                !it.enhancedSummary.root.getGlobalVisibleRect(Rect())) }
+        screenshot("reading-history-card-scrolled-away")
         scenario!!.recreate()
         await { it.recyclerView.adapter?.itemCount == 84 }
         scenario!!.onActivity { it.views.recyclerView.scrollToPosition(0) }
