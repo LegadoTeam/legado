@@ -209,7 +209,7 @@ class ReaderSourceReimportUiTest {
         try {
             assertTrue(blocked.await(5, TimeUnit.SECONDS))
             onView(withId(R.id.tv_ok)).inRoot(isDialog()).perform(click())
-            main { assertTrue(importer().sourceUpdatePending.value == true) }
+            assertTrue(oldVm.sourceUpdatePending.value == true)
             scenario.recreate()
             await("recreated importer uses the retained operation") {
                 it.supportFragmentManager.fragments.filterIsInstance<ImportBookSourceDialog>().singleOrNull()
@@ -305,6 +305,8 @@ class ReaderSourceReimportUiTest {
         pressBack()
         scenario.recreate()
         awaitReader(0)
+        main { it.refreshReaderMenu() }
+        instrumentation.waitForIdleSync()
         openOverflow()
         onView(withText(R.string.reimport_book_source)).check(doesNotExist())
         onView(withText(R.string.reader_menu_more)).inRoot(isPlatformPopup()).perform(click())
