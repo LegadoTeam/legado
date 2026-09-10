@@ -303,6 +303,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
         }
 
         if (event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
+            curPage.cancelHighlightTap()
             if (startReplacePreviewGesture(event)) return true
         }
 
@@ -342,6 +343,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
                 if (!pressDown) return true
                 val absX = abs(startX - event.x)
                 val absY = abs(startY - event.y)
+                if (absX > slopSquare || absY > slopSquare) curPage.cancelHighlightTap()
                 if (pullBookmarkCandidate || pullBookmarkState != PullBookmarkGestureState.NONE) {
                     val state = classifyPullBookmarkGesture(
                         event.x - startX,
@@ -422,6 +424,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
             }
 
             MotionEvent.ACTION_CANCEL -> {
+                curPage.cancelHighlightTap()
                 dismissTextMagnifier()
                 removeCallbacks(longPressRunnable)
                 if (!pressDown) return true
@@ -550,6 +553,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
     }
 
     internal fun cancelNonPdfGestures() {
+        curPage.cancelHighlightTap()
         removeCallbacks(longPressRunnable)
         longPressed = false
         pressDown = false

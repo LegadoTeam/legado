@@ -3,9 +3,11 @@ package io.legado.app.ui.book.read.page
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import io.legado.app.R
 import io.legado.app.data.entities.BookHighlight
 import io.legado.app.data.entities.Bookmark
@@ -72,6 +74,14 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
     private val renderRunnable by lazy { Runnable { preRenderPage() } }
     private var lastClickTime = 0L
     private var doubleClick = false
+    private data class HighlightTapTarget(val id: Long, val start: Int, val end: Int, val manual: Boolean)
+    private var highlightTapTarget: HighlightTapTarget? = null
+    private var highlightTapPage: TextPage? = null
+    private var highlightTapTime = 0L
+    private var highlightTapX = 0f
+    private var highlightTapY = 0f
+    private val highlightDoubleTapSlop = ViewConfiguration.get(context).scaledDoubleTapSlop
+    internal fun cancelHighlightTap() { highlightTapTarget = null; highlightTapPage = null }
     private val pdfZoom: PdfZoom?
         get() = (parent?.parent?.parent as? ReadView)?.pdfZoom
     private var pdfRenderer: PdfZoomRenderer? = null
@@ -85,6 +95,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
     }
 
     override fun onDetachedFromWindow() {
+        cancelHighlightTap()
         closePdfRenderer()
         super.onDetachedFromWindow()
     }
@@ -104,6 +115,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
      * 设置内容
      */
     fun setContent(textPage: TextPage) {
+        cancelHighlightTap()
         this.textPage = textPage
         upHighlight()
         // 非滑动翻页动画需要同步重绘，不然翻页可能会出现闪烁
@@ -190,6 +202,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
      * pageOffset + textPage.height 为 textPage 下方的高度
      */
     fun scroll(mOffset: Int) {
+        cancelHighlightTap()
         val previousOffset = pageOffset
         val previousPage = textPage
         pageOffset += mOffset
@@ -285,6 +298,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         y: Float,
         select: (textPos: TextPos) -> Unit,
     ) {
+        cancelHighlightTap()
         val highlightActionTrigger = AppConfig.highlightActionTrigger
         touch(x, y) { relativeOffset, textPos, textPage, textLine, column ->
             when (column) {
@@ -300,7 +314,8 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                 is TextHtmlColumn -> {
                     if (
                         column.highlightStyle != null &&
-                        (highlightActionTrigger == "longPress" || column.linkUrl != null) &&
+                        (highlightActionTrigger == "longPress" ||
+                            (column.linkUrl != null && highlightActionTrigger != "doubleTap")) &&
                         notifyHighlightClick(column, textPos, textPage, textLine, relativeOffset)
                     ) return@touch
                     if (!selectAble) return@touch
@@ -326,6 +341,40 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
             false
         }
         val highlightActionTrigger = AppConfig.highlightActionTrigger
+        val previousHighlightTarget = highlightTapTarget
+        val previousHighlightPage = highlightTapPage
+        cancelHighlightTap()
+        fun highlightTap(
+            column: TextBaseColumn,
+            textPos: TextPos,
+            page: TextPage,
+            line: TextLine,
+            relativeOffset: Float,
+        ): Boolean {
+            if (highlightActionTrigger == "doubleTap") {
+                val target = highlightAt(column, textPos, page)?.let {
+                    HighlightTapTarget(it.time, it.chapterPos, it.chapterPosEnd, true)
+                } ?: highlightRuleAt(column, textPos, page)?.let {
+                    HighlightTapTarget(it.ruleId, it.start, it.end, false)
+                } ?: return false
+                val now = SystemClock.uptimeMillis()
+                val dx = x - highlightTapX
+                val dy = y - highlightTapY
+                val isDoubleTap = previousHighlightPage === page && previousHighlightTarget == target &&
+                    now - highlightTapTime <= ViewConfiguration.getDoubleTapTimeout() &&
+                    dx * dx + dy * dy <= highlightDoubleTapSlop * highlightDoubleTapSlop
+                if (!isDoubleTap) {
+                    highlightTapTarget = target
+                    highlightTapPage = page
+                    highlightTapTime = now
+                    highlightTapX = x
+                    highlightTapY = y
+                    // Consume the first tap so it cannot turn the page before the second.
+                    return true
+                }
+            }
+            return notifyHighlightClick(column, textPos, page, line, relativeOffset)
+        }
         var handled = false
         touch(x, y) { relativeOffset, textPos, textPage, textLine, column ->
             when (column) {
@@ -396,7 +445,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                         }
                         handled = true
                     } else if (highlightActionTrigger != "longPress" && column.highlightStyle != null) {
-                        handled = notifyHighlightClick(
+                        handled = highlightTap(
                             column,
                             textPos,
                             textPage,
@@ -409,7 +458,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                 is TextColumn -> if (highlightActionTrigger != "longPress" &&
                     column.highlightStyle != null
                 ) {
-                    handled = notifyHighlightClick(
+                    handled = highlightTap(
                         column,
                         textPos,
                         textPage,
@@ -962,8 +1011,8 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
             callBack.onHighlightClick(it, x, y)
             return true
         }
-        highlightRuleIdAt(column, textPos, page)?.let {
-            callBack.onHighlightRuleClick(it, x, y)
+        highlightRuleAt(column, textPos, page)?.let {
+            callBack.onHighlightRuleClick(it.ruleId, x, y)
             return true
         }
         return false
@@ -990,11 +1039,11 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
             ?.first
     }
 
-    private fun highlightRuleIdAt(
+    private fun highlightRuleAt(
         column: TextBaseColumn,
         textPos: TextPos,
         page: TextPage
-    ): Long? {
+    ): HighlightRuleMatcher.RuleMatch? {
         val book = ReadBook.book ?: return null
         val chapter = page.getTextChapter()
         if (!chapter.isForBook(book)) return null
@@ -1002,7 +1051,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         val columnStart = chapter.getReadLength(page.index) +
                 page.getPosByLineColumn(textPos.lineIndex, textPos.columnIndex)
         val columnEnd = columnStart + column.positionLength
-        return highlightRuleIdAtColumn(
+        return highlightRuleAtColumn(
             ReadBook.ruleMatchesOfChapter(chapter),
             columnStart,
             columnEnd,
@@ -1097,15 +1146,15 @@ internal fun highlightRangeIntersects(
 ): Boolean = columnStart < columnEnd && rangeStart < rangeEnd &&
         columnStart < rangeEnd && columnEnd > rangeStart
 
-internal fun highlightRuleIdAtColumn(
+internal fun highlightRuleAtColumn(
     matches: List<HighlightRuleMatcher.RuleMatch>,
     columnStart: Int,
     columnEnd: Int,
     isTitle: Boolean
-): Long? = matches.lastOrNull {
+): HighlightRuleMatcher.RuleMatch? = matches.lastOrNull {
     (if (isTitle) it.applyToTitle else it.applyToBody) &&
             highlightRangeIntersects(columnStart, columnEnd, it.start, it.end)
-}?.ruleId
+}
 
 internal inline fun highlightSelectionEndLength(
     columnIndex: Int,

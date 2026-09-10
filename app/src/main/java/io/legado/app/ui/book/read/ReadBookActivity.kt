@@ -1230,6 +1230,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         highlightPopup?.dismiss()
         highlightPopup = popupActionMenu(this) {
             item(getString(R.string.edit), ACTION_HIGHLIGHT_RULE_EDIT)
+            item(getString(R.string.highlight_rule), ACTION_HIGHLIGHT_RULE_MANAGE)
             item(getString(R.string.highlight_rule_disable), ACTION_HIGHLIGHT_RULE_DISABLE)
             danger(ACTION_HIGHLIGHT_RULE_DISABLE)
         }.show(binding.textMenuPosition) { action ->
@@ -1238,6 +1239,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                     HighlightRuleEditDialog.edit(ruleId)
                 )
 
+                ACTION_HIGHLIGHT_RULE_MANAGE -> startActivity<HighlightRuleActivity>()
                 ACTION_HIGHLIGHT_RULE_DISABLE -> disableHighlightRule(ruleId)
             }
         }
@@ -3017,6 +3019,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         private const val ACTION_HIGHLIGHT_COPY = "highlightCopy"
         private const val ACTION_HIGHLIGHT_DELETE = "highlightDelete"
         private const val ACTION_HIGHLIGHT_RULE_EDIT = "highlightRuleEdit"
+        private const val ACTION_HIGHLIGHT_RULE_MANAGE = "highlightRuleManage"
         private const val ACTION_HIGHLIGHT_RULE_DISABLE = "highlightRuleDisable"
         private const val STATE_EDITING_HIGHLIGHT = "editingHighlight"
     }
