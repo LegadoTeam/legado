@@ -8,7 +8,6 @@ import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
-import io.github.rosemoe.sora.event.DragSelectStopEvent
 import io.github.rosemoe.sora.event.EditorFocusChangeEvent
 import io.github.rosemoe.sora.event.EditorKeyEvent
 import io.github.rosemoe.sora.event.HandleStateChangeEvent
@@ -22,35 +21,37 @@ import io.legado.app.R
 import io.legado.app.utils.share
 import io.legado.app.utils.toastOnUi
 
-/** Android's floating selection toolbar for Sora's custom-drawn text. */
+/** Long presses use Android actions; ordinary selection keeps Sora's toolbar. */
 internal class CodeTextActions(private val editor: CodeEditor) : ActionMode.Callback2() {
     private val insertionActions = editor.getComponent(EditorTextActionWindow::class.java)
     private var actionMode: ActionMode? = null
-    private var searchSelection = false
+    private var nativeRequested = false
+    private var selectingAll = false
 
     init {
         editor.subscribeEvent(SelectionChangeEvent::class.java) { event, _ ->
-            // Keep Sora's insertion/paste toolbar only when there is no selected text.
-            insertionActions.isEnabled = !editor.cursor.isSelected
-            searchSelection = event.cause == SelectionChangeEvent.CAUSE_SEARCH
-            if (!editor.cursor.isSelected || searchSelection || editor.eventHandler.isDragSelecting) {
-                dismiss()
-            } else {
+            if (event.cause == SelectionChangeEvent.CAUSE_LONG_PRESS || selectingAll) {
+                nativeRequested = true
                 show()
+            } else {
+                // Taps, handle/drag selection, IME, search and ordinary Select all stay with Sora.
+                dismiss()
             }
         }
         editor.subscribeEvent(LongPressEvent::class.java) { event, _ ->
+            nativeRequested = true
+            // Disable before the child event manager can intercept search-result long presses.
+            insertionActions.isEnabled = false
             val cursor = editor.cursor
             if (cursor.isSelected && event.index in cursor.left until cursor.right) {
                 event.intercept(InterceptTarget.TARGET_EDITOR)
-                searchSelection = false
-                show()
             }
             // Outside the selection, let Sora select the new word and start drag selection.
+            // Empty text/blank positions still get a native paste menu after the gesture.
+            show()
         }
-        editor.subscribeEvent(DragSelectStopEvent::class.java) { _, _ -> show() }
         editor.subscribeEvent(HandleStateChangeEvent::class.java) { event, _ ->
-            if (event.isHeld) dismiss() else show()
+            if (event.isHeld) dismiss()
         }
         editor.subscribeEvent(ScrollEvent::class.java) { _, _ ->
             editor.postInLifecycle { actionMode?.invalidateContentRect() }
@@ -69,7 +70,7 @@ internal class CodeTextActions(private val editor: CodeEditor) : ActionMode.Call
 
     private fun show() {
         editor.postInLifecycle {
-            if (!editor.cursor.isSelected || searchSelection || !editor.hasFocus() ||
+            if (!nativeRequested || !editor.hasFocus() ||
                 editor.eventHandler.hasAnyHeldHandle() ||
                 editor.snippetController.isInSnippet() || editor.isInMouseMode
             ) return@postInLifecycle
@@ -82,6 +83,8 @@ internal class CodeTextActions(private val editor: CodeEditor) : ActionMode.Call
     }
 
     fun dismiss(): Boolean {
+        nativeRequested = false
+        insertionActions.isEnabled = true
         val mode = actionMode ?: return false
         mode.finish()
         return true
@@ -101,8 +104,15 @@ internal class CodeTextActions(private val editor: CodeEditor) : ActionMode.Call
     }
 
     override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean {
-        menu.findItem(android.R.id.cut).isVisible = editor.isEditable
-        menu.findItem(android.R.id.paste).isVisible = editor.isEditable && editor.hasClip()
+        val selected = editor.cursor.isSelected
+        menu.findItem(android.R.id.cut).isVisible = selected && editor.isEditable
+        menu.findItem(android.R.id.copy).isVisible = selected
+        menu.findItem(android.R.id.shareText).isVisible = selected
+        menu.findItem(R.id.menu_search).isVisible = selected
+        menu.findItem(android.R.id.paste).apply {
+            isVisible = editor.isEditable
+            isEnabled = editor.hasClip()
+        }
         menu.findItem(android.R.id.selectAll).isVisible =
             editor.cursor.right - editor.cursor.left < editor.text.length
         return true
@@ -110,10 +120,11 @@ internal class CodeTextActions(private val editor: CodeEditor) : ActionMode.Call
 
     override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
         val cursor = editor.cursor
-        if (!cursor.isSelected) return false
+        if (!item.isEnabled) return false
         when (item.itemId) {
             android.R.id.selectAll -> {
-                editor.selectAll()
+                selectingAll = true
+                try { editor.selectAll() } finally { selectingAll = false }
                 return true
             }
             android.R.id.copy -> {
@@ -130,7 +141,7 @@ internal class CodeTextActions(private val editor: CodeEditor) : ActionMode.Call
             }.onFailure { editor.context.toastOnUi(it.localizedMessage) }
             else -> return false
         }
-        mode.finish()
+        dismiss()
         return true
     }
 

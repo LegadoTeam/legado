@@ -191,11 +191,17 @@ class CodeSelectionUiTest {
         selectFunction()
         withEditor {
             assertFalse(it.isEditable)
-            assertFalse(actions(it).isShowing)
+            assertTrue(actions(it).isShowing)
+            assertFalse(actions(it).view.findViewById<View>(io.github.rosemoe.sora.R.id.panel_btn_cut).isVisible)
+            assertFalse(actions(it).view.findViewById<View>(io.github.rosemoe.sora.R.id.panel_btn_paste).isVisible)
         }
+        screenshot("code-selection-read-only-share")
+        shareAndAssert(selectedText)
+        press(Tap.LONG, 2, 11)
+        assertNativeMenu()
         onView(withText(android.R.string.cut)).inRoot(isPlatformPopup()).check(doesNotExist())
         onView(withText(android.R.string.paste)).inRoot(isPlatformPopup()).check(doesNotExist())
-        screenshot("code-selection-read-only-share")
+        screenshot("code-selection-read-only-native")
         shareAndAssert(selectedText)
         withEditor { assertEquals(source, it.text.toString()) }
     }
@@ -234,7 +240,7 @@ class CodeSelectionUiTest {
             clipboard.setPrimaryClip(ClipData.newPlainText("before copy", "clipboard sentinel"))
         }
         awaitEditor { it.hasWindowFocus() && clipboard.primaryClip?.getItemAt(0)?.text?.toString() == "clipboard sentinel" }
-        selectFunction()
+        selectFunction(native = true)
         clickNativeAction(android.R.string.copy)
         awaitEditor { !it.cursor.isSelected && clipboard.primaryClip?.getItemAt(0)?.text?.toString() == selectedText }
         withEditor {
@@ -242,7 +248,7 @@ class CodeSelectionUiTest {
             assertEquals(source, it.text.toString())
             assertFalse(it.cursor.isSelected)
         }
-        selectFunction()
+        selectFunction(native = true)
         clickNativeAction(android.R.string.cut)
         val withoutFunction = source.replace(selectedText, "")
         awaitEditor { it.text.toString() == withoutFunction && clipboard.primaryClip?.getItemAt(0)?.text?.toString() == selectedText }
@@ -251,11 +257,11 @@ class CodeSelectionUiTest {
             it.setText(source)
             clipboard.setPrimaryClip(ClipData.newPlainText("native paste", "replacement 中文"))
         }
-        selectFunction()
+        selectFunction(native = true)
         clickNativeAction(android.R.string.paste)
         awaitEditor { it.text.toString() == source.replace(selectedText, "replacement 中文") }
         withEditor { it.setText(source) }
-        selectFunction()
+        selectFunction(native = true)
         clickNativeAction(android.R.string.selectAll)
         awaitEditor { selection(it) == source }
         screenshot("code-selection-native-select-all")
@@ -263,7 +269,7 @@ class CodeSelectionUiTest {
 
     @Test fun nativeSearchSharesOnlySelectedTextAndBackKeepsTheEditorOpen() {
         launchEditor()
-        selectFunction()
+        selectFunction(native = true)
         val search = AtomicReference<Intent?>()
         val monitor = object : Instrumentation.ActivityMonitor() {
             override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? {
@@ -291,7 +297,7 @@ class CodeSelectionUiTest {
         onView(withText(android.R.string.copy)).check(doesNotExist())
     }
 
-    @Test fun longPressDragStillExtendsTheSelectionBeforeShowingNativeActions() {
+    @Test fun longPressDragExtendsTheSelectionAndReturnsToTheEditorToolbar() {
         launchEditor()
         val from = editorPoint(2, 11)
         val to = editorPoint(3, 15)
@@ -311,8 +317,8 @@ class CodeSelectionUiTest {
             it.cursor.left == source.indexOf("message") &&
                 selection(it).contains("\n  return") && it.text.toString() == source
         }
-        assertNativeMenu()
-        screenshot("code-selection-native-drag")
+        assertEditorToolbar()
+        screenshot("code-selection-editor-drag")
     }
 
     @Test fun nativeMenuStaysClearOfKeyboardAndSearchToolsNearTheBottomAfterScrolling() {
@@ -331,13 +337,18 @@ class CodeSelectionUiTest {
         awaitEditor { ViewCompat.getRootWindowInsets(it)?.isVisible(WindowInsetsCompat.Type.ime()) == true }
         var selected = ""
         var offset = 0
+        var selectedLine = 0
         withEditor {
             val end = it.lastVisibleLine - 1
             assertTrue("The fixture must leave room for a multiline selection", end >= it.firstVisibleLine + 2)
             it.setSelectionRegion(end - 2, 0, end, 10, false)
             selected = selection(it)
             offset = it.offsetY
+            selectedLine = end - 1
         }
+        assertEditorToolbar()
+        withEditor { actions(it).dismiss() }
+        press(Tap.LONG, selectedLine, 3)
         assertNativeMenu()
         assertNativeMenuClearOfTools()
         screenshot("code-selection-native-ime-search-bottom")
@@ -357,6 +368,40 @@ class CodeSelectionUiTest {
         assertNativeMenu()
         assertNativeMenuClearOfTools()
         screenshot("code-selection-native-ime-search-scrolled")
+    }
+
+    @Test fun ordinarySelectionKeepsEditorActionsUntilLongPressAndReturnsAfterTap() {
+        launchEditor()
+        selectFunction()
+        screenshot("code-selection-ordinary-editor-toolbar")
+        withEditor { actions(it).dismiss() }
+        press(Tap.LONG, 2, 11)
+        assertNativeMenu()
+        withEditor { assertEquals(selectedText, selection(it)) }
+        screenshot("code-selection-long-press-native-toolbar")
+        dismissNativeMenu()
+        press(Tap.SINGLE, 0, 2)
+        awaitEditor { !it.cursor.isSelected && actions(it).isEnabled }
+        selectFunction()
+        assertEditorToolbar()
+        shareAndAssert(selectedText)
+    }
+
+    @Test fun longPressAtAnEmptyCaretShowsNativePasteAndInsertsClipboardText() {
+        launchEditor()
+        val clipboardText = "native caret paste 中文"
+        withEditor {
+            it.setText("")
+            it.context.getSystemService(ClipboardManager::class.java)
+                .setPrimaryClip(ClipData.newPlainText("caret paste", clipboardText))
+        }
+        press(Tap.LONG, 0, 0)
+        awaitEditor { !it.cursor.isSelected && !actions(it).isEnabled && !actions(it).isShowing }
+        onView(withText(android.R.string.paste)).inRoot(isPlatformPopup()).check(matches(isCompletelyDisplayed()))
+        onView(withText(android.R.string.copy)).inRoot(isPlatformPopup()).check(doesNotExist())
+        screenshot("code-selection-empty-native-paste")
+        clickNativeAction(android.R.string.paste)
+        awaitEditor { it.text.toString() == clipboardText && actions(it).isEnabled }
     }
 
     @Test fun savedDraftUsesTheCallersRequestedTransport() {
@@ -784,10 +829,15 @@ class CodeSelectionUiTest {
         closeSoftKeyboard()
     }
 
-    private fun selectFunction() {
+    private fun selectFunction(native: Boolean = false) {
         withEditor { it.setSelectionRegion(1, 0, 4, 1, false) }
-        awaitEditor { selection(it) == selectedText && !actions(it).isEnabled && !actions(it).isShowing }
-        assertNativeMenu()
+        awaitEditor { selection(it) == selectedText && actions(it).isEnabled && actions(it).isShowing }
+        assertEditorToolbar()
+        if (native) {
+            withEditor { actions(it).dismiss() }
+            press(Tap.LONG, 2, 11)
+            assertNativeMenu()
+        }
     }
 
     private fun press(tap: Tap, line: Int, column: Int) {
@@ -828,7 +878,13 @@ class CodeSelectionUiTest {
         }
         instrumentation.addMonitor(monitor)
         try {
-            clickNativeAction(R.string.share)
+            var native = false
+            withEditor { native = !actions(it).isEnabled }
+            if (native) {
+                clickNativeAction(R.string.share)
+            } else {
+                onView(withId(R.id.code_share_selection)).inRoot(isPlatformPopup()).perform(click())
+            }
             await { chooser.get() != null }
             val send = chooser.get()!!.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)!!
             assertEquals(Intent.ACTION_SEND, send.action)
@@ -850,6 +906,16 @@ class CodeSelectionUiTest {
             assertFalse("The editor toolbar must not overlap Android's menu", actions(it).isShowing)
             assertFalse(actions(it).isEnabled)
         }
+    }
+
+    private fun assertEditorToolbar() {
+        onView(withId(R.id.code_share_selection)).inRoot(isPlatformPopup())
+            .check(matches(isCompletelyDisplayed()))
+        withEditor {
+            assertTrue(actions(it).isEnabled)
+            assertTrue(actions(it).isShowing)
+        }
+        onView(withText(android.R.string.copy)).check(doesNotExist())
     }
 
     private fun assertNativeMenuClearOfTools() {
@@ -879,8 +945,10 @@ class CodeSelectionUiTest {
     }
 
     private fun dismissNativeMenu() {
-        // Exercise the same back callback as a user, while preserving the selected text.
-        pressBack()
+        var native = false
+        withEditor { native = !actions(it).isEnabled }
+        // Exercise the real Back callback for native mode; Sora's nonmodal toolbar has no Back action.
+        if (native) pressBack() else withEditor { actions(it).dismiss() }
         withEditor { assertTrue(it.isShown) }
     }
 

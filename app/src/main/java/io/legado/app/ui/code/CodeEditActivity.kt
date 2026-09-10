@@ -8,6 +8,7 @@ import android.util.Base64
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.ViewGroup
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceError
@@ -15,6 +16,8 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import android.widget.ImageButton
+import android.widget.LinearLayout
 import androidx.activity.addCallback
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
@@ -25,12 +28,15 @@ import androidx.core.widget.addTextChangedListener
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.textfield.TextInputEditText
 import io.github.rosemoe.sora.event.PublishSearchResultEvent
+import io.github.rosemoe.sora.event.ColorSchemeUpdateEvent
 import io.github.rosemoe.sora.event.SelectionChangeEvent
 import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
 import io.github.rosemoe.sora.util.regex.RegexBackrefGrammar
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.EditorSearcher
 import io.github.rosemoe.sora.widget.EditorSearcher.SearchOptions
+import io.github.rosemoe.sora.widget.component.EditorTextActionWindow
+import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.PreferKey
@@ -50,6 +56,7 @@ import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.imeHeight
 import io.legado.app.utils.putPrefBoolean
 import io.legado.app.utils.setOnApplyWindowInsetsListenerCompat
+import io.legado.app.utils.share
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.showHelp
 import io.legado.app.utils.toastOnUi
@@ -152,7 +159,7 @@ class CodeEditActivity :
             setEditorLanguage(viewModel.language)
             upEdit(AppConfig.editFontScale, null, AppConfig.editAutoWrap)
             props.maxIPCTextLength = 64 * 1024
-            textActions = CodeTextActions(this)
+            setupTextActions()
             setText(text)
             editable = viewModel.writable
             requestFocus()
@@ -160,6 +167,36 @@ class CodeEditActivity :
             val pos = cursor.indexer.getCharPosition(viewModel.cursorPosition.coerceIn(0, text.length))
             setSelection(pos.line, pos.column, true)
         }
+    }
+
+    private fun setupTextActions() {
+        val actions = editor.getComponent(EditorTextActionWindow::class.java)
+        val copy = actions.view.findViewById<ImageButton>(io.github.rosemoe.sora.R.id.panel_btn_copy)
+        val buttons = copy.parent as ViewGroup
+        val shareButton = ImageButton(this).apply {
+            id = R.id.code_share_selection
+            contentDescription = getString(R.string.share)
+            setImageResource(R.drawable.ic_share)
+            background = copy.background?.constantState?.newDrawable()?.mutate()
+            setPadding(copy.paddingLeft, copy.paddingTop, copy.paddingRight, copy.paddingBottom)
+            layoutParams = LinearLayout.LayoutParams(copy.layoutParams)
+            setOnClickListener {
+                val cursor = editor.cursor
+                if (cursor.isSelected) {
+                    share(editor.text.subSequence(cursor.left, cursor.right).toString())
+                    actions.dismiss()
+                }
+            }
+        }
+        buttons.addView(shareButton, buttons.indexOfChild(copy) + 1)
+        fun updateShareButton() {
+            shareButton.isVisible = editor.cursor.isSelected
+            shareButton.setColorFilter(editor.colorScheme.getColor(EditorColorScheme.TEXT_ACTION_WINDOW_ICON_COLOR))
+        }
+        updateShareButton()
+        editor.subscribeEvent(SelectionChangeEvent::class.java) { _, _ -> updateShareButton() }
+        editor.subscribeEvent(ColorSchemeUpdateEvent::class.java) { _, _ -> updateShareButton() }
+        textActions = CodeTextActions(editor)
     }
 
     @SuppressLint("SetJavaScriptEnabled")
