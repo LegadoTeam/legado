@@ -30,9 +30,8 @@ class FileAssociationActivity :
     VMBaseActivity<ActivityTranslucenceBinding, FileAssociationViewModel>() {
 
     private val localBookTreeSelect = registerForActivityResult(HandleFileContract()) {
-        val destination = it.uri ?: privateBookDirectory()
-        if (it.uri != null) AppConfig.defaultBookTreeUri = destination.toString()
-        viewModel.selectLocalBookDirectory(destination)
+        it.uri?.let { directory -> AppConfig.defaultBookTreeUri = directory.toString() }
+        viewModel.selectLocalBookDirectory(it.uri)
     }
     override val binding by viewBinding(ActivityTranslucenceBinding::inflate)
 
@@ -208,10 +207,10 @@ class FileAssociationActivity :
                 }
             }
             .setNegativeButton(R.string.shared_local_books_private) { _, _ ->
-                if (!viewModel.importAfterDirectorySelection) AppConfig.defaultBookTreeUri = privateBookDirectory().toString()
+                AppConfig.defaultBookTreeUri = privateBookDirectory().toString()
                 viewModel.selectLocalBookDirectory(privateBookDirectory())
             }
-            .setOnCancelListener { viewModel.selectLocalBookDirectory(privateBookDirectory()) }
+            .setOnCancelListener { viewModel.selectLocalBookDirectory(null) }
             .show()
     }
 }
