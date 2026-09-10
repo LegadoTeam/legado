@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="content_edit_plain_text">仅显示正文（隐藏图片代码）</string>
+    <string name="content_edit_plain_text">仅显示正文</string>
 </resources>

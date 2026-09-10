@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="content_edit_plain_text">Hide image and review code</string>
+    <string name="content_edit_plain_text">Show body text only</string>
 </resources>
