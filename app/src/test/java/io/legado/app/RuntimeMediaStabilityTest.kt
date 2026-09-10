@@ -123,8 +123,8 @@ class RuntimeMediaStabilityTest {
             .substringBefore("if (!drawAuthor)")
 
         assertTrue(titleLoop.contains("namePaint.textSize = viewWidth / 7"))
-        assertTrue(titleLoop.contains("namePaint.textSize = viewWidth / 10"))
-        assertTrue(titleLoop.contains("namePaint.textSize = viewWidth / 9"))
+        assertTrue(titleLoop.contains("?: (viewWidth / 10)"))
+        assertTrue(titleLoop.contains("?: (viewWidth / 9)"))
         assertTrue(titleLoop.contains("startX += namePaint.textSize"))
         assertFalse(titleLoop.contains("titleColumns"))
     }
@@ -149,6 +149,10 @@ class RuntimeMediaStabilityTest {
         assertNotEquals(
             coverBitmapCacheKey("Title", "Author", 105, 140, true, true, 1, 2, true),
             coverBitmapCacheKey("Title", "Author", 105, 140, true, true, 1, 2, false)
+        )
+        assertNotEquals(
+            coverBitmapCacheKey("Title", "Author", 105, 140, true, true, 1, 2, fontCacheKey = "font-a"),
+            coverBitmapCacheKey("Title", "Author", 105, 140, true, true, 1, 2, fontCacheKey = "font-b")
         )
     }
 
@@ -178,7 +182,8 @@ class RuntimeMediaStabilityTest {
             .takeIf { it.isFile }
             ?: File("app/src/main/java/io/legado/app/ui/config/CoverConfigFragment.kt")
         assertTrue(configSource.readText().contains("postEvent(EventBus.BOOKSHELF_REFRESH, \"\")"))
-        assertTrue(configSource.readText().contains("PreferKey.coverTitleAdaptive"))
+        val fontConfigSource = configSource.resolveSibling("CoverFontConfigFragment.kt").readText()
+        assertTrue(fontConfigSource.contains("PreferKey.coverTitleAdaptive"))
     }
 
     @Test

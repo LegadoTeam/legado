@@ -3,6 +3,7 @@ package io.legado.app.help.storage
 import android.content.Context
 import android.database.sqlite.SQLiteConstraintException
 import android.net.Uri
+import android.graphics.Typeface
 import androidx.documentfile.provider.DocumentFile
 import com.google.gson.JsonElement
 import io.legado.app.BuildConfig
@@ -52,6 +53,7 @@ import io.legado.app.model.VideoPlay.VIDEO_PREF_NAME
 import io.legado.app.model.BookCover
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.service.AutoTaskScheduler
+import io.legado.app.ui.font.installFontFile
 import io.legado.app.utils.ACache
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
@@ -478,6 +480,18 @@ object Restore {
                             }
                             if (coverPath == null) edit.remove(key) else edit.putString(key, coverPath)
                         }
+                        PreferKey.coverFont -> {
+                            val fontBackup = File(path, BookCover.fontBackupFileName)
+                            val fontPath = if (value is String && value.isNotBlank() && fontBackup.isFile) {
+                                fontBackup.inputStream().use { input ->
+                                    installFontFile(input, BookCover.fontBackupFileName,
+                                        File(appCtx.externalFiles, "font")) {
+                                        runCatching { Typeface.createFromFile(it) }.isSuccess
+                                    }.absolutePath
+                                }
+                            } else (value as? String).orEmpty().takeIf { File(it).isFile }.orEmpty()
+                            edit.putString(key, fontPath)
+                        }
                         PreferKey.webDavPassword -> {
                             kotlin.runCatching {
                                 aes.decryptStr(value.toString())
@@ -542,6 +556,9 @@ object Restore {
                 PreferKey.coverCustomFontSize !in map
             ) {
                 edit.putBoolean(PreferKey.coverCustomFontSize, false)
+            }
+            if (BackupConfig.keyIsNotIgnore(PreferKey.coverFont) && PreferKey.coverFont !in map) {
+                edit.remove(PreferKey.coverFont)
             }
             if (PreferKey.autoBackup !in map) edit.putBoolean(PreferKey.autoBackup, true)
             if (PreferKey.autoBackupWebDav !in map) edit.putBoolean(PreferKey.autoBackupWebDav, true)

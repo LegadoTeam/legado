@@ -97,10 +97,7 @@ class CoverConfigFragment : PreferenceFragment(),
             }
 
             PreferKey.coverShowAuthor,
-            PreferKey.coverShowAuthorN,
-            PreferKey.coverHorizontal,
-            PreferKey.coverTitleAdaptive,
-            PreferKey.coverKeepPunctuation -> {
+            PreferKey.coverShowAuthorN -> {
                 BookCover.upDefaultCover()
                 postEvent(EventBus.BOOKSHELF_REFRESH, "")
             }
