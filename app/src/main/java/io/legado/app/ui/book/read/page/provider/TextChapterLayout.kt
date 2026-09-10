@@ -752,6 +752,8 @@ class TextChapterLayout(
             )
         }
         val tempPaint = TextPaint(textPaint)
+        val clusterWidths = FloatArray(spanned.length)
+        textPaint.getTextWidths(spanned, 0, spanned.length, clusterWidths)
         for (lineIndex in 0 until staticLayout.lineCount) {
             val lineStart = staticLayout.getLineStart(lineIndex)
             val lineEnd = staticLayout.getLineEnd(lineIndex)
@@ -773,24 +775,34 @@ class TextChapterLayout(
                 textLine.isLeftLine = absStartX < viewWidth / 2
             }
             textLine.upTopBottom(durY, lineHeight, textPaint.fontMetrics) //y坐标
+            if ((lineStart until lineEnd).any { highlightSpacing[chapterStart + it]?.textAscent != null }) {
+                textLine.lineBase = textLine.lineTop + staticLayout.getLineBaseline(lineIndex) - mLineTop
+            }
 
             val columns = mutableListOf<BaseColumn>()
             var charIndex = lineStart
             while (charIndex < lineEnd) {
-                val char = spanned[charIndex].toString()
+                var nextChar = charIndex + 1
+                if (spanned.getSpans(charIndex, nextChar, ReplacementSpan::class.java).isEmpty()) {
+                    // Keep the same shaped clusters as plain text, including on Android 6–9.
+                    while (nextChar < lineEnd && clusterWidths[nextChar] == 0f &&
+                        !isZeroWidthChar(spanned[nextChar]) && spanned[nextChar] != '\n' &&
+                        spanned.getSpans(nextChar, nextChar + 1, ReplacementSpan::class.java).isEmpty()) nextChar++
+                }
+                val char = spanned.subSequence(charIndex, nextChar).toString()
                 lineText.append(char)
                 if (char == "\n") {
                     textLine.isParagraphEnd = true
                     durY += lineHeight * paragraphSpacing / 10f //段距
-                    charIndex++
+                    charIndex = nextChar
                     continue
                 }
                 val charX = staticLayout.getPrimaryHorizontal(charIndex)
                 val textSize = extractTextSize(spanned, charIndex, textPaint.textSize)
                 val textColor = extractTextColor(spanned, charIndex)
                 val linkUrl = extractLinkUrl(spanned, charIndex)
-                val charRight = if (charIndex + 1 < lineEnd) {
-                    staticLayout.getPrimaryHorizontal(charIndex + 1)
+                val charRight = if (nextChar < lineEnd) {
+                    staticLayout.getPrimaryHorizontal(nextChar)
                 } else {
                     tempPaint.textSize = textSize
                     val inset = highlightSpacing[chapterStart + charIndex]
@@ -898,7 +910,7 @@ class TextChapterLayout(
                     applyHighlightSpacing(columns[index], textLine, chapterStart + charIndex,
                         isFirst = index == 0)
                 }
-                charIndex++
+                charIndex = nextChar
                 if (charIndex == lineEnd && lineIndex == staticLayout.lineCount - 1) {
                     textLine.isParagraphEnd = true
                     durY += lineHeight * paragraphSpacing / 10f //段距
@@ -1075,10 +1087,13 @@ class TextChapterLayout(
         }
         val widthsArray = allocateFloatArray(text.length)
         textPaint.getTextWidthsCompat(text, widthsArray, reviewCharWidth)
+        val chapterStart = chapterPosition()
         // Compress the glyph advance before adding the separate capsule/icon space.
         val compressor = if (isTitle) null else punctuationCompressor
-        compressor?.beginParagraph(text, widthsArray, punctuationCompressMode)
-        val chapterStart = chapterPosition()
+        val metricOverrides = if (highlightSpacing.hasTextMetrics) BooleanArray(text.length) {
+            highlightSpacing[chapterStart + it]?.metricStyle != null
+        } else null
+        compressor?.beginParagraph(text, widthsArray, punctuationCompressMode, metricOverrides)
         val (leftInset, rightInset) = highlightLineInsets(chapterStart, chapterStart + text.length)
         val availableLineWidth = (visibleWidth - leftInset - rightInset).coerceAtLeast(1)
         for (index in text.indices) {
@@ -1115,14 +1130,38 @@ class TextChapterLayout(
         } else {
             StaticLayout(measuredText, textPaint, textLayoutWidth, Layout.Alignment.ALIGN_NORMAL, 0f, 0f, true)
         }
+        val lineMetrics = if (!highlightSpacing.hasTextMetrics) List(layout.lineCount) { fontMetrics }
+        else (0 until layout.lineCount).map { line ->
+            var minAscent = fontMetrics.ascent
+            var maxDescent = fontMetrics.descent
+            for (index in layout.getLineStart(line) until layout.getLineEnd(line)) {
+                highlightSpacing[chapterStart + index]?.let { inset ->
+                    minAscent = minOf(minAscent, inset.textAscent ?: minAscent)
+                    maxDescent = maxOf(maxDescent, inset.textDescent ?: maxDescent)
+                }
+            }
+            if (minAscent == fontMetrics.ascent && maxDescent == fontMetrics.descent) fontMetrics
+            else Paint.FontMetrics().apply {
+                ascent = minAscent
+                descent = maxDescent
+                top = minOf(fontMetrics.top, minAscent)
+                bottom = maxOf(fontMetrics.bottom, maxDescent)
+                leading = fontMetrics.leading
+            }
+        }
+        val lineHeights = lineMetrics.map {
+            if (it === fontMetrics) textHeight
+            else textHeight + fontMetrics.ascent - it.ascent + it.descent - fontMetrics.descent
+        }
         val layoutHeight = if (isTitle && !isTitleNumber) {
             if (layout.lineCount == 0) {
                 0f
             } else {
-                textHeight * (1f + (layout.lineCount - 1) * lineSpacing)
+                if (!highlightSpacing.hasTextMetrics) textHeight * (1f + (layout.lineCount - 1) * lineSpacing)
+                else lineHeights.sum() * lineSpacing + lineHeights.last() * (1f - lineSpacing)
             }
         } else {
-            layout.lineCount * textHeight
+            if (!highlightSpacing.hasTextMetrics) layout.lineCount * textHeight else lineHeights.sum()
         }
         durY = when {
             //标题y轴居中
@@ -1173,7 +1212,8 @@ class TextChapterLayout(
                     .takeIf { usesRightTitleReviewInset },
                 isReviewTrailingInsetApplied = usesRightTitleReviewInset && rightTitleHasReview,
             )
-            prepareNextPageIfNeed(durY + textHeight)
+            val lineHeight = lineHeights[lineIndex]
+            prepareNextPageIfNeed(durY + lineHeight)
             val lineStartX = absStartX + leftInset
             val lineStart = layout.getLineStart(lineIndex)
             val lineEnd = layout.getLineEnd(lineIndex)
@@ -1249,15 +1289,15 @@ class TextChapterLayout(
             }
             calcTextLinePosition(textPages, textLine, stringBuilder.length)
             stringBuilder.append(lineText)
-            textLine.upTopBottom(durY, textHeight, fontMetrics)
+            textLine.upTopBottom(durY, lineHeight, lineMetrics[lineIndex])
             val textPage = pendingTextPage
             textPage.addLine(textLine)
-            durY += textHeight * lineSpacing
+            durY += lineHeight * lineSpacing
             if (textPage.height < durY) {
                 textPage.height = durY
             }
         }
-        durY += textHeight * paragraphSpacing / 10f
+        durY += (lineHeights.lastOrNull() ?: textHeight) * paragraphSpacing / 10f
     }
 
     private fun calcTextLinePosition(
@@ -1595,7 +1635,8 @@ class TextChapterLayout(
 
     private fun isZeroWidthChar(char: Char): Boolean {
         val code = char.code
-        return code == 8203 || code == 8204 || code == 8205 || code == 8288
+        // ZWJ stays in its glyph cluster; drawing the following emoji separately creates overlap.
+        return code == 8203 || code == 8204 || code == 8288
     }
 
 }
