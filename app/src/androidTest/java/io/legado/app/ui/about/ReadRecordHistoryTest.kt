@@ -140,8 +140,10 @@ class ReadRecordHistoryTest {
             assertEquals(before, Rect().also(it.views.enhancedSummary.root::getGlobalVisibleRect))
             select(it, R.id.menu_fixed_card)
         }
-        await { it.recyclerView.adapter?.itemCount == 84 &&
-            it.enhancedSummary.root.parent === it.recyclerView }
+        await { it.recyclerView.adapter?.itemCount == 84 }
+        // Recreation restores the scrolled position, where the header may be recycled.
+        scenario!!.onActivity { it.views.recyclerView.scrollToPosition(0) }
+        await { it.enhancedSummary.root.parent === it.recyclerView }
         screenshot("reading-history-card-scrolls")
         scenario!!.onActivity { it.views.recyclerView.scrollBy(0, 1000) }
         await { it.recyclerView.computeVerticalScrollOffset() > 0 &&
