@@ -1,6 +1,7 @@
 package io.legado.app.ui.book.read
 
 import android.content.pm.ActivityInfo
+import android.content.ClipboardManager
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.os.SystemClock
@@ -18,6 +19,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.help.book.BookHelp
 import io.legado.app.ui.about.AboutActivity
 import io.legado.app.utils.hideSoftInput
+import io.legado.app.utils.defaultSharedPreferences
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -44,9 +46,11 @@ class ContentEditSearchTest {
     private val content = "Alpha alpha ALPHA\na.b aXb\n" +
         (0 until 500).joinToString("\n") { "Line $it: editable chapter text for scrolling." }
     private var scenario: ActivityScenario<AboutActivity>? = null
+    private val originalPlainText = context.defaultSharedPreferences.all["contentEditPlainText"] as? Boolean
 
     @Before
     fun setUp() {
+        context.defaultSharedPreferences.edit().remove("contentEditPlainText").commit()
         appDb.bookDao.insert(book)
         appDb.bookChapterDao.insert(chapter)
         BookHelp.saveText(book, chapter, content)
@@ -68,8 +72,73 @@ class ContentEditSearchTest {
     @After
     fun tearDown() {
         scenario?.close()
+        context.defaultSharedPreferences.edit().apply {
+            originalPlainText?.let { putBoolean("contentEditPlainText", it) } ?: remove("contentEditPlainText")
+        }.commit()
         BookHelp.delContent(book, chapter)
         appDb.bookDao.delete(book)
+    }
+
+    @Test
+    fun plainTextEditsCopyAndColdRestorationKeepImageCodeInTheSavedDraft() {
+        val image = "<img src=\"https://example.invalid/body.png\">"
+        val bubble = """<img src="data:image/svg+xml;base64,QQ,{'style':'TEXT','click':'getDP(1)'}">"""
+        val raw = "甲${image}乙${bubble}丙\n普通 <内容>"
+        var edited = ""
+        onDialog { dialog ->
+            val menu = dialog.binding.toolBar.menu
+            assertFalse(menu.findItem(R.id.menu_content_plain_text).isChecked)
+            dialog.viewModel.updateDraft(raw)
+            assertEquals(raw, dialog.binding.contentView.text.toString())
+            assertTrue(menu.performIdentifierAction(R.id.menu_content_plain_text, 0))
+            assertEquals("甲乙丙\n普通 <内容>", dialog.binding.contentView.text.toString())
+            assertEquals(raw, dialog.viewModel.draftText)
+            assertTrue(menu.performIdentifierAction(R.id.menu_copy_all, 0))
+            val clipboard = context.getSystemService(ClipboardManager::class.java)
+            assertEquals("Content search\n甲乙丙\n普通 <内容>", clipboard.primaryClip!!.getItemAt(0).text.toString())
+            dialog.binding.contentView.text!!.replace(1, 2, "替换")
+            edited = "甲${image}替换${bubble}丙\n普通 <内容>"
+            assertEquals(edited, dialog.viewModel.draftText)
+            assertEquals("甲替换丙\n普通 <内容>", dialog.binding.contentView.text.toString())
+            assertTrue(menu.performIdentifierAction(R.id.menu_content_plain_text, 0))
+            assertEquals(edited, dialog.binding.contentView.text.toString())
+            assertTrue(menu.performIdentifierAction(R.id.menu_copy_all, 0))
+            assertEquals("Content search\n$edited", clipboard.primaryClip!!.getItemAt(0).text.toString())
+            assertTrue(menu.performIdentifierAction(R.id.menu_content_plain_text, 0))
+            openSearch(dialog)
+            dialog.binding.searchInput.setText("替换")
+        }
+        awaitCount("1/1")
+        screenshot("content-plain-text-edited")
+        // A new Fragment gets a new ViewModel: only its saved canonical draft can retain the tags.
+        scenario!!.onActivity { activity ->
+            val manager = activity.supportFragmentManager
+            val previous = manager.findFragmentByTag("content-search") as ContentEditDialog
+            val state = manager.saveFragmentInstanceState(previous)
+            val args = Bundle(previous.requireArguments())
+            previous.dismissNow()
+            ContentEditDialog().apply {
+                arguments = args
+                setInitialSavedState(state)
+            }.showNow(manager, "content-search")
+        }
+        awaitCount("1/1")
+        onDialog {
+            assertEquals(edited, it.viewModel.draftText)
+            assertTrue(it.viewModel.hasChanges)
+            assertTrue(it.binding.toolBar.menu.findItem(R.id.menu_content_plain_text).isChecked)
+            assertEquals("甲替换丙\n普通 <内容>", it.binding.contentView.text.toString())
+        }
+        scenario!!.recreate()
+        awaitCount("1/1")
+        onDialog {
+            assertEquals(edited, it.viewModel.draftText)
+            assertTrue(it.binding.toolBar.menu.performIdentifierAction(R.id.menu_save, 0))
+        }
+        val deadline = SystemClock.uptimeMillis() + 15_000
+        while (BookHelp.getContent(book, chapter) != edited && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(25)
+        assertEquals(edited, BookHelp.getContent(book, chapter))
+        assertTrue(context.defaultSharedPreferences.getBoolean("contentEditPlainText", false))
     }
 
     @Test
