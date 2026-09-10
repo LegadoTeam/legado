@@ -431,7 +431,21 @@ class ReadAloudMenuUiTest {
             if (ready) return
             SystemClock.sleep(50)
         } while (SystemClock.uptimeMillis() < deadline)
-        throw AssertionError("Timed out waiting for $description")
+        var state = ""
+        scenario!!.onActivity {
+            val view = it.findViewById<ReadView>(R.id.read_view)
+            val controls = it.findViewById<View>(R.id.read_aloud_float_bar_container)
+            state = "page=${ReadBook.durPageIndex}, chapter=${ReadBook.durChapterIndex}, " +
+                "speechChapter=${ReadAloud.readAloudChapterIndex}, speechPosition=${ReadAloud.readAloudChapterStart}, " +
+                "following=${ReadAloud.followReadAloudPosition}, running=${BaseReadAloudService.isRun}, " +
+                "paused=${BaseReadAloudService.pause}, highlighted=${view.curPage.textPage.hasReadAloudSpan}, " +
+                "selected=${view.isTextSelected}, controls=${controls.isShown}, " +
+                "controlPosition=${controls.x},${controls.y}, dialog=${it.bottomDialog}"
+        }
+        val label = "aloud-timeout-${SystemClock.uptimeMillis()}"
+        screenshot(label)
+        File(context.getExternalFilesDir("ui-regression"), "$label-state.txt").writeText("$description\n$state")
+        throw AssertionError("Timed out waiting for $description: $state")
     }
 
     private fun screenshot(name: String) {

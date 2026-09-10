@@ -6,17 +6,21 @@ import android.os.Looper
 import android.os.SystemClock
 import android.view.PixelCopy
 import android.view.View
-import android.view.MenuItem
 import android.widget.Spinner
 import androidx.core.net.toUri
 import androidx.appcompat.widget.SearchView
 import androidx.test.core.app.ActivityScenario
-import androidx.test.espresso.Espresso.onData
+import androidx.recyclerview.widget.RecyclerView
+import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.openActionBarOverflowOrOptionsMenu
+import androidx.test.espresso.UiController
+import androidx.test.espresso.ViewAction
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isPlatformPopup
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.withId
+import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.R
@@ -42,9 +46,6 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.hamcrest.Matchers.allOf
-import org.hamcrest.Matchers.equalTo
-import org.hamcrest.Matchers.hasProperty
 import org.hamcrest.Matchers.instanceOf
 import java.io.File
 import java.util.UUID
@@ -149,8 +150,16 @@ class BookSourceCheckUiTest {
             assertNotNull(menu.findItem(R.id.menu_block_source_navigation).icon)
         }
         openActionBarOverflowOrOptionsMenu(context)
-        val navigationItem = onData(allOf(instanceOf(MenuItem::class.java),
-            hasProperty("itemId", equalTo(R.id.menu_block_source_navigation)))).inRoot(isPlatformPopup())
+        onView(withId(R.id.recycler_view)).inRoot(isPlatformPopup()).perform(object : ViewAction {
+            override fun getConstraints() = instanceOf(RecyclerView::class.java)
+            override fun getDescription() = "Scroll the overflow menu to its final settings"
+            override fun perform(uiController: UiController, view: View) {
+                val recycler = view as RecyclerView
+                recycler.scrollToPosition(checkNotNull(recycler.adapter).itemCount - 1)
+                uiController.loopMainThreadUntilIdle()
+            }
+        })
+        val navigationItem = onView(withText(R.string.block_source_navigation)).inRoot(isPlatformPopup())
         navigationItem.check(matches(isDisplayed()))
         checkNotNull(instrumentation.uiAutomation.takeScreenshot()).useBitmap { bitmap ->
             val directory = File(context.getExternalFilesDir(null), "ui-regression").apply { mkdirs() }
