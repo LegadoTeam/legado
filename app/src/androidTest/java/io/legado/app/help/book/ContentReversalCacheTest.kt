@@ -26,6 +26,7 @@ import io.legado.app.utils.defaultSharedPreferences
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.job
 import kotlinx.coroutines.async
@@ -218,7 +219,28 @@ class ContentReversalCacheTest {
                         Triple(metadata.title, metadata.imgUrl, metadata.variable))
                     assertTrue(BookHelp.resourcesOutdated(second, chapter))
                 }
-                failBody.set(-1); failImage.set(0)
+                failBody.set(7); failImage.set(0)
+                val failedEntered = CountDownLatch(1); val failedRelease = CountDownLatch(1)
+                gate.set(failedEntered to failedRelease)
+                val failedCache = CacheBook.getOrCreate(source, second)
+                failedCache.addDownload(2, 2, refreshResources = true)
+                CacheBook.errorDownloadMap[chapter.primaryStr()] = 2
+                val failedOwner = async(IO) { failedCache.downloadAwait(chapter) }
+                try {
+                    assertTrue(failedEntered.await(5, TimeUnit.SECONDS))
+                    // Start until the shared ticket suspension, so both readers receive the
+                    // final failed attempt after its resource-refresh intent is removed.
+                    val failedWaiter = async(IO, start = CoroutineStart.UNDISPATCHED) { failedCache.downloadAwait(chapter) }
+                    failedRelease.countDown()
+                    assertEquals(oldContent, failedOwner.await())
+                    assertEquals("A waiting reader must retain the old body on the final failure", oldContent, failedWaiter.await())
+                    assertArrayEquals(oldImage, BookHelp.getImage(second, "$base/shared.png").readBytes())
+                    assertTrue(BookHelp.resourcesOutdated(second, chapter))
+                } finally {
+                    failedRelease.countDown()
+                    CacheBook.errorDownloadMap.remove(chapter.primaryStr())
+                }
+                failBody.set(-1)
                 val entered = CountDownLatch(1); val release = CountDownLatch(1)
                 gate.set(entered to release)
                 val cache = CacheBook.getOrCreate(source, second)

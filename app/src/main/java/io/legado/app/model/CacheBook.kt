@@ -473,7 +473,7 @@ object CacheBook {
                     if (model.needsResourceRefresh(requestBook, chapter)) continue
                     return result.fold(
                         { BookHelp.getContent(requestBook, chapter) ?: it },
-                        { "获取正文失败\n${it.localizedMessage}" },
+                        { BookHelp.getContent(requestBook, chapter) ?: "获取正文失败\n${it.localizedMessage}" },
                     )
                 }
                 val refreshingResources = model.needsResourceRefresh(requestBook, chapter)
