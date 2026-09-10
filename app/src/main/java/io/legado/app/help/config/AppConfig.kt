@@ -576,6 +576,10 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefBoolean("readRecordShowSeconds", true)
         set(value) { appCtx.putPrefBoolean("readRecordShowSeconds", value) }
 
+    var readRecordFixedCard: Boolean
+        get() = appCtx.getPrefBoolean("readRecordFixedCard", true)
+        set(value) { appCtx.putPrefBoolean("readRecordFixedCard", value) }
+
     var enableReadRecord: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.enableReadRecord, true)
         set(value) {
