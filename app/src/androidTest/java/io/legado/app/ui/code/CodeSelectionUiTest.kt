@@ -390,6 +390,7 @@ class CodeSelectionUiTest {
             assertNativeMenu()
             var from = floatArrayOf()
             var fixedEnd = -1
+            var handleHeight = 0f
             withEditor {
                 val handle = if (rightHandle) it.rightHandleDescriptor else it.leftHandleDescriptor
                 val location = IntArray(2)
@@ -397,9 +398,12 @@ class CodeSelectionUiTest {
                 assertFalse(handle.position.isEmpty)
                 from = floatArrayOf(location[0] + handle.position.centerX(),
                     location[1] + handle.position.centerY())
+                handleHeight = handle.position.height()
                 fixedEnd = if (rightHandle) it.cursor.left else it.cursor.right
             }
             val to = if (rightHandle) editorPoint(3, 15) else editorPoint(1, 9)
+            // Sora places the caret one handle-height above the dragging finger.
+            to[1] += handleHeight
             onView(withId(R.id.editText)).perform(GeneralSwipeAction(Swipe.SLOW, { from }, { to }, Press.FINGER))
             awaitEditor {
                 !it.eventHandler.hasAnyHeldHandle() && selection(it).contains('\n') &&
