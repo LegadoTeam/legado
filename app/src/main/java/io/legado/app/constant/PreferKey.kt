@@ -126,6 +126,8 @@ object PreferKey {
     const val immNavigationBar = "immNavigationBar"
     const val defaultCover = "defaultCover"
     const val defaultCoverDark = "defaultCoverDark"
+    const val readRecordCover = "readRecordCover"
+    const val readRecordCoverDark = "readRecordCoverDark"
     const val replaceEnableDefault = "replaceEnableDefault"
     const val manualReplaceRule = "manualReplaceRule"
     const val showBrightnessView = "showBrightnessView"

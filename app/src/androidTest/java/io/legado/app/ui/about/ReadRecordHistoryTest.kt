@@ -79,7 +79,8 @@ class ReadRecordHistoryTest {
     @Before
     fun setUp() {
         prefs.edit().remove("readRecordSimpleLayout").remove("readRecordUseDays")
-            .remove("readRecordShowSeconds").commit()
+            .remove("readRecordShowSeconds").remove("readRecordFixedCard")
+            .remove(PreferKey.readRecordCover).remove(PreferKey.readRecordCoverDark).commit()
         LocalConfig.edit().putInt("readRecordSort", 1).commit()
         appDb.readRecordDao.clear()
         cover = File(context.cacheDir, "history-$id.png")
@@ -110,14 +111,126 @@ class ReadRecordHistoryTest {
         ReadRecordCoverCache.prune()
         cover.delete()
         prefs.edit().apply {
-            for (key in listOf("readRecordSimpleLayout", "readRecordUseDays", "readRecordShowSeconds")) {
+            for (key in listOf("readRecordSimpleLayout", "readRecordUseDays", "readRecordShowSeconds", "readRecordFixedCard")) {
                 val value = savedPrefs[key]
                 if (value is Boolean) putBoolean(key, value) else remove(key)
+            }
+            for (key in listOf(PreferKey.readRecordCover, PreferKey.readRecordCoverDark)) {
+                val value = savedPrefs[key]
+                if (value is String) putString(key, value) else remove(key)
             }
         }.commit()
         LocalConfig.edit().apply {
             if (savedSort is Int) putInt("readRecordSort", savedSort) else remove("readRecordSort")
         }.commit()
+    }
+
+    @Test
+    fun fixedCardCanScrollWithRowsAndReturnWithoutChangingRowActions() {
+        appDb.readRecordDao.insert(*(0 until 80).map {
+            ReadRecord(deviceId = "scroll", bookName = "Scroll $it", readTime = it + 1L)
+        }.toTypedArray())
+        AppConfig.readRecordSimpleLayout = false
+        launch()
+        await { it.recyclerView.adapter?.itemCount == 83 }
+        scenario!!.onActivity {
+            assertTrue(AppConfig.readRecordFixedCard)
+            val before = Rect().also(it.views.enhancedSummary.root::getGlobalVisibleRect)
+            it.views.recyclerView.scrollBy(0, 600)
+            assertEquals(before, Rect().also(it.views.enhancedSummary.root::getGlobalVisibleRect))
+            select(it, R.id.menu_fixed_card)
+        }
+        await { it.recyclerView.adapter?.itemCount == 84 &&
+            it.enhancedSummary.root.parent === it.recyclerView }
+        screenshot("reading-history-card-scrolls")
+        scenario!!.onActivity { it.views.recyclerView.scrollBy(0, 1000) }
+        await { it.recyclerView.computeVerticalScrollOffset() > 0 &&
+            (!it.enhancedSummary.root.isAttachedToWindow ||
+                !it.enhancedSummary.root.getGlobalVisibleRect(Rect())) }
+        screenshot("reading-history-card-scrolled-away")
+        scenario!!.recreate()
+        await { it.recyclerView.adapter?.itemCount == 84 }
+        scenario!!.onActivity { it.views.recyclerView.scrollToPosition(0) }
+        await { findRow(it, book.name) != null }
+        // With a header, removal must still target the tapped book rather than the next row.
+        scenario!!.onActivity { findRow(it.views, book.name)!!.enhanced.ivRemove.performClick() }
+        onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+        await { it.recyclerView.adapter?.itemCount == 83 && findRow(it, book.name) == null }
+        assertNull(appDb.readRecordDao.getRecord(AppConst.androidId, book.name, book.author))
+        assertNotNull(appDb.readRecordDao.getRecord("remote", "Archived second", ""))
+        scenario!!.onActivity { select(it, R.id.menu_simple_layout) }
+        await { it.recyclerView.adapter?.itemCount == 82 && it.compactSummary.isVisible }
+        scenario!!.onActivity { it.views.recyclerView.scrollToPosition(0) }
+        await { binding ->
+            findRow(binding, "Archived second")?.root?.let {
+                it === binding.recyclerView.getChildAt(0)
+            } == true
+        }
+        screenshot("reading-history-unpinned-compact")
+        scenario!!.onActivity { select(it, R.id.menu_simple_layout) }
+        await { it.recyclerView.adapter?.itemCount == 83 &&
+            it.enhancedSummary.root.parent === it.recyclerView }
+        scenario!!.onActivity { select(it, R.id.menu_fixed_card) }
+        await { it.recyclerView.adapter?.itemCount == 82 &&
+            it.enhancedSummary.root.parent === it.root }
+        scenario!!.onActivity { select(it, R.id.menu_fixed_card) }
+        await { it.recyclerView.adapter?.itemCount == 83 &&
+            it.enhancedSummary.root.parent === it.recyclerView }
+        scenario!!.onActivity { select(it, R.id.menu_fixed_card) }
+        await { it.recyclerView.adapter?.itemCount == 82 }
+        screenshot("reading-history-card-pinned")
+    }
+
+    @Test
+    fun dayAndNightFallbackCoversKeepRealCoversAndUseWhiteWhenUnset() {
+        val nightCover = File(context.cacheDir, "history-night-$id.png")
+        val nightColor = Color.rgb(64, 86, 180)
+        Bitmap.createBitmap(48, 64, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(nightColor)
+            nightCover.outputStream().use { compress(Bitmap.CompressFormat.PNG, 100, it) }
+            recycle()
+        }
+        val savedMode = prefs.getString(PreferKey.themeMode, null)
+        val savedNightMode = AppCompatDelegate.getDefaultNightMode()
+        try {
+            AppConfig.readRecordSimpleLayout = false
+            prefs.edit().putString(PreferKey.readRecordCover, cover.path)
+                .putString(PreferKey.readRecordCoverDark, nightCover.path).commit()
+            for (night in listOf(false, true)) {
+                prefs.edit().putString(PreferKey.themeMode, if (night) "2" else "1").commit()
+                instrumentation.runOnMainSync {
+                    AppCompatDelegate.setDefaultNightMode(if (night) AppCompatDelegate.MODE_NIGHT_YES
+                        else AppCompatDelegate.MODE_NIGHT_NO)
+                }
+                launch()
+                val expected = if (night) nightColor else Color.rgb(35, 148, 115)
+                await { findRow(it, "Archived second")?.enhanced?.ivCover?.let(::coverColor) == expected &&
+                    coverColor(it.enhancedSummary.coverSecond) == expected &&
+                    findRow(it, book.name)?.enhanced?.ivCover?.let(::coverColor) == Color.rgb(35, 148, 115) }
+                screenshot(if (night) "reading-history-fallback-night" else "reading-history-fallback-day")
+                scenario!!.close()
+                scenario = null
+            }
+            prefs.edit().remove(PreferKey.readRecordCoverDark).commit()
+            launch()
+            await { binding ->
+                val image = findRow(binding, "Archived second")?.enhanced?.ivCover ?: return@await false
+                if (image.width == 0 || image.height == 0) return@await false
+                val bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
+                try {
+                    image.draw(Canvas(bitmap))
+                    bitmap.getPixel(bitmap.width / 2, bitmap.height / 2) == Color.WHITE
+                } finally { bitmap.recycle() }
+            }
+        } finally {
+            scenario?.close()
+            scenario = null
+            nightCover.delete()
+            prefs.edit().apply {
+                if (savedMode == null) remove(PreferKey.themeMode) else putString(PreferKey.themeMode, savedMode)
+            }.commit()
+            instrumentation.runOnMainSync { AppCompatDelegate.setDefaultNightMode(savedNightMode) }
+        }
     }
 
     @Test
@@ -262,6 +375,8 @@ class ReadRecordHistoryTest {
 
     @Test
     fun largeHistoryOpensAndFiltersWithoutWritingBookshelfSnapshots() {
+        prefs.edit().putString(PreferKey.readRecordCover, cover.path)
+            .putString(PreferKey.readRecordCoverDark, cover.path).commit()
         appDb.readRecordDao.insert(*(0 until 6372).map { index ->
             ReadRecord(deviceId = "history-device", bookName = "Archived $id $index",
                 author = "Author $index", readTime = index + 1L, lastRead = index + 1L,
@@ -605,7 +720,9 @@ class ReadRecordHistoryTest {
     private fun launch() { scenario = ActivityScenario.launch(ReadRecordActivity::class.java) }
 
     private val ReadRecordActivity.views: ActivityReadRecordBinding
-        get() = ActivityReadRecordBinding.bind(findViewById<ViewGroup>(android.R.id.content).getChildAt(0))
+        get() = ReadRecordActivity::class.java.getDeclaredMethod("getBinding").apply {
+            isAccessible = true
+        }.invoke(this) as ActivityReadRecordBinding
 
     private fun shell(command: String) {
         instrumentation.uiAutomation.executeShellCommand(command).use { descriptor ->
@@ -622,7 +739,9 @@ class ReadRecordHistoryTest {
 
     private fun findRow(binding: ActivityReadRecordBinding, name: String, author: String? = null): ItemReadRecordDisplayBinding? {
         for (index in 0 until binding.recyclerView.childCount) {
-            val row = ItemReadRecordDisplayBinding.bind(binding.recyclerView.getChildAt(index))
+            val view = binding.recyclerView.getChildAt(index)
+            if (view === binding.enhancedSummary.root) continue
+            val row = ItemReadRecordDisplayBinding.bind(view)
             val sameName = row.enhanced.tvBookName.text.toString() == name || row.compact.tvBookName.text.toString() == name
             val sameAuthor = author == null || row.enhanced.tvAuthor.text.toString() == author ||
                 row.compact.tvAuthor.text.toString() == context.getString(R.string.author_show, author)
