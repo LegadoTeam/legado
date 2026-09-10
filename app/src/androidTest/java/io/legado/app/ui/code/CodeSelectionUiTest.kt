@@ -8,6 +8,7 @@ import android.graphics.Bitmap
 import android.graphics.Rect
 import android.os.SystemClock
 import android.view.View
+import android.view.ViewGroup
 import android.view.ViewConfiguration
 import android.webkit.WebView
 import androidx.core.view.isVisible
@@ -482,11 +483,11 @@ class CodeSelectionUiTest {
         })
         await {
             var ready = false
-            scenario!!.onActivity { ready = it.viewModel.editorDraft?.text == code }
+            scenario!!.onActivity { ready = ViewModelProvider(it)[CodeEditViewModel::class.java].editorDraft?.text == code }
             ready
         }
         scenario!!.onActivity { activity ->
-            activity.binding.editorContainer.children.filterIsInstance<WebView>().single().evaluateJavascript(
+            activity.findViewById<ViewGroup>(R.id.editorContainer).children.filterIsInstance<WebView>().single().evaluateJavascript(
                 "editor.value = ${GSON.toJson(edited)}; editor.setSelectionRange($cursor, $cursor);" +
                     "editor.dispatchEvent(new Event('input'));", null,
             )
@@ -494,7 +495,7 @@ class CodeSelectionUiTest {
         await {
             var ready = false
             scenario!!.onActivity {
-                ready = it.viewModel.editorDraft?.let { draft -> draft.text == edited && draft.cursorPosition == cursor } == true
+                ready = ViewModelProvider(it)[CodeEditViewModel::class.java].editorDraft?.let { draft -> draft.text == edited && draft.cursorPosition == cursor } == true
             }
             ready
         }
@@ -502,15 +503,15 @@ class CodeSelectionUiTest {
         await {
             var ready = false
             scenario!!.onActivity {
-                ready = it.viewModel.editorDraft?.text == edited &&
-                    it.binding.editorContainer.children.filterIsInstance<WebView>().any { web -> web.isShown }
+                ready = ViewModelProvider(it)[CodeEditViewModel::class.java].editorDraft?.text == edited &&
+                    it.findViewById<ViewGroup>(R.id.editorContainer).children.filterIsInstance<WebView>().any { web -> web.isShown }
             }
             ready
         }
         val restored = AtomicReference<String>()
         await {
             scenario!!.onActivity {
-                it.binding.editorContainer.children.filterIsInstance<WebView>().single().evaluateJavascript(
+                it.findViewById<ViewGroup>(R.id.editorContainer).children.filterIsInstance<WebView>().single().evaluateJavascript(
                     "window.__getEditorState && window.__getEditorState();", restored::set,
                 )
             }
