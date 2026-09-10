@@ -12,11 +12,14 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
+import androidx.test.espresso.UiController
+import androidx.test.espresso.ViewAction
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.RootMatchers.isPlatformPopup
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
 import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
@@ -46,12 +49,14 @@ import io.legado.app.ui.association.ImportBookSourceDialog
 import io.legado.app.ui.association.ImportBookSourceViewModel
 import io.legado.app.ui.book.read.config.ReaderMenuConfigDialog
 import io.legado.app.ui.book.read.page.ReadView
+import io.legado.app.ui.widget.PopupAction
 import io.legado.app.ui.widget.dialog.CodeDialog
 import io.legado.app.utils.GSON
 import io.legado.app.utils.defaultSharedPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.hamcrest.Matchers.allOf
+import org.hamcrest.Matcher
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -208,14 +213,22 @@ class ReaderSourceReimportUiTest {
         }
         try {
             assertTrue(blocked.await(5, TimeUnit.SECONDS))
-            onView(withId(R.id.tv_ok)).inRoot(isDialog()).perform(click())
-            assertTrue(oldVm.sourceUpdatePending.value == true)
+            // Espresso drains the loading animation after a click, which would wait until the
+            // transaction gate times out. Invoke the real button without waiting for import idle.
+            instrumentation.runOnMainSync {
+                val confirm = oldDialog.requireView().findViewById<View>(R.id.tv_ok)
+                assertTrue(confirm.isEnabled && confirm.isShown)
+                assertTrue(confirm.performClick())
+                assertTrue("Import must be pending before recreation", oldVm.sourceUpdatePending.value == true)
+                assertFalse(oldVm.importFinished.value == true)
+            }
             scenario.recreate()
             await("recreated importer uses the retained operation") {
                 it.supportFragmentManager.fragments.filterIsInstance<ImportBookSourceDialog>().singleOrNull()
                     ?.takeIf { f -> f !== oldDialog }?.let { f ->
                         scenarioDialog = f
-                        ViewModelProvider(f)[ImportBookSourceViewModel::class.java] === oldVm
+                        ViewModelProvider(f)[ImportBookSourceViewModel::class.java] === oldVm &&
+                            oldVm.sourceUpdatePending.value == true && oldVm.importFinished.value != true
                     } == true
             }
         } finally { release.countDown(); writer.join(5000) }
@@ -305,11 +318,22 @@ class ReaderSourceReimportUiTest {
         pressBack()
         scenario.recreate()
         awaitReader(0)
-        main { it.refreshReaderMenu() }
-        instrumentation.waitForIdleSync()
         openOverflow()
         onView(withText(R.string.reimport_book_source)).check(doesNotExist())
         onView(withText(R.string.reader_menu_more)).inRoot(isPlatformPopup()).perform(click())
+        // Moving an action to More appends it after the other actions, below this popup's viewport.
+        onView(withId(R.id.recycler_view)).inRoot(isPlatformPopup()).perform(object : ViewAction {
+            override fun getConstraints(): Matcher<View> = isAssignableFrom(RecyclerView::class.java)
+            override fun getDescription() = "scroll More to its reimport action"
+            override fun perform(uiController: UiController, view: View) {
+                val recycler = view as RecyclerView
+                val items = (recycler.adapter as PopupAction.Adapter).getItems()
+                val target = items.indexOfFirst { it.title == context.getString(R.string.reimport_book_source) }
+                assertTrue("More must contain the configured reimport action: $items", target >= 0)
+                recycler.scrollToPosition(target)
+                uiController.loopMainThreadUntilIdle()
+            }
+        })
         onView(withText(R.string.reimport_book_source)).inRoot(isPlatformPopup()).perform(click())
         awaitImporter()
         onView(withId(R.id.tv_cancel)).inRoot(isDialog()).perform(click())
