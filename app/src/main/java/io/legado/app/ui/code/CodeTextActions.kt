@@ -71,7 +71,7 @@ internal class CodeTextActions(private val editor: CodeEditor) : ActionMode.Call
         editor.postInLifecycle {
             if (!editor.cursor.isSelected || searchSelection || !editor.hasFocus() ||
                 editor.eventHandler.hasAnyHeldHandle() ||
-                editor.snippetController.isInSnippet || editor.isInMouseMode
+                editor.snippetController.isInSnippet() || editor.isInMouseMode
             ) return@postInLifecycle
             insertionActions.isEnabled = false
             actionMode?.let {
