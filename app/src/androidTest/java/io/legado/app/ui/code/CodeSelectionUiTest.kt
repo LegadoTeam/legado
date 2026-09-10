@@ -347,7 +347,7 @@ class CodeSelectionUiTest {
             selectedLine = end - 1
         }
         assertEditorToolbar()
-        withEditor { actions(it).dismiss() }
+        dismissEditorToolbar()
         press(Tap.LONG, selectedLine, 3)
         assertNativeMenu()
         assertNativeMenuClearOfTools()
@@ -374,7 +374,7 @@ class CodeSelectionUiTest {
         launchEditor()
         selectFunction()
         screenshot("code-selection-ordinary-editor-toolbar")
-        withEditor { actions(it).dismiss() }
+        dismissEditorToolbar()
         press(Tap.LONG, 2, 11)
         assertNativeMenu()
         withEditor { assertEquals(selectedText, selection(it)) }
@@ -834,7 +834,7 @@ class CodeSelectionUiTest {
         awaitEditor { selection(it) == selectedText && actions(it).isEnabled && actions(it).isShowing }
         assertEditorToolbar()
         if (native) {
-            withEditor { actions(it).dismiss() }
+            dismissEditorToolbar()
             press(Tap.LONG, 2, 11)
             assertNativeMenu()
         }
@@ -898,6 +898,17 @@ class CodeSelectionUiTest {
 
     private fun actions(editor: CodeEditor) = editor.getComponent(EditorTextActionWindow::class.java)
 
+    private fun dismissEditorToolbar() {
+        lateinit var popup: View
+        withEditor {
+            popup = actions(it).view.rootView
+            actions(it).dismiss()
+        }
+        await { !popup.isAttachedToWindow }
+        // Popup removal reaches InputDispatcher asynchronously; do not inject into its stale window.
+        instrumentation.uiAutomation.waitForIdle(500, 5_000)
+    }
+
     private fun assertNativeMenu() {
         // Sora's image-button popup has no text labels. This checks the actual platform popup.
         onView(withText(android.R.string.copy)).inRoot(isPlatformPopup())
@@ -925,23 +936,31 @@ class CodeSelectionUiTest {
             val nativeTextId = context.resources.getIdentifier("floating_toolbar_menu_item_text", "id", "android")
             assertEquals("The selection action must be rendered by Android", nativeTextId, view!!.id)
             val panel = view.parent.parent as View
-            assertTrue(panel.getGlobalVisibleRect(menuBounds))
+            visibleScreenBounds(panel, menuBounds)
         }
         val toolBounds = Rect()
         onView(withId(R.id.recycler_view))
             .inRoot(withDecorView(hasDescendant(withId(R.id.recycler_view))))
             .check { view, failure ->
                 if (failure != null) throw failure
-                assertTrue(view!!.getGlobalVisibleRect(toolBounds))
+                visibleScreenBounds(view!!, toolBounds)
             }
         assertFalse("Native menu $menuBounds overlaps keyboard tools $toolBounds", Rect.intersects(menuBounds, toolBounds))
         val keyboardBounds = Rect(toolBounds)
         scenario!!.onActivity { activity ->
-            assertTrue(activity.findViewById<View>(R.id.search_group).getGlobalVisibleRect(toolBounds))
+            visibleScreenBounds(activity.findViewById(R.id.search_group), toolBounds)
             assertFalse("Native menu $menuBounds overlaps search tools $toolBounds", Rect.intersects(menuBounds, toolBounds))
         }
         File(context.getExternalFilesDir("ui-regression"), "code-selection-native-menu-bounds.txt")
             .appendText("menu=$menuBounds; keyboard=$keyboardBounds; search=$toolBounds\n")
+    }
+
+    private fun visibleScreenBounds(view: View, bounds: Rect) {
+        // getGlobalVisibleRect is relative to this window's root, even for a PopupWindow.
+        assertTrue(view.getGlobalVisibleRect(bounds))
+        val origin = IntArray(2)
+        view.rootView.getLocationOnScreen(origin)
+        bounds.offset(origin[0], origin[1])
     }
 
     private fun dismissNativeMenu() {
