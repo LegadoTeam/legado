@@ -208,6 +208,7 @@ class SourceDragOrderUiTest {
         var x = 0f
         var startY = 0f
         var endY = 0f
+        var returnY = 0f
         var movedItem: Any? = null
         scenario.onActivity { activity ->
             val recycler = activity.findViewById<RecyclerView>(R.id.recycler_view)
@@ -219,7 +220,10 @@ class SourceDragOrderUiTest {
             // The left padding is outside the checkbox slide-selection area (16..50 dp).
             x = start[0] + 8 * context.resources.displayMetrics.density
             startY = start[1] + source.height / 2f
-            endY = end[1] + target.height / 2f
+            val direction = if (to > from) 1 else -1
+            // chooseDropTarget requires crossing the target edge, not merely matching it.
+            endY = end[1] + target.height / 2f + direction * target.height / 4f
+            returnY = startY - direction * source.height / 4f
         }
         val downTime = SystemClock.uptimeMillis()
         fun event(action: Int, y: Float) {
@@ -247,9 +251,18 @@ class SourceDragOrderUiTest {
                 }
                 atTarget
             }
-            if (returnToStart) move(endY, startY)
+            if (returnToStart) move(endY, returnY)
+        } catch (failure: Throwable) {
+            screenshot("drag-held-failure-${SystemClock.uptimeMillis()}")
+            scenario.onActivity { activity ->
+                val recycler = activity.findViewById<RecyclerView>(R.id.recycler_view)
+                android.util.Log.e("SourceDragOrderUiTest",
+                    "from=$from to=$to x=$x startY=$startY endY=$endY " +
+                        "rows=${(recycler.adapter as RecyclerAdapter<*, *>).getItems()}")
+            }
+            throw failure
         } finally {
-            event(MotionEvent.ACTION_UP, if (returnToStart) startY else endY)
+            event(MotionEvent.ACTION_UP, if (returnToStart) returnY else endY)
         }
         instrumentation.waitForIdleSync()
         SystemClock.sleep(400) // ItemTouchHelper calls clearView after its recovery animation.
