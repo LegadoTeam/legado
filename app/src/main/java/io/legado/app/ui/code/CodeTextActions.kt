@@ -51,7 +51,16 @@ internal class CodeTextActions(private val editor: CodeEditor) : ActionMode.Call
             show()
         }
         editor.subscribeEvent(HandleStateChangeEvent::class.java) { event, _ ->
-            if (event.isHeld) dismiss()
+            if (event.isHeld) {
+                dismiss()
+            } else {
+                // Sora only reschedules a toolbar that was visible before grabbing the handle.
+                editor.postInLifecycle {
+                    if (!nativeRequested && editor.cursor.isSelected &&
+                        !editor.eventHandler.hasAnyHeldHandle()
+                    ) insertionActions.displayWindow()
+                }
+            }
         }
         editor.subscribeEvent(ScrollEvent::class.java) { _, _ ->
             editor.postInLifecycle { actionMode?.invalidateContentRect() }

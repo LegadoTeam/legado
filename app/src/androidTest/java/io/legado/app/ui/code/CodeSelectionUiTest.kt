@@ -55,6 +55,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import io.github.rosemoe.sora.widget.CodeEditor
+import io.github.rosemoe.sora.event.HandleStateChangeEvent
 import io.github.rosemoe.sora.widget.component.EditorTextActionWindow
 import io.legado.app.R
 import io.legado.app.help.CacheManager
@@ -368,6 +369,54 @@ class CodeSelectionUiTest {
         assertNativeMenu()
         assertNativeMenuClearOfTools()
         screenshot("code-selection-native-ime-search-scrolled")
+    }
+
+    @Test fun draggingEitherSelectionHandleAfterLongPressRestoresEditorActions() {
+        launchEditor()
+        var heldType = -1
+        withEditor {
+            it.subscribeEvent(HandleStateChangeEvent::class.java) { event, _ ->
+                if (event.isHeld) heldType = event.handleType
+            }
+        }
+        for (rightHandle in listOf(true, false)) {
+            withEditor {
+                heldType = -1
+                it.setSelection(0, 0)
+            }
+            dismissEditorToolbar()
+            press(Tap.LONG, 2, 11)
+            awaitEditor { selection(it) == "message" }
+            assertNativeMenu()
+            var from = floatArrayOf()
+            var fixedEnd = -1
+            withEditor {
+                val handle = if (rightHandle) it.rightHandleDescriptor else it.leftHandleDescriptor
+                val location = IntArray(2)
+                it.getLocationOnScreen(location)
+                assertFalse(handle.position.isEmpty)
+                from = floatArrayOf(location[0] + handle.position.centerX(),
+                    location[1] + handle.position.centerY())
+                fixedEnd = if (rightHandle) it.cursor.left else it.cursor.right
+            }
+            val to = if (rightHandle) editorPoint(3, 15) else editorPoint(1, 9)
+            onView(withId(R.id.editText)).perform(GeneralSwipeAction(Swipe.SLOW, { from }, { to }, Press.FINGER))
+            awaitEditor {
+                !it.eventHandler.hasAnyHeldHandle() && selection(it).contains('\n') &&
+                    actions(it).isEnabled && actions(it).isShowing
+            }
+            var draggedSelection = ""
+            withEditor {
+                assertEquals(if (rightHandle) HandleStateChangeEvent.HANDLE_TYPE_RIGHT
+                    else HandleStateChangeEvent.HANDLE_TYPE_LEFT, heldType)
+                assertEquals(fixedEnd, if (rightHandle) it.cursor.left else it.cursor.right)
+                assertEquals(source, it.text.toString())
+                draggedSelection = selection(it)
+            }
+            assertEditorToolbar()
+            screenshot("code-selection-${if (rightHandle) "right" else "left"}-handle-editor-toolbar")
+            shareAndAssert(draggedSelection)
+        }
     }
 
     @Test fun ordinarySelectionKeepsEditorActionsUntilLongPressAndReturnsAfterTap() {
