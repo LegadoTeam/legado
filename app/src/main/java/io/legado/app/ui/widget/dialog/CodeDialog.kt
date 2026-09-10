@@ -291,7 +291,6 @@ class CodeDialog() : BaseDialogFragment(R.layout.dialog_code_view) {
                 if (path != null) putExtra("textFile", path) else putExtra("text", code)
                 putExtra("readOnly", editorReadOnly)
                 putExtra("cursorPosition", cursor)
-                putExtra("languageName", "source.json")
             })
         } catch (error: Exception) {
             CodeTextTransfer.delete(context, editorTextPath)
