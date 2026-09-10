@@ -23,6 +23,7 @@ import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.withId
+import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.R
@@ -32,6 +33,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.ReadRecord
+import io.legado.app.data.entities.ReadRecordAuthors
 import io.legado.app.data.entities.replaceBookAfterSourceChange
 import io.legado.app.data.entities.saveReadRecordSnapshot
 import io.legado.app.data.entities.saveWithCover
@@ -123,6 +125,69 @@ class ReadRecordHistoryTest {
         LocalConfig.edit().apply {
             if (savedSort is Int) putInt("readRecordSort", savedSort) else remove("readRecordSort")
         }.commit()
+    }
+
+    @Test
+    fun removingLegacyAuthorNameKeepsTimeAndLatestSnapshotsInBothLayouts() {
+        val dao = appDb.readRecordDao
+        val removedAuthor = "History Author 精校文字全本"
+        val combined = ReadRecordAuthors.merge(book.author, removedAuthor)
+        val legacyLabel = context.getString(R.string.read_record_legacy_authors,
+            ReadRecordAuthors.display(combined))
+        for (simple in listOf(true, false)) {
+            AppConfig.readRecordSimpleLayout = simple
+            val legacy = ReadRecord(deviceId = AppConst.androidId, bookName = book.name,
+                author = combined, readTime = 100, lastRead = 100,
+                lastChapterTitle = "Legacy chapter", lastChapterIndex = 1, lastChapterPos = 7,
+                coverUrl = cover.path)
+            val remote = legacy.copy(deviceId = "remote", readTime = 300, lastRead = 150,
+                lastChapterTitle = "Remote chapter", lastChapterIndex = 2)
+            val known = legacy.copy(author = book.author, readTime = 200, lastRead = 200,
+                lastChapterTitle = "Known chapter", lastChapterIndex = 3)
+            val other = known.copy(author = "Different author", readTime = 500)
+            val unknown = known.copy(author = "", readTime = 700)
+            dao.clear()
+            dao.insert(legacy, remote, known, other, unknown)
+            val total = dao.allTime
+            launch()
+            await { it.recyclerView.adapter?.itemCount == 4 && findRow(it, book.name, legacyLabel) != null }
+            fun chooseAuthor() {
+                scenario!!.onActivity { activity ->
+                    val row = checkNotNull(findRow(activity.views, book.name, legacyLabel))
+                    if (simple) row.compact.tvRemove.performClick() else row.enhanced.ivRemove.performClick()
+                }
+                onView(withId(android.R.id.button3)).inRoot(isDialog()).perform(click())
+                onView(withText(removedAuthor)).inRoot(isDialog()).perform(click())
+            }
+            chooseAuthor()
+            onView(withId(android.R.id.button2)).inRoot(isDialog()).perform(click())
+            assertEquals(setOf(legacy, remote, known, other, unknown), dao.all.toSet())
+            chooseAuthor()
+            screenshot("reading-history-remove-author-confirm-$simple")
+            // An open confirmation must not overwrite a newer position with its old row snapshot.
+            val latest = known.copy(lastRead = 300, lastChapterTitle = "Updated while confirming",
+                lastChapterIndex = 9, lastChapterPos = 41)
+            dao.insert(latest)
+            onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+            await { it.recyclerView.adapter?.itemCount == 3 && findRow(it, book.name, book.author) != null }
+            val expected = setOf(latest.copy(readTime = 300), remote.copy(author = book.author), other, unknown)
+            assertEquals(expected, dao.all.toSet())
+            assertEquals(total, dao.allTime)
+            assertEquals(600L, dao.allShow.single { it.author == book.author }.readTime)
+            // A repeated old callback and an invalid choice must neither add time nor delete data.
+            dao.removeLegacyAuthor(book.name, combined, removedAuthor)
+            dao.removeLegacyAuthor(book.name, book.author, book.author)
+            dao.removeLegacyAuthor(book.name, combined, "Not in the record")
+            assertEquals(expected, dao.all.toSet())
+            scenario!!.close()
+            scenario = null
+            launch()
+            await { it.recyclerView.adapter?.itemCount == 3 && findRow(it, book.name, book.author) != null }
+            screenshot("reading-history-removed-author-reopened-$simple")
+            assertEquals(expected, dao.all.toSet())
+            scenario!!.close()
+            scenario = null
+        }
     }
 
     @Test
