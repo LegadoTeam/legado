@@ -16,6 +16,8 @@ import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
+import androidx.test.espresso.Espresso.pressBack
+import androidx.test.espresso.contrib.RecyclerViewActions
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions.matches
@@ -39,6 +41,7 @@ import io.legado.app.data.entities.HighlightRuleFile
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.data.entities.rule.SearchRule
 import io.legado.app.help.book.BookHelp
+import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.storage.Backup
 import io.legado.app.help.storage.BackupConfig
@@ -303,13 +306,15 @@ class SharedFileImportTest {
         }
         listOf(txt to "text/plain", epub to "application/epub+zip", pdf to "application/pdf").forEach { (file, mime) ->
             val expected = file.readBytes()
-            launchShare(file, mime).use {
+            launchShare(file, mime).use { scenario ->
+                confirmLocalPreview(scenario)
                 val copied = File(directory, "books/${file.name}")
                 await { copied.isFile && appDb.bookDao.has(copied.path) }
                 val book = appDb.bookDao.getBook(copied.path)!!
                 books.add(book)
                 assertArrayEquals(expected, copied.readBytes())
                 assertTrue(file.delete())
+                openReader(book)
                 awaitReader(book)
                 val chapters = appDb.bookChapterDao.getChapterList(book.bookUrl)
                 assertTrue(chapters.isNotEmpty())
@@ -324,9 +329,12 @@ class SharedFileImportTest {
         ZipOutputStream(archive.outputStream()).use { zip ->
             zip.putNextEntry(ZipEntry("archive-$id.txt")); zip.write(chapter.toByteArray()); zip.closeEntry()
         }
-        launchShare(archive, "application/zip").use {
-            await { ReadBook.book?.originName == "archive-$id.txt" }
-            val book = ReadBook.book!!
+        launchShare(archive, "application/zip").use { scenario ->
+            confirmLocalPreview(scenario)
+            val path = File(directory, "books/archive-$id.txt").path
+            await { appDb.bookDao.has(path) }
+            val book = appDb.bookDao.getBook(path)!!
+            openReader(book)
             books.add(book)
             awaitReader(book)
             assertTrue(ReadBook.curTextChapter!!.pages.any { it.text.contains(chapter) })
@@ -334,7 +342,7 @@ class SharedFileImportTest {
         }
     }
 
-    @Test(timeout = 120_000) fun firstSharedBookRecoversItsStreamWhenVolatileStateIsLostBeforeTheFolderResult() {
+    @Test(timeout = 120_000) fun firstSharedBookRetainsItsSelectedBatchAcrossRecreationAndTheFolderResult() {
         prefs.edit().remove(PreferKey.defaultBookTreeUri).commit()
         val file = File(directory, "first-share-$id.txt").apply { writeText("FIRST_SHARED_STREAM $id\n".repeat(15)) }
         val folderRequests = AtomicInteger()
@@ -347,21 +355,25 @@ class SharedFileImportTest {
                     .flatMap { ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(it) }
                     .filterIsInstance<FileAssociationActivity>().single()
                 val model = ViewModelProvider(activity)[FileAssociationViewModel::class.java]
-                assertNotNull(model.pendingBookUri)
-                model.pendingBookUri = null
+                assertEquals(1, model.pendingLocalBooks.size)
                 return Instrumentation.ActivityResult(Activity.RESULT_OK,
                     Intent().setData(Uri.fromFile(File(directory, "books"))))
             }
         }
         instrumentation.addMonitor(monitor)
         try {
-            launchShare(file, "text/plain").use {
+            launchShare(file, "text/plain").use { scenario ->
+                awaitLocalPreview(scenario)
+                scenario.recreate()
+                confirmLocalPreview(scenario)
+                onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
                 val copied = File(directory, "books/${file.name}")
                 await { copied.exists() && appDb.bookDao.has(copied.path) }
                 val book = appDb.bookDao.getBook(copied.path)!!
                 books.add(book)
                 assertEquals(1, folderRequests.get())
                 assertEquals(file.readText(), copied.readText())
+                openReader(book)
                 awaitReader(book)
                 assertTrue(ReadBook.curTextChapter!!.pages.any { it.text.contains("FIRST_SHARED_STREAM") })
                 closeReaders()
@@ -369,6 +381,194 @@ class SharedFileImportTest {
         } finally { instrumentation.removeMonitor(monitor) }
     }
 
+    @Test(timeout = 120_000) fun archivePreviewsEverySupportedTypeAndOnlyImportsTheSelection() {
+        val pdfFile = File(directory, "batch-$id.pdf")
+        val pdf = PdfDocument()
+        try {
+            val page = pdf.startPage(PdfDocument.PageInfo.Builder(300, 400, 1).create())
+            page.canvas.drawColor(Color.WHITE)
+            pdf.finishPage(page)
+            pdfFile.outputStream().use(pdf::writeTo)
+        } finally { pdf.close() }
+        val contents = linkedMapOf(
+            "alpha-$id.txt" to "ALPHA $id".toByteArray(),
+            "omit-$id.txt" to "OMITTED $id".toByteArray(),
+            "nested/gamma-$id.TXT" to "GAMMA $id".toByteArray(),
+            "batch-$id.epub" to instrumentation.context.assets.open("issue1074-containers-fragments.epub").use { it.readBytes() },
+            pdfFile.name to pdfFile.readBytes(),
+            "notes.json" to "{}".toByteArray(), "picture.jpg" to byteArrayOf(1, 2, 3))
+        val archive = File(directory, "five-books-$id.zip")
+        writeArchive(archive, contents)
+        val original = archive.readBytes()
+        val previousBook = ReadBook.book?.bookUrl
+        launchShare(archive, "application/zip").use { scenario ->
+            awaitLocalPreview(scenario)
+            lateinit var model: FileAssociationViewModel
+            scenario.onActivity { model = ViewModelProvider(it)[FileAssociationViewModel::class.java] }
+            val items = model.localBookBatch.value!!
+            assertEquals(5, items.size)
+            assertEquals(setOf("txt", "epub", "pdf"), items.map { it.file.name.substringAfterLast('.').lowercase() }.toSet())
+            assertEquals(previousBook, ReadBook.book?.bookUrl)
+            items.forEach { assertFalse(appDb.bookDao.has(it.preview!!.name, it.preview.author)) }
+            val omitted = items.indexOfFirst { it.file.name.startsWith("omit-") }
+            onView(withId(R.id.recycler_view)).inRoot(isDialog())
+                .perform(RecyclerViewActions.actionOnItemAtPosition<RecyclerView.ViewHolder>(omitted, click()))
+            assertEquals(4, model.selectedLocalBooks.size)
+            scenario.recreate()
+            awaitLocalPreview(scenario)
+            assertEquals(4, model.selectedLocalBooks.size)
+            screenshot("share-local-archive-selection")
+            val selected = items.filter { it.file.uri in model.selectedLocalBooks }
+            confirmLocalPreview(scenario)
+            await { model.importedLocalBooks.value == true }
+            assertEquals(previousBook, ReadBook.book?.bookUrl)
+            selected.forEach { item ->
+                val book = appDb.bookDao.getBook(File(directory, "books/${item.file.name}").path)!!
+                books.add(book)
+                assertEquals(item.preview!!.name, book.name)
+                assertArrayEquals(contents.entries.single { File(it.key).name == item.file.name }.value,
+                    File(book.bookUrl).readBytes())
+            }
+            assertFalse(appDb.bookDao.has(items[omitted].preview!!.name, items[omitted].preview!!.author))
+            assertFalse(File(directory, "books/${items[omitted].file.name}").exists())
+            assertArrayEquals(original, archive.readBytes())
+            assertEquals(File(directory, "books").path, AppConfig.defaultBookTreeUri)
+        }
+    }
+
+    @Test(timeout = 120_000) fun multipleSharesKeepAllThreeIdentityConflictsAndOriginalFiles() {
+        AppConfig.bookImportFileName = "name='Shared identity $id';author='Shared author';"
+        val existingFile = File(directory, "books/one.txt").apply { writeText("EXISTING BOOK") }
+        val existing = LocalBook.importFile(Uri.fromFile(existingFile)).also(books::add)
+        val originals = listOf("one.txt", "two.txt", "three.txt").mapIndexed { index, name ->
+            File(directory, name).apply { writeText("SHARED COPY $index $id") }
+        }
+        val unsupported = File(directory, "ignore.png").apply { writeBytes(byteArrayOf(1, 2)) }
+        val uris = (originals + unsupported).map(::providerUri)
+        val intent = Intent(Intent.ACTION_SEND_MULTIPLE).setType("*/*").setPackage(context.packageName)
+            .putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        intent.clipData = ClipData.newRawUri("books", uris[0]).apply {
+            uris.drop(1).forEach { addItem(ClipData.Item(it)) }
+        }
+        assertTrue(context.packageManager.queryIntentActivities(intent, 0)
+            .any { it.activityInfo.name == FileAssociationActivity::class.java.name })
+        intent.component = ComponentName(context, FileAssociationActivity::class.java)
+        ActivityScenario.launch<FileAssociationActivity>(intent).use { scenario ->
+            awaitLocalPreview(scenario)
+            lateinit var model: FileAssociationViewModel
+            scenario.onActivity { model = ViewModelProvider(it)[FileAssociationViewModel::class.java] }
+            val preview = model.localBookBatch.value!!.map { it.preview!! }
+            assertEquals(listOf(2, 3, 4).map { "${existing.name} ($it)" }, preview.map { it.name })
+            assertEquals(3, preview.size)
+            preview.forEach { assertFalse(appDb.bookDao.has(it.name, it.author)) }
+            screenshot("share-local-multiple-conflicts")
+            confirmLocalPreview(scenario)
+            await { model.importedLocalBooks.value == true }
+            preview.forEachIndexed { index, item ->
+                val copy = appDb.bookDao.getBook(item.name, item.author)!!
+                books.add(copy)
+                assertNotEquals(existing.bookUrl, copy.bookUrl)
+                assertArrayEquals(originals[index].readBytes(), File(copy.bookUrl).readBytes())
+                assertTrue(originals[index].isFile)
+            }
+            assertEquals("EXISTING BOOK", existingFile.readText())
+            assertEquals(existing, appDb.bookDao.getBook(existing.bookUrl))
+            assertFalse(File(directory, "books/ignore.png").exists())
+        }
+    }
+
+    @Test(timeout = 120_000) fun unsupportedArchiveReportsTheFormatAndEndsInsteadOfLoadingForever() {
+        val archive = File(directory, "no-books-$id.zip")
+        writeArchive(archive, linkedMapOf("readme.md" to "No books".toByteArray(), "data.bin" to byteArrayOf(1)))
+        launchShare(archive, "application/zip").use { scenario ->
+            lateinit var model: FileAssociationViewModel
+            scenario.onActivity { model = ViewModelProvider(it)[FileAssociationViewModel::class.java] }
+            await { model.errorLive.value == context.getString(R.string.unsupport_archivefile_entry) }
+            assertNull(model.localBookBatch.value)
+            scenario.onActivity { assertFalse(it.findViewById<android.view.View>(R.id.rotate_loading).isShown) }
+            screenshot("share-local-unsupported-archive")
+            await { scenario.state == androidx.lifecycle.Lifecycle.State.DESTROYED }
+            assertTrue(archive.isFile)
+        }
+    }
+
+    @Test(timeout = 120_000) fun openWithCopiesToPrivateStorageAfterDefaultDismissOrCancelledPicker() {
+        prefs.edit().remove(PreferKey.defaultBookTreeUri).commit()
+        for (choice in listOf("default", "dismiss", "picker")) {
+            val file = File(directory, "private-$choice-$id.txt").apply {
+                writeText("PRIVATE COPY $choice $id\n".repeat(20))
+            }
+            val monitor = object : Instrumentation.ActivityMonitor() {
+                override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? =
+                    if (intent.component?.className == HandleFileActivity::class.java.name)
+                        Instrumentation.ActivityResult(Activity.RESULT_CANCELED, null) else null
+            }
+            instrumentation.addMonitor(monitor)
+            try {
+                val intent = Intent(Intent.ACTION_VIEW).setDataAndType(providerUri(file), "text/plain")
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    .setComponent(ComponentName(context, FileAssociationActivity::class.java))
+                ActivityScenario.launch<FileAssociationActivity>(intent).use { scenario ->
+                    onView(withText(R.string.shared_local_books_storage)).inRoot(isDialog()).check(matches(isDisplayed()))
+                    scenario.onActivity {
+                        assertNull(it.supportFragmentManager.findFragmentByTag("sharedLocalBooks"))
+                    }
+                    if (choice == "default") screenshot("share-local-private-folder")
+                    when (choice) {
+                        "default" -> onView(withId(android.R.id.button2)).inRoot(isDialog()).perform(click())
+                        "dismiss" -> pressBack()
+                        else -> onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+                    }
+                    await { ReadBook.book?.originName == file.name }
+                    val book = ReadBook.book!!.also(books::add)
+                    val copy = File(book.bookUrl)
+                    assertEquals(File(context.filesDir, "books").canonicalFile, copy.parentFile!!.canonicalFile)
+                    assertArrayEquals(file.readBytes(), copy.readBytes())
+                    assertTrue(file.isFile)
+                    awaitReader(book)
+                    assertTrue(ReadBook.curTextChapter!!.pages.any { it.text.contains("PRIVATE COPY $choice") })
+                    closeReaders()
+                    assertTrue(copy.delete())
+                    assertNull(AppConfig.defaultBookTreeUri)
+                }
+            } finally { instrumentation.removeMonitor(monitor) }
+        }
+    }
+
+    private fun providerUri(file: File): Uri =
+        FileProvider.getUriForFile(context, "${context.packageName}.fileProvider", file)
+
+    private fun writeArchive(file: File, contents: Map<String, ByteArray>) {
+        ZipOutputStream(file.outputStream()).use { zip ->
+            contents.forEach { (name, bytes) ->
+                zip.putNextEntry(ZipEntry(name)); zip.write(bytes); zip.closeEntry()
+            }
+        }
+    }
+    private fun awaitLocalPreview(scenario: ActivityScenario<FileAssociationActivity>) {
+        await {
+            var ready = false
+            scenario.onActivity { activity ->
+                ready = activity.supportFragmentManager.findFragmentByTag("sharedLocalBooks")
+                    ?.view?.findViewById<RecyclerView>(R.id.recycler_view)?.adapter?.itemCount?.let { it > 0 } == true
+            }
+            ready
+        }
+    }
+
+    private fun confirmLocalPreview(scenario: ActivityScenario<FileAssociationActivity>) {
+        awaitLocalPreview(scenario)
+        onView(withId(R.id.tv_ok)).inRoot(isDialog()).perform(click())
+    }
+
+    private fun openReader(book: Book) {
+        instrumentation.runOnMainSync {
+            context.startActivity(Intent(context, ReadBookActivity::class.java)
+                .putExtra("bookUrl", book.bookUrl).putExtra("inBookshelf", true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
     private fun launchShare(file: File, mime: String): ActivityScenario<FileAssociationActivity> {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileProvider", file)
         val intent = Intent(Intent.ACTION_SEND).setType(mime).setPackage(context.packageName)

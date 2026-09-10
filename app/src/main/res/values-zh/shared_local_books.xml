@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shared_local_books_storage">书籍将复制到所选目录。也可使用应用私有目录，原文件保持不变。</string>
+    <string name="shared_local_books_private">使用应用默认路径</string>
+    <string name="shared_local_books_copied">已复制并加入书架 %1$d 本，失败 %2$d 本。原文件已保留。</string>
+</resources>

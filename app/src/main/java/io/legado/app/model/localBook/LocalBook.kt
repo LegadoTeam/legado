@@ -280,7 +280,7 @@ object LocalBook {
     /**
      * 导入本地文件
      */
-    fun importFile(uri: Uri): Book {
+    fun importFile(uri: Uri, preview: Book? = null): Book {
         val bookUrl: String
         //updateTime变量不要修改,否则会导致读取不到缓存
         val (fileName, _, _, updateTime, _) = FileDoc.fromUri(uri, false).apply {
@@ -290,21 +290,16 @@ object LocalBook {
         }
         var book = appDb.bookDao.getBook(bookUrl)
         if (book == null) {
-            val nameAuthor = analyzeNameAuthor(fileName)
-            book = Book(
-                type = BookType.text or BookType.local,
-                bookUrl = bookUrl,
-                name = nameAuthor.first,
-                author = nameAuthor.second,
-                originName = fileName,
-                latestChapterTime = updateTime,
-                order = appDb.bookDao.minOrder - 1
-            )
-            upBookInfo(book)
-            if (appDb.bookDao.insertIgnore(book) == -1L) {
-                throw NoStackTraceException(
-                    appCtx.getString(R.string.local_book_identity_conflict, book.name, book.author)
-                )
+            book = preview?.copy(bookUrl = bookUrl, originName = fileName,
+                latestChapterTime = updateTime, order = appDb.bookDao.minOrder - 1)
+                ?: previewImportFile(uri)
+            val name = book.name
+            var suffix = 2
+            while (appDb.bookDao.insertIgnore(book) == -1L) {
+                if (preview == null) throw NoStackTraceException(
+                    appCtx.getString(R.string.local_book_identity_conflict, book.name, book.author))
+                // Only confirmed shared copies opt into preserving both colliding books.
+                book.name = "$name (${suffix++})"
             }
         } else {
             withParserCacheInvalidated(book) {
@@ -317,6 +312,17 @@ object LocalBook {
             }
         }
         return book
+    }
+
+    /** Read the same metadata as importFile without changing the bookshelf. */
+    fun previewImportFile(uri: Uri): Book {
+        val file = FileDoc.fromUri(uri, false)
+        if (file.size == 0L) throw EmptyFileException("Unexpected empty File")
+        val (name, author) = analyzeNameAuthor(file.name)
+        return Book(type = BookType.text or BookType.local, bookUrl = file.toString(),
+            name = name, author = author, originName = file.name,
+            latestChapterTime = file.lastModified, order = appDb.bookDao.minOrder - 1)
+            .also(::upBookInfo)
     }
 
     fun upBookInfo(book: Book) {
@@ -416,7 +422,7 @@ object LocalBook {
         return books
     }
 
-    fun importFiles(uris: List<Uri>): Pair<Set<Uri>, List<Book>> {
+    fun importFiles(uris: List<Uri>, previews: Map<Uri, Book> = emptyMap()): Pair<Set<Uri>, List<Book>> {
         val importedUris = linkedSetOf<Uri>()
         val importedBooks = mutableListOf<Book>()
         var firstError: Throwable? = null
@@ -428,7 +434,7 @@ object LocalBook {
                         it.matches(AppPattern.bookFileRegex)
                     }
                 } else {
-                    importedBooks.add(importFile(uri))
+                    importedBooks.add(importFile(uri, previews[uri]))
                 }
             }.onSuccess {
                 importedUris.add(uri)
