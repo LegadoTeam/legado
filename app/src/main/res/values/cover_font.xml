@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cover_font_config">Cover font sizes</string>
+    <string name="cover_custom_font_size">Customize font sizes</string>
+    <string name="cover_custom_font_size_summary">Percentages of the default sizes. Small sizes are used for longer text or later rows and columns. Turn off to restore the original cover style.</string>
+    <string name="cover_title_large_size">Title large size</string>
+    <string name="cover_title_small_size">Title small size</string>
+    <string name="cover_author_large_size">Author large size</string>
+    <string name="cover_author_small_size">Author small size</string>
+</resources>
