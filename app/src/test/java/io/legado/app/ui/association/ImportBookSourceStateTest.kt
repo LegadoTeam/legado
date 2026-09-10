@@ -226,7 +226,9 @@ class ImportBookSourceStateTest {
                 codeDialog.indexOf("val canPreviewReplacement")
         )
         assertTrue(codeDialog.contains("initMenu(!disableEdit)"))
-        assertTrue(codeDialog.contains("saveEnabled && !show && searchView.isIconified"))
+        assertTrue(codeDialog.contains("saveEnabled && (!show || sourcePreview) && searchView.isIconified"))
+        assertTrue(codeDialog.contains("editorReadOnly = showingAlternate && !sourcePreview"))
+        assertTrue(codeDialog.contains("callback()?.onCodeSave(currentOriginalCode(), requestId)"))
         assertTrue(codeDialog.contains("findTextRanges("))
         assertTrue(codeDialog.contains("right - left - navigationWidth"))
         assertTrue(
