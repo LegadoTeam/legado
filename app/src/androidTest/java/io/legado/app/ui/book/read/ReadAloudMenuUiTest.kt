@@ -17,8 +17,6 @@ import androidx.test.espresso.action.Press
 import androidx.test.espresso.action.Swipe
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.longClick
-import androidx.test.espresso.action.ViewActions.swipeLeft
-import androidx.test.espresso.action.ViewActions.swipeRight
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.withId
@@ -319,14 +317,15 @@ class ReadAloudMenuUiTest {
         }
         for (paused in listOf(false, true)) {
             scenario!!.onActivity { if (paused) ReadAloud.pause(it) else ReadAloud.resume(it) }
+            await("requested playback state") { BaseReadAloudService.pause == paused }
             prefs.edit().putBoolean(PreferKey.readAloudControlsRealtime, true).commit()
-            onView(withId(R.id.read_view)).perform(swipeLeft())
+            swipePage(next = true)
             await("manual departure stays detached after navigation (paused=$paused)") {
                 ReadBook.durPageIndex == 1 && !ReadAloud.followReadAloudPosition &&
                     it.findViewById<View>(R.id.ll_back_to_speech).isShown
             }
             prefs.edit().putBoolean(PreferKey.readAloudControlsPause, false).commit()
-            onView(withId(R.id.read_view)).perform(swipeRight())
+            swipePage(next = false)
             await("return restores follow and highlight without overriding pause switch") {
                 ReadBook.durPageIndex == 0 && ReadAloud.followReadAloudPosition &&
                     ReadBook.curTextChapter!!.getPage(0)!!.hasReadAloudSpan &&
@@ -338,9 +337,9 @@ class ReadAloudMenuUiTest {
             screenshot("aloud-realtime-return-paused-$paused")
         }
         prefs.edit().putBoolean(PreferKey.readAloudControlsRealtime, false).commit()
-        onView(withId(R.id.read_view)).perform(swipeLeft())
+        swipePage(next = true)
         await("leave with realtime off") { ReadBook.durPageIndex == 1 && !ReadAloud.followReadAloudPosition }
-        onView(withId(R.id.read_view)).perform(swipeRight())
+        swipePage(next = false)
         await("realtime off keeps manual return at the speech page") {
             ReadBook.durPageIndex == 0 && !ReadAloud.followReadAloudPosition &&
                 it.findViewById<View>(R.id.ll_back_to_speech).isShown
@@ -351,7 +350,7 @@ class ReadAloudMenuUiTest {
             ReadAloud.followReadAloudPosition && ReadBook.curTextChapter!!.getPage(0)!!.hasReadAloudSpan
         }
         prefs.edit().putBoolean(PreferKey.readAloudControlsRealtime, true).commit()
-        onView(withId(R.id.read_view)).perform(swipeLeft())
+        swipePage(next = true)
         await("reader is ahead of the speech cursor") { ReadBook.durPageIndex == 1 && !ReadAloud.followReadAloudPosition }
         scenario!!.onActivity {
             val nextSpeechStart = ReadBook.curTextChapter!!.getPage(1)!!.lines.first().chapterPosition + 1
@@ -406,6 +405,15 @@ class ReadAloudMenuUiTest {
                 it.findViewById<ReadView>(R.id.read_view).getReadAloudPos()!!.second.lineTop, .01f)
         }
         screenshot("aloud-realtime-scroll-return")
+    }
+
+    private fun swipePage(next: Boolean) {
+        // Start within the page so Android's edge-back gesture does not consume the swipe.
+        val offset = if (next) .3f else -.3f
+        onView(withId(R.id.read_view)).perform(GeneralSwipeAction(Swipe.FAST,
+            { view -> GeneralLocation.CENTER.calculateCoordinates(view).also { it[0] += view.width * offset } },
+            { view -> GeneralLocation.CENTER.calculateCoordinates(view).also { it[0] -= view.width * offset } },
+            Press.FINGER))
     }
 
     private fun playbackFlag(name: String, value: Boolean) {
