@@ -694,6 +694,125 @@ class TitleFontWeightRenderingTest {
     }
 
     @Test
+    fun paragraphIndentHasNoDecorationWhileBodySpacesAndHangingPunctuationStayHighlighted() {
+        launchReader()
+        val savedZh = ReadBookConfig.useZhLayout
+        val savedJustify = ReadBookConfig.textFullJustify
+        val savedHanging = ReadBookConfig.hangingPunctuation
+        val savedAdapt = AppConfig.adaptSpecialStyle
+        val image = File(context.cacheDir, "highlight-indent.png")
+        Bitmap.createBitmap(24, 24, Bitmap.Config.ARGB_8888).let { bitmap ->
+            try {
+                bitmap.eraseColor(Color.BLUE)
+                image.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+            } finally { bitmap.recycle() }
+        }
+        try {
+            scenario!!.onActivity { activity ->
+                ReadBookConfig.titleMode = 2
+                ReadBookConfig.textSize = 24
+                context.putPrefBoolean(PreferKey.hangingPunctuation, true)
+                AppConfig.adaptSpecialStyle = true
+                ChapterProvider.clearReviewProviders()
+                val fixture = BookChapter(bookUrl = book!!.bookUrl, url = "highlight-indent", index = 10003)
+                val decoration = Color.MAGENTA
+                val fullStyle = HighlightStyle(underline = HighlightStyle.Underline(color = decoration),
+                    strike = HighlightStyle.Deco(decoration), box = HighlightStyle.Deco(decoration),
+                    emphasis = HighlightStyle.Deco(Color.CYAN))
+                for (mode in listOf("static", "zh", "html")) for (justify in listOf(false, true))
+                    for (indentCount in listOf(0, 2, 4)) {
+                    val indent = ChapterProvider.indentChar.repeat(indentCount)
+                    val style = fullStyle.copy(underline = fullStyle.underline.takeUnless { justify })
+                    ReadBookConfig.paragraphIndent = indent
+                    ReadBookConfig.useZhLayout = mode == "zh"
+                    context.putPrefBoolean(PreferKey.textFullJustify, justify)
+                    ChapterProvider.upStyle()
+                    val text = "“正文　 内部空格仍应高亮，段落需要自动换行。".repeat(5)
+                    val src = "${image.absolutePath},{\"style\":\"text\"}"
+                    val img = if (mode == "html") "<img src='$src'>" else """<img src="$src">"""
+                    val contents = if (mode == "html") listOf("<usehtml><p>　 $img$text</p></usehtml>")
+                        else listOf(indent + img + text, indent + text)
+                    val chapter = ChapterProvider.getTextChapterAsync(CoroutineScope(Dispatchers.Default),
+                        book!!, fixture, "Indent", BookContent(false, contents, null), fixture.index + 1,
+                        saveChapterData = false)
+                    runBlocking { withTimeout(30_000) {
+                        for (ignored in chapter.layoutChannel) Unit
+                        while (!chapter.isCompleted) yield()
+                    } }
+                    val label = "$mode justify=$justify indent=$indentCount"
+                    val lines = chapter.pages.flatMap { it.lines }
+                    val canonical = HighlightTextBuilder.build(lines.map {
+                        HighlightTextBuilder.LineInput(it.text, it.isParagraphEnd) })
+                    val ranges = listOf(HighlightMatcher.Range(0, canonical.length, style))
+                    val columns = lines.flatMap { it.columns }.filterIsInstance<TextBaseColumn>()
+                    assertEquals(label, if (mode == "html") 0 else indentCount * 2,
+                        columns.count { it.isParagraphIndent })
+                    assertTrue("Image must be laid out: $label", lines.any { line -> line.columns.any { it is ImageColumn } })
+                    assertTrue("Fixture must wrap: $label", lines.size > 2)
+                    for (page in chapter.pages) {
+                        val width = ChapterProvider.viewWidth
+                        val height = ceil(maxOf(page.height, page.renderHeight.toFloat())).toInt()
+                        val view = ContentTextView(activity, null).apply { layout(0, 0, width, height); setContent(page) }
+                        val styles = HighlightMatcher.resolve(chapter.getReadLength(page.index), page.lines.map { line ->
+                            HighlightMatcher.LineSpec(line.charSize, line.columns.map { it.positionLength },
+                                line.isParagraphEnd, line.isTitle,
+                                line.columns.map { (it as? TextBaseColumn)?.isParagraphIndent == true })
+                        }, ranges)
+                        page.lines.forEachIndexed { row, line -> line.columns.forEachIndexed { col, column ->
+                            if (column is TextBaseColumn) {
+                                column.highlightStyle = styles[row][col]
+                                assertEquals(label, !column.isParagraphIndent, column.highlightStyle != null)
+                            }
+                        } }
+                        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                        try {
+                            view.draw(Canvas(bitmap))
+                            val pixels = IntArray(width * height)
+                            bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+                            assertTrue("Actual decorations must be visible: $label", pixels.count {
+                                Color.alpha(it) > 100 && Color.red(it) > 180 &&
+                                    Color.blue(it) > 180 && Color.green(it) < 100
+                            } > 20)
+                            if (justify) assertTrue("Emphasis dots must actually draw: $label", pixels.count {
+                                Color.alpha(it) > 100 && Color.red(it) < 100 &&
+                                    Color.blue(it) > 180 && Color.green(it) > 180
+                            } > 3)
+                            for (line in page.lines) for (column in line.columns.filterIsInstance<TextBaseColumn>()) {
+                                if (!column.isParagraphIndent) continue
+                                for (y in ceil(line.lineTop).toInt().coerceAtLeast(0) until line.lineBottom.toInt().coerceAtMost(height))
+                                    for (x in ceil(column.start + 3).toInt().coerceAtLeast(0) until (column.end - 3).toInt().coerceAtMost(width)) {
+                                        val pixel = bitmap.getPixel(x, y)
+                                        assertFalse("Decoration leaked into indent: $label ($x,$y)",
+                                            Color.alpha(pixel) > 100 && Color.blue(pixel) > 180 &&
+                                                (Color.red(pixel) > 180 && Color.green(pixel) < 100 ||
+                                                    Color.red(pixel) < 100 && Color.green(pixel) > 180))
+                                    }
+                            }
+                            if (page.index == 0 && indentCount == 2) File(context.getExternalFilesDir("ui-regression"),
+                                "highlight-indent-$mode-$justify.png").outputStream().use {
+                                assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+                            }
+                        } finally { bitmap.recycle(); page.recycleRecorders() }
+                    }
+                    assertEquals(label, canonical, HighlightTextBuilder.build(lines.map {
+                        HighlightTextBuilder.LineInput(it.text, it.isParagraphEnd) }))
+                    assertTrue("Real body space stays styled: $label", columns.any {
+                        !it.isParagraphIndent && it.charData == ChapterProvider.indentChar && it.highlightStyle == style })
+                }
+            }
+        } finally {
+            instrumentation.runOnMainSync {
+                ReadBookConfig.useZhLayout = savedZh
+                context.putPrefBoolean(PreferKey.textFullJustify, savedJustify)
+                context.putPrefBoolean(PreferKey.hangingPunctuation, savedHanging)
+                AppConfig.adaptSpecialStyle = savedAdapt
+                ImageProvider.remove(image.absolutePath)
+            }
+            image.delete()
+        }
+    }
+
+    @Test
     fun wrappedFillOnlyCapsKeepVisibleEndsWithZeroPageMargins() {
         launchReader()
         val savedOptimize = AppConfig.optimizeRender
