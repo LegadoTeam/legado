@@ -9,7 +9,9 @@ import android.graphics.Rect
 import android.os.SystemClock
 import android.view.View
 import android.view.ViewConfiguration
+import android.webkit.WebView
 import androidx.core.view.isVisible
+import androidx.core.view.children
 import androidx.core.content.FileProvider
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.ViewModelProvider
@@ -285,7 +287,12 @@ class CodeSelectionUiTest {
                             preview!!.setReplaceRuleRefreshPending(false)
                             preview!!.binding.toolBar.showOverflowMenu()
                         }
-                        onView(withText(R.string.view_in_code_editor)).perform(click())
+                        await {
+                            var shown = false
+                            instrumentation.runOnMainSync { shown = preview!!.binding.toolBar.isOverflowMenuShowing }
+                            shown
+                        }
+                        onView(withText(R.string.view_in_code_editor)).inRoot(isPlatformPopup()).perform(click())
                         var inputPath: String? = null
                         await {
                             var ready = false
@@ -308,7 +315,23 @@ class CodeSelectionUiTest {
                         assertTrue(insertion > urls[1].length)
                         val edited = original.substring(0, insertion) + "#edited" + original.substring(insertion)
                         instrumentation.runOnMainSync {
-                            editorActivity!!.findViewById<CodeEditor>(R.id.editText).text.replace(insertion, insertion, "#edited")
+                            val editor = editorActivity!!.findViewById<CodeEditor>(R.id.editText)
+                            editor.text.replace(insertion, insertion, "#edited")
+                            val position = editor.cursor.indexer.getCharPosition(insertion + "#edited".length)
+                            editor.setSelection(position.line, position.column)
+                        }
+                        val beforeRecreation = editorActivity
+                        instrumentation.runOnMainSync { editorActivity!!.recreate() }
+                        await {
+                            var ready = false
+                            instrumentation.runOnMainSync {
+                                editorActivity = ActivityLifecycleMonitorRegistry.getInstance()
+                                    .getActivitiesInStage(Stage.RESUMED).filterIsInstance<CodeEditActivity>().firstOrNull()
+                                val editor = editorActivity?.findViewById<CodeEditor>(R.id.editText)
+                                ready = editorActivity !== beforeRecreation && editor != null &&
+                                    editor.text.toString() == edited && editor.cursor.left == insertion + "#edited".length
+                            }
+                            ready
                         }
                         onView(withId(R.id.menu_save)).perform(click())
                         await {
@@ -330,7 +353,12 @@ class CodeSelectionUiTest {
                         }
                         // Discard a second edit: only the cursor may return, never the discarded draft.
                         instrumentation.runOnMainSync { preview!!.binding.toolBar.showOverflowMenu() }
-                        onView(withText(R.string.view_in_code_editor)).perform(click())
+                        await {
+                            var shown = false
+                            instrumentation.runOnMainSync { shown = preview!!.binding.toolBar.isOverflowMenuShowing }
+                            shown
+                        }
+                        onView(withText(R.string.view_in_code_editor)).inRoot(isPlatformPopup()).perform(click())
                         await {
                             var ready = false
                             instrumentation.runOnMainSync {
@@ -370,6 +398,50 @@ class CodeSelectionUiTest {
                             }
                             ready
                         }
+                        if (rss) {
+                            val derived = edited.replace("#edited", "#replacement-only")
+                            val readOnlyPreview = CodeDialog(edited, false, "1", derived, showAlternate = true)
+                            instrumentation.runOnMainSync {
+                                readOnlyPreview.show(parent!!.childFragmentManager, "readonly-editor-entry")
+                            }
+                            await {
+                                var ready = false
+                                instrumentation.runOnMainSync {
+                                    ready = readOnlyPreview.dialog?.window?.decorView?.hasWindowFocus() == true
+                                }
+                                ready
+                            }
+                            instrumentation.runOnMainSync {
+                                assertTrue(readOnlyPreview.binding.cbSourceReplacementPreview.isChecked)
+                                readOnlyPreview.binding.toolBar.showOverflowMenu()
+                            }
+                            await {
+                                var shown = false
+                                instrumentation.runOnMainSync { shown = readOnlyPreview.binding.toolBar.isOverflowMenuShowing }
+                                shown
+                            }
+                            onView(withText(R.string.view_in_code_editor)).inRoot(isPlatformPopup()).perform(click())
+                            await {
+                                var ready = false
+                                instrumentation.runOnMainSync {
+                                    editorActivity = ActivityLifecycleMonitorRegistry.getInstance()
+                                        .getActivitiesInStage(Stage.RESUMED).filterIsInstance<CodeEditActivity>().firstOrNull()
+                                    val editor = editorActivity?.findViewById<CodeEditor>(R.id.editText)
+                                    ready = editor != null && editor.text.toString() == derived && !editor.isEditable
+                                }
+                                ready
+                            }
+                            instrumentation.runOnMainSync { editorActivity!!.finish() }
+                            await {
+                                var ready = false
+                                instrumentation.runOnMainSync {
+                                    ready = readOnlyPreview.dialog?.window?.decorView?.hasWindowFocus() == true
+                                    if (ready) assertEquals(edited, readOnlyPreview.currentOriginalCode())
+                                }
+                                ready
+                            }
+                            instrumentation.runOnMainSync { readOnlyPreview.dismiss() }
+                        }
                     }
                 } finally {
                     instrumentation.runOnMainSync { editorActivity?.takeUnless { it.isFinishing }?.finish() }
@@ -398,6 +470,56 @@ class CodeSelectionUiTest {
         } finally {
             CodeTextTransfer.delete(context, path)
         }
+    }
+
+    @Test fun safeEditorRetainsItsEditedDraftAndCursorAcrossRecreation() {
+        val code = "\uFEFF// 中文 🌍\r\n" + "a" + "\u0301".repeat(12) + "\r\noriginal"
+        val edited = code.replace("\r\n", "\n") + " 已修改"
+        val cursor = edited.length - 2
+        scenario = ActivityScenario.launchActivityForResult(Intent(context, CodeEditActivity::class.java).apply {
+            putExtra("text", code)
+            putExtra("useTextFile", true)
+        })
+        await {
+            var ready = false
+            scenario!!.onActivity { ready = it.viewModel.editorDraft?.text == code }
+            ready
+        }
+        scenario!!.onActivity { activity ->
+            activity.binding.editorContainer.children.filterIsInstance<WebView>().single().evaluateJavascript(
+                "editor.value = ${GSON.toJson(edited)}; editor.setSelectionRange($cursor, $cursor);" +
+                    "editor.dispatchEvent(new Event('input'));", null,
+            )
+        }
+        await {
+            var ready = false
+            scenario!!.onActivity {
+                ready = it.viewModel.editorDraft?.let { draft -> draft.text == edited && draft.cursorPosition == cursor } == true
+            }
+            ready
+        }
+        scenario!!.recreate()
+        await {
+            var ready = false
+            scenario!!.onActivity {
+                ready = it.viewModel.editorDraft?.text == edited &&
+                    it.binding.editorContainer.children.filterIsInstance<WebView>().any { web -> web.isShown }
+            }
+            ready
+        }
+        val restored = AtomicReference<String>()
+        await {
+            scenario!!.onActivity {
+                it.binding.editorContainer.children.filterIsInstance<WebView>().single().evaluateJavascript(
+                    "window.__getEditorState && window.__getEditorState();", restored::set,
+                )
+            }
+            SafeEditorResultCodec.decode(restored.get())?.let { it.text == edited && it.cursorPosition == cursor && it.dirty } == true
+        }
+        onView(withId(R.id.menu_save)).perform(click())
+        assertEquals(Activity.RESULT_OK, scenario!!.result.resultCode)
+        assertEquals(edited, scenario!!.result.resultData.getStringExtra("text"))
+        assertEquals(cursor, scenario!!.result.resultData.getIntExtra("cursorPosition", -1))
     }
 
     private fun launchEditor(readOnly: Boolean = false, forResult: Boolean = false, fileMode: Boolean = false) {
