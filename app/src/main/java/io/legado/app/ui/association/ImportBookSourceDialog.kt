@@ -27,6 +27,9 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.replace.ReplaceRuleActivity
+import io.legado.app.ui.book.read.EffectiveReplacesDialog
+import io.legado.app.ui.book.read.ManualReplaceRulesDialog
+import io.legado.app.utils.toastOnUi
 import io.legado.app.ui.widget.dialog.CodeDialog
 import io.legado.app.ui.widget.dialog.WaitDialog
 import io.legado.app.utils.GSON
@@ -46,7 +49,7 @@ import splitties.views.onClick
  */
 class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
     Toolbar.OnMenuItemClickListener,
-    CodeDialog.Callback {
+    CodeDialog.Callback, ManualReplaceRulesDialog.Callback, EffectiveReplacesDialog.Callback {
 
     constructor(source: String, finishOnDismiss: Boolean = false) : this() {
         arguments = Bundle().apply {
@@ -69,7 +72,7 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
                     if (!startPendingReplacementRefresh() && pendingReplacementRefresh == null) {
                         syncOpenCodeDialog()
                     }
-                }
+                } ?: viewModel.refreshSourceReplacements()
             }
         }
 
@@ -258,6 +261,9 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
     override fun onMenuItemClick(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.menu_new_group -> alertCustomGroup()
+            R.id.menu_replace_rule -> onOpenReplaceRules()
+            R.id.menu_effective_replaces -> showSourceReplacements(false)
+            R.id.menu_manual_replace_rule -> showSourceReplacements(true)
             R.id.menu_select_new_source -> {
                 val indices = adapter.getItems().filter { viewModel.newSourceStatus[it] }
                 val selectAll = indices.all { !viewModel.canImportSource(it) || viewModel.selectStatus[it] }
@@ -349,6 +355,13 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
         binding.tvFooterLeft.isEnabled = importEnabled && adapter.itemCount > 0
         binding.tvCancel.isEnabled = !sourceUpdatePending
         isCancelable = !sourceUpdatePending
+        binding.toolBar.menu.findItem(R.id.menu_effective_replaces).isEnabled = importEnabled
+        binding.toolBar.menu.findItem(R.id.menu_replace_rule).isEnabled = importEnabled
+        binding.toolBar.menu.findItem(R.id.menu_manual_replace_rule).apply {
+            isVisible = AppConfig.manualSourceReplaceRule
+            isEnabled = importEnabled
+        }
+        binding.toolBar.menu.findItem(R.id.menu_replace_source).isVisible = !AppConfig.manualSourceReplaceRule
         binding.toolBar.menu.apply {
             findItem(R.id.menu_select_new_source)?.isEnabled = importEnabled
             findItem(R.id.menu_select_update_source)?.isEnabled = importEnabled
@@ -365,6 +378,45 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
         if (index !in viewModel.allSources.indices) return
         val source = GSON.fromJsonObject<BookSource>(code).getOrNull() ?: return
         viewModel.updateSource(index, source)
+    }
+
+    private fun showSourceReplacements(manual: Boolean, index: Int = -1) {
+        if (!isAdded || childFragmentManager.isStateSaved || viewModel.sourceUpdatePending.value == true) return
+        if (manual) {
+            if (!AppConfig.manualSourceReplaceRule) return
+            showDialogFragment(ManualReplaceRulesDialog(viewModel.selectedManualRuleIds(index), index.toString()))
+        } else {
+            showDialogFragment(EffectiveReplacesDialog(viewModel.effectiveRuleIds(index)))
+        }
+    }
+
+    override fun onShowSourceReplacements(code: String, requestId: String?, manual: Boolean) {
+        val index = requestId?.toIntOrNull() ?: return
+        val source = parseDraftSource(code) ?: run {
+            toastOnUi(R.string.wrong_format)
+            return
+        }
+        viewModel.refreshSourceReplacements(index, source) { showSourceReplacements(manual, index) }
+    }
+
+    override fun onManualSourceRulesSelected(ids: List<Long>, requestId: String?) {
+        val index = requestId?.toIntOrNull() ?: -1
+        val dialog = openCodeDialog()?.takeIf { it.requestId?.toIntOrNull() == index }
+        val source = dialog?.let { parseDraftSource(it.currentOriginalCode()) }
+        if (dialog != null && source == null) {
+            toastOnUi(R.string.wrong_format)
+            return
+        }
+        viewModel.refreshSourceReplacements(index, source, ids)
+    }
+
+    override fun onEffectiveSourceRulesChanged() {
+        val dialog = openCodeDialog()
+        if (dialog == null) viewModel.refreshSourceReplacements()
+        else {
+            pendingReplacementRefresh = dialog.currentOriginalCode() to dialog.requestId
+            startPendingReplacementRefresh()
+        }
     }
 
     override fun onOpenReplaceRules() {

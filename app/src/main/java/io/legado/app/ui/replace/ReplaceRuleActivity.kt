@@ -135,7 +135,8 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
         groupMenu = menu.findItem(R.id.menu_group)?.subMenu
-        menu.findItem(R.id.menu_manual_replace_rule)?.isChecked = AppConfig.manualReplaceRule
+        menu.findItem(R.id.menu_manual_reader_replace)?.isChecked = AppConfig.manualReplaceRule
+        menu.findItem(R.id.menu_manual_source_replace)?.isChecked = AppConfig.manualSourceReplaceRule
         upGroupMenu()
         return super.onPrepareOptionsMenu(menu)
     }
@@ -257,9 +258,15 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
                 editActivity.launch(ReplaceEditActivity.startIntent(this))
 
             R.id.menu_group_manage -> showDialogFragment<GroupManageDialog>()
-            R.id.menu_manual_replace_rule -> {
+            R.id.menu_manual_reader_replace -> {
                 AppConfig.manualReplaceRule = !AppConfig.manualReplaceRule
                 item.isChecked = AppConfig.manualReplaceRule
+                setResult(RESULT_OK)
+                invalidateOptionsMenu()
+            }
+            R.id.menu_manual_source_replace -> {
+                AppConfig.manualSourceReplaceRule = !AppConfig.manualSourceReplaceRule
+                item.isChecked = AppConfig.manualSourceReplaceRule
                 setResult(RESULT_OK)
                 invalidateOptionsMenu()
             }

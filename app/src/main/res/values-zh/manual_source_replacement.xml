@@ -1,0 +1,4 @@
+<resources>
+    <string name="manual_reader_replacement">正文标题替换</string>
+    <string name="manual_source_replacement">导入书源替换</string>
+</resources>

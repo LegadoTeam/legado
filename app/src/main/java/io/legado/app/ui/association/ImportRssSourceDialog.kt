@@ -26,6 +26,9 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.replace.ReplaceRuleActivity
+import io.legado.app.ui.book.read.EffectiveReplacesDialog
+import io.legado.app.ui.book.read.ManualReplaceRulesDialog
+import io.legado.app.utils.toastOnUi
 import io.legado.app.ui.widget.dialog.CodeDialog
 import io.legado.app.ui.widget.dialog.WaitDialog
 import io.legado.app.utils.dpToPx
@@ -42,7 +45,7 @@ import splitties.views.onClick
  */
 class ImportRssSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
     Toolbar.OnMenuItemClickListener,
-    CodeDialog.Callback {
+    CodeDialog.Callback, ManualReplaceRulesDialog.Callback, EffectiveReplacesDialog.Callback {
 
     constructor(source: String, finishOnDismiss: Boolean = false) : this() {
         arguments = Bundle().apply {
@@ -65,7 +68,7 @@ class ImportRssSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_view
                     if (!startPendingReplacementRefresh() && pendingReplacementRefresh == null) {
                         syncOpenCodeDialog()
                     }
-                }
+                } ?: viewModel.refreshSourceReplacements()
             }
         }
 
@@ -249,6 +252,9 @@ class ImportRssSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_view
     override fun onMenuItemClick(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.menu_new_group -> alertCustomGroup()
+            R.id.menu_replace_rule -> onOpenReplaceRules()
+            R.id.menu_effective_replaces -> showSourceReplacements(false)
+            R.id.menu_manual_replace_rule -> showSourceReplacements(true)
             R.id.menu_keep_original_name -> {
                 item.isChecked = !item.isChecked
                 putPrefBoolean(PreferKey.importKeepName, item.isChecked)
@@ -324,6 +330,49 @@ class ImportRssSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_view
         viewModel.refreshSourceReplacements(index, source)
     }
 
+    private fun parseDraftSource(code: String): RssSource? = runCatching {
+        parseSingleRssSourceJson(code).also { require(it.sourceUrl.isNotBlank()) }
+    }.getOrNull()
+
+    private fun showSourceReplacements(manual: Boolean, index: Int = -1) {
+        if (!isAdded || childFragmentManager.isStateSaved || viewModel.sourceUpdatePending.value == true) return
+        if (manual) {
+            if (!AppConfig.manualSourceReplaceRule) return
+            showDialogFragment(ManualReplaceRulesDialog(viewModel.selectedManualRuleIds(index), index.toString()))
+        } else {
+            showDialogFragment(EffectiveReplacesDialog(viewModel.effectiveRuleIds(index)))
+        }
+    }
+
+    override fun onShowSourceReplacements(code: String, requestId: String?, manual: Boolean) {
+        val index = requestId?.toIntOrNull() ?: return
+        val source = parseDraftSource(code) ?: run {
+            toastOnUi(R.string.wrong_format)
+            return
+        }
+        viewModel.refreshSourceReplacements(index, source) { showSourceReplacements(manual, index) }
+    }
+
+    override fun onManualSourceRulesSelected(ids: List<Long>, requestId: String?) {
+        val index = requestId?.toIntOrNull() ?: -1
+        val dialog = openCodeDialog()?.takeIf { it.requestId?.toIntOrNull() == index }
+        val source = dialog?.let { parseDraftSource(it.currentOriginalCode()) }
+        if (dialog != null && source == null) {
+            toastOnUi(R.string.wrong_format)
+            return
+        }
+        viewModel.refreshSourceReplacements(index, source, ids)
+    }
+
+    override fun onEffectiveSourceRulesChanged() {
+        val dialog = openCodeDialog()
+        if (dialog == null) viewModel.refreshSourceReplacements()
+        else {
+            pendingReplacementRefresh = dialog.currentOriginalCode() to dialog.requestId
+            startPendingReplacementRefresh()
+        }
+    }
+
     override fun onOpenReplaceRules() {
         replaceRuleActivity.launch(Intent(requireContext(), ReplaceRuleActivity::class.java))
     }
@@ -366,6 +415,13 @@ class ImportRssSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_view
         binding.tvFooterLeft.isEnabled = importEnabled && adapter.itemCount > 0
         binding.tvCancel.isEnabled = !sourceUpdatePending
         isCancelable = !sourceUpdatePending
+        binding.toolBar.menu.findItem(R.id.menu_effective_replaces).isEnabled = importEnabled
+        binding.toolBar.menu.findItem(R.id.menu_replace_rule).isEnabled = importEnabled
+        binding.toolBar.menu.findItem(R.id.menu_manual_replace_rule).apply {
+            isVisible = AppConfig.manualSourceReplaceRule
+            isEnabled = importEnabled
+        }
+        binding.toolBar.menu.findItem(R.id.menu_replace_source).isVisible = !AppConfig.manualSourceReplaceRule
         binding.toolBar.menu.findItem(R.id.menu_replace_source)?.apply {
             isChecked = viewModel.useSourceReplacement
             isEnabled = importEnabled

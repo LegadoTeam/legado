@@ -42,4 +42,16 @@
         android:title="@string/action_save"
         app:showAsAction="always" />
 
+    <item
+        android:id="@+id/menu_effective_replaces"
+        android:title="@string/effective_replaces"
+        android:visible="false"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_manual_replace_rule"
+        android:title="@string/manual_replace_rule"
+        android:visible="false"
+        app:showAsAction="never" />
+
 </menu>

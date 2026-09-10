@@ -28,7 +28,16 @@ import io.legado.app.utils.viewbindingdelegate.viewBinding
 /**
  * 起效的替换规则
  */
-class EffectiveReplacesDialog : BaseDialogFragment(R.layout.dialog_recycler_view) {
+class EffectiveReplacesDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
+    constructor(ids: List<Long>) : this() {
+        arguments = Bundle().apply { putLongArray("sourceRuleIds", ids.toLongArray()) }
+    }
+
+    interface Callback {
+        fun onEffectiveSourceRulesChanged()
+    }
+
+    private val sourceReplacement get() = arguments?.containsKey("sourceRuleIds") == true
 
     private val binding by viewBinding(DialogRecyclerViewBinding::bind)
     private val viewModel by activityViewModels<ReadBookViewModel>()
@@ -50,14 +59,17 @@ class EffectiveReplacesDialog : BaseDialogFragment(R.layout.dialog_recycler_view
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
+        isEdit = savedInstanceState?.getBoolean("isEdit") == true
         binding.run {
             toolBar.setBackgroundColor(primaryColor)
             toolBar.setTitle(R.string.effective_replaces)
             recyclerView.layoutManager = LinearLayoutManager(requireContext())
             recyclerView.adapter = adapter
         }
-        val effectiveReplaceRules = ReadBook.curTextChapter?.effectiveReplaceRules ?: emptyList()
-        if (AppConfig.chineseConverterType > 0) {
+        val effectiveReplaceRules = if (sourceReplacement) {
+            appDb.replaceRuleDao.findByIds(*arguments!!.getLongArray("sourceRuleIds")!!)
+        } else ReadBook.curTextChapter?.effectiveReplaceRules ?: emptyList()
+        if (!sourceReplacement && AppConfig.chineseConverterType > 0) {
             adapter.setItems(effectiveReplaceRules + chineseConvert)
         } else {
             adapter.setItems(effectiveReplaceRules)
@@ -67,8 +79,14 @@ class EffectiveReplacesDialog : BaseDialogFragment(R.layout.dialog_recycler_view
     override fun onDismiss(dialog: DialogInterface) {
         super.onDismiss(dialog)
         if (isEdit) {
-            viewModel.replaceRuleChanged()
+            if (sourceReplacement) (parentFragment as? Callback)?.onEffectiveSourceRulesChanged()
+            else viewModel.replaceRuleChanged()
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("isEdit", isEdit)
+        super.onSaveInstanceState(outState)
     }
     
     private fun showChineseConvertAlert() {

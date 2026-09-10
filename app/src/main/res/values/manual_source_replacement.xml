@@ -1,0 +1,4 @@
+<resources>
+    <string name="manual_reader_replacement">Body and title replacement</string>
+    <string name="manual_source_replacement">Imported source replacement</string>
+</resources>
