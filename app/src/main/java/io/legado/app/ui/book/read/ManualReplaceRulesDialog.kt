@@ -20,8 +20,21 @@ import io.legado.app.utils.setLayout
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.legado.app.utils.visible
 
-/** Selects the replacement rules used by the current book in the reader. */
-class ManualReplaceRulesDialog : BaseDialogFragment(R.layout.dialog_recycler_view) {
+/** Selects replacement rules for the current book or a source import preview. */
+class ManualReplaceRulesDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
+    constructor(ids: List<Long>, requestId: String?) : this() {
+        arguments = Bundle().apply {
+            putBoolean("sourceReplacement", true)
+            putLongArray("selectedIds", ids.toLongArray())
+            putString("requestId", requestId)
+        }
+    }
+
+    interface Callback {
+        fun onManualSourceRulesSelected(ids: List<Long>, requestId: String?)
+    }
+
+    private val sourceReplacement get() = arguments?.getBoolean("sourceReplacement") == true
 
     private val binding by viewBinding(DialogRecyclerViewBinding::bind)
     private val viewModel by activityViewModels<ReadBookViewModel>()
@@ -34,7 +47,8 @@ class ManualReplaceRulesDialog : BaseDialogFragment(R.layout.dialog_recycler_vie
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
-        val book = ReadBook.book ?: run {
+        val book = ReadBook.book
+        if (!sourceReplacement && book == null) {
             dismissAllowingStateLoss()
             return
         }
@@ -42,8 +56,12 @@ class ManualReplaceRulesDialog : BaseDialogFragment(R.layout.dialog_recycler_vie
         binding.toolBar.setTitle(R.string.manual_replace_rule)
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = adapter
-        candidates = appDb.replaceRuleDao.findManualCandidates()
-        adapter.selectedIds.addAll(book.config.manualReplaceRuleIds)
+        candidates = if (sourceReplacement) appDb.replaceRuleDao.findEnabledBySourceScope()
+            else appDb.replaceRuleDao.findManualCandidates()
+        val selected = savedInstanceState?.getLongArray("selectedIds")?.toList()
+            ?: if (sourceReplacement) arguments?.getLongArray("selectedIds")?.toList().orEmpty()
+            else book!!.config.manualReplaceRuleIds
+        adapter.selectedIds.addAll(selected)
         adapter.selectedIds.retainAll(candidates.mapTo(hashSetOf(), ReplaceRule::id))
         adapter.setItems(candidates)
 
@@ -51,11 +69,14 @@ class ManualReplaceRulesDialog : BaseDialogFragment(R.layout.dialog_recycler_vie
         binding.tvCancel.setOnClickListener { dismissAllowingStateLoss() }
         binding.tvOk.visible()
         binding.tvOk.setOnClickListener {
-            book.config.manualReplaceRuleIds = candidates
-                .filter { it.id in adapter.selectedIds }
-                .map { it.id }
-            ReadBook.saveRead()
-            viewModel.replaceRuleChanged()
+            val ids = candidates.filter { it.id in adapter.selectedIds }.map { it.id }
+            if (sourceReplacement) {
+                (parentFragment as? Callback)?.onManualSourceRulesSelected(ids, arguments?.getString("requestId"))
+            } else {
+                book!!.config.manualReplaceRuleIds = ids
+                ReadBook.saveRead()
+                viewModel.replaceRuleChanged()
+            }
             dismissAllowingStateLoss()
         }
         binding.tvFooterLeft.visible()
@@ -74,6 +95,11 @@ class ManualReplaceRulesDialog : BaseDialogFragment(R.layout.dialog_recycler_vie
             .setSlideArea(16, 50)
         dragSelectTouchHelper.attachToRecyclerView(binding.recyclerView)
         dragSelectTouchHelper.activeSlideSelect()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putLongArray("selectedIds", adapter.selectedIds.toLongArray())
+        super.onSaveInstanceState(outState)
     }
 
     private fun updateFooter() {

@@ -55,4 +55,20 @@
         android:checkable="true"
         app:showAsAction="never" />
 
+    <item
+        android:id="@+id/menu_effective_replaces"
+        android:title="@string/effective_replaces"
+        android:visible="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_manual_replace_rule"
+        android:title="@string/manual_replace_rule"
+        android:visible="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_replace_rule"
+        android:title="@string/menu_replace_rule"
+        app:showAsAction="never" />
 </menu>
