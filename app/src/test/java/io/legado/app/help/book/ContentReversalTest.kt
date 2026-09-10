@@ -4,6 +4,34 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ContentReversalTest {
+    @Test fun `left and right symbols mirror only in text`() {
+        for ((original, reversed) in listOf(
+            "《我饿了》" to "《了饿我》", "“你好。”" to "“。好你”",
+            "3 < 5" to "5 > 3", "A ← B" to "B → A",
+            "甲\"乙'丙。丁，戊↑己↓庚" to "庚↓己↑戊，丁。丙'乙\"甲",
+        )) {
+            assertEquals(reversed, reverseContentText(original))
+            assertEquals(original, reverseContentText(reversed))
+        }
+        for (pair in listOf("“”", "‘’", "【】", "()", "<>", "{}", "[]", "（）", "《》",
+            "〈〉", "〖〗", "〔〕", "『』", "「」", "｛｝", "≤≥", "≦≧", "⊆⊇", "⊂⊃",
+            "◢◣", "◤◥", "←→", "↖↗", "↙↘", "☜☞", "꧁꧂", "╭╮", "╰╯", "«»",
+            "〝〞", "＜＞", "［］", "｢｣")) {
+            // Exercise both halves separately so angle brackets cannot be mistaken for markup.
+            assertEquals("${pair[1]}甲", reverseContentText("甲${pair[0]}"))
+            assertEquals("甲${pair[0]}", reverseContentText("${pair[1]}甲"))
+        }
+    }
+
+    @Test fun `rich paragraph indentation stays before text and SVG markup is untouched`() {
+        val review = """<img src="x,{"style":"text","reviewCount":"3","click":"f('《甲》')"}">"""
+        val svg = """<svg viewBox="0 0 24 24"><path d="M 1 2 L 3 4" /></svg>"""
+        val original = "　　《甲乙》$review\r\n\t （丙丁）$review\n【戊己】$svg"
+        val reversed = "　　《乙甲》$review\r\n\t （丁丙）$review\n【己戊】$svg"
+        assertEquals(reversed, reverseContentText(original))
+        assertEquals(original, reverseContentText(reversed))
+    }
+
     @Test fun `plain text keeps Unicode code points and is reversible`() {
         val content = " \r\n甲😀e\u0301𠀀乙\n "
         assertEquals(" \n乙𠀀\u0301e😀甲\n\r ", reverseContentText(content))
