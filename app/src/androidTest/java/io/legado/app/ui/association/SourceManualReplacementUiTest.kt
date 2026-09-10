@@ -144,6 +144,13 @@ class SourceManualReplacementUiTest {
                         main { if (rss) host.feed.sourceUpdatePending.value != true else host.book.sourceUpdatePending.value != true }
                     }
                     if (!recreate) host.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+                    await("The pending replacement dialog must be restored after resume") {
+                        main {
+                            host.parent.childFragmentManager.fragments.any {
+                                it is ManualReplaceRulesDialog || it is EffectiveReplacesDialog
+                            }
+                        }
+                    }
                     val menu: DialogFragment = if (manual) host.child<ManualReplaceRulesDialog>() else host.child<EffectiveReplacesDialog>()
                     main {
                         assertEquals(if (manual) rules.take(4).map { it.id } else listOf(rules[0].id), ruleIds(menu))
