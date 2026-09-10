@@ -179,18 +179,24 @@ class CoverTitleAdaptiveUiTest {
                 fun glyphs(text: String) = glyphBounds(renderText(
                     if (author) "" else text, if (author) text else "", textOnly = true))
                 val reference = glyphs("H").single()
-                // Keep the ellipsis outline separate from the final H when measuring components.
-                val sample = if (horizontal && author) "H    " else "H "
-                val repeated = glyphs(sample.repeat(if (author) 12 else 6).trim())
+                // Android trims spaces before ellipsizing. Its outline can join the final H,
+                // so compare that suffix with the same untruncated large-size H + ellipsis.
+                val suffix = if (horizontal && author) glyphs("H\u2026").sortedBy { it.left } else emptyList()
+                val repeated = glyphs("H ".repeat(if (author) 12 else 6).trim()).let {
+                    if (horizontal && author) it.sortedBy { glyph -> glyph.left } else it
+                }
                 screenshot("cover-equal-glyphs-$horizontal-$adaptive-$author")
                 assertTrue("long text must render repeated glyphs", repeated.size >= 3)
-                repeated.forEach { glyph ->
+                assertTrue("long text retains multiple complete H glyphs", repeated.size - suffix.size >= 2)
+                repeated.forEachIndexed { index, glyph ->
+                    val expected = if (index >= repeated.size - suffix.size)
+                        suffix[index - (repeated.size - suffix.size)] else reference
                     val label = "equal glyph size: horizontal=$horizontal adaptive=$adaptive author=$author"
                     // Fractional baselines and centered alignment can shift raster edges by one pixel.
-                    assertTrue("$label width ${reference.width()} vs ${glyph.width()}",
-                        kotlin.math.abs(reference.width() - glyph.width()) <= 1)
-                    assertTrue("$label height ${reference.height()} vs ${glyph.height()}",
-                        kotlin.math.abs(reference.height() - glyph.height()) <= 1)
+                    assertTrue("$label width ${expected.width()} vs ${glyph.width()}",
+                        kotlin.math.abs(expected.width() - glyph.width()) <= 1)
+                    assertTrue("$label height ${expected.height()} vs ${glyph.height()}",
+                        kotlin.math.abs(expected.height() - glyph.height()) <= 1)
                 }
             }
             screenshot("cover-equal-size-$horizontal-$adaptive")
