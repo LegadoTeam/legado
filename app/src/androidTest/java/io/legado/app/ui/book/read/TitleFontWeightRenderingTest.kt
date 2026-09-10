@@ -50,8 +50,10 @@ import io.legado.app.ui.book.read.page.entities.column.BaseColumn
 import io.legado.app.ui.book.read.page.entities.column.ImageColumn
 import io.legado.app.ui.book.read.page.entities.column.ReviewColumn
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
+import io.legado.app.ui.book.read.page.provider.LineColumnLayout
 import io.legado.app.utils.GSON
 import io.legado.app.utils.dpToPx
+import io.legado.app.utils.getTextWidthsCompat
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -185,7 +187,9 @@ class TitleFontWeightRenderingTest {
                             val page = TextPage(text = "多恐怖吗顶\n上", height = height.toFloat())
                             // A wrapped run at the left margin and a single glyph at the right.
                             for ((row, text) in listOf("多恐怖吗顶", "上").withIndex()) {
-                                val widths = text.map { paint.measureText(it.toString()) }
+                                val widths = FloatArray(text.length).also {
+                                    paint.getTextWidthsCompat(text, it, ChapterProvider.getReviewWidth(false))
+                                }
                                 var x = if (row == 0) ChapterProvider.paddingLeft.toFloat()
                                 else width - ChapterProvider.paddingRight - widths.sum()
                                 val y = top + row * lineHeight
@@ -287,16 +291,39 @@ class TitleFontWeightRenderingTest {
                 val textSize = paint.textSize
                 val top = ChapterProvider.paddingTop.toFloat()
                 val height = ceil(top + textSize * 2).toInt()
-                for (optimized in listOf(false, true)) for (scale in listOf(0.5f, 1f, 2f)) {
+                for (optimized in listOf(false, true)) for (scale in listOf(0.5f, 1f, 2f))
+                    for (justified in listOf(false, true)) {
                     AppConfig.optimizeRender = optimized
                     val text = "顶上多恐怖吗"
-                    var x = (width - paint.measureText(text)) / 2f
-                    val line = TextLine(text = text, startX = x, lineTop = top,
+                    val words = text.map(Char::toString)
+                    val advances = FloatArray(text.length).also {
+                        paint.getTextWidthsCompat(text, it, ChapterProvider.getReviewWidth(false))
+                    }
+                    val desiredWidth = advances.sum()
+                    val layoutWidth = if (justified) ChapterProvider.visibleWidth.toFloat() else desiredWidth
+                    val start = (width - layoutWidth) / 2f
+                    val caseLabel = "optimized=$optimized scale=$scale justified=$justified"
+                    val line = TextLine(text = text, startX = start, lineTop = top,
                         lineBase = top + textSize * 1.2f, lineBottom = height.toFloat())
-                    for (char in text) {
-                        val advance = paint.measureText(char.toString())
-                        line.addColumn(TextColumn(x, x + advance, char.toString()))
-                        x += advance
+                    if (justified) {
+                        LineColumnLayout.justified(words, advances.toList(), layoutWidth, desiredWidth, start,
+                            onJustify = { startX, gap, wordSpacing ->
+                                line.startX = startX
+                                if (wordSpacing) line.wordSpacing = gap else {
+                                    line.extraLetterSpacingOffsetX = -gap / 2f
+                                    line.extraLetterSpacing = gap / textSize
+                                }
+                            }) { index, xStart, xEnd, _ ->
+                            line.addColumn(TextColumn(xStart, xEnd, words[index]))
+                        }
+                        assertTrue("The fixture must exercise actual justification: $caseLabel",
+                            line.extraLetterSpacing > 0f)
+                    } else {
+                        var x = start
+                        for (index in words.indices) {
+                            line.addColumn(TextColumn(x, x + advances[index], words[index]))
+                            x += advances[index]
+                        }
                     }
                     val page = TextPage(text = text, height = height.toFloat()).apply {
                         addLine(line)
@@ -314,7 +341,7 @@ class TitleFontWeightRenderingTest {
                         columns.forEach { it.highlightStyle = HighlightStyle(fill = fill,
                             fillShape = HighlightStyle.FillShape.PILL, pillPaddingScale = scale) }
                         line.invalidate()
-                        assertEquals("Fill alone must preserve the actual whole-line drawing path",
+                        assertEquals("Fill alone must preserve the actual whole-line drawing path: $caseLabel",
                             optimized, line.checkFastDraw())
                         return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                             .also { view.draw(Canvas(it)) }
@@ -325,20 +352,21 @@ class TitleFontWeightRenderingTest {
                     val result = render(Color.BLACK, fill)
                     try {
                         File(context.getExternalFilesDir("ui-regression"),
-                            "highlight-pill-fill-only-$optimized-$scale.png").outputStream().use {
+                            "highlight-pill-fill-only-$optimized-$scale-$justified.png").outputStream().use {
                             assertTrue(result.compress(Bitmap.CompressFormat.PNG, 100, it))
                         }
                         var ink = 0
                         for (y in 0 until height) for (pixelX in 0 until width) {
                             if (Color.alpha(glyphs.getPixel(pixelX, y)) < 240) continue
                             ink++
-                            assertTrue("Fast-drawn glyph crosses the capsule: optimized=$optimized scale=$scale ($pixelX,$y)",
+                            assertTrue("Fast-drawn glyph crosses the capsule: $caseLabel ($pixelX,$y)",
                                 Color.alpha(background.getPixel(pixelX, y)) in 70..110)
-                            assertTrue("The highlight must not move the fast-drawn glyphs",
+                            assertTrue("The highlight must not move the fast-drawn glyphs: $caseLabel ($pixelX,$y)",
                                 Color.red(result.getPixel(pixelX, y)) < 20)
                         }
-                        assertTrue("The fixture must draw actual Chinese glyphs", ink > 50)
-                        assertEquals(positions, columns.map { it.start to it.end })
+                        assertTrue("The fixture must draw actual Chinese glyphs: $caseLabel", ink > 50)
+                        assertEquals("The highlight must not move text columns: $caseLabel",
+                            positions, columns.map { it.start to it.end })
                     } finally {
                         listOf(glyphs, background, result).forEach(Bitmap::recycle)
                         page.recycleRecorders()
@@ -377,22 +405,25 @@ class TitleFontWeightRenderingTest {
                     ReadBookConfig.textSize = size
                     ChapterProvider.upStyle()
                     ImageProvider.remove(imageFile.absolutePath)
+                    val caseLabel = "size=$size optimized=$optimized space=$withSpace padding=$paddingScale icon=$iconScale"
                     val textSize = ChapterProvider.contentPaint.textSize
                     val iconWidth = ceil(ChapterProvider.getReviewWidth(false))
-                    val glyphWidth = ceil(ChapterProvider.contentPaint.measureText("顶"))
-                    val gap = if (withSpace) ceil(glyphWidth / 4) else 0f
+                    val rowText = if (withSpace) " 顶上 " else "顶上"
+                    val advances = FloatArray(rowText.length).also {
+                        ChapterProvider.contentPaint.getTextWidthsCompat(rowText, it, ChapterProvider.getReviewWidth(false))
+                    }
                     val lineHeight = ceil(textSize * 2.1f)
-                    assertNotNull("The author's SVG must decode through the real review icon provider",
+                    assertNotNull("The author's SVG must decode through the real review icon provider: $caseLabel",
                         ChapterProvider.getReviewIconBitmap(88, iconWidth.toInt(), lineHeight.toInt()))
                     val decodedImage = ImageProvider.getImage(book!!, src, iconWidth.toInt(), lineHeight.toInt())
-                    assertEquals("The image column must decode the SVG instead of using an error placeholder",
+                    assertEquals("The image column must decode the SVG instead of using an error placeholder: $caseLabel",
                         iconWidth.toInt(), decodedImage.width)
-                    assertEquals(80f / 90f, decodedImage.width.toFloat() / decodedImage.height, 0.03f)
+                    assertEquals("The decoded SVG must keep its aspect ratio: $caseLabel",
+                        80f / 90f, decodedImage.width.toFloat() / decodedImage.height, 0.03f)
                     val top = ChapterProvider.paddingTop.toFloat()
                     val height = ceil(top + lineHeight * 3).toInt()
-                    val start = floor((width - 2 * iconWidth - 2 * glyphWidth - 2 * gap) / 2)
-                    assertTrue("All text and icons must fit inside the page", start > 0)
-                    val rowText = if (withSpace) " 顶上 " else "顶上"
+                    val start = floor((width - 2 * iconWidth - advances.sum()) / 2)
+                    assertTrue("All text and icons must fit inside the page: $caseLabel", start > 0)
                     val page = TextPage(text = List(3) { rowText }.joinToString("\n"), height = height.toFloat())
                     for (kind in 0..2) {
                         fun icon(x: Float): BaseColumn = when (kind) {
@@ -405,13 +436,12 @@ class TitleFontWeightRenderingTest {
                         val line = TextLine(text = rowText, startX = start + iconWidth,
                             lineTop = y, lineBase = y + textSize * 1.35f, lineBottom = y + lineHeight)
                         line.addColumn(icon(start))
-                        val textStart = start + iconWidth + gap
-                        if (withSpace) line.addColumn(TextColumn(start + iconWidth, textStart, " "))
-                        line.addColumn(TextColumn(textStart, textStart + glyphWidth, "顶"))
-                        line.addColumn(TextColumn(textStart + glyphWidth, textStart + 2 * glyphWidth, "上"))
-                        val textEnd = textStart + 2 * glyphWidth
-                        if (withSpace) line.addColumn(TextColumn(textEnd, textEnd + gap, " "))
-                        line.addColumn(icon(textEnd + gap))
+                        var textX = start + iconWidth
+                        rowText.forEachIndexed { index, char ->
+                            line.addColumn(TextColumn(textX, textX + advances[index], char.toString()))
+                            textX += advances[index]
+                        }
+                        line.addColumn(icon(textX))
                         page.addLine(line)
                     }
                     page.upRenderHeight()
@@ -472,21 +502,25 @@ class TitleFontWeightRenderingTest {
                         for ((row, line) in page.lines.withIndex()) {
                             for (icon in listOf(line.columns.first(), line.columns.last())) {
                                 var transparent = 0
-                                var opaque = 0
+                                var visibleInk = 0
                                 var oldOverlap = 0
                                 for (y in ceil(line.lineTop).toInt() until floor(line.lineBottom).toInt()) {
                                     for (x in icon.start.toInt() until icon.end.toInt()) {
                                         val before = icons.getPixel(x, y)
                                         if (Color.alpha(before) == 0) transparent++
-                                        if (Color.alpha(before) > 240) opaque++
+                                        // Thin SVG strokes at small sizes are primarily antialiased.
+                                        if (Color.alpha(before) >= 128) visibleInk++
                                         if (legacy.getPixel(x, y) != before) oldOverlap++
-                                        assertEquals("SVG changed: row=$row size=$size optimized=$optimized space=$withSpace ($x,$y)",
+                                        assertEquals("SVG changed: $caseLabel row=$row ($x,$y)",
                                             before, background.getPixel(x, y))
                                     }
                                 }
-                                assertTrue("The real SVG must retain transparent areas", transparent > 100)
-                                assertTrue("The real SVG must draw visible ink", opaque > 10)
-                                assertTrue("The original cap must overlap the real transparent SVG", oldOverlap > 0)
+                                assertTrue("The real SVG must retain transparent areas: $caseLabel row=$row x=${icon.start} count=$transparent",
+                                    transparent > 100)
+                                assertTrue("The real SVG must draw visible ink: $caseLabel row=$row x=${icon.start} count=$visibleInk",
+                                    visibleInk > 10)
+                                assertTrue("The original cap must overlap the real transparent SVG: $caseLabel row=$row x=${icon.start}",
+                                    oldOverlap > 0)
                             }
                             var ink = 0
                             val highlighted = line.columns.filterIsInstance<TextColumn>()
@@ -495,11 +529,11 @@ class TitleFontWeightRenderingTest {
                                 for (x in highlighted.first().start.toInt() until highlighted.last().end.toInt()) {
                                     if (Color.alpha(glyphs.getPixel(x, y)) < 240) continue
                                     ink++
-                                    assertTrue("Adjacent icons must not push the cap through text glyphs",
+                                    assertTrue("Adjacent icons must not push the cap through text glyphs: $caseLabel row=$row ($x,$y)",
                                         Color.alpha(background.getPixel(x, y)) in 70..110)
                                 }
                             }
-                            assertTrue("Both real Chinese glyphs must be rendered", ink > 50)
+                            assertTrue("Both real Chinese glyphs must be rendered: $caseLabel row=$row", ink > 50)
                             run {
                                 val band = HighlightGeometry.fillBand(line.lineBase - line.lineTop, textSize,
                                     line.height, HighlightStyle.FillShape.PILL, 1f.dpToPx())
@@ -513,17 +547,17 @@ class TitleFontWeightRenderingTest {
                                 }
                                 val centerEdges = edges(background, middle)
                                 val shoulderEdges = edges(background, shoulder)
-                                assertTrue("Left cap must be visibly curved: size=$size scale=$paddingScale icon=$iconScale space=$withSpace",
+                                assertTrue("Left cap must be visibly curved: $caseLabel row=$row middle=$centerEdges shoulder=$shoulderEdges",
                                     shoulderEdges.first - centerEdges.first >= 2)
-                                assertTrue("Right cap must be visibly curved: size=$size scale=$paddingScale icon=$iconScale space=$withSpace",
+                                assertTrue("Right cap must be visibly curved: $caseLabel row=$row middle=$centerEdges shoulder=$shoulderEdges",
                                     centerEdges.second - shoulderEdges.second >= 2)
                                 val flatCenter = edges(flattened, middle)
                                 val flatShoulder = edges(flattened, shoulder)
-                                assertTrue("The previously clipped capsule must fail the curvature check",
+                                assertTrue("The previously clipped capsule must fail the curvature check: $caseLabel row=$row middle=$flatCenter shoulder=$flatShoulder",
                                     flatShoulder.first - flatCenter.first < 2 || flatCenter.second - flatShoulder.second < 2)
                             }
                         }
-                        assertEquals("Adaptive caps must not move text or review columns", positions,
+                        assertEquals("Adaptive caps must not move text or review columns: $caseLabel", positions,
                             columns.map { it.start to it.end })
                         if (optimized && size == 50 && withSpace && paddingScale == 2f) {
                             view.setBackgroundColor(Color.WHITE)
