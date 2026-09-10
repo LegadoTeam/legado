@@ -1036,13 +1036,15 @@ class CodeSelectionUiTest {
         val artifacts = checkNotNull(context.getExternalFilesDir("ui-regression"))
         val report = StringBuilder("sampleSha256=$digest\n")
         try {
-            for ((label, code) in listOf("actual" to actual, "without-icon" to withoutIcon, "actual-unwrapped" to actual)) {
+            for ((label, code) in listOf("actual" to actual, "without-icon" to withoutIcon,
+                "actual-unwrapped" to actual, "actual-monospace" to actual)) {
                 val dialog = CodeDialog(code, disableEdit = false)
                 var expected = code
                 val opened = SystemClock.uptimeMillis()
                 scenario!!.onActivity {
                     dialog.showNow(it.supportFragmentManager, "reported-rss-$label")
                     if (label == "actual-unwrapped") dialog.binding.codeView.setHorizontallyScrolling(true)
+                    if (label == "actual-monospace") dialog.binding.codeView.typeface = android.graphics.Typeface.MONOSPACE
                 }
                 try {
                     await {
@@ -1074,17 +1076,37 @@ class CodeSelectionUiTest {
                         val started = SystemClock.uptimeMillis()
                         var editMs = 0L
                         var selectionMs = 0L
-                        instrumentation.runOnMainSync {
-                            val view = dialog.binding.codeView
-                            val selectStarted = SystemClock.uptimeMillis()
-                            view.setSelection(offset)
-                            selectionMs = SystemClock.uptimeMillis() - selectStarted
-                            view.viewTreeObserver.registerFrameCommitCallback { frame.countDown() }
-                            val input = checkNotNull(view.onCreateInputConnection(EditorInfo()))
-                            val editStarted = SystemClock.uptimeMillis()
-                            assertTrue(input.commitText("x", 1))
-                            editMs = SystemClock.uptimeMillis() - editStarted
-                            view.postInvalidateOnAnimation()
+                        val sampling = java.util.concurrent.atomic.AtomicBoolean(label == "actual" && offset == 15)
+                        val stacks = HashMap<String, Int>()
+                        val sampler = if (sampling.get()) kotlin.concurrent.thread(name = "preview-edit-sampler", isDaemon = true) {
+                            while (sampling.get()) {
+                                val stack = android.os.Looper.getMainLooper().thread.stackTrace.joinToString("\n")
+                                stacks[stack] = (stacks[stack] ?: 0) + 1
+                                Thread.sleep(5)
+                            }
+                        } else null
+                        try {
+                            instrumentation.runOnMainSync {
+                                val view = dialog.binding.codeView
+                                val selectStarted = SystemClock.uptimeMillis()
+                                view.setSelection(offset)
+                                selectionMs = SystemClock.uptimeMillis() - selectStarted
+                                view.viewTreeObserver.registerFrameCommitCallback { frame.countDown() }
+                                val input = checkNotNull(view.onCreateInputConnection(EditorInfo()))
+                                val editStarted = SystemClock.uptimeMillis()
+                                assertTrue(input.commitText("x", 1))
+                                editMs = SystemClock.uptimeMillis() - editStarted
+                                view.postInvalidateOnAnimation()
+                            }
+                        } finally {
+                            sampling.set(false)
+                            sampler?.join(5_000)
+                            if (sampler != null) {
+                                assertFalse("Main-thread sampler stopped", sampler.isAlive)
+                                File(artifacts, "reported-rss-edit-stacks.txt").writeText(
+                                    stacks.entries.sortedByDescending { it.value }
+                                        .joinToString("\n\n") { "samples=${it.value}\n${it.key}" })
+                            }
                         }
                         assertTrue("$label input did not commit a frame", frame.await(15, TimeUnit.SECONDS))
                         expected = expected.substring(0, offset) + "x" + expected.substring(offset)
