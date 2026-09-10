@@ -162,11 +162,9 @@ class CodeEditActivity :
             setText(text)
             editable = viewModel.writable
             requestFocus()
-            postDelayed({
-                if (isDestroyed) return@postDelayed
-                val pos = cursor.indexer.getCharPosition(viewModel.cursorPosition)
-                setSelection(pos.line, pos.column, true)
-            }, 360) // 延时等待长文本完成布局，再恢复光标位置
+            // Restore before accepting input; a delayed restore can overwrite a new selection.
+            val pos = cursor.indexer.getCharPosition(viewModel.cursorPosition.coerceIn(0, text.length))
+            setSelection(pos.line, pos.column, true)
         }
     }
 

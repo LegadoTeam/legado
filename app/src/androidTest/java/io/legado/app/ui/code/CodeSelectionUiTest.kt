@@ -326,15 +326,22 @@ class CodeSelectionUiTest {
                             editor.text.replace(insertion, insertion, "#edited")
                             val position = editor.cursor.indexer.getCharPosition(insertion + "#edited".length)
                             editor.setSelection(position.line, position.column)
+                            assertEquals(edited, editor.text.toString())
+                            assertEquals(insertion + "#edited".length, editor.cursor.left)
                         }
                         val beforeRecreation = editorActivity
                         instrumentation.runOnMainSync { editorActivity!!.recreate() }
-                        await {
+                        var recreationState = "No resumed editor"
+                        await(message = { "Editor draft restoration: $recreationState" }) {
                             var ready = false
                             instrumentation.runOnMainSync {
                                 editorActivity = ActivityLifecycleMonitorRegistry.getInstance()
                                     .getActivitiesInStage(Stage.RESUMED).filterIsInstance<CodeEditActivity>().firstOrNull()
                                 val editor = editorActivity?.findViewById<CodeEditor>(R.id.editText)
+                                recreationState = "newActivity=${editorActivity !== beforeRecreation}, " +
+                                    "editable=${editor?.isEditable}, textMatches=${editor?.text?.toString() == edited}, " +
+                                    "length=${editor?.text?.length}/${edited.length}, " +
+                                    "cursor=${editor?.cursor?.left}/${insertion + "#edited".length}"
                                 ready = editorActivity !== beforeRecreation && editor != null && editor.isEditable &&
                                     editor.text.toString() == edited && editor.cursor.left == insertion + "#edited".length
                             }
@@ -686,13 +693,17 @@ class CodeSelectionUiTest {
         ready
     }
 
-    private fun await(condition: () -> Boolean) {
+    private fun await(
+        message: () -> String = { "Code editor did not reach the expected state" },
+        condition: () -> Boolean,
+    ) {
         val deadline = SystemClock.uptimeMillis() + 15_000
         while (SystemClock.uptimeMillis() < deadline) {
             if (condition()) return
             SystemClock.sleep(50)
         }
-        assertTrue("Code editor did not reach the expected state", condition())
+        val ready = condition()
+        assertTrue(message(), ready)
     }
 
     private fun screenshot(name: String) {
