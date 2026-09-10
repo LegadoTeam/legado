@@ -25,6 +25,7 @@ import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.ReadRecordShow
+import io.legado.app.data.entities.ReadRecordAuthors
 import io.legado.app.databinding.ActivityReadRecordBinding
 import io.legado.app.databinding.ItemReadRecordDisplayBinding
 import io.legado.app.help.config.AppConfig
@@ -385,6 +386,32 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
                             ReadRecordCoverCache.prune()
                         }
                         initData()
+                    }
+                }
+                noButton()
+                if (item.hasCombinedAuthors && ReadRecordAuthors.decode(item.author).size > 1) {
+                    neutralButton(R.string.read_record_remove_author) { removeAuthorAlert(item) }
+                }
+            }
+        }
+
+        private fun removeAuthorAlert(item: ReadRecordShow) {
+            val authors = ReadRecordAuthors.decode(item.author).toList()
+            alert(R.string.read_record_remove_author) {
+                items(authors) { _, index ->
+                    val removedAuthor = authors[index]
+                    alert(R.string.read_record_remove_author) {
+                        setMessage(getString(R.string.read_record_remove_author_confirm, removedAuthor))
+                        yesButton {
+                            lifecycleScope.launch {
+                                withContext(IO) {
+                                    appDb.readRecordDao.removeLegacyAuthor(item.bookName, item.author, removedAuthor)
+                                    ReadRecordCoverCache.prune()
+                                }
+                                initData()
+                            }
+                        }
+                        noButton()
                     }
                 }
                 noButton()
