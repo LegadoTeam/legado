@@ -39,6 +39,24 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
 
     private var diffJob: Coroutine<*>? = null
 
+    // A drag owns the displayed positions until its database move has completed.
+    protected var listUpdatesPaused = false
+        private set
+    internal var listUpdateVersion = 0L
+        private set
+
+    protected fun pauseListUpdates() {
+        listUpdatesPaused = true
+        listUpdateVersion++
+        diffJob?.cancel()
+        diffJob = null
+    }
+
+    /** The owner must request a fresh list after resuming; paused snapshots are discarded. */
+    protected fun resumeListUpdates() {
+        listUpdatesPaused = false
+    }
+
     private var isResumed = false
 
     var itemAnimation: ItemAnimation? = null
@@ -98,6 +116,10 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
     @SuppressLint("NotifyDataSetChanged")
     @Synchronized
     fun setItems(items: List<ITEM>?) {
+        listUpdateVersion++
+        if (listUpdatesPaused) return
+        diffJob?.cancel()
+        diffJob = null
         kotlin.runCatching {
             if (this.items.isNotEmpty()) {
                 this.items.clear()
@@ -116,6 +138,8 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
         itemCallback: DiffUtil.ItemCallback<ITEM>,
         skipDiff: Boolean = false
     ) {
+        val version = ++listUpdateVersion
+        if (listUpdatesPaused) return
         kotlin.runCatching {
             if (!isResumed) { //全量标记更新
                 setItems(items)
@@ -127,7 +151,7 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
             val footerCount = getFooterCount()
             val callback = object : DiffUtil.Callback() {
                 override fun getOldListSize(): Int {
-                    return itemCount
+                    return oldItems.size + headerCount + footerCount
                 }
 
                 override fun getNewListSize(): Int {
@@ -174,6 +198,8 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
                 }
                 ensureActive()
                 withContext(Main) {
+                    ensureActive()
+                    if (listUpdatesPaused || version != listUpdateVersion) return@withContext
                     if (!isResumed || diffResult == null) {
                         setItems(items)
                         return@withContext

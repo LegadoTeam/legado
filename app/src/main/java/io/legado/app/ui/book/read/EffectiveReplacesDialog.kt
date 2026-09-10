@@ -108,7 +108,7 @@ class EffectiveReplacesDialog : BaseDialogFragment(R.layout.dialog_recycler_view
                         return@let
                     }
                     item.isEnabled = false
-                    appDb.replaceRuleDao.insert(item)
+                    appDb.replaceRuleDao.enable(item.id, false)
                 }
             }
         }

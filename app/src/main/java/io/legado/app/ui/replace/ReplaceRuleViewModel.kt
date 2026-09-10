@@ -6,6 +6,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.help.config.ReplacePreviewConfig
 import io.legado.app.utils.renameGroupExact
+import io.legado.app.utils.moveRelativeTo
 
 /**
  * 替换规则数据修改
@@ -17,6 +18,10 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
         execute {
             appDb.replaceRuleDao.update(*rule)
         }
+    }
+
+    fun enable(id: Long, enable: Boolean) {
+        execute { appDb.replaceRuleDao.enable(id, enable) }
     }
 
     fun delete(rule: ReplaceRule) {
@@ -60,31 +65,28 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
         }
     }
 
-    fun upOrder() {
-        execute {
-            val rules = appDb.replaceRuleDao.all
-            for ((index, rule) in rules.withIndex()) {
-                rule.order = index + 1
+    fun move(ruleId: Long, targetId: Long, after: Boolean, onFinally: () -> Unit = {}) {
+        executeLazy {
+            appDb.runInTransaction {
+                val current = appDb.replaceRuleDao.all
+                val reordered = moveRelativeTo(current, ruleId, targetId, after) { it.id }
+                if (reordered == current) return@runInTransaction
+                appDb.replaceRuleDao.update(*reordered.mapIndexed { index, item ->
+                    item.copy(order = index)
+                }.toTypedArray())
             }
-            appDb.replaceRuleDao.update(*rules.toTypedArray())
-        }
+        }.onFinally { onFinally() }.start()
     }
 
     fun enableSelection(rules: List<ReplaceRule>) {
         execute {
-            val array = Array(rules.size) {
-                rules[it].copy(isEnabled = true)
-            }
-            appDb.replaceRuleDao.update(*array)
+            appDb.replaceRuleDao.enable(true, rules)
         }
     }
 
     fun disableSelection(rules: List<ReplaceRule>) {
         execute {
-            val array = Array(rules.size) {
-                rules[it].copy(isEnabled = false)
-            }
-            appDb.replaceRuleDao.update(*array)
+            appDb.replaceRuleDao.enable(false, rules)
         }
     }
 

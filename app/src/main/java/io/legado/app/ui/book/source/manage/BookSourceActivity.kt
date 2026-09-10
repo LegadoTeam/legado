@@ -816,9 +816,11 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
         }
     }
 
-    override fun upOrder(items: List<BookSourcePart>, resetAll: Boolean) {
-        viewModel.upOrder(items, resetAll, sortAscending)
+    override fun move(sourceUrl: String, targetUrl: String, after: Boolean, onFinally: () -> Unit) {
+        viewModel.move(sourceUrl, targetUrl, if (sortAscending) after else !after, onFinally)
     }
+
+    override fun reload() = upBookSource(searchView.query.toString())
 
     override fun enable(enable: Boolean, bookSource: BookSourcePart) {
         viewModel.enable(enable, listOf(bookSource))
