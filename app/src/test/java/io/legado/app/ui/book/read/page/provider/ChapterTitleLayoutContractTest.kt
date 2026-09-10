@@ -42,7 +42,8 @@ class ChapterTitleLayoutContractTest {
         )
         assertTrue(layout.contains("(visibleWidth - rightTitleReviewInset).toInt().coerceAtLeast(1)"))
         assertTrue(layout.contains("ZhLayout(text, textPaint, textLayoutWidth"))
-        assertTrue(layout.contains("StaticLayout(text, textPaint, textLayoutWidth"))
+        assertTrue(layout.contains("val measuredText = highlightSpacing.withSpans(text, chapterStart)"))
+        assertTrue(layout.contains("StaticLayout(measuredText, textPaint, textLayoutWidth"))
         assertTrue(layout.contains("reviewTrailingInset = if (usesRightTitleReviewInset)"))
         assertTrue(layout.contains("reviewTrailingPadding = paddingRight.toFloat()"))
         assertTrue(

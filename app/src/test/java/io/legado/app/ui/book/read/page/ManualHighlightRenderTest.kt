@@ -14,13 +14,16 @@ class ManualHighlightRenderTest {
     @Test
     fun `manual ranges cover every text column but skip titles`() {
         val content = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/ContentTextView.kt")
+        val ranges = readProjectFile("src/main/java/io/legado/app/model/ReadBook.kt")
+            .substringAfter("fun highlightRangesOfChapter(").substringBefore("private fun highlightLayoutState")
 
-        assertTrue(content.contains("ReadBook.anchoredHighlightsOfChapter(chapter, titleLength)"))
-        assertTrue(content.contains("anchor.start + titleLength"))
-        assertTrue(content.contains("anchor.end + titleLength"))
+        assertTrue(content.contains("ReadBook.highlightRangesOfChapter(chapter)"))
+        assertTrue(ranges.contains("anchoredHighlightsOfChapter(chapter, titleLength)"))
+        assertTrue(ranges.contains("anchor.start + titleLength"))
+        assertTrue(ranges.contains("anchor.end + titleLength"))
         assertTrue(content.contains(".lastOrNull { (_, anchor)"))
         assertTrue(content.contains("val pageBase = chapter.getReadLength(page.index)"))
-        assertTrue(content.contains("val ruleRanges = ReadBook.ruleMatchesOfChapter(chapter)"))
+        assertTrue(ranges.contains("ruleMatchesOfChapter(chapter)"))
         assertTrue(content.contains("line.columns.map { it.positionLength }"))
         assertTrue(content.contains("isTitle = line.isTitle"))
         assertTrue(content.contains("if (column is TextBaseColumn)"))
