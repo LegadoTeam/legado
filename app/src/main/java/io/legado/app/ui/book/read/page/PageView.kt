@@ -67,6 +67,7 @@ class PageView(context: Context) : FrameLayout(context) {
         get() = binding.vwRoot.top + binding.contentTextView.top.toFloat()
 
     internal fun closePdfRenderer() = binding.contentTextView.closePdfRenderer()
+    internal fun cancelHighlightTap() = binding.contentTextView.cancelHighlightTap()
 
     val headerHeight: Int
         get() {
