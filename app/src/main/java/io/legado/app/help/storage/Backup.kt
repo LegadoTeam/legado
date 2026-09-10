@@ -347,9 +347,13 @@ object Backup {
                 .writeText(GSON.toJson(it))
         }
         currentCoroutineContext().ensureActive()
+        val preferenceSnapshot = HashMap<String, Any?>(appCtx.defaultSharedPreferences.all)
+        (preferenceSnapshot[PreferKey.coverFont] as? String)?.takeIf { it.isNotBlank() }?.let {
+            if (!File(it).exists()) preferenceSnapshot[PreferKey.coverFont] = ""
+        }
         writePreferenceSnapshot(appCtx, backupPath, "config") {
             putInt("readRecordSort", LocalConfig.getInt("readRecordSort", 0))
-            appCtx.defaultSharedPreferences.all.forEach { (key, value) ->
+            preferenceSnapshot.forEach { (key, value) ->
                 if (BackupConfig.keyIsNotIgnore(key) &&
                     (!lanTransfer || key !in lanTransferIgnoredPrefKeys)
                 ) {
@@ -394,6 +398,17 @@ object Backup {
         currentCoroutineContext().ensureActive()
         val zipFileName = getNowZipFileName()
         val paths = ArrayList(selectedBackupFileNames(enabledContentKeys::contains))
+        if (BackupConfig.settingContentKey in enabledContentKeys &&
+            BackupConfig.keyIsNotIgnore(PreferKey.coverFont)
+        ) {
+            (preferenceSnapshot[PreferKey.coverFont] as? String)?.takeIf { it.isNotBlank() }?.let { fontPath ->
+                val fontBackup = File(backupPath, BookCover.fontBackupFileName)
+                val fontFile = File(fontPath)
+                check(fontFile.isFile) { "Invalid cover font: $fontPath" }
+                fontFile.copyTo(fontBackup, overwrite = true)
+                paths.add(BookCover.fontBackupFileName)
+            }
+        }
         if (lanTransfer) {
             paths.removeAll(listOf("servers.json", DirectLinkUpload.ruleFileName))
         }
