@@ -1036,11 +1036,14 @@ class CodeSelectionUiTest {
         val artifacts = checkNotNull(context.getExternalFilesDir("ui-regression"))
         val report = StringBuilder("sampleSha256=$digest\n")
         try {
-            for ((label, code) in listOf("actual" to actual, "without-icon" to withoutIcon)) {
+            for ((label, code) in listOf("actual" to actual, "without-icon" to withoutIcon, "actual-unwrapped" to actual)) {
                 val dialog = CodeDialog(code, disableEdit = false)
                 var expected = code
                 val opened = SystemClock.uptimeMillis()
-                scenario!!.onActivity { dialog.show(it.supportFragmentManager, "reported-rss-$label") }
+                scenario!!.onActivity {
+                    dialog.showNow(it.supportFragmentManager, "reported-rss-$label")
+                    if (label == "actual-unwrapped") dialog.binding.codeView.setHorizontallyScrolling(true)
+                }
                 try {
                     await {
                         var ready = false
@@ -1051,6 +1054,10 @@ class CodeSelectionUiTest {
                         ready
                     }
                     report.append("$label; characters=${code.length}; openMs=${SystemClock.uptimeMillis() - opened}\n")
+                    instrumentation.runOnMainSync {
+                        val view = dialog.binding.codeView
+                        report.append("$label; breakStrategy=${view.breakStrategy}; hyphenation=${view.hyphenationFrequency}; lines=${view.lineCount}\n")
+                    }
                     val focusStarted = SystemClock.uptimeMillis()
                     onView(withId(R.id.code_view)).inRoot(isDialog()).perform(click())
                     await {
@@ -1087,11 +1094,7 @@ class CodeSelectionUiTest {
                         }
                         report.append("$label; offset=$offset; selectMs=$selectionMs; editMs=$editMs; frameMs=${SystemClock.uptimeMillis() - started}\n")
                         val deleteStarted = SystemClock.uptimeMillis()
-                        instrumentation.runOnMainSync {
-                            val input = checkNotNull(dialog.binding.codeView.onCreateInputConnection(EditorInfo()))
-                            assertTrue(input.sendKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DEL)))
-                            assertTrue(input.sendKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DEL)))
-                        }
+                        instrumentation.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DEL)
                         expected = expected.removeRange(offset, offset + 1)
                         await {
                             var matches = false
