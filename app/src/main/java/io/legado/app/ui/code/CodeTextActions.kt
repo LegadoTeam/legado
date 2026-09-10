@@ -27,6 +27,14 @@ internal class CodeTextActions(private val editor: CodeEditor) : ActionMode.Call
     private var actionMode: ActionMode? = null
     private var nativeRequested = false
     private var selectingAll = false
+    private val toolbarSpace = platformDimension("floating_toolbar_height", 48) +
+        2 * platformDimension("floating_toolbar_vertical_margin", 8)
+
+    private fun platformDimension(name: String, fallbackDp: Int): Int {
+        val id = editor.resources.getIdentifier(name, "dimen", "android")
+        return if (id != 0) editor.resources.getDimensionPixelSize(id)
+        else (fallbackDp * editor.resources.displayMetrics.density).toInt()
+    }
 
     init {
         editor.subscribeEvent(SelectionChangeEvent::class.java) { event, _ ->
@@ -169,11 +177,13 @@ internal class CodeTextActions(private val editor: CodeEditor) : ActionMode.Call
             if (sameRow) maxOf(startX, endX) else editor.width,
             endY
         )
-        // Anchor within the editor, whose bounds exclude the search and keyboard toolbars.
+        // Android places the toolbar below the anchor when there is no room above it.
+        // Reserve its platform height/margins so the menu cannot extend into the search tools.
+        val bottom = (editor.height - toolbarSpace).coerceAtLeast(0)
         outRect.left = outRect.left.coerceIn(0, editor.width)
         outRect.right = outRect.right.coerceIn(outRect.left, editor.width)
-        outRect.top = outRect.top.coerceIn(0, editor.height)
-        outRect.bottom = outRect.bottom.coerceIn(outRect.top, editor.height)
+        outRect.top = outRect.top.coerceIn(0, bottom)
+        outRect.bottom = outRect.bottom.coerceIn(outRect.top, bottom)
     }
 
     override fun onDestroyActionMode(mode: ActionMode) {
