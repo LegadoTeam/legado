@@ -306,7 +306,7 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
             book.durChapterIndex.plus(AppConfig.preDownloadNum)
         )
         val cacheBook = CacheBook.getOrCreate(source, book)
-        cacheBook.addDownload(book.durChapterIndex, endIndex)
+        cacheBook.addDownload(book.durChapterIndex, endIndex, refreshResources = true)
     }
 
     /**

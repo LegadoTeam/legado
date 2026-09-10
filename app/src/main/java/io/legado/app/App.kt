@@ -39,6 +39,7 @@ import io.legado.app.help.DispatchersMonitor
 import io.legado.app.help.LifecycleHelp
 import io.legado.app.help.RuleBigDataHelp
 import io.legado.app.help.book.BookHelp
+import io.legado.app.help.book.ResourceThemeGeneration
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ThemeConfig.applyDayNight
@@ -78,6 +79,10 @@ class App : Application() {
             ThreadUtils.hasSubtleSideEffectsSetThreadAssertsDisabledForTesting(true)
         }
         oldConfig = Configuration(resources.configuration)
+        ResourceThemeGeneration.observeSystemNight(
+            oldConfig.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES,
+            AppConfig.themeMode !in listOf("1", "2", "3"),
+        )
         WallpaperTheme.syncWithPreferences(this)
         applyDayNightInit(this)
         registerActivityLifecycleCallbacks(LifecycleHelp)
@@ -144,6 +149,10 @@ class App : Application() {
         super.onConfigurationChanged(newConfig)
         val diff = newConfig.diff(oldConfig)
         if ((diff and ActivityInfo.CONFIG_UI_MODE) != 0) {
+            ResourceThemeGeneration.observeSystemNight(
+                newConfig.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES,
+                AppConfig.themeMode !in listOf("1", "2", "3"),
+            )
             applyDayNight(this)
         }
         oldConfig = Configuration(newConfig)

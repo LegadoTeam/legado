@@ -12,6 +12,7 @@ internal class ChapterDownloadState {
     private val waiting = linkedSetOf<Int>()
     private val running = linkedMapOf<Int, Ticket>()
     private val batchFallback = hashSetOf<Int>()
+    private val resourceRefresh = hashSetOf<Int>()
 
     val waitCount get() = synchronized(this) { waiting.size }
     val runningCount get() = synchronized(this) { running.size }
@@ -21,8 +22,9 @@ internal class ChapterDownloadState {
     }
 
     @Synchronized
-    fun enqueue(indexes: Iterable<Int>) {
+    fun enqueue(indexes: Iterable<Int>, refreshResources: Boolean = false) {
         indexes.forEach { index ->
+            if (refreshResources) resourceRefresh.add(index)
             val ticket = running[index]
             if (ticket == null) waiting.add(index) else ticket.manualRequested = true
         }
@@ -32,6 +34,7 @@ internal class ChapterDownloadState {
     fun stopManual() {
         waiting.clear()
         batchFallback.clear()
+        resourceRefresh.clear()
         running.values.forEach { it.manualRequested = false }
     }
 
@@ -50,7 +53,16 @@ internal class ChapterDownloadState {
     }
 
     @Synchronized
-    fun discardWaiting(index: Int) { waiting.remove(index) }
+    fun discardWaiting(index: Int) {
+        waiting.remove(index)
+        resourceRefresh.remove(index)
+    }
+
+    @Synchronized
+    fun requestsResourceRefresh(index: Int): Boolean = index in resourceRefresh
+
+    @Synchronized
+    fun isCurrent(ticket: Ticket): Boolean = running[ticket.index] === ticket
 
     @Synchronized
     fun canBatch(index: Int): Boolean = index !in batchFallback
@@ -95,8 +107,10 @@ internal class ChapterDownloadState {
                 batchFallback.remove(ticket.index)
                 // A reader fetched text; explicit caching still needs to download its images.
                 if (ticket.manualRequested && !manualComplete) waiting.add(ticket.index)
+                else resourceRefresh.remove(ticket.index)
             } else {
                 if (retryManual && ticket.manualRequested) waiting.add(ticket.index)
+                else resourceRefresh.remove(ticket.index)
                 if (fallback) batchFallback.add(ticket.index)
             }
         }

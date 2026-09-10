@@ -38,6 +38,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.help.ReaderMenuConfig
 import io.legado.app.help.book.BookHelp
+import io.legado.app.help.book.refreshBookResources
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
@@ -196,6 +197,8 @@ class ContentReversalUiTest {
                 BookHelp.saveText(book, it, body(it.index, 1))
                 BookHelp.writeImage(book, "$base/image/${it.index}.png", png(Color.RED))
             }
+            runBlocking { refreshBookResources(source, book, refreshChapters) }
+            repeat(7) { bodyRequests.set(it, 0); imageRequests.set(it, 0) }
             scenario = ActivityScenario.launch(Intent(context, ReadBookActivity::class.java)
                 .putExtra("bookUrl", book.bookUrl).putExtra("inBookshelf", true))
             fun ready(previous: TextChapter? = null) = await("refreshed real reader") {
@@ -366,7 +369,9 @@ class ContentReversalUiTest {
             assertEquals(position, ReadBook.durChapterPos)
 
             scenario!!.onActivity { config.setCurTextColor(originalColor xor 0x00010101) }
-            scenario!!.recreate()
+            scenario!!.close()
+            scenario = ActivityScenario.launch(Intent(context, ReadBookActivity::class.java)
+                .putExtra("bookUrl", book.bookUrl).putExtra("inBookshelf", true))
             ready()
             bodyVersion.set(3)
             failBody.set(3)
@@ -404,7 +409,8 @@ class ContentReversalUiTest {
                     assertTrue("Switching reader styles must request resource refresh",
                         viewModel.resourceThemeChanged(book))
                 } finally { ReadBookConfig.styleSelect = style }
-                assertFalse(viewModel.resourceThemeChanged(book))
+                assertTrue("Switching back remains pending until resources are accepted",
+                    viewModel.resourceThemeChanged(book))
             }
 
             scenario!!.onActivity {

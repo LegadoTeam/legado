@@ -12,6 +12,30 @@ import org.junit.Test
 
 class ChapterDownloadStateTest {
     @Test
+    fun `shelf resource intent survives borrowing failure and replacement but stays in range`() {
+        val state = ChapterDownloadState()
+        state.enqueue(2..4, refreshResources = true)
+        assertFalse(state.requestsResourceRefresh(1))
+        assertFalse(state.requestsResourceRefresh(5))
+        val old = state.claimRead(2).first
+        state.invalidate(listOf(2))
+        assertFalse(state.isCurrent(old))
+        assertTrue(state.requestsResourceRefresh(2))
+        val owner = state.claimRead(2).first
+        assertFalse(state.finish(old, Result.success("obsolete")))
+        state.finish(owner, Result.failure(IllegalStateException("offline")))
+        assertTrue(state.requestsResourceRefresh(2))
+        val retry = state.claimManual(2)!!
+        state.finish(retry, Result.success("text only"), manualComplete = false)
+        assertTrue(state.requestsResourceRefresh(2))
+        state.finish(state.claimManual(2)!!, Result.success("complete resources"))
+        assertFalse(state.requestsResourceRefresh(2))
+        assertTrue(state.requestsResourceRefresh(3))
+        state.stopManual()
+        assertFalse(state.requestsResourceRefresh(3))
+    }
+
+    @Test
     fun `refresh replaces only target owners and preserves explicit caching`() = runBlocking {
         val state = ChapterDownloadState()
         state.enqueue(listOf(1, 2, 4))

@@ -7,6 +7,7 @@ import io.legado.app.BuildConfig
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
+import io.legado.app.help.book.ResourceThemeGeneration
 import io.legado.app.utils.GSON
 import io.legado.app.utils.canvasrecorder.CanvasRecorderFactory
 import io.legado.app.utils.defaultSharedPreferences
@@ -76,9 +77,17 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
                 showBoardLine = appCtx.getPrefInt(PreferKey.showBoardLine, 1).coerceIn(1, 5)
             PreferKey.adaptSpecialStyle -> adaptSpecialStyle = appCtx.getPrefBoolean(PreferKey.adaptSpecialStyle, true)
 
+            PreferKey.dThemeName, PreferKey.dNThemeName,
+            PreferKey.cPrimary, PreferKey.cNPrimary, PreferKey.cAccent, PreferKey.cNAccent,
+            PreferKey.cBackground, PreferKey.cNBackground, PreferKey.cBBackground, PreferKey.cNBBackground,
+            PreferKey.bgImage, PreferKey.bgImageN -> ResourceThemeGeneration.changed()
+
             PreferKey.themeMode -> {
+                // Each preference mutation invalidates resources, including A -> B -> A
+                // before queued preference callbacks observe the final value.
                 themeMode = appCtx.getPrefString(PreferKey.themeMode, "0")
                 isEInkMode = themeMode == "3"
+                ResourceThemeGeneration.changed()
             }
 
             PreferKey.clickActionTL -> clickActionTL =
