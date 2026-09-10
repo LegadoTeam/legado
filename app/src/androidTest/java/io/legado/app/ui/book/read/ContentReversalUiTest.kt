@@ -267,14 +267,7 @@ class ContentReversalUiTest {
                     }
                     assertTrue("Reader frames must continue while HTTP is blocked", frame.await(2, TimeUnit.SECONDS))
                     closeReaderMenu()
-                    if (scroll) {
-                        dragReader(0.5f, 0.7f, 0.5f, 0.3f)
-                        dragReader(0.5f, 0.3f, 0.5f, 0.7f)
-                    } else {
-                        dragReader(0.8f, 0.5f, 0.2f, 0.5f)
-                        dragReader(0.2f, 0.5f, 0.8f, 0.5f)
-                    }
-                    scenario!!.onActivity {
+                    fun assertLoadingFixed() = scenario!!.onActivity {
                         val reader = it.findViewById<ReadView>(R.id.read_view)
                         assertTrue(showsLoading(it))
                         assertFalse(reader.pageFactory.moveToNext(true))
@@ -289,6 +282,16 @@ class ContentReversalUiTest {
                         assertTrue("Blocked paging must not show an end-of-book Snackbar",
                             it.findViewById<View>(com.google.android.material.R.id.snackbar_text)?.isShown != true)
                     }
+                    if (scroll) {
+                        dragReader(0.5f, 0.7f, 0.5f, 0.3f)
+                        assertLoadingFixed()
+                        dragReader(0.5f, 0.3f, 0.5f, 0.7f)
+                    } else {
+                        dragReader(0.8f, 0.5f, 0.2f, 0.5f)
+                        assertLoadingFixed()
+                        dragReader(0.2f, 0.5f, 0.8f, 0.5f)
+                    }
+                    assertLoadingFixed()
                     screenshot(if (scroll) "resource-refresh-loading-scroll" else "resource-refresh-loading")
                     if (failBody.get() == 3) {
                         scenario!!.recreate()
