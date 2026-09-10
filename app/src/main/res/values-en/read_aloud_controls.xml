@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string formatted="false" name="read_aloud_controls_realtime">Show live read-aloud status</string>
+    <string formatted="false" name="read_aloud_controls_position">Show original position/read from here controls</string>
     <string formatted="false" name="read_aloud_controls">Read-aloud playback controls</string>
     <string formatted="false" name="read_aloud_controls_pause">Show pause/resume control</string>
     <string formatted="false" name="read_aloud_controls_auto_hide">Auto-hide</string>

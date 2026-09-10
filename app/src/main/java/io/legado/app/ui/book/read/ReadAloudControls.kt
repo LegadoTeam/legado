@@ -85,9 +85,10 @@ class ReadAloudControls(
         }
         running = isRun
         wasFollowing = following
-        val showPause = following && prefs.getBoolean(PreferKey.readAloudControlsPause, false)
+        val showPause = following && prefs.getBoolean(PreferKey.readAloudControlsPause, true)
         val shouldShow = ReadAloudBarVisibility.shouldShow(
             isRun, following, menuVisible, showPause,
+            prefs.getBoolean(PreferKey.readAloudControlsPosition, true),
         ) && !hidden
         bar.isVisible = shouldShow
         if (!shouldShow) return

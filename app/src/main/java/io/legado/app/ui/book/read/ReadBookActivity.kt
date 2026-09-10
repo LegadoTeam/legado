@@ -307,6 +307,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     private val aloudControls by lazy {
         ReadAloudControls(binding.readAloudFloatBarContainer) { updateReadAloudFloatBar() }
     }
+    private val restoreAloudFollowRunnable = Runnable { restoreAloudFollowOnVisiblePage() }
     /** 最近一次朗读进度的章内字符位置; 供"回到朗读位置"在同章内即时跳转 */
     private var lastReadAloudChapterStart = -1
     private var lastReadAloudChapterIndex = -1
@@ -1509,6 +1510,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                 (readPositionVersion == null || isReadPositionVersionCurrent(readPositionVersion))
             binding.readView.cancelTouchGestures()
             binding.readView.upContent(relativePosition, shouldResetPageOffset)
+            scheduleAloudFollowCheck()
             observeBookmarks()
             upBookmarkIndicator()
             if (relativePosition == 0) {
@@ -1538,6 +1540,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             (readPositionVersion == null || isReadPositionVersionCurrent(readPositionVersion))
         binding.readView.cancelTouchGestures()
         binding.readView.upContent(relativePosition, shouldResetPageOffset)
+        scheduleAloudFollowCheck()
         observeBookmarks()
         upBookmarkIndicator()
         if (relativePosition == 0) {
@@ -1578,6 +1581,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         handler.post {
             upBookmarkIndicator()
             upSeekBarProgress()
+            restoreAloudFollowOnVisiblePage()
         }
         executor.execute {
             startBackupJob()
@@ -1588,11 +1592,37 @@ class ReadBookActivity : BaseReadBookActivity(),
         if (BaseReadAloudService.isRun && !isAutoPage) {
             ReadAloud.detachReadAloudFollow()
             aloudControls.onMovement(-offset * 100f / ChapterProvider.visibleHeight.coerceAtLeast(1))
+            scheduleAloudFollowCheck()
         }
     }
 
     fun showReadAloudControls(resetPosition: Boolean = false) {
         aloudControls.reveal(resetPosition)
+        scheduleAloudFollowCheck()
+    }
+
+    private fun scheduleAloudFollowCheck() {
+        // Manual navigation emits detach before changing the displayed page.
+        handler.removeCallbacks(restoreAloudFollowRunnable)
+        handler.post(restoreAloudFollowRunnable)
+    }
+
+    private fun restoreAloudFollowOnVisiblePage() {
+        if (!BaseReadAloudService.isRun || ReadAloud.followReadAloudPosition ||
+            !getPrefBoolean(PreferKey.readAloudControlsRealtime, true)
+        ) return
+        val chapterStart = ReadAloud.readAloudChapterStart
+        val chapterIndex = ReadAloud.readAloudChapterIndex
+        if (chapterStart < 0 || chapterIndex != ReadBook.durChapterIndex) return
+        val chapter = ReadBook.curTextChapter ?: return
+        if (binding.readView.curPage.textPage !== chapter.getPage(ReadBook.durPageIndex)) return
+        val (visibleChapter, line) = binding.readView.getReadAloudPos() ?: return
+        if (visibleChapter != chapterIndex) return
+        val speakingPage = chapter.getPageByReadPos(chapterStart) ?: return
+        if (chapter.getPageByReadPos(line.chapterPosition) !== speakingPage) return
+        ReadAloud.restoreReadAloudFollow()
+        speakingPage.upPageAloudSpan(chapterStart - chapter.getReadLength(speakingPage.index))
+        binding.readView.upContent(resetPageOffset = false)
     }
 
     /**
@@ -2939,6 +2969,10 @@ class ReadBookActivity : BaseReadBookActivity(),
         observeEventSticky<Int>(EventBus.TTS_PROGRESS) { chapterStart ->
             lastReadAloudChapterStart = chapterStart
             lastReadAloudChapterIndex = ReadAloud.readAloudChapterIndex
+            if (!ReadAloud.followReadAloudPosition) {
+                scheduleAloudFollowCheck()
+                return@observeEventSticky
+            }
             lifecycleScope.launch(IO) {
                 if (BaseReadAloudService.shouldApplySpeechProgressToVisibleReader(
                         isSpeechPlaying = BaseReadAloudService.isPlay()

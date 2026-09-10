@@ -5,6 +5,7 @@ object ReadAloudBarVisibility {
         isRun: Boolean,
         following: Boolean,
         menuVisible: Boolean,
-        pauseEnabled: Boolean = false,
-    ): Boolean = isRun && (!following || pauseEnabled) && !menuVisible
+        pauseEnabled: Boolean = true,
+        positionEnabled: Boolean = true,
+    ): Boolean = isRun && (if (following) pauseEnabled else positionEnabled) && !menuVisible
 }
