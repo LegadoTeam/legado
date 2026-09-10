@@ -23,7 +23,7 @@ data class ReadRecord(
     var deviceId: String = "",
     var bookName: String = "",
     /**
-     * 同设备按书名和作者分别记录；旧的未知作者及合并作者记录原样保留。
+     * 同设备按书名和作者分别记录；未知作者在重读时补全，旧合并作者记录原样保留。
      */
     @ColumnInfo(defaultValue = "")
     var author: String = "",
@@ -58,6 +58,7 @@ fun ReadRecord.saveWithCover(book: Book?, elapsed: Long? = null) {
     var saved = this
     appDb.runInTransaction {
         if (elapsed != null) {
+            if (snapshotBook != null) appDb.readRecordDao.mergeUnknownAuthor(bookName, author)
             val current = appDb.readRecordDao.getRecord(deviceId, bookName, author)
             // A reader can revisit this identity before an earlier interval reaches the queue.
             // Add the interval to the stored total instead of replacing it with a stale total.

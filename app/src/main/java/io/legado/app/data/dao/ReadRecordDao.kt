@@ -91,6 +91,17 @@ interface ReadRecordDao {
         val authors = ReadRecordAuthors.decode(author)
         if (!ReadRecordAuthors.isCombined(author) || authors.size < 2 || removedAuthor !in authors) return
         val remaining = (authors - removedAuthor).reduce(ReadRecordAuthors::merge)
+        mergeAuthorRecords(bookName, author, remaining)
+    }
+
+    /** The first subsequent reading supplies the author for this title's unknown history. */
+    @Transaction
+    fun mergeUnknownAuthor(bookName: String, author: String) {
+        if (author.isBlank() || ReadRecordAuthors.isCombined(author)) return
+        mergeAuthorRecords(bookName, "", author)
+    }
+
+    private fun mergeAuthorRecords(bookName: String, author: String, remaining: String) {
         getRecords(bookName, author).forEach { original ->
             val renamed = original.copy(author = remaining)
             val current = getRecord(original.deviceId, bookName, remaining)

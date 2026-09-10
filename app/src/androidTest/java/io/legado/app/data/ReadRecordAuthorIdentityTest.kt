@@ -295,6 +295,52 @@ class ReadRecordAuthorIdentityTest {
     }
 
     @Test
+    fun firstKnownAuthorReadingMergesUnknownDevicesOnceAndKeepsOtherIdentities() {
+        val dao = appDb.readRecordDao
+        val saved = dao.all
+        val name = "Unknown author ${UUID.randomUUID()}"
+        val known = ReadRecord(deviceId = AppConst.androidId, bookName = name, author = "A",
+            readTime = 2000, lastRead = 20, lastChapterTitle = "Known", lastChapterIndex = 2)
+        val unknown = known.copy(author = "", readTime = 7000, lastRead = 70,
+            lastChapterTitle = "Newer unknown", lastChapterIndex = 7, lastChapterPos = 17)
+        val remote = unknown.copy(deviceId = "remote", readTime = 11000)
+        val remoteKnown = known.copy(deviceId = "remote", readTime = 5000, lastRead = 90,
+            lastChapterTitle = "Newest remote", lastChapterIndex = 9)
+        val other = known.copy(author = "B", readTime = 3000)
+        val otherTitle = unknown.copy(bookName = "Different $name", readTime = 13000)
+        val combined = unknown.copy(author = combinedAuthor, readTime = 17000)
+        val currentBook = Book(bookUrl = "unknown:$name", name = name, author = "A")
+        try {
+            dao.clear()
+            dao.insert(known, unknown, remote, remoteKnown, other, otherTitle, combined)
+            val original = dao.all.toSet()
+            val total = dao.allTime
+            // Cover-only saves and mismatched book snapshots must not claim unknown history.
+            known.saveWithCover(currentBook)
+            known.saveWithCover(currentBook.copy(author = "B"), 0)
+            assertEquals(original, dao.all.toSet())
+            known.copy(lastRead = 100, lastChapterTitle = "Reading now", lastChapterIndex = 10)
+                .saveWithCover(currentBook, 1000)
+            val expectedLocal = known.copy(readTime = 10000, lastRead = 100,
+                lastChapterTitle = "Reading now", lastChapterIndex = 10)
+            val expectedRemote = remoteKnown.copy(readTime = 16000)
+            assertEquals(setOf(expectedLocal, expectedRemote, other, otherTitle, combined), dao.all.toSet())
+            assertEquals(total + 1000, dao.allTime)
+            assertNull(dao.getRecord(known.deviceId, name, ""))
+            assertNull(dao.getRecord("remote", name, ""))
+            // Reading a second known author must never steal the first reader's merged time.
+            other.copy(lastRead = 110).saveWithCover(currentBook.copy(author = "B"), 500)
+            assertEquals(expectedLocal, dao.getRecord(known.deviceId, name, "A"))
+            assertEquals(expectedRemote, dao.getRecord("remote", name, "A"))
+            assertEquals(3500L, dao.getRecord(known.deviceId, name, "B")!!.readTime)
+            assertEquals(total + 1500, dao.allTime)
+        } finally {
+            dao.clear()
+            dao.insert(*saved.toTypedArray())
+        }
+    }
+
+    @Test
     fun actualReadersResumeAndWriteOnlyTheirDeviceAndAuthor() {
         val dao = appDb.readRecordDao
         val saved = dao.all
@@ -346,9 +392,9 @@ class ReadRecordAuthorIdentityTest {
                     type.getDeclaredMethod("upReadTime").invoke(model)
                     awaitWrites()
                     val resolved = dao.getRecord(AppConst.androidId, name, "Resolved author")!!
-                    assertTrue(resolved.readTime in 1000L..10_000L)
+                    assertTrue(resolved.readTime in (unknown.readTime + 1000)..(unknown.readTime + 10_000))
                     assertEquals("Resolved chapter", resolved.lastChapterTitle)
-                    assertEquals(unknown, dao.getRecord(AppConst.androidId, name, ""))
+                    assertNull(dao.getRecord(AppConst.androidId, name, ""))
                 } finally {
                     awaitWrites()
                     bookField.set(model, oldBook)
@@ -415,11 +461,11 @@ class ReadRecordAuthorIdentityTest {
                 try {
                     dao.clear()
                     dao.insert(first, other, remote, unknown)
-                    val expected = mutableMapOf("A" to first.readTime, "B" to other.readTime)
+                    val expected = mutableMapOf("A" to first.readTime + unknown.readTime, "B" to other.readTime)
                     withReadRecordWritesPaused {
                         // Exercise the real loaders and interval writers while their shared
                         // executor cannot save anything; no wait is allowed between identities.
-                        for ((author, duration) in listOf("A" to 1000L, "B" to 3000L, "A" to 2000L)) {
+                        for ((author, duration) in listOf("" to 500L, "A" to 1000L, "B" to 3000L, "A" to 2000L)) {
                             val current = Book(bookUrl = "queued:$author", name = name, author = author,
                                 durChapterTitle = "Chapter $duration")
                             val elapsed: Long
@@ -440,7 +486,8 @@ class ReadRecordAuthorIdentityTest {
                                 type.getDeclaredMethod("upReadTime").invoke(model)
                                 elapsed = timerFields[1].getLong(timer) - start
                             }
-                            expected[author] = expected.getValue(author) + elapsed
+                            val creditedAuthor = author.ifEmpty { "A" }
+                            expected[creditedAuthor] = expected.getValue(creditedAuthor) + elapsed
                         }
                         assertEquals(first, dao.getRecord(first.deviceId, name, "A"))
                         assertEquals(other, dao.getRecord(first.deviceId, name, "B"))
@@ -452,7 +499,7 @@ class ReadRecordAuthorIdentityTest {
                     assertEquals("Chapter 2000", dao.getRecord(first.deviceId, name, "A")!!.lastChapterTitle)
                     assertEquals("Chapter 3000", dao.getRecord(first.deviceId, name, "B")!!.lastChapterTitle)
                     assertEquals(remote, dao.getRecord("remote", name, "A"))
-                    assertEquals(unknown, dao.getRecord(first.deviceId, name, ""))
+                    assertNull(dao.getRecord(first.deviceId, name, ""))
                 } finally {
                     globalExecutor.submit {}.get(10, TimeUnit.SECONDS)
                     bookField.set(model, oldBook)
