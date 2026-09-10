@@ -500,6 +500,14 @@ class TitleFontWeightRenderingTest {
         scenario!!.onActivity { activity ->
             val readView = activity.findViewById<ReadView>(R.id.read_view)
             val imageDir = context.getExternalFilesDir("ui-regression")
+            // Check the legacy icon on real Android Paint, independent of helper signatures.
+            val ordinarySpan = BatteryLevelSpan(50)
+            val legacyPaint = Paint().apply { textSize = 20f }
+            val defaultWidth = ordinarySpan.getSize(legacyPaint, "", 0, 0, null)
+            legacyPaint.typeface = Typeface.MONOSPACE
+            assertEquals(defaultWidth, ordinarySpan.getSize(legacyPaint, "", 0, 0, null))
+            legacyPaint.textSize = 40f
+            assertTrue(ordinarySpan.getSize(legacyPaint, "", 0, 0, null) > defaultWidth)
             val widths = mutableListOf<Int>()
             var previous: IntArray? = null
             for (level in listOf(0, 7, 85, 100)) {
