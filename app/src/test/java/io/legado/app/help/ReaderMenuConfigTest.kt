@@ -55,4 +55,14 @@ class ReaderMenuConfigTest {
         }, config.primary)
         assertEquals(listOf("help"), config.more)
     }
+    @Test
+    fun reimportIsAddedOnceToOldPreferencesAndKeepsExplicitMorePlacement() {
+        val oldKeys = ReaderMenuConfig.ALL_KEYS - "reimportSource"
+        val migrated = ReaderMenuConfig(primary = oldKeys.take(2), more = oldKeys.drop(2)).normalized()
+        assertEquals(oldKeys.take(2) + "reimportSource", migrated.primary)
+        assertEquals(oldKeys.drop(2), migrated.more)
+        val hidden = ReaderMenuConfig(primary = oldKeys, more = listOf("reimportSource"))
+        assertEquals(hidden, ReaderMenuConfig.fromJson(hidden.toJson()).normalized())
+    }
+
 }
