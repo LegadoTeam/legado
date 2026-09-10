@@ -383,6 +383,7 @@ class SharedFileImportTest {
     private fun awaitReader(book: Book) {
         await {
             ReadBook.book?.bookUrl == book.bookUrl &&
+                ReadBook.curTextChapter?.chapter?.bookUrl == book.bookUrl &&
                 ReadBook.curTextChapter?.isCompleted == true &&
                 ReadBook.curTextChapter?.pages?.isNotEmpty() == true
         }
