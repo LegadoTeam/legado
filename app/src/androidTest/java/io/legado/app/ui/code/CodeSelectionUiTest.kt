@@ -398,6 +398,44 @@ class CodeSelectionUiTest {
                             }
                             ready
                         }
+                        if (replacements) {
+                            // A malformed draft stays editable; it must not overwrite the valid candidate.
+                            val invalid = "] invalid source draft"
+                            for (draft in listOf(invalid, edited)) {
+                                onView(withId(R.id.menu_fullscreen_edit)).inRoot(isDialog()).perform(click())
+                                await {
+                                    var ready = false
+                                    instrumentation.runOnMainSync {
+                                        editorActivity = ActivityLifecycleMonitorRegistry.getInstance()
+                                            .getActivitiesInStage(Stage.RESUMED).filterIsInstance<CodeEditActivity>().firstOrNull()
+                                        val editor = editorActivity?.findViewById<CodeEditor>(R.id.editText)
+                                        ready = editor != null && editor.isEditable && editor.hasWindowFocus()
+                                    }
+                                    ready
+                                }
+                                instrumentation.runOnMainSync {
+                                    val editor = editorActivity!!.findViewById<CodeEditor>(R.id.editText)
+                                    editor.text.replace(0, editor.text.length, draft)
+                                }
+                                onView(withId(R.id.menu_save)).perform(click())
+                                await {
+                                    var ready = false
+                                    instrumentation.runOnMainSync {
+                                        ready = preview!!.currentOriginalCode() == draft &&
+                                            preview!!.dialog?.window?.decorView?.hasWindowFocus() == true &&
+                                            preview!!.binding.toolBar.menu.findItem(R.id.menu_fullscreen_edit).isEnabled
+                                        if (ready) {
+                                            val expected = if (draft == invalid) draft else edited.replace("#edited", "#edited-once")
+                                            assertEquals(expected, preview!!.binding.codeView.text.toString())
+                                            val raw = if (rss) ViewModelProvider(parent!!)[ImportRssSourceViewModel::class.java].originalSourceJson(1)
+                                                else ViewModelProvider(parent!!)[ImportBookSourceViewModel::class.java].originalSourceJson(1)
+                                            assertEquals(edited, raw)
+                                        }
+                                    }
+                                    ready
+                                }
+                            }
+                        }
                         onView(withId(R.id.menu_save)).inRoot(isDialog()).perform(click())
                         val expectedUrl = urls[1] + if (replacements) "#edited-once" else "#edited"
                         await {
