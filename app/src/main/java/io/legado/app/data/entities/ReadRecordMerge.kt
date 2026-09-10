@@ -17,5 +17,6 @@ internal fun mergeRestoredReadRecord(
         lastChapterIndex = chapter.lastChapterIndex,
         lastChapterPos = chapter.lastChapterPos,
         coverUrl = latest.coverUrl?.takeIf { it.isNotBlank() } ?: previous.coverUrl,
+        resolvedAuthor = current.resolvedAuthor ?: incoming.resolvedAuthor,
     )
 }
