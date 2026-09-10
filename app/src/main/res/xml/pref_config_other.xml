@@ -9,6 +9,14 @@
         app:entries="@array/language"
         app:entryValues="@array/language_value" />
 
+    <io.legado.app.lib.prefs.NameListPreference
+        android:defaultValue="never"
+        android:key="bookMetadataSync"
+        android:title="@string/book_metadata_sync"
+        android:summary="@string/book_metadata_sync_summary"
+        app:entries="@array/book_metadata_sync_options"
+        app:entryValues="@array/book_metadata_sync_values" />
+
     <io.legado.app.lib.prefs.PreferenceCategory
         android:title="@string/main_activity"
         app:allowDividerAbove="false"
