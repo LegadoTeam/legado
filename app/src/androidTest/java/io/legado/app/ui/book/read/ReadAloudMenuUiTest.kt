@@ -9,6 +9,7 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.os.PowerManager
 import android.os.SystemClock
+import android.view.MotionEvent
 import android.view.View
 import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
@@ -401,7 +402,7 @@ class ReadAloudMenuUiTest {
                     "readAloudControls" -> controlsOrder = index
                 }
             }
-            fragment.scrollToPreference(PreferKey.readAloudStart)
+            fragment.scrollToPreference("readAloudControls")
             category.findPreference<androidx.preference.Preference>(PreferKey.readAloudStart)!!.performClick()
         }
         assertTrue(startOrder >= 0)
@@ -437,7 +438,7 @@ class ReadAloudMenuUiTest {
                 val fragment = dialog.childFragmentManager.fragments.single() as ReadAloudConfigDialog.ReadAloudPreferenceFragment
                 val preference = fragment.findPreference<androidx.preference.ListPreference>(PreferKey.readAloudStart)!!
                 assertEquals("page", preference.value)
-                fragment.scrollToPreference(PreferKey.readAloudStart)
+                fragment.scrollToPreference("readAloudControls")
                 preference.performClick()
             }
             onView(withText(R.string.read_aloud_start_sentence)).inRoot(isDialog()).check(matches(isDisplayed()))
@@ -556,6 +557,28 @@ class ReadAloudMenuUiTest {
                 File(context.getExternalFilesDir("ui-regression"), "aloud-start-$mode-split-$splitByPage-queue.txt").writeText(
                     "requested=$requested, actual=$expected, session=$session, stops=$stops\n" +
                         calls.joinToString("\n") { "${it.id}: mode=${it.mode}, length=${it.text.length}" })
+                val pageBeforeSwipe = ReadBook.durPageIndex
+                val downTime = SystemClock.uptimeMillis()
+                fun touch(view: ReadView, action: Int, x: Float) {
+                    MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action,
+                        view.width * x, view.height * .4f, 0).also {
+                        view.dispatchTouchEvent(it)
+                        it.recycle()
+                    }
+                }
+                scenario!!.onActivity { touch(it.findViewById(R.id.read_view), MotionEvent.ACTION_DOWN, .8f) }
+                listener.onRangeStart(next.id, 3, 4, 0)
+                instrumentation.waitForIdleSync()
+                assertEquals(next.position + 3, ReadAloud.readAloudChapterStart)
+                scenario!!.onActivity {
+                    val view = it.findViewById<ReadView>(R.id.read_view)
+                    touch(view, MotionEvent.ACTION_MOVE, .5f)
+                    touch(view, MotionEvent.ACTION_MOVE, .2f)
+                    touch(view, MotionEvent.ACTION_UP, .2f)
+                }
+                await("a same-page range during touch-down does not swallow the manual page turn") {
+                    ReadBook.durPageIndex == pageBeforeSwipe + 1 && !ReadAloud.followReadAloudPosition
+                }
             }
         } finally {
             scenario!!.onActivity { service.clearTTS() }

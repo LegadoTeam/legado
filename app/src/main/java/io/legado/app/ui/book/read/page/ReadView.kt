@@ -147,6 +147,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
     val nextPage by lazy { PageView(context) }
     val defaultAnimationSpeed = 300
     private var pressDown = false
+    internal val isTouching: Boolean get() = pressDown
     private var isMove = false
     private val readPositionVersion = ReadPositionVersion()
 

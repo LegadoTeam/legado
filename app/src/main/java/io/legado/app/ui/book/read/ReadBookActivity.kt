@@ -2977,9 +2977,15 @@ class ReadBookActivity : BaseReadBookActivity(),
                         ReadBook.durChapterPos = chapterStart
                         val pageIndex = ReadBook.durPageIndex
                         val aloudSpanStart = chapterStart - textChapter.getReadLength(pageIndex)
-                        textChapter.getPage(pageIndex)
-                            ?.upPageAloudSpan(aloudSpanStart)
-                        upContent()
+                        val page = textChapter.getPage(pageIndex)
+                        page?.upPageAloudSpan(aloudSpanStart)
+                        if (readView.isTouching && readView.curPage.textPage === page) {
+                            // Same-page speech ranges must not cancel the user's pending swipe.
+                            readView.curPage.invalidateContentView()
+                            readView.submitRenderTask()
+                        } else {
+                            upContent()
+                        }
                     }
                 }
             }
