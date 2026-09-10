@@ -193,6 +193,15 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
         }
         upBookSource(savedSearch)
         initLiveDataGroup()
+        lifecycleScope.launch {
+            appDb.bookDao.flowBookshelfSourceOrigins()
+                .map { origins -> origins.groupingBy { it }.eachCount() }
+                .distinctUntilChanged()
+                .flowOn(IO)
+                .flowWithLifecycle(lifecycle)
+                .catch { AppLog.put("更新书源书架引用数出错", it) }
+                .collect { adapter.updateBookshelfCounts(it) }
+        }
         initSelectActionBar()
         resumeCheckSource()
         if (!LocalConfig.bookSourcesHelpVersionIsLast) {

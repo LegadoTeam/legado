@@ -40,7 +40,7 @@
         android:scrollbars="none"
         android:singleLine="true"
         android:textColor="@color/primaryText"
-        app:layout_constraintBottom_toTopOf="@id/iv_debug_text"
+        app:layout_constraintBottom_toTopOf="@id/tv_bookshelf_count"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toLeftOf="@id/tv_js_badge"
         app:layout_constraintTop_toBottomOf="@id/barrier"
@@ -70,7 +70,7 @@
         android:layout_height="wrap_content"
         android:layout_marginRight="6dp"
         android:scrollbars="none"
-        app:layout_constraintBottom_toTopOf="@id/iv_debug_text"
+        app:layout_constraintBottom_toTopOf="@id/tv_bookshelf_count"
         app:layout_constraintRight_toLeftOf="@id/iv_edit"
         app:layout_constraintTop_toBottomOf="@id/barrier"
         tools:ignore="RtlHardcoded,RtlSymmetry,TouchTargetSizeCheck" />
@@ -86,7 +86,7 @@
         android:scrollbars="none"
         android:src="@drawable/ic_edit"
         android:tint="@color/primaryText"
-        app:layout_constraintBottom_toTopOf="@id/iv_debug_text"
+        app:layout_constraintBottom_toTopOf="@id/tv_bookshelf_count"
         app:layout_constraintRight_toLeftOf="@id/iv_menu_more"
         app:layout_constraintTop_toBottomOf="@id/barrier" />
 
@@ -100,7 +100,7 @@
         android:scrollbars="none"
         android:src="@drawable/ic_more_vert"
         android:tint="@color/primaryText"
-        app:layout_constraintBottom_toTopOf="@id/iv_debug_text"
+        app:layout_constraintBottom_toTopOf="@id/tv_bookshelf_count"
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintTop_toBottomOf="@id/barrier"
         tools:ignore="RtlHardcoded" />
@@ -116,6 +116,19 @@
         app:layout_constraintTop_toTopOf="@id/iv_menu_more" />
 
     <TextView
+        android:id="@+id/tv_bookshelf_count"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="32dp"
+        android:textColor="@color/secondaryText"
+        android:textSize="12sp"
+        app:layout_constraintTop_toBottomOf="@id/cb_book_source"
+        app:layout_constraintBottom_toTopOf="@id/iv_debug_text"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        tools:text="书架：2 本" />
+
+    <TextView
         android:id="@+id/iv_debug_text"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -126,7 +139,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toLeftOf="@id/iv_progressBar"
-        app:layout_constraintTop_toBottomOf="@id/cb_book_source"
+        app:layout_constraintTop_toBottomOf="@id/tv_bookshelf_count"
         tools:text="@string/debug_hint"
         tools:visibility="visible" />
 
