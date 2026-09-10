@@ -301,11 +301,11 @@ class CodeSelectionUiTest {
                                 editorActivity = ActivityLifecycleMonitorRegistry.getInstance()
                                     .getActivitiesInStage(Stage.RESUMED).filterIsInstance<CodeEditActivity>().firstOrNull()
                                 val editor = editorActivity?.findViewById<CodeEditor>(R.id.editText)
-                                ready = editor != null && editor.text.toString() == original && editor.isShown
+                                ready = editor != null && editor.text.toString() == original && editor.isShown && editor.isEditable
                                 if (ready) {
                                     inputPath = editorActivity!!.intent.getStringExtra("textFile")
                                     assertFalse(editorActivity!!.intent.hasExtra("text"))
-                                    assertTrue(editor!!.isEditable)
+                                    assertFalse(editorActivity!!.intent.getBooleanExtra("readOnly", false))
                                 }
                             }
                             ready
@@ -329,7 +329,7 @@ class CodeSelectionUiTest {
                                 editorActivity = ActivityLifecycleMonitorRegistry.getInstance()
                                     .getActivitiesInStage(Stage.RESUMED).filterIsInstance<CodeEditActivity>().firstOrNull()
                                 val editor = editorActivity?.findViewById<CodeEditor>(R.id.editText)
-                                ready = editorActivity !== beforeRecreation && editor != null &&
+                                ready = editorActivity !== beforeRecreation && editor != null && editor.isEditable &&
                                     editor.text.toString() == edited && editor.cursor.left == insertion + "#edited".length
                             }
                             ready
@@ -365,7 +365,8 @@ class CodeSelectionUiTest {
                             instrumentation.runOnMainSync {
                                 editorActivity = ActivityLifecycleMonitorRegistry.getInstance()
                                     .getActivitiesInStage(Stage.RESUMED).filterIsInstance<CodeEditActivity>().firstOrNull()
-                                ready = editorActivity?.findViewById<CodeEditor>(R.id.editText)?.text?.toString() == edited
+                                val editor = editorActivity?.findViewById<CodeEditor>(R.id.editText)
+                                ready = editor?.text?.toString() == edited && editor.isEditable
                             }
                             ready
                         }
