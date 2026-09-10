@@ -302,7 +302,9 @@ class ReadRecordHistoryTest {
                 }
             }
             prefs.edit().putString(PreferKey.bookMetadataSync, "always").commit()
-            writePreferenceSnapshot(context, backup.absolutePath, "config") {}
+            writePreferenceSnapshot(context, backup.absolutePath, "config") {
+                putString(PreferKey.bookMetadataSync, AppConfig.bookMetadataSync)
+            }
             prefs.edit().putString(PreferKey.bookMetadataSync, "never").commit()
             runBlocking(Dispatchers.IO) { Restore.restoreLocked(backup.absolutePath) }
             assertEquals("always", AppConfig.bookMetadataSync)
