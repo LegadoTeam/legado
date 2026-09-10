@@ -40,6 +40,7 @@ import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.matcher.ViewMatchers.isCompletelyDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.RootMatchers.isPlatformPopup
 import androidx.test.espresso.matcher.RootMatchers.isDialog
@@ -72,6 +73,7 @@ import org.junit.After
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.hamcrest.Matchers.allOf
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
@@ -866,8 +868,10 @@ class CodeSelectionUiTest {
     }
 
     private fun clickNativeAction(label: Int) {
+        // Android keeps the overflow panel in the view tree while it is invisible.
+        val visibleAction = allOf(withText(label), isDisplayed())
         try {
-            onView(withText(label)).inRoot(isPlatformPopup()).check(matches(isCompletelyDisplayed()))
+            onView(visibleAction).inRoot(isPlatformPopup()).check(matches(isCompletelyDisplayed()))
         } catch (_: NoMatchingViewException) {
             val overflow = context.resources.getIdentifier(
                 "floating_toolbar_open_overflow_description", "string", "android"
@@ -875,7 +879,7 @@ class CodeSelectionUiTest {
             assertNotEquals("Android's overflow accessibility label must exist", 0, overflow)
             onView(withContentDescription(context.getString(overflow))).inRoot(isPlatformPopup()).perform(click())
         }
-        onView(withText(label)).inRoot(isPlatformPopup()).check(matches(isCompletelyDisplayed())).perform(click())
+        onView(visibleAction).inRoot(isPlatformPopup()).check(matches(isCompletelyDisplayed())).perform(click())
     }
 
     private fun selection(editor: CodeEditor) = editor.text.subSequence(editor.cursor.left, editor.cursor.right).toString()
