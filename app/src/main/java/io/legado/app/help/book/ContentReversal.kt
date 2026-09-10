@@ -6,7 +6,7 @@ import io.legado.app.constant.AppPattern
 // attach its click action to other text. In particular, never rewrite src JSON.
 private val readerMarkup = Regex(
     "${AppPattern.useHtmlRegex.pattern}|${AppPattern.imgPattern.pattern()}|" +
-        "\\[newpage\\]|<!--[\\s\\S]*?-->|</?[a-zA-Z][^<>]*>|" +
+        "\\[newpage\\]|<!--[\\s\\S]*?-->|</?[a-zA-Z](?:[^<>\"']|\"[^\"]*\"|'[^']*')*>|" +
         "&(?:#\\d+|#x[\\da-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);",
     RegexOption.DOT_MATCHES_ALL,
 )

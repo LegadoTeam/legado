@@ -25,7 +25,7 @@ class ContentReversalTest {
 
     @Test fun `rich paragraph indentation stays before text and SVG markup is untouched`() {
         val review = """<img src="x,{"style":"text","reviewCount":"3","click":"f('《甲》')"}">"""
-        val svg = """<svg viewBox="0 0 24 24"><path d="M 1 2 L 3 4" /></svg>"""
+        val svg = """<svg viewBox="0 0 24 24" aria-label="《x>y》"><path d="M 1 2 L 3 4" data-text='a<b' /></svg>"""
         val original = "　　《甲乙》$review\r\n\t （丙丁）$review\n【戊己】$svg"
         val reversed = "　　《乙甲》$review\r\n\t （丁丙）$review\n【己戊】$svg"
         assertEquals(reversed, reverseContentText(original))
