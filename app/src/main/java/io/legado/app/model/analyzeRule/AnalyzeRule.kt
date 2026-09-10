@@ -1,5 +1,7 @@
 package io.legado.app.model.analyzeRule
 
+import com.script.rhino.runScriptWithContext
+
 import android.text.TextUtils
 import androidx.annotation.Keep
 import com.google.gson.internal.LinkedTreeMap
@@ -182,12 +184,12 @@ class AnalyzeRule(
         if (isMainThread) {
             error("webJs must be called on a background thread")
         }
-        return runBlocking {
+        return runBlocking(coroutineContext) {
             BackstageWebView(
                 url = baseUrl,
                 html = content.toString(),
                 javaScript = jsStr,
-                headerMap = getSource()?.getHeaderMap(true),
+                headerMap = runScriptWithContext(coroutineContext) { getSource()?.getHeaderMap(true) },
                 tag = getSource()?.getKey(),
                 cacheFirst = true,
                 timeout = 10000,

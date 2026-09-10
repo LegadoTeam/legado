@@ -1,6 +1,7 @@
 package io.legado.app.help.source
 
 import android.webkit.JavascriptInterface
+import com.script.rhino.runScriptWithContext
 import io.legado.app.data.entities.BaseSource
 import io.legado.app.help.config.AppConfig
 import io.legado.app.model.VideoPlay
@@ -12,6 +13,9 @@ internal fun BaseSource.withSourceNavigationContext(context: CoroutineContext): 
     val original = this
     return object : BaseSource by original {
         private fun allowed() = !shouldSuppressSourceNavigation(AppConfig.blockSourceNavigation, context)
+
+        @JavascriptInterface
+        override fun login() = runScriptWithContext(context) { original.login() }
 
         @JavascriptInterface
         override fun openVideoPlayer(url: String, title: String) =

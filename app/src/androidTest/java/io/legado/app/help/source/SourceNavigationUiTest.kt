@@ -8,6 +8,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import fi.iki.elonen.NanoHTTPD
 import io.legado.app.constant.PreferKey
+import io.legado.app.constant.SourceType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookSource
@@ -16,7 +17,6 @@ import io.legado.app.data.entities.rule.ExploreRule
 import io.legado.app.data.entities.rule.SearchRule
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
-import io.legado.app.help.http.BackstageWebView
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
 import io.legado.app.model.webBook.WebBook
@@ -58,6 +58,7 @@ class SourceNavigationUiTest {
             assertFalse(AppConfig.blockSourceNavigation)
             LocalConfig.edit().putInt("bookSourceHelpVersion", 1).commit()
             scenario = ActivityScenario.launch(BookSourceActivity::class.java)
+            source.loginUrl = "@js:function login() { java.openUrl('https://navigation.invalid/nested'); source.put('navigationLogin', 'ok'); }"
             appDb.bookSourceDao.insert(source)
             instrumentation.addMonitor(monitor)
             server.start()
@@ -93,16 +94,24 @@ class SourceNavigationUiTest {
                 scenario!!.onActivity { assertTrue(it.supportFragmentManager.fragments.isEmpty()) }
 
                 // Rule WebViews call both bridges on a separate Java thread; storage remains usable.
-                val response = BackstageWebView(url = pageUrl, html = "<p>Background</p>",
-                    tag = source.bookSourceUrl, isRule = true, timeout = 10_000,
-                    javaScript = """
+                rule.setContent("<p>Background</p>", pageUrl)
+                source.header = "@js:java.openUrl('https://navigation.invalid/header'); '{\"X-Navigation\":\"ok\"}'"
+                for (blocked in listOf(true, false)) {
+                    AppConfig.blockSourceNavigation = blocked
+                    val response = rule.getString("""@webjs:
                         java.openUrl('https://navigation.invalid/java');
                         source.openUrl('https://navigation.invalid/source');
+                        source.login();
                         source.put('navigationTest', 'stored');
-                        source.get('navigationTest') + ':' + document.querySelector('p').textContent;
-                    """.trimIndent()).getStrResponse()
-                assertEquals("stored:Background", response.body)
-                assertTrue(starts.isEmpty())
+                        source.get('navigationTest') + ':' + document.querySelector('p').textContent + ':' + source.get('navigationLogin');
+                    """.trimIndent())
+                    assertEquals("stored:Background:ok", response)
+                    assertEquals(if (blocked) 0 else 4, starts.size)
+                    starts.forEach { assertEquals(SourceType.book, it.getIntExtra("sourceType", -1)) }
+                    starts.clear()
+                }
+                source.header = null
+                AppConfig.blockSourceNavigation = true
             }
 
             // A normal detail request still runs its required login after a blocked search.

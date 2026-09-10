@@ -120,7 +120,7 @@ class BackstageWebView(
                            appDb.bookSourceDao.getBookSource(key)?.let {
                                val source = (it as BaseSource).withSourceNavigationContext(navigationContext)
                                webView.addJavascriptInterface(source, nameSource)
-                               val webJsExtensions = WebJsExtensions(source, null, webView,
+                               val webJsExtensions = WebJsExtensions(it, null, webView,
                                    navigationContext = navigationContext)
                                webView.addJavascriptInterface(webJsExtensions, nameJava)
                             }
