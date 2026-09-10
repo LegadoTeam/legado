@@ -26,6 +26,7 @@ import androidx.test.espresso.Espresso.openActionBarOverflowOrOptionsMenu
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isDialog
+import androidx.test.espresso.matcher.RootMatchers.isPlatformPopup
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
@@ -423,7 +424,7 @@ class SharedFileImportTest {
                     pressBack()
                 }
                 openActionBarOverflowOrOptionsMenu(context)
-                onView(withText(R.string.local_book_save_path)).perform(click())
+                onView(withText(R.string.local_book_save_path)).inRoot(isPlatformPopup()).perform(click())
                 onView(withText(R.string.local_book_save_path)).inRoot(isDialog()).check(matches(isDisplayed()))
                 screenshot("local-import-save-folder-menu")
                 onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
@@ -435,7 +436,7 @@ class SharedFileImportTest {
                 awaitLocalPreview(scenario)
                 onView(withContentDescription(androidx.appcompat.R.string.abc_action_menu_overflow_description))
                     .inRoot(isDialog()).perform(click())
-                onView(withText(R.string.local_book_save_path)).perform(click())
+                onView(withText(R.string.local_book_save_path)).inRoot(isPlatformPopup()).perform(click())
                 screenshot("share-local-preview-save-folder-menu")
                 onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
                 await { AppConfig.defaultBookTreeUri == Uri.fromFile(finalDirectory).toString() }
