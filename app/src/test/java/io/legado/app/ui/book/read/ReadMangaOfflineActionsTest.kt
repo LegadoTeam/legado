@@ -36,6 +36,9 @@ class ReadMangaOfflineActionsTest {
         assertTrue(viewModel.contains("BookHelp.saveImage(ReadManga.bookSource, book, src)"))
         assertTrue(viewModel.contains("createFileIfNotExist(image.name).writeFile(image)"))
         val cacheSuccess = cacheBook.substringAfter("val ticket = downloads.claimManual(index)")
+            // Ordinary offline caching still finishes only after its images are saved.
+            // Theme resource refresh now has a separate staged transaction above this branch.
+            .substringAfter("} else {")
             .substringBefore("private fun startManual")
         assertTrue(cacheSuccess.contains("val content = BookHelp.getContent(requestBook, chapter)"))
         assertTrue(cacheSuccess.contains("BookHelp.saveImages(source, requestBook, chapter, content, 1)"))
