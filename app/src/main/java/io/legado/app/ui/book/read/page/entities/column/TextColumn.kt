@@ -86,7 +86,7 @@ data class TextColumn(
         }
         val styledPaint = style?.takeIf {
             it.textColor != 0 || it.bold || it.italic || it.shadow != null ||
-                it.resolvedFontPath.isNotEmpty()
+                it.resolvedFontPath.isNotEmpty() || it.changesTextMetrics
         }?.let { HighlightDraw.obtainTextPaint(textPaint, it, textColor, charData) }
         val drawPaint = styledPaint ?: textPaint
         val y = textLine.lineBase - textLine.lineTop

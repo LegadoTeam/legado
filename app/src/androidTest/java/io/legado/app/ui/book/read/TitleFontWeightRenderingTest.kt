@@ -694,6 +694,99 @@ class TitleFontWeightRenderingTest {
     }
 
     @Test
+    fun highlightFontMetricsReflowWithoutChangingAnchorsAndFitTheRenderedLines() {
+        launchReader()
+        val savedZh = ReadBookConfig.useZhLayout
+        val savedAdapt = AppConfig.adaptSpecialStyle
+        val savedJustify = ReadBookConfig.textFullJustify
+        val font = listOf("/system/fonts/DroidSansMono.ttf", "/system/fonts/NotoSerif-Regular.ttf")
+            .first { File(it).isFile }
+        fun awaitLayout(chapter: TextChapter): TextChapter = runBlocking {
+            withTimeout(30_000) { for (ignored in chapter.layoutChannel) Unit; while (!chapter.isCompleted) yield() }
+            chapter
+        }
+        fun canonical(chapter: TextChapter) = HighlightTextBuilder.build(chapter.pages.flatMap { it.lines }
+            .map { HighlightTextBuilder.LineInput(it.text, it.isParagraphEnd) })
+        try {
+            scenario!!.onActivity { activity ->
+                ReadBookConfig.titleMode = 2
+                ReadBookConfig.paragraphIndent = ""
+                ReadBookConfig.textSize = 20
+                context.putPrefBoolean(PreferKey.textFullJustify, false)
+                AppConfig.adaptSpecialStyle = true
+                ChapterProvider.upStyle()
+                for (mode in listOf("static", "zh", "html")) for (justify in listOf(false, true)) {
+                    context.putPrefBoolean(PreferKey.textFullJustify, justify)
+                    ReadBookConfig.useZhLayout = mode == "zh"
+                    val scope = CoroutineScope(Dispatchers.Default)
+                    val fixture = BookChapter(bookUrl = book!!.bookUrl, url = "highlight-font-$mode", index = 10004)
+                    val text = "字号 abc　👩‍💻 字距与换行。".repeat(8)
+                    val content = if (mode == "html") "<usehtml><p>$text</p></usehtml>" else text
+                    val base = awaitLayout(ChapterProvider.getTextChapterAsync(scope, book!!, fixture,
+                        "Metrics", BookContent(false, listOf(content), null), fixture.index + 1, saveChapterData = false))
+                    val original = canonical(base)
+                    val legacy = HighlightStyle(fontPath = font)
+                    assertTrue(HighlightSpacing.resolve(base,
+                        listOf(HighlightMatcher.Range(0, original.length, legacy))).isEmpty)
+                    for ((size, gap) in listOf(12f to -0.1f, 48f to null, 36f to 0.3f)) {
+                        val style = legacy.copy(fontSize = size, letterSpacing = gap, textColor = Color.BLACK)
+                        val spacing = HighlightSpacing.resolve(base,
+                            listOf(HighlightMatcher.Range(0, original.length, style)))
+                        assertTrue(spacing.hasTextMetrics)
+                        val chapter = awaitLayout(checkNotNull(base.layoutWithHighlightSpacing(scope, spacing)))
+                        val label = "$mode justify=$justify size=$size gap=$gap"
+                        assertEquals(label, original, canonical(chapter))
+                        if (size > 20) {
+                            assertTrue(label, chapter.pages.sumOf { it.lines.size } > base.pages.sumOf { it.lines.size })
+                            assertTrue(label, chapter.pages.first().lines.first().height > base.pages.first().lines.first().height)
+                        }
+                        for (page in chapter.pages) {
+                            val width = ChapterProvider.viewWidth
+                            val height = ceil(maxOf(page.height, page.renderHeight.toFloat())).toInt()
+                            val view = ContentTextView(activity, null).apply { layout(0, 0, width, height); setContent(page) }
+                            for (line in page.lines) for (column in line.columns.filterIsInstance<TextBaseColumn>()) {
+                                column.highlightStyle = style
+                                val paint = HighlightDraw.obtainTextPaint(line.textPaint, style, Color.BLACK, column.charData)
+                                try {
+                                    assertTrue("Glyph must fit above baseline: $label", line.lineBase + paint.fontMetrics.ascent >= line.lineTop - 1f)
+                                    assertTrue("Glyph must fit below baseline: $label", line.lineBase + paint.fontMetrics.descent <= line.lineBottom + 1f)
+                                    assertEquals("Advance must use the actual styled paint: $label",
+                                        paint.measureText(column.charData).coerceAtLeast(0.01f), column.end - column.start, 1.1f)
+                                } finally { HighlightDraw.recycleTextPaint(paint) }
+                            }
+                            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                            try {
+                                view.draw(Canvas(bitmap))
+                                val pixels = IntArray(width * height)
+                                bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+                                assertTrue("Actual glyphs must be visible: $label", pixels.count { Color.alpha(it) > 200 } > 50)
+                                if (size == 48f && page.index == 0) File(context.getExternalFilesDir("ui-regression"),
+                                    "highlight-font-metrics-$mode-$justify.png").outputStream().use {
+                                    assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+                                }
+                            } finally { bitmap.recycle(); page.recycleRecorders() }
+                        }
+                    }
+                    base.pages.forEach(TextPage::recycleRecorders)
+                }
+                val fallback = HighlightStyle(fontPath = "/missing/font.ttf", fontSize = 42f, letterSpacing = 0.2f)
+                val paint = HighlightDraw.obtainTextPaint(ChapterProvider.contentPaint, fallback, Color.BLACK, "正文")
+                try {
+                    assertEquals(HighlightDraw.textSize(0f, fallback), paint.textSize, 0.01f)
+                    assertEquals(0.2f, paint.letterSpacing, 0.001f)
+                } finally { HighlightDraw.recycleTextPaint(paint) }
+            }
+        } finally {
+            instrumentation.runOnMainSync {
+                ReadBookConfig.useZhLayout = savedZh
+                AppConfig.adaptSpecialStyle = savedAdapt
+                context.putPrefBoolean(PreferKey.textFullJustify, savedJustify)
+                ChapterProvider.invalidateHighlightTypeface(font)
+            }
+        }
+    }
+
+    @Test
     fun wrappedFillOnlyCapsKeepVisibleEndsWithZeroPageMargins() {
         launchReader()
         val savedOptimize = AppConfig.optimizeRender

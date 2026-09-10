@@ -11,6 +11,7 @@ import io.legado.app.help.HighlightStyle
 import io.legado.app.help.PaintPool
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.utils.dpToPx
+import io.legado.app.utils.spToPx
 
 object HighlightDraw {
 
@@ -36,6 +37,8 @@ object HighlightDraw {
     fun obtainTextPaint(base: Paint, style: HighlightStyle, color: Int, text: String): Paint {
         val paint = PaintPool.obtain()
         paint.set(base)
+        paint.textSize = textSize(base.textSize, style)
+        style.resolvedLetterSpacing?.let { paint.letterSpacing = it }
         paint.color = color
         paint.isFakeBoldText = paint.isFakeBoldText || style.bold
         if (style.italic) paint.textSkewX = -0.25f
@@ -48,11 +51,13 @@ object HighlightDraw {
                     it,
                     base.typeface?.style ?: Typeface.NORMAL
                 )
-                preserveTextAdvance(base, paint, text)
+                if (!style.changesTextMetrics) preserveTextAdvance(base, paint, text)
             }
         }
         return paint
     }
+
+    fun textSize(base: Float, style: HighlightStyle?): Float = style?.resolvedFontSize?.spToPx() ?: base
 
     private fun preserveTextAdvance(base: Paint, paint: Paint, text: String) {
         val targetWidth = base.measureText(text)

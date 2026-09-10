@@ -2,11 +2,13 @@ package io.legado.app.ui.book.read.page.provider
 
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Rect
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ReplacementSpan
 import io.legado.app.help.HighlightMatcher
 import io.legado.app.help.HighlightStyle
+import io.legado.app.ui.book.read.page.HighlightDraw
 import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.book.read.page.entities.column.BaseColumn
@@ -25,6 +27,7 @@ data class HighlightSpacing(
     data class ParagraphEdge(val start: Int, val end: Int, val padding: Float)
 
     val isEmpty get() = columns.isEmpty() && paragraphEdges.isEmpty()
+    val hasTextMetrics = columns.values.any { it.textAscent != null }
 
     fun edgePadding(start: Int, end: Int): Float = paragraphEdges.asSequence()
         .filter { it.start < end && it.end > start }.maxOfOrNull { it.padding } ?: 0f
@@ -36,6 +39,8 @@ data class HighlightSpacing(
         val contentWidth: Float? = null,
         val reviewGap: Float? = null,
         val reviewWidth: Float = 0f,
+        val textAscent: Float? = null,
+        val textDescent: Float? = null,
     )
 
     operator fun get(position: Int): Insets? = columns[position]
@@ -58,6 +63,10 @@ data class HighlightSpacing(
         override fun getSize(paint: Paint, text: CharSequence, start: Int, end: Int, fm: Paint.FontMetricsInt?): Int {
             val originalWidth = original?.getSize(paint, text, start, end, fm)?.toFloat()
             if (original == null && fm != null) paint.getFontMetricsInt(fm)
+            if (fm != null) {
+                inset.textAscent?.let { fm.ascent = minOf(fm.ascent, kotlin.math.floor(it).toInt()); fm.top = minOf(fm.top, fm.ascent) }
+                inset.textDescent?.let { fm.descent = maxOf(fm.descent, ceil(it).toInt()); fm.bottom = maxOf(fm.bottom, fm.descent) }
+            }
             val width = inset.contentWidth ?: originalWidth
                 ?: paint.measureText(text, start, end)
             return ceil(width + inset.before + inset.after).toInt()
@@ -73,7 +82,20 @@ data class HighlightSpacing(
     companion object {
         private data class Cell(val column: BaseColumn, val line: TextLine, val position: Int,
             val style: HighlightStyle?) {
-            val textSize get() = (column as? TextHtmlColumn)?.mTextSize ?: line.textPaint.textSize
+            val baseTextSize get() = (column as? TextHtmlColumn)?.mTextSize ?: line.textPaint.textSize
+            val textSize get() = HighlightDraw.textSize(baseTextSize, style)
+            val metrics = if (column is TextBaseColumn && style?.changesTextMetrics == true) {
+                val base = Paint(line.textPaint).apply { textSize = baseTextSize }
+                val paint = HighlightDraw.obtainTextPaint(base, style, base.color, column.charData)
+                try {
+                    val fm = paint.fontMetrics
+                    val ink = Rect()
+                    paint.getTextBounds(column.charData, 0, column.charData.length, ink)
+                    Insets(column.positionLength, contentWidth = paint.measureText(column.charData).coerceAtLeast(0.01f),
+                        textAscent = minOf(fm.top, fm.ascent, ink.top.toFloat()),
+                        textDescent = maxOf(fm.bottom, fm.descent, ink.bottom.toFloat()))
+                } finally { HighlightDraw.recycleTextPaint(paint) }
+            } else null
             val padding get(): Float {
                 // The full PILL band is 0.9em above and 0.16em below the baseline, plus
                 // 2dp on each side. HTML fallback metrics can unclip it after reflow.
@@ -81,6 +103,7 @@ data class HighlightSpacing(
                 return fullBandHeight / 2f * checkNotNull(style).resolvedPillPaddingScale
             }
             val advance get(): Float {
+                metrics?.contentWidth?.let { return it }
                 val text = (column as? TextBaseColumn)?.charData ?: return column.end - column.start
                 val paint = Paint(line.textPaint).apply { textSize = this@Cell.textSize }
                 // Justification can disappear when a paragraph wraps differently.
@@ -101,7 +124,11 @@ data class HighlightSpacing(
                 page.lines.forEachIndexed { row, line ->
                     var position = line.chapterPosition
                     line.columns.forEachIndexed { i, column ->
-                        if (column !is ReviewColumn) cells.add(Cell(column, line, position, styles[row][i]))
+                        if (column !is ReviewColumn) {
+                            val cell = Cell(column, line, position, styles[row][i])
+                            cells.add(cell)
+                            cell.metrics?.let { result[position] = it }
+                        }
                         position += column.positionLength
                     }
                     if (line.isParagraphEnd) {

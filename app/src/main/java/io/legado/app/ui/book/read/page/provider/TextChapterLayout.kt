@@ -773,6 +773,9 @@ class TextChapterLayout(
                 textLine.isLeftLine = absStartX < viewWidth / 2
             }
             textLine.upTopBottom(durY, lineHeight, textPaint.fontMetrics) //y坐标
+            if ((lineStart until lineEnd).any { highlightSpacing[chapterStart + it]?.textAscent != null }) {
+                textLine.lineBase = textLine.lineTop + staticLayout.getLineBaseline(lineIndex) - mLineTop
+            }
 
             val columns = mutableListOf<BaseColumn>()
             var charIndex = lineStart
@@ -1115,14 +1118,38 @@ class TextChapterLayout(
         } else {
             StaticLayout(measuredText, textPaint, textLayoutWidth, Layout.Alignment.ALIGN_NORMAL, 0f, 0f, true)
         }
+        val lineMetrics = if (!highlightSpacing.hasTextMetrics) List(layout.lineCount) { fontMetrics }
+        else (0 until layout.lineCount).map { line ->
+            var minAscent = fontMetrics.ascent
+            var maxDescent = fontMetrics.descent
+            for (index in layout.getLineStart(line) until layout.getLineEnd(line)) {
+                highlightSpacing[chapterStart + index]?.let { inset ->
+                    minAscent = minOf(minAscent, inset.textAscent ?: minAscent)
+                    maxDescent = maxOf(maxDescent, inset.textDescent ?: maxDescent)
+                }
+            }
+            if (minAscent == fontMetrics.ascent && maxDescent == fontMetrics.descent) fontMetrics
+            else Paint.FontMetrics().apply {
+                ascent = minAscent
+                descent = maxDescent
+                top = minOf(fontMetrics.top, minAscent)
+                bottom = maxOf(fontMetrics.bottom, maxDescent)
+                leading = fontMetrics.leading
+            }
+        }
+        val lineHeights = lineMetrics.map {
+            if (it === fontMetrics) textHeight
+            else textHeight + fontMetrics.ascent - it.ascent + it.descent - fontMetrics.descent
+        }
         val layoutHeight = if (isTitle && !isTitleNumber) {
             if (layout.lineCount == 0) {
                 0f
             } else {
-                textHeight * (1f + (layout.lineCount - 1) * lineSpacing)
+                if (!highlightSpacing.hasTextMetrics) textHeight * (1f + (layout.lineCount - 1) * lineSpacing)
+                else lineHeights.sum() * lineSpacing + lineHeights.last() * (1f - lineSpacing)
             }
         } else {
-            layout.lineCount * textHeight
+            if (!highlightSpacing.hasTextMetrics) layout.lineCount * textHeight else lineHeights.sum()
         }
         durY = when {
             //标题y轴居中
@@ -1173,7 +1200,8 @@ class TextChapterLayout(
                     .takeIf { usesRightTitleReviewInset },
                 isReviewTrailingInsetApplied = usesRightTitleReviewInset && rightTitleHasReview,
             )
-            prepareNextPageIfNeed(durY + textHeight)
+            val lineHeight = lineHeights[lineIndex]
+            prepareNextPageIfNeed(durY + lineHeight)
             val lineStartX = absStartX + leftInset
             val lineStart = layout.getLineStart(lineIndex)
             val lineEnd = layout.getLineEnd(lineIndex)
@@ -1249,15 +1277,15 @@ class TextChapterLayout(
             }
             calcTextLinePosition(textPages, textLine, stringBuilder.length)
             stringBuilder.append(lineText)
-            textLine.upTopBottom(durY, textHeight, fontMetrics)
+            textLine.upTopBottom(durY, lineHeight, lineMetrics[lineIndex])
             val textPage = pendingTextPage
             textPage.addLine(textLine)
-            durY += textHeight * lineSpacing
+            durY += lineHeight * lineSpacing
             if (textPage.height < durY) {
                 textPage.height = durY
             }
         }
-        durY += textHeight * paragraphSpacing / 10f
+        durY += (lineHeights.lastOrNull() ?: textHeight) * paragraphSpacing / 10f
     }
 
     private fun calcTextLinePosition(
