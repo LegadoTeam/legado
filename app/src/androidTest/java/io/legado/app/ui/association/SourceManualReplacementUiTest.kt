@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.os.SystemClock
 import android.view.MenuItem
 import android.view.View
+import android.widget.AdapterView
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.core.content.FileProvider
@@ -126,10 +127,12 @@ class SourceManualReplacementUiTest {
                     code.binding.codeView.setText(GSON.toJson(source(rss, 0, "Edited Seed0")))
                 }
                 withBlockedSourceRules { entered, release ->
-                    host.menu(if (manual) R.id.menu_manual_replace_rule else R.id.menu_effective_replaces, code)
+                    host.menu(if (manual) R.id.menu_manual_replace_rule else R.id.menu_effective_replaces,
+                        code, waitForIdleAfterClick = false)
                     assertTrue("The real source-rule query must be held", entered.await(15, java.util.concurrent.TimeUnit.SECONDS))
                     val model = main { if (rss) host.feed else host.book }
-                    assertTrue(main { if (rss) host.feed.sourceUpdatePending.value == true else host.book.sourceUpdatePending.value == true })
+                    assertTrue("The query must still be held: rss=$rss manual=$manual recreate=$recreate",
+                        main { if (rss) host.feed.sourceUpdatePending.value == true else host.book.sourceUpdatePending.value == true })
                     if (recreate) {
                         host.scenario.recreate()
                         host.findParent()
@@ -359,13 +362,15 @@ class SourceManualReplacementUiTest {
             host.ready()
             host.names("Seed+0", "Seed+1")
             withBlockedSourceRules(fail = true) { entered, release ->
-                host.menu(R.id.menu_replace_source)
+                host.menu(R.id.menu_replace_source, waitForIdleAfterClick = false)
                 assertTrue(entered.await(15, java.util.concurrent.TimeUnit.SECONDS))
                 release.countDown()
                 host.ready()
                 host.names("Seed+0", "Seed+1")
                 assertFalse(AppConfig.importReplaceSource)
                 host.manualEnabled(true)
+                assertTrue(main { (if (rss) host.feed.errorLiveData.value else host.book.errorLiveData.value)
+                    ?.contains("Injected source-rule read failure") == true })
             }
             host.menu(R.id.menu_replace_source)
             host.ready()
@@ -480,14 +485,31 @@ class SourceManualReplacementUiTest {
             }
             return checkNotNull(result)
         }
-        fun menu(id: Int, dialog: DialogFragment = parent) {
+        fun menu(id: Int, dialog: DialogFragment = parent, waitForIdleAfterClick: Boolean = true) {
             val toolbar = main { dialog.requireView().findViewById<Toolbar>(R.id.tool_bar) }
             main { assertTrue(toolbar.menu.findItem(id).isVisible); toolbar.showOverflowMenu() }
             await("Missing overflow") { main { toolbar.isOverflowMenuShowing } }
-            onData(object : TypeSafeMatcher<Any>() {
+            val item = onData(object : TypeSafeMatcher<Any>() {
                 override fun describeTo(description: Description) { description.appendText("menu $id") }
                 override fun matchesSafely(item: Any) = item is MenuItem && item.itemId == id
-            }).inRoot(isPlatformPopup()).perform(click())
+            }).inRoot(isPlatformPopup())
+            if (waitForIdleAfterClick) item.perform(click())
+            else {
+                // A held query keeps the progress animation running. Dispatch the real popup
+                // item without Espresso waiting for that query before this test can release it.
+                var row: View? = null
+                item.check { view, error ->
+                    if (error != null) throw error
+                    row = view
+                }
+                main {
+                    val view = checkNotNull(row)
+                    val list = view.parent as AdapterView<*>
+                    val position = list.getPositionForView(view)
+                    assertTrue(position >= 0)
+                    assertTrue(list.performItemClick(view, position, list.getItemIdAtPosition(position)))
+                }
+            }
         }
         fun manualEnabled(enabled: Boolean, dialog: DialogFragment = parent) = main {
             val toolbar = dialog.requireView().findViewById<Toolbar>(R.id.tool_bar)
