@@ -353,10 +353,11 @@ class CodeSelectionUiTest {
         assertNativeMenu()
         assertNativeMenuClearOfTools()
         screenshot("code-selection-native-ime-search-bottom")
-        val nativeWindow = Rect()
+        val nativeMenu = Rect()
         onView(withText(android.R.string.copy)).inRoot(isPlatformPopup()).check { view, failure ->
             if (failure != null) throw failure
-            visibleScreenBounds(view!!.rootView, nativeWindow)
+            // Android's popup window also reserves transparent space for its closed overflow panel.
+            visibleScreenBounds(view!!.parent.parent as View, nativeMenu)
         }
         fun scrollPoint(view: View, rowsFromBottom: Float): FloatArray {
             val editor = view as CodeEditor
@@ -364,16 +365,24 @@ class CodeSelectionUiTest {
             view.getLocationOnScreen(position)
             val point = floatArrayOf(position[0] + view.width * 0.9f,
                 position[1] + view.height - editor.rowHeight * rowsFromBottom)
-            assertFalse("The scroll gesture must avoid the native popup window $nativeWindow",
-                nativeWindow.contains(point[0].toInt(), point[1].toInt()))
+            assertFalse("The scroll gesture must avoid the visible native menu $nativeMenu",
+                nativeMenu.contains(point[0].toInt(), point[1].toInt()))
             return point
         }
         onView(withId(R.id.editText)).perform(GeneralSwipeAction(Swipe.SLOW, { view ->
-            scrollPoint(view, 0.5f)
+            scrollPoint(view, 0.25f)
         }, { view ->
-            scrollPoint(view, 1.5f)
+            scrollPoint(view, 2.25f)
         }, Press.FINGER))
-        awaitEditor { it.offsetY > offset && selection(it) == selected && it.text.toString() == code }
+        var scrollState = ""
+        await(message = { scrollState }) {
+            var ready = false
+            withEditor {
+                scrollState = "Scroll ${it.offsetY} > $offset; selection=${selection(it)}; expected=$selected"
+                ready = it.offsetY > offset && selection(it) == selected && it.text.toString() == code
+            }
+            ready
+        }
         // FloatingActionMode deliberately hides a moving toolbar briefly before positioning it.
         SystemClock.sleep(500)
         assertNativeMenu()
