@@ -202,6 +202,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
      * pageOffset + textPage.height 为 textPage 下方的高度
      */
     fun scroll(mOffset: Int) {
+        if (pageFactory.isRefreshingResources) return
         cancelHighlightTap()
         val previousOffset = pageOffset
         val previousPage = textPage

@@ -10,16 +10,22 @@ import splitties.init.appCtx
 class TextPageFactory(dataSource: DataSource) : PageFactory<TextPage>(dataSource) {
 
     private val keepSwipeTip = appCtx.getString(R.string.keep_swipe_tip)
+    var isRefreshingResources = false
+    private val message: String?
+        get() = if (isRefreshingResources) appCtx.getString(R.string.data_loading) else ReadBook.msg
 
     override fun hasPrev(): Boolean = with(dataSource) {
+        if (isRefreshingResources) return@with false
         return hasPrevChapter() || pageIndex > 0
     }
 
     override fun hasNext(): Boolean = with(dataSource) {
+        if (isRefreshingResources) return@with false
         return hasNextChapter() || (currentChapter != null && currentChapter?.isLastIndex(pageIndex) != true)
     }
 
     override fun hasNextPlus(): Boolean = with(dataSource) {
+        if (isRefreshingResources) return@with false
         return hasNextChapter() || pageIndex < (currentChapter?.pageSize ?: 1) - 2
     }
 
@@ -83,7 +89,7 @@ class TextPageFactory(dataSource: DataSource) : PageFactory<TextPage>(dataSource
 
     override val curPage: TextPage
         get() = with(dataSource) {
-            ReadBook.msg?.let {
+            message?.let {
                 return@with TextPage(text = it).format()
             }
             currentChapter?.let {
@@ -95,7 +101,7 @@ class TextPageFactory(dataSource: DataSource) : PageFactory<TextPage>(dataSource
 
     override val nextPage: TextPage
         get() = with(dataSource) {
-            ReadBook.msg?.let {
+            message?.let {
                 return@with TextPage(text = it).format()
             }
             currentChapter?.let {
@@ -117,7 +123,7 @@ class TextPageFactory(dataSource: DataSource) : PageFactory<TextPage>(dataSource
 
     override val prevPage: TextPage
         get() = with(dataSource) {
-            ReadBook.msg?.let {
+            message?.let {
                 return@with TextPage(text = it).format()
             }
             currentChapter?.let {
@@ -139,6 +145,9 @@ class TextPageFactory(dataSource: DataSource) : PageFactory<TextPage>(dataSource
 
     override val nextPlusPage: TextPage
         get() = with(dataSource) {
+            message?.let {
+                return@with TextPage(text = it).format()
+            }
             currentChapter?.let {
                 val pageIndex = pageIndex
                 if (pageIndex < it.pageSize - 2) {
