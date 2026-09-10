@@ -20,6 +20,7 @@ import androidx.test.espresso.Espresso.openActionBarOverflowOrOptionsMenu
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.matcher.RootMatchers.isPlatformPopup
 import androidx.test.espresso.matcher.ViewMatchers.withText
+import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.legado.app.R
@@ -40,7 +41,7 @@ import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.EffectiveReplacesDialog
 import io.legado.app.ui.book.read.ManualReplaceRulesDialog
 import io.legado.app.ui.replace.ReplaceRuleActivity
-import io.legado.app.ui.widget.TitleBar
+import io.legado.app.ui.widget.PopupAction
 import io.legado.app.ui.widget.dialog.CodeDialog
 import io.legado.app.utils.GSON
 import io.legado.app.utils.defaultSharedPreferences
@@ -196,15 +197,17 @@ class SourceManualReplacementUiTest {
         assertFalse(AppConfig.manualSourceReplaceRule)
         prefs.edit().putBoolean(PreferKey.manualReplaceRule, true).commit()
         ActivityScenario.launch(ReplaceRuleActivity::class.java).use { scenario ->
-            scenario.onActivity { activity ->
-                val menu = activity.findViewById<TitleBar>(R.id.title_bar).menu
-                assertTrue(menu.findItem(R.id.menu_manual_reader_replace).isChecked)
-                assertFalse(menu.findItem(R.id.menu_manual_source_replace).isChecked)
-                assertNull(menu.findItem(R.id.menu_manual_reader_replace).icon)
-                assertNull(menu.findItem(R.id.menu_manual_source_replace).icon)
-            }
+            assertTrue(AppConfig.manualReplaceRule)
+            assertFalse(AppConfig.manualSourceReplaceRule)
             openActionBarOverflowOrOptionsMenu(context)
             onView(withText(R.string.manual_replace_rule)).inRoot(isPlatformPopup()).perform(click())
+            onView(withId(R.id.recycler_view)).inRoot(isPlatformPopup()).check { view, error ->
+                if (error != null) throw error
+                val items = ((view as RecyclerView).adapter as PopupAction.Adapter).getItems()
+                assertEquals(listOf(PreferKey.manualReplaceRule, PreferKey.manualSourceReplaceRule), items.map { it.value })
+                assertEquals(listOf(true, false), items.map { it.checked })
+                assertTrue(items.all { it.checkable && it.icon == null })
+            }
             screenshot("source-manual-two-switches")
             onView(withText(R.string.manual_source_replacement)).inRoot(isPlatformPopup()).perform(click())
             assertTrue(AppConfig.manualSourceReplaceRule)

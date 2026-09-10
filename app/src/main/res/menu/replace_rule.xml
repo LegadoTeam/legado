@@ -64,14 +64,7 @@
         android:id="@+id/menu_manual_replace_rule"
         android:icon="@drawable/ic_find_replace"
         android:title="@string/manual_replace_rule"
-        app:showAsAction="never">
-        <menu>
-            <item android:id="@+id/menu_manual_reader_replace"
-                android:title="@string/manual_reader_replacement" android:checkable="true" />
-            <item android:id="@+id/menu_manual_source_replace"
-                android:title="@string/manual_source_replacement" android:checkable="true" />
-        </menu>
-    </item>
+        app:showAsAction="never" />
 
     <item
         android:id="@+id/menu_help"

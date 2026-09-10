@@ -3,6 +3,7 @@ package io.legado.app.ui.replace
 import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.Menu
+import android.view.Gravity
 import android.view.MenuItem
 import android.view.SubMenu
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,6 +16,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.AppLog
+import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.databinding.ActivityReplaceRuleBinding
@@ -34,6 +36,7 @@ import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.qrcode.QrCodeResult
 import io.legado.app.ui.replace.edit.ReplaceEditActivity
 import io.legado.app.ui.widget.SelectActionBar
+import io.legado.app.ui.widget.PopupAction
 import io.legado.app.ui.widget.recycler.DragSelectTouchHelper
 import io.legado.app.ui.widget.recycler.ItemTouchCallback
 import io.legado.app.ui.widget.recycler.VerticalDivider
@@ -135,8 +138,6 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
         groupMenu = menu.findItem(R.id.menu_group)?.subMenu
-        menu.findItem(R.id.menu_manual_reader_replace)?.isChecked = AppConfig.manualReplaceRule
-        menu.findItem(R.id.menu_manual_source_replace)?.isChecked = AppConfig.manualSourceReplaceRule
         upGroupMenu()
         return super.onPrepareOptionsMenu(menu)
     }
@@ -258,18 +259,7 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
                 editActivity.launch(ReplaceEditActivity.startIntent(this))
 
             R.id.menu_group_manage -> showDialogFragment<GroupManageDialog>()
-            R.id.menu_manual_reader_replace -> {
-                AppConfig.manualReplaceRule = !AppConfig.manualReplaceRule
-                item.isChecked = AppConfig.manualReplaceRule
-                setResult(RESULT_OK)
-                invalidateOptionsMenu()
-            }
-            R.id.menu_manual_source_replace -> {
-                AppConfig.manualSourceReplaceRule = !AppConfig.manualSourceReplaceRule
-                item.isChecked = AppConfig.manualSourceReplaceRule
-                setResult(RESULT_OK)
-                invalidateOptionsMenu()
-            }
+            R.id.menu_manual_replace_rule -> showManualReplacementSettings()
             R.id.menu_enabled_group -> {
                 searchView.setQuery(getString(R.string.enabled), true)
             }
@@ -295,6 +285,27 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
             }
         }
         return super.onCompatOptionsItemSelected(item)
+    }
+
+    private fun showManualReplacementSettings() {
+        PopupAction(this).apply {
+            setVertical(true)
+            setActionItems(listOf(
+                PopupAction.PopupActionItem(getString(R.string.manual_reader_replacement),
+                    PreferKey.manualReplaceRule, checkable = true, checked = AppConfig.manualReplaceRule),
+                PopupAction.PopupActionItem(getString(R.string.manual_source_replacement),
+                    PreferKey.manualSourceReplaceRule, checkable = true, checked = AppConfig.manualSourceReplaceRule),
+            ))
+            onActionClick = { key ->
+                dismiss()
+                when (key) {
+                    PreferKey.manualReplaceRule -> AppConfig.manualReplaceRule = !AppConfig.manualReplaceRule
+                    PreferKey.manualSourceReplaceRule -> AppConfig.manualSourceReplaceRule = !AppConfig.manualSourceReplaceRule
+                }
+                setResult(RESULT_OK)
+            }
+            showAsDropDown(binding.titleBar.toolbar, 0, 4.dpToPx(), Gravity.END)
+        }
     }
 
     override fun onMenuItemClick(item: MenuItem?): Boolean {
