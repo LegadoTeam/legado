@@ -12,6 +12,8 @@ import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import android.os.SystemClock
 import android.os.Bundle
+import android.os.Build
+import android.os.Environment
 import android.view.View
 import androidx.core.content.FileProvider
 import androidx.fragment.app.DialogFragment
@@ -376,6 +378,7 @@ class SharedFileImportTest {
                 scenario.onActivity { activity ->
                     assertEquals(1, activity.supportFragmentManager.fragments.filterIsInstance<ImportLocalBookDialog>().size)
                 }
+                awaitLocalPreview(scenario)
                 confirmLocalPreview(scenario)
                 onView(withText(R.string.shared_local_books_storage)).inRoot(isDialog()).check(matches(isDisplayed()))
                 screenshot("share-local-folder-after-confirmation")
@@ -413,6 +416,12 @@ class SharedFileImportTest {
         instrumentation.addMonitor(monitor)
         try {
             ActivityScenario.launch<ImportBookActivity>(Intent(context, ImportBookActivity::class.java)).use {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
+                    onView(withText(R.string.tip_perm_request_storage)).inRoot(isDialog())
+                        .check(matches(isDisplayed()))
+                    // Declining the existing scan permission must still leave the save-folder menu usable.
+                    pressBack()
+                }
                 openActionBarOverflowOrOptionsMenu(context)
                 onView(withText(R.string.local_book_save_path)).perform(click())
                 onView(withText(R.string.local_book_save_path)).inRoot(isDialog()).check(matches(isDisplayed()))

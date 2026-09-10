@@ -664,13 +664,18 @@ class BottomWebViewDialogShowTest {
         scenario!!.onActivity { activity ->
             browser = newDialog(config = """{"heightPercentage":0.5,"dismissOnTouchOutside":false}""")
             browser.show(activity.supportFragmentManager, "outside-toggle")
-            browser.upConfig("""{"dismissOnTouchOutside":true}""")
         }
         awaitGeometry { it.height > 0 && it.top > 0 && it.state == BottomSheetBehavior.STATE_EXPANDED }
         assertTrue(awaitCondition { browser.dialog?.window?.decorView?.hasWindowFocus() == true })
+        // Initial config is parsed on IO; toggle only after its geometry has been applied.
+        scenario!!.onActivity { browser.upConfig("""{"dismissOnTouchOutside":true}""") }
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        screenshot("paragraph-outside-toggle-before")
         tapOutside(browser)
+        val dismissed = awaitCondition { browser.dialog?.isShowing != true }
+        screenshot("paragraph-outside-toggle-after")
         assertTrue("Enabling outside touch must still dismiss the browser",
-            awaitCondition { browser.dialog?.isShowing != true })
+            dismissed)
         scenario!!.onActivity { assertFalse(it.isFinishing) }
     }
 
