@@ -1658,9 +1658,15 @@ class ReadBookActivity : BaseReadBookActivity(),
                 // 跨章：打开朗读所在章节并精确定位到朗读字符位置。
                 // openChapter 会先脱离跟随, 故在加载完成回调里再恢复跟随。
                 val durChapterPos = chapterStart.coerceAtLeast(0)
+                val bookUrl = ReadBook.book?.bookUrl
                 ReadBook.openChapter(speakingChapterIndex, durChapterPos) {
-                    ReadAloud.restoreReadAloudFollow()
-                    upTextChapterAloudSpan(chapterStart)
+                    if (BaseReadAloudService.isRun && ReadBook.book?.bookUrl == bookUrl &&
+                        ReadBook.durChapterIndex == speakingChapterIndex &&
+                        ReadAloud.readAloudChapterIndex == speakingChapterIndex
+                    ) {
+                        ReadAloud.restoreReadAloudFollow()
+                        upTextChapterAloudSpan(ReadAloud.readAloudChapterStart)
+                    }
                 }
             }
 

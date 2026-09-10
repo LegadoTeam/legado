@@ -518,6 +518,7 @@ object CacheBook {
             semaphore: Semaphore?,
             resetPageOffset: Boolean = false,
             readPositionVersion: Long? = null,
+            success: (() -> Unit)? = null,
         ) {
             val requestBook = book
             val contentToken = BookHelp.contentSaveToken(requestBook, chapter)
@@ -525,7 +526,7 @@ object CacheBook {
                 downloadAwait(chapter)
             }.onSuccess { content ->
                 downloadFinish(requestBook, chapter, content, resetPageOffset,
-                    readPositionVersion = readPositionVersion, contentToken = contentToken)
+                    readPositionVersion = readPositionVersion, contentToken = contentToken, success = success)
             }.onCancel {
                 downloadFinish(requestBook, chapter, "download canceled", resetPageOffset,
                     canceled = true, readPositionVersion = readPositionVersion, contentToken = contentToken)
@@ -543,6 +544,7 @@ object CacheBook {
             canceled: Boolean = false,
             readPositionVersion: Long? = null,
             contentToken: ContentSaveToken,
+            success: (() -> Unit)? = null,
         ) {
             if (ReadBook.book?.bookUrl == requestBook.bookUrl && BookHelp.isContentSaveCurrent(contentToken)) {
                 ReadBook.contentLoadFinish(
@@ -551,6 +553,7 @@ object CacheBook {
                     canceled = canceled,
                     readPositionVersion = readPositionVersion,
                     contentToken = contentToken,
+                    success = success,
                 )
             }
         }
