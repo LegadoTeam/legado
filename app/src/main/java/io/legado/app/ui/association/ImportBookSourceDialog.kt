@@ -51,10 +51,17 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
     Toolbar.OnMenuItemClickListener,
     CodeDialog.Callback, ManualReplaceRulesDialog.Callback, EffectiveReplacesDialog.Callback {
 
-    constructor(source: String, finishOnDismiss: Boolean = false) : this() {
+    constructor(
+        source: String,
+        finishOnDismiss: Boolean = false,
+        reimportBookUrl: String? = null,
+        reimportSourceUrl: String? = null,
+    ) : this() {
         arguments = Bundle().apply {
             putString("source", source)
             putBoolean("finishOnDismiss", finishOnDismiss)
+            putString("reimportBookUrl", reimportBookUrl)
+            putString("reimportSourceUrl", reimportSourceUrl)
         }
     }
 
@@ -110,11 +117,15 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
         binding.tvOk.isEnabled = false
         binding.tvOk.setOnClickListener {
             if (viewModel.sourceUpdatePending.value == true) return@setOnClickListener
-            val waitDialog = WaitDialog(requireContext())
-            waitDialog.show()
-            viewModel.importSelect {
-                waitDialog.dismiss()
-                dismissAllowingStateLoss()
+            if (arguments?.getString("reimportBookUrl") != null) {
+                viewModel.importSelect()
+            } else {
+                val waitDialog = WaitDialog(requireContext())
+                waitDialog.show()
+                viewModel.importSelect {
+                    waitDialog.dismiss()
+                    dismissAllowingStateLoss()
+                }
             }
         }
         binding.tvFooterLeft.visible()
@@ -125,6 +136,9 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
             indices.forEach { viewModel.setSelection(it, !selectAll) }
             adapter.notifyDataSetChanged()
             upSelectText()
+        }
+        viewModel.importFinished.observe(viewLifecycleOwner) { finished ->
+            if (finished) dismissAllowingStateLoss()
         }
         viewModel.errorLiveData.observe(viewLifecycleOwner) {
             binding.rotateLoading.gone()
@@ -156,6 +170,8 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
             }
         }
         viewModel.sourceUpdatePending.observe(viewLifecycleOwner) {
+            if (it == true) binding.rotateLoading.visible()
+            else if (sourceListReady) binding.rotateLoading.gone()
             adapter.notifyDataSetChanged()
             updateInteractionState()
             openCodeDialog()?.setReplaceRuleRefreshPending(
@@ -174,7 +190,9 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
             dismiss()
             return
         }
-        viewModel.importSource(source)
+        viewModel.importSource(source,
+            reimportBookUrl = arguments?.getString("reimportBookUrl"),
+            reimportSourceUrl = arguments?.getString("reimportSourceUrl"))
     }
 
     private fun refreshSources() {

@@ -1344,4 +1344,5 @@
     <string name="book_memo_clear_confirm">清空這本書的備忘？</string>
     <string name="book_memo_discard">放棄未儲存的修改並關閉？</string>
     <string name="book_memo_save_failed">備忘儲存失敗：%1$s</string>
+    <string name="reimport_book_source">重新匯入本書書源</string>
 </resources>

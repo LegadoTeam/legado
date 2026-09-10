@@ -41,6 +41,7 @@ enum class ReaderMenuItem(
     DelRubyTag("delRubyTag", intArrayOf(R.id.menu_del_ruby_tag), R.string.del_ruby_tag),
     DelHTag("delHTag", intArrayOf(R.id.menu_del_h_tag), R.string.del_h_tag),
     ImageStyle("imageStyle", intArrayOf(R.id.menu_image_style), R.string.image_style),
+    ReimportSource("reimportSource", intArrayOf(R.id.menu_reimport_source), R.string.reimport_book_source),
     UpdateToc("updateToc", intArrayOf(R.id.menu_update_toc), R.string.update_toc),
     EffectiveReplaces(
         "effectiveReplaces",

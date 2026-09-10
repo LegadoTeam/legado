@@ -177,6 +177,7 @@ import androidx.lifecycle.Lifecycle
 import com.script.rhino.runScriptWithContext
 import io.legado.app.model.analyzeRule.AnalyzeUrl.Companion.paramPattern
 import io.legado.app.ui.login.SourceLoginJsExtensions
+import io.legado.app.ui.association.ImportBookSourceDialog
 
 /**
  * 阅读界面
@@ -355,6 +356,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     @SuppressLint("ClickableViewAccessibility")
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
+        viewModel.pendingSourceReimport.observe(this) { showPendingSourceReimport() }
         viewModel.resourceRefreshing.observe(this) { loading ->
             if (binding.readView.pageFactory.isRefreshingResources != loading) {
                 if (loading) binding.readView.updateScrollReadPosition()
@@ -483,6 +485,22 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
     }
 
+    override fun onPostResume() {
+        super.onPostResume()
+        showPendingSourceReimport()
+    }
+
+    private fun showPendingSourceReimport() {
+        val pending = viewModel.pendingSourceReimport.value ?: return
+        if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) ||
+            supportFragmentManager.isStateSaved) return
+        viewModel.pendingSourceReimport.value = null
+        if (ReadBook.book?.bookUrl != pending.bookUrl || ReadBook.book?.origin != pending.sourceUrl) return
+        if (supportFragmentManager.findFragmentByTag("readerSourceReimport") != null) return
+        ImportBookSourceDialog(pending.json, reimportBookUrl = pending.bookUrl,
+            reimportSourceUrl = pending.sourceUrl).show(supportFragmentManager, "readerSourceReimport")
+    }
+
     override fun onPause() {
         super.onPause()
         binding.readView.cancelTouchGestures()
@@ -564,6 +582,7 @@ class ReadBookActivity : BaseReadBookActivity(),
 //                        item.isChecked = AppConfig.enableReview
 //                    }
 
+                    R.id.menu_reimport_source -> item.isVisible = onLine
                     R.id.menu_reverse_content -> {
                         item.isVisible = onLine
                         item.isChecked = ReadBook.curTextChapter?.chapter?.takeIf {
@@ -830,6 +849,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             R.id.menu_edit_content -> ContentEditDialog.newInstance()?.let {
                 showDialogFragment(it)
             }
+            R.id.menu_reimport_source -> viewModel.prepareSourceReimport()
             R.id.menu_update_toc -> ReadBook.book?.let {
                 if (it.isEpub) {
                     BookHelp.clearCache(it)
