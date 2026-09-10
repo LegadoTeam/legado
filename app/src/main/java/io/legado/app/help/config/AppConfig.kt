@@ -692,6 +692,22 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefBoolean(PreferKey.importReplaceSource, value)
         }
 
+    var importRememberGroup: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.importRememberGroup, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.importRememberGroup, value)
+            if (!value) {
+                importLastGroup = null
+                importLastGroupAdd = false
+            }
+        }
+    var importLastGroup: String?
+        get() = appCtx.getPrefString(PreferKey.importLastGroup)
+        set(value) { appCtx.putPrefString(PreferKey.importLastGroup, value) }
+    var importLastGroupAdd: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.importLastGroupAdd, false)
+        set(value) { appCtx.putPrefBoolean(PreferKey.importLastGroupAdd, value) }
+
     val clickImgWay: String?
         get() = appCtx.getPrefString(PreferKey.clickImgWay)
 

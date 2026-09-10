@@ -44,6 +44,12 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_remember_source_group"
+        android:title="@string/import_remember_group"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_replace_source"
         android:title="@string/replace_source_on_import"
         android:checkable="true"
