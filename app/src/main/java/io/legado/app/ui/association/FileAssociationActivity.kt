@@ -44,7 +44,9 @@ class FileAssociationActivity :
     VMBaseActivity<ActivityTranslucenceBinding, FileAssociationViewModel>() {
 
     private val localBookTreeSelect = registerForActivityResult(HandleFileContract()) {
-        intent.data?.let { uri ->
+        (viewModel.pendingBookUri ?: intent.data ?: IntentCompat.getParcelableExtra(
+            intent, Intent.EXTRA_STREAM, Uri::class.java
+        ))?.let { uri ->
             it.uri?.let { treeUri ->
                 AppConfig.defaultBookTreeUri = treeUri.toString()
                 importBook(treeUri, uri)
@@ -91,6 +93,7 @@ class FileAssociationActivity :
                 "txtRule" -> showDialogFragment(ImportTxtTocRuleDialog(it.second, true))
                 "dictRule" -> showDialogFragment(ImportDictRuleDialog(it.second, true))
                 "autoTask" -> showDialogFragment(ImportAutoTaskDialog(it.second, true))
+                "bookshelf", "backup" -> showDialogFragment(ImportDataDialog(it.first, it.second))
             }
         }
         viewModel.errorLive.observe(this) {
@@ -184,6 +187,7 @@ class FileAssociationActivity :
     }
 
     private fun importBook(uri: Uri) {
+        viewModel.pendingBookUri = uri
         if (uri.isContentScheme()) {
             val treeUriStr = AppConfig.defaultBookTreeUri
             if (treeUriStr.isNullOrEmpty()) {
@@ -282,4 +286,9 @@ class FileAssociationActivity :
 internal fun isSupportedSharedImportMimeType(mimeType: String?): Boolean =
     mimeType.equals("text/plain", ignoreCase = true) ||
         mimeType.equals("text/*", ignoreCase = true) ||
-        mimeType.equals("application/json", ignoreCase = true)
+        mimeType.equals("application/json", ignoreCase = true) ||
+        mimeType.equals("application/epub+zip", ignoreCase = true) ||
+        mimeType.equals("application/pdf", ignoreCase = true) ||
+        mimeType.equals("application/zip", ignoreCase = true) ||
+        mimeType.equals("application/x-zip-compressed", ignoreCase = true) ||
+        mimeType.equals("application/octet-stream", ignoreCase = true)
