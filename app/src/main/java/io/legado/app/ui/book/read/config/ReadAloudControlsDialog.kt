@@ -57,6 +57,9 @@ class ReadAloudControlsDialog : BasePrefDialogFragment() {
 
         override fun onPreferenceTreeClick(preference: Preference): Boolean {
             when (preference.key) {
+                PreferKey.readAloudControlsRealtime -> {
+                    (activity as? ReadBookActivity)?.showReadAloudControls()
+                }
                 "readAloudControlsReveal", "readAloudControlsReset" -> {
                     (activity as? ReadBookActivity)?.showReadAloudControls(
                         resetPosition = preference.key == "readAloudControlsReset",

@@ -5,9 +5,19 @@
         android:title="@string/read_aloud_controls"
         app:iconSpaceReserved="false" />
     <io.legado.app.lib.prefs.SwitchPreference
+        android:key="readAloudControlsRealtime"
+        android:defaultValue="true"
+        android:title="@string/read_aloud_controls_realtime"
+        app:iconSpaceReserved="false" />
+    <io.legado.app.lib.prefs.SwitchPreference
         android:key="readAloudControlsPause"
-        android:defaultValue="false"
+        android:defaultValue="true"
         android:title="@string/read_aloud_controls_pause"
+        app:iconSpaceReserved="false" />
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:key="readAloudControlsPosition"
+        android:defaultValue="true"
+        android:title="@string/read_aloud_controls_position"
         app:iconSpaceReserved="false" />
     <io.legado.app.lib.prefs.SwitchPreference
         android:key="readAloudControlsAutoHide"

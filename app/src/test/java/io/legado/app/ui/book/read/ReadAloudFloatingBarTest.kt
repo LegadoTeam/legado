@@ -8,14 +8,19 @@ import java.io.File
 class ReadAloudFloatingBarTest {
 
     @Test
-    fun `visibility requires running detached speech with menus hidden`() {
+    fun `each control follows its own switch and all controls hide under menus or after stopping`() {
+        assertTrue(ReadAloudBarVisibility.shouldShow(true, true, false))
         assertTrue(ReadAloudBarVisibility.shouldShow(true, false, false))
-        assertFalse(ReadAloudBarVisibility.shouldShow(false, false, false))
-        assertFalse(ReadAloudBarVisibility.shouldShow(true, true, false))
-        assertFalse(ReadAloudBarVisibility.shouldShow(true, false, true))
-        assertTrue(ReadAloudBarVisibility.shouldShow(true, true, false, true))
-        assertFalse(ReadAloudBarVisibility.shouldShow(true, true, true, true))
-        assertFalse(ReadAloudBarVisibility.shouldShow(false, true, false, true))
+        for (following in listOf(false, true)) {
+            for (pause in listOf(false, true)) {
+                for (position in listOf(false, true)) {
+                    org.junit.Assert.assertEquals(if (following) pause else position,
+                        ReadAloudBarVisibility.shouldShow(true, following, false, pause, position))
+                    assertFalse(ReadAloudBarVisibility.shouldShow(false, following, false, pause, position))
+                    assertFalse(ReadAloudBarVisibility.shouldShow(true, following, true, pause, position))
+                }
+            }
+        }
     }
 
     @Test
