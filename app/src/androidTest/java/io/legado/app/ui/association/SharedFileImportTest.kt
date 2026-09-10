@@ -368,6 +368,9 @@ class SharedFileImportTest {
                 onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
                 awaitLocalPreview(scenario)
                 scenario.recreate()
+                scenario.onActivity { activity ->
+                    assertEquals(1, activity.supportFragmentManager.fragments.filterIsInstance<ImportLocalBookDialog>().size)
+                }
                 confirmLocalPreview(scenario)
                 val copied = File(directory, "books/${file.name}")
                 await { copied.exists() && appDb.bookDao.has(copied.path) }
@@ -424,6 +427,9 @@ class SharedFileImportTest {
             assertEquals(4, model.selectedLocalBooks.size)
             scenario.recreate()
             awaitLocalPreview(scenario)
+            scenario.onActivity { activity ->
+                assertEquals(1, activity.supportFragmentManager.fragments.filterIsInstance<ImportLocalBookDialog>().size)
+            }
             assertEquals(4, model.selectedLocalBooks.size)
             screenshot("share-local-archive-selection")
             val selected = items.filter { it.file.uri in model.selectedLocalBooks }
@@ -513,21 +519,28 @@ class SharedFileImportTest {
         }
     }
 
-    @Test(timeout = 120_000) fun archiveContainingOneRecognizedJsonUsesItsExistingImportPreview() {
-        val rule = HighlightRule(name = "Archive highlight $id", pattern = id, style = "{\"bold\":true}")
-        rules.add(rule)
+    @Test(timeout = 120_000) fun archiveCombinesSameCategoryJsonIntoItsExistingSelectionPreview() {
+        val imported = (1..3).map { index ->
+            HighlightRule(name = "Archive highlight $index $id", pattern = "$index-$id", style = "{\"bold\":true}")
+        }
+        rules.addAll(imported)
         val archive = File(directory, "rules-$id.zip")
-        writeArchive(archive, linkedMapOf("unrelated.json" to GSON.toJson(listOf(rule)).toByteArray(),
+        writeArchive(archive, linkedMapOf("unrelated.json" to GSON.toJson(imported.take(2)).toByteArray(),
+            "typed.json" to GSON.toJson(HighlightRuleFile(HighlightRuleFile.TYPE, imported.drop(2))).toByteArray(),
             "ignored.json" to "{}".toByteArray(), "picture.jpg" to byteArrayOf(1, 2)))
         val original = archive.readBytes()
         launchShare(archive, "application/zip").use { scenario ->
             awaitDialog(scenario)
-            onView(withText(rule.name)).inRoot(isDialog()).check(matches(isDisplayed()))
-            assertFalse(appDb.highlightRuleDao.all.any { it.uuid == rule.uuid })
+            imported.forEach { rule ->
+                onView(withText(rule.name)).inRoot(isDialog()).check(matches(isDisplayed()))
+                assertFalse(appDb.highlightRuleDao.all.any { it.uuid == rule.uuid })
+            }
             screenshot("share-local-archive-json-preview")
             onView(withId(R.id.tv_ok)).inRoot(isDialog()).perform(click())
-            await { appDb.highlightRuleDao.all.any { it.uuid == rule.uuid } }
-            assertEquals(rule.styleObj(), appDb.highlightRuleDao.all.single { it.uuid == rule.uuid }.styleObj())
+            await { imported.all { rule -> appDb.highlightRuleDao.all.any { it.uuid == rule.uuid } } }
+            imported.forEach { rule ->
+                assertEquals(rule.styleObj(), appDb.highlightRuleDao.all.single { it.uuid == rule.uuid }.styleObj())
+            }
             assertArrayEquals(original, archive.readBytes())
         }
     }

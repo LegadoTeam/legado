@@ -47,7 +47,7 @@ class FileAssociationActivity :
         viewModel.localBookBatch.observe(this) {
             binding.rotateLoading.gone()
             if (supportFragmentManager.findFragmentByTag("sharedLocalBooks") == null) {
-                ImportLocalBookDialog().show(supportFragmentManager, "sharedLocalBooks")
+                ImportLocalBookDialog().show(supportFragmentManager.beginTransaction(), "sharedLocalBooks")
             }
         }
         viewModel.localBookDestination.observe(this) { requested ->

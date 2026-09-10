@@ -4,13 +4,17 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.SavedStateHandle
+import com.google.gson.JsonArray
+import com.google.gson.JsonElement
 import io.legado.app.R
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern
 import io.legado.app.constant.AppPattern.bookFileRegex
 import io.legado.app.constant.AppPattern.jsFileRegex
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.HighlightRuleFile
 import io.legado.app.model.localBook.LocalBook
+import io.legado.app.model.jsSource.JsSourceConfig
 import io.legado.app.help.storage.Restore
 import io.legado.app.help.storage.selectedBackupFileNames
 import io.legado.app.ui.main.bookshelf.importBookshelfJson
@@ -20,6 +24,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers.Main
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 
 class FileAssociationViewModel(application: Application, private val savedState: SavedStateHandle) : BaseAssociationViewModel(application) {
@@ -202,11 +207,26 @@ class FileAssociationViewModel(application: Application, private val savedState:
             file.name.matches(bookFileRegex) && dataFiles.none { it.second == file }
         }
         if (dataFiles.isNotEmpty()) {
-            if (bookFiles.isNotEmpty() || dataFiles.size != 1) {
+            if (bookFiles.isNotEmpty() || dataFiles.map { it.first }.distinct().size != 1) {
                 mixedLocalTypes.postValue(true)
                 return
             }
-            val (type, file) = dataFiles.single()
+            val type = dataFiles.first().first
+            val file = if (dataFiles.size == 1) dataFiles.single().second else {
+                val merged = JsonArray()
+                dataFiles.forEach { (_, source) ->
+                    val json = if (source.name.matches(jsFileRegex)) {
+                        GSON.toJsonTree(JsSourceConfig.extract(source.readText(), currentCoroutineContext()))
+                    } else source.reader().use { GSON.fromJson(it, JsonElement::class.java) }
+                    val records = if (type == "highlightRule" && json.isJsonObject &&
+                        json.asJsonObject.get("type")?.asString == HighlightRuleFile.TYPE) {
+                        json.asJsonObject.getAsJsonArray("rules")
+                    } else json
+                    if (records.isJsonArray) records.asJsonArray.forEach(merged::add)
+                    else merged.add(records)
+                }
+                File(staging, "import-data.json").apply { writeText(merged.toString()) }
+            }
             successLive.postValue(type to Uri.fromFile(file).toString())
             return
         }
