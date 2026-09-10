@@ -160,7 +160,7 @@ data class BookChapter(
                         }
                     } catch (_: RegexTimeoutException) {
                         item.isEnabled = false
-                        appDb.replaceRuleDao.update(item)
+                        appDb.replaceRuleDao.enable(item.id, false)
                     } catch (_: CancellationException) {
                         return@run
                     } catch (e: Exception) {
