@@ -11,6 +11,7 @@ interface TextBaseColumn : BaseColumn {
     val charData: String
     override val positionLength: Int get() = charData.length
     var selected: Boolean
+    var isReadAloud: Boolean
     var isSearchResult: Boolean
     var highlightStyle: HighlightStyle?
 }

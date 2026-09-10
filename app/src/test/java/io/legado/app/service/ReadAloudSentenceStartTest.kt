@@ -10,10 +10,9 @@ class ReadAloudSentenceStartTest {
 
     @Test
     fun `only visible-position reading rewinds to a sentence`() {
-        assertTrue(shouldRewindReadAloudToSentenceStart(true, false, false))
-        assertFalse(shouldRewindReadAloudToSentenceStart(false, false, false))
-        assertFalse(shouldRewindReadAloudToSentenceStart(true, true, false))
-        assertFalse(shouldRewindReadAloudToSentenceStart(true, false, true))
+        assertTrue(shouldRewindReadAloudToSentenceStart(true, false))
+        assertFalse(shouldRewindReadAloudToSentenceStart(false, false))
+        assertFalse(shouldRewindReadAloudToSentenceStart(true, true))
     }
 
     @Test
@@ -65,7 +64,7 @@ class ReadAloudSentenceStartTest {
         assertTrue(visibleReadCalls > 0)
         assertEquals(
             visibleReadCalls,
-            Regex("rewindToSentenceStart = true").findAll(onClick).count()
+            Regex("rewindToSentenceStart = AppConfig.readAloudStartAtSentence").findAll(onClick).count()
         )
         assertTrue(onClick.contains("startPos = line.pagePosition"))
         assertTrue(readBook.contains("rewindToSentenceStart: Boolean = false"))
@@ -74,12 +73,11 @@ class ReadAloudSentenceStartTest {
         assertTrue(readAloud.contains("intent.putExtra(\"rewindToSentenceStart\", rewindToSentenceStart)"))
         assertTrue(rewind.contains("findReadAloudSentenceStart("))
         assertTrue(rewind.contains("readAloudNumber = paragraph.chapterPosition + sentenceStart"))
-        assertTrue(rewind.contains("pos = sentenceStart"))
-        assertTrue(rewind.contains("else if (!readAloudByPage && startPos == 0 && !toLast)"))
-        assertTrue(rewind.contains("pos = page.chapterPosition"))
+        assertTrue(rewind.contains("getParagraphs(readAloudByPage)[nowSpeak].chapterPosition"))
         val cursorIndex = service.indexOf("readAloudChapterStart = readAloudNumber")
-        val toLastIndex = service.indexOf("if (toLast)", cursorIndex)
-        assertTrue(cursorIndex >= 0 && toLastIndex > cursorIndex)
+        val toLastIndex = service.indexOf("if (toLast)")
+        assertTrue(cursorIndex >= 0 && toLastIndex in 0 until cursorIndex)
+        assertTrue(service.contains("pageIndex = textChapter.getPageIndexByCharIndex(readAloudNumber)"))
         assertTrue(select.contains("ReadBook.readAloud(startPos = startPos)"))
         assertFalse(select.contains("rewindToSentenceStart = true"))
         assertTrue(readFromHere.contains("ReadBook.readAloud()"))

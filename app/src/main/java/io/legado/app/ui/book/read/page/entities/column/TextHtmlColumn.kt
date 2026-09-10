@@ -46,6 +46,12 @@ data class TextHtmlColumn(
             field = value
         }
 
+    override var isReadAloud: Boolean = false
+        set(value) {
+            if (field != value) textLine.invalidate()
+            field = value
+        }
+
     override var isSearchResult: Boolean = false
         set(value) {
             if (field != value) {
@@ -81,7 +87,7 @@ data class TextHtmlColumn(
         val style = highlightStyle
         val styleTextColor = style?.textColor ?: 0
         val textColor = when {
-            textLine.isReadAloud || isSearchResult || linkUrl != null -> {
+            isReadAloud || isSearchResult || linkUrl != null -> {
                 ReadBookConfig.textAccentColor
             }
 
