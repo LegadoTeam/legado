@@ -686,6 +686,75 @@ class TitleFontWeightRenderingTest {
     }
 
     @Test
+    fun capsuleControllerRestoresItsBaselineAndRejectsQueuedWorkAfterBookSwitch() {
+        launchReader()
+        awaitReader { ReadBook.curTextChapter?.highlightRuleMatchesJob?.isActive != true }
+        val originalBook = checkNotNull(ReadBook.book)
+        val baseline = checkNotNull(ReadBook.curTextChapter)
+        val callback = ReadBook.callBack
+        val originalPosition = ReadBook.durChapterPos
+        val line = baseline.pages.flatMap { it.lines }.first { !it.isTitle && it.isParagraphEnd }
+        val end = line.chapterPosition + line.charSize
+        val range = HighlightMatcher.Range(end - 2, end,
+            HighlightStyle(fill = Color.GREEN, fillShape = HighlightStyle.FillShape.PILL))
+        fun canonical(chapter: TextChapter) = HighlightTextBuilder.build(chapter.pages
+            .flatMap { it.lines }.map { HighlightTextBuilder.LineInput(it.text, it.isParagraphEnd) })
+        val originalText = canonical(baseline)
+        var job: kotlinx.coroutines.Job? = null
+        fun awaitJob() = runBlocking { withTimeout(30_000) { checkNotNull(job).join() } }
+        try {
+            scenario!!.onActivity {
+                // Exercise the real controller without a view requesting different styles meanwhile.
+                ReadBook.callBack = null
+                ChapterProvider.setReviewProviders({ index, _ ->
+                    if (index == baseline.chapter.index) 88 else 0
+                }, null, baseline.chapter.index)
+                ReadBook.durChapterPos = end - 2
+                assertFalse(ReadBook.upHighlightSpacing(baseline, listOf(range)))
+                job = baseline.highlightSpacingJob
+            }
+            awaitJob()
+            scenario!!.onActivity {
+                val spaced = checkNotNull(ReadBook.curTextChapter)
+                assertTrue("The controller must publish a new measured chapter", spaced !== baseline)
+                assertTrue(spaced.isCompleted && spaced.highlightSpacing.columns.isNotEmpty())
+                assertEquals(originalText, canonical(spaced))
+                assertEquals("Reflow must preserve the latest character anchor", end - 2, ReadBook.durChapterPos)
+                assertFalse(ReadBook.upHighlightSpacing(spaced, emptyList()))
+                job = spaced.highlightSpacingJob
+            }
+            awaitJob()
+            val otherBook = originalBook.copy(bookUrl = "${originalBook.bookUrl}-switched")
+            val otherChapter = baseline.copy(chapter = baseline.chapter.copy(bookUrl = otherBook.bookUrl))
+            scenario!!.onActivity {
+                assertTrue("Removing the style must restore the retained baseline", ReadBook.curTextChapter === baseline)
+                assertFalse(ReadBook.upHighlightSpacing(baseline, listOf(range)))
+                job = baseline.highlightSpacingJob
+                // Switch in the same Main turn, before the queued worker can publish anything.
+                ReadBook.book = otherBook
+                ReadBook.curTextChapter = otherChapter
+                ReadBook.durChapterPos = 7
+            }
+            awaitJob()
+            scenario!!.onActivity {
+                assertTrue("Old-book work must not replace the new book", ReadBook.book === otherBook)
+                assertTrue("Old-book work must not replace its chapter", ReadBook.curTextChapter === otherChapter)
+                assertEquals(7, ReadBook.durChapterPos)
+                assertEquals(null, baseline.highlightSpacingJob)
+            }
+        } finally {
+            instrumentation.runOnMainSync {
+                job?.cancel()
+                ReadBook.book = originalBook
+                ReadBook.curTextChapter = baseline
+                ReadBook.durChapterPos = originalPosition
+                ReadBook.callBack = callback
+                ChapterProvider.clearReviewProviders()
+            }
+        }
+    }
+
+    @Test
     fun capsuleSpacingWrapsAndRepaginatesWithoutChangingTextOrAccumulatingInsets() {
         launchReader()
         val src = "https://fixture.invalid/issue1255-wrapping.svg"
