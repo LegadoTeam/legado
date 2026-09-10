@@ -443,7 +443,7 @@ class TitleFontWeightRenderingTest {
                     ChapterProvider.setReviewProviders({ index, id ->
                         if (index == fixtureChapter.index && id == 1) 88 else 0
                     }, null, fixtureChapter.index)
-                    val plainImage = "<img src='$plainSrc'>"
+                    val plainImage = """<img src="$plainSrc">"""
                     val reviewImage = "<img src='$reviewSrc'>"
                     val contents = listOf(plainImage + rowText,
                         plainImage + rowText + plainImage,
@@ -463,6 +463,9 @@ class TitleFontWeightRenderingTest {
                     val base = awaitLayout(ChapterProvider.getTextChapterAsync(scope, book!!,
                         fixtureChapter, fixtureChapter.title, BookContent(false, contents, null),
                         fixtureChapter.index + 1, saveChapterData = false))
+                    assertEquals("TEXT fixtures must parse three actual inline images: $caseLabel", 3,
+                        base.pages.flatMap { it.lines }.filterNot { it.isHtml }
+                            .sumOf { line -> line.columns.count { it is ImageColumn } })
                     val fill = Color.rgb(32, 144, 80)
                     val style = HighlightStyle(bold = true, fill = fill,
                         fillShape = HighlightStyle.FillShape.PILL, pillPaddingScale = paddingScale)
@@ -707,7 +710,7 @@ class TitleFontWeightRenderingTest {
                     if (index == chapter.index) 88 else 0
                 }, null, chapter.index)
                 val paint = ChapterProvider.contentPaint
-                val image = "<img src='$imageSrc'>"
+                val image = """<img src="$imageSrc">"""
                 // Leave less than one glyph of spare width before reserving the capsule and review slot.
                 val count = ((ChapterProvider.visibleWidth - paint.measureText("顶上") -
                     paint.measureText(ChapterProvider.srcReplaceStr)) / paint.measureText("前")).toInt() - 1
@@ -729,6 +732,8 @@ class TitleFontWeightRenderingTest {
                     val base = awaitLayout(ChapterProvider.getTextChapterAsync(scope, book!!,
                         chapter, "Spacing", BookContent(false, List(90) { paragraph }, null),
                         chapter.index + 1, saveChapterData = false))
+                    assertEquals("Every paragraph must contain its actual inline image", 90,
+                        base.pages.flatMap { it.lines }.sumOf { line -> line.columns.count { it is ImageColumn } })
                     val originalText = canonical(base)
                     val style = HighlightStyle(fill = Color.GREEN,
                         fillShape = HighlightStyle.FillShape.PILL, pillPaddingScale = 2f)
