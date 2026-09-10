@@ -69,6 +69,17 @@ class ExploreRefreshUiTest {
                 var source = this.source, java = this.java;
                 var state = JSON.parse(String(source.getLoginHeader() || '{}'));
                 state[key] = String(value);
+                if (state.forceGc) {
+                    function marker() { return new Packages.java.lang.ref.WeakReference(new Packages.java.lang.Object()); }
+                    var weak = marker();
+                    for (var attempt = 0; weak.get() != null && attempt < 20; attempt++) {
+                        Packages.java.lang.System.gc();
+                        Packages.java.lang.System.runFinalization();
+                        Packages.java.lang.Thread.sleep(10);
+                    }
+                    if (weak.get() != null) throw new Error('GC did not collect the control probe');
+                    state.gcObserved = true;
+                }
                 source.putLoginHeader(JSON.stringify(state));
                 source.refreshExplore();
                 java.refreshExplore();
@@ -166,6 +177,19 @@ class ExploreRefreshUiTest {
                 onView(allOf(withId(R.id.sp_type), isDisplayed())).perform(click())
                 onView(allOf(withText(mode), isDisplayed())).perform(click())
             }
+        }
+    }
+
+    @Test fun discoveryControlsKeepTheirRefreshCallbackThroughGarbageCollection() {
+        source.putLoginHeader("""{"forceGc":true}""")
+        positionControls()
+        for (mode in listOf("Long list", "Short list")) {
+            verifyRefresh("explore-select-gc-${mode.substringBefore(' ')}", "Category mode", "Category mode", "Rendered + $mode") {
+                onView(allOf(withId(R.id.sp_type), isDisplayed())).perform(click())
+                onView(allOf(withText(mode), isDisplayed())).perform(click())
+            }
+            assertTrue("The actual source action must observe collection before refreshing",
+                source.getLoginHeader().orEmpty().contains("\"gcObserved\":true"))
         }
     }
 
