@@ -401,9 +401,11 @@ class TitleFontWeightRenderingTest {
         val svg = instrumentation.context.assets.open("issue1255-transparent-cat.svg")
             .bufferedReader().use { it.readText() }
         val src = "https://fixture.invalid/issue1255-transparent-cat.svg"
-        val imageFile = BookHelp.getImage(book!!, src)
-        imageFile.parentFile!!.mkdirs()
-        imageFile.writeText(svg)
+        val plainSrc = """$src,{"style":"text"}"""
+        val reviewSrc = """$src,{"style":"TEXT","reviewCount":"88","click":"review"}"""
+        val fixtureFiles = listOf(src, plainSrc, reviewSrc).map { BookHelp.getImage(book!!, it) }
+        fixtureFiles.forEach { it.parentFile!!.mkdirs(); it.writeText(svg) }
+        val imageFile = fixtureFiles.first()
         val savedOptimize = AppConfig.optimizeRender
         val savedZhLayout = ReadBookConfig.useZhLayout
         val savedAdaptStyle = AppConfig.adaptSpecialStyle
@@ -419,7 +421,7 @@ class TitleFontWeightRenderingTest {
                     ReadBookConfig.reviewIconScale = iconScale
                     ReadBookConfig.textSize = size
                     ChapterProvider.upStyle()
-                    ImageProvider.remove(imageFile.absolutePath)
+                    fixtureFiles.forEach { ImageProvider.remove(it.absolutePath) }
                     val caseLabel = "size=$size optimized=$optimized space=$withSpace padding=$paddingScale icon=$iconScale"
                     val textSize = ChapterProvider.contentPaint.textSize
                     val iconWidth = ceil(ChapterProvider.getReviewWidth(false))
@@ -440,8 +442,8 @@ class TitleFontWeightRenderingTest {
                         url = "highlight-spacing-fixture", index = 10000, title = "Spacing")
                     ChapterProvider.setReviewProviders({ _, id -> if (id == 1) 88 else 0 },
                         null, fixtureChapter.index)
-                    val plainImage = """<img src='$src,{"style":"text"}'>"""
-                    val reviewImage = """<img src='$src,{"style":"TEXT","reviewCount":"88","click":"review"}'>"""
+                    val plainImage = "<img src='$plainSrc'>"
+                    val reviewImage = "<img src='$reviewSrc'>"
                     val contents = listOf(plainImage + rowText,
                         plainImage + rowText + plainImage,
                         "<usehtml><p>$reviewImage$rowText$reviewImage</p></usehtml>")
@@ -655,9 +657,9 @@ class TitleFontWeightRenderingTest {
                 ReadBookConfig.useZhLayout = savedZhLayout
                 AppConfig.adaptSpecialStyle = savedAdaptStyle
                 ChapterProvider.clearReviewProviders()
-                ImageProvider.remove(imageFile.absolutePath)
+                fixtureFiles.forEach { ImageProvider.remove(it.absolutePath) }
             }
-            imageFile.delete()
+            fixtureFiles.forEach(File::delete)
         }
     }
 
@@ -665,7 +667,8 @@ class TitleFontWeightRenderingTest {
     fun capsuleSpacingWrapsAndRepaginatesWithoutChangingTextOrAccumulatingInsets() {
         launchReader()
         val src = "https://fixture.invalid/issue1255-wrapping.svg"
-        val imageFile = BookHelp.getImage(book!!, src)
+        val imageSrc = """$src,{"style":"text"}"""
+        val imageFile = BookHelp.getImage(book!!, imageSrc)
         imageFile.parentFile!!.mkdirs()
         imageFile.writeText(instrumentation.context.assets.open("issue1255-transparent-cat.svg")
             .bufferedReader().use { it.readText() })
@@ -683,7 +686,7 @@ class TitleFontWeightRenderingTest {
                 val chapter = BookChapter(bookUrl = book!!.bookUrl, url = "spacing-wrap", index = 10001)
                 ChapterProvider.setReviewProviders({ _, _ -> 88 }, null, chapter.index)
                 val paint = ChapterProvider.contentPaint
-                val image = """<img src='$src,{"style":"text"}'>"""
+                val image = "<img src='$imageSrc'>"
                 // Leave less than one glyph of spare width before reserving the capsule and review slot.
                 val count = ((ChapterProvider.visibleWidth - paint.measureText("顶上") -
                     paint.measureText(ChapterProvider.srcReplaceStr)) / paint.measureText("前")).toInt() - 1
