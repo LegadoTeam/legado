@@ -255,7 +255,7 @@ class ContentReversalUiTest {
                         reader.postOnAnimation { frame.countDown() }
                     }
                     assertTrue("Reader frames must continue while HTTP is blocked", frame.await(2, TimeUnit.SECONDS))
-                    if (ReadBook.pageAnim() == PageAnim.scroll) {
+                    if (ReadBook.pageAnim() == PageAnim.scrollPageAnim) {
                         closeReaderMenu()
                         screenshot("resource-refresh-loading-scroll")
                     }
@@ -369,7 +369,7 @@ class ContentReversalUiTest {
             }
 
             scenario!!.onActivity {
-                ReadBook.book!!.setPageAnim(PageAnim.scroll)
+                ReadBook.book!!.setPageAnim(PageAnim.scrollPageAnim)
                 it.upPageAnim()
             }
             await("scroll reader ready for full resource refresh") {
