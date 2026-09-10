@@ -452,8 +452,14 @@ class ReadAloudMenuUiTest {
                 service.textChapter === ReadBook.curTextChapter &&
                     ReadAloud.readAloudChapterStart == speechStart
             }
+            val beforePlaybackCommand = speechSession(service)[1]
             scenario!!.onActivity { activity ->
                 if (paused) ReadAloud.pause(activity) else ReadAloud.resume(activity)
+            }
+            await("real pause/resume command finishes before the session snapshot") {
+                BaseReadAloudService.pause == paused && speechSession(service)[1] != beforePlaybackCommand
+            }
+            scenario!!.onActivity { activity ->
                 service.upTtsProgress(speechStart)
                 activity.backToSpeakingPosition()
             }
@@ -509,6 +515,7 @@ class ReadAloudMenuUiTest {
                     }
                     awaiting = CoroutineScope(Dispatchers.IO).async {
                         ReadBook.loadContentAwait(1, resetPageOffset = true)
+                        Unit
                     }
                 } else {
                     onView(withId(R.id.ll_back_to_speech)).perform(click())
