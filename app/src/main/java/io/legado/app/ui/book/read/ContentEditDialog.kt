@@ -15,6 +15,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.core.view.doOnLayout
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
+import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.MutableLiveData
@@ -37,6 +38,8 @@ import io.legado.app.model.webBook.WebBook
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.hideSoftInput
+import io.legado.app.utils.getPrefBoolean
+import io.legado.app.utils.putPrefBoolean
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.showSoftInput
@@ -117,6 +120,10 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
         private const val ARG_CHAPTER_POS = "chapterPos"
         private const val ARG_TITLE = "title"
         private const val STATE_HAS_DRAFT = "hasDraft"
+        private const val STATE_DRAFT = "contentRawDraft"
+        private const val STATE_SELECTION_START = "contentRawSelectionStart"
+        private const val STATE_SELECTION_END = "contentRawSelectionEnd"
+        private const val PREF_PLAIN_TEXT = "contentEditPlainText"
         private const val STATE_HAS_CHANGES = "hasChanges"
         private const val STATE_SEARCH_QUERY = "contentSearchQuery"
         private const val STATE_SEARCH_VISIBLE = "contentSearchVisible"
@@ -154,6 +161,10 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
     private var searchIndex = -1
     private var searchSpan: BackgroundColorSpan? = null
     private var restoredScrollY: Int? = null
+    private var plainText = false
+    private var projection = ContentEditProjection("")
+    private var renderingDraft = false
+    private var editingDraft = false
     private val scrollListener = ViewTreeObserver.OnScrollChangedListener { updatePositionBar() }
     private val layoutListener = ViewTreeObserver.OnGlobalLayoutListener { updatePositionBar() }
     private val editTarget by lazy(LazyThreadSafetyMode.NONE) {
@@ -172,6 +183,7 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         val owner = viewLifecycleOwner
         val contentView = binding.contentView
+        plainText = requireContext().getPrefBoolean(PREF_PLAIN_TEXT, false)
         restoredScrollY = savedInstanceState?.getInt(STATE_SCROLL_Y)
         binding.toolBar.setBackgroundColor(primaryColor)
         binding.toolBar.title = viewModel.titleLiveData.value
@@ -209,15 +221,16 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
             }
         }
         viewModel.contentLiveData.observe(owner) { content ->
-            if (contentView.text?.toString() == content) return@observe
-            contentView.setText(content)
+            if (!renderDraft(content) || editingDraft) return@observe
+            scheduleSearch(scrollToMatch = false)
             contentView.post {
                 if (!owner.lifecycle.currentState.isAtLeast(Lifecycle.State.CREATED)) {
                     return@post
                 }
                 contentView.apply {
                     val textLayout = layout ?: return@post
-                    val lineIndex = textLayout.getLineForOffset(editTarget.chapterPos.coerceIn(0, length()))
+                    val position = if (plainText) projection.displayOffset(editTarget.chapterPos) else editTarget.chapterPos
+                    val lineIndex = textLayout.getLineForOffset(position.coerceIn(0, length()))
                     val target = restoredScrollY ?: textLayout.getLineTop(lineIndex)
                     restoredScrollY = null
                     scrollTo(0, target.coerceIn(0, maxScrollY()))
@@ -232,15 +245,31 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
         val owner = viewLifecycleOwner
         if (savedInstanceState?.getBoolean(STATE_HAS_DRAFT) == true) {
             viewModel.restoreDraft(
-                contentView.text?.toString().orEmpty(),
+                savedInstanceState.getString(STATE_DRAFT) ?: contentView.text?.toString().orEmpty(),
                 savedInstanceState.getBoolean(STATE_HAS_CHANGES),
             )
         }
-        viewModel.draftText?.let { draft ->
-            if (contentView.text?.toString() != draft) contentView.setText(draft)
+        viewModel.draftText?.let { renderDraft(it) }
+        if (savedInstanceState?.containsKey(STATE_SELECTION_START) == true) {
+            setRawSelection(savedInstanceState.getInt(STATE_SELECTION_START), savedInstanceState.getInt(STATE_SELECTION_END))
+        }
+        var changeStart = 0
+        var changeEnd = 0
+        var changeCount = 0
+        contentView.doOnTextChanged { _, start, before, count ->
+            if (!renderingDraft) {
+                changeStart = start
+                changeEnd = start + before
+                changeCount = count
+            }
         }
         contentView.doAfterTextChanged {
-            viewModel.updateDraft(it?.toString().orEmpty())
+            if (renderingDraft) return@doAfterTextChanged
+            val displayed = it?.toString().orEmpty()
+            val raw = if (plainText) projection.replace(changeStart, changeEnd,
+                displayed.substring(changeStart, changeStart + changeCount)) else displayed
+            editingDraft = true
+            try { viewModel.updateDraft(raw) } finally { editingDraft = false }
             scheduleSearch(scrollToMatch = false)
             contentView.post {
                 if (owner.lifecycle.currentState.isAtLeast(Lifecycle.State.CREATED)) updatePositionBar()
@@ -262,7 +291,12 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
         super.onSaveInstanceState(outState)
         outState.putBoolean(STATE_HAS_DRAFT, viewModel.hasDraft)
         outState.putBoolean(STATE_HAS_CHANGES, viewModel.hasChanges)
+        // Save the canonical draft once; the EditText contains only its current presentation.
+        outState.putString(STATE_DRAFT, viewModel.draftText)
         if (view == null) return
+        val (start, end) = rawSelectionRange()
+        outState.putInt(STATE_SELECTION_START, start)
+        outState.putInt(STATE_SELECTION_END, end)
         outState.putString(STATE_SEARCH_QUERY, binding.searchInput.text?.toString())
         outState.putBoolean(STATE_SEARCH_VISIBLE, binding.searchBar.isVisible)
         outState.putBoolean(STATE_SEARCH_REGEX, binding.searchRegex.isChecked)
@@ -285,6 +319,7 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
 
     private fun initMenu() {
         binding.toolBar.inflateMenu(R.menu.content_edit)
+        binding.toolBar.menu.findItem(R.id.menu_content_plain_text).isChecked = plainText
         binding.toolBar.menu.applyTint(requireContext())
         binding.toolBar.setOnMenuItemClickListener {
             when (it.itemId) {
@@ -294,11 +329,68 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
                     dismiss()
                 }
                 R.id.menu_reset -> viewModel.initContent(editTarget, true)
+                R.id.menu_content_plain_text -> {
+                    val contentView = binding.contentView
+                    val (start, end) = rawSelectionRange()
+                    val top = contentView.layout?.let { layout ->
+                        rawSelection(layout.getLineStart(layout.getLineForVertical(contentView.scrollY)), false)
+                    } ?: start
+                    plainText = !plainText
+                    it.isChecked = plainText
+                    requireContext().putPrefBoolean(PREF_PLAIN_TEXT, plainText)
+                    renderDraft(viewModel.draftText.orEmpty())
+                    setRawSelection(start, end)
+                    contentView.post {
+                        if (view == null) return@post
+                        val layout = contentView.layout ?: return@post
+                        val offset = if (plainText) projection.displayOffset(top) else top
+                        contentView.scrollTo(0, layout.getLineTop(layout.getLineForOffset(offset.coerceIn(0, contentView.length()))))
+                    }
+                    scheduleSearch(scrollToMatch = false)
+                }
                 R.id.menu_copy_all -> requireContext()
                     .sendToClip("${binding.toolBar.title}\n${binding.contentView.text}")
             }
             return@setOnMenuItemClickListener true
         }
+    }
+
+    private fun rawSelection(offset: Int, afterImages: Boolean): Int =
+        if (plainText) projection.rawOffset(offset, afterImages) else offset.coerceAtLeast(0)
+
+    private fun rawSelectionRange(): Pair<Int, Int> {
+        val contentView = binding.contentView
+        val end = rawSelection(contentView.selectionEnd, true)
+        // A caret at a hidden image must stay collapsed when showing or restoring raw text.
+        val start = if (contentView.selectionStart == contentView.selectionEnd) end
+            else rawSelection(contentView.selectionStart, false)
+        return start to end
+    }
+
+    private fun setRawSelection(start: Int, end: Int) {
+        val contentView = binding.contentView
+        val from = if (plainText) projection.displayOffset(start) else start
+        val to = if (plainText) projection.displayOffset(end) else end
+        contentView.setSelection(from.coerceIn(0, contentView.length()), to.coerceIn(0, contentView.length()))
+    }
+
+    private fun renderDraft(raw: String): Boolean {
+        projection = ContentEditProjection(raw)
+        val contentView = binding.contentView
+        val displayed = if (plainText) projection.text else raw
+        if (contentView.text?.toString() == displayed) return false
+        val oldDisplay = ContentEditProjection(contentView.text?.toString().orEmpty())
+        val start = contentView.selectionStart.coerceAtLeast(0)
+        val end = contentView.selectionEnd.coerceAtLeast(0)
+        renderingDraft = true
+        try {
+            contentView.setText(displayed)
+            contentView.setSelection(
+                (if (plainText) oldDisplay.displayOffset(start) else start).coerceIn(0, displayed.length),
+                (if (plainText) oldDisplay.displayOffset(end) else end).coerceIn(0, displayed.length),
+            )
+        } finally { renderingDraft = false }
+        return true
     }
 
     private fun setupSearch(savedState: Bundle?) {
@@ -466,7 +558,7 @@ class ContentEditDialog : BaseDialogFragment(R.layout.dialog_content_edit) {
     }
 
     private fun save() {
-        val content = binding.contentView.text?.toString() ?: return
+        val content = viewModel.draftText ?: return
         Coroutine.async {
             val book = ReadBook.book?.takeIf { it.bookUrl == editTarget.bookUrl }
                 ?: appDb.bookDao.getBook(editTarget.bookUrl)

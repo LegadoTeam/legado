@@ -26,4 +26,10 @@
         android:title="@string/copy_all"
         app:showAsAction="never" />
 
+    <item
+        android:id="@+id/menu_content_plain_text"
+        android:title="@string/content_edit_plain_text"
+        android:checkable="true"
+        app:showAsAction="never" />
+
 </menu>
