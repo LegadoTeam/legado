@@ -355,6 +355,8 @@ class SharedFileImportTest {
                     .filterIsInstance<FileAssociationActivity>().single()
                 val model = ViewModelProvider(activity)[FileAssociationViewModel::class.java]
                 assertEquals(1, model.pendingLocalBooks.size)
+                assertTrue(model.choosingLocalBookDirectory)
+                assertNull(activity.supportFragmentManager.findFragmentByTag("sharedLocalBooks"))
                 return Instrumentation.ActivityResult(Activity.RESULT_OK,
                     Intent().setData(Uri.fromFile(File(directory, "books"))))
             }
@@ -362,10 +364,11 @@ class SharedFileImportTest {
         instrumentation.addMonitor(monitor)
         try {
             launchShare(file, "text/plain").use { scenario ->
+                onView(withText(R.string.shared_local_books_storage)).inRoot(isDialog()).check(matches(isDisplayed()))
+                onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
                 awaitLocalPreview(scenario)
                 scenario.recreate()
                 confirmLocalPreview(scenario)
-                onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
                 val copied = File(directory, "books/${file.name}")
                 await { copied.exists() && appDb.bookDao.has(copied.path) }
                 val book = appDb.bookDao.getBook(copied.path)!!
@@ -489,6 +492,46 @@ class SharedFileImportTest {
         }
     }
 
+    @Test(timeout = 120_000) fun archiveRejectsBooksMixedWithRecognizedRulesBeforeWritingEitherType() {
+        val rule = HighlightRule(name = "Mixed archive $id", pattern = id, style = "{\"bold\":true}")
+        val archive = File(directory, "mixed-types-$id.zip")
+        writeArchive(archive, linkedMapOf("book-$id.txt" to "BOOK $id".toByteArray(),
+            "renamed.json" to GSON.toJson(HighlightRuleFile(HighlightRuleFile.TYPE, listOf(rule))).toByteArray()))
+        val original = archive.readBytes()
+        launchShare(archive, "application/zip").use { scenario ->
+            onView(withText(R.string.shared_local_books_mixed_types)).inRoot(isDialog()).check(matches(isDisplayed()))
+            scenario.onActivity {
+                assertNull(it.supportFragmentManager.findFragmentByTag("sharedLocalBooks"))
+                assertFalse(it.findViewById<android.view.View>(R.id.rotate_loading).isShown)
+            }
+            assertTrue(File(directory, "books").listFiles()!!.isEmpty())
+            assertFalse(appDb.highlightRuleDao.all.any { it.uuid == rule.uuid })
+            screenshot("share-local-mixed-types-rejected")
+            onView(withId(android.R.id.button1)).inRoot(isDialog()).perform(click())
+            await { scenario.state == androidx.lifecycle.Lifecycle.State.DESTROYED }
+            assertArrayEquals(original, archive.readBytes())
+        }
+    }
+
+    @Test(timeout = 120_000) fun archiveContainingOneRecognizedJsonUsesItsExistingImportPreview() {
+        val rule = HighlightRule(name = "Archive highlight $id", pattern = id, style = "{\"bold\":true}")
+        rules.add(rule)
+        val archive = File(directory, "rules-$id.zip")
+        writeArchive(archive, linkedMapOf("unrelated.json" to GSON.toJson(listOf(rule)).toByteArray(),
+            "ignored.json" to "{}".toByteArray(), "picture.jpg" to byteArrayOf(1, 2)))
+        val original = archive.readBytes()
+        launchShare(archive, "application/zip").use { scenario ->
+            awaitDialog(scenario)
+            onView(withText(rule.name)).inRoot(isDialog()).check(matches(isDisplayed()))
+            assertFalse(appDb.highlightRuleDao.all.any { it.uuid == rule.uuid })
+            screenshot("share-local-archive-json-preview")
+            onView(withId(R.id.tv_ok)).inRoot(isDialog()).perform(click())
+            await { appDb.highlightRuleDao.all.any { it.uuid == rule.uuid } }
+            assertEquals(rule.styleObj(), appDb.highlightRuleDao.all.single { it.uuid == rule.uuid }.styleObj())
+            assertArrayEquals(original, archive.readBytes())
+        }
+    }
+
     @Test(timeout = 120_000) fun unsupportedArchiveReportsTheFormatAndEndsInsteadOfLoadingForever() {
         val archive = File(directory, "no-books-$id.zip")
         writeArchive(archive, linkedMapOf("readme.md" to "No books".toByteArray(), "data.bin" to byteArrayOf(1)))
@@ -558,13 +601,25 @@ class SharedFileImportTest {
         }
     }
     private fun awaitLocalPreview(scenario: ActivityScenario<FileAssociationActivity>) {
-        await {
-            var ready = false
-            scenario.onActivity { activity ->
-                ready = activity.supportFragmentManager.findFragmentByTag("sharedLocalBooks")
-                    ?.view?.findViewById<RecyclerView>(R.id.recycler_view)?.adapter?.itemCount?.let { it > 0 } == true
+        var state = ""
+        try {
+            await {
+                var ready = false
+                scenario.onActivity { activity ->
+                    val model = ViewModelProvider(activity)[FileAssociationViewModel::class.java]
+                    val fragment = activity.supportFragmentManager.findFragmentByTag("sharedLocalBooks")
+                    val recycler = fragment?.view?.findViewById<RecyclerView>(R.id.recycler_view)
+                    state = "batch=${model.localBookBatch.value?.size}; selected=${model.selectedLocalBooks.size}; " +
+                        "pending=${model.pendingLocalBooks.size}; destination=${model.localBookDestination.value}; " +
+                        "error=${model.errorLive.value}; fragments=${activity.supportFragmentManager.fragments.map { it.javaClass.simpleName to it.tag }}; " +
+                        "view=${fragment?.view}; adapter=${recycler?.adapter}; count=${recycler?.adapter?.itemCount}"
+                    ready = (recycler?.adapter?.itemCount ?: 0) > 0
+                }
+                ready
             }
-            ready
+        } catch (error: AssertionError) {
+            screenshot("share-local-preview-failure-$id")
+            throw AssertionError(state, error)
         }
     }
 

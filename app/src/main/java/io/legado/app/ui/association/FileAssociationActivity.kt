@@ -32,7 +32,7 @@ class FileAssociationActivity :
     private val localBookTreeSelect = registerForActivityResult(HandleFileContract()) {
         val destination = it.uri ?: privateBookDirectory()
         if (it.uri != null) AppConfig.defaultBookTreeUri = destination.toString()
-        viewModel.importLocalBooks(destination)
+        viewModel.selectLocalBookDirectory(destination)
     }
     override val binding by viewBinding(ActivityTranslucenceBinding::inflate)
 
@@ -51,7 +51,7 @@ class FileAssociationActivity :
             }
         }
         viewModel.localBookDestination.observe(this) { requested ->
-            if (requested) chooseBookDirectory()
+            if (requested && !viewModel.choosingLocalBookDirectory) chooseBookDirectory()
         }
         viewModel.importingLocalBooks.observe(this) { importing ->
             if (viewModel.localBookBatch.value.isNullOrEmpty()) {
@@ -59,6 +59,16 @@ class FileAssociationActivity :
             }
         }
         viewModel.importedLocalBooks.observe(this) { if (it) finish() }
+        viewModel.mixedLocalTypes.observe(this) { mixed ->
+            if (mixed) {
+                binding.rotateLoading.gone()
+                alert(title = getString(R.string.wrong_format),
+                    message = getString(R.string.shared_local_books_mixed_types)) {
+                    yesButton { finish() }
+                    onCancelled { finish() }
+                }
+            }
+        }
         viewModel.onLineImportLive.observe(this) {
             binding.rotateLoading.gone()
             startActivity<OnLineImportActivity> {
@@ -182,7 +192,7 @@ class FileAssociationActivity :
     private fun chooseBookDirectory() {
         val configured = AppConfig.defaultBookTreeUri
         if (!configured.isNullOrBlank()) {
-            viewModel.importLocalBooks(Uri.parse(configured))
+            viewModel.selectLocalBookDirectory(Uri.parse(configured))
             return
         }
         binding.rotateLoading.gone()
@@ -190,15 +200,16 @@ class FileAssociationActivity :
             .setTitle(R.string.select_book_folder)
             .setMessage(R.string.shared_local_books_storage)
             .setPositiveButton(R.string.select_folder) { _, _ ->
+                viewModel.choosingLocalBookDirectory = true
                 localBookTreeSelect.launch {
                     title = getString(R.string.select_book_folder)
                     mode = HandleFileContract.DIR_SYS
                 }
             }
             .setNegativeButton(R.string.shared_local_books_private) { _, _ ->
-                viewModel.importLocalBooks(privateBookDirectory())
+                viewModel.selectLocalBookDirectory(privateBookDirectory())
             }
-            .setOnCancelListener { viewModel.importLocalBooks(privateBookDirectory()) }
+            .setOnCancelListener { viewModel.selectLocalBookDirectory(privateBookDirectory()) }
             .show()
     }
 }

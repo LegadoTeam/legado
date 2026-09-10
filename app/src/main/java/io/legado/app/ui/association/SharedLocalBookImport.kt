@@ -16,13 +16,14 @@ import splitties.init.appCtx
 import java.io.File
 
 /** Own the complete input batch before showing a preview or opening a reader. */
-internal fun collectSharedLocalBooks(uris: List<Uri>, staging: File): List<ImportBook> {
-    val files = uris.distinct().flatMapIndexed { index, uri ->
+internal fun collectSharedImportFiles(uris: List<Uri>, staging: File): List<File> =
+    uris.distinct().flatMapIndexed { index, uri ->
         val doc = FileDoc.fromUri(uri, false)
         val directory = File(staging, index.toString()).apply { check(mkdirs()) }
         when {
             ArchiveUtils.isArchive(doc.name) -> ArchiveUtils.deCompress(doc, directory.path) {
-                it.matches(AppPattern.bookFileRegex)
+                it.matches(AppPattern.bookFileRegex) || it.endsWith(".json", true) ||
+                    it.matches(AppPattern.jsFileRegex)
             }
             doc.name.matches(AppPattern.bookFileRegex) -> {
                 val copy = File(directory, File(doc.name).name)
@@ -34,6 +35,8 @@ internal fun collectSharedLocalBooks(uris: List<Uri>, staging: File): List<Impor
             else -> emptyList()
         }
     }
+
+internal fun previewSharedLocalBooks(files: List<File>): List<ImportBook> {
     check(files.isNotEmpty()) { appCtx.getString(R.string.unsupport_archivefile_entry) }
     val identities = hashSetOf<Pair<String, String>>()
     return files.map { file ->
