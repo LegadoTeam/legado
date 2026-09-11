@@ -470,6 +470,40 @@ data class TextLine(
         canvas.drawPath(path, paint)
     }
 
+    private fun highlightInkEdges(start: Int, end: Int, style: HighlightStyle,
+        band: HighlightGeometry.Band? = null, radius: Float = 0f): Pair<Float, Float> {
+        val requested = checkNotNull(style.resolvedHorizontalPadding).dpToPx()
+        val baseline = lineBase - lineTop
+        var left = Float.POSITIVE_INFINITY
+        var right = Float.NEGATIVE_INFINITY
+        val ink = Rect()
+        val base = PaintPool.obtain()
+        try {
+            for (index in start until end) {
+                val column = columns[index] as TextBaseColumn
+                base.set(if (column is TextHtmlColumn) ChapterProvider.contentPaint else textPaint)
+                if (column is TextHtmlColumn) base.textSize = column.mTextSize
+                val paint = HighlightDraw.obtainTextPaint(base, style, 0, column.charData)
+                try {
+                    paint.getTextBounds(column.charData, 0, column.charData.length, ink)
+                    val minimum = if (band != null && radius > 0f) HighlightGeometry.pillClearance(radius,
+                        baseline + ink.top, baseline + ink.bottom, band.top, band.bottom, 1f.dpToPx())
+                        else if (style.box != null) 1f.dpToPx() else 0f
+                    val clearance = maxOf(requested, minimum)
+                    val origin = column.start + ((column as? TextColumn)?.drawOffset ?: 0f) +
+                        if (atLeastApi35) paint.letterSpacing * paint.textSize * 0.5f else 0f
+                    left = minOf(left, if (ink.isEmpty) column.start - clearance else origin + ink.left - clearance)
+                    right = maxOf(right, if (ink.isEmpty) column.end + clearance else origin + ink.right + clearance)
+                } finally { HighlightDraw.recycleTextPaint(paint) }
+            }
+        } finally { PaintPool.recycle(base) }
+        // Two complete end caps need at least their combined width even for a one-glyph run.
+        val extra = (radius * 2f - (right - left)).coerceAtLeast(0f) / 2f
+        left -= extra
+        right += extra
+        return left to right
+    }
+
     private fun drawHighlightFills(canvas: Canvas) {
         val baseline = lineBase - lineTop
         val baseTextSize = textPaint.textSize
@@ -514,9 +548,11 @@ data class TextLine(
             val padding = if (shape == HighlightStyle.FillShape.PILL) {
                 (band.bottom - band.top) / 2f * style.resolvedPillPaddingScale
             } else 0f
-            val extra = (style.resolvedHorizontalPadding ?: 0f).dpToPx()
-            var left = first.start - padding - extra
-            var right = last.end + padding + extra
+            val explicitEdges = style.resolvedHorizontalPadding?.let {
+                highlightInkEdges(index, endIndex, style, band, padding)
+            }
+            var left = explicitEdges?.first ?: (first.start - padding)
+            var right = explicitEdges?.second ?: (last.end + padding)
             var leftRadius = padding
             var rightRadius = padding
             if (padding > 0f) {
@@ -595,7 +631,7 @@ data class TextLine(
                 index++
                 continue
             }
-            val sizeSensitive = strike != null || box != null
+            val sizeSensitive = strike != null || box != null || style.resolvedHorizontalPadding != null
             val textSize = HighlightDraw.textSize(
                 if (sizeSensitive) (first as? TextHtmlColumn)?.mTextSize ?: baseTextSize else baseTextSize, style)
             var endIndex = index + 1
@@ -629,10 +665,11 @@ data class TextLine(
                 val paint = HighlightDraw.obtainTextPaint(base, style, fallbackColor, first.charData)
                 try { paint.fontMetrics } finally { HighlightDraw.recycleTextPaint(paint) }
             } else null
+            val explicitEdges = style.resolvedHorizontalPadding?.let { highlightInkEdges(index, endIndex, style) }
             HighlightDraw.drawRun(
                 canvas,
-                first.start - (style.resolvedHorizontalPadding ?: 0f).dpToPx(),
-                last.end + (style.resolvedHorizontalPadding ?: 0f).dpToPx(),
+                explicitEdges?.first ?: first.start,
+                explicitEdges?.second ?: last.end,
                 baseline,
                 height,
                 customMetrics?.ascent ?: (fontMetrics.ascent * metricScale),

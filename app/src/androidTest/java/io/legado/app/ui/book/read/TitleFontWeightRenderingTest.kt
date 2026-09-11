@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.Typeface
 import android.os.Build
 import android.os.SystemClock
@@ -854,13 +855,17 @@ class TitleFontWeightRenderingTest {
         val savedAdapt = AppConfig.adaptSpecialStyle
         val savedJustify = ReadBookConfig.textFullJustify
         val savedOptimize = AppConfig.optimizeRender
+        val savedHanging = ReadBookConfig.hangingPunctuation
         val image = File(context.cacheDir, "highlight-horizontal-padding.png")
+        val imageSrc = "${image.absolutePath},{\"style\":\"text\"}"
+        val cachedImage = BookHelp.getImage(book!!, imageSrc)
         Bitmap.createBitmap(24, 24, Bitmap.Config.ARGB_8888).let { bitmap ->
             try {
                 bitmap.eraseColor(Color.BLUE)
                 image.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
             } finally { bitmap.recycle() }
         }
+        BookHelp.writeImage(book!!, imageSrc, image.readBytes())
         fun awaitLayout(chapter: TextChapter): TextChapter = runBlocking {
             withTimeout(30_000) { for (ignored in chapter.layoutChannel) Unit; while (!chapter.isCompleted) yield() }
             chapter
@@ -874,24 +879,28 @@ class TitleFontWeightRenderingTest {
                 ReadBookConfig.paddingRight = 0
                 ReadBookConfig.paragraphIndent = ChapterProvider.indentChar.repeat(2)
                 ReadBookConfig.textSize = 20
+                context.putPrefBoolean(PreferKey.hangingPunctuation, true)
                 AppConfig.adaptSpecialStyle = true
                 AppConfig.optimizeRender = true
-                val short = "👩‍💻甲乙"
-                val long = "真实左右空白不能挤压字形或覆盖旁边图标".repeat(3)
+                ReadBookConfig.letterSpacing = 0.2f
+                val short = "甲乙👩‍💻"
+                val long = "“" + "真实左右空白不能挤压字形或覆盖旁边图标".repeat(3)
                 val fixture = BookChapter(bookUrl = book!!.bookUrl, url = "horizontal-padding", index = 10008)
                 ChapterProvider.setReviewProviders({ index, id ->
                     if (index == fixture.index && id == 2) 88 else 0
                 }, null, fixture.index)
                 val styles = listOf(
                     HighlightStyle(fill = Color.MAGENTA),
-                    HighlightStyle(fill = Color.MAGENTA, fillShape = HighlightStyle.FillShape.PILL, pillPaddingScale = 0.75f),
+                    HighlightStyle(fill = Color.MAGENTA, fillShape = HighlightStyle.FillShape.PILL, pillPaddingScale = 0.5f),
+                    HighlightStyle(fill = Color.MAGENTA, fillShape = HighlightStyle.FillShape.PILL, pillPaddingScale = 1.25f),
                     HighlightStyle(box = HighlightStyle.Deco(Color.MAGENTA)))
                 for (mode in listOf("static", "zh", "html")) for (justify in listOf(false, true)) {
                     ReadBookConfig.useZhLayout = mode == "zh"
                     context.putPrefBoolean(PreferKey.textFullJustify, justify)
                     ChapterProvider.upStyle()
-                    val src = "${image.absolutePath},{\"style\":\"text\"}"
-                    val img = if (mode == "html") "<img src='$src'>" else """<img src="$src">"""
+                    val decoded = ImageProvider.getImage(book!!, imageSrc, 24, 24)
+                    assertEquals("Real fixture image must decode, not an error icon", Color.BLUE, decoded.getPixel(12, 12))
+                    val img = if (mode == "html") "<img src='$imageSrc'>" else """<img src="$imageSrc">"""
                     val paragraphs = listOf("前$short${img}后", long)
                     val contents = if (mode == "html") listOf("<usehtml>" + paragraphs.joinToString("") { "<p>$it</p>" } + "</usehtml>")
                         else paragraphs.map { ReadBookConfig.paragraphIndent + it }
@@ -899,11 +908,14 @@ class TitleFontWeightRenderingTest {
                     val base = awaitLayout(ChapterProvider.getTextChapterAsync(scope, book!!, fixture,
                         "Padding", BookContent(false, contents, null), fixture.index + 1, saveChapterData = false))
                     val original = canonical(base)
+                    val fixedMarginCurves = mutableListOf<Int>()
                     for ((styleIndex, originalStyle) in styles.withIndex()) {
                         val measuredGaps = mutableListOf<Float>()
                         val measuredCurves = mutableListOf<Int>()
-                        for (gap in listOf(4f, 16f)) {
-                            val style = originalStyle.copy(horizontalPadding = gap, fontSize = 30f, textColor = 1)
+                        for (gap in listOf(0f, 4f, 24f)) {
+                            val style = originalStyle.copy(horizontalPadding = gap,
+                                fontSize = 30f.takeUnless { styleIndex == 0 },
+                                letterSpacing = (-0.1f).takeIf { styleIndex == 3 }, textColor = 1)
                             val ranges = listOf(short, long).map { text ->
                                 val start = original.indexOf(text)
                                 assertTrue("Fixture anchor must exist: $mode $text", start >= 0)
@@ -913,6 +925,29 @@ class TitleFontWeightRenderingTest {
                             val chapter = awaitLayout(checkNotNull(base.layoutWithHighlightSpacing(scope, spacing)))
                             val label = "$mode justify=$justify style=$styleIndex gap=$gap"
                             assertEquals(label, original, canonical(chapter))
+                            if (styleIndex == 0) {
+                                assertFalse("Padding alone must inherit font metrics: $label", spacing.hasTextMetrics)
+                                assertEquals("Only four boundary cells need padding spans: $label", 4, spacing.columns.size)
+                                assertTrue("Every boundary uses the full native run width: $label",
+                                    spacing.columns.values.all { it.contentWidth != null })
+                                if (!justify) {
+                                    val native = base.pages.flatMap { it.lines }.flatMap { it.columns }.filterIsInstance<TextBaseColumn>()
+                                    val padded = chapter.pages.flatMap { it.lines }.flatMap { it.columns }.filterIsInstance<TextBaseColumn>()
+                                    native.zip(padded).forEach { (before, after) ->
+                                        assertEquals("Same native glyph with inherited spacing: $label", before.charData, after.charData)
+                                        assertEquals("Padding alone keeps native advances: $label ${before.charData}",
+                                            before.end - before.start, after.end - after.start, 0.02f)
+                                    }
+                                }
+                            }
+                            val originalIcons = base.pages.flatMap { it.lines }.flatMap { it.columns }
+                                .filter { it is ImageColumn || it is ReviewColumn }.map { it.end - it.start }
+                            val actualIcons = chapter.pages.flatMap { it.lines }.flatMap { it.columns }
+                                .filter { it is ImageColumn || it is ReviewColumn }.map { it.end - it.start }
+                            assertEquals("Keep each real icon: $label", originalIcons.size, actualIcons.size)
+                            originalIcons.zip(actualIcons).forEach { (expected, actual) ->
+                                assertEquals("Padding must not shrink images/review icons: $label", expected, actual, 0.01f)
+                            }
                             val repeated = awaitLayout(checkNotNull(chapter.layoutWithHighlightSpacing(scope, spacing)))
                             assertEquals("Repeated reflow must not add padding: $label",
                                 chapter.pages.flatMap { it.lines }.flatMap { it.columns }.map { it.start to it.end },
@@ -954,8 +989,26 @@ class TitleFontWeightRenderingTest {
                                             line.height, style.resolvedFillShape, 1f.dpToPx())
                                         val cap = if (style.fill != 0 && style.resolvedFillShape == HighlightStyle.FillShape.PILL)
                                             (band.bottom - band.top) / 2f * style.resolvedPillPaddingScale else 0f
-                                        val left = first.start - cap - gap.dpToPx()
-                                        val right = last.end + cap + gap.dpToPx()
+                                        var inkLeft = Float.POSITIVE_INFINITY
+                                        var inkRight = Float.NEGATIVE_INFINITY
+                                        var left = Float.POSITIVE_INFINITY
+                                        var right = Float.NEGATIVE_INFINITY
+                                        for (column in selected) {
+                                            val paint = HighlightDraw.obtainTextPaint(line.textPaint, style, 0, column.charData)
+                                            try {
+                                                val ink = Rect()
+                                                paint.getTextBounds(column.charData, 0, column.charData.length, ink)
+                                                val origin = column.start + ((column as? TextColumn)?.drawOffset ?: 0f) +
+                                                    if (Build.VERSION.SDK_INT >= 35) paint.letterSpacing * paint.textSize * 0.5f else 0f
+                                                val minimum = if (cap > 0f) HighlightGeometry.pillClearance(cap,
+                                                    line.lineBase - line.lineTop + ink.top, line.lineBase - line.lineTop + ink.bottom,
+                                                    band.top, band.bottom, 1f.dpToPx()) else if (style.box != null) 1f.dpToPx() else 0f
+                                                inkLeft = minOf(inkLeft, origin + ink.left)
+                                                inkRight = maxOf(inkRight, origin + ink.right)
+                                                left = minOf(left, origin + ink.left - maxOf(gap.dpToPx(), minimum))
+                                                right = maxOf(right, origin + ink.right + maxOf(gap.dpToPx(), minimum))
+                                            } finally { HighlightDraw.recycleTextPaint(paint) }
+                                        }
                                         assertTrue("Full left boundary stays on the page: $label $left", left >= -0.01f)
                                         assertTrue("Full right boundary stays on the page: $label $right", right <= width + 0.01f)
                                         val firstIndex = line.columns.indexOf(first)
@@ -974,22 +1027,51 @@ class TitleFontWeightRenderingTest {
                                         assertTrue("Actual boundary pixels must be present: $label", edgePixels.size >= 2)
                                         assertEquals("Drawn left edge: $label", left, edgePixels.first().toFloat(), 1.5f)
                                         assertEquals("Drawn right edge: $label", right, edgePixels.last().toFloat(), 1.5f)
-                                        if (first.charData == "👩‍💻") {
+                                        if (gap == 24f) {
+                                            assertEquals("Actual requested left blank distance: $label", gap.dpToPx(), inkLeft - edgePixels.first(), 1.5f)
+                                            assertEquals("Actual requested right blank distance: $label", gap.dpToPx(), edgePixels.last() - inkRight, 1.5f)
+                                        }
+                                        if (first.charData == "甲") {
                                             checkedShort = true
-                                            measuredGaps += first.start - edgePixels.first()
-                                            if (cap > 0f) {
-                                                val shoulder = (line.lineTop + band.top + (band.bottom - band.top) * 0.05f).toInt()
-                                                val shoulderPixels = edgePixels.first()..edgePixels.last()
-                                                val edge = shoulderPixels.first { colored(it, shoulder) }
-                                                val curve = edge - edgePixels.first()
-                                                assertTrue("Real pill curve remains visible: $label curve=$curve", curve >= 2)
-                                                measuredCurves += curve
+                                            measuredGaps += inkLeft - edgePixels.first()
+                                            if (cap > 0f && gap == 0f) assertTrue("Explicit margin can reduce legacy clearance without changing curvature: $label",
+                                                measuredGaps.last() < inkLeft - first.start + cap - 1f)
+                                        }
+                                        selected.firstOrNull { it.charData == "👩‍💻" }?.let { emoji ->
+                                            val glyph = Bitmap.createBitmap(width, ceil(line.height).toInt(), Bitmap.Config.ARGB_8888)
+                                            val expected = Bitmap.createBitmap(width, glyph.height, Bitmap.Config.ARGB_8888)
+                                            val glyphStyle = style.copy(textColor = Color.BLACK)
+                                            val paint = HighlightDraw.obtainTextPaint(line.textPaint, glyphStyle, Color.BLACK, emoji.charData)
+                                            try {
+                                                emoji.highlightStyle = glyphStyle
+                                                emoji.draw(view, Canvas(glyph))
+                                                val offset = if (Build.VERSION.SDK_INT >= 35) paint.letterSpacing * paint.textSize * 0.5f else 0f
+                                                Canvas(expected).drawText(emoji.charData, emoji.start + offset, line.lineBase - line.lineTop, paint)
+                                                assertTrue("Padded boundary emoji must draw as a complete native glyph: $label", glyph.sameAs(expected))
+                                            } finally {
+                                                emoji.highlightStyle = style
+                                                HighlightDraw.recycleTextPaint(paint)
+                                                glyph.recycle(); expected.recycle()
                                             }
                                         }
+                                        if (cap > 0f) {
+                                            val shoulder = (line.lineTop + band.top + (band.bottom - band.top) * 0.05f).toInt()
+                                            val shoulderPixels = edgePixels.first()..edgePixels.last()
+                                            val edge = shoulderPixels.first { colored(it, shoulder) }
+                                            val curve = edge - edgePixels.first()
+                                            assertTrue("Real pill curve remains visible: $label curve=$curve", curve >= 2)
+                                            val rightEdge = shoulderPixels.last { colored(it, shoulder) }
+                                            assertTrue("Real right curve remains visible: $label", edgePixels.last() - rightEdge >= 2)
+                                            if (first.charData == "甲") measuredCurves += curve
+                                        }
                                         for (icon in line.columns.filter { it is ImageColumn }) {
+                                            var bluePixels = 0
                                             for (y in ceil(line.lineTop).toInt() until floor(line.lineBottom).toInt())
-                                                for (x in ceil(icon.start).toInt() until floor(icon.end).toInt())
+                                                for (x in ceil(icon.start).toInt() until floor(icon.end).toInt()) {
                                                     assertFalse("Padding must not paint the image slot: $label", colored(x, y))
+                                                    if (bitmap.getPixel(x, y) == Color.BLUE) bluePixels++
+                                                }
+                                            assertTrue("The actual image pixels remain visible: $label", bluePixels > 20)
                                         }
                                     }
                                     if (page.index == 0) File(context.getExternalFilesDir("ui-regression"),
@@ -1002,11 +1084,15 @@ class TitleFontWeightRenderingTest {
                             assertTrue("Wrapped run was checked: $label", checkedWrap)
                             assertTrue("Native review neighbor was checked: $label", checkedReview)
                         }
-                        assertEquals("More margin adds real empty pixels at fixed curvature: $mode $justify $styleIndex",
-                            12f.dpToPx(), measuredGaps[1] - measuredGaps[0], 1.5f)
-                        if (measuredCurves.isNotEmpty()) assertEquals("Margin must not retune curvature: $mode $justify",
-                            measuredCurves[0].toFloat(), measuredCurves[1].toFloat(), 1.5f)
+                        assertTrue("Large margin adds real blank space: $mode $justify $styleIndex", measuredGaps.last() > measuredGaps.first() + 2f)
+                        if (measuredCurves.isNotEmpty()) {
+                            measuredCurves.forEach { assertEquals("Margin must not retune curvature: $mode $justify",
+                                measuredCurves.first().toFloat(), it.toFloat(), 1.5f) }
+                            fixedMarginCurves += measuredCurves.last()
+                        }
                     }
+                    assertTrue("Fixed margin still permits visibly different curvatures: $mode $justify",
+                        fixedMarginCurves[1] > fixedMarginCurves[0] + 2)
                 }
             }
         } finally {
@@ -1014,10 +1100,12 @@ class TitleFontWeightRenderingTest {
                 ReadBookConfig.useZhLayout = savedZh
                 AppConfig.adaptSpecialStyle = savedAdapt
                 AppConfig.optimizeRender = savedOptimize
+                context.putPrefBoolean(PreferKey.hangingPunctuation, savedHanging)
                 context.putPrefBoolean(PreferKey.textFullJustify, savedJustify)
                 ChapterProvider.clearReviewProviders()
-                ImageProvider.remove(image.absolutePath)
+                ImageProvider.remove(cachedImage.absolutePath)
             }
+            cachedImage.delete()
             image.delete()
         }
     }

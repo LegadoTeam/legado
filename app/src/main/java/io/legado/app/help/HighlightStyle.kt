@@ -18,7 +18,7 @@ data class HighlightStyle(
     val pillPaddingScale: Float? = null,
     val fontSize: Float? = null,
     val letterSpacing: Float? = null,
-    // Extra horizontal space in dp; null keeps the legacy shape and layout.
+    // Requested ink-to-edge distance in dp; null keeps the legacy shape and layout.
     val horizontalPadding: Float? = null
 ) {
     data class Underline(

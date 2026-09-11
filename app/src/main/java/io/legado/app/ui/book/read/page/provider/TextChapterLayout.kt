@@ -242,7 +242,8 @@ class TextChapterLayout(
         line.hasHighlightSpacing = true
         if (isFirst) line.highlightLeadingSpace = inset.before
         column.start += inset.before
-        column.end = inset.contentWidth?.let { column.start + it } ?: (column.end - inset.after)
+        column.end = inset.contentWidth?.takeIf { inset.metricStyle != null || line.isHtml }
+            ?.let { column.start + it } ?: (column.end - inset.after)
         inset.reviewGap?.let {
             line.highlightReviewGap = it
             line.highlightReviewWidth = inset.reviewWidth
@@ -1368,6 +1369,8 @@ class TextChapterLayout(
         val wordStart = LineColumnLayout.justifiedFirst(
             words, textWidths, lineWidth.toFloat(), desiredWidth,
             paragraphIndent.length, indentCharWidth, hangingWidth,
+            hangingPadding = highlightSpacing[textLine.chapterPosition + paragraphIndent.length]
+                ?.let { it.before + it.after } ?: 0f,
             onIndentWidth = { textLine.indentWidth = it },
             onJustify = { startX, gap, isWordSpacing ->
                 applyJustify(textLine, textPaint, absStartX, startX, gap, isWordSpacing)
@@ -1481,6 +1484,8 @@ class TextChapterLayout(
         textLine.startX = absStartX + startX
         LineColumnLayout.natural(
             textWidths, startX, hasIndent, paragraphIndent.length, hangingWidth,
+            hangingPadding = highlightSpacing[textLine.chapterPosition + paragraphIndent.length]
+                ?.let { it.before + it.after } ?: 0f,
             onIndentWidth = { textLine.indentWidth = it }
         ) { index, xStart, xEnd, kind ->
             if (kind == LineColumnLayout.kindHanging) {
