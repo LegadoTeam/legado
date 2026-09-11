@@ -18,13 +18,16 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.GeneralLocation
+import androidx.test.espresso.action.GeneralClickAction
 import androidx.test.espresso.action.GeneralSwipeAction
 import androidx.test.espresso.action.Press
 import androidx.test.espresso.action.Swipe
+import androidx.test.espresso.action.Tap
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.longClick
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isDialog
+import androidx.test.espresso.matcher.RootMatchers.isPlatformPopup
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
@@ -39,6 +42,9 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.HttpTTS
+import io.legado.app.help.TTS
+import io.legado.app.help.TextSelectMenuConfig
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.LifecycleHelp
 import io.legado.app.help.config.LocalConfig
@@ -51,6 +57,7 @@ import io.legado.app.model.ReadBook
 import io.legado.app.model.localBook.TextFile
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.service.TTSReadAloudService
+import io.legado.app.service.HttpReadAloudService
 import io.legado.app.ui.book.read.config.ClickActionConfigDialog
 import io.legado.app.ui.book.read.config.ReadAloudControlsDialog
 import io.legado.app.ui.book.read.config.ReadAloudConfigDialog
@@ -75,6 +82,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 import java.io.FileInputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.lang.ref.WeakReference
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -98,7 +107,9 @@ class ReadAloudMenuUiTest {
         PreferKey.readAloudControlsX, PreferKey.readAloudControlsY,
         PreferKey.readAloudWakeLock, PreferKey.ttsTimer, PreferKey.readAloudStart,
         PreferKey.preDownloadNum, PreferKey.cronet,
-        PreferKey.readAloudByPage).associateWith { prefs.all[it] }
+        PreferKey.readAloudByPage, PreferKey.contentSelectSpeakMod,
+        PreferKey.textSelectMenuConfig, PreferKey.longPressSelectParagraph,
+        PreferKey.streamReadAloudAudio).associateWith { prefs.all[it] }
     private val savedRunning = BaseReadAloudService.isRun
     private val savedPaused = BaseReadAloudService.pause
     private val savedFollowing = BaseReadAloudService.followReadAloudPosition
@@ -174,6 +185,7 @@ class ReadAloudMenuUiTest {
                     is Boolean -> putBoolean(key, value)
                     is Int -> putInt(key, value)
                     is Float -> putFloat(key, value)
+                    is String -> putString(key, value)
                 }
             }
         }.commit()
@@ -261,11 +273,13 @@ class ReadAloudMenuUiTest {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun readAloudService(): TTSReadAloudService? {
+    private fun <T : BaseReadAloudService> readAloudService(type: Class<T>): T? {
         val services = LifecycleHelp::class.java.getDeclaredField("services").apply { isAccessible = true }
             .get(LifecycleHelp) as List<WeakReference<*>>
-        return services.mapNotNull { it.get() }.filterIsInstance<TTSReadAloudService>().singleOrNull()
+        return services.mapNotNull { it.get() }.filter { type.isInstance(it) }.map(type::cast).singleOrNull()
     }
+
+    private fun readAloudService() = readAloudService(TTSReadAloudService::class.java)
 
     private fun shell(command: String) = instrumentation.uiAutomation.executeShellCommand(command).use {
         FileInputStream(it.fileDescriptor).bufferedReader().use { reader -> reader.readText() }
@@ -435,19 +449,28 @@ class ReadAloudMenuUiTest {
         val unpacked = File(directory, "unpacked").apply { mkdirs() }
         val savedIgnore = HashMap(BackupConfig.ignoreConfig)
         val savedLatest = prefs.all[PreferKey.onlyLatestBackup]
+        val menuConfig = TextSelectMenuConfig(listOf("aloudFromHere", "copy"), listOf("aloud")).normalized()
         try {
             BackupConfig.contentKeys.forEach { BackupConfig.ignoreConfig[it] = true }
             BackupConfig.ignoreConfig[BackupConfig.settingContentKey] = false
-            prefs.edit().putBoolean(PreferKey.onlyLatestBackup, true).commit()
+            prefs.edit().putBoolean(PreferKey.onlyLatestBackup, true)
+                .putString(PreferKey.textSelectMenuConfig, menuConfig.toJson())
+                .putBoolean(PreferKey.readAloudByPage, false)
+                .putInt(PreferKey.contentSelectSpeakMod, 1).commit()
             runBlocking(Dispatchers.IO) { Backup.backupLocked(context, directory.path, uploadWebDav = false) }
             val archive = directory.listFiles()!!.single { it.extension == "zip" }
             ZipFile(archive).use { zip ->
                 val entry = zip.getEntry("config.xml") ?: error("Settings missing from real backup")
                 File(unpacked, "config.xml").outputStream().use { output -> zip.getInputStream(entry).copyTo(output) }
             }
-            prefs.edit().putString(PreferKey.readAloudStart, "sentence").commit()
+            prefs.edit().putString(PreferKey.readAloudStart, "sentence")
+                .remove(PreferKey.textSelectMenuConfig).putBoolean(PreferKey.readAloudByPage, true)
+                .putInt(PreferKey.contentSelectSpeakMod, 0).commit()
             runBlocking(Dispatchers.IO) { Restore.restoreLocked(unpacked.path) }
             assertFalse("Real settings restore preserves page start", AppConfig.readAloudStartAtSentence)
+            assertEquals(menuConfig, loadTextSelectMenuConfig(context))
+            assertFalse(prefs.getBoolean(PreferKey.readAloudByPage, true))
+            assertEquals(1, prefs.getInt(PreferKey.contentSelectSpeakMod, -1))
             scenario!!.onActivity { ReadAloudConfigDialog().showNow(it.supportFragmentManager, "aloud-start-restored") }
             scenario!!.onActivity { activity ->
                 val dialog = activity.supportFragmentManager.findFragmentByTag("aloud-start-restored") as ReadAloudConfigDialog
@@ -475,10 +498,11 @@ class ReadAloudMenuUiTest {
         }
     }
 
-    @Test fun initialCursorAndQueuedPageBoundariesPreserveExactHighlightsWithoutRestart() {
+    @Test fun wholeParagraphQueueAndActualRangesPreserveExactHighlightsWithoutRestart() {
         val file = checkNotNull(textFile)
-        file.writeText("先读完的句子。" + "当前句子需要连续阅读并且跨过多个页面".repeat(180) + "。\n" +
-            "下一段也要保持原来的朗读顺序。".repeat(10))
+        var firstParagraph = "先读完的句子。" + "当前句子需要连续阅读并且跨过多个页面".repeat(180) + "。"
+        val secondParagraph = "下一段也要保持原来的朗读顺序。".repeat(60)
+        file.writeText("$firstParagraph\n$secondParagraph")
         val fixture = checkNotNull(book)
         appDb.bookChapterDao.insert(BookChapter(bookUrl = fixture.bookUrl, url = "aloud-menu-chapter",
             title = "Playback controls", start = 0L, end = file.length()))
@@ -490,6 +514,22 @@ class ReadAloudMenuUiTest {
         await("long paragraph spans actual reader pages") {
             ReadBook.curTextChapter?.isCompleted == true && ReadBook.curTextChapter!!.pageSize > 3 &&
                 it.findViewById<ReadView>(R.id.read_view).curPage.textPage.textChapter === ReadBook.curTextChapter
+        }
+        scenario!!.onActivity {
+            val chapter = ReadBook.curTextChapter!!
+            val boundary = chapter.getReadLength(1)
+            val paragraph = chapter.paragraphs.first { boundary in it.chapterIndices }
+            val offset = boundary - paragraph.chapterPosition - paragraph.text.indexOf("先读完的句子。")
+            firstParagraph = firstParagraph.replaceRange(offset - 1, offset + 2, "养老院")
+            file.writeText("$firstParagraph\n$secondParagraph")
+            TextFile.clear()
+            ReadBook.clearTextChapter()
+            ReadBook.loadContent(resetPageOffset = true)
+        }
+        await("the reported word straddles a real rendered page boundary") {
+            val chapter = ReadBook.curTextChapter
+            chapter?.isCompleted == true && chapter.pageSize > 3 &&
+                chapter.getPage(0)!!.text.endsWith("养") && chapter.getPage(1)!!.text.startsWith("老院")
         }
         val service = startReadAloudService(paused = false)
         val recorder = RecordingSpeech(context)
@@ -516,8 +556,8 @@ class ReadAloudMenuUiTest {
                     ReadAloud.play(activity, pageIndex = 1,
                         rewindToSentenceStart = AppConfig.readAloudStartAtSentence)
                 }
-                await("real TTS preparation and queued page segments") {
-                    service.readAloudNumber == expected && recorder.calls.size >= 3 &&
+                await("real TTS preparation and queued paragraphs") {
+                    service.readAloudNumber == expected && recorder.calls.size >= 2 &&
                         recorder.calls.last().last &&
                         recorder.calls.last().id.split(':')[2].toInt() == service.contentList.lastIndex
                 }
@@ -531,14 +571,21 @@ class ReadAloudMenuUiTest {
                 }
                 previousId = calls.first().id
                 assertEquals(expected, calls.first().position)
+                if (!splitByPage && mode == "sentence") {
+                    assertTrue("A word crossing the page reaches TTS in a single utterance",
+                        calls.first().text.contains("养老院"))
+                }
                 assertEquals(ReadBook.curTextChapter!!.getPageIndexByCharIndex(expected), service.pageIndex)
                 assertEquals(TextToSpeech.QUEUE_FLUSH, calls.first().mode)
                 assertTrue(calls.drop(1).all { it.mode == TextToSpeech.QUEUE_ADD })
                 val expectedQueued = service.contentList.drop(service.nowSpeak).mapIndexed { index, text ->
                     if (index == 0) text.substring(service.paragraphStartPos) else text
                 }.joinToString("")
-                assertEquals("Page splitting neither repeats nor drops spoken characters", expectedQueued,
+                assertEquals("Paragraph queuing neither repeats nor drops spoken characters", expectedQueued,
                     calls.joinToString("") { it.text })
+                assertTrue(calls.all { it.text.length <= TextToSpeech.getMaxSpeechInputLength() })
+                assertEquals("Paragraphs below the engine limit must each use one speak call",
+                    service.contentList.size - service.nowSpeak, calls.size)
                 val session = (field("playbackSessionId").get(service) as AtomicLong).get()
                 val stops = recorder.stops
                 listener.onStart(calls.first().id)
@@ -552,16 +599,28 @@ class ReadAloudMenuUiTest {
                     ReadAloud.readAloudChapterStart == samePagePosition && exactAloudStart(samePagePosition)
                 }
                 screenshot("aloud-start-$mode-split-$splitByPage-exact-character")
+                if (!splitByPage) {
+                    val chapter = ReadBook.curTextChapter!!
+                    val boundary = chapter.getReadLength(chapter.getPageIndexByCharIndex(expected) + 1)
+                    assertTrue("A queued paragraph must contain both sides of the real page boundary",
+                        boundary > calls.first().position && boundary + 1 < calls.first().position + calls.first().text.length)
+                    listener.onRangeStart(calls.first().id, boundary - calls.first().position,
+                        boundary - calls.first().position + 1, 0)
+                    await("a real range crosses the page inside the same utterance") {
+                        ReadBook.durChapterPos == boundary && exactAloudStart(boundary)
+                    }
+                    assertEquals("Range following never requeues the paragraph", calls.size, recorder.calls.size)
+                }
                 val next = calls[1]
-                assertEquals("Only explicit page segmentation ends this speech paragraph", splitByPage, calls.first().last)
+                assertTrue("A complete paragraph finishes with one final callback", calls.first().last)
                 val paragraphBefore = service.nowSpeak
                 listener.onDone(calls.first().id)
                 instrumentation.waitForIdleSync()
-                assertEquals("Only a final page chunk advances the paragraph",
-                    paragraphBefore + if (splitByPage) 1 else 0, service.nowSpeak)
-                // A range-less engine reports onStart for the already queued next page.
+                assertEquals("A final utterance advances exactly one prepared paragraph",
+                    paragraphBefore + 1, service.nowSpeak)
+                // Without ranges, only actual paragraph starts provide a new speech position.
                 listener.onStart(next.id)
-                await("range-less engine follows the next queued page at its actual start") {
+                await("range-less engine follows the next paragraph at its actual start") {
                     ReadAloud.readAloudChapterStart == next.position && ReadBook.durChapterPos == next.position &&
                         ReadBook.durPageIndex == ReadBook.curTextChapter!!.getPageIndexByCharIndex(next.position) &&
                         exactAloudStart(next.position)
@@ -603,6 +662,194 @@ class ReadAloudMenuUiTest {
         }
     }
 
+    @Test fun oversizedParagraphUsesOnlyTheEngineLimitAndKeepsItsSingleParagraphCursor() {
+        val file = checkNotNull(textFile)
+        file.writeText("甲".repeat(3999) + "😀" + "养老院完整长段落".repeat(700) + "。\n最后一段。")
+        val fixture = checkNotNull(book)
+        appDb.bookChapterDao.insert(BookChapter(bookUrl = fixture.bookUrl, url = "aloud-menu-chapter",
+            title = "Playback controls", start = 0L, end = file.length()))
+        prefs.edit().putBoolean(PreferKey.readAloudByPage, false).commit()
+        scenario!!.onActivity {
+            TextFile.clear()
+            ReadBook.clearTextChapter()
+            ReadBook.loadContent(resetPageOffset = true)
+        }
+        await("oversized paragraph laid out by the reader") {
+            ReadBook.curTextChapter?.isCompleted == true &&
+                ReadBook.curTextChapter!!.paragraphs.any { it.length > TextToSpeech.getMaxSpeechInputLength() }
+        }
+        val service = startReadAloudService(paused = false)
+        val recorder = RecordingSpeech(context)
+        fun field(name: String) = TTSReadAloudService::class.java.getDeclaredField(name).apply { isAccessible = true }
+        try {
+            scenario!!.onActivity { activity ->
+                field("textToSpeech").set(service, recorder)
+                field("ttsInitFinish").setBoolean(service, true)
+                val start = ReadBook.curTextChapter!!.paragraphs.first { it.length > 4000 }.chapterPosition
+                ReadAloud.play(activity, pageIndex = 0, startPos = start)
+            }
+            await("all maximum-sized chunks and final paragraph queued") {
+                recorder.calls.size >= 4 && recorder.calls.last().id.split(':')[2].toInt() == service.contentList.lastIndex
+            }
+            val calls = synchronized(recorder.calls) { recorder.calls.toList() }
+            assertEquals(service.contentList.drop(service.nowSpeak).joinToString(""), calls.joinToString("") { it.text })
+            assertTrue(calls.all { it.text.length <= TextToSpeech.getMaxSpeechInputLength() })
+            assertTrue(calls.any { it.text.length > ReadBook.curTextChapter!!.pages.maxOf { page -> page.text.length } })
+            assertFalse(calls.any { Character.isHighSurrogate(it.text.last()) || Character.isLowSurrogate(it.text.first()) })
+            assertFalse(calls.first().last)
+            val paragraphBefore = service.nowSpeak
+            val listener = field("ttsUtteranceListener").get(service) as UtteranceProgressListener
+            listener.onDone(calls.first().id)
+            instrumentation.waitForIdleSync()
+            assertEquals("Only the paragraph's final chunk advances the paragraph cursor", paragraphBefore, service.nowSpeak)
+        } finally {
+            scenario!!.onActivity { service.clearTTS() }
+            recorder.shutdown()
+        }
+    }
+
+    @Test fun selectedReadFromHereStartsAtTheFirstCharacterRegardlessOfLegacyMode() {
+        val service = startReadAloudService(paused = false)
+        val recorder = RecordingSpeech(context)
+        val selectedRecorder = RecordingSpeech(context)
+        fun field(name: String) = TTSReadAloudService::class.java.getDeclaredField(name).apply { isAccessible = true }
+        scenario!!.onActivity { activity ->
+            field("textToSpeech").set(service, recorder)
+            field("ttsInitFinish").setBoolean(service, true)
+            val helper = TTS()
+            TTS::class.java.getDeclaredField("textToSpeech").apply { isAccessible = true }.set(helper, selectedRecorder)
+            ReadBookActivity::class.java.getDeclaredField("tts").apply { isAccessible = true }.set(activity, helper)
+        }
+        val listener = field("ttsUtteranceListener").get(service) as UtteranceProgressListener
+        try {
+            for (legacyMode in listOf(0, 1)) for (byPage in listOf(false, true)) {
+                prefs.edit().putInt(PreferKey.contentSelectSpeakMod, legacyMode)
+                    .putString(PreferKey.readAloudStart, if (byPage) "page" else "sentence")
+                    .putBoolean(PreferKey.readAloudByPage, byPage).commit()
+                recorder.calls.clear()
+                val selected = selectBodyWord()
+                screenshot("aloud-selection-mode-$legacyMode-page-$byPage-menu")
+                onView(withText(R.string.read_aloud_from_here)).inRoot(isPlatformPopup()).perform(click())
+                await("selection menu prepares the actual service at the first selected UTF-16 position") {
+                    recorder.calls.isNotEmpty() && service.readAloudNumber == selected.position &&
+                        recorder.calls.first().position == selected.position
+                }
+                assertEquals(selected.paragraphTail, recorder.calls.first().text)
+                assertTrue("Continuation includes unselected text", recorder.calls.first().text.length > selected.text.length)
+                assertEquals(legacyMode, prefs.getInt(PreferKey.contentSelectSpeakMod, -1))
+                assertTrue("Independent action does not use the selected-text helper", selectedRecorder.calls.isEmpty())
+                listener.onStart(recorder.calls.first().id)
+                await("selection highlight starts exactly at the selected character") { exactAloudStart(selected.position) }
+            }
+            prefs.edit().putInt(PreferKey.contentSelectSpeakMod, 0).commit()
+            val selected = selectBodyWord()
+            val session = (field("playbackSessionId").get(service) as AtomicLong).get()
+            val queued = recorder.calls.size
+            onView(withText(R.string.read_aloud)).inRoot(isPlatformPopup()).perform(click())
+            await("legacy selection-only action reaches its own speech endpoint") { selectedRecorder.calls.any { it.text.isNotEmpty() } }
+            assertEquals(selected.text, selectedRecorder.calls.filter { it.text.isNotEmpty() }.joinToString("") { it.text })
+            assertEquals("Legacy selection-only speech does not replace the book queue", queued, recorder.calls.size)
+            assertEquals(session, (field("playbackSessionId").get(service) as AtomicLong).get())
+        } finally {
+            scenario!!.onActivity { service.clearTTS() }
+            recorder.shutdown()
+        }
+    }
+
+    @Test fun selectedReadFromHereUsesTheBooksHttpEngineInBufferedAndStreamingModes() {
+        val requests = Collections.synchronizedList(mutableListOf<String>())
+        // A real decodable clip keeps the first paragraph active while its start is inspected.
+        val dataSize = 8000 * 2 * 20
+        val wav = ByteBuffer.allocate(44 + dataSize).order(ByteOrder.LITTLE_ENDIAN).apply {
+            put("RIFF".toByteArray()); putInt(36 + dataSize); put("WAVEfmt ".toByteArray())
+            putInt(16); putShort(1); putShort(1); putInt(8000); putInt(16000)
+            putShort(2); putShort(16); put("data".toByteArray()); putInt(dataSize)
+        }.array()
+        val server = object : NanoHTTPD("127.0.0.1", 0) {
+            override fun serve(session: IHTTPSession): Response {
+                requests.add(session.parameters["text"]?.firstOrNull().orEmpty())
+                return newFixedLengthResponse(Response.Status.OK, "audio/wav", wav.inputStream(), wav.size.toLong())
+            }
+        }.also { it.start() }
+        val engine = HttpTTS(name = "Selection HTTP ${System.nanoTime()}",
+            url = "http://127.0.0.1:${server.listeningPort}/speech?text={{java.encodeURI(speakText)}}")
+        appDb.httpTTSDao.insert(engine)
+        shell("pm grant ${context.packageName} $notificationPermission")
+        shell("dumpsys deviceidle whitelist +${context.packageName}")
+        try {
+            for (streaming in listOf(false, true)) {
+                prefs.edit().putBoolean(PreferKey.cronet, false)
+                    .putBoolean(PreferKey.streamReadAloudAudio, streaming)
+                    .putBoolean(PreferKey.readAloudByPage, false)
+                    .putBoolean(PreferKey.readAloudWakeLock, false)
+                    .putInt(PreferKey.ttsTimer, 0).putInt(PreferKey.contentSelectSpeakMod, 0)
+                    .putString(PreferKey.readAloudStart, "sentence").commit()
+                requests.clear()
+                scenario!!.onActivity { ReadBook.book!!.setTtsEngine(engine.id.toString()) }
+                val selected = selectBodyWord()
+                onView(withText(R.string.read_aloud_from_here)).inRoot(isPlatformPopup()).perform(click())
+                await("selection starts the configured HTTP service and sends the exact continuation") {
+                    readAloudService(HttpReadAloudService::class.java) != null && requests.isNotEmpty()
+                }
+                assertEquals(selected.paragraphTail, requests.first())
+                assertEquals(engine.id, ReadAloud.httpTTS?.id)
+                assertEquals(null, readAloudService())
+                scenario!!.onActivity {
+                    val service = checkNotNull(readAloudService(HttpReadAloudService::class.java))
+                    val paragraph = service.textChapter!!.getParagraphs(false)[service.nowSpeak]
+                    assertEquals(selected.position, paragraph.chapterPosition + service.paragraphStartPos)
+                }
+                context.stopService(Intent(context, HttpReadAloudService::class.java))
+                await("HTTP service stopped before next playback mode") {
+                    readAloudService(HttpReadAloudService::class.java) == null && !BaseReadAloudService.isRun
+                }
+                // A distinct engine key avoids hitting the previous mode's persistent audio cache.
+                engine.url += "&streaming=$streaming"
+                appDb.httpTTSDao.update(engine)
+            }
+        } finally {
+            context.stopService(Intent(context, HttpReadAloudService::class.java))
+            await("HTTP selection service cleaned up") { readAloudService(HttpReadAloudService::class.java) == null }
+            scenario!!.onActivity { ReadBook.book!!.setTtsEngine(""); ReadAloud.upReadAloudClass() }
+            appDb.httpTTSDao.delete(engine)
+            server.stop()
+            if (!wasBatteryExempt) shell("dumpsys deviceidle whitelist -${context.packageName}")
+        }
+    }
+
+    private data class SelectedSpeech(val position: Int, val text: String, val paragraphTail: String)
+
+    private fun selectBodyWord(): SelectedSpeech {
+        prefs.edit().putBoolean(PreferKey.longPressSelectParagraph, false)
+            .putString(PreferKey.textSelectMenuConfig,
+                TextSelectMenuConfig(listOf("aloudFromHere", "aloud")).normalized().toJson()).commit()
+        val coordinates = FloatArray(2)
+        scenario!!.onActivity { activity ->
+            val page = activity.findViewById<ReadView>(R.id.read_view).curPage
+            val line = page.textPage.lines.first { !it.isTitle && it.text.contains("content") }
+            val column = line.columns.filterIsInstance<TextBaseColumn>().first { it.charData == "c" }
+            val location = IntArray(2).also(page.findViewById<View>(R.id.content_text_view)::getLocationOnScreen)
+            coordinates[0] = location[0] + (column.start + column.end) / 2
+            coordinates[1] = location[1] + (line.lineTop + line.lineBottom) / 2
+        }
+        onView(withId(R.id.read_view)).perform(GeneralClickAction(Tap.LONG, { coordinates }, Press.FINGER))
+        await("long press exposes the real selection popup") {
+            it.textActionMenu.isShowing && it.findViewById<ReadView>(R.id.read_view).isTextSelected
+        }
+        var result: SelectedSpeech? = null
+        scenario!!.onActivity { activity ->
+            val view = activity.findViewById<ReadView>(R.id.read_view)
+            val start = view.curPage.selectStartPos
+            val page = view.curPage.relativePage(start.relativePagePos)
+            val position = page.chapterPosition + page.getPosByLineColumn(start.lineIndex, start.columnIndex)
+            val paragraph = ReadBook.curTextChapter!!.getParagraphs(prefs.getBoolean(PreferKey.readAloudByPage, false))
+                .first { position in it.chapterIndices }
+            assertTrue("Selection is after the sentence/page start", position > paragraph.chapterPosition)
+            result = SelectedSpeech(position, view.getSelectText(), paragraph.text.substring(position - paragraph.chapterPosition))
+        }
+        return checkNotNull(result)
+    }
+
     private fun exactAloudStart(position: Int): Boolean {
         val chapter = ReadBook.curTextChapter ?: return false
         val page = chapter.getPageByReadPos(position) ?: return false
@@ -628,7 +875,7 @@ class ReadAloudMenuUiTest {
         val calls = Collections.synchronizedList(mutableListOf<SpokenCall>())
         @Volatile var stops = 0
         override fun speak(text: CharSequence, queueMode: Int, params: Bundle?, utteranceId: String?): Int {
-            calls.add(SpokenCall(text.toString(), queueMode, checkNotNull(utteranceId)))
+            calls.add(SpokenCall(text.toString(), queueMode, utteranceId.orEmpty()))
             return SUCCESS
         }
         override fun stop(): Int { stops++; return SUCCESS }
