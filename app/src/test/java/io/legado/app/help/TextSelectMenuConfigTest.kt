@@ -12,7 +12,7 @@ class TextSelectMenuConfigTest {
         val config = TextSelectMenuConfig.default()
 
         assertEquals(
-            listOf("replace", "copy", "bookmark", "highlight", "aloud"),
+            listOf("replace", "copy", "bookmark", "highlight", "aloud", "aloudFromHere"),
             config.bar
         )
         assertEquals(
@@ -57,7 +57,17 @@ class TextSelectMenuConfigTest {
         ).normalized()
 
         assertEquals(listOf("copy", "dict"), config.bar)
-        assertEquals("highlight", config.more.last())
+        assertEquals(listOf("highlight", "aloudFromHere"), config.more.takeLast(2))
+    }
+
+    @Test
+    fun savedMenuAddsReadFromHereWithoutMovingExistingActions() {
+        val original = TextSelectMenuConfig(listOf("aloud", "copy"),
+            listOf("highlight", "bookmark", "replace", "dict", "search", "browser", "share", "processText"))
+        val migrated = TextSelectMenuConfig.fromJson(original.toJson()).normalized()
+        assertEquals(original.bar, migrated.bar)
+        assertEquals(original.more + "aloudFromHere", migrated.more)
+        assertEquals(migrated, TextSelectMenuConfig.fromJson(migrated.toJson()).normalized())
     }
 
     @Test
