@@ -5,7 +5,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import androidx.annotation.StringRes
-import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import io.legado.app.R
@@ -14,9 +13,7 @@ import io.legado.app.constant.AppLog
 import io.legado.app.help.CrashHandler
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
-import io.legado.app.help.update.AppUpdate
 import io.legado.app.ui.widget.dialog.TextDialog
-import io.legado.app.ui.widget.dialog.WaitDialog
 import io.legado.app.utils.FileDoc
 import io.legado.app.utils.compress.ZipUtils
 import io.legado.app.utils.createFileIfNotExist
@@ -38,10 +35,6 @@ import java.io.File
 
 class AboutFragment : PreferenceFragmentCompat() {
 
-    private val waitDialog by lazy {
-        WaitDialog(requireContext())
-    }
-
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         addPreferencesFromResource(R.xml.about)
         findPreference<Preference>("update_log")?.summary =
@@ -57,8 +50,8 @@ class AboutFragment : PreferenceFragmentCompat() {
         when (preference.key) {
             "contributors" -> openUrl(R.string.contributors_url)
             "update_log" -> showMdFile(getString(R.string.update_log), "updateLog.md")
-            "check_update" -> checkUpdate()
-            "check_beta_update" -> checkBetaUpdate()
+            "check_update" -> checkAppUpdate()
+            "check_beta_update" -> checkAppUpdate(beta = true)
             "mail" -> requireContext().sendMail(getString(R.string.email))
             "license" -> showMdFile(getString(R.string.license), "LICENSE.md")
             "disclaimer" -> showMdFile(getString(R.string.disclaimer), "disclaimer.md")
@@ -83,40 +76,6 @@ class AboutFragment : PreferenceFragmentCompat() {
         val mdText = String(requireContext().assets.open(fileName).readBytes())
         showDialogFragment(TextDialog(title, mdText, TextDialog.Mode.MD))
     }
-
-    /**
-     * 检测更新
-     */
-    private fun checkUpdate() {
-        waitDialog.show()
-        AppUpdate.gitHubUpdate.run {
-            check(lifecycleScope)
-                .onSuccess {
-                    if (childFragmentManager.isStateSaved) return@onSuccess
-                    showDialogFragment(
-                        UpdateDialog(it)
-                    )
-                }.onError {
-                    appCtx.toastOnUi(it.localizedMessage)
-                }.onFinally {
-                    waitDialog.dismiss()
-                }
-        }
-    }
-
-    private fun checkBetaUpdate() {
-        waitDialog.show()
-        AppUpdate.checkBeta(lifecycleScope)
-            .onSuccess {
-                if (childFragmentManager.isStateSaved) return@onSuccess
-                showDialogFragment(UpdateDialog(it))
-            }.onError {
-                appCtx.toastOnUi(it.localizedMessage)
-            }.onFinally {
-                waitDialog.dismiss()
-            }
-    }
-
 
     /**
      * 加入qq群

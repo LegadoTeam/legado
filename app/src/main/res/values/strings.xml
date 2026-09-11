@@ -1838,4 +1838,6 @@
     <string name="view_in_code_editor">View in editor</string>
     <string name="code_editor_result_error">Could not read the editor result. The preview has been kept.</string>
     <string name="reimport_book_source">Reimport this book’s source</string>
+    <string name="customize_my">Customize My page</string>
+    <string name="my_more_items">Move selected items to More</string>
 </resources>
