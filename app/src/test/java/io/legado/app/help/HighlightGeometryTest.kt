@@ -7,6 +7,17 @@ import org.junit.Test
 class HighlightGeometryTest {
 
     @Test
+    fun `actual clearance can be smaller than radius while retaining the same ellipse`() {
+        for (radius in listOf(10f, 20f, 40f)) {
+            val minimum = HighlightGeometry.pillClearance(radius, 10f, 40f, 0f, 60f, 2f)
+            assertTrue("Full cap radius is not the minimum ink gap", minimum < radius)
+            assertEquals(radius, HighlightGeometry.pillRadiusX(radius, minimum + 0.001f, 10f, 40f, 0f, 60f, 2f), 0.01f)
+            assertTrue("A smaller gap would require reducing the chosen curve",
+                HighlightGeometry.pillRadiusX(radius, minimum - 0.1f, 10f, 40f, 0f, 60f, 2f) < radius)
+        }
+    }
+
+    @Test
     fun `pill ends use the largest safe ellipse instead of clipping a circle`() {
         val border = 2f
         for (clearance in listOf(3f, 5f, 10f, 32f)) {

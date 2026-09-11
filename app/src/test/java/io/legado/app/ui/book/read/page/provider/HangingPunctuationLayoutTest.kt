@@ -38,10 +38,12 @@ class HangingPunctuationLayoutTest {
         widths: List<Float>,
         startX: Float = 0f,
         hasIndent: Boolean = true,
-        hangingWidth: Float = 0f
+        hangingWidth: Float = 0f,
+        hangingPadding: Float = 0f
     ) = Line().also { line ->
         LineColumnLayout.natural(
             widths, startX, hasIndent, indentLength, hangingWidth,
+            hangingPadding = hangingPadding,
             onIndentWidth = { line.indentWidth = it }
         ) { index, xStart, xEnd, kind ->
             line.columns.add(Column(index, xStart, xEnd, kind))
@@ -51,12 +53,14 @@ class HangingPunctuationLayoutTest {
     private fun justifiedFirstLine(
         widths: List<Float>,
         hangingWidth: Float = 0f,
+        hangingPadding: Float = 0f,
         indentCharWidth: Float = em,
         words: List<String> = List(widths.size) { "字" }
     ) = Line().also { line ->
         LineColumnLayout.justifiedFirst(
             words, widths, visibleWidth, widths.sum(),
             indentLength, indentCharWidth, hangingWidth,
+            hangingPadding = hangingPadding,
             onIndentWidth = { line.indentWidth = it },
             onJustify = { startX, gap, isWordSpacing ->
                 line.startX = startX
@@ -89,6 +93,20 @@ class HangingPunctuationLayoutTest {
     }
 
     // region 自然排版
+
+    @Test
+    fun `highlight padding advances after hanging punctuation and keeps indent hit cells apart`() {
+        val padding = 16f
+        val widths = listOf(em, em, em + padding, em, em)
+        for (line in listOf(naturalLine(widths, hangingWidth = em, hangingPadding = padding),
+            justifiedFirstLine(widths, hangingWidth = em, hangingPadding = padding))) {
+            assertNoOverlap(line)
+            val punctuation = requireNotNull(line.hanging)
+            assertEquals(em, punctuation.start, delta)
+            assertEquals(em + padding, punctuation.width, delta)
+            assertEquals(2 * em + padding, line.body(indentLength + 1).start, delta)
+        }
+    }
 
     @Test
     fun `natural line without hanging is contiguous from the origin`() {

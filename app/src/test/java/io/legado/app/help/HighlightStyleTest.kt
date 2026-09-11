@@ -15,6 +15,24 @@ import org.junit.Test
 class HighlightStyleTest {
 
     @Test
+    fun `horizontal padding is independent optional and zero overrides the base`() {
+        val legacy = HighlightStyle(fill = 1, fillShape = FillShape.PILL, pillPaddingScale = 1.5f)
+        val padded = legacy.copy(horizontalPadding = 12f)
+        assertTrue(padded.needsPerColumnDraw)
+        assertFalse(HighlightStyle(horizontalPadding = 0f).isEmpty)
+        assertEquals(1.5f, padded.resolvedPillPaddingScale, 0f)
+        assertEquals(12f, padded.copy(pillPaddingScale = 0.5f).resolvedHorizontalPadding)
+        assertEquals(padded.copy(horizontalPadding = 0f),
+            HighlightStyle.merge(padded, HighlightStyle(horizontalPadding = 0f)))
+        assertEquals(padded, HighlightStyle.merge(padded, HighlightStyle()))
+        assertEquals(legacy, padded.copy(horizontalPadding = null))
+        assertEquals(HighlightStyle(), HighlightStyle(horizontalPadding = Float.NaN).normalized())
+        assertEquals(HighlightStyle(), HighlightStyle(horizontalPadding = Float.POSITIVE_INFINITY).normalized())
+        assertEquals(0f, HighlightStyle(horizontalPadding = -1f).normalized().horizontalPadding)
+        assertEquals(64f, HighlightStyle(horizontalPadding = 100f).normalized().horizontalPadding)
+    }
+
+    @Test
     fun `font metrics are optional normalized channels and zero spacing overrides the base`() {
         val legacy = HighlightStyle(fontPath = "font.ttf")
         assertFalse(legacy.changesTextMetrics)

@@ -1,6 +1,7 @@
 package io.legado.app.ui.highlight.edit
 
 import android.os.Bundle
+import android.graphics.Rect
 import android.view.View
 import android.view.ViewGroup
 import androidx.lifecycle.lifecycleScope
@@ -20,6 +21,7 @@ import io.legado.app.ui.book.read.HighlightFillPreviewDrawable
 import io.legado.app.ui.book.read.HighlightStyleDialog
 import io.legado.app.utils.GSON
 import io.legado.app.utils.getCompatColor
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.toastOnUi
@@ -27,6 +29,7 @@ import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.ceil
 
 class HighlightRuleEditDialog : BaseDialogFragment(R.layout.dialog_highlight_rule_edit, true),
     HighlightStyleDialog.StyleHost,
@@ -158,8 +161,17 @@ class HighlightRuleEditDialog : BaseDialogFragment(R.layout.dialog_highlight_rul
     }
 
     private fun upPreview() {
+        val preview = binding.tvStylePreview
+        val ink = Rect().also { preview.paint.getTextBounds(preview.text.toString(), 0, preview.text.length, it) }
+        val padding = editingStyle.resolvedHorizontalPadding?.let { requested ->
+            val radius = if (editingStyle.resolvedFillShape == HighlightStyle.FillShape.PILL)
+                (preview.textSize * 1.06f + 4f.dpToPx()) / 2f * editingStyle.resolvedPillPaddingScale else 0f
+            ceil(maxOf(requested.dpToPx(), radius) + maxOf(0f, -ink.left.toFloat(),
+                ink.right - preview.paint.measureText(preview.text.toString()))).toInt()
+        } ?: 12.dpToPx()
+        preview.setPadding(padding, preview.paddingTop, padding, preview.paddingBottom)
         binding.tvStylePreview.background = if (editingStyle.fill != 0) {
-            HighlightFillPreviewDrawable(editingStyle, binding.tvStylePreview.textSize)
+            HighlightFillPreviewDrawable(editingStyle, preview.textSize, ink, padding.toFloat())
         } else {
             null
         }

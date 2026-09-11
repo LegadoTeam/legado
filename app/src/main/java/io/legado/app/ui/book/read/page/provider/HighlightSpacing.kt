@@ -3,13 +3,16 @@ package io.legado.app.ui.book.read.page.provider
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Rect
+import android.os.Build
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.TextPaint
 import android.text.style.MetricAffectingSpan
 import android.text.style.ReplacementSpan
 import io.legado.app.help.HighlightMatcher
+import io.legado.app.help.HighlightGeometry
 import io.legado.app.help.HighlightStyle
+import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.ui.book.read.page.HighlightDraw
 import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.ui.book.read.page.entities.TextLine
@@ -18,6 +21,7 @@ import io.legado.app.ui.book.read.page.entities.column.ImageColumn
 import io.legado.app.ui.book.read.page.entities.column.ReviewColumn
 import io.legado.app.ui.book.read.page.entities.column.TextBaseColumn
 import io.legado.app.ui.book.read.page.entities.column.TextHtmlColumn
+import io.legado.app.ui.book.read.page.entities.column.TextColumn
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getTextWidthsCompat
 import kotlin.math.ceil
@@ -112,14 +116,39 @@ data class HighlightSpacing(
             val baseTextSize get() = (column as? TextHtmlColumn)?.mTextSize ?: line.textPaint.textSize
             val textSize get() = HighlightDraw.textSize(baseTextSize, style)
             var metrics: Insets? = null
+            var nativeAdvance: Float? = null
             val padding get(): Float {
+                val style = checkNotNull(style)
                 // The full PILL band is 0.9em above and 0.16em below the baseline, plus
                 // 2dp on each side. HTML fallback metrics can unclip it after reflow.
                 val fullBandHeight = textSize * 1.06f + 4f.dpToPx()
-                return fullBandHeight / 2f * checkNotNull(style).resolvedPillPaddingScale
+                val radius = if (style.fill != 0 && style.resolvedFillShape == HighlightStyle.FillShape.PILL)
+                    fullBandHeight / 2f * style.resolvedPillPaddingScale else 0f
+                val requested = style.resolvedHorizontalPadding ?: return radius
+                val text = (column as TextBaseColumn).charData
+                val base = Paint(line.textPaint).apply { textSize = baseTextSize }
+                val paint = HighlightDraw.obtainTextPaint(base, style, 0, text)
+                try {
+                    val ink = Rect()
+                    paint.getTextBounds(text, 0, text.length, ink)
+                    val fm = paint.fontMetrics
+                    // A future line can lose a tall neighbour. Reserve for this font's shortest
+                    // glyph-containing band; actual drawing uses that row's ink and band.
+                    val top = maxOf(-textSize * 0.9f - 2f.dpToPx(), minOf(fm.ascent, ink.top.toFloat()))
+                    val bottom = minOf(textSize * 0.16f + 2f.dpToPx(), maxOf(fm.descent, ink.bottom.toFloat()))
+                    val minimum = if (radius > 0f) HighlightGeometry.pillClearance(radius,
+                        ink.top.toFloat(), ink.bottom.toFloat(), top, bottom, 1f.dpToPx())
+                        else if (style.box != null) 1f.dpToPx() else 0f
+                    val clearance = maxOf(requested.dpToPx(), minimum, radius - ink.width() / 2f)
+                    val offset = ((column as? TextColumn)?.drawOffset ?: 0f) +
+                        if (Build.VERSION.SDK_INT >= 35) paint.letterSpacing * paint.textSize * 0.5f else 0f
+                    return if (ink.isEmpty) clearance else maxOf(0f,
+                        clearance - offset - ink.left, clearance + offset + ink.right - advance)
+                } finally { HighlightDraw.recycleTextPaint(paint) }
             }
             val advance get(): Float {
                 metrics?.contentWidth?.let { return it }
+                nativeAdvance?.let { return it }
                 val text = (column as? TextBaseColumn)?.charData ?: return column.end - column.start
                 val paint = Paint(line.textPaint).apply { textSize = this@Cell.textSize }
                 // Justification can disappear when a paragraph wraps differently.
@@ -157,6 +186,27 @@ data class HighlightSpacing(
             // Resolve neighbours across soft line/page breaks: another padded token can move
             // an originally separated image and capsule onto the same line on the second layout.
             for (paragraph in paragraphs) {
+                if (paragraph.any { it.style?.resolvedHorizontalPadding != null }) {
+                    // Measure native paragraph runs, including unstyled neighbours. Measuring a
+                    // boundary glyph alone drops inherited edge letter spacing on Android 15+.
+                    val texts = paragraph.map { cell -> (cell.column as? TextBaseColumn)?.charData
+                        ?: "\uFFFC".repeat(cell.column.positionLength) }
+                    val text = texts.joinToString("")
+                    for (size in paragraph.map { it.baseTextSize }.distinct()) {
+                        val paint = TextPaint(paragraph.first().line.textPaint).apply { textSize = size }
+                        val widths = FloatArray(text.length)
+                        paint.getTextWidthsCompat(text, widths, 0f)
+                        if (!paragraph.first().line.isHtml && !paragraph.first().line.isTitle) {
+                            PunctuationCompressor(paint).beginParagraph(text, widths, ReadBookConfig.punctuationCompress)
+                        }
+                        var offset = 0
+                        paragraph.forEachIndexed { index, cell ->
+                            val end = offset + texts[index].length
+                            if (cell.baseTextSize == size) cell.nativeAdvance = (offset until end).sumOf { widths[it].toDouble() }.toFloat()
+                            offset = end
+                        }
+                    }
+                }
                 var metricStart = 0
                 while (metricStart < paragraph.size) {
                     val first = paragraph[metricStart]
@@ -198,11 +248,14 @@ data class HighlightSpacing(
                 while (i < paragraph.size) {
                     val first = paragraph[i]
                     val style = first.style
-                    if (first.column !is TextBaseColumn || style == null || style.fill == 0 ||
-                        style.resolvedFillShape != HighlightStyle.FillShape.PILL) { i++; continue }
+                    if (first.column !is TextBaseColumn || style == null ||
+                        style.resolvedHorizontalPadding == null &&
+                        (style.fill == 0 || style.resolvedFillShape != HighlightStyle.FillShape.PILL)) { i++; continue }
+                    val explicit = style.resolvedHorizontalPadding != null
                     var end = i + 1
                     while (end < paragraph.size && paragraph[end].column is TextBaseColumn &&
-                        paragraph[end].style?.let { it.fill == style.fill &&
+                        paragraph[end].style?.let { if (explicit || it.resolvedHorizontalPadding != null) it == style
+                        else it.fill == style.fill &&
                             it.resolvedFillShape == style.resolvedFillShape &&
                             it.resolvedPillPaddingScale == style.resolvedPillPaddingScale } == true &&
                         paragraph[end].textSize == first.textSize) end++
@@ -210,6 +263,25 @@ data class HighlightSpacing(
                     // coverage disjoint even when measured advances end on fractional pixels.
                     val padding = paragraph.subList(i, end).maxOf { it.padding } + 1f
                     edgePadding = maxOf(edgePadding, padding)
+                    if (explicit) {
+                        // Reserve the shape's entire footprint at actual run boundaries. Only
+                        // boundary Unicode cells get spans, so interior shaping/word breaks stay intact.
+                        val last = paragraph[end - 1]
+                        val before = result[first.position] ?: Insets(first.column.positionLength, contentWidth = first.advance)
+                        result[first.position] = before.copy(before = maxOf(before.before, padding))
+                        val after = result[last.position] ?: Insets(last.column.positionLength, contentWidth = last.advance)
+                        result[last.position] = after.copy(after = maxOf(after.after, padding))
+                        val line = last.line
+                        if (end == paragraph.size && line.isParagraphEnd &&
+                            ChapterProvider.getReviewCount(line.paragraphNum, line.isReviewTitle,
+                                line.reviewTitleOffset, chapter.chapter.index) > 0) {
+                            val width = ChapterProvider.getReviewWidth(line.isReviewTitle)
+                            result[last.position] = result.getValue(last.position).copy(
+                                after = padding + width, reviewGap = padding, reviewWidth = width)
+                        }
+                        i = end
+                        continue
+                    }
                     var distance = 0f
                     for (left in i - 1 downTo 0) {
                         val cell = paragraph[left]
