@@ -40,7 +40,7 @@ import java.util.UUID
 @RunWith(AndroidJUnit4::class)
 class MyPageCustomizationTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
-    private val context = instrumentation.targetContext
+    private val context = instrumentation.targetContext.applicationContext
     private val prefs = context.defaultSharedPreferences
     private val savedPrefs = prefs.all
     private val savedLocal = LocalConfig.all
@@ -51,11 +51,11 @@ class MyPageCustomizationTest {
     @Before fun setUp() {
         prefs.edit().remove(PreferKey.myMoreItems)
             .putBoolean(PreferKey.autoRefresh, false).putBoolean(PreferKey.autoCheckNewBackup, false)
-            .putBoolean("autoUpdateVariant", false).putString(PreferKey.defaultHomePage, "settings").commit()
+            .putBoolean("autoUpdateVariant", false).putString(PreferKey.defaultHomePage, "my").commit()
         LocalConfig.edit().putBoolean("privacyPolicyOk", true)
             .putLong("appVersionCode", appInfo.versionCode).putString("password", "").commit()
         scenario = ActivityScenario.launch(MainActivity::class.java)
-        awaitMain { it.findPreference<Preference>("autoTaskManage")?.isVisible == true }
+        awaitMain { it.isResumed && it.findPreference<Preference>("autoTaskManage")?.isVisible == true }
     }
 
     @After fun cleanUp() {
