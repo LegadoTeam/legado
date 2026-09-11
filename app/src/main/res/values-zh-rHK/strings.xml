@@ -1344,4 +1344,12 @@
     <string name="book_memo_discard">放棄未儲存的修改並關閉？</string>
     <string name="book_memo_save_failed">備忘儲存失敗：%1$s</string>
     <string name="reimport_book_source">重新匯入本書書源</string>
+    <string name="book_metadata_sync">同步書籍資訊</string>
+    <string name="book_metadata_sync_summary">修改書名或作者時，同步書籤與閱讀記錄。</string>
+    <string name="book_metadata_sync_always">同步</string>
+    <string name="book_metadata_sync_never">不同步</string>
+    <string name="book_metadata_sync_ask">每次提醒</string>
+    <string name="book_metadata_sync_question">同步修改對應書籤與閱讀記錄的書名和作者？</string>
+    <string name="read_record_edit">編輯閱讀記錄</string>
+    <string name="read_record_edit_summary">修改顯示的書名和作者；相同書名和作者的記錄合併顯示，閱讀時長保持不變。</string>
 </resources>

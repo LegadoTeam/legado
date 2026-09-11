@@ -1838,4 +1838,12 @@
     <string name="view_in_code_editor">View in editor</string>
     <string name="code_editor_result_error">Could not read the editor result. The preview has been kept.</string>
     <string name="reimport_book_source">Reimport this book’s source</string>
+    <string name="book_metadata_sync">Sync book details</string>
+    <string name="book_metadata_sync_summary">When a title or author is edited, update its bookmarks and reading history.</string>
+    <string name="book_metadata_sync_always">Sync</string>
+    <string name="book_metadata_sync_never">Do not sync</string>
+    <string name="book_metadata_sync_ask">Ask every time</string>
+    <string name="book_metadata_sync_question">Update the title and author in the related bookmarks and reading history?</string>
+    <string name="read_record_edit">Edit reading history</string>
+    <string name="read_record_edit_summary">Only the displayed title and author change. Matching records are shown together; reading duration stays unchanged.</string>
 </resources>
