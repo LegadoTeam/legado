@@ -5,7 +5,7 @@ import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.ReadRecordBook
 import io.legado.app.data.entities.ReadRecordShow
 import io.legado.app.data.entities.ReadRecordAuthors
-import io.legado.app.data.entities.mergeRestoredReadRecord
+import io.legado.app.data.entities.withDisplayMetadata
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -15,27 +15,24 @@ interface ReadRecordDao {
     val all: List<ReadRecord>
 
     @Query(
-        """select distinct bookName, case when author = '' then coalesce(resolvedAuthor, '') else author end as author from readRecord
+        """select distinct displayBookName as bookName, displayAuthor as author from readRecord
             order by bookName collate localized, author collate localized"""
     )
     fun flowBooks(): Flow<List<ReadRecordBook>>
 
     @get:Query(
         """
-        select history.bookName, sum(history.readTime) as readTime,
+        select history.displayBookName as bookName, sum(history.readTime) as readTime,
             max(history.lastRead) as lastRead,
-            case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end as author,
+            history.displayAuthor as author,
             snapshot.lastChapterTitle, snapshot.lastChapterIndex,
             snapshot.lastChapterPos, snapshot.coverUrl
         from readRecord history
         join readRecord snapshot on snapshot.rowid = (select rowid from readRecord
-                where bookName = history.bookName and
-                    (case when author = '' then coalesce(resolvedAuthor, '') else author end) =
-                    (case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end)
-                order by lastRead desc, deviceId, author limit 1)
-        group by history.bookName,
-            case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end
-        order by history.bookName collate localized, author collate localized"""
+                where displayBookName = history.displayBookName and displayAuthor = history.displayAuthor
+                order by lastRead desc, deviceId, bookName, author limit 1)
+        group by history.displayBookName, history.displayAuthor
+        order by history.displayBookName collate localized, author collate localized"""
     )
     val allShow: List<ReadRecordShow>
 
@@ -44,22 +41,19 @@ interface ReadRecordDao {
 
     @Query(
         """
-        select history.bookName, sum(history.readTime) as readTime,
+        select history.displayBookName as bookName, sum(history.readTime) as readTime,
             max(history.lastRead) as lastRead,
-            case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end as author,
+            history.displayAuthor as author,
             snapshot.lastChapterTitle, snapshot.lastChapterIndex,
             snapshot.lastChapterPos, snapshot.coverUrl
         from readRecord history
         join readRecord snapshot on snapshot.rowid = (select rowid from readRecord
-                where bookName = history.bookName and
-                    (case when author = '' then coalesce(resolvedAuthor, '') else author end) =
-                    (case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end)
-                order by lastRead desc, deviceId, author limit 1)
-        group by history.bookName,
-            case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end
-        having history.bookName like '%' || :searchKey || '%'
-            or (case when history.author = '' then coalesce(history.resolvedAuthor, '') else history.author end) like '%' || :searchKey || '%'
-        order by history.bookName collate localized, author collate localized"""
+                where displayBookName = history.displayBookName and displayAuthor = history.displayAuthor
+                order by lastRead desc, deviceId, bookName, author limit 1)
+        group by history.displayBookName, history.displayAuthor
+        having history.displayBookName like '%' || :searchKey || '%'
+            or history.displayAuthor like '%' || :searchKey || '%'
+        order by history.displayBookName collate localized, author collate localized"""
     )
     fun search(searchKey: String): List<ReadRecordShow>
 
@@ -74,7 +68,29 @@ interface ReadRecordDao {
     fun updateCoverIfUnchanged(deviceId: String, bookName: String, author: String, expected: String, coverUrl: String): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insert(vararg readRecord: ReadRecord)
+    fun insertRecords(vararg readRecord: ReadRecord)
+
+    @Query("""select * from readRecord where bookName = :bookName and author = :author
+        and metadataEditedAt > 0 order by metadataEditedAt desc limit 1""")
+    fun latestMetadata(bookName: String, author: String): ReadRecord?
+
+    @Transaction
+    fun insert(vararg readRecord: ReadRecord) {
+        readRecord.groupBy { it.bookName to it.author }.forEach { (identity, records) ->
+            val stored = latestMetadata(identity.first, identity.second)
+            val incoming = records.maxByOrNull { it.metadataEditedAt }
+            val metadata = if ((stored?.metadataEditedAt ?: 0) >= (incoming?.metadataEditedAt ?: 0)) stored else incoming
+            insertRecords(*records.map { it.withDisplayMetadata(metadata) }.toTypedArray())
+            if (metadata != null && metadata.metadataEditedAt > 0) {
+                updatePhysicalMetadata(identity.first, identity.second, metadata.displayBookName,
+                    metadata.displayAuthor, metadata.metadataEditedAt)
+            }
+        }
+    }
+
+    @Query("""update readRecord set displayBookName = :name, displayAuthor = :displayAuthor, metadataEditedAt = :editedAt
+        where bookName = :bookName and author = :author and metadataEditedAt <= :editedAt""")
+    fun updatePhysicalMetadata(bookName: String, author: String, name: String, displayAuthor: String, editedAt: Long)
 
     @Update
     fun update(vararg record: ReadRecord)
@@ -85,12 +101,26 @@ interface ReadRecordDao {
     @Query("delete from readRecord")
     fun clear()
 
-    @Query("""delete from readRecord where bookName = :bookName and
-        (case when author = '' then coalesce(resolvedAuthor, '') else author end) = :author""")
+    @Query("delete from readRecord where displayBookName = :bookName and displayAuthor = :author")
     fun deleteByBook(bookName: String, author: String)
 
-    @Query("select * from readRecord where bookName = :bookName and author = :author")
+    @Query("select * from readRecord where displayBookName = :bookName and displayAuthor = :author")
     fun getRecords(bookName: String, author: String): List<ReadRecord>
+
+    @Query("select coalesce(max(metadataEditedAt), 0) from readRecord")
+    fun latestMetadataEditTime(): Long
+
+    @Query("""update readRecord set displayBookName = :newName, displayAuthor = :newAuthor, metadataEditedAt = :editedAt
+        where displayBookName = :oldName and displayAuthor = :oldAuthor""")
+    fun updateDisplayMetadata(oldName: String, oldAuthor: String, newName: String, newAuthor: String, editedAt: Long): Int
+
+    @Transaction
+    fun renameBook(oldName: String, oldAuthor: String, newName: String, newAuthor: String) {
+        require(newName.isNotBlank())
+        if (oldName == newName && oldAuthor == newAuthor) return
+        updateDisplayMetadata(oldName, oldAuthor, newName, newAuthor,
+            maxOf(System.currentTimeMillis(), latestMetadataEditTime() + 1, 1))
+    }
 
     /** A user removes an obsolete label; the legacy row's undivided duration stays intact. */
     @Transaction
@@ -98,17 +128,7 @@ interface ReadRecordDao {
         val authors = ReadRecordAuthors.decode(author)
         if (!ReadRecordAuthors.isCombined(author) || authors.size < 2 || removedAuthor !in authors) return
         val remaining = (authors - removedAuthor).reduce(ReadRecordAuthors::merge)
-        getRecords(bookName, author).forEach { original ->
-            val renamed = original.copy(author = remaining)
-            val current = getRecord(original.deviceId, bookName, remaining)
-            val saved = if (current == null) renamed else {
-                mergeRestoredReadRecord(current, renamed, localDevice = true).copy(
-                    readTime = Math.addExact(current.readTime, renamed.readTime),
-                )
-            }
-            delete(original)
-            insert(saved)
-        }
+        renameBook(bookName, author, bookName, remaining)
     }
 
     /** The first subsequent reading supplies the author for this title's unknown history. */
@@ -118,7 +138,8 @@ interface ReadRecordDao {
         assignUnknownAuthor(bookName, author)
     }
 
-    @Query("""update readRecord set resolvedAuthor = :author
+    @Query("""update readRecord set resolvedAuthor = :author,
+        displayAuthor = case when metadataEditedAt = 0 then :author else displayAuthor end
         where bookName = :bookName and author = '' and resolvedAuthor is null""")
     fun assignUnknownAuthor(bookName: String, author: String)
 

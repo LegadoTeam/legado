@@ -1193,6 +1193,8 @@ class CodeSelectionUiTest {
     @Suppress("DEPRECATION")
     private fun shareAndAssert(expected: String) {
         val chooser = AtomicReference<Intent?>()
+        var shareButton: View? = null
+        var touchTrace = ""
         val monitor = object : Instrumentation.ActivityMonitor() {
             override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? {
                 if (intent.action != Intent.ACTION_CHOOSER) return null
@@ -1207,15 +1209,45 @@ class CodeSelectionUiTest {
             if (native) {
                 clickNativeAction(R.string.share)
             } else {
+                // A visible PopupWindow view can precede its committed surface/input window.
+                // Wait on the popup itself after switching back from Android's floating toolbar.
+                val committed = CountDownLatch(1)
+                withEditor { editor ->
+                    val root = actions(editor).view.rootView
+                    assertTrue(root.isHardwareAccelerated)
+                    root.viewTreeObserver.registerFrameCommitCallback { committed.countDown() }
+                    root.postInvalidateOnAnimation()
+                }
+                assertTrue("Share popup frame was not committed", committed.await(5, TimeUnit.SECONDS))
+                instrumentation.uiAutomation.waitForIdle(500, 5_000)
+                withEditor { editor ->
+                    assertEquals(expected, selection(editor))
+                    shareButton = actions(editor).view.findViewById(R.id.code_share_selection)
+                    shareButton!!.setOnTouchListener { view, event ->
+                        val location = IntArray(2)
+                        view.getLocationOnScreen(location)
+                        touchTrace += "${MotionEvent.actionToString(event.action)} " +
+                            "screen=${event.rawX},${event.rawY} button=${location.toList()} " +
+                            "size=${view.width}x${view.height} selected=${selection(editor)}; "
+                        false
+                    }
+                }
                 onView(withId(R.id.code_share_selection)).inRoot(isPlatformPopup()).perform(click())
             }
-            await { chooser.get() != null }
+            await(message = {
+                var state = ""
+                withEditor { state = "selected=${selection(it)} showing=${actions(it).isShowing} " +
+                    "enabled=${actions(it).isEnabled}; touches=$touchTrace" }
+                runCatching { screenshot("code-selection-share-timeout") }
+                "Share did not launch a chooser: $state"
+            }) { chooser.get() != null }
             val send = chooser.get()!!.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)!!
             assertEquals(Intent.ACTION_SEND, send.action)
             assertEquals("text/plain", send.type)
             assertEquals(expected, send.getStringExtra(Intent.EXTRA_TEXT))
             assertNotEquals(source, send.getStringExtra(Intent.EXTRA_TEXT))
         } finally {
+            instrumentation.runOnMainSync { shareButton?.setOnTouchListener(null) }
             instrumentation.removeMonitor(monitor)
         }
     }

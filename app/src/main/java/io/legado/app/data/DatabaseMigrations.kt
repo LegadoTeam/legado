@@ -563,6 +563,14 @@ object DatabaseMigrations {
     }
 
     @Suppress("ClassName")
+    class Migration_111_112 : AutoMigrationSpec {
+        override fun onPostMigrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""update readRecord set displayBookName = bookName,
+                displayAuthor = case when author = '' then coalesce(resolvedAuthor, '') else author end""")
+        }
+    }
+
+    @Suppress("ClassName")
     class Migration_101_102 : AutoMigrationSpec {
         override fun onPostMigrate(db: SupportSQLiteDatabase) {
             val update = db.compileStatement(
