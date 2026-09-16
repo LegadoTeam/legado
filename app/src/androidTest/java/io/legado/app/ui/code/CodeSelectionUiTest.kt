@@ -1209,7 +1209,19 @@ class CodeSelectionUiTest {
             if (native) {
                 clickNativeAction(R.string.share)
             } else {
+                // A visible PopupWindow view can precede its committed surface/input window.
+                // Wait on the popup itself after switching back from Android's floating toolbar.
+                val committed = CountDownLatch(1)
                 withEditor { editor ->
+                    val root = actions(editor).view.rootView
+                    assertTrue(root.isHardwareAccelerated)
+                    root.viewTreeObserver.registerFrameCommitCallback { committed.countDown() }
+                    root.postInvalidateOnAnimation()
+                }
+                assertTrue("Share popup frame was not committed", committed.await(5, TimeUnit.SECONDS))
+                instrumentation.uiAutomation.waitForIdle(500, 5_000)
+                withEditor { editor ->
+                    assertEquals(expected, selection(editor))
                     shareButton = actions(editor).view.findViewById(R.id.code_share_selection)
                     shareButton!!.setOnTouchListener { view, event ->
                         val location = IntArray(2)
