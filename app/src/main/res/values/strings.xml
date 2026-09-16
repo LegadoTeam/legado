@@ -398,8 +398,9 @@
     <string name="highlight_fill_half">Half height</string>
     <string name="highlight_fill_baseline">Baseline</string>
     <string name="highlight_fill_pill">Pill</string>
-    <string name="highlight_pill_padding">Pill margin (%)</string>
-    <string name="highlight_pill_padding_value">Margin %1$d%%</string>
+    <string name="highlight_pill_padding">Curvature (%)</string>
+    <string name="highlight_pill_padding_value">Curvature %1$d%%</string>
+    <string name="highlight_horizontal_padding">Horizontal margin</string>
     <string name="highlight_rule">Highlight rules</string>
     <string name="highlight_rule_add">New highlight rule</string>
     <string name="highlight_rule_edit_title">Edit highlight rule</string>

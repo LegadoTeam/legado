@@ -29,6 +29,7 @@ class HighlightStyleAppGsonTest {
             fill = 0x80FFFF00.toInt(),
             fillShape = FillShape.MARKER,
             pillPaddingScale = 1.25f,
+            horizontalPadding = 12f,
             textColor = 0xFFFF0000.toInt(),
             bold = true,
             underline = Underline(
@@ -93,6 +94,7 @@ class HighlightStyleAppGsonTest {
         for (json in listOf("""{"fill":1}""", """{"fill":1,"pillPaddingScale":null}""")) {
             val restored = GSON.fromJsonObject<HighlightStyle>(json).getOrThrow()
             assertEquals(1f, restored.resolvedPillPaddingScale, 0f)
+            assertNull(restored.resolvedHorizontalPadding)
         }
         val base = HighlightStyle(fill = 1, pillPaddingScale = 1.5f)
         assertEquals(1.5f, HighlightStyle.merge(base, HighlightStyle(bold = true)).resolvedPillPaddingScale, 0f)

@@ -46,6 +46,7 @@ internal object LineColumnLayout {
         hasIndent: Boolean,
         indentLength: Int,
         hangingWidth: Float,
+        hangingPadding: Float = 0f,
         onIndentWidth: (indentWidth: Float) -> Unit,
         emit: (index: Int, xStart: Float, xEnd: Float, kind: Int) -> Unit
     ) {
@@ -57,11 +58,13 @@ internal object LineColumnLayout {
                 indentEnd += widths[i]
             }
             //自然排列按逐字测量的宽度排布,悬挂宽度取本行的列宽而非段落测量值
-            hangingStart = indentEnd - widths[indentLength]
+            hangingStart = indentEnd - widths[indentLength] + hangingPadding
         }
         var x = startX
         for (index in widths.indices) {
             if (hanging && index == indentLength) {
+                // The punctuation hangs, but its optional highlight space still advances the body.
+                x += hangingPadding
                 emit(index, hangingStart, x, kindHanging)
                 continue
             }
@@ -140,6 +143,7 @@ internal object LineColumnLayout {
         indentLength: Int,
         indentCharWidth: Float,
         hangingWidth: Float,
+        hangingPadding: Float = 0f,
         onIndentWidth: (indentWidth: Float) -> Unit,
         onJustify: (startX: Float, gap: Float, isWordSpacing: Boolean) -> Unit,
         emit: (index: Int, xStart: Float, xEnd: Float, kind: Int) -> Unit
@@ -161,6 +165,7 @@ internal object LineColumnLayout {
         var wordStart = indentLength
         if (hanging) {
             //段首标点悬挂到缩进内,正文首字与其他段落对齐
+            x += hangingPadding
             emit(wordStart, hangingStart, x, kindHanging)
             wordStart++
         }
