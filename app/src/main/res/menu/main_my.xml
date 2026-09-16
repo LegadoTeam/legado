@@ -4,6 +4,11 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
+        android:id="@+id/menu_customize_my"
+        android:title="@string/customize_my"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_help"
         android:title="@string/help"
         android:icon="@drawable/ic_help"

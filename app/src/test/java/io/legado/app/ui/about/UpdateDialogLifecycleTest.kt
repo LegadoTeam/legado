@@ -14,20 +14,17 @@ class UpdateDialogLifecycleTest {
             "private suspend fun upVersion()",
             "private suspend fun setLocalPassword()"
         )
-        val about = functionBody(
-            "src/main/java/io/legado/app/ui/about/AboutFragment.kt",
-            "private fun checkUpdate()",
-            "private fun checkBetaUpdate()"
-        )
-        val beta = functionBody(
-            "src/main/java/io/legado/app/ui/about/AboutFragment.kt",
-            "private fun checkBetaUpdate()",
-            "private fun joinQQGroup("
-        )
+        val shared = projectFile(
+            "src/main/java/io/legado/app/ui/about/CheckAppUpdate.kt"
+        ).readText()
 
         assertGuardBeforeDialog(main, "supportFragmentManager.isStateSaved")
-        assertGuardBeforeDialog(about, "childFragmentManager.isStateSaved")
-        assertGuardBeforeDialog(beta, "childFragmentManager.isStateSaved")
+        assertGuardBeforeDialog(shared, "isAdded && !childFragmentManager.isStateSaved")
+        for (path in listOf("ui/about/AboutFragment.kt", "ui/main/my/MyFragment.kt")) {
+            val caller = projectFile("src/main/java/io/legado/app/$path").readText()
+            assertTrue(caller.contains("\"check_update\" -> checkAppUpdate()"))
+            assertTrue(caller.contains("\"check_beta_update\" -> checkAppUpdate(beta = true)"))
+        }
     }
 
     @Test
@@ -111,18 +108,14 @@ class UpdateDialogLifecycleTest {
 
     @Test
     fun `manual update errors show their message without a redundant action prefix`() {
-        val source = projectFile(
-            "src/main/java/io/legado/app/ui/about/AboutFragment.kt"
+        val shared = projectFile(
+            "src/main/java/io/legado/app/ui/about/CheckAppUpdate.kt"
         ).readText()
-        val official = source.substringAfter("private fun checkUpdate()")
-            .substringBefore("private fun checkBetaUpdate()")
-        val beta = source.substringAfter("private fun checkBetaUpdate()")
-            .substringBefore("private fun joinQQGroup(")
-
-        assertTrue(official.contains("appCtx.toastOnUi(it.localizedMessage)"))
-        assertFalse(official.contains("getString(R.string.check_update)"))
-        assertTrue(beta.contains("appCtx.toastOnUi(it.localizedMessage)"))
-        assertFalse(beta.contains("getString(R.string.check_beta_update)"))
+        assertTrue(shared.contains("AppUpdate.checkBeta(lifecycleScope)"))
+        assertTrue(shared.contains("AppUpdate.gitHubUpdate.check(lifecycleScope)"))
+        assertTrue(shared.contains("appCtx.toastOnUi(it.localizedMessage)"))
+        assertFalse(shared.contains("getString(R.string.check_update)"))
+        assertFalse(shared.contains("getString(R.string.check_beta_update)"))
     }
 
     private fun assertGuardBeforeDialog(source: String, guard: String) {
