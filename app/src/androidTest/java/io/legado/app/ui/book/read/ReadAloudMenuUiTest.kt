@@ -588,6 +588,17 @@ class ReadAloudMenuUiTest {
                     service.contentList.size - service.nowSpeak, calls.size)
                 val session = (field("playbackSessionId").get(service) as AtomicLong).get()
                 val stops = recorder.stops
+                val staleInit = field("ttsInitGeneration").getLong(service) - 1
+                val initCallback = TTSReadAloudService::class.java.getDeclaredMethod(
+                    "onTtsInitialized", Long::class.javaPrimitiveType, Int::class.javaPrimitiveType
+                ).apply { isAccessible = true }
+                scenario!!.onActivity {
+                    initCallback.invoke(service, staleInit, TextToSpeech.SUCCESS)
+                    initCallback.invoke(service, staleInit, TextToSpeech.ERROR)
+                }
+                assertEquals("A cleared engine's late initialization cannot requeue active speech",
+                    session, (field("playbackSessionId").get(service) as AtomicLong).get())
+                assertEquals(calls.size, recorder.calls.size)
                 listener.onStart(calls.first().id)
                 await("initial highlight begins exactly at the prepared speech position") {
                     ReadAloud.readAloudChapterStart == expected && ReadBook.durChapterPos == expected &&

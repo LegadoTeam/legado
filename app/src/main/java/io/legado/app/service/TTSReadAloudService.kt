@@ -40,10 +40,11 @@ internal fun speechChunkEnd(text: String, start: Int, limit: Int): Int {
 /**
  * 本地朗读
  */
-class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener {
+class TTSReadAloudService : BaseReadAloudService() {
 
     private var textToSpeech: TextToSpeech? = null
     private var ttsInitFinish = false
+    private var ttsInitGeneration = 0L
     private val ttsUtteranceListener = TTSUtteranceListener()
     private var speakJob: Coroutine<*>? = null
     private val playbackSessionId = AtomicLong()
@@ -67,18 +68,24 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
     @Synchronized
     private fun initTts() {
         ttsInitFinish = false
+        val generation = ++ttsInitGeneration
+        val listener = TextToSpeech.OnInitListener { status ->
+            // Construction and shutdown can finish before their asynchronous init callback.
+            callbackHandler.post { onTtsInitialized(generation, status) }
+        }
         val engine = GSON.fromJsonObject<SelectItem<String>>(ReadAloud.ttsEngine).getOrNull()?.value
         LogUtils.d(TAG, "initTts engine:$engine")
         textToSpeech = if (engine.isNullOrBlank()) {
-            TextToSpeech(this, this)
+            TextToSpeech(this, listener)
         } else {
-            TextToSpeech(this, this, engine)
+            TextToSpeech(this, listener, engine)
         }
         upSpeechRate()
     }
 
     @Synchronized
     fun clearTTS() {
+        ttsInitGeneration++
         playbackSessionId.incrementAndGet()
         textToSpeech?.runCatching {
             stop()
@@ -88,7 +95,9 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
         ttsInitFinish = false
     }
 
-    override fun onInit(status: Int) {
+    @Synchronized
+    private fun onTtsInitialized(generation: Long, status: Int) {
+        if (generation != ttsInitGeneration) return
         if (status == TextToSpeech.SUCCESS) {
             textToSpeech?.let {
                 it.setOnUtteranceProgressListener(ttsUtteranceListener)
