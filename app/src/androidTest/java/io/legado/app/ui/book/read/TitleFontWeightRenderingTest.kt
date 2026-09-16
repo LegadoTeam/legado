@@ -1009,6 +1009,9 @@ class TitleFontWeightRenderingTest {
                                                 right = maxOf(right, origin + ink.right + maxOf(gap.dpToPx(), minimum))
                                             } finally { HighlightDraw.recycleTextPaint(paint) }
                                         }
+                                        val capWidthDeficit = (cap * 2f - (right - left)).coerceAtLeast(0f) / 2f
+                                        left -= capWidthDeficit
+                                        right += capWidthDeficit
                                         assertTrue("Full left boundary stays on the page: $label $left", left >= -0.01f)
                                         assertTrue("Full right boundary stays on the page: $label $right", right <= width + 0.01f)
                                         val firstIndex = line.columns.indexOf(first)

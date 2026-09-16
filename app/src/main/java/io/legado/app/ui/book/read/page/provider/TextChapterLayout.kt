@@ -242,7 +242,7 @@ class TextChapterLayout(
         line.hasHighlightSpacing = true
         if (isFirst) line.highlightLeadingSpace = inset.before
         column.start += inset.before
-        column.end = inset.contentWidth?.takeIf { inset.metricStyle != null || line.isHtml }
+        column.end = inset.contentWidth?.takeIf { column !is TextBaseColumn || inset.metricStyle != null || line.isHtml }
             ?.let { column.start + it } ?: (column.end - inset.after)
         inset.reviewGap?.let {
             line.highlightReviewGap = it
@@ -1569,9 +1569,11 @@ class TextChapterLayout(
         } else {
             columns.last()
         }
-        val endX = endColumn.end.roundToInt()
+        val endX = endColumn.end
         if (endX > visibleEnd) {
             textLine.exceed = true
+            // Native line breaking can omit edge letter spacing. Keep the fractional
+            // correction: integer division leaves small overflows completely unchanged.
             val cc = (endX - visibleEnd) / size
             for (i in 0..<size) {
                 textLine.getColumnReverseAt(i, offset).let {

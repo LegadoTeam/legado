@@ -661,6 +661,14 @@ class ContentReversalUiTest {
     }
 
     private fun showReaderMenu() {
+        // skipToPage updates ReadBook before its asynchronous page view callback finishes.
+        // Tap the displayed target page, not the previous page (which can contain an image).
+        await("reader page ready for menu tap") {
+            val reader = it.findViewById<ReadView>(R.id.read_view)
+            val page = reader.curPage.textPage
+            it.window.decorView.hasWindowFocus() && reader.pageDelegate?.isRunning != true &&
+                (page.isMsgPage || page.index == ReadBook.durPageIndex)
+        }
         awaitDraw()
         var visible = false
         scenario!!.onActivity { visible = it.findViewById<ReadMenu>(R.id.read_menu).isVisible }
@@ -737,8 +745,12 @@ class ContentReversalUiTest {
         val chapter = ReadBook.curTextChapter
         var pageState = "unavailable"
         scenario!!.onActivity {
+            val reader = it.findViewById<ReadView>(R.id.read_view)
             pageState = "messagePage=${it.findViewById<ReadView>(R.id.read_view).curPage.textPage.isMsgPage}, " +
-                "readerMenu=${it.findViewById<ReadMenu>(R.id.read_menu).isVisible}, bottomDialog=${it.bottomDialog}"
+                "readerMenu=${it.findViewById<ReadMenu>(R.id.read_menu).isVisible}, bottomDialog=${it.bottomDialog}, " +
+                "displayedPage=${reader.curPage.textPage.index}, expectedPage=${ReadBook.durPageIndex}, " +
+                "focused=${it.window.decorView.hasWindowFocus()}, animating=${reader.pageDelegate?.isRunning}, " +
+                "abortTap=${reader.isAbortAnim}, selected=${reader.isTextSelected}"
         }
         throw AssertionError("Timed out waiting for $description; chapter=${ReadBook.durChapterIndex}, " +
             "book=${ReadBook.book?.bookUrl}, url=${chapter?.chapter?.url}, complete=${chapter?.isCompleted}, $pageState, " +
