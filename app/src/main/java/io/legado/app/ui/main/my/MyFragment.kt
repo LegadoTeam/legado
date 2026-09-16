@@ -5,6 +5,8 @@ import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import androidx.preference.MultiSelectListPreference
+import androidx.preference.PreferenceGroup
 import androidx.preference.Preference
 import io.legado.app.R
 import io.legado.app.base.BaseFragment
@@ -21,6 +23,7 @@ import io.legado.app.lib.theme.primaryColor
 import io.legado.app.service.McpService
 import io.legado.app.service.AutoTaskScheduler
 import io.legado.app.service.WebService
+import io.legado.app.ui.about.checkAppUpdate
 import io.legado.app.ui.about.AboutActivity
 import io.legado.app.ui.about.ReadRecordActivity
 import io.legado.app.ui.autoTask.AutoTaskActivity
@@ -72,6 +75,8 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
     override fun onCompatOptionsItemSelected(item: MenuItem) {
         when (item.itemId) {
             R.id.menu_help -> showHelp("appHelp")
+            R.id.menu_customize_my -> (childFragmentManager.findFragmentByTag("prefFragment")
+                as? MyPreferenceFragment)?.showCustomization()
         }
     }
 
@@ -81,10 +86,55 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
     class MyPreferenceFragment : PreferenceFragment(),
         SharedPreferences.OnSharedPreferenceChangeListener {
 
+        private val isMore: Boolean
+            get() = activity?.intent?.getStringExtra("configTag") == ConfigTag.MY_MORE
+        private lateinit var customization: MultiSelectListPreference
+
+        fun showCustomization() = onDisplayPreferenceDialog(customization)
+
+        private fun applyVisibility(group: PreferenceGroup = preferenceScreen) {
+            val moreItems = customization.values
+            repeat(group.preferenceCount) { index ->
+                val preference = group.getPreference(index)
+                if (preference is PreferenceGroup) {
+                    applyVisibility(preference)
+                    preference.isVisible = (0 until preference.preferenceCount)
+                        .any { preference.getPreference(it).isVisible }
+                } else {
+                    preference.isVisible = when (preference.key) {
+                        PreferKey.myMoreItems -> false
+                        "myMore", "exit" -> !isMore
+                        else -> (preference.key in moreItems) == isMore
+                    }
+                }
+            }
+        }
+
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             putPrefBoolean(PreferKey.webService, WebService.isRun)
             putPrefBoolean(PreferKey.mcpService, McpService.isRun)
             addPreferencesFromResource(R.xml.pref_main)
+            if (isMore) activity?.setTitle(R.string.reader_menu_more)
+            val available = mutableListOf<Preference>()
+            fun collect(group: PreferenceGroup) {
+                repeat(group.preferenceCount) { index ->
+                    val preference = group.getPreference(index)
+                    if (preference is PreferenceGroup) collect(preference)
+                    else if (preference.key !in setOf("exit", "myMore")) available.add(preference)
+                }
+            }
+            collect(preferenceScreen)
+            customization = MultiSelectListPreference(requireContext()).apply {
+                key = PreferKey.myMoreItems
+                title = getString(R.string.customize_my)
+                dialogTitle = getString(R.string.my_more_items)
+                entries = available.map { it.title }.toTypedArray()
+                entryValues = available.map { it.key }.toTypedArray()
+                setDefaultValue(setOf("check_update", "check_beta_update"))
+                isVisible = false
+            }
+            preferenceScreen.addPreference(customization)
+            applyVisibility()
             findPreference<SwitchPreference>("webService")?.onLongClick {
                 if (!WebService.isRun) {
                     return@onLongClick false
@@ -146,6 +196,9 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
         override fun onResume() {
             super.onResume()
             preferenceManager.sharedPreferences?.registerOnSharedPreferenceChangeListener(this)
+            customization.values = preferenceManager.sharedPreferences?.getStringSet(PreferKey.myMoreItems,
+                setOf("check_update", "check_beta_update")).orEmpty()
+            applyVisibility()
         }
 
         override fun onPause() {
@@ -158,6 +211,11 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
             key: String?
         ) {
             when (key) {
+                PreferKey.myMoreItems -> {
+                    customization.values = sharedPreferences?.getStringSet(key,
+                        setOf("check_update", "check_beta_update")).orEmpty()
+                    applyVisibility()
+                }
                 PreferKey.webService -> {
                     if (requireContext().getPrefBoolean("webService")) {
                         WebService.start(requireContext())
@@ -189,6 +247,9 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
 
         override fun onPreferenceTreeClick(preference: Preference): Boolean {
             when (preference.key) {
+                "myMore" -> startActivity<ConfigActivity> { putExtra("configTag", ConfigTag.MY_MORE) }
+                "check_update" -> checkAppUpdate()
+                "check_beta_update" -> checkAppUpdate(beta = true)
                 "bookSourceManage" -> startActivity<BookSourceActivity>()
                 "autoTaskManage" -> startActivity<AutoTaskActivity>()
                 "replaceManage" -> startActivity<ReplaceRuleActivity>()

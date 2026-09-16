@@ -1846,4 +1846,6 @@
     <string name="book_metadata_sync_question">Update the title and author in the related bookmarks and reading history?</string>
     <string name="read_record_edit">Edit reading history</string>
     <string name="read_record_edit_summary">Only the displayed title and author change. Matching records are shown together; reading duration stays unchanged.</string>
+    <string name="customize_my">Customize My page</string>
+    <string name="my_more_items">Move selected items to More</string>
 </resources>

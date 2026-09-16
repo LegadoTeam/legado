@@ -1352,4 +1352,6 @@
     <string name="book_metadata_sync_question">同步修改對應書籤與閱讀記錄的書名和作者？</string>
     <string name="read_record_edit">編輯閱讀記錄</string>
     <string name="read_record_edit_summary">修改顯示的書名和作者；相同書名和作者的記錄合併顯示，閱讀時長保持不變。</string>
+    <string name="customize_my">自訂我的頁面</string>
+    <string name="my_more_items">將選取的功能移至更多</string>
 </resources>

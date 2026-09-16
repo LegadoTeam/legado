@@ -1733,4 +1733,6 @@
     <string name="book_metadata_sync_question">同步修改对应书签与阅读记录的书名和作者？</string>
     <string name="read_record_edit">编辑阅读记录</string>
     <string name="read_record_edit_summary">修改显示的书名和作者；相同书名和作者的记录合并显示，阅读时长保持不变。</string>
+    <string name="customize_my">自定义我的页面</string>
+    <string name="my_more_items">将选中的功能放入更多</string>
 </resources>
