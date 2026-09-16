@@ -141,11 +141,29 @@
             app:iconSpaceReserved="false" />
 
         <io.legado.app.lib.prefs.Preference
+            android:icon="@drawable/ic_download"
+            android:key="check_update"
+            android:title="@string/check_update"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
+            android:icon="@drawable/ic_download"
+            android:key="check_beta_update"
+            android:title="@string/check_beta_update"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
             android:icon="@drawable/ic_exit"
             android:key="exit"
             android:title="@string/exit"
             app:iconSpaceReserved="false" />
 
     </io.legado.app.lib.prefs.PreferenceCategory>
+
+    <io.legado.app.lib.prefs.Preference
+        android:icon="@drawable/ic_more_vert"
+        android:key="myMore"
+        android:title="@string/reader_menu_more"
+        app:iconSpaceReserved="false" />
 
 </androidx.preference.PreferenceScreen>
