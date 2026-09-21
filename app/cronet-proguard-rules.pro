@@ -140,6 +140,13 @@
 -dontwarn org.chromium.net.internal.com.google.protobuf.Any
 -dontwarn org.chromium.net.internal.com.google.protobuf.Any$Builder
 # -------- Config Path: third_party/protobuf/java/lite/proguard.pgcfg --------
+# Keep the annotations that proguard needs to process.
+-keep @org.chromium.net.internal.com.google.protobuf.DoNotInline class *
+
+# Allow the method to be shrunk if unused and obfuscated even it it is used.
+-keepclassmembers,allowshrinking,allowobfuscation class * {
+    @org.chromium.net.internal.com.google.protobuf.DoNotInline *;
+}
 
 # Skip runtime check for isOnAndroidDevice().
 # One line to make it easy to remove with sed.
