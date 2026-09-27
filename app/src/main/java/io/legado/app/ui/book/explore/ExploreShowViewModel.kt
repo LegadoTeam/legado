@@ -14,6 +14,7 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.data.entities.rule.ExploreKind
+import io.legado.app.help.book.ReadRecordIndex
 import io.legado.app.help.book.SearchBookShelfHelp
 import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.book.mergeActiveShelfBook
@@ -34,6 +35,7 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
@@ -42,6 +44,11 @@ import java.util.concurrent.ConcurrentHashMap
 @OptIn(ExperimentalCoroutinesApi::class)
 class ExploreShowViewModel(application: Application) : BaseViewModel(application) {
     val bookshelf: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    @Volatile
+    var readRecordIndex: ReadRecordIndex = ReadRecordIndex.EMPTY
+        private set
+
     val upAdapterLiveData = MutableLiveData<String>()
     internal val booksData = MutableLiveData<ExploreListState>()
     internal val categoryData = MutableLiveData<ExploreCategory>()
@@ -61,6 +68,17 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
     private var addBooksCoroutine: Coroutine<*>? = null
 
     init {
+        execute {
+            //阅读记录会在阅读后变化,用流监听保证返回发现列表时是最新的
+            appDb.readRecordDao.flowBooks().distinctUntilChanged().catch {
+                AppLog.put("发现列表界面获取阅读记录失败\n${it.localizedMessage}", it)
+            }.collect {
+                readRecordIndex = ReadRecordIndex.of(it)
+                upAdapterLiveData.postValue("hasReadRecord")
+            }
+        }.onError {
+            AppLog.put("加载阅读记录失败", it)
+        }
         execute {
             appDb.bookDao.flowAll().mapLatest { books ->
                 val keys = arrayListOf<String>()
@@ -330,6 +348,13 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
         val bookUrl = book.bookUrl
         val key = if (author.isNotBlank()) "$name-$author" else name
         return bookshelf.contains(key) || bookshelf.contains(bookUrl)
+    }
+
+    fun hasReadRecord(book: SearchBook): Boolean {
+        if (!AppConfig.showSearchReadRecord) {
+            return false
+        }
+        return readRecordIndex.contains(book.name, book.author)
     }
 
     private data class ShelfState(

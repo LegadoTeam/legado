@@ -59,6 +59,17 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
                 true
             }
         }
+        menu.add(R.string.show_search_read_record).apply {
+            isCheckable = true
+            isChecked = AppConfig.showSearchReadRecord
+            setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+            setOnMenuItemClickListener {
+                AppConfig.showSearchReadRecord = !AppConfig.showSearchReadRecord
+                it.isChecked = AppConfig.showSearchReadRecord
+                viewModel.upAdapterLiveData.postValue("hasReadRecord")
+                true
+            }
+        }
         menuAddLoadedBooks = menu.add(R.string.add_loaded_books_to_bookshelf).apply {
             isEnabled = viewModel.addBooksBusy.value != true
             setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
@@ -303,6 +314,10 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
 
     override fun isInBookshelf(book: SearchBook): Boolean {
         return viewModel.isInBookShelf(book)
+    }
+
+    override fun hasReadRecord(book: SearchBook): Boolean {
+        return viewModel.hasReadRecord(book)
     }
 
     override fun showBookInfo(book: SearchBook) {
