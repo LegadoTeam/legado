@@ -13,6 +13,7 @@
     <uses-permission android:name="android.permission.DOWNLOAD_WITHOUT_NOTIFICATION" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
@@ -28,6 +29,7 @@
         android:name=".App"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
+        android:enableOnBackInvokedCallback="true"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="${app_name}"
@@ -39,7 +41,8 @@
         <!-- 主入口 -->
         <activity
             android:name=".ui.welcome.WelcomeActivity"
-            android:exported="true">
+            android:exported="true"
+            android:theme="@style/AppTheme.Welcome">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -51,7 +54,8 @@
             android:name=".ui.welcome.Launcher1"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/launcher1">
+            android:icon="@mipmap/launcher1"
+            android:theme="@style/AppTheme.Welcome">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -63,7 +67,8 @@
             android:name=".ui.welcome.Launcher2"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/launcher2">
+            android:icon="@mipmap/launcher2"
+            android:theme="@style/AppTheme.Welcome">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -75,7 +80,8 @@
             android:name=".ui.welcome.Launcher3"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/launcher3">
+            android:icon="@mipmap/launcher3"
+            android:theme="@style/AppTheme.Welcome">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -87,7 +93,8 @@
             android:name=".ui.welcome.Launcher4"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/launcher4">
+            android:icon="@mipmap/launcher4"
+            android:theme="@style/AppTheme.Welcome">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -99,7 +106,8 @@
             android:name=".ui.welcome.Launcher5"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/launcher5">
+            android:icon="@mipmap/launcher5"
+            android:theme="@style/AppTheme.Welcome">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -111,7 +119,8 @@
             android:name=".ui.welcome.Launcher6"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/launcher6">
+            android:icon="@mipmap/launcher6"
+            android:theme="@style/AppTheme.Welcome">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -124,7 +133,8 @@
             android:alwaysRetainTaskState="true"
             android:configChanges="locale|keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout|uiMode"
             android:exported="true"
-            android:launchMode="singleTask" />
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize" />
         <!-- 阅读界面 -->
         <activity
             android:name=".ui.book.read.ReadBookActivity"
@@ -413,6 +423,32 @@
             android:exported="true"
             android:launchMode="singleTop"
             android:theme="@style/AppTheme.Transparent">
+            <intent-filter android:label="@string/receiving_shared_import_label">
+                <action android:name="android.intent.action.SEND" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="application/json" />
+                <data android:mimeType="application/epub+zip" />
+                <data android:mimeType="application/pdf" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/x-zip-compressed" />
+                <data android:mimeType="application/x-rar-compressed" />
+                <data android:mimeType="application/vnd.rar" />
+                <data android:mimeType="application/x-7z-compressed" />
+                <data android:mimeType="application/mobi" />
+                <data android:mimeType="application/x-mobipocket-ebook" />
+                <data android:mimeType="application/azw" />
+                <data android:mimeType="application/azw3" />
+                <data android:mimeType="application/x-mobi8-ebook" />
+                <data android:mimeType="application/octet-stream" />
+            </intent-filter>
+            <intent-filter android:label="@string/receiving_shared_import_label">
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
             <!-- VIEW (Open with) action -->
             <!-- Works when an app knows the media type of a file, e.g. Gmail or Chrome. -->
             <intent-filter>
@@ -428,6 +464,10 @@
                 <data android:mimeType="text/plain" />
                 <!-- json -->
                 <data android:mimeType="application/json" />
+                <!-- javascript -->
+                <data android:mimeType="application/javascript" />
+                <data android:mimeType="text/javascript" />
+                <data android:mimeType="application/x-javascript" />
                 <!-- EPUB -->
                 <data android:mimeType="application/epub+zip" />
                 <!-- pdf -->
@@ -463,6 +503,10 @@
                 <data android:pathAdvancedPattern=".*\\.[jJ][sS][oO][nN]" />
                 <data android:pathPattern=".*\\.json" />
                 <data android:pathPattern=".*\\.JSON" />
+                <!--JS-->
+                <data android:pathAdvancedPattern=".*\\.[jJ][sS]" />
+                <data android:pathPattern=".*\\.js" />
+                <data android:pathPattern=".*\\.JS" />
                 <!-- EPUB -->
                 <data android:pathAdvancedPattern=".*\\.[eE][pP][uU][bB]" />
                 <data android:pathPattern=".*\\.epub" />

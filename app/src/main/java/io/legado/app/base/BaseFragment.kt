@@ -55,11 +55,16 @@ abstract class BaseFragment(@LayoutRes layoutID: Int) : Fragment(layoutID) {
     fun setSupportToolbar(toolbar: Toolbar) {
         supportToolbar = toolbar
         supportToolbar?.let {
+            val titleBar = it.parent as? TitleBar
             it.menu.apply {
                 onCompatCreateOptionsMenu(this)
-                applyTint(requireContext())
+                applyTint(
+                    requireContext(),
+                    transparentBar = titleBar?.usesTransparentForeground == true
+                )
             }
             it.installMd3OverflowMenu()
+            titleBar?.post { titleBar.applyForegroundColor() }
 
             it.setOnMenuItemClickListener { item ->
                 onCompatOptionsItemSelected(item)

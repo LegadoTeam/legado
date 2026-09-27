@@ -36,6 +36,8 @@ class ChangeChapterSourceAdapter(
         override fun areContentsTheSame(oldItem: SearchBook, newItem: SearchBook): Boolean {
             return oldItem.originName == newItem.originName
                     && oldItem.getDisplayLastChapterTitle() == newItem.getDisplayLastChapterTitle()
+                    && oldItem.chapterWordCountText == newItem.chapterWordCountText
+                    && oldItem.respondTime == newItem.respondTime
         }
 
     }

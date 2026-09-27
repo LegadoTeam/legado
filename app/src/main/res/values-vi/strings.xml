@@ -4,6 +4,7 @@
     <string name="app_name">Legado</string>
     <string name="app_name_a">Legado·A</string>
     <string name="receiving_shared_label">Legado·Tìm kiếm</string>
+    <string name="receiving_shared_import_label">Legado·Nhập</string>
     <string name="tip_perm_request_storage">Legado cần quyền truy cập bộ nhớ để tìm và đọc sách. Vui lòng vào "Cài đặt ứng dụng" để cấp "Quyền truy cập bộ nhớ".</string>
 
     <!--Other-->
@@ -318,6 +319,8 @@
     <string name="fonts_folder">Vui lòng đặt tệp phông chữ vào thư mục Fonts của thư mục gốc bộ nhớ và chọn lại</string>
     <string name="default_font">Phông chữ mặc định</string>
     <string name="select_font">Chọn phông chữ</string>
+    <string name="font_item_external">%1$s · Thư mục ngoài</string>
+    <string name="font_item_private">%1$s · Thư mục ứng dụng</string>
     <string name="text_size">Cỡ chữ</string>
     <string name="line_size">Khoảng cách dòng</string>
     <string name="paragraph_size">Khoảng cách đoạn</string>
@@ -1047,6 +1050,7 @@
     <string name="tag_explore_enabled">Cờ: đã bật khám phá</string>
     <string name="tag_explore_disabled">Cờ: đã tắt khám phá</string>
     <string name="show_read_title_addition">Hiển thị vùng bổ sung tiêu đề đã đọc</string>
+    <string name="show_read_title_chapter_name_only">Chỉ hiển thị tên chương trong vùng bổ sung tiêu đề</string>
     <string name="read_bar_style_follow_page">Kiểu thanh đọc theo trang</string>
     <string name="rule_image_decode">Giải mã hình ảnh (imageDecode)</string>
     <string name="like_source">Thích</string>

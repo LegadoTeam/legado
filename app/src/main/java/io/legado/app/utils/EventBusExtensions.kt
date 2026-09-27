@@ -57,7 +57,7 @@ inline fun <reified EVENT> Fragment.observeEvent(
         observer(it)
     }
     tags.forEach {
-        eventObservable<EVENT>(it).observe(this, o)
+        eventObservable<EVENT>(it).observe(viewLifecycleOwner, o)
     }
 }
 

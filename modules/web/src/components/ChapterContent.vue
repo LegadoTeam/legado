@@ -1,8 +1,22 @@
 <template>
-  <div class="title" data-chapterpos="0" ref="titleRef">{{ title }}</div>
+  <div class="title" data-chapterpos="0">
+    <span class="title-text">{{ title }}</span>
+    <button
+      v-if="reviewCount(-1) > 0"
+      type="button"
+      class="review-trigger"
+      :aria-label="`查看标题的 ${reviewCount(-1)} 条段评`"
+      :title="`查看 ${reviewCount(-1)} 条段评`"
+      @click.stop="openReview(-1)"
+    >
+      <ChatDotRound aria-hidden="true" />
+      <span>{{ reviewCount(-1) }}</span>
+    </button>
+  </div>
   <div
     v-for="(para, index) in contents"
     :key="index"
+    class="paragraph"
     ref="paragraphRef"
     :data-chapterpos="chapterPos[index]"
   >
@@ -11,9 +25,28 @@
       v-if="/^\s*<img[^>]*src[^>]+>$/.test(String(para))"
       :src="getImageSrc(para)"
       @error.once="proxyImage"
+      @click="handleReviewImageClick"
       loading="lazy"
     />
-    <p v-else :style="{ fontFamily, fontSize }" v-html="sanitizeContent(para)" @error.capture="handleImgLoadError" />
+    <p v-else-if="isPlainText(para)" :style="{ fontFamily, fontSize }">{{ para }}</p>
+    <p
+      v-else
+      :style="{ fontFamily, fontSize }"
+      v-html="sanitizeContent(para)"
+      @error.capture="handleImgLoadError"
+      @click="handleReviewImageClick"
+    />
+    <button
+      v-if="reviewCount(index + 1) > 0"
+      type="button"
+      class="review-trigger"
+      :aria-label="`查看第 ${index + 1} 段的 ${reviewCount(index + 1)} 条段评`"
+      :title="`查看 ${reviewCount(index + 1)} 条段评`"
+      @click.stop="openReview(index + 1)"
+    >
+      <ChatDotRound aria-hidden="true" />
+      <span>{{ reviewCount(index + 1) }}</span>
+    </button>
   </div>
 </template>
 
@@ -21,8 +54,12 @@
 import { isLegadoUrl, lazyRegex } from '@/utils/utils'
 import API from '@api'
 import jump from '@/plugins/jump'
+import { parseLegacyReviewClick } from '@/utils/reviewClick'
+import type { LegacyReviewClick } from '@/utils/reviewClick'
+import type { ParagraphReview, ReviewTarget } from '@/book'
 import type { webReadConfig } from '@/web'
 import DOMPurify from 'dompurify'
+import { ChatDotRound } from '@element-plus/icons-vue'
 
 const store = useBookStore()
 const readWidth = computed(() => store.config.readWidth)
@@ -30,13 +67,37 @@ const lineImgWidth = computed(() => store.config.fontSize * 2)
 const bookUrl = computed(() => store.readingBook.bookUrl)
 
 const props = defineProps<{
-  chapterIndex: number
   contents: Array<string>
   title: string
   spacing: webReadConfig['spacing']
   fontFamily: string
   fontSize: string
+  chapterIndex: number
+  reviews: Record<number, ParagraphReview>
 }>()
+
+const emit = defineEmits<{
+  openReview: [target: ReviewTarget]
+  openLegacyReview: [target: LegacyReviewClick & { chapterIndex: number }]
+}>()
+
+const reviewCount = (paraIndex: number) => props.reviews[paraIndex]?.count || 0
+
+const openReview = (paraIndex: number) => {
+  const review = props.reviews[paraIndex]
+  if (!review || review.count <= 0) return
+  emit('openReview', { ...review, chapterIndex: props.chapterIndex, paraIndex })
+}
+
+const handleReviewImageClick = (event: MouseEvent) => {
+  const image = event.target
+  if (!(image instanceof HTMLImageElement)) return
+  const legacy = parseLegacyReviewClick(image.getAttribute('src') || '')
+  if (!legacy) return
+
+  event.stopPropagation()
+  emit('openLegacyReview', { ...legacy, chapterIndex: props.chapterIndex })
+}
 
 const imgPatternStr = '<img[^>]*src=[\'"]([^\'"]*(?:[\'"][^>]+\\})?)[\'"][^>]*>'
 const imgPattern = lazyRegex(imgPatternStr)
@@ -61,12 +122,16 @@ const replaceImage = (content: string) => {
   })
 }
 
-const sanitizeContent = (content: string) =>
-  DOMPurify.sanitize(replaceImage(content), {
+const sanitizeContent = (content: string) => {
+  if (!content.includes('<')) return content
+  return DOMPurify.sanitize(replaceImage(content), {
     USE_PROFILES: { html: true },
     FORBID_TAGS: ['form', 'iframe', 'object', 'embed', 'style'],
     FORBID_ATTR: ['srcdoc'],
   })
+}
+const isPlainText = (content: string) =>
+  !content.includes('<') && !content.includes('&')
 
 const getImageSrc = (content: string) => {
   const src = content.match(imgPattern())![1] //reg tested in template
@@ -121,6 +186,7 @@ const handleImgLoadError = (event: Event) => {
 }
 
 const calculateWordCount = (paragraph: string) => {
+  if (!paragraph.includes('<')) return paragraph.length
   //内嵌图片文字为1
   const imagePlaceHolder = ' '
   return paragraph.replace(imgPatternAll(), imagePlaceHolder).length
@@ -133,8 +199,7 @@ const chapterPos = computed(() => {
   })
 })
 
-const titleRef = ref<HTMLElement>()
-const paragraphRef = ref<HTMLParagraphElement[]>()
+const paragraphRef = ref<HTMLElement[]>()
 const scrollToReadedLength = (length: number) => {
   if (length === 0) return
   const paragraphIndex = chapterPos.value.findIndex(
@@ -150,39 +215,13 @@ const scrollToReadedLength = (length: number) => {
 defineExpose({
   scrollToReadedLength,
 })
-let intersectionObserver: IntersectionObserver | null = null
-const emit = defineEmits(['readedLengthChange'])
-onMounted(() => {
-  intersectionObserver = new IntersectionObserver(
-    entries => {
-      for (const { target, isIntersecting } of entries) {
-        if (isIntersecting) {
-          emit(
-            'readedLengthChange',
-            props.chapterIndex,
-            parseInt((target as HTMLElement).dataset.chapterpos as string),
-          )
-        }
-      }
-    },
-    {
-      rootMargin: `0px 0px -${window.innerHeight - 24}px 0px`,
-    },
-  )
-  intersectionObserver.observe(titleRef.value!)
-  paragraphRef.value!.forEach(element => {
-    intersectionObserver!.observe(element)
-  })
-})
-
-onUnmounted(() => {
-  intersectionObserver?.disconnect()
-  intersectionObserver = null
-})
 </script>
 
 <style lang="scss" scoped>
 .title {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   margin-bottom: 57px;
   font:
     24px / 32px PingFangSC-Regular,
@@ -190,6 +229,51 @@ onUnmounted(() => {
     'Helvetica Neue Light',
     'Microsoft YaHei',
     sans-serif;
+
+  .title-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .review-trigger {
+    flex: 0 0 auto;
+    margin-top: 2px;
+  }
+}
+
+.paragraph {
+  position: relative;
+}
+
+.review-trigger {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  margin: 2px 0 0 auto;
+  padding: 3px 8px;
+  color: var(--el-color-primary);
+  font: inherit;
+  font-size: 13px;
+  background: transparent;
+  border: 0;
+  border-radius: 14px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--el-color-primary-light-9);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--el-color-primary);
+    outline-offset: 2px;
+  }
+
+  svg {
+    width: 17px;
+    height: 17px;
+  }
 }
 
 p {

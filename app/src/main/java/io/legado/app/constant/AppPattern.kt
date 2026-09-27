@@ -41,6 +41,8 @@ object AppPattern {
 
     //本地书籍支持类型
     val bookFileRegex = Regex(".*\\.(txt|epub|umd|pdf|mobi|azw3|azw)", RegexOption.IGNORE_CASE)
+    //JS源文件支持类型
+    val jsFileRegex = Regex(".*\\.js$", RegexOption.IGNORE_CASE)
     //压缩文件支持类型
     val archiveFileRegex = Regex(".*\\.(zip|rar|7z)$", RegexOption.IGNORE_CASE)
 

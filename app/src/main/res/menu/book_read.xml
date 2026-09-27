@@ -78,6 +78,7 @@
 
     <item
         android:id="@+id/menu_reverse_content"
+        android:checkable="true"
         android:title="@string/reverse_content"
         app:showAsAction="never" />
 
@@ -91,6 +92,12 @@
         android:checkable="true"
         android:checked="true"
         android:title="@string/replace_rule_title"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_manual_replace_rule"
+        android:title="@string/manual_replace_rule"
+        android:visible="false"
         app:showAsAction="never" />
 
     <item
@@ -138,6 +145,11 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_reimport_source"
+        android:title="@string/reimport_book_source"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_update_toc"
         android:title="@string/update_toc"
         app:showAsAction="never" />
@@ -155,6 +167,18 @@
     <item
         android:id="@+id/menu_help"
         android:title="@string/help"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_reader_more"
+        android:title="@string/reader_menu_more"
+        android:visible="false"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_reader_all_features"
+        android:title="@string/reader_menu_all_features"
+        android:visible="false"
         app:showAsAction="never" />
 
 </menu>

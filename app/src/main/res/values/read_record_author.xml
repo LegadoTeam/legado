@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="read_record_remove_author">Remove author name</string>
+    <string name="read_record_remove_author_confirm">Remove “%1$s” and keep all reading time? If a record for the remaining author already exists, their reading times will be combined.</string>
+</resources>

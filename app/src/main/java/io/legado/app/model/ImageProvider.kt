@@ -93,6 +93,24 @@ object ImageProvider {
         return bitmapLruCache.remove(key)
     }
 
+    @Synchronized
+    fun clearImage(book: Book, src: String) {
+        val path = BookHelp.getImage(book, src).absolutePath
+        BookHelp.delImage(book, src)
+        bitmapLruCache.remove(path)
+        BitmapUtils.removeImageSizeCache(path)
+    }
+
+    @Synchronized
+    internal fun replaceResources(book: Book, images: Collection<String>, replace: () -> Unit) {
+        replace()
+        images.forEach { src ->
+            val path = BookHelp.getImage(book, src).absolutePath
+            bitmapLruCache.remove(path)
+            BitmapUtils.removeImageSizeCache(path)
+        }
+    }
+
     private fun getNotRecycled(key: String): Bitmap? {
         val bitmap = bitmapLruCache[key] ?: return null
         if (bitmap.isRecycled) {
@@ -158,11 +176,8 @@ object ImageProvider {
         bookSource: BookSource?
     ): Size {
         val file = cacheImage(book, src, bookSource)
-        val op = BitmapFactory.Options()
-        // inJustDecodeBounds如果设置为true,仅仅返回图片实际的宽和高,宽和高是赋值给opts.outWidth,opts.outHeight;
-        op.inJustDecodeBounds = true
-        BitmapFactory.decodeFile(file.absolutePath, op)
-        if (op.outWidth < 1 && op.outHeight < 1) {
+        BitmapUtils.getImageSize(file.absolutePath)?.let { return it }
+        run {
             //svg size
             val size = SvgUtils.getSize(file.absolutePath)
             if (size != null) return size
@@ -170,12 +185,13 @@ object ImageProvider {
             //file.delete() 重复下载
             return Size(errorBitmap.width, errorBitmap.height)
         }
-        return Size(op.outWidth, op.outHeight)
     }
 
     /**
      *获取bitmap 使用LruCache缓存
      */
+    // ponytail: serialize local bitmap decode with invalidation; use per-path locks if contention matters.
+    @Synchronized
     fun getImage(
         book: Book,
         src: String,
@@ -207,6 +223,7 @@ object ImageProvider {
 
     fun clear() {
         bitmapLruCache.evictAll()
+        BitmapUtils.clearImageSizeCache()
     }
 
 }

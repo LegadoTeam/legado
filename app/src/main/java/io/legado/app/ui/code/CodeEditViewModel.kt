@@ -2,6 +2,9 @@ package io.legado.app.ui.code
 
 import android.app.Application
 import android.content.Intent
+import androidx.lifecycle.SavedStateHandle
+import com.script.ScriptException
+import com.script.rhino.RhinoScriptEngine
 import io.github.rosemoe.sora.langs.textmate.TextMateLanguage
 import io.github.rosemoe.sora.langs.textmate.registry.FileProviderRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.GrammarRegistry
@@ -9,8 +12,10 @@ import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.model.ThemeModel
 import io.github.rosemoe.sora.langs.textmate.registry.provider.AssetsFileResolver
 import io.github.rosemoe.sora.widget.CodeEditor
+import io.legado.app.R
 import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppLog
+import io.legado.app.constant.AppPattern
 import io.legado.app.help.CacheManager
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.BackstageWebView
@@ -21,7 +26,7 @@ import org.eclipse.tm4e.core.registry.IThemeSource
 import org.jsoup.Jsoup
 import splitties.init.appCtx
 
-class CodeEditViewModel(application: Application) : BaseViewModel(application) {
+class CodeEditViewModel(application: Application, private val savedState: SavedStateHandle) : BaseViewModel(application) {
     private val beautifyJs by lazy {
         appCtx.assets.open("scripts/beautify.min.js").bufferedReader().use { it.readText() }
     }
@@ -37,12 +42,16 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
     )
 
     var initialText = ""
+    @Volatile
+    internal var editorDraft: SafeEditorContent? = null
     var cursorPosition = 0
     internal var language: RuntimeObjectCompletionLanguage? = null
     private var languageName = "source.js"
     private val themeRegistry: ThemeRegistry = ThemeRegistry.getInstance()
     var writable = true
     var title: String? = null
+    internal var canCheckJavaScriptSyntax = false
+        private set
 
     fun initSora() {
         //初始化sora加载
@@ -61,8 +70,19 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
                 val cacheText = CacheManager.getFromMemory(cacheKey) as? String ?: throw Exception("未获取到查看文本")
                 writable = false
                 initialText = cacheText
+            } else if (intent.hasExtra("textFile")) {
+                initialText = CodeTextTransfer.read(context, intent.getStringExtra("textFile").orEmpty())
+                    ?: throw Exception("未获取到待编辑文本")
             } else {
                 initialText = intent.getStringExtra("text") ?: throw Exception("未获取到待编辑文本")
+            }
+            if (intent.getBooleanExtra("readOnly", false)) writable = false
+            if (editorDraft == null) {
+                savedState.get<String>("editorDraftPath")?.let { path ->
+                    val text = CodeTextTransfer.read(context, path)
+                        ?: error(context.getString(R.string.code_editor_result_error))
+                    editorDraft = SafeEditorContent(text, savedState["editorDraftCursor"] ?: 0, text != initialText)
+                }
             }
             if (isHtmlStr(initialText)) {
                 languageName = "text.html.basic"
@@ -74,12 +94,30 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
             )
             cursorPosition = intent.getIntExtra("cursorPosition", 0)
             title = intent.getStringExtra("title")
+            canCheckJavaScriptSyntax = intent.getBooleanExtra(
+                CodeEditActivity.EXTRA_CHECK_JAVASCRIPT_SYNTAX,
+                false,
+            )
         }.onSuccess {
             success.invoke()
         }.onError {
             context.toastOnUi("error\n${it.localizedMessage}")
             it.printOnDebug()
         }
+    }
+
+    internal fun persistEditorDraft() {
+        val draft = editorDraft ?: return
+        val path = CodeTextTransfer.write(context, draft.text)
+        val previous = savedState.get<String>("editorDraftPath")
+        savedState["editorDraftPath"] = path
+        savedState["editorDraftCursor"] = draft.cursorPosition
+        CodeTextTransfer.delete(context, previous)
+    }
+
+    override fun onCleared() {
+        CodeTextTransfer.delete(context, savedState.get<String>("editorDraftPath"))
+        super.onCleared()
     }
 
     private fun isHtmlStr(text: String): Boolean {
@@ -107,8 +145,9 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
     }
 
     fun formatCode(editor: CodeEditor) {
+        val source = editor.text.toString()
         execute {
-            val text = editor.text.toString()
+            val text = source
             if (languageName.contains("markdown")) {
                 context.toastOnUi("markdown不需要格式化")
                 return@execute text
@@ -116,6 +155,9 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
             val isHtml = languageName.contains("html")
             if (isHtml) {
                 return@execute formatCodeHtml(text)
+            }
+            formatRuleExpression(text, ::webFormatCode)?.let {
+                return@execute it
             }
             var result = ""
             var start = 0
@@ -160,11 +202,37 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
                 result += text.substring(start).trim()
             }
             result
-        }.onSuccess {
-            editor.setText(it)
+        }.onSuccess { formatted ->
+            if (formatted != null && formatted != source && editor.text.toString() == source) {
+                editor.text.replace(0, editor.text.length, formatted)
+            }
         }.onError {
             AppLog.put("格式化失败",it, true)
         }
+    }
+
+    fun checkJavaScriptSyntax(editor: CodeEditor) {
+        val source = editor.text.toString()
+        executeLazy {
+            RhinoScriptEngine.compile(source)
+        }.onSuccess {
+            if (editor.text.toString() == source) {
+                context.toastOnUi(R.string.javascript_syntax_correct)
+            }
+        }.onError { error ->
+            if (editor.text.toString() != source) return@onError
+            (error as? ScriptException)?.takeIf { it.lineNumber > 0 }?.let {
+                val index = scriptSourceIndex(source, it.lineNumber, it.columnNumber)
+                val position = editor.cursor.indexer.getCharPosition(index)
+                editor.setSelection(position.line, position.column, true)
+                editor.requestFocus()
+            }
+            AppLog.put(
+                error.localizedMessage ?: context.getString(R.string.javascript_syntax_error),
+                error,
+                true,
+            )
+        }.start()
     }
 
     private suspend fun webFormatCode(jsCode: String): String? {
@@ -201,4 +269,27 @@ class CodeEditViewModel(application: Application) : BaseViewModel(application) {
         return doc.outerHtml()
     }
 
+}
+
+internal suspend fun formatRuleExpression(
+    text: String,
+    formatter: suspend (String) -> String?
+): String? {
+    val matcher = AppPattern.EXP_PATTERN.matcher(text.trim())
+    if (!matcher.matches()) return null
+    val body = matcher.group(1).trim()
+    val formattedBody = if (body.isEmpty()) body else formatter(body) ?: body
+    return "{{$formattedBody}}"
+}
+
+internal fun scriptSourceIndex(source: String, lineNumber: Int, columnNumber: Int): Int {
+    if (lineNumber <= 0) return 0
+    var lineStart = 0
+    repeat(lineNumber - 1) {
+        val lineEnd = source.indexOf('\n', lineStart)
+        if (lineEnd < 0) return source.length
+        lineStart = lineEnd + 1
+    }
+    val lineEnd = source.indexOf('\n', lineStart).takeIf { it >= 0 } ?: source.length
+    return (lineStart + (columnNumber - 1).coerceAtLeast(0)).coerceAtMost(lineEnd)
 }

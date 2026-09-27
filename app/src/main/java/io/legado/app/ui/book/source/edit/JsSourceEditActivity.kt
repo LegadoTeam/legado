@@ -114,6 +114,7 @@ class JsSourceEditActivity : BaseActivity<ActivityJsSourceEditBinding>(imageBg =
             putExtra("title", getString(R.string.js_source_edit))
             putExtra("languageName", "source.js")
             putExtra("returnUnchangedText", true)
+            putExtra(CodeEditActivity.EXTRA_CHECK_JAVASCRIPT_SYNTAX, true)
             putExtra(CodeEditActivity.EXTRA_SHOW_DEBUG_SOURCE, true)
             putExtra(CodeEditActivity.EXTRA_SHOW_LOGIN_SOURCE, true)
         }

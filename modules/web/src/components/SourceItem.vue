@@ -8,8 +8,18 @@
       edit: sourceUrl == currentSourceUrl,
     }"
   >
-    {{ getSourceName(source) }}
-    <el-button text :icon="Edit" @click="handleSourceClick(source)" />
+    <span class="source-name" :title="getSourceName(source)">
+      {{ getSourceName(source) }}
+    </span>
+    <span v-if="'bookSourceUrl' in source" class="check-status" :title="store.checkStates[sourceUrl]?.detail">{{ checkLabel }}</span>
+    <el-button
+      class="edit-source"
+      text
+      :icon="Edit"
+      title="编辑源"
+      aria-label="编辑源"
+      @click="handleSourceClick(source)"
+    />
   </el-checkbox>
 </template>
 
@@ -17,12 +27,14 @@
 import { Edit } from '@element-plus/icons-vue'
 import { getSourceUniqueKey, getSourceName } from '@/utils/souce'
 import type { Source } from '@/source'
+import { sourceCheckOptions } from '@/utils/sourceCheckState'
 
 const props = defineProps<{
   source: Source
 }>()
 
 const store = useSourceStore()
+const checkLabel = computed(() => sourceCheckOptions.find(option => option.value === store.checkStatus(props.source))?.label)
 
 const currentSourceUrl = computed(() => store.currentSourceUrl)
 const sourceUrl = computed(() => getSourceUniqueKey(props.source))
@@ -39,10 +51,22 @@ const isSaveError = computed(() => {
 <style lang="scss" scoped>
 :deep(.el-checkbox__label) {
   flex: 1;
+  min-width: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
+.source-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.edit-source {
+  flex: none;
+}
+.check-status { flex: none; font-size: 12px; margin-left: 6px; }
 .error {
   border-color: var(--el-color-error) !important;
   color: var(--el-color-error) !important;

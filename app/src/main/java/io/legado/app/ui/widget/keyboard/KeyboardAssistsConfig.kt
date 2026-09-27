@@ -31,6 +31,7 @@ import io.legado.app.ui.widget.recycler.ItemTouchCallback
 import io.legado.app.ui.widget.recycler.VerticalDivider
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.dpToPx
+import io.legado.app.utils.postEvent
 import io.legado.app.utils.putPrefInt
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.viewbindingdelegate.viewBinding
@@ -43,7 +44,7 @@ import kotlinx.coroutines.launch
 /**
  * 辅助按键配置
  */
-class KeyboardAssistsConfig(private val callBack: CallBack) : BaseDialogFragment(R.layout.dialog_recycler_view),
+class KeyboardAssistsConfig : BaseDialogFragment(R.layout.dialog_recycler_view),
     Toolbar.OnMenuItemClickListener {
 
     private val binding by viewBinding(DialogRecyclerViewBinding::bind)
@@ -74,7 +75,7 @@ class KeyboardAssistsConfig(private val callBack: CallBack) : BaseDialogFragment
                     .show {
                         putPrefInt(PreferKey.showBoardLine, it)
                         subtitle = it.toLineStr(context)
-                        callBack.requestLayout()
+                        postEvent(PreferKey.showBoardLine, it)
                     }
             }
         }
@@ -197,11 +198,6 @@ class KeyboardAssistsConfig(private val callBack: CallBack) : BaseDialogFragment
             isMoved = false
         }
     }
-    interface CallBack {
-         /**通知布局管理器重新布局*/
-        fun requestLayout()
-    }
-
     private fun Int.toLineStr(context: Context): String {
       return context.getString(R.string.show_line_number, this)
     }

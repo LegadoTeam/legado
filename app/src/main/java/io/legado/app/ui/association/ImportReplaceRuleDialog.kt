@@ -2,7 +2,6 @@ package io.legado.app.ui.association
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.DialogInterface
 import android.os.Bundle
 import android.view.MenuItem
 import android.view.View
@@ -52,13 +51,6 @@ class ImportReplaceRuleDialog() : BaseDialogFragment(R.layout.dialog_recycler_vi
     override fun onStart() {
         super.onStart()
         setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-    }
-
-    override fun onDismiss(dialog: DialogInterface) {
-        super.onDismiss(dialog)
-        if (arguments?.getBoolean("finishOnDismiss") == true) {
-            activity?.finish()
-        }
     }
 
     @SuppressLint("NotifyDataSetChanged")
@@ -212,15 +204,17 @@ class ImportReplaceRuleDialog() : BaseDialogFragment(R.layout.dialog_recycler_vi
                     "${item.name}(${item.group})"
                 }
                 val localRule = viewModel.checkRules[holder.layoutPosition]
-                tvSourceState.text = when {
-                    localRule == null -> "新增"
-                    item.pattern != localRule.pattern
-                            || item.replacement != localRule.replacement
-                            || item.isRegex != localRule.isRegex
-                            || item.scope != localRule.scope -> "更新"
+                tvSourceState.setText(
+                    when {
+                        localRule == null -> R.string.import_status_new
+                        item.pattern != localRule.pattern
+                                || item.replacement != localRule.replacement
+                                || item.isRegex != localRule.isRegex
+                                || item.scope != localRule.scope -> R.string.import_status_update
 
-                    else -> "已有"
-                }
+                        else -> R.string.import_status_exist
+                    }
+                )
             }
         }
 

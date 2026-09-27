@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import io.legado.app.constant.AppPattern
 import io.legado.app.data.entities.RssSource
@@ -151,6 +152,13 @@ interface RssSourceDao {
 
     @Query("update rssSources set enabled = :enable where sourceUrl = :sourceUrl")
     fun enable(sourceUrl: String, enable: Boolean)
+
+    @Transaction
+    fun enable(enable: Boolean, sources: List<RssSource>) {
+        for (source in sources) {
+            enable(source.sourceUrl, enable)
+        }
+    }
 
     private fun dealGroups(list: List<String>): List<String> {
         val groups = linkedSetOf<String>()

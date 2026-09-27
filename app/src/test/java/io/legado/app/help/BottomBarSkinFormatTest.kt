@@ -40,6 +40,12 @@ class BottomBarSkinFormatTest {
     }
 
     @Test
+    fun `parseEntryName accepts svg`() {
+        assertEquals(Entry("bookshelf", true), BottomBarSkinFormat.parseEntryName("bookshelf_selected.svg"))
+        assertEquals(Entry("home", false), BottomBarSkinFormat.parseEntryName("HOME_NORMAL.SVG"))
+    }
+
+    @Test
     fun `parseEntryName rejects non image extension`() {
         assertNull(BottomBarSkinFormat.parseEntryName("home_selected.txt"))
     }
@@ -135,6 +141,7 @@ class BottomBarSkinFormatTest {
         assertTrue(BottomBarSkinFormat.isImageName("a.png"))
         assertTrue(BottomBarSkinFormat.isImageName("A.JPG"))
         assertTrue(BottomBarSkinFormat.isImageName("dir/b.webp"))
+        assertTrue(BottomBarSkinFormat.isImageName("dir/c.svg"))
     }
 
     @Test

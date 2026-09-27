@@ -19,6 +19,64 @@
             app:titleTextAppearance="@style/ToolbarTitle"
             app:layout_constraintTop_toTopOf="parent" />
 
+        <LinearLayout
+            android:id="@+id/search_bar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp"
+            android:visibility="gone"
+            app:layout_constraintTop_toBottomOf="@id/tool_bar">
+
+            <io.legado.app.lib.theme.view.ThemeEditText
+                android:id="@+id/search_input"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="@string/search"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:minHeight="48dp"
+                android:paddingHorizontal="12dp"
+                android:saveEnabled="false"
+                android:singleLine="true" />
+
+            <TextView
+                android:id="@+id/search_count"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:accessibilityLiveRegion="polite"
+                android:gravity="center"
+                android:minWidth="40dp"
+                android:textColor="@color/secondaryText"
+                android:textSize="12sp" />
+
+            <ImageButton
+                android:id="@+id/btn_search_prev"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/help_search_prev"
+                android:enabled="false"
+                android:padding="12dp"
+                android:rotation="180"
+                android:src="@drawable/ic_arrow_down"
+                app:tint="@color/primaryText" />
+
+            <ImageButton
+                android:id="@+id/btn_search_next"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/help_search_next"
+                android:enabled="false"
+                android:padding="12dp"
+                android:src="@drawable/ic_arrow_down"
+                app:tint="@color/primaryText" />
+
+        </LinearLayout>
+
         <io.legado.app.ui.widget.text.ScrollTextView
             android:id="@+id/text_view"
             android:layout_width="match_parent"
@@ -28,7 +86,7 @@
             android:textColor="@color/secondaryText"
             android:textIsSelectable="true"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/tool_bar" />
+            app:layout_constraintTop_toBottomOf="@id/search_bar" />
 
         <io.legado.app.ui.widget.text.BadgeView
             android:id="@+id/badge_view"

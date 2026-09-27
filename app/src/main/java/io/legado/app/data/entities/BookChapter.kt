@@ -85,8 +85,13 @@ data class BookChapter(
         }
     }
 
+    @Ignore
+    @IgnoredOnParcel
+    @Transient
+    internal var deferUpdates = false
+
     fun update() {
-        appDb.bookChapterDao.update(this)
+        if (!deferUpdates) appDb.bookChapterDao.update(this)
     }
 
     @Ignore
@@ -155,7 +160,7 @@ data class BookChapter(
                         }
                     } catch (_: RegexTimeoutException) {
                         item.isEnabled = false
-                        appDb.replaceRuleDao.update(item)
+                        appDb.replaceRuleDao.enable(item.id, false)
                     } catch (_: CancellationException) {
                         return@run
                     } catch (e: Exception) {

@@ -12,6 +12,7 @@ import io.legado.app.ui.book.search.SearchScope
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.mapParallelSafe
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -41,7 +42,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
     private var searchKey: String = ""
     private var bookSourceParts = emptyList<BookSourcePart>()
     private var searchBooks = arrayListOf<SearchBook>()
-    private var searchJob: Job? = null
+    private val pageOwner = SearchPageOwner()
     private var workingState = MutableStateFlow(true)
     private val activeProgress = AtomicReference<SearchProgressReporter?>()
 
@@ -53,27 +54,30 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
     }
 
     fun search(searchId: Long, key: String) {
-        if (searchId != mSearchId) {
-            if (key.isEmpty()) {
-                return
+        synchronized(pageOwner) {
+            if (searchId == mSearchId && pageOwner.isRunning()) return
+            if (searchId != mSearchId) {
+                if (key.isEmpty()) {
+                    return
+                }
+                searchKey = key
+                if (mSearchId != 0L) {
+                    close()
+                }
+                searchBooks.clear()
+                bookSourceParts = callBack.getSearchScope().getBookSourceParts()
+                if (bookSourceParts.isEmpty()) {
+                    callBack.onSearchCancel(NoStackTraceException("启用书源为空"))
+                    return
+                }
+                mSearchId = searchId
+                searchPage = 1
+                initSearchPool()
+            } else {
+                searchPage++
             }
-            searchKey = key
-            if (mSearchId != 0L) {
-                close()
-            }
-            searchBooks.clear()
-            bookSourceParts = callBack.getSearchScope().getBookSourceParts()
-            if (bookSourceParts.isEmpty()) {
-                callBack.onSearchCancel(NoStackTraceException("启用书源为空"))
-                return
-            }
-            mSearchId = searchId
-            searchPage = 1
-            initSearchPool()
-        } else {
-            searchPage++
+            startSearch()
         }
-        startSearch()
     }
 
     private fun startSearch() {
@@ -84,7 +88,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
         val page = searchPage
         val progress = SearchProgressReporter(sourceParts.size, callBack::onSearchProgress)
         activeProgress.getAndSet(progress)?.cancel()
-        searchJob = scope.launch(searchPool!!) {
+        val job = scope.launch(searchPool!!, start = CoroutineStart.LAZY) {
             flow {
                 for (bs in sourceParts) {
                     val source = bs.getBookSource()
@@ -125,20 +129,25 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                 currentCoroutineContext().ensureActive()
                 callBack.onSearchSuccess(searchBooks)
             }.onCompletion { error ->
-                when {
-                    error == null -> progress.finish {
-                        callBack.onSearchFinish(searchBooks.isEmpty(), hasMore)
+                val context = currentCoroutineContext()
+                pageOwner.complete(context[Job]) {
+                    when {
+                        error == null -> progress.finish {
+                            callBack.onSearchFinish(searchBooks.isEmpty(), hasMore)
+                        }
+                        context.isActive -> progress.finish {
+                            callBack.onSearchCancel()
+                        }
+                        else -> progress.cancel()
                     }
-                    currentCoroutineContext().isActive -> progress.finish {
-                        callBack.onSearchCancel()
-                    }
-                    else -> progress.cancel()
+                    activeProgress.compareAndSet(progress, null)
                 }
-                activeProgress.compareAndSet(progress, null)
             }.catch {
                 AppLog.put("书源搜索出错\n${it.localizedMessage}", it)
             }.collect()
         }
+        check(pageOwner.register(job))
+        job.start()
     }
 
     private suspend fun mergeItems(newDataS: List<SearchBook>, precision: Boolean, key: String) {
@@ -238,11 +247,13 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
     }
 
     fun close() {
-        activeProgress.getAndSet(null)?.cancel()
-        searchJob?.cancel()
-        searchPool?.close()
-        searchPool = null
-        mSearchId = 0L
+        synchronized(pageOwner) {
+            activeProgress.getAndSet(null)?.cancel()
+            pageOwner.cancel()?.cancel()
+            searchPool?.close()
+            searchPool = null
+            mSearchId = 0L
+        }
     }
 
     interface CallBack {
@@ -254,6 +265,35 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
         fun onSearchCancel(exception: Throwable? = null)
     }
 
+}
+
+internal class SearchPageOwner {
+    private var owner: Job? = null
+
+    @Synchronized
+    fun isRunning(): Boolean = owner != null
+
+    @Synchronized
+    fun register(job: Job): Boolean {
+        if (owner != null) return false
+        owner = job
+        return true
+    }
+
+    @Synchronized
+    fun complete(job: Job?, onComplete: () -> Unit): Boolean {
+        if (job == null || owner !== job) return false
+        owner = null
+        onComplete()
+        return true
+    }
+
+    @Synchronized
+    fun cancel(): Job? {
+        val job = owner
+        owner = null
+        return job
+    }
 }
 
 internal class SearchProgressReporter(

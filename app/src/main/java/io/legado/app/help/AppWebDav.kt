@@ -8,6 +8,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookProgress
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.book.update
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.storage.Backup
 import io.legado.app.help.storage.Restore
@@ -21,7 +22,6 @@ import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.UrlUtil
-import io.legado.app.utils.compress.ZipUtils
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.isJson
@@ -123,10 +123,13 @@ object AppWebDav {
     suspend fun restoreWebDav(name: String) {
         authorization?.let {
             val webDav = WebDav(rootWebDavUrl + name, it)
-            webDav.downloadTo(Backup.zipFilePath, true)
-            FileUtils.delete(Backup.backupPath)
-            ZipUtils.unZipToPath(File(Backup.zipFilePath), Backup.backupPath)
-            Restore.restoreLocked(Backup.backupPath)
+            val archive = File.createTempFile("webdav-restore-", ".zip", appCtx.cacheDir)
+            try {
+                webDav.downloadTo(archive.absolutePath, true)
+                Restore.restoreOrThrow(appCtx, Uri.fromFile(archive))
+            } finally {
+                archive.delete()
+            }
         }
     }
 
@@ -162,11 +165,10 @@ object AppWebDav {
      */
     @Throws(Exception::class)
     suspend fun backUpWebDav(fileName: String) {
-        if (!NetworkUtils.isAvailable()) return
-        authorization?.let {
-            val putUrl = "$rootWebDavUrl$fileName"
-            WebDav(putUrl, it).upload(Backup.zipFilePath)
-        }
+        val authorization = authorization ?: throw NoStackTraceException("webDav未配置或授权失败")
+        if (!NetworkUtils.isAvailable()) throw NoStackTraceException("网络未连接")
+        val putUrl = "$rootWebDavUrl$fileName"
+        WebDav(putUrl, authorization).upload(Backup.zipFilePath)
     }
 
     /**
@@ -187,8 +189,8 @@ object AppWebDav {
      * 上传背景图片
      */
     suspend fun upBgs(files: Array<File>) {
-        val authorization = authorization ?: return
-        if (!NetworkUtils.isAvailable()) return
+        val authorization = authorization ?: throw NoStackTraceException("webDav未配置或授权失败")
+        if (!NetworkUtils.isAvailable()) throw NoStackTraceException("网络未连接")
         val bgWebDavFiles = getAllBgWebDavFiles().getOrThrow()
             .map { it.displayName }
             .toSet()
@@ -218,7 +220,7 @@ object AppWebDav {
             authorization?.let {
                 // 如果导出的本地文件存在,开始上传
                 val putUrl = exportsWebDavUrl + fileName
-                WebDav(putUrl, it).upload(byteArray, "text/plain")
+                WebDav(putUrl, it).upload(byteArray, FileUtils.getMimeType(fileName))
             }
         } catch (e: Exception) {
             currentCoroutineContext().ensureActive()
@@ -232,7 +234,7 @@ object AppWebDav {
             authorization?.let {
                 // 如果导出的本地文件存在,开始上传
                 val putUrl = exportsWebDavUrl + fileName
-                WebDav(putUrl, it).upload(uri, "text/plain")
+                WebDav(putUrl, it).upload(uri, FileUtils.getMimeType(fileName))
             }
         } catch (e: Exception) {
             currentCoroutineContext().ensureActive()
@@ -329,7 +331,7 @@ object AppWebDav {
                     book.durChapterTitle = bookProgress.durChapterTitle
                     book.durChapterTime = bookProgress.durChapterTime
                     book.syncTime = System.currentTimeMillis()
-                    appDb.bookDao.update(book)
+                    book.update()
                 }
             }
         }

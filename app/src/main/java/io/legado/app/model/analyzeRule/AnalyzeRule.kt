@@ -6,6 +6,7 @@ import com.google.gson.internal.LinkedTreeMap
 import com.script.CompiledScript
 import com.script.buildScriptBindings
 import com.script.rhino.RhinoScriptEngine
+import com.script.rhino.runScriptWithContext
 import io.legado.app.constant.AppPattern.JS_PATTERN
 import io.legado.app.constant.AppPattern.WebJS_PATTERN
 import io.legado.app.data.entities.BaseBook
@@ -21,6 +22,7 @@ import io.legado.app.help.http.BackstageWebView
 import io.legado.app.help.http.CookieStore
 import io.legado.app.help.source.getShareScope
 import io.legado.app.help.source.getSharedGlobalStateKey
+import io.legado.app.model.BatchContentContext
 import io.legado.app.model.Debug
 import io.legado.app.model.SharedJsScope
 import io.legado.app.model.webBook.WebBook
@@ -70,6 +72,7 @@ class AnalyzeRule(
 
     private var chapter: BookChapter? = null
     private var nextChapterUrl: String? = null
+    private var batchContext: BatchContentContext? = null
     private var content: Any? = null
     private var baseUrl: String? = null
     private var redirectUrl: URL? = null
@@ -180,12 +183,12 @@ class AnalyzeRule(
         if (isMainThread) {
             error("webJs must be called on a background thread")
         }
-        return runBlocking {
+        return runBlocking(coroutineContext) {
             BackstageWebView(
                 url = baseUrl,
                 html = content.toString(),
                 javaScript = jsStr,
-                headerMap = getSource()?.getHeaderMap(true),
+                headerMap = runScriptWithContext(coroutineContext) { getSource()?.getHeaderMap(true) },
                 tag = getSource()?.getKey(),
                 cacheFirst = true,
                 timeout = 10000,
@@ -219,7 +222,9 @@ class AnalyzeRule(
                 val sourceRule = ruleList.first()
                 putRule(sourceRule.putMap)
                 sourceRule.makeUpRule(result)
-                result = if (sourceRule.mode == Mode.Json) {
+                result = if (sourceRule.mode == Mode.Js) {
+                    evalJS(sourceRule.rule, result)
+                } else if (sourceRule.mode == Mode.Json) {
                     getAnalyzeByJSonPath(result).getStringList(sourceRule.rule)
                 } else if (sourceRule.getParamSize() > 1) {
                     // get {{}}
@@ -898,6 +903,7 @@ class AnalyzeRule(
             bindings["result"] = result
             bindings["baseUrl"] = baseUrl
             bindings["chapter"] = chapter
+            bindings["chapters"] = batchContext?.chapters
             bindings["title"] = chapter?.title
             bindings["src"] = content
             bindings["nextChapterUrl"] = nextChapterUrl
@@ -937,6 +943,10 @@ class AnalyzeRule(
 
     override fun getSource(): BaseSource? {
         return source
+    }
+
+    override fun getBatchContext(): BatchContentContext? {
+        return batchContext
     }
 
     override fun getTag(): String? {
@@ -1036,6 +1046,11 @@ class AnalyzeRule(
 
         fun AnalyzeRule.setChapter(chapter: BookChapter?): AnalyzeRule {
             this.chapter = chapter
+            return this
+        }
+
+        fun AnalyzeRule.setBatchContext(batchContext: BatchContentContext?): AnalyzeRule {
+            this.batchContext = batchContext
             return this
         }
 

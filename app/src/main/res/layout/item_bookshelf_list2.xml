@@ -214,7 +214,7 @@
     <com.google.android.material.progressindicator.LinearProgressIndicator
         android:id="@+id/pb_read_progress"
         android:layout_width="0dp"
-        android:layout_height="2dp"
+        android:layout_height="4dp"
         android:layout_marginBottom="1dp"
         android:visibility="gone"
         app:indicatorColor="@color/accent"

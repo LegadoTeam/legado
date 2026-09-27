@@ -84,18 +84,19 @@
         <div
           v-for="data in chapterData"
           :key="data.index"
-          :chapterIndex="data.index"
-          ref="chapter"
+          :data-chapter-index="data.index"
         >
           <chapter-content
             ref="chapterRef"
-            :chapterIndex="data.index"
             :contents="data.content"
             :title="data.title"
             :spacing="store.config.spacing"
             :fontSize="fontSize"
             :fontFamily="fontFamily"
-            @readedLengthChange="onReadedLengthChange"
+            :chapterIndex="data.sourceIndex"
+            :reviews="data.reviews"
+            @open-review="openReview"
+            @open-legacy-review="openLegacyReview"
             v-if="showContent"
           />
         </div>
@@ -103,6 +104,14 @@
         <div class="bottom-bar" ref="bottom"></div>
       </div>
     </div>
+    <ReviewDialog v-model="reviewVisible" :target="selectedReview" />
+    <LegacyReviewDialog
+      v-model="legacyReviewVisible"
+      :page-url="legacyReviewPageUrl"
+      :session-id="legacyReviewSessionId"
+      :session-nonce="legacyReviewSessionNonce"
+      :kind="legacyReviewKind"
+    />
   </div>
 </template>
 
@@ -113,10 +122,16 @@ import API from '@api'
 import { useLoading } from '@/hooks/loading'
 import { useThrottleFn } from '@vueuse/shared'
 import { isNullOrBlank } from '@/utils/utils'
+import { trimChapterWindowBeforeAppend } from '@/utils/chapterWindow'
+import ReviewDialog from '@/components/ReviewDialog.vue'
+import LegacyReviewDialog from '@/components/LegacyReviewDialog.vue'
+import type { LegacyReviewClick } from '@/utils/reviewClick'
+import type { ParagraphReview, ReviewTarget } from '@/book'
+import { ElLoading } from 'element-plus'
 
-const content = ref()
+const content = ref<HTMLElement>()
 // loading spinner
-const { isLoading, loadingWrapper } = useLoading(content, '正在获取信息')
+const { loadingWrapper } = useLoading(content, '正在获取信息')
 const store = useBookStore()
 
 const {
@@ -160,6 +175,8 @@ watch(
 
 // 无限滚动
 const infiniteLoading = computed(() => store.config.infiniteLoading)
+const chapterLoading = ref(false)
+let contentGeneration = 0
 let scrollObserver: IntersectionObserver | null
 const loading = ref()
 watchEffect(() => {
@@ -170,7 +187,9 @@ watchEffect(() => {
   }
 })
 const loadMore = () => {
-  const index = chapterData.value.slice(-1)[0].index
+  const lastChapter = chapterData.value[chapterData.value.length - 1]
+  if (lastChapter === undefined) return
+  const index = lastChapter.index
   if (catalog.value.length - 1 > index) {
     getContent(index + 1, false)
     store.saveBookProgress() // 保存的是上一章的进度，不是预载的本章进度
@@ -178,7 +197,7 @@ const loadMore = () => {
 }
 // IntersectionObserver回调 底部加载
 const onReachBottom = (entries: IntersectionObserverEntry[]) => {
-  if (isLoading.value) return
+  if (chapterLoading.value) return
   for (const { isIntersecting } of entries) {
     if (!isIntersecting) return
     loadMore()
@@ -282,55 +301,158 @@ const toShelf = () => {
 }
 
 // 获取章节内容
-const chapterData = ref<{ index: number; content: string[]; title: string }[]>(
-  [],
-)
+type ChapterData = {
+  index: number
+  sourceIndex: number
+  content: string[]
+  title: string
+  reviews: Record<number, ParagraphReview>
+}
+const chapterData = ref<ChapterData[]>([])
+const reviewVisible = ref(false)
+const selectedReview = ref<ReviewTarget | null>(null)
+const legacyReviewVisible = ref(false)
+const legacyReviewPageUrl = ref('')
+const legacyReviewSessionId = ref('')
+const legacyReviewSessionNonce = ref('')
+const legacyReviewKind = ref<LegacyReviewClick['kind']>('paragraph')
+
+const openReview = (target: ReviewTarget) => {
+  selectedReview.value = target
+  reviewVisible.value = true
+}
+
+const openLegacyReview = async (
+  target: LegacyReviewClick & { chapterIndex: number },
+) => {
+  const loading = ElLoading.service({ lock: true, text: '正在加载评论' })
+  try {
+    const response = await API.openLegacyReview(
+      store.readingBook.bookUrl,
+      target.chapterIndex,
+      target.src,
+    )
+    if (!response.data.isSuccess) {
+      ElMessage.error(response.data.errorMsg)
+      return
+    }
+    const session = response.data.data
+    legacyReviewKind.value = target.kind
+    legacyReviewSessionId.value = session.id
+    legacyReviewSessionNonce.value = session.nonce
+    legacyReviewPageUrl.value = API.getLegacyReviewPageUrl(session)
+    legacyReviewVisible.value = true
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') {
+      console.error(error)
+      ElMessage.error(error instanceof Error ? error.message : '评论加载失败')
+    }
+  } finally {
+    loading.close()
+  }
+}
+
+const loadReviewSummary = async (
+  chapter: ChapterData,
+  bookUrl: string,
+  generation: number,
+) => {
+  try {
+    const response = await API.getReviewSummary(bookUrl, chapter.sourceIndex)
+    const currentChapter = chapterData.value.find(
+      item => item.sourceIndex === chapter.sourceIndex,
+    )
+    if (
+      generation !== contentGeneration ||
+      !currentChapter ||
+      !response.data.isSuccess
+    ) return
+    const reviews: Record<number, ParagraphReview> = {}
+    for (const [key, count] of Object.entries(response.data.data.counts || {})) {
+      const paraIndex = Number(key)
+      if (!Number.isInteger(paraIndex) || paraIndex === 0 || count <= 0) continue
+      reviews[paraIndex] = {
+        count,
+        paraData: response.data.data.keys?.[key] || key,
+      }
+    }
+    currentChapter.reviews = reviews
+  } catch {}
+}
+
 const noPoint = ref(true)
 const getContent = (index: number, reloadChapter = true, chapterPos = 0) => {
+  const generation = reloadChapter ? ++contentGeneration : contentGeneration
+  chapterLoading.value = true
   if (reloadChapter) {
     //展示进度条
     store.setShowContent(false)
     //强制滚回顶层
-    jump(top.value, { duration: 0 })
+    window.scrollTo(0, 0)
     //从目录，按钮切换章节时保存进度 预加载时不保存
     saveReadingBookProgressToBrowser(index, chapterPos)
     chapterData.value = []
+  } else {
+    // 提前清理旧章节，避免与下一章渲染挤在同一帧
+    chapterData.value = trimChapterWindowBeforeAppend(chapterData.value)
   }
   const bookUrl = store.readingBook.bookUrl
   const { title, index: chapterIndex } = catalog.value[index]
 
-  loadingWrapper(
-    API.getBookContent(bookUrl, chapterIndex).then(
-      res => {
-        if (res.data.isSuccess) {
-          const data = res.data.data
-          const content = data.split(/\n+/)
-          chapterData.value.push({ index, content, title })
-          if (reloadChapter) toChapterPos(chapterPos)
-        } else {
-          ElMessage({ message: res.data.errorMsg, type: 'error' })
-          const content = [res.data.errorMsg]
-          chapterData.value.push({ index, content, title })
+  const request = API.getBookContent(bookUrl, chapterIndex).then(
+    res => {
+      if (generation !== contentGeneration) return
+      if (res.data.isSuccess) {
+        const data = res.data.data
+        const content = data.split(/\n+/)
+        const chapter: ChapterData = {
+          index,
+          sourceIndex: chapterIndex,
+          content,
+          title,
+          reviews: {},
         }
-        store.setContentLoading(true)
-        noPoint.value = false
-        store.setShowContent(true)
-        if (!res.data.isSuccess) {
-          throw res.data
-        }
-      },
-      err => {
-        const content = ['获取章节内容失败！']
-        chapterData.value.push({ index, content, title })
-        store.setShowContent(true)
-        throw err
-      },
-    ),
+        chapterData.value.push(chapter)
+        void loadReviewSummary(chapter, bookUrl, generation)
+        if (reloadChapter) toChapterPos(chapterPos)
+      } else {
+        ElMessage({ message: res.data.errorMsg, type: 'error' })
+        const content = [res.data.errorMsg]
+        chapterData.value.push({
+          index,
+          sourceIndex: chapterIndex,
+          content,
+          title,
+          reviews: {},
+        })
+      }
+      store.setContentLoading(true)
+      noPoint.value = false
+      store.setShowContent(true)
+      if (!res.data.isSuccess) {
+        throw res.data
+      }
+    },
+    err => {
+      if (generation !== contentGeneration) return
+      const content = ['获取章节内容失败！']
+      chapterData.value.push({
+        index,
+        sourceIndex: chapterIndex,
+        content,
+        title,
+        reviews: {},
+      })
+      store.setShowContent(true)
+      throw err
+    },
   )
+  return (reloadChapter ? loadingWrapper(request) : request).finally(() => {
+    if (generation === contentGeneration) chapterLoading.value = false
+  })
 }
 
 // 章节进度跳转和计算
-const chapter = ref()
 const chapterRef = ref()
 const toChapterPos = (pos: number) => {
   nextTick(() => {
@@ -348,6 +470,30 @@ const saveBookProgressThrottle = useThrottleFn(
 const onReadedLengthChange = (index: number, pos: number) => {
   saveReadingBookProgressToBrowser(index, pos)
   saveBookProgressThrottle()
+}
+
+let progressFrame: number | null = null
+const updateReadingProgress = () => {
+  progressFrame = null
+  let paragraph: HTMLElement | null = null
+  for (const element of document.elementsFromPoint(
+    window.innerWidth / 2,
+    24,
+  )) {
+    paragraph = element.closest<HTMLElement>('[data-chapterpos]')
+    if (paragraph !== null) break
+  }
+  const chapter = paragraph?.closest<HTMLElement>('[data-chapter-index]')
+  const index = Number(chapter?.dataset.chapterIndex)
+  const pos = Number(paragraph?.dataset.chapterpos)
+  if (!Number.isInteger(index) || !Number.isInteger(pos)) return
+  if (index === chapterIndex.value && pos === chapterPos.value) return
+  onReadedLengthChange(index, pos)
+}
+const onScroll = () => {
+  if (progressFrame === null) {
+    progressFrame = window.requestAnimationFrame(updateReadingProgress)
+  }
 }
 
 // 文档标题
@@ -417,7 +563,7 @@ const toPreChapter = () => {
 let canJump = true
 // 监听方向键
 const handleKeyPress = (event: KeyboardEvent) => {
-  if (!canJump) return
+  if (!canJump || reviewVisible.value) return
   switch (event.key) {
     case 'ArrowLeft':
       event.stopPropagation()
@@ -464,14 +610,17 @@ const handleKeyPress = (event: KeyboardEvent) => {
 
 // 阻止默认滚动事件
 const ignoreKeyPress = (event: KeyboardEvent) => {
+  if (reviewVisible.value) return
   if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
     event.preventDefault()
     event.stopPropagation()
   }
 }
 
+let disposed = false
 onMounted(async () => {
   await store.loadWebConfig()
+  if (disposed) return
   //获取书籍数据
   const bookUrl = sessionStorage.getItem('bookUrl')
   const name = sessionStorage.getItem('bookName')
@@ -497,28 +646,40 @@ onMounted(async () => {
   window.addEventListener('resize', onResize)
   loadingWrapper(
     store.loadWebCatalog(book).then(chapters => {
+      if (disposed) return
       store.setReadingBook(book)
-      getContent(chapterIndex, true, chapterPos)
-      window.addEventListener('keyup', handleKeyPress)
-      window.addEventListener('keydown', ignoreKeyPress)
-      // 兼容Safari < 14
-      document.addEventListener('visibilitychange', onVisibilityChange)
-      //监听底部加载
-      scrollObserver = new IntersectionObserver(onReachBottom, {
-        rootMargin: '-100% 0% 20% 0%',
+      return getContent(chapterIndex, true, chapterPos).finally(() => {
+        if (disposed) return
+        window.addEventListener('keyup', handleKeyPress)
+        window.addEventListener('keydown', ignoreKeyPress)
+        window.addEventListener('scroll', onScroll, { passive: true })
+        onScroll()
+        // 兼容Safari < 14
+        document.addEventListener('visibilitychange', onVisibilityChange)
+        //监听底部加载
+        scrollObserver = new IntersectionObserver(onReachBottom, {
+          rootMargin: '-100% 0% 20% 0%',
+        })
+        if (infiniteLoading.value === true)
+          scrollObserver.observe(loading.value)
+        //第二次点击同一本书 页面标题不会变化
+        const currentTitle = chapters[store.readingBook.chapterIndex]?.title
+        if (currentTitle) {
+          document.title = '...'
+          document.title = (name as string) + ' | ' + currentTitle
+        }
       })
-      if (infiniteLoading.value === true) scrollObserver.observe(loading.value)
-      //第二次点击同一本书 页面标题不会变化
-      document.title = '...'
-      document.title = (name as string) + ' | ' + chapters[chapterIndex].title
     }),
   )
 })
 
 onUnmounted(() => {
+  disposed = true
   window.removeEventListener('keyup', handleKeyPress)
   window.removeEventListener('keydown', ignoreKeyPress)
   window.removeEventListener('resize', onResize)
+  window.removeEventListener('scroll', onScroll)
+  if (progressFrame !== null) window.cancelAnimationFrame(progressFrame)
   // 兼容Safari < 14
   document.removeEventListener('visibilitychange', onVisibilityChange)
   readSettingsVisible.value = false

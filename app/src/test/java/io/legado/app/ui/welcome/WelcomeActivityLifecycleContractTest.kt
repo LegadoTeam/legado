@@ -36,6 +36,21 @@ class WelcomeActivityLifecycleContractTest {
         assertTrue(finish.indexOf("startMainJob?.cancel()") < finish.indexOf("super.finish()"))
     }
 
+    @Test
+    fun `welcome content visibility does not depend on custom background`() {
+        val background = section("override fun upBackgroundImage()", "private fun startMainActivity")
+        val customBackground = background.indexOf("if (getPrefBoolean(PreferKey.customWelcome))")
+
+        assertTrue(customBackground > 0)
+        listOf(
+            "binding.tvLegado.visible(showText)",
+            "binding.ivBook.visible(showIcon)",
+            "binding.tvGzh.visible(showText)",
+        ).forEach { visibilityCall ->
+            assertTrue(background.indexOf(visibilityCall) in 0 until customBackground)
+        }
+    }
+
     private fun section(startMarker: String, endMarker: String): String {
         val start = source.indexOf(startMarker)
         val end = source.indexOf(endMarker, start)

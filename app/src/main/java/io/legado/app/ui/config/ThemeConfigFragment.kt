@@ -29,7 +29,9 @@ import io.legado.app.help.http.okHttpClient
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.prefs.ColorPreference
+import io.legado.app.lib.prefs.SwitchPreference
 import io.legado.app.lib.prefs.fragment.PreferenceFragment
+import io.legado.app.lib.theme.WallpaperTheme
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.ui.file.HandleFileContract
@@ -40,6 +42,7 @@ import io.legado.app.utils.FileUtils
 import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.externalFiles
+import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getPrefInt
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.inputStream
@@ -54,6 +57,7 @@ import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.launch
 import splitties.init.appCtx
 import java.io.FileOutputStream
+import kotlin.math.roundToInt
 
 
 @Suppress("SameParameterValue")
@@ -82,6 +86,10 @@ class ThemeConfigFragment : PreferenceFragment(),
         if (Build.VERSION.SDK_INT < 26) {
             preferenceScreen.removePreferenceRecursively(PreferKey.launcherIcon)
         }
+        if (!WallpaperTheme.isAvailable()) {
+            preferenceScreen.removePreferenceRecursively(PreferKey.wallpaperColorFollow)
+            preferenceScreen.removePreferenceRecursively(PreferKey.wallpaperColorAutoUpdate)
+        }
         upPreferenceSummary(PreferKey.bgImage, getPrefString(PreferKey.bgImage))
         upPreferenceSummary(PreferKey.bgImageN, getPrefString(PreferKey.bgImageN))
         upPreferenceSummary(PreferKey.barElevation, AppConfig.elevation.toString())
@@ -106,6 +114,32 @@ class ThemeConfigFragment : PreferenceFragment(),
                 }
             }
         }
+        findPreference<SwitchPreference>(PreferKey.wallpaperColorFollow)
+            ?.setOnPreferenceChangeListener { _, newValue ->
+                val enabled = newValue as Boolean
+                val autoUpdate = getPrefBoolean(PreferKey.wallpaperColorAutoUpdate, true)
+                if (!WallpaperTheme.setFollow(requireContext(), enabled, autoUpdate)) {
+                    toastOnUi(R.string.wallpaper_colors_unavailable)
+                    false
+                } else {
+                    true
+                }
+            }
+        findPreference<SwitchPreference>(PreferKey.wallpaperColorAutoUpdate)
+            ?.setOnPreferenceChangeListener { _, newValue ->
+                if (getPrefBoolean(PreferKey.wallpaperColorFollow)) {
+                    val updated = WallpaperTheme.setFollow(
+                        requireContext(),
+                        enabled = true,
+                        autoUpdate = newValue as Boolean,
+                    )
+                    if (!updated) {
+                        toastOnUi(R.string.wallpaper_colors_unavailable)
+                        return@setOnPreferenceChangeListener false
+                    }
+                }
+                true
+            }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -145,13 +179,21 @@ class ThemeConfigFragment : PreferenceFragment(),
         sharedPreferences ?: return
         when (key) {
             PreferKey.launcherIcon -> LauncherIconHelp.changeIcon(getPrefString(key))
-            PreferKey.transparentStatusBar -> recreateActivities()
-            PreferKey.immNavigationBar -> recreateActivities()
+            PreferKey.wallpaperColorFollow ->
+                findPreference<SwitchPreference>(PreferKey.wallpaperColorFollow)?.isChecked =
+                    getPrefBoolean(PreferKey.wallpaperColorFollow)
+            PreferKey.transparentStatusBar,
+            PreferKey.immNavigationBar,
+            PreferKey.disablePredictiveBack -> recreateActivities()
             PreferKey.cPrimary,
             PreferKey.cAccent,
             PreferKey.cBackground,
             PreferKey.cBBackground,
-            PreferKey.tNavBar-> {
+            PreferKey.tNavBar -> {
+                if (WallpaperTheme.isApplyingColors) return
+                if (key != PreferKey.tNavBar) {
+                    WallpaperTheme.onColorPreferenceChanged(requireContext())
+                }
                 upTheme(false)
             }
 
@@ -160,6 +202,10 @@ class ThemeConfigFragment : PreferenceFragment(),
             PreferKey.cNBackground,
             PreferKey.cNBBackground,
             PreferKey.tNavBarN -> {
+                if (WallpaperTheme.isApplyingColors) return
+                if (key != PreferKey.tNavBarN) {
+                    WallpaperTheme.onColorPreferenceChanged(requireContext())
+                }
                 upTheme(true)
             }
 
@@ -192,7 +238,11 @@ class ThemeConfigFragment : PreferenceFragment(),
                 .setTitle(getString(R.string.font_scale))
                 .setMaxValue(16)
                 .setMinValue(8)
-                .setValue(10)
+                .setValue(
+                    (AppContextWrapper.getFontScale(requireContext()) * 10)
+                        .roundToInt()
+                        .coerceIn(8, 16)
+                )
                 .setCustomButton((R.string.btn_default_s)) {
                     putPrefInt(PreferKey.fontScale, 0)
                     recreateActivities()

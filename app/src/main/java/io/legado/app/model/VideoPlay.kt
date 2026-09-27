@@ -74,6 +74,12 @@ object VideoPlay : CoroutineScope by MainScope(){
         set(value) {
             videoPrefs.edit { putBoolean("startFull", value) }
         }
+    /**  默认使用悬浮窗播放  **/
+    var defaultFloatWindow
+        get() = videoPrefs.getBoolean("defaultFloatWindow", false)
+        set(value) {
+            videoPrefs.edit { putBoolean("defaultFloatWindow", value) }
+        }
     /**  长按倍速  **/
     var longPressSpeed
         get() = videoPrefs.getInt("longPressSpeed", 30)
@@ -164,6 +170,7 @@ object VideoPlay : CoroutineScope by MainScope(){
                 appCtx.toastOnUi("未找到订阅")
                 return
             }
+            videoTitle = rssArticle.title
             val ruleContent = s.ruleContent
             if (ruleContent.isNullOrBlank()) {
                 Coroutine.async(loadScope, IO) {
@@ -248,6 +255,7 @@ object VideoPlay : CoroutineScope by MainScope(){
             appCtx.toastOnUi("未找到章节")
             return
         }
+        videoTitle = chapter.title
         WebBook.getContent(loadScope, source as BookSource, book, chapter)
             .onSuccess(IO) { content ->
                 val content = content.trim()
@@ -397,6 +405,7 @@ object VideoPlay : CoroutineScope by MainScope(){
 
     fun stopLoading() {
         loadScope.coroutineContext.cancelChildren()
+        isLoading = false
     }
 
     fun initSource(sourceKey: String?, sourceType: Int?, bookUrl: String?, record:String?): Boolean {
@@ -426,6 +435,7 @@ object VideoPlay : CoroutineScope by MainScope(){
         }
         upEpisodes()
         if (source == null) {
+            isLoading = false
             appCtx.toastOnUi("未找到源")
             return false
         }
@@ -509,19 +519,16 @@ object VideoPlay : CoroutineScope by MainScope(){
                 book.durChapterIndex = durChapterIndex
                 book.durChapterPos = durPos
                 val chapter = toc?.getOrNull(durChapterIndex)
-                videoTitle = chapter?.title
                 book.durChapterTitle = chapter?.title
                 SourceCallBack.callBackBook(SourceCallBack.SAVE_READ, source as BookSource?, book, chapter, durTime.toString())
                 book.update()
             }
             rssStar?.let {
                 it.durPos = durPos
-                videoTitle = it.title
                 appDb.rssStarDao.update(it)
             }
             rssRecord?.let {
                 it.durPos = durPos
-                videoTitle = it.title
                 appDb.rssReadRecordDao.update(it)
             }
             postEvent(EventBus.VIDEO_SUB_TITLE, videoTitle ?: appCtx.getString(R.string.data_loading))

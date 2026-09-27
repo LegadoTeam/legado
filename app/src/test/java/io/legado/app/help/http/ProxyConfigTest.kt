@@ -103,12 +103,21 @@ class ProxyConfigTest {
     }
 
     @Test
-    fun rejectsSocksAuthentication() {
-        assertThrows(IllegalArgumentException::class.java) {
-            parseProxyConfig("socks5://user:password@proxy.example:1080")
-        }
+    fun supportsSocks5AuthenticationAndRejectsSocks4Authentication() {
+        val standard = parseProxyConfig("socks5://user:p%40ss@proxy.example:1080")
+        val legacy = parseProxyConfig("socks5://proxy.example:1080@user@password")
+
+        assertEquals(ProxyProtocol.SOCKS5, standard.protocol)
+        assertEquals(ProxyCredentials("user", "p@ss"), standard.credentials)
+        assertEquals(ProxyCredentials("user", "password"), legacy.credentials)
         assertThrows(IllegalArgumentException::class.java) {
             parseProxyConfig("socks4://proxy.example:1080@user@password")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            parseProxyConfig("socks5://user:@proxy.example:1080")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            parseProxyConfig("socks5://${"u".repeat(256)}:password@proxy.example:1080")
         }
     }
 

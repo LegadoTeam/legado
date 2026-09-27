@@ -14,6 +14,8 @@ import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 import java.lang.ref.WeakReference
 import java.util.UUID
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 @Suppress("unused")
 class WebJsExtensions(
@@ -21,10 +23,13 @@ class WebJsExtensions(
     activity: AppCompatActivity?,
     webView: WebView,
     bookType: Int = 0,
-    callback: Callback? = null
+    callback: Callback? = null,
+    private val navigationContext: CoroutineContext = EmptyCoroutineContext,
 ): RssJsExtensions(activity, source, bookType) {
+    override fun getSourceNavigationContext(): CoroutineContext = navigationContext
     private val callbackRef: WeakReference<Callback> = WeakReference(callback)
     private val webViewRef: WeakReference<WebView?> = WeakReference(webView)
+    private var lastForwardedConfig: String? = null
 
     interface Callback {
         fun upConfig(config: String)
@@ -32,6 +37,8 @@ class WebJsExtensions(
 
     @JavascriptInterface
     fun upConfig(config: String) {
+        if (config == lastForwardedConfig) return
+        lastForwardedConfig = config
         callbackRef.get()?.upConfig(config)
     }
 
@@ -357,6 +364,7 @@ class WebJsExtensions(
                 const callBack = JSBridgeCallbacks[id];
                 if (callBack) {
                     const result = cache.getFromMemory(id);
+                    cache.deleteMemory(id);
                     if (success) {
                         callBack.resolve(result);
                     } else {
@@ -385,6 +393,7 @@ class WebJsExtensions(
                 const callBack = JSBridgeCallbacks[id];
                 if (callBack) {
                     const result = cache.getFromMemory(id);
+                    cache.deleteMemory(id);
                     if (success) {
                         callBack.resolve(result);
                     } else {

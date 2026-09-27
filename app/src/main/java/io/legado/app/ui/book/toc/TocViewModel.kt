@@ -9,8 +9,15 @@ import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppLog
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
+import io.legado.app.help.book.update
+import io.legado.app.help.book.isPdf
+import io.legado.app.help.book.isEpub
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.globalExecutor
+import io.legado.app.model.AudioPlay
 import io.legado.app.model.ReadBook
+import io.legado.app.model.ReadManga
+import io.legado.app.model.VideoPlay
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.utils.FileDoc
 import io.legado.app.utils.GSON
@@ -38,11 +45,11 @@ class TocViewModel(application: Application) : BaseViewModel(application) {
 
     fun upBookTocRule(book: Book, complete: (Throwable?) -> Unit) {
         execute {
-            appDb.bookDao.update(book)
+            book.update()
             LocalBook.getChapterList(book).let {
                 appDb.bookChapterDao.delByBook(book.bookUrl)
                 appDb.bookChapterDao.insert(*it.toTypedArray())
-                appDb.bookDao.update(book)
+                book.update()
                 ReadBook.onChapterListUpdated(book)
                 bookData.postValue(book)
             }
@@ -56,17 +63,48 @@ class TocViewModel(application: Application) : BaseViewModel(application) {
     fun reverseToc(success: (book: Book) -> Unit) {
         execute {
             bookData.value?.apply {
-                setReverseToc(!getReverseToc())
-                val toc = appDb.bookChapterDao.getChapterList(bookUrl)
-                val newToc = toc.reversed()
-                newToc.forEachIndexed { index, bookChapter ->
-                    bookChapter.index = index
+                if (isPdf || isEpub) {
+                    setReverseToc(!getReverseToc())
+                    listOf(ReadBook.book, ReadManga.book, AudioPlay.book, VideoPlay.book)
+                        .filter { it?.bookUrl == bookUrl }
+                        .forEach { it?.setReverseToc(getReverseToc()) }
+                    appDb.bookDao.updateReverseToc(bookUrl, getReverseToc())
+                    return@apply
                 }
-                appDb.bookChapterDao.insert(*newToc.toTypedArray())
+                // Keep source parsing and index-based reading/cache identities unchanged.
+                setReverseTocDisplay(!getReverseTocDisplay())
+                listOf(ReadBook.book, ReadManga.book, AudioPlay.book, VideoPlay.book)
+                    .filter { it?.bookUrl == bookUrl }
+                    .forEach { it?.setReverseTocDisplay(getReverseTocDisplay()) }
+                appDb.bookDao.updateReverseTocDisplay(bookUrl, getReverseTocDisplay())
             }
         }.onSuccess {
             it?.let(success)
         }
+    }
+
+    fun setTocExpanded(expanded: Boolean) {
+        val book = bookData.value ?: return
+        book.setTocExpanded(expanded)
+        updateActiveReaderBooks(book.bookUrl, expanded)
+        chapterListCallBack?.upChapterList(
+            searchKey,
+            resetCollapse = true,
+            replaceAll = true,
+        )
+        globalExecutor.execute {
+            runCatching {
+                appDb.bookDao.updateTocExpanded(book.bookUrl, expanded)
+            }.onFailure {
+                AppLog.put("保存目录展开设置失败\n${it.localizedMessage}", it)
+            }
+        }
+    }
+
+    private fun updateActiveReaderBooks(bookUrl: String, expanded: Boolean) {
+        listOf(ReadBook.book, ReadManga.book, AudioPlay.book, VideoPlay.book)
+            .filter { it?.bookUrl == bookUrl }
+            .forEach { it?.setTocExpanded(expanded) }
     }
 
     fun startChapterListSearch(newText: String?) {

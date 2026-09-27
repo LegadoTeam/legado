@@ -96,6 +96,7 @@
         android:textColor="@color/md_white_1000"
         android:textSize="16sp"
         android:textStyle="bold"
+        app:layout_constraintTop_toBottomOf="@+id/lyricViewX"
         app:layout_constraintBottom_toTopOf="@+id/tv_chapter_index" />
 
     <TextView

@@ -121,10 +121,16 @@ abstract class BaseImportBookActivity<VM : ViewModel> :
         fileName: String,
         onSuccess: (Book) -> Unit
     ) {
-        LocalBook.importArchiveFile(fileDoc.uri, fileName) {
-            it.contains(fileName)
-        }.firstOrNull()?.run {
-            onSuccess.invoke(this)
+        try {
+            LocalBook.importArchiveFile(fileDoc.uri, fileName) {
+                it.contains(fileName)
+            }.firstOrNull()?.run {
+                onSuccess.invoke(this)
+            }
+        } catch (error: Exception) {
+            toastOnUi(
+                error.localizedMessage ?: getString(R.string.add_loaded_books_to_bookshelf_failed)
+            )
         }
     }
 

@@ -18,6 +18,7 @@ import io.legado.app.help.http.decompressed
 import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.source.SourceHelp
+import io.legado.app.model.ReadBook
 import io.legado.app.model.RuleUpdate
 import io.legado.app.model.jsSource.JsSourceConfig
 import io.legado.app.utils.inputStream
@@ -27,6 +28,9 @@ import io.legado.app.utils.isJsonObject
 import io.legado.app.utils.isUri
 import io.legado.app.utils.runCatchingCancellable
 import io.legado.app.utils.splitNotBlank
+import kotlinx.coroutines.Dispatchers.Main
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
 
 
@@ -51,29 +55,40 @@ internal fun resolveImportBookSourceStatus(
 internal fun resolveImportSourceSelection(
     status: ImportBookSourceStatus,
     manualSelection: Boolean?,
+    selectExisting: Boolean = false,
 ): Boolean {
-    return manualSelection ?: status.shouldSelect
+    return manualSelection ?: (selectExisting || status.shouldSelect)
 }
 
 class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
-    var isAddGroup = false
-    var groupName: String? = null
+    var isAddGroup = AppConfig.importRememberGroup && AppConfig.importLastGroupAdd
+    var groupName: String? = AppConfig.importLastGroup.takeIf { AppConfig.importRememberGroup }
+    var searchQuery = ""
     val errorLiveData = MutableLiveData<String>()
     val successLiveData = MutableLiveData<Int>()
     val sourceUpdatePending = MutableLiveData(false)
+    val importFinished = MutableLiveData(false)
+    private var reimportBookUrl: String? = null
+    private var reimportSourceUrl: String? = null
 
     val allSources = arrayListOf<BookSource>()
+    private val sourceCandidates = arrayListOf<BookSourceImportCandidate>()
     val checkSources = arrayListOf<BookSourcePart?>()
     val selectStatus = arrayListOf<Boolean>()
     val newSourceStatus = arrayListOf<Boolean>()
     val updateSourceStatus = arrayListOf<Boolean>()
     private val manualSelections = arrayListOf<Boolean?>()
     private var importStarted = false
+    var automaticSourceReplacement = AppConfig.importReplaceSource
+        private set
+    private val manualRuleIds = hashMapOf<Int, List<Long>>()
+    val useSourceReplacement: Boolean
+        get() = automaticSourceReplacement || manualRuleIds.isNotEmpty()
 
     val isSelectAll: Boolean
         get() {
-            selectStatus.forEach {
-                if (!it) {
+            selectStatus.forEachIndexed { index, selected ->
+                if (canImportSource(index) && !selected) {
                     return false
                 }
             }
@@ -83,7 +98,7 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
     val isSelectAllNew: Boolean
         get() {
             newSourceStatus.forEachIndexed { index, b ->
-                if (b && !selectStatus[index]) {
+                if (b && canImportSource(index) && !selectStatus[index]) {
                     return false
                 }
             }
@@ -93,7 +108,7 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
     val isSelectAllUpdate: Boolean
         get() {
             updateSourceStatus.forEachIndexed { index, b ->
-                if (b && !selectStatus[index]) {
+                if (b && canImportSource(index) && !selectStatus[index]) {
                     return false
                 }
             }
@@ -111,7 +126,9 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
             return count
         }
 
-    fun importSelect(finally: () -> Unit) {
+    fun importSelect(finally: () -> Unit = {}) {
+        if (sourceUpdatePending.value == true || importFinished.value == true) return
+        sourceUpdatePending.value = true
         execute {
             val group = groupName?.trim()
             val keepName = AppConfig.importKeepName
@@ -119,7 +136,7 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
             val keepEnable = AppConfig.importKeepEnable
             val selectSource = arrayListOf<BookSource>()
             selectStatus.forEachIndexed { index, b ->
-                if (b) {
+                if (b && canImportSource(index)) {
                     val source = allSources[index]
                     checkSources[index]?.let {
                         if (keepName) {
@@ -149,16 +166,36 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
                     selectSource.add(source)
                 }
             }
-            SourceHelp.insertBookSource(*selectSource.toTypedArray())
-            ContentProcessor.upReplaceRules()
+            // Once confirmed, finish publication even if the dialog is destroyed after the DB write.
+            withContext(NonCancellable) {
+                SourceHelp.insertBookSource(*selectSource.toTypedArray())
+                ContentProcessor.upReplaceRules()
+                val source = reimportSourceUrl?.takeIf { url ->
+                    selectSource.any { it.bookSourceUrl == url }
+                }?.let { appDb.bookSourceDao.getBookSource(it) }
+                withContext(Main) {
+                    val current = ReadBook.book
+                    if (source != null && current != null && current.bookUrl == reimportBookUrl &&
+                        current.origin == reimportSourceUrl) {
+                        ReadBook.bookSource = source
+                    }
+                    importFinished.value = true
+                }
+            }
+        }.onError {
+            errorLiveData.value = "ImportError:${it.localizedMessage}"
+            AppLog.put("ImportError:${it.localizedMessage}", it)
         }.onFinally {
+            sourceUpdatePending.value = false
             finally.invoke()
         }
     }
 
-    fun importSource(text: String) {
+    fun importSource(text: String, reimportBookUrl: String? = null, reimportSourceUrl: String? = null) {
         if (importStarted) return
         importStarted = true
+        this.reimportBookUrl = reimportBookUrl
+        this.reimportSourceUrl = reimportSourceUrl
         executeLazy {
             val mText = text.trim()
             when {
@@ -188,8 +225,35 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
             errorLiveData.postValue("ImportError:${it.localizedMessage}")
             AppLog.put("ImportError:${it.localizedMessage}", it)
         }.onSuccess {
-            comparisonSource()
+            prepareSourceCandidates()
         }.start()
+    }
+
+    private fun prepareSourceCandidates() {
+        executeLazy {
+            val rules = appDb.replaceRuleDao.findEnabledBySourceScope()
+            allSources.mapIndexed { index, source ->
+                prepareBookSourceImportCandidate(source, selectedRules(index, rules))
+            }
+        }.onSuccess { candidates ->
+            sourceCandidates.clear()
+            sourceCandidates.addAll(candidates)
+            applyCandidateSources()
+            comparisonSource()
+        }.onError {
+            errorLiveData.value = "ImportError:${it.localizedMessage}"
+            AppLog.put("ImportError:${it.localizedMessage}", it)
+        }.start()
+    }
+
+    private fun applyCandidateSources() {
+        allSources.clear()
+        allSources.addAll(sourceCandidates.map { it.source(useSourceReplacement) })
+    }
+
+    fun setUseSourceReplacement(enabled: Boolean) {
+        if (enabled == automaticSourceReplacement) return
+        refreshSourceReplacements(automatic = enabled)
     }
 
     private suspend fun importSourceUrl(url: String) {
@@ -229,7 +293,12 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
         }
     }
 
-    private fun comparisonSource() {
+    private fun comparisonSource(
+        preserveManualSelections: Boolean = false,
+        onError: () -> Unit = {},
+        finally: () -> Unit = {},
+    ) {
+        val savedManualSelections = manualSelections.toList()
         executeLazy {
             allSources.map { source ->
                 val localSource = appDb.bookSourceDao.getBookSourcePart(source.bookSourceUrl)
@@ -245,22 +314,35 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
             newSourceStatus.clear()
             updateSourceStatus.clear()
             manualSelections.clear()
-            comparisons.forEach { (localSource, status) ->
+            comparisons.forEachIndexed { index, (localSource, status) ->
+                val manualSelection = if (preserveManualSelections) {
+                    savedManualSelections.getOrNull(index)
+                } else {
+                    null
+                }
                 checkSources.add(localSource)
-                selectStatus.add(status.shouldSelect)
+                selectStatus.add(
+                    canImportSource(index) &&
+                        resolveImportSourceSelection(status, manualSelection,
+                            selectExisting = reimportSourceUrl == allSources[index].bookSourceUrl)
+                )
                 newSourceStatus.add(status.isNew)
                 updateSourceStatus.add(status.isUpdate)
-                manualSelections.add(null)
+                manualSelections.add(manualSelection)
             }
             successLiveData.value = allSources.size
         }.onError {
+            onError()
             errorLiveData.value = "ImportError:${it.localizedMessage}"
             AppLog.put("ImportError:${it.localizedMessage}", it)
+        }.onFinally {
+            finally()
         }.start()
     }
 
     fun setSelection(index: Int, selected: Boolean) {
         if (index !in selectStatus.indices || index !in manualSelections.indices) return
+        if (sourceUpdatePending.value == true || !canImportSource(index)) return
         selectStatus[index] = selected
         manualSelections[index] = selected
     }
@@ -269,20 +351,23 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
         if (sourceUpdatePending.value == true) return
         sourceUpdatePending.value = true
         executeLazy {
-            val localSource = appDb.bookSourceDao.getBookSourcePart(source.bookSourceUrl)
+            val rules = appDb.replaceRuleDao.findEnabledBySourceScope()
+            val candidate = prepareBookSourceImportCandidate(source, selectedRules(index, rules))
+            val activeSource = candidate.source(useSourceReplacement)
+            val localSource = appDb.bookSourceDao.getBookSourcePart(activeSource.bookSourceUrl)
             val editedStatus = resolveImportBookSourceStatus(
-                source.lastUpdateTime,
+                activeSource.lastUpdateTime,
                 localSource?.lastUpdateTime,
             )
-            localSource to editedStatus
-        }.onSuccess { (localSource, editedStatus) ->
+            Triple(candidate, localSource, editedStatus)
+        }.onSuccess { (candidate, localSource, editedStatus) ->
             if (index !in allSources.indices) return@onSuccess
-            allSources[index] = source
+            sourceCandidates[index] = candidate
+            allSources[index] = candidate.source(useSourceReplacement)
             checkSources[index] = localSource
-            selectStatus[index] = resolveImportSourceSelection(
-                editedStatus,
-                manualSelections[index],
-            )
+            selectStatus[index] = canImportSource(index) &&
+                resolveImportSourceSelection(editedStatus, manualSelections[index],
+                    selectExisting = reimportSourceUrl == allSources[index].bookSourceUrl)
             newSourceStatus[index] = editedStatus.isNew
             updateSourceStatus[index] = editedStatus.isUpdate
             successLiveData.value = allSources.size
@@ -293,5 +378,92 @@ class ImportBookSourceViewModel(app: Application) : BaseViewModel(app) {
             sourceUpdatePending.value = false
         }.start()
     }
+
+    var pendingReplacementDialog: Pair<Boolean, Int>? = null
+
+    fun refreshSourceReplacements(
+        index: Int = -1,
+        source: BookSource? = null,
+        ids: List<Long>? = null,
+        openDialog: Boolean? = null,
+        automatic: Boolean = automaticSourceReplacement,
+    ): Boolean {
+        if (sourceUpdatePending.value == true || (index != -1 && index !in sourceCandidates.indices)) return false
+        if (automatic && (ids != null || openDialog == true)) return false
+        val previousCandidates = sourceCandidates.toList()
+        val previousIds = manualRuleIds.toMap()
+        val previousMode = automaticSourceReplacement
+        automaticSourceReplacement = automatic
+        fun restorePreviousState() {
+            automaticSourceReplacement = previousMode
+            sourceCandidates.clear()
+            sourceCandidates.addAll(previousCandidates)
+            manualRuleIds.clear()
+            manualRuleIds.putAll(previousIds)
+            applyCandidateSources()
+        }
+        if (ids != null) {
+            if (index == -1) sourceCandidates.indices.forEach { manualRuleIds[it] = ids }
+            else manualRuleIds[index] = ids
+        }
+        val selectedIds = manualRuleIds.toMap().takeUnless { automatic }
+        sourceUpdatePending.value = true
+        executeLazy {
+            refreshBookSourceImportCandidates(
+                previousCandidates,
+                index,
+                source,
+                appDb.replaceRuleDao.findEnabledBySourceScope(),
+                selectedIds,
+            )
+        }.onSuccess { candidates ->
+            var comparisonSucceeded = true
+            sourceCandidates.clear()
+            sourceCandidates.addAll(candidates)
+            applyCandidateSources()
+            comparisonSource(
+                preserveManualSelections = true,
+                onError = {
+                    comparisonSucceeded = false
+                    restorePreviousState()
+                },
+            ) {
+                if (comparisonSucceeded) {
+                    AppConfig.importReplaceSource = automatic
+                    if (openDialog != null) pendingReplacementDialog = openDialog to index
+                }
+                sourceUpdatePending.value = false
+            }
+        }.onError {
+            errorLiveData.value = "ImportError:${it.localizedMessage}"
+            AppLog.put("ImportError:${it.localizedMessage}", it)
+            restorePreviousState()
+            sourceUpdatePending.value = false
+        }.start()
+        return true
+    }
+
+    private fun selectedRules(index: Int, rules: List<io.legado.app.data.entities.ReplaceRule>) =
+        if (automaticSourceReplacement) rules else rules.filter { it.id in manualRuleIds[index].orEmpty() }
+
+    fun selectedManualRuleIds(index: Int = -1): List<Long> = if (index >= 0) manualRuleIds[index].orEmpty()
+        else sourceCandidates.indices.map { manualRuleIds[it].orEmpty().toSet() }
+            .reduceOrNull { all, ids -> all.intersect(ids) }?.toList().orEmpty()
+
+    fun effectiveRuleIds(index: Int = -1): List<Long> = if (!useSourceReplacement) emptyList() else
+        (if (index >= 0) listOfNotNull(sourceCandidates.getOrNull(index)) else sourceCandidates)
+            .flatMap { it.effectiveRuleIds }.distinct()
+
+    fun canImportSource(index: Int): Boolean =
+        sourceCandidates.getOrNull(index)?.canImport(useSourceReplacement) != false
+
+    fun originalSourceJson(index: Int): String? =
+        sourceCandidates.getOrNull(index)?.originalJson
+
+    fun replacedSourceJson(index: Int): String? =
+        sourceCandidates.getOrNull(index)?.replacedJson
+
+    fun sourceReplacementError(index: Int): String? =
+        sourceCandidates.getOrNull(index)?.replacementError
 
 }

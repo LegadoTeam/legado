@@ -101,15 +101,13 @@ class CacheAdapter(context: Context, private val callBack: CallBack) :
             iv.gone()
         } else {
             iv.visible()
-            CacheBook.cacheBookMap[book.bookUrl]?.let {
-                if (!it.isStop()) {
-                    iv.setImageResource(R.drawable.ic_stop_black_24dp)
-                } else {
-                    iv.setImageResource(R.drawable.ic_play_24dp)
-                }
-            } ?: let {
-                iv.setImageResource(R.drawable.ic_play_24dp)
-            }
+            val isRunning = CacheBook.cacheBookMap[book.bookUrl]?.isStop() == false
+            iv.setImageResource(
+                if (isRunning) R.drawable.ic_stop_black_24dp else R.drawable.ic_play_24dp
+            )
+            iv.contentDescription = context.getString(
+                if (isRunning) R.string.stop else R.string.start
+            )
         }
     }
 

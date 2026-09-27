@@ -41,7 +41,7 @@ class WebViewPoolJavascriptInterfaceContractTest {
     fun `interfaces are removed before blank page navigation`() {
         val release = section("fun release", "private fun createNewWebView")
         val stopLoading = release.indexOf("stopLoading()")
-        val loadBlank = release.indexOf("loadUrl(BLANK_HTML)")
+        val loadBlank = release.indexOf("loadUrl(recycleUrl)")
 
         assertTrue(stopLoading >= 0)
         assertTrue(loadBlank > stopLoading)

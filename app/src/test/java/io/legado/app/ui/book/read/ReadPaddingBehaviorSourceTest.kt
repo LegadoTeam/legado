@@ -1,5 +1,6 @@
 package io.legado.app.ui.book.read
 
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -56,6 +57,16 @@ class ReadPaddingBehaviorSourceTest {
         assertTrue(source.contains("ReadBookConfig.save()"))
         assertTrue(source.contains("bottomDialog++"))
         assertTrue(source.contains("bottomDialog--"))
+    }
+
+    @Test
+    fun `padding panel is centered without covering the page footer`() {
+        val source = paddingDialogSource()
+
+        assertTrue(source.contains("gravity = Gravity.CENTER"))
+        assertFalse(source.contains("gravity = Gravity.BOTTOM"))
+        assertTrue(source.contains("setLayout(0.9f, ViewGroup.LayoutParams.WRAP_CONTENT)"))
+        assertTrue(source.contains("cornerRadius = radius"))
     }
 
     private fun paddingDialogSource(): String = projectFile(

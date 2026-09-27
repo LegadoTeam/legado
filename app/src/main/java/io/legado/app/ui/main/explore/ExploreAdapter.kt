@@ -125,12 +125,24 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                     }
                 }
                 ivStatus.setImageResource(R.drawable.ic_arrow_down)
+                sourceKinds[item.bookSourceUrl]?.let { kindList ->
+                    val position = currentBindingPosition() ?: return@run
+                    // A refresh has already loaded these kinds. Replace them in this layout pass
+                    // so an expanded row cannot briefly collapse above the current viewport.
+                    upKindList(this@run, item, kindList, position)
+                    rotateLoading.gone()
+                    if (scrollTo >= 0) {
+                        callBack.scrollTo(scrollTo)
+                        scrollTo = -1
+                    }
+                    return@run
+                }
                 rotateLoading.loadingColor = context.accentColor
                 rotateLoading.visible()
                 recyclerFlexbox(flexbox)
                 flexbox.gone()
                 Coroutine.async(callBack.scope) {
-                    sourceKinds[item.bookSourceUrl] ?: item.exploreKinds()
+                    item.exploreKinds()
                 }.onSuccess { kindList ->
                     currentBindingPosition()?.let { position ->
                         sourceKinds[item.bookSourceUrl] = kindList
@@ -170,16 +182,18 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                     exploreInfoMapList.put(sourceUrl, it)
                 }
             }
-            val sourceJsExtensions by lazy {
-                SourceLoginJsExtensions(context as? AppCompatActivity, source,
-                    callback = object : SourceLoginJsExtensions.Callback {
-                        override fun upUiData(data: Map<String, Any?>?) {
-                        }
+            val sourceUiCallback = object : SourceLoginJsExtensions.Callback {
+                override fun upUiData(data: Map<String, Any?>?) {
+                }
 
-                        override fun reUiView(deltaUp: Boolean) {
-                            refreshExplore(item, exIndex, binding)
-                        }
-                    })
+                override fun reUiView(deltaUp: Boolean) {
+                    refreshExplore(item, exIndex, binding)
+                }
+            }
+            // The JS bridge holds callbacks weakly; the live controls own this one.
+            flexbox.tag = sourceUiCallback
+            val sourceJsExtensions by lazy {
+                SourceLoginJsExtensions(context as? AppCompatActivity, source, callback = sourceUiCallback)
             }
             kinds.forEach { kind ->
                 val type = kind.type
@@ -604,6 +618,7 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
 
     @Synchronized
     private fun recyclerFlexbox(flexbox: FlexboxLayout) {
+        flexbox.tag = null
         val children = flexbox.children.toList()
         if (children.isEmpty()) return
         flexbox.removeAllViews()

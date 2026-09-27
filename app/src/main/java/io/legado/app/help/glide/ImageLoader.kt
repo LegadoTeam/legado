@@ -9,6 +9,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import com.bumptech.glide.Glide
 import com.bumptech.glide.RequestBuilder
+import com.bumptech.glide.request.RequestOptions
 import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.isContentScheme
 import io.legado.app.utils.isDataUrl
@@ -54,9 +55,13 @@ object ImageLoader {
         }
     }
 
-    fun loadBitmap(context: Context, path: String?): RequestBuilder<Bitmap> {
+    fun loadBitmap(
+        context: Context,
+        path: String?,
+        sourceOrigin: String? = null,
+    ): RequestBuilder<Bitmap> {
         val requestManager = Glide.with(context).`as`(Bitmap::class.java)
-        return when {
+        val request = when {
             path.isNullOrEmpty() -> requestManager.load(path)
             path.isDataUrl() -> requestManager.load(path)
             path.isAbsUrl() -> requestManager.load(path)
@@ -67,6 +72,9 @@ object ImageLoader {
                 requestManager.load(path)
             }
         }
+        return sourceOrigin?.let {
+            request.apply(RequestOptions().set(OkHttpModelLoader.sourceOriginOption, it))
+        } ?: request
     }
 
     fun loadFile(context: Context, path: String?): RequestBuilder<File> {

@@ -34,9 +34,14 @@ class McpServiceContractTest {
         assertTrue(application.contains("allowedOrigins = allowedOrigins"))
         assertFalse(application.contains("enableDnsRebindingProtection = false"))
         assertFalse(application.contains("request.path()"))
+        assertTrue(application.contains("tokenRequiredProvider()"))
 
         val service = projectFile("app/src/main/java/io/legado/app/service/McpService.kt")
-        assertTrue(service.indexOf("token.isNullOrBlank()") < service.indexOf("embeddedServer("))
+        assertTrue(
+            service.indexOf("AppConfig.jsSourceApiTokenRequired && token.isNullOrBlank()") <
+                service.indexOf("embeddedServer(")
+        )
+        assertTrue(service.contains("tokenRequiredProvider = { AppConfig.jsSourceApiTokenRequired }"))
 
         val manifest = projectFile("app/src/main/AndroidManifest.xml")
         assertTrue(manifest.contains("FOREGROUND_SERVICE_SPECIAL_USE"))
@@ -135,6 +140,11 @@ class McpServiceContractTest {
         assertTrue(notification.contains("catch (error: CancellationException)"))
         assertTrue(notification.contains("throw error"))
 
+        val checkProgress = tools
+            .substringAfter("private suspend fun ClientConnection.sendCheckProgress(")
+            .substringBefore("private fun registerTools")
+        assertTrue(checkProgress.contains("total = total"))
+
         val api = projectFile("api.md")
         assertTrue(api.contains("notifications/message"))
         assertTrue(api.contains("progressToken"))
@@ -155,6 +165,7 @@ class McpServiceContractTest {
         assertTrue(checkTool.contains("Debug.getCheckSnapshot(checkSessionId, urls)"))
         assertTrue(checkTool.contains("Debug.takeCheckSnapshot(checkSessionId, urls)"))
         assertTrue(checkTool.contains("sendCheckProgress("))
+        assertTrue(tools.contains("total = total?.toDouble()"))
         assertTrue(tools.contains("logger = \"legado.check_source\""))
         assertFalse(checkTool.contains("getBookSources(urls)"))
 
@@ -167,6 +178,62 @@ class McpServiceContractTest {
             "app/src/main/java/io/legado/app/model/jsSource/JsSourceUpsert.kt"
         )
         assertTrue(upsert.contains("internal suspend fun <T> withSaveLock"))
+    }
+
+    @Test
+    fun `tools publish conservative behavior annotations`() {
+        val tools = projectFile("app/src/main/java/io/legado/app/web/mcp/McpToolServer.kt")
+        val registrations = tools.substringAfter("private fun registerTools")
+        val profiles = mapOf(
+            "localReadToolAnnotations" to listOf(
+                "list_sources", "get_source", "get_http_logs", "get_http_log", "get_cookies"
+            ),
+            "localWriteToolAnnotations" to listOf(
+                "delete_sources", "set_http_log_recording", "set_cookie", "clear_cookies"
+            ),
+            "openWorldWriteToolAnnotations" to listOf(
+                "save_source", "debug_source", "eval_js", "check_source"
+            ),
+        )
+        val registeredNames = Regex("name = \\\"([a-z_]+)\\\"")
+            .findAll(registrations)
+            .map { it.groupValues[1] }
+            .toSet()
+        assertEquals(profiles.values.flatten().toSet(), registeredNames)
+        profiles.forEach { (profile, names) ->
+            names.forEach { name ->
+                val tool = registrations.substringAfter("name = \"$name\"")
+                    .substringBefore("\n        server.addTool(")
+                assertTrue("$name must use $profile", tool.contains("toolAnnotations = $profile"))
+            }
+        }
+
+        fun hints(profile: String): Set<String> {
+            val definition = tools.substringAfter("private val $profile = ToolAnnotations(")
+                .substringBefore(')')
+            return Regex("""[a-zA-Z]+Hint = (?:true|false)""")
+                .findAll(definition)
+                .map { it.value }
+                .toSet()
+        }
+        assertEquals(
+            setOf("readOnlyHint = true", "openWorldHint = false"),
+            hints("localReadToolAnnotations"),
+        )
+        assertEquals(
+            setOf(
+                "readOnlyHint = false", "destructiveHint = true",
+                "idempotentHint = true", "openWorldHint = false",
+            ),
+            hints("localWriteToolAnnotations"),
+        )
+        assertEquals(
+            setOf(
+                "readOnlyHint = false", "destructiveHint = true",
+                "idempotentHint = false", "openWorldHint = true",
+            ),
+            hints("openWorldWriteToolAnnotations"),
+        )
     }
 
     @Test

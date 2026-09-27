@@ -46,6 +46,12 @@ data class TextHtmlColumn(
             field = value
         }
 
+    override var isReadAloud: Boolean = false
+        set(value) {
+            if (field != value) textLine.invalidate()
+            field = value
+        }
+
     override var isSearchResult: Boolean = false
         set(value) {
             if (field != value) {
@@ -63,13 +69,17 @@ data class TextHtmlColumn(
         set(value) {
             val normalized = value?.normalized()
             if (field != normalized) {
-                textLine.invalidate()
+                val beforeFill = field?.fill?.let { it != 0 } == true
+                val afterFill = normalized?.fill?.let { it != 0 } == true
+                if (!beforeFill && afterFill) textLine.fillColumnCount++
+                else if (beforeFill && !afterFill) textLine.fillColumnCount--
                 val before = field?.needsPerColumnDraw == true
                 val after = normalized?.needsPerColumnDraw == true
                 if (!before && after) textLine.styledColumnCount++
                 else if (before && !after) textLine.styledColumnCount--
+                field = normalized
+                textLine.invalidate()
             }
-            field = normalized
         }
 
     override fun draw(view: ContentTextView, canvas: Canvas) {
@@ -77,7 +87,7 @@ data class TextHtmlColumn(
         val style = highlightStyle
         val styleTextColor = style?.textColor ?: 0
         val textColor = when {
-            textLine.isReadAloud || isSearchResult || linkUrl != null -> {
+            isReadAloud || isSearchResult || linkUrl != null -> {
                 ReadBookConfig.textAccentColor
             }
 
@@ -90,7 +100,7 @@ data class TextHtmlColumn(
         }
         val styledPaint = style?.takeIf {
             it.textColor != 0 || it.bold || it.italic || it.shadow != null ||
-                it.resolvedFontPath.isNotEmpty()
+                it.resolvedFontPath.isNotEmpty() || it.changesTextMetrics
         }?.let { HighlightDraw.obtainTextPaint(textPaint, it, textColor, charData) }
         drawText(canvas, y, styledPaint ?: textPaint)
         styledPaint?.let(HighlightDraw::recycleTextPaint)

@@ -56,6 +56,7 @@ class WebtoonRecyclerView @JvmOverloads constructor(
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(e: MotionEvent): Boolean {
+        if (e.actionMasked == MotionEvent.ACTION_DOWN) requestFocus()
         return detector.onTouchEvent(e) || super.onTouchEvent(e)
     }
 
@@ -65,11 +66,26 @@ class WebtoonRecyclerView @JvmOverloads constructor(
         lastVisibleItemPosition = layoutManager.findLastVisibleItemPosition()
         firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition()
 
-        val position = findCenterViewPosition()
+        val position = currentPagePosition()
         if (position != NO_POSITION && position != mLastCenterViewPosition) {
             mLastCenterViewPosition = position
             mPreScrollListener?.onPreScrollListener(this, dx, dy, position)
         }
+    }
+
+    fun currentPagePosition(): Int {
+        val center = findCenterViewPosition()
+        if (center != NO_POSITION || (layoutManager as? LinearLayoutManager)?.orientation != HORIZONTAL) {
+            return center
+        }
+        // Chapter separators are shorter than the viewport but still occupy one horizontal page.
+        for (index in 0 until childCount) {
+            val child = getChildAt(index)
+            if (child.left <= width / 2 && child.right > width / 2) {
+                return getChildAdapterPosition(child)
+            }
+        }
+        return NO_POSITION
     }
 
     override fun onScrollStateChanged(state: Int) {

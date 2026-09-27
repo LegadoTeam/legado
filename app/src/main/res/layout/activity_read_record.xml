@@ -14,6 +14,7 @@
         app:title="@string/read_record" />
 
     <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/compact_summary"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingLeft="10dp"
@@ -57,6 +58,21 @@
             app:layout_constraintTop_toTopOf="parent" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <include
+        android:id="@+id/enhanced_summary"
+        layout="@layout/view_read_record_summary"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tv_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="24dp"
+        android:gravity="center"
+        android:text="@string/read_record_empty"
+        android:textColor="@color/secondaryText"
+        android:visibility="gone" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_view"

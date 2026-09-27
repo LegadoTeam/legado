@@ -10,6 +10,7 @@
   />
   <el-input
     id="debug-text"
+    :class="{ 'with-key': isBookSource }"
     v-model="printDebug"
     type="textarea"
     readonly
@@ -21,6 +22,7 @@
 <script setup lang="ts">
 import API from '@api'
 import { Search } from '@element-plus/icons-vue'
+import { isJsBookSource } from '@utils/souce'
 
 const store = useSourceStore()
 
@@ -42,7 +44,18 @@ const appendDebugMsg = (msg: string) => {
 const startDebug = async () => {
   printDebug.value = ''
   try {
-    await API.saveSource(store.currentSource)
+    const source = store.currentSource
+    if (isJsBookSource(source)) {
+      const { data } = await API.saveJsSource(source.mainJs!, source.bookSourceUrl)
+      if (!data.isSuccess) {
+        appendDebugMsg(`JS源保存失败: ${data.errorMsg}`)
+        store.debugFinish()
+        return
+      }
+      store.changeCurrentSource(data.data)
+    } else {
+      await API.saveSource(source)
+    }
   } catch (e) {
     store.debugFinish()
     throw e
@@ -62,6 +75,12 @@ const isBookSource = computed(() => {
 
 <style lang="scss" scoped>
 :deep(#debug-text) {
-  height: calc(100vh - 45px - 36px - 5px);
+  height: 100%;
+}
+:deep(#debug-text.with-key) {
+  height: calc(100% - 40px);
+}
+:deep(#debug-text .el-textarea__inner) {
+  height: 100%;
 }
 </style>

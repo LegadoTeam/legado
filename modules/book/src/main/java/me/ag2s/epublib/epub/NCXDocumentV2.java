@@ -138,14 +138,15 @@ public class NCXDocumentV2 {
         } else {
             tocResourceRoot = tocResourceRoot + "/";
         }
-        String reference = StringUtil
-                .collapsePathDots(tocResourceRoot + readNavReference(navpointElement));
+        String navReference = readNavReference(navpointElement);
+        String reference = StringUtil.isBlank(navReference) ? "" : StringUtil
+                .collapsePathDots(tocResourceRoot + navReference);
         String href = StringUtil
                 .substringBefore(reference, Constants.FRAGMENT_SEPARATOR_CHAR);
         String fragmentId = StringUtil
                 .substringAfter(reference, Constants.FRAGMENT_SEPARATOR_CHAR);
-        Resource resource = book.getResources().getByHref(href);
-        if (resource == null) {
+        Resource resource = StringUtil.isBlank(reference) ? null : book.getResources().getByHref(href);
+        if (resource == null && !StringUtil.isBlank(reference)) {
             Log.e(TAG, "Resource with href " + href + " in NCX document not found");
         }
         //Log.v(TAG, "label:" + label);
@@ -159,9 +160,7 @@ public class NCXDocumentV2 {
     }
 
     private static String readNavReference(Element navpointElement) {
-        Element contentElement = DOMUtil
-                .getFirstElementByTagNameNS(navpointElement, NAMESPACE_NCX,
-                        NCXTags.content);
+        Element contentElement = DOMUtil.getFirstChildElementByTagName(navpointElement, NCXTags.content);
         if (contentElement == null) {
             return null;
         }
@@ -177,10 +176,8 @@ public class NCXDocumentV2 {
 
     private static String readNavLabel(Element navpointElement) {
         //Log.d(TAG,navpointElement.getTagName());
-        Element navLabel = DOMUtil
-                .getFirstElementByTagNameNS(navpointElement, NAMESPACE_NCX,
-                        NCXTags.navLabel);
-        assert navLabel != null;
+        Element navLabel = DOMUtil.getFirstChildElementByTagName(navpointElement, NCXTags.navLabel);
+        if (navLabel == null) return "";
         return DOMUtil.getTextChildrenContent(DOMUtil
                 .getFirstElementByTagNameNS(navLabel, NAMESPACE_NCX, NCXTags.text));
     }

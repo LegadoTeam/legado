@@ -1,0 +1,85 @@
+'platform: android':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'app/**'
+          - 'modules/book/**'
+          - 'modules/rhino/**'
+'platform: web':
+  - changed-files:
+      - any-glob-to-any-file: 'modules/web/**'
+
+'area: reader':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'app/src/main/java/io/legado/app/ui/book/read/**'
+          - 'app/src/main/java/io/legado/app/model/ReadBook*'
+          - 'app/src/main/java/io/legado/app/help/book/BookHelp.kt'
+'area: manga':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'app/src/main/java/io/legado/app/ui/book/manga/**'
+          - 'app/src/main/java/io/legado/app/model/ReadManga*'
+'area: audio':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'app/src/main/java/io/legado/app/ui/book/audio/**'
+          - 'app/src/main/java/io/legado/app/model/AudioPlay.kt'
+          - 'app/src/main/java/io/legado/app/service/ReadAloudService.kt'
+'area: bookshelf':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'app/src/main/java/io/legado/app/ui/main/**'
+          - 'app/src/main/java/io/legado/app/ui/book/group/**'
+          - 'app/src/main/java/io/legado/app/ui/book/manage/**'
+'area: book source':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'app/src/main/java/io/legado/app/ui/book/source/**'
+          - 'app/src/main/java/io/legado/app/model/analyzeRule/**'
+          - 'app/src/main/java/io/legado/app/model/webBook/**'
+          - 'app/src/main/java/io/legado/app/data/entities/BookSource.kt'
+'area: web':
+  - changed-files:
+      - any-glob-to-any-file: 'modules/web/**'
+'area: data':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'app/src/main/java/io/legado/app/data/**'
+          - 'app/schemas/**'
+'area: build':
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.gradle'
+          - '**/*.gradle.kts'
+          - 'gradle/**'
+          - 'gradle.properties'
+          - 'settings.gradle'
+'area: automation':
+  - changed-files:
+      - any-glob-to-any-file: '.github/**'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'README*.md'
+          - 'docs/**'
+          - 'app/src/main/assets/help/**'
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/src/test/**'
+          - '**/src/androidTest/**'
+          - 'modules/web/tests/**'
+          - '.github/scripts/test-*'
+kotlin:
+  - changed-files:
+      - any-glob-to-any-file: '**/*.kt'
+java:
+  - changed-files:
+      - any-glob-to-any-file: '**/*.java'
+javascript:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'modules/web/**/*.js'
+          - 'modules/web/**/*.ts'
+          - 'modules/web/**/*.vue'

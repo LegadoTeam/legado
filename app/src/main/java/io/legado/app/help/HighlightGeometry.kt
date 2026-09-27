@@ -3,12 +3,35 @@ package io.legado.app.help
 import kotlin.math.PI
 import kotlin.math.ceil
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 object HighlightGeometry {
 
     const val GLYPH_BOX_CENTER_RATIO = 0.37f
 
     data class Band(val top: Float, val bottom: Float)
+
+    /** Largest horizontal end radius whose inner ellipse still contains this glyph's ink box. */
+    fun pillRadiusX(
+        desired: Float,
+        clearance: Float,
+        inkTop: Float,
+        inkBottom: Float,
+        top: Float,
+        bottom: Float,
+        border: Float
+    ): Float {
+        // An icon touching the ink leaves no room for both a border and a curved cap.
+        if (clearance <= border) return 0f
+        val radiusY = (bottom - top) / 2f - border
+        if (radiusY <= 0f) return 0f
+        val centerY = (top + bottom) / 2f
+        val vertical = maxOf(kotlin.math.abs(inkTop - centerY), kotlin.math.abs(inkBottom - centerY))
+            .div(radiusY).coerceIn(0f, 1f)
+        val intrusion = 1f - sqrt(1f - vertical * vertical)
+        if (intrusion == 0f) return desired
+        return minOf(desired, border + (clearance - border) / intrusion).coerceAtLeast(0f)
+    }
 
     fun fillBand(
         baseline: Float,
@@ -38,6 +61,22 @@ object HighlightGeometry {
 
     fun strikeY(baseline: Float, ascent: Float, descent: Float): Float {
         return baseline + (ascent + descent) / 2f
+    }
+
+    fun underlineRenderBottom(
+        baseline: Float,
+        distancePx: Float,
+        strokeWidthPx: Float,
+        kind: HighlightStyle.Kind
+    ): Float {
+        val width = strokeWidthPx.coerceAtLeast(0f)
+        val distance = distancePx.coerceAtLeast(0f)
+        val extent = when (kind) {
+            HighlightStyle.Kind.DOUBLE -> width + 1f
+            HighlightStyle.Kind.WAVY -> width * 1.5f
+            else -> width / 2f
+        }
+        return baseline + distance + extent
     }
 
     fun glyphTop(baseline: Float, ascent: Float, height: Float): Float {

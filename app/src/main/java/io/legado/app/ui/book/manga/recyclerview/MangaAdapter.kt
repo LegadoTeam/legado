@@ -238,7 +238,7 @@ class MangaAdapter(private val context: Context) :
         if (item is MangaPage) {
             return BookCover.preloadManga(
                 context,
-                item.mImageUrl,
+                mangaImagePath(item.mImageUrl),
                 sourceOrigin = ReadManga.book?.origin,
             )
         }

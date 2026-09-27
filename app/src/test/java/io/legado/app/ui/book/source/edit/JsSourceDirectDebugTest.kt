@@ -1,6 +1,8 @@
 package io.legado.app.ui.book.source.edit
 
+import io.legado.app.ui.code.scriptSourceIndex
 import io.legado.app.ui.code.shouldShowDebugSourceAction
+import io.legado.app.ui.code.shouldShowJavaScriptSyntaxAction
 import io.legado.app.ui.code.shouldShowLoginSourceAction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -24,6 +26,16 @@ class JsSourceDirectDebugTest {
         assertFalse(shouldShowLoginSourceAction(writable = false, requested = true))
         assertFalse(shouldShowLoginSourceAction(writable = true, requested = false))
         assertTrue(shouldShowLoginSourceAction(writable = true, requested = true))
+    }
+
+    @Test
+    fun `syntax action requires the explicit JavaScript editor mode`() {
+        assertFalse(
+            shouldShowJavaScriptSyntaxAction(useSafeEditor = false, requested = false)
+        )
+        assertFalse(shouldShowJavaScriptSyntaxAction(useSafeEditor = true, requested = true))
+        assertTrue(shouldShowJavaScriptSyntaxAction(useSafeEditor = false, requested = true))
+        assertEquals(7, scriptSourceIndex("ok\r\nbad(", lineNumber = 2, columnNumber = 4))
     }
 
     @Test
@@ -122,14 +134,24 @@ class JsSourceDirectDebugTest {
         val loginMenuItem = codeEditorMenu
             .substringAfter("android:id=\"@+id/menu_login\"")
             .substringBefore("/>")
+        val syntaxMenuItem = codeEditorMenu
+            .substringAfter("android:id=\"@+id/menu_check_javascript_syntax\"")
+            .substringBefore("/>")
 
         assertTrue(codeEditorMenu.contains("android:id=\"@+id/menu_debug_source\""))
         assertTrue(codeEditorMenu.contains("android:id=\"@+id/menu_login\""))
+        assertTrue(codeEditorMenu.contains("android:id=\"@+id/menu_check_javascript_syntax\""))
         assertTrue(debugMenuItem.contains("android:visible=\"false\""))
         assertTrue(loginMenuItem.contains("android:visible=\"false\""))
+        assertTrue(syntaxMenuItem.contains("android:visible=\"false\""))
         assertTrue(debugLauncher >= 0 && debugLauncher < editorLauncher)
         assertTrue(editorLauncher < loginLauncher)
         assertTrue(sourceEditor.contains("putExtra(CodeEditActivity.EXTRA_SHOW_DEBUG_SOURCE, true)"))
+        assertTrue(
+            sourceEditor.contains(
+                "putExtra(CodeEditActivity.EXTRA_CHECK_JAVASCRIPT_SYNTAX, true)"
+            )
+        )
         assertTrue(sourceEditor.contains("putExtra(CodeEditActivity.EXTRA_SHOW_LOGIN_SOURCE, true)"))
         assertTrue(sourceEditor.contains("StartActivityContract(SourceLoginActivity::class.java)"))
         assertTrue(sourceEditor.contains("if (source.hasLogin())"))

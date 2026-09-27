@@ -124,7 +124,9 @@ data class Book(
     var readConfig: ReadConfig? = null,
     //同步时间
     @ColumnInfo(defaultValue = "0")
-    var syncTime: Long = 0L
+    var syncTime: Long = 0L,
+    // 保存到本地的网络封面
+    var persistedCoverUrl: String? = null
 ) : Parcelable, BaseBook {
 
     override fun equals(other: Any?): Boolean {
@@ -169,14 +171,15 @@ data class Book(
 
     fun getUnreadChapterNum() = max(simulatedTotalChapterNum() - durChapterIndex - 1, 0)
 
-    fun getDisplayCover() = if (customCoverUrl.isNullOrEmpty()) coverUrl else customCoverUrl
+    fun getDisplayCover() = persistedCoverUrl?.takeIf { it.isNotEmpty() }
+        ?: customCoverUrl?.takeIf { it.isNotEmpty() }
+        ?: coverUrl
 
     /** Source credentials are only reused for custom covers on the same network origin. */
-    fun getCoverSourceOrigin(): String? {
-        val customUrl = customCoverUrl?.takeIf { it.isNotEmpty() } ?: return origin
-        val sourceOrigin = NetworkUtils.getBaseUrl(origin) ?: return null
-        val coverOrigin = NetworkUtils.getBaseUrl(customUrl) ?: return null
-        return origin.takeIf { sourceOrigin.equals(coverOrigin, ignoreCase = true) }
+    fun getCoverSourceOrigin() = if (persistedCoverUrl.isNullOrEmpty()) {
+        coverSourceOrigin(origin, customCoverUrl)
+    } else {
+        null
     }
 
     fun getDisplayIntro() = if (customIntro.isNullOrEmpty()) intro else customIntro
@@ -195,7 +198,7 @@ data class Book(
     val config: ReadConfig
         get() {
             if (readConfig == null) {
-                readConfig = ReadConfig()
+                readConfig = ReadConfig(useGlobalAudioSkip = true)
             }
             return readConfig!!
         }
@@ -206,6 +209,20 @@ data class Book(
 
     fun getReverseToc(): Boolean {
         return config.reverseToc
+    }
+
+    fun setReverseTocDisplay(reversed: Boolean) {
+        config.reverseTocDisplay = reversed
+    }
+
+    fun getReverseTocDisplay(): Boolean = config.reverseTocDisplay
+
+    fun setTocExpanded(expanded: Boolean) {
+        config.tocExpanded = expanded
+    }
+
+    fun getTocExpanded(): Boolean {
+        return config.tocExpanded
     }
 
     fun setUseReplaceRule(useReplaceRule: Boolean) {
@@ -311,19 +328,38 @@ data class Book(
 
     // 片头 的 setter 和 getter
     fun setOpenCredits(openCredits: Int) {
-        config.openCredits = openCredits
+        switchToBookAudioSkip()
+        config.openCredits = openCredits.coerceAtLeast(0)
     }
 
     fun getOpenCredits(): Int {
-        return config.openCredits
+        return if (config.useGlobalAudioSkip) AppConfig.audioSkipOpenCredits else config.openCredits
     }
+
     // 片尾 的 setter 和 getter
     fun setCloseCredits(closeCredits: Int) {
-        config.closeCredits = closeCredits
+        switchToBookAudioSkip()
+        config.closeCredits = closeCredits.coerceAtLeast(0)
     }
 
     fun getCloseCredits(): Int {
-        return config.closeCredits
+        return if (config.useGlobalAudioSkip) AppConfig.audioSkipCloseCredits else config.closeCredits
+    }
+
+    fun isAudioSkipUsingGlobal(): Boolean {
+        return config.useGlobalAudioSkip
+    }
+
+    fun setAudioSkipUsingGlobal(useGlobal: Boolean) {
+        if (useGlobal) config.useGlobalAudioSkip = true else switchToBookAudioSkip()
+    }
+
+    private fun switchToBookAudioSkip() {
+        val readConfig = config
+        if (!readConfig.useGlobalAudioSkip) return
+        readConfig.openCredits = AppConfig.audioSkipOpenCredits
+        readConfig.closeCredits = AppConfig.audioSkipCloseCredits
+        readConfig.useGlobalAudioSkip = false
     }
 
     // 播放模式 的 setter 和 getter
@@ -419,6 +455,7 @@ data class Book(
         newBook.group = group
         newBook.order = order
         newBook.customCoverUrl = customCoverUrl
+        newBook.persistedCoverUrl = persistedCoverUrl
         newBook.customIntro = customIntro
         newBook.customTag = customTag
         newBook.canUpdate = canUpdate
@@ -445,6 +482,7 @@ data class Book(
         if (ReadBook.book?.bookUrl == bookUrl) {
             ReadBook.book = null
         }
+        saveReadRecordSnapshot()
         appDb.bookDao.delete(this)
     }
 
@@ -461,6 +499,8 @@ data class Book(
     @Parcelize
     data class ReadConfig(
         var reverseToc: Boolean = false,
+        var reverseTocDisplay: Boolean = false,
+        var tocExpanded: Boolean = true,
         var pageAnim: Int? = null,
         var reSegment: Boolean = false,
         var imageStyle: String? = null,
@@ -475,7 +515,10 @@ data class Book(
         var openCredits: Int = 0,       //音频片头
         var closeCredits: Int = 0,       //音频片尾
         var playMode: Int = 0,           //音频播放模式
-        var playSpeed: Float = 1.0f      //音频播放速度
+        var playSpeed: Float = 1.0f,     //音频播放速度
+        var useGlobalAudioSkip: Boolean = false,
+        // 阅读页手动选择的替换规则；旧书籍配置缺失时保持空集合。
+        var manualReplaceRuleIds: List<Long> = emptyList()
     ) : Parcelable
 
     class Converters {
@@ -486,4 +529,11 @@ data class Book(
         @TypeConverter
         fun stringToReadConfig(json: String?) = GSON.fromJsonObject<ReadConfig>(json).getOrNull()
     }
+}
+
+internal fun coverSourceOrigin(origin: String, customCoverUrl: String?): String? {
+    val customUrl = customCoverUrl?.takeIf { it.isNotEmpty() } ?: return origin
+    val sourceOrigin = NetworkUtils.getBaseUrl(origin) ?: return null
+    val coverOrigin = NetworkUtils.getBaseUrl(customUrl) ?: return null
+    return origin.takeIf { sourceOrigin.equals(coverOrigin, ignoreCase = true) }
 }

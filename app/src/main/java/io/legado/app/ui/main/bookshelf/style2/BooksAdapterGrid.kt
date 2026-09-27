@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.data.entities.Book
-import io.legado.app.data.entities.BookGroup
 import io.legado.app.databinding.ItemBookshelfGrid2Binding
 import io.legado.app.databinding.ItemBookshelfGridBinding
 import io.legado.app.databinding.ItemBookshelfGridGroup2Binding
@@ -59,12 +58,12 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                 holder.onBind(it, position, payloads)
             }
 
-            is GroupViewHolder -> (getItem(position) as? BookGroup)?.let {
+            is GroupViewHolder -> (getItem(position) as? BookshelfGroupItem)?.let {
                 holder.registerListener(it)
                 holder.onBind(it, position, payloads)
             }
 
-            is GroupViewHolder2 -> (getItem(position) as? BookGroup)?.let {
+            is GroupViewHolder2 -> (getItem(position) as? BookshelfGroupItem)?.let {
                 holder.registerListener(it)
                 holder.onBind(it, position, payloads)
             }
@@ -193,17 +192,17 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
     inner class GroupViewHolder(val binding: ItemBookshelfGridGroupBinding) :
         RecyclerView.ViewHolder(binding.root) {
 
-        fun onBind(item: BookGroup, position: Int) = binding.run {
+        fun onBind(item: BookshelfGroupItem, position: Int) = binding.run {
             if (showBookname == 1) {
                 tvName.gone()
             } else {
                 tvName.visible()
-                tvName.text = item.groupName
+                tvName.text = item.group.groupName
             }
-            ivCover.load(item.cover)
+            ivCover.load(item.group.cover, item.previewBooks)
         }
 
-        fun onBind(item: BookGroup, position: Int, payloads: MutableList<Any>) = binding.run {
+        fun onBind(item: BookshelfGroupItem, position: Int, payloads: MutableList<Any>) = binding.run {
             if (payloads.isEmpty()) {
                 onBind(item, position)
             } else {
@@ -211,20 +210,20 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     val bundle = payloads[i] as Bundle
                     bundle.keySet().forEach {
                         when (it) {
-                            "groupName" -> tvName.text = item.groupName
-                            "cover" -> ivCover.load(item.cover)
+                            "groupName" -> tvName.text = item.group.groupName
+                            "cover" -> ivCover.load(item.group.cover, item.previewBooks)
                         }
                     }
                 }
             }
         }
 
-        fun registerListener(item: Any) {
+        fun registerListener(item: BookshelfGroupItem) {
             binding.root.setOnClickListener {
-                callBack.onItemClick(item)
+                callBack.onItemClick(item.group)
             }
             binding.root.onLongClick {
-                callBack.onItemLongClick(item)
+                callBack.onItemLongClick(item.group)
             }
         }
 
@@ -233,8 +232,8 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
     inner class GroupViewHolder2(val binding: ItemBookshelfGridGroup2Binding) :
         RecyclerView.ViewHolder(binding.root) {
 
-        fun onBind(item: BookGroup, position: Int) = binding.run {
-            item.groupName.let {
+        fun onBind(item: BookshelfGroupItem, position: Int) = binding.run {
+            item.group.groupName.let {
                 if (it.isBlank()) {
                     tvName.gone()
                 } else{
@@ -242,10 +241,10 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     tvName.text = it
                 }
             }
-            ivCover.load(item.cover)
+            ivCover.load(item.group.cover, item.previewBooks)
         }
 
-        fun onBind(item: BookGroup, position: Int, payloads: MutableList<Any>) = binding.run {
+        fun onBind(item: BookshelfGroupItem, position: Int, payloads: MutableList<Any>) = binding.run {
             if (payloads.isEmpty()) {
                 onBind(item, position)
             } else {
@@ -253,7 +252,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     val bundle = payloads[i] as Bundle
                     bundle.keySet().forEach { key ->
                         when (key) {
-                            "groupName" -> item.groupName.let {
+                            "groupName" -> item.group.groupName.let {
                                 if (it.isBlank()) {
                                     tvName.gone()
                                 } else{
@@ -261,19 +260,19 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                                     tvName.text = it
                                 }
                             }
-                            "cover" -> ivCover.load(item.cover)
+                            "cover" -> ivCover.load(item.group.cover, item.previewBooks)
                         }
                     }
                 }
             }
         }
 
-        fun registerListener(item: Any) {
+        fun registerListener(item: BookshelfGroupItem) {
             binding.root.setOnClickListener {
-                callBack.onItemClick(item)
+                callBack.onItemClick(item.group)
             }
             binding.root.onLongClick {
-                callBack.onItemLongClick(item)
+                callBack.onItemLongClick(item.group)
             }
         }
 

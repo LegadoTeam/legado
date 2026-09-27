@@ -19,6 +19,7 @@ import io.legado.app.databinding.ItemRssReadRecordBinding
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.rss.read.ReadRss
+import io.legado.app.utils.applyTint
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 
@@ -41,6 +42,7 @@ class ReadRecordDialog(private val origin: String? = null) : BaseDialogFragment(
             toolBar.setBackgroundColor(primaryColor)
             toolBar.setTitle(R.string.read_record)
             toolBar.inflateMenu(R.menu.rss_read_record)
+            toolBar.menu.applyTint(requireContext())
             toolBar.setOnMenuItemClickListener(this@ReadRecordDialog)
             recyclerView.layoutManager = LinearLayoutManager(requireContext())
             recyclerView.adapter = adapter

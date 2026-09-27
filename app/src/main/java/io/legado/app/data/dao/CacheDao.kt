@@ -22,6 +22,17 @@ interface CacheDao {
     fun delete(key: String)
 
     @Query(
+        """select * from caches
+        where (substr(`key`, 1, 2) = 'v_'
+        or substr(`key`, 1, 9) = 'userInfo_'
+        or substr(`key`, 1, 12) = 'loginHeader_'
+        or substr(`key`, 1, 15) = 'sourceVariable_'
+        or substr(`key`, 1, 8) = 'infoMap_')
+        and (deadline = 0 or deadline > :now)"""
+    )
+    fun getRuntimeSourceCaches(now: Long): List<Cache>
+
+    @Query(
         """delete from caches where `key` like 'v_' || :key || '_%'
         or `key` = 'userInfo_' || :key
         or `key` = 'loginHeader_' || :key

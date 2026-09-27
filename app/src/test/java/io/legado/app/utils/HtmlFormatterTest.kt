@@ -48,6 +48,13 @@ class HtmlFormatterTest {
     }
 
     @Test
+    fun `formatters normalize escaped line breaks from source responses`() {
+        assertEquals("第一段\n　　第二段", HtmlFormatter.format("第一段\\n\\n第二段"))
+        assertEquals("第一段\n第二段", HtmlFormatter.formatIntro("第一段\\r\\n第二段"))
+        assertEquals("第一段\n第二段", HtmlFormatter.formatIntro("<p>第一段</p>\\n<p>第二段</p>"))
+    }
+
+    @Test
     fun `js html formatter resolves relative image urls`() {
         val extensions = object : JsExtensions {
             override fun getSource(): BaseSource? = null

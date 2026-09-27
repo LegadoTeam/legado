@@ -35,10 +35,18 @@ fun Context.getSharedPreferences(
         fieldMPreferencesDir.isAccessible = true
         // 创建自定义路径
         val file = File(dir)
-        // 修改mPreferencesDir变量的值
-        fieldMPreferencesDir.set(objMBase, file)
-        // 返回修改路径以后的 SharedPreferences :%FILE_PATH%/%fileName%.xml
-        return getSharedPreferences(fileName, Activity.MODE_PRIVATE)
+        // SharedPreferences resolves and caches the file while this field points at the
+        // requested directory. Restore it immediately so unrelated preferences keep using
+        // the application's normal shared_prefs directory.
+        return synchronized(objMBase.javaClass) {
+            val originalPreferencesDir = fieldMPreferencesDir.get(objMBase)
+            fieldMPreferencesDir.set(objMBase, file)
+            try {
+                getSharedPreferences(fileName, Activity.MODE_PRIVATE)
+            } finally {
+                fieldMPreferencesDir.set(objMBase, originalPreferencesDir)
+            }
+        }
     } catch (e: NoSuchFieldException) {
         e.printOnDebug()
     } catch (e: IllegalArgumentException) {
@@ -60,8 +68,21 @@ fun SharedPreferences.putString(key: String, value: String) {
 }
 
 fun SharedPreferences.getBoolean(key: String): Boolean {
-    return getBoolean(key, false)
+    return getBooleanCompat(key, false)
 }
+
+fun SharedPreferences.getBooleanCompat(key: String, defValue: Boolean): Boolean {
+    return try {
+        getBoolean(key, defValue)
+    } catch (_: ClassCastException) {
+        val value = parseBooleanPreference(all[key], defValue)
+        edit { putBoolean(key, value) }
+        value
+    }
+}
+
+internal fun parseBooleanPreference(value: Any?, defValue: Boolean): Boolean =
+    (value as? String)?.trim()?.toBooleanStrictOrNull() ?: defValue
 
 fun SharedPreferences.putBoolean(key: String, value: Boolean) {
     edit {

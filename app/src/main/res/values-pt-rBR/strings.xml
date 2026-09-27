@@ -4,6 +4,7 @@
     <string name="app_name">Legado</string>
     <string name="app_name_a">Legado·A</string>
     <string name="receiving_shared_label">Legado·pesquisa</string>
+    <string name="receiving_shared_import_label">Legado·importar</string>
     <string name="tip_perm_request_storage">Legado precisa de acesso ao armazenamento para encontrar e ler livros. Por favor, vá às "Configurações do App" para conceder "Permissão de armazenamento".</string>
 
     <!--Other-->
@@ -324,6 +325,8 @@
     <string name="fonts_folder">Favor colocar os arquivos de fontes na pasta Root de Fontes no armazenamento e selecionar novamente</string>
     <string name="default_font">Fonte padrão</string>
     <string name="select_font">Selecionar fontes</string>
+    <string name="font_item_external">%1$s · Pasta externa</string>
+    <string name="font_item_private">%1$s · Pasta do aplicativo</string>
     <string name="text_size">Tamanho do texto</string>
     <string name="line_size">Espaço entre linhas</string>
     <string name="paragraph_size">Espaço entre parágrafos</string>
@@ -1054,6 +1057,7 @@
     <string name="tag_explore_enabled">标志:发现已启用</string>
     <string name="tag_explore_disabled">标志:发现已禁用</string>
     <string name="show_read_title_addition">show read title addition area</string>
+    <string name="show_read_title_chapter_name_only">mostrar apenas o nome do capítulo na área adicional do título</string>
     <string name="read_bar_style_follow_page">read bar style follow page</string>
     <string name="rule_image_decode">Decode Image(imageDecode)</string>
     <string name="like_source">赞</string>

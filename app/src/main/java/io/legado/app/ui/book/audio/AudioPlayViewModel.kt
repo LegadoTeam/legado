@@ -10,13 +10,16 @@ import io.legado.app.constant.BookType
 import io.legado.app.constant.EventBus
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.replaceBookAfterSourceChange
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.saveReadRecordSnapshot
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.getBookSource
 import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.simulatedTotalChapterNum
+import io.legado.app.help.book.update
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.AudioPlay
 import io.legado.app.model.webBook.WebBook
@@ -36,8 +39,6 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
         val requestedBookUrl = intent.getStringExtra("bookUrl")
         val cachedBook = AudioPlay.book
         val cachedInBookshelf = AudioPlay.inBookshelf
-        val cachedChapterIndex = AudioPlay.durChapterIndex
-        val cachedChapterPos = AudioPlay.durChapterPos
         initTask?.cancel()
         initTask = execute(semaphore = initSemaphore) {
             var databaseBook = requestedBookUrl
@@ -51,10 +52,6 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
             ) ?: return@execute null
             var targetBook = databaseBook
                 ?.takeIf { resolvedBook === cachedBook }
-                ?.apply {
-                    durChapterIndex = cachedChapterIndex
-                    durChapterPos = cachedChapterPos
-                }
                 ?: resolvedBook
             if (!requestedBookUrl.isNullOrBlank()
                 && databaseBook == null
@@ -67,10 +64,7 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
                     val concurrentBook = appDb.bookDao.getBook(requestedBookUrl)
                         ?: return@execute null
                     databaseBook = concurrentBook
-                    targetBook = concurrentBook.apply {
-                        durChapterIndex = cachedChapterIndex
-                        durChapterPos = cachedChapterPos
-                    }
+                    targetBook = concurrentBook
                 } else {
                     targetBook = temporaryBook
                 }
@@ -107,7 +101,7 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
     private suspend fun initBook(book: Book): Boolean {
         val isSameBook = AudioPlay.book?.bookUrl == book.bookUrl
         if (isSameBook) {
-            AudioPlay.upData(book)
+            AudioPlay.upData(book, preserveProgress = true)
         } else {
             AudioPlay.resetData(book)
         }
@@ -141,7 +135,7 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
             val cList = WebBook.getChapterListAwait(bookSource, book).getOrThrow()
             if (cList.isEmpty()) return false
             if (oldBook.bookUrl == book.bookUrl) {
-                appDb.bookDao.update(book)
+                book.update()
             } else {
                 appDb.bookDao.replace(oldBook, book)
             }
@@ -165,7 +159,12 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
         }
     }
 
-    fun changeTo(source: BookSource, book: Book, toc: List<BookChapter>) {
+    fun changeTo(
+        source: BookSource,
+        book: Book,
+        toc: List<BookChapter>,
+        onSuccess: () -> Unit = {},
+    ) {
         execute {
             val oldBook = AudioPlay.book
             val wasNotShelf = oldBook?.let {
@@ -174,14 +173,14 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
             oldBook?.migrateTo(book, toc)
             book.removeType(BookType.updateError)
             if (wasNotShelf) book.addType(BookType.notShelf)
-            oldBook?.delete()
-            appDb.bookDao.insert(book)
+            replaceBookAfterSourceChange(oldBook, book, toc)
             AudioPlay.replaceBook(book)
             AudioPlay.inBookshelf = !wasNotShelf
             AudioPlay.setBookSource(source)
-            appDb.bookChapterDao.insert(*toc.toTypedArray())
-            AudioPlay.upData(book)
+            AudioPlay.upData(book, preserveProgress = false)
             AudioPlayService.updateNotification(context)
+        }.onSuccess {
+            onSuccess()
         }.onFinally {
             postEvent(EventBus.SOURCE_CHANGED, book.bookUrl)
         }
@@ -190,6 +189,7 @@ class AudioPlayViewModel(application: Application) : BaseViewModel(application) 
     fun removeFromBookshelf(success: (() -> Unit)?) {
         execute {
             AudioPlay.book?.let {
+                it.saveReadRecordSnapshot()
                 appDb.bookDao.delete(it)
             }
         }.onSuccess {

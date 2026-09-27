@@ -39,6 +39,7 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
     private val binding by viewBinding(DialogReadBookStyleBinding::bind)
     private val callBack get() = activity as? ReadBookActivity
     private lateinit var styleAdapter: StyleAdapter
+    private var updatingPageAnim = false
 
     override fun onStart() {
         super.onStart()
@@ -81,7 +82,7 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
         dsbTextLetterSpacing.valueFormat = {
             ((it - 50) / 100f).toString()
         }
-        dsbLineSize.valueFormat = { ((it - 10) / 10f).toString() }
+        dsbLineSize.valueFormat = { lineSpacingDisplayValue(it) }
         dsbParagraphSpacing.valueFormat = { (it / 10f).toString() }
         styleAdapter = StyleAdapter()
         rvStyle.adapter = styleAdapter
@@ -134,13 +135,16 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
             TipConfigDialog().show(childFragmentManager, "tipConfigDialog")
         }
         rgPageAnim.setOnCheckedChangeListener { _, checkedId ->
+            if (updatingPageAnim) return@setOnCheckedChangeListener
             ReadBook.book?.setPageAnim(-1)
             ReadBookConfig.pageAnim = binding.rgPageAnim.getIndexById(checkedId)
             callBack?.upPageAnim()
             ReadBook.loadContent(false)
         }
         cbShareLayout.onCheckedChangeListener = { _, isChecked ->
+            val oldPageAnim = ReadBook.pageAnim()
             ReadBookConfig.shareLayout = isChecked
+            if (ReadBook.pageAnim() != oldPageAnim) callBack?.upPageAnim()
             upView()
             postEvent(EventBus.UP_CONFIG, arrayListOf(1, 2, 5))
         }
@@ -153,7 +157,7 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
             postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
         }
         dsbLineSize.onChanged = {
-            ReadBookConfig.lineSpacingExtra = it
+            ReadBookConfig.lineSpacingExtra = lineSpacingFromProgress(it)
             postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
         }
         dsbParagraphSpacing.onChanged = {
@@ -165,7 +169,9 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
     private fun changeBgTextConfig(index: Int) {
         val oldIndex = ReadBookConfig.styleSelect
         if (index != oldIndex) {
+            val oldPageAnim = ReadBook.pageAnim()
             ReadBookConfig.styleSelect = index
+            if (ReadBook.pageAnim() != oldPageAnim) callBack?.upPageAnim()
             upView()
             styleAdapter.notifyItemChanged(oldIndex)
             styleAdapter.notifyItemChanged(index)
@@ -185,15 +191,22 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
 
     private fun upView() = binding.run {
         textFontWeightConverter.upUi(ReadBookConfig.textBold)
-        ReadBook.pageAnim().let {
-            if (it >= 0 && it < rgPageAnim.childCount) {
-                rgPageAnim.check(rgPageAnim[it].id)
+        // Reflect the selected preset without replaying radio-button change callbacks.
+        // Those callbacks can apply new padding while the old scroll page is still bound.
+        updatingPageAnim = true
+        try {
+            ReadBook.pageAnim().let {
+                if (it >= 0 && it < rgPageAnim.childCount) {
+                    rgPageAnim.check(rgPageAnim[it].id)
+                }
             }
+        } finally {
+            updatingPageAnim = false
         }
         ReadBookConfig.let {
             dsbTextSize.progress = it.textSize - 5
             dsbTextLetterSpacing.progress = (it.letterSpacing * 100).toInt() + 50
-            dsbLineSize.progress = it.lineSpacingExtra
+            dsbLineSize.progress = lineSpacingToProgress(it.lineSpacingExtra)
             dsbParagraphSpacing.progress = it.paragraphSpacing
         }
     }
@@ -251,4 +264,22 @@ class ReadStyleDialog : BaseDialogFragment(R.layout.dialog_read_book_style),
         }
 
     }
+}
+
+private const val LINE_SPACING_CONFIG_MIN = -10
+private const val LINE_SPACING_CONFIG_MAX = 40
+private const val LINE_SPACING_PROGRESS_OFFSET = 10
+
+internal fun lineSpacingToProgress(value: Int): Int {
+    return (value + LINE_SPACING_PROGRESS_OFFSET)
+        .coerceIn(0, LINE_SPACING_CONFIG_MAX - LINE_SPACING_CONFIG_MIN)
+}
+
+internal fun lineSpacingFromProgress(progress: Int): Int {
+    return (progress - LINE_SPACING_PROGRESS_OFFSET)
+        .coerceIn(LINE_SPACING_CONFIG_MIN, LINE_SPACING_CONFIG_MAX)
+}
+
+internal fun lineSpacingDisplayValue(progress: Int): String {
+    return ((lineSpacingFromProgress(progress) - 10) / 10f).toString()
 }

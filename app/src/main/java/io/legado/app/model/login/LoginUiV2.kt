@@ -28,9 +28,12 @@ object LoginUiV2 {
         val keys = rows.filter {
             it.type == RowUi.Type.text ||
                 it.type == RowUi.Type.password ||
-                it.type == RowUi.Type.select
+                it.type == RowUi.Type.select ||
+                it.type == RowUi.Type.toggle
         }.mapNotNull { it.key }
-        val actions = rows.filter { it.type == RowUi.Type.button }.mapNotNull { it.action }
+        val actions = rows.filter {
+            it.type == RowUi.Type.button || it.type == RowUi.Type.toggle
+        }.mapNotNull { it.action }
         if (keys.size != keys.distinct().size || actions.size != actions.distinct().size) {
             return null
         }
@@ -43,6 +46,9 @@ object LoginUiV2 {
             RowUi.Type.text, RowUi.Type.password -> !key.isNullOrBlank()
             RowUi.Type.label -> true
             RowUi.Type.select -> !key.isNullOrBlank() && !options.isNullOrEmpty()
+            RowUi.Type.toggle -> !key.isNullOrBlank() &&
+                (value == null || value == "true" || value == "false") &&
+                (action == null || action.isNotBlank())
             RowUi.Type.button -> !action.isNullOrBlank()
             else -> false
         }

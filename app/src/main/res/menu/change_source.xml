@@ -24,6 +24,12 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_chapter_source_automation"
+        android:title="@string/chapter_source_automation"
+        android:visible="false"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_refresh_list"
         android:title="@string/refresh_list"
         app:showAsAction="never" />
@@ -37,6 +43,18 @@
     <item
         android:id="@+id/menu_load_word_count"
         android:title="@string/load_word_count"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_sort_respond_time"
+        android:title="@string/change_source_sort_respond_time"
+        android:checkable="true"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_word_count_filter"
+        android:title="@string/change_source_word_count_filter"
         android:checkable="true"
         app:showAsAction="never" />
 

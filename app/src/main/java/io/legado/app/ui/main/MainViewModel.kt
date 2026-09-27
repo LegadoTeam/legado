@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import androidx.recyclerview.widget.RecyclerView.RecycledViewPool
+import io.legado.app.R
 import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
@@ -12,6 +13,7 @@ import io.legado.app.constant.EventBus
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.saveReadRecordSnapshot
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.DefaultData
 import io.legado.app.help.book.BookHelp
@@ -19,13 +21,16 @@ import io.legado.app.help.book.addType
 import io.legado.app.help.book.isUpError
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.sync
+import io.legado.app.help.book.update
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.LocalConfig
 import io.legado.app.model.CacheBook
 import io.legado.app.model.ReadBook
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.CacheBookService
 import io.legado.app.utils.onEachParallel
 import io.legado.app.utils.postEvent
+import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -120,9 +125,15 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
         books: List<Book>,
         onlyUpdateRead: Boolean,
         policy: TocUpdatePolicy = TocUpdatePolicy.ALLOW_PRE_DOWNLOAD,
+        refreshBookInfo: Boolean = false,
     ) {
         execute(context = upTocPool) {
-            addToWaitUp(filterBooksForTocUpdate(books), onlyUpdateRead, policy)
+            addToWaitUp(
+                filterBooksForTocUpdate(books),
+                onlyUpdateRead,
+                policy,
+                refreshBookInfo,
+            )
         }
     }
 
@@ -131,10 +142,11 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
         books: List<Book>,
         onlyUpdateRead: Boolean,
         policy: TocUpdatePolicy = TocUpdatePolicy.ALLOW_PRE_DOWNLOAD,
+        refreshBookInfo: Boolean = false,
     ) {
         books.forEach { book ->
             if (onlyUpdateRead && book.getUnreadChapterNum() > 0) return@forEach
-            tocUpdateRequests.enqueue(book.bookUrl, policy)
+            tocUpdateRequests.enqueue(book.bookUrl, policy, refreshBookInfo)
         }
         if (upTocJob == null && tocUpdateRequests.hasQueued()) {
             startUpTocJob()
@@ -185,21 +197,24 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
             startUpTocJob()
             return
         }
-        if (tocUpdateRequests.isIdle() && cacheBookJob == null && !CacheBookService.isRun) {
+        if (tocUpdateRequests.isIdle() && !CacheBookService.isRun) {
             //所有目录更新完再开始缓存章节
+            // A finished/finishing worker may still have a Job reference. Restart through
+            // cacheBook(), which cancels it and lets the shared download queue resume.
             cacheBook()
         }
     }
 
     private suspend fun updateToc(request: TocUpdateRequestToken) {
         val bookUrl = request.bookUrl
+        var persistedBookUrl = bookUrl
         try {
             val book = appDb.bookDao.getBook(bookUrl) ?: return
             val source = appDb.bookSourceDao.getBookSource(book.origin)
             if (source == null) {
                 if (!book.isUpError) {
                     book.addType(BookType.updateError)
-                    appDb.bookDao.update(book)
+                    book.update()
                 }
                 return
             }
@@ -215,23 +230,49 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
                 }
             }
             kotlin.runCatching {
-                val oldBook = book.copy()
-                if (book.tocUrl.isBlank()) {
+                val refreshBookInfo = tocUpdateRequests.takeRefreshBookInfo(request)
+                if (refreshBookInfo) {
+                    WebBook.getBookInfoAwait(source, book, canReName = false)
+                } else if (book.tocUrl.isBlank()) {
                     WebBook.getBookInfoAwait(source, book)
                 } else {
                     WebBook.runPreUpdateJs(source, book).getOrThrow()
                 }
-                val toc = WebBook.getChapterListAwait(source, book).getOrThrow()
-                book.sync(oldBook)
-                book.removeType(BookType.updateError)
-                if (book.bookUrl == bookUrl) {
-                    appDb.bookDao.update(book)
-                } else {
-                    appDb.bookDao.replace(oldBook, book)
-                    BookHelp.updateCacheFolder(oldBook, book)
+                val toc = WebBook.getChapterListAwait(
+                    source,
+                    book,
+                    runPerJs = refreshBookInfo,
+                    isFromBookInfo = refreshBookInfo,
+                ).getOrThrow()
+                var replacedBook: Book? = null
+                var persisted = false
+                appDb.runInTransaction {
+                    val currentBook = appDb.bookDao.getBook(bookUrl)
+                        ?: return@runInTransaction
+                    if (currentBook.origin != source.bookSourceUrl) {
+                        return@runInTransaction
+                    }
+                    if (refreshBookInfo) {
+                        book.name = currentBook.name.ifBlank { book.name }
+                        book.author = currentBook.author.ifBlank { book.author }
+                    }
+                    book.sync(currentBook, toc)
+                    book.removeType(BookType.updateError)
+                    if (book.bookUrl != bookUrl) {
+                        replacedBook = currentBook
+                        appDb.bookDao.replace(currentBook, book)
+                    } else {
+                        book.update()
+                    }
+                    appDb.bookChapterDao.delByBook(bookUrl)
+                    appDb.bookChapterDao.insert(*toc.toTypedArray())
+                    persisted = true
                 }
-                appDb.bookChapterDao.delByBook(bookUrl)
-                appDb.bookChapterDao.insert(*toc.toTypedArray())
+                if (!persisted) return@runCatching
+                persistedBookUrl = book.bookUrl
+                replacedBook?.let {
+                    BookHelp.updateCacheFolder(it, book)
+                }
                 ReadBook.onChapterListUpdated(book)
                 val policy = tocUpdateRequests.close(request)
                 if (policy == TocUpdatePolicy.ALLOW_PRE_DOWNLOAD) {
@@ -241,13 +282,13 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
                 currentCoroutineContext().ensureActive()
                 AppLog.put("${book.name} 更新目录失败\n${it.localizedMessage}", it)
                 //这里可能因为时间太长书籍信息已经更改,所以重新获取
-                appDb.bookDao.getBook(book.bookUrl)?.let { book ->
+                appDb.bookDao.getBook(persistedBookUrl)?.let { book ->
                     book.addType(BookType.updateError)
-                    appDb.bookDao.update(book)
+                    book.update()
                 }
             }
         } finally {
-            tocUpdateRequests.finish(request)
+            tocUpdateRequests.finish(request, persistedBookUrl)
         }
     }
 
@@ -267,7 +308,7 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
             book.durChapterIndex.plus(AppConfig.preDownloadNum)
         )
         val cacheBook = CacheBook.getOrCreate(source, book)
-        cacheBook.addDownload(book.durChapterIndex, endIndex)
+        cacheBook.addDownload(book.durChapterIndex, endIndex, refreshResources = true)
     }
 
     /**
@@ -311,14 +352,20 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
-    fun restoreWebDav(name: String) {
-        execute {
+    fun restoreWebDav(name: String, restoredLastBackup: Long) {
+        executeLazy {
             AppWebDav.restoreWebDav(name)
-        }
+        }.onSuccess {
+            LocalConfig.lastBackup = maxOf(LocalConfig.lastBackup, restoredLastBackup)
+        }.onError {
+            AppLog.put("WebDav恢复出错\n${it.localizedMessage}", it)
+            context.toastOnUi("${context.getString(R.string.restore_fail)}\n${it.localizedMessage}")
+        }.start()
     }
 
     private fun deleteNotShelfBook() {
         execute {
+            appDb.bookDao.getNotShelfBooks().forEach { it.saveReadRecordSnapshot() }
             appDb.bookDao.deleteNotShelfBook()
         }
     }

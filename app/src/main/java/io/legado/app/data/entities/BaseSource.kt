@@ -51,6 +51,12 @@ internal object LoginInfoMapInitialization {
     }
 }
 
+internal fun BaseSource.getStoredLoginInfoMap(): MutableMap<String, String>? {
+    val json = getLoginInfo() ?: return null
+    return GSON.fromJsonObject<MutableMap<String, String>>(json).getOrNull()
+        ?: mutableMapOf()
+}
+
 /**
  * 可在js里调用,source.xxx()
  */
@@ -110,18 +116,30 @@ interface BaseSource : JsExtensions {
         return LoginUiV2.isV2(loginUi)
     }
 
-    fun evalLoginUiV2(stateJson: String): String? {
+    fun evalLoginUiV2(
+        stateJson: String,
+        book: Book? = null,
+        chapter: BookChapter? = null,
+    ): String? {
         val loginJs = getLoginJs()
             ?: throw NoStackTraceException("登录UI v2 缺少 loginUi/loginAction 脚本")
         val result = evalJS(
             "$loginJs\nloginUi(JSON.parse(String(__loginState)))"
         ) {
             put("__loginState", stateJson)
+            put("book", book)
+            put("chapter", chapter)
         }
         return JsSourceEngine.normalizeJsResult(result)
     }
 
-    fun evalLoginActionV2(action: String, stateJson: String, formJson: String): String? {
+    fun evalLoginActionV2(
+        action: String,
+        stateJson: String,
+        formJson: String,
+        book: Book? = null,
+        chapter: BookChapter? = null,
+    ): String? {
         val loginJs = getLoginJs()
             ?: throw NoStackTraceException("登录UI v2 缺少 loginUi/loginAction 脚本")
         val result = evalJS(
@@ -132,6 +150,8 @@ interface BaseSource : JsExtensions {
             put("__loginAction", action)
             put("__loginState", stateJson)
             put("__loginForm", formJson)
+            put("book", book)
+            put("chapter", chapter)
         }
         return JsSourceEngine.normalizeJsResult(result)
     }
@@ -176,16 +196,9 @@ interface BaseSource : JsExtensions {
     fun getHeaderMap(hasLoginHeader: Boolean = false) = HashMap<String, String>().apply {
         header?.let {
             try {
-                val json = when {
-                    it.startsWith("@js:", true) ->
-                        JsSourceEngine.normalizeJsResult(evalJS(it.substring(4))).orEmpty()
-
-                    it.startsWith("<js>", true) -> JsSourceEngine.normalizeJsResult(
-                        evalJS(it.substring(4, it.lastIndexOf("<")))
-                    ).orEmpty()
-
-                    else -> it
-                }
+                val json = extractInlineJs(it)?.let { js ->
+                    JsSourceEngine.normalizeJsResult(evalJS(js)).orEmpty()
+                } ?: it
                 GSON.fromJsonObject<Map<String, String>>(json).getOrNull()?.let { map ->
                     putAll(map)
                 }
@@ -256,10 +269,7 @@ interface BaseSource : JsExtensions {
     }
 
     fun getLoginInfoMap(): MutableMap<String, String> {
-        getLoginInfo()?.let { json ->
-            return GSON.fromJsonObject<MutableMap<String, String>>(json).getOrNull()
-                ?: mutableMapOf()
-        }
+        getStoredLoginInfoMap()?.let { return it }
         if (isLoginUiV2()) return mutableMapOf()
         val loginUiRule = loginUi?.trim().takeUnless { it.isNullOrBlank() } ?: return mutableMapOf()
         return LoginInfoMapInitialization.run(

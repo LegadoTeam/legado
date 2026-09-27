@@ -16,9 +16,16 @@ class BatteryIconGeometryTest {
     }
 
     @Test
+    fun `icon center follows visible digit bounds`() {
+        assertEquals(24f, BatteryIconGeometry.centerY(30, -10, -2), 0f)
+        assertEquals(30f, BatteryIconGeometry.centerY(30, -12, 12), 0f)
+    }
+
+    @Test
     fun `battery spans compare by level`() {
         assertEquals(BatteryLevelSpan(50), BatteryLevelSpan(50))
         assertNotEquals(BatteryLevelSpan(50), BatteryLevelSpan(51))
+        assertNotEquals(BatteryLevelSpan(50), BatteryLevelSpan(50, true))
     }
 
 }

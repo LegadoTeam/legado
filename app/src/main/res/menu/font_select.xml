@@ -12,4 +12,10 @@
         android:title="@string/other_folder"
         app:showAsAction="never" />
 
+    <item
+        android:id="@+id/menu_import"
+        android:icon="@drawable/ic_import"
+        android:title="@string/import_str"
+        app:showAsAction="ifRoom" />
+
 </menu>

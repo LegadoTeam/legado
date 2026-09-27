@@ -10,6 +10,7 @@ import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.normalizeFileName
 import io.legado.app.utils.renameGroupExact
+import io.legado.app.utils.moveRelativeTo
 import io.legado.app.utils.stackTraceStr
 import io.legado.app.utils.toastOnUi
 import java.io.File
@@ -54,31 +55,32 @@ class RssSourceViewModel(application: Application) : BaseViewModel(application) 
         execute { appDb.rssSourceDao.update(*rssSource) }
     }
 
-    fun upOrder() {
-        execute {
-            val sources = appDb.rssSourceDao.all
-            for ((index: Int, source: RssSource) in sources.withIndex()) {
-                source.customOrder = index + 1
+    fun enable(sourceUrl: String, enable: Boolean) {
+        execute { appDb.rssSourceDao.enable(sourceUrl, enable) }
+    }
+
+    fun move(sourceUrl: String, targetUrl: String, after: Boolean, onFinally: () -> Unit = {}) {
+        executeLazy {
+            appDb.runInTransaction {
+                val current = appDb.rssSourceDao.all
+                val reordered = moveRelativeTo(current, sourceUrl, targetUrl, after) { it.sourceUrl }
+                if (reordered == current) return@runInTransaction
+                appDb.rssSourceDao.update(*reordered.mapIndexed { index, item ->
+                    item.copy(customOrder = index)
+                }.toTypedArray())
             }
-            appDb.rssSourceDao.update(*sources.toTypedArray())
-        }
+        }.onFinally { onFinally() }.start()
     }
 
     fun enableSelection(sources: List<RssSource>) {
         execute {
-            val array = Array(sources.size) {
-                sources[it].copy(enabled = true)
-            }
-            appDb.rssSourceDao.update(*array)
+            appDb.rssSourceDao.enable(true, sources)
         }
     }
 
     fun disableSelection(sources: List<RssSource>) {
         execute {
-            val array = Array(sources.size) {
-                sources[it].copy(enabled = false)
-            }
-            appDb.rssSourceDao.update(*array)
+            appDb.rssSourceDao.enable(false, sources)
         }
     }
 
@@ -152,10 +154,7 @@ class RssSourceViewModel(application: Application) : BaseViewModel(application) 
     }
 
     fun disable(rssSource: RssSource) {
-        execute {
-            rssSource.enabled = false
-            appDb.rssSourceDao.update(rssSource)
-        }
+        enable(rssSource.sourceUrl, false)
     }
 
 }

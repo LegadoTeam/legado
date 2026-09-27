@@ -73,6 +73,22 @@ class HighlightStyleDialogTest {
     }
 
     @Test
+    fun `underline tuning entry uses the shared half dp controls`() {
+        val row = projectFile("src/main/res/layout/item_highlight_channel.xml").readText()
+        val dialog = projectFile("src/main/res/layout/dialog_highlight_underline.xml").readText()
+        val source = projectFile(
+            "src/main/java/io/legado/app/ui/book/read/HighlightStyleDialog.kt"
+        ).readText()
+
+        assertTrue(row.contains("@+id/tv_tune"))
+        assertTrue(source.contains("highlight_underline_adjust"))
+        assertTrue(dialog.contains("@+id/dsb_width"))
+        assertTrue(dialog.contains("@+id/dsb_distance"))
+        assertTrue(dialog.contains("app:max=\"20\""))
+        assertTrue(dialog.contains("app:max=\"60\""))
+    }
+
+    @Test
     fun highlightDefaultFontDoesNotChangeTheGlobalSystemTypeface() {
         fun callback(selectSystemTypeface: Boolean) = object : FontSelectDialog.CallBack {
             override val curFontPath = ""
@@ -101,4 +117,9 @@ class HighlightStyleDialogTest {
         assertFalse(callback.contains("execute"))
         assertTrue(highlightDialog.contains("invalidateHighlightTypeface(path)"))
     }
+
+    private fun projectFile(pathInApp: String): File =
+        sequenceOf(File(pathInApp), File("app/$pathInApp"))
+            .firstOrNull(File::isFile)
+            ?: error("Missing project file: $pathInApp")
 }

@@ -8,6 +8,7 @@ import io.legado.app.data.entities.RssSource
 import io.legado.app.data.entities.RuleSub
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.book.ContentProcessor
+import io.legado.app.help.config.ReplacePreviewConfig
 import io.legado.app.help.http.decompressed
 import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
@@ -87,9 +88,21 @@ object RuleUpdate {
                 2 -> GSON.fromJsonArray<ReplaceRule>(it).getOrThrow().let { lists ->
                     lists.forEach { list ->
                         val oldRule = appDb.replaceRuleDao.findById(list.id)
-                        if (oldRule == null || list.pattern != oldRule.pattern || list.replacement != oldRule.replacement) {
+                        val contentChanged = oldRule != null &&
+                            (list.pattern != oldRule.pattern || list.replacement != oldRule.replacement)
+                        val previewChanged = list.previewText != null &&
+                            list.previewText != ReplacePreviewConfig.sample(list.id)
+                        if (oldRule == null || contentChanged || previewChanged
+                        ) {
                             if (silentUpdate) {
-                                appDb.replaceRuleDao.insert(list)
+                                val insertedId = appDb.replaceRuleDao.insert(list).firstOrNull()
+                                if (insertedId != null) {
+                                    ReplacePreviewConfig.saveImportedSamples(
+                                        listOf(list),
+                                        listOf(insertedId),
+                                        clearMissing = contentChanged
+                                    )
+                                }
                                 upRules = true
                             }
                             else {

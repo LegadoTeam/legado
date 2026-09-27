@@ -82,6 +82,16 @@ by appCtx.getSharedPreferences("local", Context.MODE_PRIVATE) {
             putLong("lastCheckUpdate", value)
         }
 
+    var ignoreUpdateVersion: String?
+        get() = getString("ignoreUpdateVersion", null)
+        set(value) {
+            if (value == null) {
+                remove("ignoreUpdateVersion")
+            } else {
+                putString("ignoreUpdateVersion", value)
+            }
+        }
+
     val isFirstOpenApp: Boolean
         get() {
             val value = getBoolean("firstOpen", true)
@@ -120,6 +130,12 @@ by appCtx.getSharedPreferences("local", Context.MODE_PRIVATE) {
         get() = getBoolean("deleteBookOriginal")
         set(value) {
             putBoolean("deleteBookOriginal", value)
+        }
+
+    var uploadImportedBookToWebDav: Boolean
+        get() = getBoolean("uploadImportedBookToWebDav")
+        set(value) {
+            putBoolean("uploadImportedBookToWebDav", value)
         }
 
     var appCrash: Boolean

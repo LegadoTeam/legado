@@ -91,6 +91,7 @@ class ReadAloudConfigDialog : BasePrefDialogFragment() {
             when (preference.key) {
                 PreferKey.ttsEngine -> showDialogFragment(SpeakEngineDialog())
                 "sysTtsConfig" -> IntentHelp.openTTSSetting()
+                "readAloudControls" -> showDialogFragment(ReadAloudControlsDialog())
             }
             return super.onPreferenceTreeClick(preference)
         }

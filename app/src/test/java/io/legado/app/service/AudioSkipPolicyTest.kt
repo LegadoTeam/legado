@@ -44,7 +44,7 @@ class AudioSkipPolicyTest {
             .substringBefore("private fun localMediaItem")
         val resume = source.substringAfter("private fun resume()")
             .substringBefore("private fun adjustProgress")
-        val upData = audioPlay.substringAfter("fun upData(book: Book)")
+        val upData = audioPlay.substringAfter("fun upData(book: Book, preserveProgress: Boolean)")
             .substringBefore("fun resetData(book: Book)")
         val resetData = audioPlay.substringAfter("fun resetData(book: Book)")
             .substringBefore("fun replaceBook(book: Book)")

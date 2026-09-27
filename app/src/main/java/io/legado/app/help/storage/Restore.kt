@@ -3,7 +3,9 @@ package io.legado.app.help.storage
 import android.content.Context
 import android.database.sqlite.SQLiteConstraintException
 import android.net.Uri
+import android.graphics.Typeface
 import androidx.documentfile.provider.DocumentFile
+import com.google.gson.JsonElement
 import io.legado.app.BuildConfig
 import io.legado.app.R
 import io.legado.app.constant.AppConst.androidId
@@ -14,13 +16,17 @@ import io.legado.app.data.entities.AutoTaskRule
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookHighlight
+import io.legado.app.data.entities.BookMemo
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.Bookmark
+import io.legado.app.data.entities.Cache
+import io.legado.app.data.entities.Cookie
 import io.legado.app.data.entities.DictRule
 import io.legado.app.data.entities.HttpTTS
 import io.legado.app.data.entities.HighlightRule
 import io.legado.app.data.entities.KeyboardAssist
 import io.legado.app.data.entities.ReadRecord
+import io.legado.app.data.entities.mergeRestoredReadRecord
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.data.entities.RssSource
 import io.legado.app.data.entities.RssStar
@@ -28,21 +34,30 @@ import io.legado.app.data.entities.RuleSub
 import io.legado.app.data.entities.SearchKeyword
 import io.legado.app.data.entities.Server
 import io.legado.app.data.entities.TxtTocRule
+import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.AppCacheManager
 import io.legado.app.help.DirectLinkUpload
 import io.legado.app.help.HighlightStyle
 import io.legado.app.help.LauncherIconHelp
 import io.legado.app.help.book.isLocal
+import io.legado.app.help.book.normalizeLegacyPersistedCover
 import io.legado.app.help.book.upType
+import io.legado.app.help.config.BookshelfReadProgressMode
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
+import io.legado.app.help.config.ReplacePreviewConfig
 import io.legado.app.help.config.ThemeConfig
+import io.legado.app.help.http.CookieStore
+import io.legado.app.lib.theme.WallpaperTheme
 import io.legado.app.model.VideoPlay.VIDEO_PREF_NAME
 import io.legado.app.model.BookCover
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.service.AutoTaskScheduler
+import io.legado.app.ui.font.installFontFile
 import io.legado.app.utils.ACache
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
+import io.legado.app.utils.GSONStrict
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.compress.ZipUtils
 import io.legado.app.utils.defaultSharedPreferences
@@ -52,65 +67,212 @@ import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getPrefInt
 import io.legado.app.utils.getPrefString
-import io.legado.app.utils.getSharedPreferences
 import io.legado.app.utils.isContentScheme
 import io.legado.app.utils.isJsonArray
 import io.legado.app.utils.openInputStream
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.Dispatchers.Main
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import splitties.init.appCtx
 import java.io.File
 import java.io.FileInputStream
+import java.util.UUID
+
+internal fun parseCookieBackup(json: String): List<Cookie> {
+    return GSONStrict.fromJsonArray<JsonElement>(json).getOrThrow().map { element ->
+        require(element.isJsonObject)
+        val url = element.asJsonObject.get("url")
+        val cookie = element.asJsonObject.get("cookie")
+        require(url != null && url.isJsonPrimitive && url.asJsonPrimitive.isString)
+        require(cookie != null && cookie.isJsonPrimitive && cookie.asJsonPrimitive.isString)
+        Cookie(url.asString.also { require(it.isNotBlank()) }, cookie.asString)
+    }
+}
+
+private val runtimeSourceCachePrefixes = arrayOf(
+    "v_",
+    "userInfo_",
+    "loginHeader_",
+    "sourceVariable_",
+    "infoMap_",
+)
+
+internal fun isRuntimeSourceCacheKey(key: String): Boolean {
+    return runtimeSourceCachePrefixes.any { prefix ->
+        key.startsWith(prefix) && key.length > prefix.length
+    }
+}
+
+internal fun parseRuntimeSourceCacheBackup(json: String): List<Cache> {
+    val latestByKey = linkedMapOf<String, Cache>()
+    GSONStrict.fromJsonArray<JsonElement>(json).getOrThrow().forEach { element ->
+        require(element.isJsonObject)
+        val objectElement = element.asJsonObject
+        val keyElement = objectElement.get("key")
+        require(keyElement != null && keyElement.isJsonPrimitive && keyElement.asJsonPrimitive.isString)
+        val key = keyElement.asString
+        require(isRuntimeSourceCacheKey(key))
+
+        val valueElement = objectElement.get("value")
+        require(
+            valueElement != null && (valueElement.isJsonNull ||
+                (valueElement.isJsonPrimitive && valueElement.asJsonPrimitive.isString))
+        )
+        val deadlineElement = objectElement.get("deadline")
+        require(
+            deadlineElement != null && deadlineElement.isJsonPrimitive &&
+                deadlineElement.asJsonPrimitive.isNumber
+        )
+        val deadline = deadlineElement.asJsonPrimitive.asString.toLongOrNull()
+            ?: throw IllegalArgumentException("deadline must be an integer")
+        require(deadline >= 0L)
+        latestByKey[key] = Cache(
+            key = key,
+            value = if (valueElement.isJsonNull) null else valueElement.asString,
+            deadline = deadline,
+        )
+    }
+    return latestByKey.values.toList()
+}
 
 /**
  * 恢复
  */
 object Restore {
 
-    private val mutex = Mutex()
-
     private const val TAG = "Restore"
 
-    suspend fun restore(context: Context, uri: Uri) {
+    suspend fun restore(context: Context, uri: Uri): Unit = backupRestoreMutex.withLock {
         LogUtils.d(TAG, "开始恢复备份 uri:$uri")
         kotlin.runCatching {
-            FileUtils.delete(Backup.backupPath)
-            if (uri.isContentScheme()) {
-                DocumentFile.fromSingleUri(context, uri)!!.openInputStream()!!.use {
-                    ZipUtils.unZipToPath(it, Backup.backupPath)
-                }
-            } else {
-                ZipUtils.unZipToPath(File(uri.path!!), Backup.backupPath)
-            }
+            extractBackup(context, uri)
         }.onFailure {
             AppLog.put("复制解压文件出错\n${it.localizedMessage}", it)
             return
         }
         kotlin.runCatching {
-            restoreLocked(Backup.backupPath)
-            LocalConfig.lastBackup = System.currentTimeMillis()
+            restoreUnpacked(Backup.backupPath)
         }.onFailure {
             appCtx.toastOnUi("恢复备份出错\n${it.localizedMessage}")
             AppLog.put("恢复备份出错\n${it.localizedMessage}", it)
         }
     }
 
-    suspend fun restoreLocked(path: String) {
-        mutex.withLock {
-            restore(path)
+    suspend fun restoreOrThrow(
+        context: Context,
+        uri: Uri,
+        lanTransfer: Boolean = false,
+    ) = backupRestoreMutex.withLock {
+        LogUtils.d(TAG, "开始恢复备份 uri:$uri")
+        val restorePath = if (lanTransfer) {
+            File(context.cacheDir, "lan_backup/restore/${UUID.randomUUID()}").absolutePath
+        } else {
+            Backup.backupPath
+        }
+        try {
+            extractBackup(context, uri, restorePath)
+            if (lanTransfer) {
+                LanBackupTransfer.requireRestoreMediaSpace(
+                    context,
+                    File(restorePath),
+                    includeBackgrounds = !BackupConfig.ignoreReadConfig,
+                )
+            }
+            restoreUnpacked(restorePath, lanTransfer)
+        } finally {
+            if (lanTransfer) FileUtils.delete(restorePath)
         }
     }
 
-    private suspend fun restore(path: String) {
-        val aes = BackupAES()
+    private fun extractBackup(
+        context: Context,
+        uri: Uri,
+        targetPath: String = Backup.backupPath,
+    ) {
+        FileUtils.delete(targetPath)
+        if (uri.isContentScheme()) {
+            DocumentFile.fromSingleUri(context, uri)!!.openInputStream()!!.use {
+                ZipUtils.unZipToPath(it, targetPath)
+            }
+        } else {
+            ZipUtils.unZipToPath(File(uri.path!!), targetPath)
+        }
+    }
+
+    suspend fun restoreLocked(path: String, lanTransfer: Boolean = false) {
+        backupRestoreMutex.withLock {
+            restoreUnpacked(path, lanTransfer)
+        }
+    }
+
+    private suspend fun restoreUnpacked(path: String, lanTransfer: Boolean = false) {
+        if (lanTransfer) {
+            currentCoroutineContext().ensureActive()
+            withContext(NonCancellable) {
+                restore(path, lanTransfer = true)
+            }
+        } else {
+            restore(path)
+        }
+        LocalConfig.lastBackup = System.currentTimeMillis()
+    }
+
+    private suspend fun restore(path: String, lanTransfer: Boolean = false) {
+        val password = LocalConfig.password
+        val aes = BackupAES(password)
+        val backupRoot = File(path)
+        val restoredPreferences = readPreferenceSnapshot(appCtx, path, "config")
+        val restoredVideoPreferences = readPreferenceSnapshot(appCtx, path, "videoConfig")
+        val restoredCookies = if (!lanTransfer && !BackupConfig.ignoreCookies) {
+            File(path, BackupConfig.cookieFileName).takeIf { it.exists() }?.let { file ->
+                if (password.isNullOrBlank()) {
+                    throw NoStackTraceException(
+                        appCtx.getString(R.string.cookie_backup_password_required)
+                    )
+                }
+                parseCookieBackup(aes.decryptStr(file.readText()))
+            }
+        } else {
+            null
+        }
+        val restoredRuntimeSourceCaches = if (!lanTransfer &&
+            !BackupConfig.ignoreSourceVariables
+        ) {
+            File(path, BackupConfig.runtimeSourceCacheFileName).takeIf { it.exists() }?.let { file ->
+                if (password.isNullOrBlank()) {
+                    throw NoStackTraceException(
+                        appCtx.getString(R.string.source_variables_backup_password_required)
+                    )
+                }
+                val raw = file.readText()
+                val json = if (raw.isJsonArray()) {
+                    raw
+                } else {
+                    aes.decryptStr(raw)
+                }
+                parseRuntimeSourceCacheBackup(json)
+            }
+        } else {
+            null
+        }
         val restoredAutoTasks = fileToListT<AutoTaskRule>(path, "autoTask.json")
+        val restoredBookUrls = hashSetOf<String>()
         fileToListT<Book>(path, "bookshelf.json")?.let {
             it.forEach { book ->
+                if (lanTransfer) book.variable = null
                 book.upType()
+                book.normalizeLegacyPersistedCover()
+                book.customCoverUrl = book.customCoverUrl?.let { coverPath ->
+                    remapRestoredCoverPath(coverPath, backupRoot, appCtx.externalFiles)
+                }
+                book.persistedCoverUrl = book.persistedCoverUrl?.let { coverPath ->
+                    remapRestoredCoverPath(coverPath, backupRoot, appCtx.externalFiles)
+                }
             }
             it.filter { book -> book.isLocal }
                 .forEach { book ->
@@ -120,6 +282,11 @@ object Restore {
             val ignoreLocalBook = BackupConfig.ignoreLocalBook
             it.forEach { book ->
                 if (ignoreLocalBook && book.isLocal) {
+                    return@forEach
+                }
+                restoredBookUrls.add(book.bookUrl)
+                if (lanTransfer) {
+                    appDb.bookDao.upsertPreservingVariable(book)
                     return@forEach
                 }
                 if (appDb.bookDao.has(book.bookUrl)) {
@@ -133,6 +300,9 @@ object Restore {
                 }
             }
             appDb.bookDao.insert(*newBooks.toTypedArray())
+        }
+        fileToListT<BookMemo>(path, "bookMemo.json")?.let { memos ->
+            appDb.bookMemoDao.restore(memos.filter { it.bookUrl in restoredBookUrls })
         }
         fileToListT<Bookmark>(path, "bookmark.json")?.let {
             appDb.bookmarkDao.insert(*it.toTypedArray())
@@ -153,8 +323,13 @@ object Restore {
                 AppLog.put("恢复高亮规则出错\n${it.localizedMessage}", it)
             }
         }
-        fileToListT<BookGroup>(path, "bookGroup.json")?.let {
-            appDb.bookGroupDao.insert(*it.toTypedArray())
+        fileToListT<BookGroup>(path, "bookGroup.json")?.let { groups ->
+            groups.forEach { group ->
+                group.cover = group.cover?.let { coverPath ->
+                    remapRestoredCoverPath(coverPath, backupRoot, appCtx.externalFiles)
+                }
+            }
+            appDb.bookGroupDao.insert(*groups.toTypedArray())
         }
         fileToListT<BookSource>(path, "bookSource.json")?.let {
             appDb.bookSourceDao.insert(*it.toTypedArray())
@@ -172,7 +347,8 @@ object Restore {
             appDb.rssStarDao.insert(*it.toTypedArray())
         }
         fileToListT<ReplaceRule>(path, "replaceRule.json")?.let {
-            appDb.replaceRuleDao.insert(*it.toTypedArray())
+            val insertedIds = appDb.replaceRuleDao.insert(*it.toTypedArray())
+            ReplacePreviewConfig.saveImportedSamples(it, insertedIds, clearMissing = true)
         }
         fileToListT<SearchKeyword>(path, "searchHistory.json")?.let {
             appDb.searchKeywordDao.insert(*it.toTypedArray())
@@ -195,22 +371,26 @@ object Restore {
         }
         fileToListT<ReadRecord>(path, "readRecord.json")?.let {
             it.forEach { readRecord ->
-                //判断是不是本机记录
-                if (readRecord.deviceId != androidId) {
-                    appDb.readRecordDao.insert(readRecord)
+                // Older backups omitted the device id; treat them as local records.
+                val normalizedRecord = if (readRecord.deviceId.isBlank()) {
+                    readRecord.copy(deviceId = androidId)
                 } else {
-                    val current = appDb.readRecordDao
-                        .getRecord(readRecord.deviceId, readRecord.bookName)
-                    if (current == null || current.readTime < readRecord.readTime) {
-                        appDb.readRecordDao.insert(readRecord)
-                    } else if (readRecord.author.isNotBlank()) {
-                        appDb.readRecordDao.insert(current.copy(author = readRecord.author))
-                    }
+                    readRecord
+                }
+                val restoredRecord = normalizedRecord.copy(coverUrl = remapReadRecordCover(
+                    normalizedRecord.coverUrl?.let { remapRestoredCoverPath(it, File(path), appCtx.externalFiles) },
+                    File(path), appCtx.externalFiles,
+                ))
+                appDb.runInTransaction {
+                    val current = appDb.readRecordDao.getRecord(restoredRecord.deviceId, restoredRecord.bookName, restoredRecord.author)
+                    appDb.readRecordDao.insert(mergeRestoredReadRecord(
+                        current, restoredRecord, restoredRecord.deviceId == androidId,
+                    ))
                 }
             }
         }
         File(path, "servers.json").takeIf {
-            it.exists()
+            !lanTransfer && it.exists()
         }?.runCatching {
             var json = readText()
             if (!json.isJsonArray()) {
@@ -222,8 +402,20 @@ object Restore {
         }?.onFailure {
             AppLog.put("恢复服务器配置出错\n${it.localizedMessage}", it)
         }
+        restoredCookies?.filter { cookie -> cookie.url.isNotBlank() }?.forEach { cookie ->
+            if ('|' in cookie.url) {
+                appDb.cookieDao.insert(cookie)
+            } else {
+                CookieStore.restoreCookie(cookie.url, cookie.cookie)
+            }
+        }
+        restoredRuntimeSourceCaches?.takeIf { it.isNotEmpty() }?.let { caches ->
+            // REPLACE updates matching keys while leaving local-only runtime entries intact.
+            appDb.cacheDao.insert(*caches.toTypedArray())
+            AppCacheManager.clearSourceVariables()
+        }
         File(path, DirectLinkUpload.ruleFileName).takeIf {
-            it.exists()
+            !lanTransfer && it.exists()
         }?.runCatching {
             val json = readText()
             ACache.get(cacheDir = false).put(DirectLinkUpload.ruleFileName, json)
@@ -270,12 +462,36 @@ object Restore {
             }
         }
         //AppWebDav.downBgs()
-        appCtx.getSharedPreferences(path, "config")?.all?.let { map ->
+        restoredPreferences?.let { map ->
             val edit = appCtx.defaultSharedPreferences.edit()
 
             map.forEach { (key, value) ->
-                if (BackupConfig.keyIsNotIgnore(key)) {
+                if (BackupConfig.keyIsNotIgnore(key) &&
+                    (!lanTransfer || key !in lanTransferIgnoredPrefKeys)
+                ) {
                     when (key) {
+                        "readRecordSort" -> (value as? Int)?.let {
+                            LocalConfig.edit().putInt(key, it.coerceIn(0, 2)).apply()
+                        }
+                        PreferKey.readRecordCover,
+                        PreferKey.readRecordCoverDark -> {
+                            val coverPath = (value as? String)?.let {
+                                remapRestoredCoverPath(it, File(path), appCtx.externalFiles)
+                            }
+                            if (coverPath == null) edit.remove(key) else edit.putString(key, coverPath)
+                        }
+                        PreferKey.coverFont -> {
+                            val fontBackup = File(path, BookCover.fontBackupFileName)
+                            val fontPath = if (value is String && value.isNotBlank() && fontBackup.isFile) {
+                                fontBackup.inputStream().use { input ->
+                                    installFontFile(input, BookCover.fontBackupFileName,
+                                        File(appCtx.externalFiles, "font")) {
+                                        runCatching { Typeface.createFromFile(it) }.isSuccess
+                                    }.absolutePath
+                                }
+                            } else (value as? String).orEmpty().takeIf { File(it).isFile }.orEmpty()
+                            edit.putString(key, fontPath)
+                        }
                         PreferKey.webDavPassword -> {
                             kotlin.runCatching {
                                 aes.decryptStr(value.toString())
@@ -296,13 +512,71 @@ object Restore {
                             is Long -> edit.putLong(key, value)
                             is Float -> edit.putFloat(key, value)
                             is String -> edit.putString(key, value)
+                            is Set<*> -> {
+                                @Suppress("UNCHECKED_CAST")
+                                edit.putStringSet(key, value as Set<String>)
+                            }
                         }
                     }
                 }
             }
+            if (PreferKey.bookshelfReadProgressMode !in map &&
+                PreferKey.showBookshelfReadProgress in map
+            ) {
+                val legacyEnabled = when (val value = map[PreferKey.showBookshelfReadProgress]) {
+                    is Boolean -> value
+                    is String -> value.toBooleanStrictOrNull()
+                    else -> null
+                }
+                legacyEnabled?.let { enabled ->
+                    edit.putInt(
+                        PreferKey.bookshelfReadProgressMode,
+                        if (enabled) {
+                            BookshelfReadProgressMode.STANDARD
+                        } else {
+                            BookshelfReadProgressMode.HIDDEN
+                        },
+                    )
+                }
+            }
+            if (!BackupConfig.ignoreReadConfig &&
+                PreferKey.showReadTitleChapterNameOnly !in map
+            ) {
+                edit.putBoolean(PreferKey.showReadTitleChapterNameOnly, false)
+            }
+            if (PreferKey.showExploreCategories !in map) {
+                edit.putBoolean(PreferKey.showExploreCategories, false)
+            }
+            if (BackupConfig.keyIsNotIgnore(PreferKey.coverTitleAdaptive) &&
+                PreferKey.coverTitleAdaptive !in map
+            ) {
+                edit.putBoolean(PreferKey.coverTitleAdaptive, true)
+            }
+            if (BackupConfig.keyIsNotIgnore(PreferKey.coverCustomFontSize) &&
+                PreferKey.coverCustomFontSize !in map
+            ) {
+                edit.putBoolean(PreferKey.coverCustomFontSize, false)
+            }
+            if (BackupConfig.keyIsNotIgnore(PreferKey.coverFont) && PreferKey.coverFont !in map) {
+                edit.remove(PreferKey.coverFont)
+            }
+            if (PreferKey.myMoreItems !in map) edit.remove(PreferKey.myMoreItems)
+            if (PreferKey.autoBackup !in map) edit.putBoolean(PreferKey.autoBackup, true)
+            if (PreferKey.autoBackupWebDav !in map) edit.putBoolean(PreferKey.autoBackupWebDav, true)
+            if (PreferKey.autoBackupIntervalDays !in map) edit.putInt(PreferKey.autoBackupIntervalDays, 1)
+            if ("readRecordSimpleLayout" !in map) edit.putBoolean("readRecordSimpleLayout", true)
+            if ("readRecordUseDays" !in map) edit.putBoolean("readRecordUseDays", false)
+            if ("readRecordShowSeconds" !in map) edit.putBoolean("readRecordShowSeconds", true)
+            if ("readRecordFixedCard" !in map) edit.putBoolean("readRecordFixedCard", true)
+            for (key in listOf(PreferKey.readRecordCover, PreferKey.readRecordCoverDark)) {
+                if (key !in map && BackupConfig.keyIsNotIgnore(key)) edit.remove(key)
+            }
+            if (!BackupConfig.ignoreReadConfig && PreferKey.mangaRightToLeft !in map) {
+                edit.putBoolean(PreferKey.mangaRightToLeft, false)
+            }
             edit.apply()
         }
-        appCtx.getSharedPreferences(path, "videoConfig")?.all?.let { map ->
+        restoredVideoPreferences?.let { map ->
             appCtx.getSharedPreferences(VIDEO_PREF_NAME, Context.MODE_PRIVATE).edit().apply {
                 map.forEach { (key, value) ->
                     when (value) {
@@ -311,6 +585,10 @@ object Restore {
                         is Long -> putLong(key, value)
                         is Float -> putFloat(key, value)
                         is String -> putString(key, value)
+                        is Set<*> -> {
+                            @Suppress("UNCHECKED_CAST")
+                            putStringSet(key, value as Set<String>)
+                        }
                     }
                 }
                 apply()
@@ -324,16 +602,22 @@ object Restore {
             hideNavigationBar = appCtx.getPrefBoolean(PreferKey.hideNavigationBar)
             autoReadSpeed = appCtx.getPrefInt(PreferKey.autoReadSpeed, 46)
         }
-        restoreBackupMediaDirectory(File(path), appCtx.externalFiles, "covers")
+        val coverRestoreResult =
+            restoreBackupMediaDirectory(File(path), appCtx.externalFiles, "covers")
             .onFailure {
                 AppLog.put("恢复封面图片出错\n${it.localizedMessage}", it)
             }
-        if (!BackupConfig.ignoreReadConfig) {
+        val backgroundRestoreResult = if (!BackupConfig.ignoreReadConfig) {
             restoreBackupMediaDirectory(File(path), appCtx.externalFiles, "bg")
                 .onFailure {
                     AppLog.put("恢复阅读背景图片出错\n${it.localizedMessage}", it)
                 }
+        } else {
+            null
         }
+        coverRestoreResult.getOrThrow()
+        restoreBackupMediaDirectory(File(path), appCtx.externalFiles, readRecordCoverDirectory).getOrThrow()
+        backgroundRestoreResult?.getOrThrow()
         if (!restoredAutoTasks.isNullOrEmpty()) {
             appDb.autoTaskRuleDao.upsert(*restoredAutoTasks.toTypedArray())
         }
@@ -344,6 +628,7 @@ object Restore {
             if (!BuildConfig.DEBUG) {
                 LauncherIconHelp.changeIcon(appCtx.getPrefString(PreferKey.launcherIcon))
             }
+            WallpaperTheme.syncWithPreferences(appCtx)
             ThemeConfig.applyDayNight(appCtx)
         }
     }

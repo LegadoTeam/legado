@@ -39,6 +39,28 @@ class TocListStateTest {
     }
 
     @Test
+    fun `collapsed default keeps the current volume expanded`() {
+        val state = stateOf(
+            listOf(
+                volume(0, "First"), chapter(1), chapter(2),
+                volume(3, "Second"), chapter(4), chapter(5),
+            ),
+            defaultExpanded = false,
+            currentChapterIndex = 4,
+        )
+
+        val items = state.showNormal(currentChapterIndex = 4)
+
+        assertTrue(state.isVolumeCollapsed(0))
+        assertFalse(state.isVolumeCollapsed(3))
+        assertEquals(
+            listOf("volume:0", "volume:3", "chapter:4", "chapter:5"),
+            items.keys(),
+        )
+        assertTrue((items[1] as TocListItem.Volume).containsCurrentChapter)
+    }
+
+    @Test
     fun `toggle changes visible rows and preserves current group marker`() {
         val state = stateOf(
             listOf(volume(0, "First"), chapter(1), chapter(2)),
@@ -174,6 +196,57 @@ class TocListStateTest {
     }
 
     @Test
+    fun `new volume defaults to collapsed when global expansion is disabled`() {
+        val initial = listOf(volume(0, "First"), chapter(1))
+        val state = stateOf(
+            initial,
+            defaultExpanded = false,
+            currentChapterIndex = 1,
+        )
+        val refreshed = initial + listOf(volume(2, "Second"), chapter(3))
+
+        state.setFullChapters(
+            refreshed,
+            reverseOrder = false,
+            resetCollapse = false,
+            defaultExpanded = false,
+            currentChapterIndex = 1,
+        )
+        val items = state.showNormal(currentChapterIndex = 1)
+
+        assertFalse(state.isVolumeCollapsed(0))
+        assertTrue(state.isVolumeCollapsed(2))
+        assertEquals(listOf("volume:0", "chapter:1", "volume:2"), items.keys())
+    }
+
+    @Test
+    fun `refresh expands the volume containing the current chapter`() {
+        val chapters = listOf(
+            volume(0, "First"), chapter(1),
+            volume(2, "Second"), chapter(3),
+        )
+        val state = stateOf(
+            chapters,
+            defaultExpanded = false,
+            currentChapterIndex = 1,
+        )
+        assertTrue(state.isVolumeCollapsed(2))
+        assertTrue(state.toggleVolume(0))
+        assertTrue(state.isVolumeCollapsed(0))
+
+        state.setFullChapters(
+            chapters,
+            reverseOrder = false,
+            resetCollapse = false,
+            defaultExpanded = false,
+            currentChapterIndex = 3,
+        )
+
+        assertFalse(state.isVolumeCollapsed(2))
+        assertTrue(state.isVolumeCollapsed(0))
+    }
+
+    @Test
     fun `reverse order assigns preceding chapters to trailing volume headers`() {
         val reversed = listOf(
             chapter(0, "C3"),
@@ -251,12 +324,16 @@ class TocListStateTest {
     private fun stateOf(
         chapters: List<BookChapter>,
         reverse: Boolean = false,
+        defaultExpanded: Boolean = true,
+        currentChapterIndex: Int? = null,
     ): TocListState {
         return TocListState().apply {
             setFullChapters(
                 chapters = chapters,
                 reverseOrder = reverse,
                 resetCollapse = true,
+                defaultExpanded = defaultExpanded,
+                currentChapterIndex = currentChapterIndex,
             )
         }
     }

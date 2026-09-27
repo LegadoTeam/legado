@@ -182,7 +182,7 @@ internal class RuntimeObjectCompletionLanguage(
                     durChapterPos durChapterTime durChapterTitle durVolumeIndex group imageStyle
                     infoHtml intro kind lastChapterIndex lastCheckCount lastCheckTime latestChapterTime
                     latestChapterTitle name openCredits order origin originName originOrder pageAnim
-                    playMode playSpeed readConfig readSimulating reSegment reverseToc splitLongChapter
+                    persistedCoverUrl playMode playSpeed readConfig readSimulating reSegment reverseToc splitLongChapter
                     startChapter startDate syncTime tocHtml tocUrl totalChapterNum ttsEngine type
                     useReplaceRule variable variableMap wordCount
                     """

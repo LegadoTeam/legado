@@ -173,6 +173,13 @@
 
                 </io.legado.app.ui.widget.text.TextInputLayout>
 
+                <io.legado.app.lib.theme.view.ThemeCheckBox
+                    android:id="@+id/cb_is_enable_cookie"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:text="@string/auto_save_cookie" />
+
             </LinearLayout>
 
         </androidx.core.widget.NestedScrollView>

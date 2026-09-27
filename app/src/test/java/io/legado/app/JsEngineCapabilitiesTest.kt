@@ -54,6 +54,16 @@ class JsEngineCapabilitiesTest {
     }
 
     @Test
+    fun sharedLibraryFunctionUsesCallerBindingsAsDefaultThis() {
+        val shared = RhinoScriptEngine.getRuntimeScope(ScriptBindings())
+        RhinoScriptEngine.eval("function readCache() { return this.cache }", shared)
+        val bindings = ScriptBindings().apply { this["cache"] = "runtime" }
+        bindings.chainTo(shared)
+
+        Assert.assertEquals("runtime", RhinoScriptEngine.eval("readCache()", bindings))
+    }
+
+    @Test
     fun constForInAndBlockScopesRemainIndependent() {
         val script = """
             const params = { first: 1, second: 2 };

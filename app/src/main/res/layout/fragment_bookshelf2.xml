@@ -40,6 +40,16 @@
 
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
+    <io.legado.app.ui.widget.recycler.scroller.FastScroller
+        android:id="@+id/fast_scroller"
+        android:layout_width="wrap_content"
+        android:layout_height="0dp"
+        android:layout_marginTop="@dimen/fastscroll_scrollbar_margin_top"
+        android:layout_marginBottom="@dimen/fastscroll_scrollbar_margin_bottom"
+        app:layout_constraintTop_toTopOf="@id/refresh_layout"
+        app:layout_constraintBottom_toBottomOf="@id/refresh_layout"
+        app:layout_constraintEnd_toEndOf="@id/refresh_layout" />
+
     <TextView
         android:id="@+id/tv_empty_msg"
         android:layout_width="wrap_content"

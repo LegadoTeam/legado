@@ -7,6 +7,7 @@ import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -36,8 +37,34 @@ class HighlightBackupCompatibilityTest {
         ).getOrThrow().single().normalizeForRestore()
 
         assertFalse(rule.applyToTitle)
+        assertTrue(rule.applyToBody)
         assertEquals(HighlightRule.DEFAULT_TIMEOUT_MILLISECONDS, rule.timeoutMillisecond)
         assertEquals(HighlightStyle(), rule.styleObj())
+    }
+
+    @Test
+    fun `rule json preserves title only scope`() {
+        val rule = GSON.fromJsonArray<HighlightRule>(
+            """[{"pattern":"text","applyToTitle":true,"applyToBody":false}]"""
+        ).getOrThrow().single().normalizeForRestore()
+
+        assertTrue(rule.applyToTitle)
+        assertFalse(rule.applyToBody)
+    }
+
+    @Test
+    fun `legacy rules receive distinct uuids and new backups preserve them`() {
+        val legacy = GSON.fromJsonArray<HighlightRule>(
+            """[{"pattern":"one"},{"uuid":null,"pattern":"two"}]"""
+        ).getOrThrow().map(HighlightRule::normalizeForRestore)
+
+        assertTrue(legacy.all { it.uuid.isNotBlank() })
+        assertNotEquals(legacy[0].uuid, legacy[1].uuid)
+
+        val restored = GSON.fromJsonArray<HighlightRule>(GSON.toJson(legacy))
+            .getOrThrow()
+            .map(HighlightRule::normalizeForRestore)
+        assertEquals(legacy.map { it.uuid }, restored.map { it.uuid })
     }
 
     @Test

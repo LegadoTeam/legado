@@ -42,6 +42,15 @@
             app:iconSpaceReserved="false" />
 
         <io.legado.app.lib.prefs.SwitchPreference
+            android:defaultValue="false"
+            android:key="webDavBookAutoRestore"
+            android:summary="@string/webdav_book_auto_restore_s"
+            android:title="@string/webdav_book_auto_restore_t"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.SwitchPreference
             android:defaultValue="true"
             android:key="syncBookProgress"
             android:summary="@string/sync_book_progress_s"
@@ -69,14 +78,32 @@
         app:layout="@layout/view_preference_category">
 
         <io.legado.app.lib.prefs.Preference
+            android:key="localPassword"
+            android:summary="@string/set_local_password_summary"
+            android:title="@string/set_local_password"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
             android:key="backupUri"
             android:summary="@string/select_backup_path"
             android:title="@string/backup_path"
             app:iconSpaceReserved="false" />
 
         <io.legado.app.lib.prefs.Preference
+            android:key="backupContent"
+            android:summary="@string/backup_content_summary"
+            android:title="@string/backup_content"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
+            android:key="lan_backup_transfer"
+            android:summary="@string/lan_backup_transfer_summary"
+            android:title="@string/lan_backup_transfer"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
             android:key="web_dav_backup"
-            android:summary="@string/backup_summary"
+            android:summary="@string/backup_destination_summary"
             android:title="@string/backup"
             app:iconSpaceReserved="false" />
 
@@ -97,6 +124,13 @@
             android:key="onlyLatestBackup"
             android:summary="@string/only_latest_backup_s"
             android:title="@string/only_latest_backup_t"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
+            android:key="autoBackup"
+            android:title="@string/auto_backup_t"
+            app:allowDividerAbove="false"
+            app:allowDividerBelow="false"
             app:iconSpaceReserved="false" />
 
         <io.legado.app.lib.prefs.SwitchPreference

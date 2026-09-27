@@ -10,6 +10,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -28,6 +29,65 @@ class JsSourceConfigTest {
         function getChapters(book) { return []; }
         function getContent(chapter, book) { return "content"; }
     """.trimIndent()
+
+    @Test
+    fun `batch size requires a numeric exact int without truncation`() {
+        for (value in listOf("2.5", "2147483648", "4294967298", "1e100", "'2'", "null", "true")) {
+            assertExtractError(
+                validScript + "\nconfig.maxBatchSize = $value; function getContentBatch(chapters, book) {}",
+                "必须是整数",
+            )
+        }
+        assertEquals(2, JsSourceConfig.extract(
+            validScript + "\nconfig.maxBatchSize = 2.0; function getContentBatch(chapters, book) {}"
+        ).contentBatchSize())
+        assertEquals(io.legado.app.data.entities.BookSource.MAX_CONTENT_BATCH_SIZE,
+            JsSourceConfig.extract(
+                validScript + "\nconfig.maxBatchSize = 2147483647; function getContentBatch(chapters, book) {}"
+            ).contentBatchSize())
+    }
+
+    @Test
+    fun `review capability ignores comments and requires both functions`() {
+        assertFalse(
+            JsSourceConfig.declaresReviewFunctions(
+                "/* function getReviewSummary() {} function getReviewDetail() {} */"
+            )
+        )
+        assertFalse(
+            JsSourceConfig.declaresReviewFunctions("function getReviewSummary() {}")
+        )
+        assertTrue(
+            JsSourceConfig.declaresReviewFunctions(
+                "function getReviewSummary() {} function getReviewDetail() {}"
+            )
+        )
+        assertTrue(
+            JsSourceConfig.declaresReviewFunctions(
+                "var getReviewSummary = function() {}; " +
+                    "var getReviewDetail = function() {};"
+            )
+        )
+    }
+
+    @Test
+    fun `review reply capability ignores comments and accepts a top level function`() {
+        assertFalse(
+            JsSourceConfig.declaresReviewRepliesFunction(
+                "/* function getReviewReplies() {} */"
+            )
+        )
+        assertTrue(
+            JsSourceConfig.declaresReviewRepliesFunction(
+                "function getReviewReplies() {}"
+            )
+        )
+        assertTrue(
+            JsSourceConfig.declaresReviewRepliesFunction(
+                "var getReviewReplies = function() {};"
+            )
+        )
+    }
 
     @Test
     fun `extracts metadata and keeps full script`() {
@@ -327,17 +387,21 @@ class JsSourceConfigTest {
     }
 
     @Test
-    fun `review functions are accepted as a pair`() {
+    fun `review functions accept optional paged replies`() {
         val source = JsSourceConfig.extract(
             validScript + "\n" + """
                 function getReviewSummary(chapter, book) { return []; }
                 function getReviewDetail(chapter, book, paraIndex, paraData, page) {
                     return { items: [] };
                 }
+                function getReviewReplies(chapter, book, paraIndex, paraData, reviewId, page) {
+                    return { items: [] };
+                }
             """.trimIndent()
         )
 
         assertTrue(source.mainJs.orEmpty().contains("getReviewSummary"))
+        assertTrue(JsSourceReview.hasReviewRepliesCapability(source))
     }
 
     @Test
@@ -379,6 +443,26 @@ class JsSourceConfigTest {
                 var getReviewDetail = {};
             """.trimIndent(),
             "getReviewSummary",
+        )
+    }
+
+    @Test
+    fun `review replies require the review function pair`() {
+        assertExtractError(
+            validScript + "\nfunction getReviewReplies() { return { items: [] }; }",
+            "getReviewSummary/getReviewDetail",
+        )
+    }
+
+    @Test
+    fun `review replies property must be a function`() {
+        assertExtractError(
+            validScript + "\n" + """
+                function getReviewSummary() { return []; }
+                function getReviewDetail() { return { items: [] }; }
+                var getReviewReplies = [];
+            """.trimIndent(),
+            "getReviewReplies",
         )
     }
 
@@ -445,6 +529,22 @@ class JsSourceConfigTest {
                 lastUpdateTime: 123456 // version timestamp
             };
             var fallback = { lastUpdateTime: 1 };
+        """.trimIndent()
+
+        assertEquals(expected, JsSourceConfig.stampLastUpdateTime(script, 123456))
+    }
+
+    @Test
+    fun `ignores comments and unrelated objects before declared update time`() {
+        val script = """
+            // lastUpdateTime: 1
+            var metadata = { lastUpdateTime: 2 };
+            var config = { "lastUpdateTime": Date.now() };
+        """.trimIndent()
+        val expected = """
+            // lastUpdateTime: 1
+            var metadata = { lastUpdateTime: 2 };
+            var config = { "lastUpdateTime": 123456 };
         """.trimIndent()
 
         assertEquals(expected, JsSourceConfig.stampLastUpdateTime(script, 123456))

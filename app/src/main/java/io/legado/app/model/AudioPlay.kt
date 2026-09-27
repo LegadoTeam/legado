@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.SystemClock
 import io.legado.app.R
+import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.IntentAction
@@ -14,6 +15,8 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.ReadRecord
+import io.legado.app.data.entities.updateSnapshot
+import io.legado.app.data.entities.saveWithCover
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.getBookSource
 import io.legado.app.help.book.readSimulating
@@ -33,7 +36,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancelChildren
 import splitties.init.appCtx
-import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.text.trim
 
@@ -119,9 +121,12 @@ internal class AudioReadTimeTracker {
     }
 
     @Synchronized
-    fun updateAuthor(author: String) {
-        record.author = author
-        activeRecord?.author = author
+    fun isForBook(book: Book): Boolean = record.bookName == book.name && record.author == book.author
+
+    @Synchronized
+    fun updateSnapshot(book: Book, chapterIndex: Int, chapterPos: Int) {
+        record.updateSnapshot(book, chapterIndex, chapterPos)
+        activeRecord?.updateSnapshot(book, chapterIndex, chapterPos)
     }
 
     @Synchronized
@@ -133,7 +138,7 @@ internal class AudioReadTimeTracker {
     }
 
     @Synchronized
-    fun stop(now: Long, lastRead: Long): ReadRecord? {
+    fun stop(now: Long, lastRead: Long): Pair<ReadRecord, Long>? {
         val start = startedAt ?: return null
         val record = activeRecord ?: return null
         activeRecord = null
@@ -142,7 +147,7 @@ internal class AudioReadTimeTracker {
         if (elapsed == 0L) return null
         record.readTime += elapsed
         record.lastRead = lastRead
-        return record.copy()
+        return record.copy() to elapsed
     }
 }
 
@@ -198,8 +203,6 @@ object AudioPlay : CoroutineScope by MainScope() {
     private var playingCacheBookUrl: String? = null
     private var playingCacheTreeUri: String? = null
     private val readTimeTracker = AudioReadTimeTracker()
-    @Volatile
-    private var readTimeWrite: Future<*>? = null
     val executor = globalExecutor
 
     fun changePlayMode() {
@@ -215,13 +218,21 @@ object AudioPlay : CoroutineScope by MainScope() {
         postEvent(EventBus.PLAY_MODE_CHANGED, playMode)
     }
 
-    fun upData(book: Book) {
-        val playbackChanged = AudioPlay.book?.bookUrl != book.bookUrl ||
-                durChapterIndex != book.durChapterIndex
-        if (playbackChanged) {
-            stopPlay()
+    fun upData(book: Book, preserveProgress: Boolean) {
+        val playbackChanged = synchronized(this) {
+            if (preserveProgress && AudioPlay.book?.bookUrl == book.bookUrl) {
+                book.durChapterIndex = durChapterIndex
+                book.durChapterPos = durChapterPos
+            }
+            val changed = AudioPlay.book?.bookUrl != book.bookUrl ||
+                    durChapterIndex != book.durChapterIndex
+            if (changed) stopPlay()
+            if (!readTimeTracker.isForBook(book)) {
+                resetReadRecord(book, resumeIfPlaying = !changed)
+            }
+            AudioPlay.book = book
+            changed
         }
-        AudioPlay.book = book
         chapterSize = appDb.bookChapterDao.getChapterCount(book.bookUrl)
         simulatedChapterSize = if (book.readSimulating()) {
             book.simulatedTotalChapterNum()
@@ -276,25 +287,26 @@ object AudioPlay : CoroutineScope by MainScope() {
 
     @Synchronized
     fun replaceBook(book: Book) {
-        AudioPlay.book = book
         resetReadRecord(book, resumeIfPlaying = true)
+        AudioPlay.book = book
     }
 
     @Synchronized
     private fun resetReadRecord(book: Book, resumeIfPlaying: Boolean = false) {
         upReadTime()
-        kotlin.runCatching { readTimeWrite?.get() }.onFailure {
-            AppLog.put("保存听书时长失败\n${it.localizedMessage}", it)
-        }
-        readTimeTracker.setRecord(
-            ReadRecord(
-                bookName = book.name,
-                author = book.author,
-                readTime = appDb.readRecordDao.getReadTime(book.name) ?: 0,
-            )
+        val record = ReadRecord(
+            deviceId = AppConst.androidId,
+            bookName = book.name,
+            author = book.author,
         )
+        record.readTime = appDb.readRecordDao
+            .getReadTime(record.deviceId, record.bookName, record.author) ?: 0
+        readTimeTracker.setRecord(record)
         if (resumeIfPlaying && AudioPlayService.isPlaying) {
-            markReadTimeStart()
+            if (AppConfig.enableReadRecord) {
+                readTimeTracker.updateSnapshot(book, durChapterIndex, durChapterPos)
+                readTimeTracker.start(SystemClock.elapsedRealtime())
+            }
         }
     }
 
@@ -309,18 +321,21 @@ object AudioPlay : CoroutineScope by MainScope() {
     @Synchronized
     fun markReadTimeStart() {
         if (AppConfig.enableReadRecord) {
-            readTimeTracker.updateAuthor(book?.author.orEmpty())
+            book?.takeUnless(readTimeTracker::isForBook)?.let { resetReadRecord(it) }
+            book?.let { readTimeTracker.updateSnapshot(it, durChapterIndex, durChapterPos) }
             readTimeTracker.start(SystemClock.elapsedRealtime())
         }
     }
 
     @Synchronized
     fun upReadTime() {
-        val record = readTimeTracker.stop(
+        book?.let { readTimeTracker.updateSnapshot(it, durChapterIndex, durChapterPos) }
+        val (record, elapsed) = readTimeTracker.stop(
             now = SystemClock.elapsedRealtime(),
             lastRead = System.currentTimeMillis(),
         ) ?: return
-        readTimeWrite = executor.submit { appDb.readRecordDao.insert(record) }
+        val snapshotBook = book?.copy()
+        executor.execute { record.saveWithCover(snapshotBook, elapsed) }
     }
 
     private fun addLoading(index: Int): Boolean {

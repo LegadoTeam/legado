@@ -1,7 +1,6 @@
 package io.legado.app.data.entities
 
 import android.os.Parcelable
-import android.text.TextUtils
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
@@ -171,18 +170,20 @@ data class BookSource(
     }
 
     fun addGroup(groups: String): BookSource {
-        bookSourceGroup?.splitNotBlank(AppPattern.splitGroupRegex)?.toHashSet()?.let {
+        bookSourceGroup?.splitNotBlank(AppPattern.splitGroupRegex)
+            ?.toCollection(linkedSetOf())?.let {
             it.addAll(groups.splitNotBlank(AppPattern.splitGroupRegex))
-            bookSourceGroup = TextUtils.join(",", it)
+            bookSourceGroup = it.joinToString(",")
         }
         if (bookSourceGroup.isNullOrBlank()) bookSourceGroup = groups
         return this
     }
 
     fun removeGroup(groups: String): BookSource {
-        bookSourceGroup?.splitNotBlank(AppPattern.splitGroupRegex)?.toHashSet()?.let {
+        bookSourceGroup?.splitNotBlank(AppPattern.splitGroupRegex)
+            ?.toCollection(linkedSetOf())?.let {
             it.removeAll(groups.splitNotBlank(AppPattern.splitGroupRegex).toSet())
-            bookSourceGroup = TextUtils.join(",", it)
+            bookSourceGroup = it.joinToString(",")
         }
         return this
     }
@@ -237,6 +238,30 @@ data class BookSource(
 
     fun isJsSource(): Boolean = !mainJs.isNullOrBlank()
 
+    /**
+     * 是否支持批量下载正文。
+     * 常规源需要配置批量规则和大于1的最大批量数量;
+     * JS源的批量规则是 getContentBatch 函数,只看 config.maxBatchSize。
+     */
+    fun supportContentBatch(): Boolean {
+        val rule = ruleContent ?: return false
+        if ((rule.maxBatchSize ?: 0) <= 1) return false
+        return isJsSource() || !rule.contentBatch.isNullOrBlank()
+    }
+
+    /**
+     * 每批下载的章节数,未配置或不支持批量时返回1
+     */
+    fun contentBatchSize(): Int {
+        if (!supportContentBatch()) return 1
+        return (ruleContent?.maxBatchSize ?: 1).coerceIn(1, MAX_CONTENT_BATCH_SIZE)
+    }
+    /** Ranking, timing and list toggles do not change the rules being checked. */
+    fun checkContent(): String = GSON.toJson(copy(
+        customOrder = 0, enabled = true, enabledExplore = true,
+        lastUpdateTime = 0, respondTime = 0, weight = 0,
+    ))
+
     override fun getLoginJs(): String? {
         return if (isJsSource()) mainJs else super.getLoginJs()
     }
@@ -272,6 +297,11 @@ data class BookSource(
     }
 
     private fun equal(a: String?, b: String?) = a == b || (a.isNullOrEmpty() && b.isNullOrEmpty())
+
+    companion object {
+        /** 单批章节数上限,防止书源声明过大的批量导致内存和超时问题 */
+        const val MAX_CONTENT_BATCH_SIZE = 50
+    }
 
     class Converters {
 

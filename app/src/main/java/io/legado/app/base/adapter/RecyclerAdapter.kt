@@ -10,9 +10,10 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
 import io.legado.app.help.coroutine.Coroutine
-import io.legado.app.utils.buildMainHandler
 import io.legado.app.utils.withTimeoutOrNullAsync
+import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 import splitties.views.onLongClick
 import java.util.Collections
 import androidx.core.util.size
@@ -37,6 +38,24 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
     private var itemLongClickListener: ((holder: ItemViewHolder, item: ITEM) -> Boolean)? = null
 
     private var diffJob: Coroutine<*>? = null
+
+    // A drag owns the displayed positions until its database move has completed.
+    protected var listUpdatesPaused = false
+        private set
+    internal var listUpdateVersion = 0L
+        private set
+
+    protected fun pauseListUpdates() {
+        listUpdatesPaused = true
+        listUpdateVersion++
+        diffJob?.cancel()
+        diffJob = null
+    }
+
+    /** The owner must request a fresh list after resuming; paused snapshots are discarded. */
+    protected fun resumeListUpdates() {
+        listUpdatesPaused = false
+    }
 
     private var isResumed = false
 
@@ -97,6 +116,10 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
     @SuppressLint("NotifyDataSetChanged")
     @Synchronized
     fun setItems(items: List<ITEM>?) {
+        listUpdateVersion++
+        if (listUpdatesPaused) return
+        diffJob?.cancel()
+        diffJob = null
         kotlin.runCatching {
             if (this.items.isNotEmpty()) {
                 this.items.clear()
@@ -115,6 +138,8 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
         itemCallback: DiffUtil.ItemCallback<ITEM>,
         skipDiff: Boolean = false
     ) {
+        val version = ++listUpdateVersion
+        if (listUpdatesPaused) return
         kotlin.runCatching {
             if (!isResumed) { //全量标记更新
                 setItems(items)
@@ -126,7 +151,7 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
             val footerCount = getFooterCount()
             val callback = object : DiffUtil.Callback() {
                 override fun getOldListSize(): Int {
-                    return itemCount
+                    return oldItems.size + headerCount + footerCount
                 }
 
                 override fun getNewListSize(): Int {
@@ -172,19 +197,18 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
                     DiffUtil.calculateDiff(callback, itemsSize < 2000)
                 }
                 ensureActive()
-                handler.post {
-                    if (isResumed || diffResult == null) {
+                withContext(Main) {
+                    ensureActive()
+                    if (listUpdatesPaused || version != listUpdateVersion) return@withContext
+                    if (!isResumed || diffResult == null) {
                         setItems(items)
-                        return@post
+                        return@withContext
                     }
                     if (this@RecyclerAdapter.items.isNotEmpty()) {
                         this@RecyclerAdapter.items.clear()
                     }
                     if (items != null) {
                         this@RecyclerAdapter.items.addAll(items)
-                    }
-                    if (!isResumed) {
-                        return@post
                     }
                     ensureActive()
                     diffResult.dispatchUpdatesTo(this@RecyclerAdapter)
@@ -450,7 +474,6 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
         if (!isResumed) {
             diffJob?.cancel()
             diffJob = null
-            handler.removeCallbacksAndMessages(null)
         }
         this.isResumed = isResumed
     }
@@ -500,7 +523,6 @@ abstract class RecyclerAdapter<ITEM, VB : ViewBinding>(protected val context: Co
     companion object {
         private const val TYPE_HEADER_VIEW = Int.MIN_VALUE
         const val TYPE_FOOTER_VIEW = Int.MAX_VALUE - 999
-        private val handler by lazy { buildMainHandler() }
     }
 
 }

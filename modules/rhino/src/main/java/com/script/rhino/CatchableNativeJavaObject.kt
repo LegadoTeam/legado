@@ -47,12 +47,14 @@ internal class CatchableNativeJavaList(
     javaObject: Any,
     staticType: TypeInfo,
     private val declaredElementType: TypeInfo? = null,
+    private val preserveIndexOverrides: Boolean = false,
 ) : NativeJavaList(scope, javaObject, staticType) {
 
     private val methodCache = CatchableJavaMethodCache(this)
 
     @Suppress("UNCHECKED_CAST")
     private val mutableList = javaObject as MutableList<Any?>
+    private val indexOverrides = if (preserveIndexOverrides) HashMap<Int, Any?>() else null
 
     override fun get(name: String, start: Scriptable): Any? {
         return catchJavaInvocation {
@@ -69,6 +71,7 @@ internal class CatchableNativeJavaList(
     override fun get(index: Int, start: Scriptable): Any? {
         val elementType = declaredElementType ?: return super.get(index, start)
         if (index !in mutableList.indices) return Undefined.instance
+        indexOverrides?.get(index)?.let { return it }
         val value = mutableList[index]
         val context = Context.getCurrentContext() ?: return value
         return context.wrapFactory.wrap(context, parentScope, value, elementType)
@@ -77,13 +80,19 @@ internal class CatchableNativeJavaList(
     override fun put(index: Int, start: Scriptable, value: Any?) {
         val elementType = declaredElementType ?: return super.put(index, start, value)
         if (index < 0) return super.put(index, start, value)
-        val javaValue = Context.jsToJava(value, elementType)
-        if (index == mutableList.size) {
-            mutableList.add(javaValue)
-            return
+        try {
+            val javaValue = Context.jsToJava(value, elementType)
+            if (index == mutableList.size) {
+                mutableList.add(javaValue)
+                return
+            }
+            ensureCapacity(index + 1)
+            mutableList[index] = javaValue
+            indexOverrides?.remove(index)
+        } catch (error: ClassCastException) {
+            // jsoup 1.23 Elements rejects legacy scripts assigning non-Element values.
+            if (indexOverrides != null) indexOverrides[index] = value else throw error
         }
-        ensureCapacity(index + 1)
-        mutableList[index] = javaValue
     }
 
     private fun ensureCapacity(minCapacity: Int) {

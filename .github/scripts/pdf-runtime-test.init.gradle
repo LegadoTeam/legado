@@ -1,0 +1,11 @@
+gradle.beforeProject { project ->
+    project.plugins.withId('com.android.application') {
+        project.extensions.getByName('androidComponents').finalizeDsl { android ->
+            // Keep production minSdk and shrinking; only CI includes the platform test entry point.
+            android.buildTypes.getByName('release').signingConfig = android.signingConfigs.getByName('debug')
+            android.sourceSets.getByName('release').java.srcDir('src/pdfRuntime/java')
+            android.sourceSets.getByName('release').manifest.srcFile('src/pdfRuntime/AndroidManifest.xml')
+            android.sourceSets.getByName('release').assets.srcDir('src/androidTest/assets')
+        }
+    }
+}

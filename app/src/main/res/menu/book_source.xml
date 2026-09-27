@@ -141,7 +141,22 @@
     <item
         android:id="@+id/menu_group_sources_by_domain"
         android:checkable="true"
+        android:icon="@drawable/ic_add_online"
         android:title="@string/group_sources_by_domain"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_show_source_check_status"
+        android:checkable="true"
+        android:icon="@drawable/ic_find_replace"
+        android:title="@string/show_source_check_status"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_block_source_navigation"
+        android:checkable="true"
+        android:icon="@drawable/ic_block"
+        android:title="@string/block_source_navigation"
         app:showAsAction="never" />
 
     <item

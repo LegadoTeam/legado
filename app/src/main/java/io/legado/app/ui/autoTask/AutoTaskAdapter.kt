@@ -10,8 +10,11 @@ import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.constant.AppConst
 import io.legado.app.data.entities.AutoTaskRule
 import io.legado.app.databinding.ItemAutoTaskBinding
+import io.legado.app.model.AutoTask
+import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.widget.popupActionMenu
 import io.legado.app.ui.widget.recycler.DragSelectTouchHelper
+import io.legado.app.utils.startActivity
 
 class AutoTaskAdapter(context: Context, private val callback: Callback) :
     RecyclerAdapter<AutoTaskRule, ItemAutoTaskBinding>(context) {
@@ -120,6 +123,7 @@ class AutoTaskAdapter(context: Context, private val callback: Callback) :
     private fun showMenu(anchor: View, position: Int) {
         val task = getItem(position) ?: return
         popupActionMenu(context) {
+            item(context.getString(R.string.login), "login", AutoTask.buildSource(task).hasLogin())
             item(context.getString(R.string.auto_task_log), "log")
             item(context.getString(R.string.auto_task_move_up), "moveUp")
             item(context.getString(R.string.auto_task_move_down), "moveDown")
@@ -127,6 +131,11 @@ class AutoTaskAdapter(context: Context, private val callback: Callback) :
             danger("delete")
         }.show(anchor) { action ->
             when (action) {
+                "login" -> context.startActivity<SourceLoginActivity> {
+                    putExtra("type", "autoTask")
+                    putExtra("key", task.id)
+                }
+
                 "log" -> callback.showLog(task)
                 "moveUp" -> callback.move(task, -1)
                 "moveDown" -> callback.move(task, 1)

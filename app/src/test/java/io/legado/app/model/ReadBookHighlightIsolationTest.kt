@@ -88,6 +88,7 @@ class ReadBookHighlightIsolationTest {
         assertTrue(source.contains("textChapter.chapter.index != chapterIndex"))
         assertTrue(source.contains("!isActiveTextChapter(textChapter)"))
         assertTrue(source.contains("textChapter.highlightRuleMatchesJob !== job"))
+        assertTrue(source.contains("if (matchResult.completed)"))
         assertTrue(source.contains("HighlightTextBuilder.LineInput("))
         assertTrue(source.contains("line.text,"))
         assertFalse(source.contains("line.columns.map { column ->"))

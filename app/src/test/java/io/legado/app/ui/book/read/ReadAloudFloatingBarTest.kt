@@ -8,11 +8,19 @@ import java.io.File
 class ReadAloudFloatingBarTest {
 
     @Test
-    fun `visibility requires running detached speech with menus hidden`() {
+    fun `each control follows its own switch and all controls hide under menus or after stopping`() {
+        assertTrue(ReadAloudBarVisibility.shouldShow(true, true, false))
         assertTrue(ReadAloudBarVisibility.shouldShow(true, false, false))
-        assertFalse(ReadAloudBarVisibility.shouldShow(false, false, false))
-        assertFalse(ReadAloudBarVisibility.shouldShow(true, true, false))
-        assertFalse(ReadAloudBarVisibility.shouldShow(true, false, true))
+        for (following in listOf(false, true)) {
+            for (pause in listOf(false, true)) {
+                for (position in listOf(false, true)) {
+                    org.junit.Assert.assertEquals(if (following) pause else position,
+                        ReadAloudBarVisibility.shouldShow(true, following, false, pause, position))
+                    assertFalse(ReadAloudBarVisibility.shouldShow(false, following, false, pause, position))
+                    assertFalse(ReadAloudBarVisibility.shouldShow(true, following, true, pause, position))
+                }
+            }
+        }
     }
 
     @Test
@@ -30,7 +38,8 @@ class ReadAloudFloatingBarTest {
         assertTrue(host.contains("@layout/view_read_aloud_float_bar"))
         assertTrue(activity.contains("backToSpeakingPosition()"))
         assertTrue(activity.contains("ReadBook.readAloud()"))
-        assertTrue(activity.contains("ReadAloudBarVisibility.shouldShow"))
+        val controls = projectFile("src/main/java/io/legado/app/ui/book/read/ReadAloudControls.kt").readText()
+        assertTrue(controls.contains("ReadAloudBarVisibility.shouldShow"))
     }
 
     @Test

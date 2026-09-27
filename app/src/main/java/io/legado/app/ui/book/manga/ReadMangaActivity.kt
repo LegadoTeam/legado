@@ -7,15 +7,20 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
 import android.view.WindowManager
 import android.view.animation.LinearInterpolator
+import androidx.activity.addCallback
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
+import androidx.core.net.toUri
+import androidx.core.view.doOnNextLayout
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.PagerSnapHelper
+import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.integration.recyclerview.RecyclerViewPreloader
 import com.bumptech.glide.request.target.Target.SIZE_ORIGINAL
@@ -23,6 +28,7 @@ import com.bumptech.glide.util.FixedPreloadSizeProvider
 import io.legado.app.BuildConfig
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
+import io.legado.app.constant.AppConst
 import io.legado.app.constant.BookType
 import io.legado.app.constant.EventBus
 import io.legado.app.data.entities.Book
@@ -32,11 +38,13 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.databinding.ActivityMangaBinding
 import io.legado.app.databinding.ViewLoadMoreBinding
 import io.legado.app.help.book.isImage
+import io.legado.app.help.book.isPdf
 import io.legado.app.help.book.removeType
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.storage.Backup
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.model.ReadManga
+import io.legado.app.model.localBook.PdfFile
 import io.legado.app.receiver.NetworkChangedListener
 import io.legado.app.ui.book.changesource.ChangeBookSourceDialog
 import io.legado.app.ui.book.info.BookInfoActivity
@@ -52,13 +60,15 @@ import io.legado.app.ui.book.manga.recyclerview.MangaLayoutManager
 import io.legado.app.ui.book.manga.recyclerview.ScrollTimer
 import io.legado.app.ui.book.read.MangaMenu
 import io.legado.app.ui.book.read.ReadBookActivity.Companion.RESULT_DELETED
+import io.legado.app.ui.book.read.showBookDownloadDialog
 import io.legado.app.ui.book.toc.TocActivityResult
+import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.widget.number.NumberPickerDialog
 import io.legado.app.ui.widget.recycler.LoadMoreView
+import io.legado.app.utils.ACache
 import io.legado.app.utils.GSON
 import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.StartActivityContract
-import io.legado.app.utils.canScroll
 import io.legado.app.utils.fastBinarySearch
 import io.legado.app.utils.findCenterViewPosition
 import io.legado.app.utils.fromJsonObject
@@ -107,6 +117,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     }
 
     private var justInitData: Boolean = false
+    private var contentUpdateId = 0
     private var syncDialog: AlertDialog? = null
     private val mScrollTimer by lazy {
         ScrollTimer(this, binding.recyclerView, lifecycleScope).apply {
@@ -130,7 +141,11 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     //打开目录返回选择章节返回结果
     private val tocActivity = registerForActivityResult(TocActivityResult()) {
         it?.let {
-            viewModel.openChapter(it[0] as Int, it[1] as Int)
+            val pdfPage = it[TocActivityResult.PDF_PAGE_INDEX] as Int
+            val position = if (ReadManga.book?.isPdf == true && pdfPage >= 0) {
+                pdfPage % PdfFile.PAGE_SIZE
+            } else it[1] as Int
+            viewModel.openChapter(it[0] as Int, position)
         }
     }
     private val bookInfoActivity =
@@ -142,6 +157,12 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                 ReadManga.loadOrUpContent()
             }
         }
+    private val selectImageDir = registerForActivityResult(HandleFileContract()) {
+        it.uri?.let { uri ->
+            ACache.get().put(AppConst.imagePathKey, uri.toString())
+            viewModel.saveImage(it.value, uri)
+        }
+    }
     override val binding by viewBinding(ActivityMangaBinding::inflate)
     override val viewModel by viewModels<ReadMangaViewModel>()
     private val loadingViewVisible get() = binding.flLoading.isVisible
@@ -155,6 +176,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        onBackPressedDispatcher.addCallback(this) { finish() }
         ReadManga.register(this)
         upSystemUiVisibility(false)
         initRecyclerView()
@@ -206,15 +228,21 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             setDisableMangaScale(AppConfig.disableMangaScale)
             setRecyclerViewPreloader(AppConfig.mangaPreDownloadNum)
             setPreScrollListener { _, _, _, position ->
-                if (mAdapter.isNotEmpty()) {
+                // Until the requested page is laid out, callbacks still describe the old page.
+                if (!loadingViewVisible && mAdapter.isNotEmpty()) {
                     val item = mAdapter.getItem(position)
                     if (item is BaseMangaPage) {
+                        // Capture the new chapter's page before its transition saves progress.
+                        ReadManga.durChapterPos = if (item is MangaPage) {
+                            item.index
+                        } else {
+                            (item.index - 1).coerceAtLeast(0)
+                        }
                         if (ReadManga.durChapterIndex < item.chapterIndex) {
                             ReadManga.moveToNextChapter()
                         } else if (ReadManga.durChapterIndex > item.chapterIndex) {
                             ReadManga.moveToPrevChapter()
                         } else {
-                            ReadManga.durChapterPos = item.index
                             ReadManga.curPageChanged()
                         }
                         if (item is MangaPage) {
@@ -222,6 +250,19 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                             upInfoBar(item)
                         }
                     }
+                }
+            }
+            longTapListener = { event ->
+                if (!AppConfig.mangaLongClickSaveImage) {
+                    false
+                } else {
+                    val position = findChildViewUnder(event.x, event.y)
+                        ?.let { getChildAdapterPosition(it) }
+                        ?: RecyclerView.NO_POSITION
+                    (mAdapter.getItem(position) as? MangaPage)?.let {
+                        saveImage(it.mImageUrl)
+                        true
+                    } ?: false
                 }
             }
         }
@@ -240,6 +281,15 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         }
     }
 
+    private fun saveImage(src: String) {
+        val path = ACache.get().getAsString(AppConst.imagePathKey)
+        if (path.isNullOrEmpty()) {
+            selectImageDir.launch { value = src }
+        } else {
+            viewModel.saveImage(src, path.toUri())
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         viewModel.initData(intent)
@@ -253,8 +303,11 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
 
     override fun upContent() {
         lifecycleScope.launch {
+            val updateId = ++contentUpdateId
             setTitle(ReadManga.book?.name)
-            val data = withContext(IO) { ReadManga.mangaContents }
+            // This only snapshots the loaded chapters and clamps the reading position.
+            // Keep snapshots ordered; an older IO task must not overwrite a newer list.
+            val data = ReadManga.mangaContents
             val pos = data.pos
             val list = data.items
             val curFinish = data.curFinish
@@ -264,11 +317,15 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                     binding.infobar.isVisible = true
                     upInfoBar(list[pos])
                     mLayoutManager.scrollToPositionWithOffset(pos, 0)
-                    binding.flLoading.isGone = true
-                    loadMoreView.visible()
-                    binding.mangaMenu.upSeekBar(
-                        ReadManga.durChapterPos, ReadManga.curMangaChapter!!.imageCount
-                    )
+                    binding.recyclerView.doOnNextLayout {
+                        if (updateId == contentUpdateId) {
+                            binding.flLoading.isGone = true
+                            loadMoreView.visible()
+                            ReadManga.curMangaChapter?.let { chapter ->
+                                binding.mangaMenu.upSeekBar(ReadManga.durChapterPos, chapter.imageCount)
+                            }
+                        }
+                    }
                 }
 
                 if (curFinish) {
@@ -345,6 +402,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
 
     override fun onResume() {
         super.onResume()
+        ReadManga.readStartTime = System.currentTimeMillis()
         networkChangedListener.register()
         networkChangedListener.onNetworkChanged = {
             // 当网络是可用状态且无需初始化时同步进度（初始化中已有同步进度逻辑）
@@ -362,6 +420,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
 
     override fun onPause() {
         super.onPause()
+        ReadManga.upReadTime()
         if (ReadManga.inBookshelf) {
             ReadManga.saveRead()
             if (!BuildConfig.DEBUG) {
@@ -417,6 +476,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
 
     override fun showLoading() {
         lifecycleScope.launch {
+            contentUpdateId++
             binding.flLoading.isVisible = true
         }
     }
@@ -428,11 +488,17 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     }
 
     override fun scrollBy(distance: Int) {
-        if (!binding.recyclerView.canScroll(1)) {
+        val horizontal = mLayoutManager.orientation == LinearLayoutManager.HORIZONTAL
+        val direction = if (mLayoutManager.reverseLayout) -1 else 1
+        if (if (horizontal) !binding.recyclerView.canScrollHorizontally(direction)
+            else !binding.recyclerView.canScrollVertically(1)) {
             return
         }
         val time = ceil(16f / distance * 10000).toInt()
-        binding.recyclerView.smoothScrollBy(10000, 10000, mLinearInterpolator, time)
+        binding.recyclerView.smoothScrollBy(
+            if (horizontal) 10000 * direction else 0,
+            if (horizontal) 0 else 10000, mLinearInterpolator, time,
+        )
     }
 
     override fun scrollPage() {
@@ -442,10 +508,15 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     override val oldBook: Book?
         get() = ReadManga.book
 
-    override fun changeTo(source: BookSource, book: Book, toc: List<BookChapter>) {
+    override fun changeTo(
+        source: BookSource,
+        book: Book,
+        toc: List<BookChapter>,
+        onSuccess: () -> Unit,
+    ) {
         if (book.isImage) {
             binding.flLoading.isVisible = true
-            viewModel.changeTo(book, toc)
+            viewModel.changeTo(book, toc, onSuccess)
         } else {
             toastOnUi("所选择的源不是漫画源")
         }
@@ -483,10 +554,14 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             }
 
             R.id.menu_refresh -> {
-                binding.flLoading.isVisible = true
+                showLoading()
                 ReadManga.book?.let {
                     viewModel.refreshContentDur(it)
                 }
+            }
+
+            R.id.menu_download -> {
+                ReadManga.book?.let { showBookDownloadDialog(it) }
             }
 
             R.id.menu_pre_manga_number -> {
@@ -507,6 +582,11 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                 setDisableMangaScale(item.isChecked)
             }
 
+            R.id.menu_manga_long_click_save_image -> {
+                item.isChecked = !item.isChecked
+                AppConfig.mangaLongClickSaveImage = item.isChecked
+            }
+
             R.id.menu_disable_click_scroll -> {
                 item.isChecked = !item.isChecked
                 AppConfig.disableClickScroll = item.isChecked
@@ -522,6 +602,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                 enableAutoScroll = false
                 mScrollTimer.isEnabled = false
                 mMenu?.findItem(R.id.menu_enable_auto_scroll)?.isChecked = false
+                updatePageSnap()
             }
 
             R.id.menu_manga_auto_page_speed -> {
@@ -545,9 +626,17 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             R.id.menu_enable_horizontal_scroll -> {
                 item.isChecked = !item.isChecked
                 AppConfig.enableMangaHorizontalScroll = item.isChecked
-                mMenu?.findItem(R.id.menu_disable_horizontal_page_snap)?.isVisible = item.isChecked
+                mMenu?.findItem(R.id.menu_disable_horizontal_page_snap)?.isVisible =
+                    item.isChecked && !AppConfig.disableMangaPageAnim
+                mMenu?.findItem(R.id.menu_manga_right_to_left)?.isVisible = item.isChecked
                 setHorizontalScroll(item.isChecked)
                 mAdapter.notifyDataSetChanged()
+            }
+
+            R.id.menu_manga_right_to_left -> {
+                item.isChecked = !item.isChecked
+                AppConfig.mangaRightToLeft = item.isChecked
+                setHorizontalScroll(AppConfig.enableMangaHorizontalScroll)
             }
 
             R.id.menu_manga_color_filter -> {
@@ -563,11 +652,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                 enableAutoScrollPage = false
                 mScrollTimer.isEnabledPage = false
                 mMenu?.findItem(R.id.menu_manga_auto_page_speed)?.isVisible = item.isChecked
-                if (enableAutoScroll) {
-                    mPagerSnapHelper.attachToRecyclerView(null)
-                } else if (AppConfig.enableMangaHorizontalScroll) {
-                    mPagerSnapHelper.attachToRecyclerView(binding.recyclerView)
-                }
+                updatePageSnap()
             }
 
             R.id.menu_hide_manga_title -> {
@@ -592,24 +677,15 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             R.id.menu_disable_horizontal_page_snap -> {
                 item.isChecked = !item.isChecked
                 AppConfig.disableHorizontalPageSnap = item.isChecked
-                if (item.isChecked) {
-                    mPagerSnapHelper.attachToRecyclerView(null)
-                } else {
-                    mPagerSnapHelper.attachToRecyclerView(binding.recyclerView)
-                }
+                updatePageSnap()
             }
 
             R.id.menu_disable_manga_page_anim -> {
                 item.isChecked = !item.isChecked
-                mMenu?.findItem(R.id.menu_disable_horizontal_page_snap)?.isVisible = !item.isChecked
+                mMenu?.findItem(R.id.menu_disable_horizontal_page_snap)?.isVisible =
+                    AppConfig.enableMangaHorizontalScroll && !item.isChecked
                 AppConfig.disableMangaPageAnim = item.isChecked
-                if (item.isChecked) {
-                    mPagerSnapHelper.attachToRecyclerView(null)
-                } else {
-                    if (AppConfig.enableMangaHorizontalScroll && !AppConfig.disableHorizontalPageSnap) {
-                        mPagerSnapHelper.attachToRecyclerView(binding.recyclerView)
-                    }
-                }
+                updatePageSnap()
             }
 
             R.id.menu_gray_manga -> {
@@ -635,6 +711,10 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
 
     override fun upSystemUiVisibility(menuIsVisible: Boolean) {
         toggleSystemBar(menuIsVisible)
+        if (!menuIsVisible) {
+            // Keep focus in touch mode so Android delivers the first page key after a gesture.
+            binding.recyclerView.requestFocus()
+        }
         if (enableAutoScroll) {
             mScrollTimer.isEnabled = !menuIsVisible
         }
@@ -658,6 +738,20 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                 return true
             }
         }
+        if (!binding.mangaMenu.isVisible && !loadingViewVisible) {
+            val direction = when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> if (mLayoutManager.reverseLayout) 1 else -1
+                KeyEvent.KEYCODE_DPAD_RIGHT -> if (mLayoutManager.reverseLayout) -1 else 1
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_PAGE_UP -> -1
+                KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_PAGE_DOWN -> 1
+                KeyEvent.KEYCODE_SPACE -> if (event.isShiftPressed) -1 else 1
+                else -> 0
+            }
+            if (direction != 0) {
+                if (isDown) scrollPageTo(direction)
+                return true
+            }
+        }
         return super.dispatchKeyEvent(event)
     }
 
@@ -672,20 +766,35 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     }
 
     private fun setHorizontalScroll(enable: Boolean) {
+        val recycler = binding.recyclerView
+        val anchor = recycler.currentPagePosition()
+        val resumeAutoScroll = enableAutoScroll && !binding.mangaMenu.isVisible
+        if (resumeAutoScroll) mScrollTimer.isEnabled = false
+        recycler.stopScroll()
+        mPagerSnapHelper.attachToRecyclerView(null)
         mAdapter.isHorizontal = enable
-        if (enable) {
-            if (!enableAutoScroll) {
-                if (AppConfig.disableHorizontalPageSnap || AppConfig.disableMangaPageAnim) {
-                    mPagerSnapHelper.attachToRecyclerView(null)
-                } else {
-                    mPagerSnapHelper.attachToRecyclerView(binding.recyclerView)
-                }
+        // Keep adapter positions in reading order. Only their horizontal placement is reversed.
+        recycler.layoutDirection = View.LAYOUT_DIRECTION_LTR
+        mLayoutManager.orientation = if (enable) LinearLayoutManager.HORIZONTAL else LinearLayoutManager.VERTICAL
+        mLayoutManager.reverseLayout = enable && AppConfig.mangaRightToLeft
+        binding.webtoonFrame.rightToLeft = mLayoutManager.reverseLayout
+        binding.mangaMenu.setRightToLeft(mLayoutManager.reverseLayout)
+        if (anchor != RecyclerView.NO_POSITION) {
+            mLayoutManager.scrollToPositionWithOffset(anchor, 0)
+            recycler.doOnNextLayout {
+                updatePageSnap()
+                if (resumeAutoScroll) mScrollTimer.isEnabled = true
             }
-            mLayoutManager.orientation = LinearLayoutManager.HORIZONTAL
         } else {
-            mPagerSnapHelper.attachToRecyclerView(null)
-            mLayoutManager.orientation = LinearLayoutManager.VERTICAL
+            updatePageSnap()
+            if (resumeAutoScroll) mScrollTimer.isEnabled = true
         }
+    }
+
+    private fun updatePageSnap() {
+        val snap = AppConfig.enableMangaHorizontalScroll && !enableAutoScroll &&
+            !AppConfig.disableHorizontalPageSnap && !AppConfig.disableMangaPageAnim
+        mPagerSnapHelper.attachToRecyclerView(if (snap) binding.recyclerView else null)
     }
 
     @SuppressLint("StringFormatMatches")
@@ -694,11 +803,17 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         menu.findItem(R.id.menu_pre_manga_number).title =
             getString(R.string.pre_download_m, AppConfig.mangaPreDownloadNum)
         menu.findItem(R.id.menu_disable_manga_scale).isChecked = AppConfig.disableMangaScale
+        menu.findItem(R.id.menu_manga_long_click_save_image).isChecked =
+            AppConfig.mangaLongClickSaveImage
         menu.findItem(R.id.menu_disable_click_scroll).isChecked = AppConfig.disableClickScroll
         menu.findItem(R.id.menu_manga_auto_page_speed).title =
             getString(R.string.manga_auto_page_speed, AppConfig.mangaAutoPageSpeed)
         menu.findItem(R.id.menu_enable_horizontal_scroll).isChecked =
             AppConfig.enableMangaHorizontalScroll
+        menu.findItem(R.id.menu_manga_right_to_left).run {
+            isVisible = AppConfig.enableMangaHorizontalScroll
+            isChecked = AppConfig.mangaRightToLeft
+        }
         menu.findItem(R.id.menu_epaper_manga).isChecked = AppConfig.enableMangaEInk
         menu.findItem(R.id.menu_epaper_manga_setting).isVisible = AppConfig.enableMangaEInk
         menu.findItem(R.id.menu_disable_horizontal_page_snap).run {
@@ -739,22 +854,21 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     }
 
     private fun scrollPageTo(direction: Int) {
-        if (!binding.recyclerView.canScroll(direction)) {
-            return
-        }
+        if (loadingViewVisible) return
         var dx = 0
         var dy = 0
         if (AppConfig.enableMangaHorizontalScroll) {
+            val physicalDirection = if (mLayoutManager.reverseLayout) -direction else direction
+            if (!binding.recyclerView.canScrollHorizontally(physicalDirection)) return
             dx = binding.recyclerView.run {
                 width - paddingStart - paddingEnd
-            }
+            } * physicalDirection
         } else {
+            if (!binding.recyclerView.canScrollVertically(direction)) return
             dy = binding.recyclerView.run {
                 height - paddingTop - paddingBottom
-            }
+            } * direction
         }
-        dx *= direction
-        dy *= direction
         if (AppConfig.disableMangaPageAnim) {
             binding.recyclerView.scrollBy(dx, dy)
         } else {

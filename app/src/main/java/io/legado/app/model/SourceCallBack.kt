@@ -9,17 +9,32 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.ui.login.SourceLoginJsExtensions
+import io.legado.app.ui.widget.dialog.BottomWebViewDialog
+import io.legado.app.utils.GSON
 import io.legado.app.utils.isTrue
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import java.util.Collections
 import kotlin.String
 import kotlin.onFailure
 
 object SourceCallBack {
+    private data class CustomButtonRequest(
+        val activity: AppCompatActivity,
+        val sourceKey: String,
+        val bookUrl: String,
+        val chapterIndex: Int?,
+        val bookType: Int,
+        val event: String,
+    )
+
+    private val pendingCustomButtons = Collections.synchronizedSet(mutableSetOf<CustomButtonRequest>())
+
     const val CLICK_AUTHOR = "clickAuthor"
     const val LONG_CLICK_AUTHOR = "longClickAuthor"
     const val CLICK_BOOK_NAME = "clickBookName"
@@ -60,26 +75,45 @@ object SourceCallBack {
             noCall?.invoke()
             return
         }
-        activity.lifecycleScope.launch(IO) {
-            val java = SourceLoginJsExtensions(activity, source,  bookType)
-            kotlin.runCatching {
-                val result = runScriptWithContext {
-                    source.evalJS(jsStr) {
-                        put("event", event)
-                        put("java", java)
-                        put("result", result)
-                        put("book", book)
-                        put("chapter", chapter)
-                    }.toString()
+        val request = if (event == CLICK_CUSTOM_BUTTON || event == LONG_CLICK_CUSTOM_BUTTON) {
+            CustomButtonRequest(activity, source.getKey(), book.bookUrl, chapter?.index, bookType, event)
+        } else null
+        if (request != null && !pendingCustomButtons.add(request)) return
+        val browserKey = request?.let {
+            GSON.toJson(listOf(it.sourceKey, it.bookUrl, it.chapterIndex, it.bookType, it.event))
+        }
+        // Finish on Main after any showBrowser work posted by the script.
+        activity.lifecycleScope.launch(start = CoroutineStart.LAZY) {
+            if (browserKey != null && activity.supportFragmentManager.fragments.any {
+                it is BottomWebViewDialog && it.handlesCustomButton(browserKey)
+            }) return@launch
+            withContext(IO) {
+                val java = SourceLoginJsExtensions(activity, source, bookType).apply {
+                    customButtonKey = browserKey
                 }
-                if (!result.isTrue()) {
-                    withContext(Dispatchers.Main) {
-                        noCall?.invoke()
+                kotlin.runCatching {
+                    val result = runScriptWithContext {
+                        source.evalJS(jsStr) {
+                            put("event", event)
+                            put("java", java)
+                            put("result", result)
+                            put("book", book)
+                            put("chapter", chapter)
+                        }.toString()
                     }
+                    if (!result.isTrue()) {
+                        withContext(Dispatchers.Main) {
+                            noCall?.invoke()
+                        }
+                    }
+                }.onFailure {
+                    AppLog.put("${source.bookSourceName}\n书源执行回调事件${event}出错\n${it.localizedMessage}", it, true)
                 }
-            }.onFailure {
-                AppLog.put("${source.bookSourceName}\n书源执行回调事件${event}出错\n${it.localizedMessage}", it, true)
             }
+        }.apply {
+            // Also releases the claim when a destroyed host cancels before the lazy block starts.
+            invokeOnCompletion { if (request != null) pendingCustomButtons.remove(request) }
+            start()
         }
     }
 

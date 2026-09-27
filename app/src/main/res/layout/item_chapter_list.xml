@@ -6,6 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="?android:attr/selectableItemBackground"
+    android:minHeight="48dp"
     android:orientation="vertical"
     android:padding="12dp">
 
@@ -92,10 +93,23 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:contentDescription="@string/success"
+            android:importantForAccessibility="no"
             android:padding="4dp"
             android:src="@drawable/ic_check"
             android:visibility="invisible"
             app:tint="@color/secondaryText"
+            tools:visibility="visible" />
+
+        <io.legado.app.lib.theme.view.ThemeCheckBox
+            android:id="@+id/cb_selected"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clickable="false"
+            android:focusable="false"
+            android:importantForAccessibility="no"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:visibility="gone"
             tools:visibility="visible" />
 
         <ImageView

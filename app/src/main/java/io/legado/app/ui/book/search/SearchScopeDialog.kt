@@ -107,7 +107,7 @@ class SearchScopeDialog : BaseDialogFragment(R.layout.dialog_search_scope) {
     }
 
     private fun initData() {
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             groups = withContext(IO) {
                 appDb.bookSourceDao.allEnabledGroups()
             }
@@ -127,7 +127,7 @@ class SearchScopeDialog : BaseDialogFragment(R.layout.dialog_search_scope) {
     @SuppressLint("NotifyDataSetChanged")
     private fun upBookSource(searchKey: String? = null) {
         sourceFlowJob?.cancel()
-        sourceFlowJob = lifecycleScope.launch {
+        sourceFlowJob = viewLifecycleOwner.lifecycleScope.launch {
             when {
                 searchKey.isNullOrEmpty() -> {
                     appDb.bookSourceDao.flowAll()
@@ -137,7 +137,7 @@ class SearchScopeDialog : BaseDialogFragment(R.layout.dialog_search_scope) {
                     appDb.bookSourceDao.flowSearch(searchKey)
                 }
             }.flowWithLifecycleAndDatabaseChange(
-                lifecycle,
+                viewLifecycleOwner.lifecycle,
                 table = AppDatabase.BOOK_SOURCE_TABLE_NAME
             ).catch {
                 AppLog.put("多分组/书源界面更新书源出错", it)

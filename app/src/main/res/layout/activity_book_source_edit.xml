@@ -186,6 +186,15 @@
         android:elevation="3dp"
         tools:ignore="SpeakableTextPresentCheck" />
 
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/field_nav"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@color/background"
+        app:tabIndicatorFullWidth="false"
+        app:tabMode="scrollable"
+        tools:ignore="SpeakableTextPresentCheck" />
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_view"
         android:layout_width="match_parent"

@@ -22,10 +22,16 @@ import com.bumptech.glide.load.Transformation
 import com.bumptech.glide.load.engine.GlideException
 import com.bumptech.glide.request.RequestListener
 import com.bumptech.glide.request.target.Target
+import io.legado.app.help.book.BookHelp
 import io.legado.app.help.glide.progress.ProgressManager
 import io.legado.app.model.BookCover
 import io.legado.app.model.ReadManga
 import io.legado.app.utils.printOnDebug
+
+internal fun mangaImagePath(imageUrl: String): String {
+    val book = ReadManga.book ?: return imageUrl
+    return BookHelp.getImage(book, imageUrl).takeIf { it.isFile }?.absolutePath ?: imageUrl
+}
 
 open class MangaVH<VB : ViewBinding>(val binding: VB, private val context: Context) :
     RecyclerView.ViewHolder(binding.root) {
@@ -72,7 +78,7 @@ open class MangaVH<VB : ViewBinding>(val binding: VB, private val context: Conte
             mImage.tag = imageUrl
             BookCover.loadManga(
                 context,
-                imageUrl,
+                mangaImagePath(imageUrl),
                 sourceOrigin = ReadManga.book?.origin,
                 transformation = transformation
             ).addListener(object : RequestListener<Drawable> {

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="title_font_weight">Title font weight</string>
+    <string name="title_font_weight_follow">Follow body (original title style)</string>
+</resources>

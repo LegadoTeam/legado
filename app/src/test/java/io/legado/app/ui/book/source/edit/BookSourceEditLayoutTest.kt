@@ -103,6 +103,81 @@ class BookSourceEditLayoutTest {
     }
 
     @Test
+    fun `edit adapters replay current safety state after holder reuse`() {
+        listOf(BOOK_SOURCE_ADAPTER_PATH, RSS_SOURCE_ADAPTER_PATH).forEach { path ->
+            val source = File(repositoryRoot, path).readText()
+            val bind = source.section(
+                "fun bind(editEntity: EditEntity)",
+                "private fun applyInteractionState()"
+            )
+            val stateUpdate = Regex(
+                "(?m)^\\s*isUnsafeText\\s*=\\s*!presentation\\.isInlineEditable\\s*$"
+            ).find(bind)?.range?.first ?: -1
+            val stateReplay = Regex(
+                "(?m)^\\s*applyInteractionState\\(\\)\\s*$"
+            ).find(bind)?.range?.first ?: -1
+
+            assertTrue(
+                "$path must keep safety state on the holder",
+                Regex("private\\s+var\\s+isUnsafeText\\s*=\\s*false").containsMatchIn(source)
+            )
+            assertTrue(
+                "$path must replay safety state when attached",
+                Regex(
+                    "onViewAttachedToWindow\\([^)]*\\)\\s*\\{\\s*" +
+                        "applyInteractionState\\(\\)"
+                ).containsMatchIn(source)
+            )
+            assertTrue("$path must update holder safety state while binding", stateUpdate >= 0)
+            assertTrue(
+                "$path must replay safety state after updating it",
+                stateReplay > stateUpdate
+            )
+            assertTrue(Regex("isFocusable\\s*=\\s*!isUnsafeText").containsMatchIn(source))
+            assertTrue(Regex("isFocusableInTouchMode\\s*=\\s*!isUnsafeText")
+                .containsMatchIn(source))
+        }
+    }
+
+    @Test
+    fun `source editor keeps the caret visible after selection and layout changes`() {
+        val source = File(repositoryRoot, ACTIVITY_PATH).readText()
+        val initView = source.section("private fun initView()", "private fun initOptionPanel()")
+        val sendText = source.section("override fun sendText(text: String)", "private fun setSourceVariable()")
+        val layoutManager = File(repositoryRoot, LAYOUT_MANAGER_PATH).readText()
+        val codeView = File(repositoryRoot, CODE_VIEW_PATH).readText()
+
+        assertTrue(initView.contains("binding.recyclerView.layoutManager = NoChildScrollLinearLayoutManager(this)"))
+        assertFalse(initView.contains("adapter.editEntityMaxLine < 999"))
+        assertTrue(layoutManager.contains("override fun onRequestChildFocus("))
+        assertTrue(layoutManager.contains("return true"))
+        assertFalse(layoutManager.contains("requestChildRectangleOnScreen"))
+        assertTrue(initView.contains("(oldFocus as? CodeView)?.keepSelectionVisible = false"))
+        assertTrue(initView.contains("(newFocus as? CodeView)?.keepSelectionVisible = true"))
+        assertTrue(initView.contains("binding.recyclerView.addOnLayoutChangeListener"))
+        assertTrue(initView.contains("(binding.recyclerView.findFocus() as? CodeView)?.requestSelectionVisible()"))
+        assertTrue(codeView.contains("override fun onSelectionChanged("))
+        assertTrue(codeView.contains("super.onSelectionChanged(selStart, selEnd)"))
+        assertTrue(codeView.contains("override fun performClick(): Boolean"))
+        assertTrue(codeView.contains("val handled = super.performClick()"))
+        assertTrue(codeView.contains("removeCallbacks(selectionVisibilityRunnable)"))
+        assertTrue(codeView.contains("post(selectionVisibilityRunnable)"))
+        assertTrue(codeView.contains("!keepSelectionVisible || !isFocused"))
+        assertTrue(codeView.contains("selectionVisibilityOffset("))
+        assertTrue(codeView.contains("activeSelectionOffset"))
+        assertTrue(codeView.contains("requestSelectionHandleVisible(offset)"))
+        assertTrue(codeView.contains("textSelectHandle"))
+        assertTrue(codeView.contains("bringPointIntoView(offset)"))
+        assertTrue(codeView.contains(".coerceIn(0, text.length)"))
+        assertFalse(codeView.contains("selectionStart == selectionEnd && selectionEnd >= 0"))
+        assertTrue(initView.contains("resolveSelectionHandleClearance(this)"))
+        assertFalse(codeView.contains("MotionEvent.ACTION_UP"))
+        assertFalse(initView.contains("setOnClickListener { sendText(\"\") }"))
+        assertFalse(sendText.contains("smoothScrollBy"))
+        assertFalse(sendText.contains("editEntityMaxLine"))
+    }
+
+    @Test
     fun `ported panel stays independent from legadoT theme stack`() {
         val source = listOf(LAYOUT_PATH, ACTIVITY_PATH)
             .joinToString("\n") { File(repositoryRoot, it).readText() }
@@ -116,6 +191,47 @@ class BookSourceEditLayoutTest {
         ).forEach { dependency ->
             assertFalse("unexpected dependency: $dependency", source.contains(dependency))
         }
+    }
+
+    @Test
+    fun `source and auto task editors share main field tab navigation`() {
+        listOf(
+            LAYOUT_PATH to ACTIVITY_PATH,
+            RSS_LAYOUT_PATH to RSS_ACTIVITY_PATH
+        ).forEach { (layoutPath, activityPath) ->
+            val navigation = parse(layoutPath).elementById("field_nav")
+            val activity = File(repositoryRoot, activityPath).readText()
+
+            assertEquals(TAB_LAYOUT, navigation.tagName)
+            assertEquals("48dp", navigation.androidAttribute("layout_height"))
+            assertEquals("scrollable", navigation.appAttribute("tabMode"))
+            assertTrue(activity.contains("fieldNav.bindFieldNavigation(binding.recyclerView)"))
+            assertTrue(activity.contains("fieldNav.setFieldLabels(entities.map { it.hint })"))
+        }
+
+        val autoTaskDocument = parse(AUTO_TASK_LAYOUT_PATH)
+        val autoTaskNavigation = autoTaskDocument.elementById("field_nav")
+        val autoTaskFieldContainer = autoTaskDocument.elementById("field_container")
+        val autoTaskActivity = File(repositoryRoot, AUTO_TASK_ACTIVITY_PATH).readText()
+        assertEquals(TAB_LAYOUT, autoTaskNavigation.tagName)
+        assertEquals("48dp", autoTaskNavigation.androidAttribute("layout_height"))
+        assertEquals("scrollable", autoTaskNavigation.appAttribute("tabMode"))
+        val directFields = (0 until autoTaskFieldContainer.childNodes.length)
+            .map { autoTaskFieldContainer.childNodes.item(it) }
+            .filterIsInstance<Element>()
+            .count { it.tagName == TEXT_INPUT_LAYOUT }
+        assertEquals(10, directFields)
+        assertTrue(autoTaskActivity.contains("fieldContainer.children.filterIsInstance<TextInputLayout>()"))
+        assertTrue(autoTaskActivity.contains("fieldNav.setFieldLabels(fields.map"))
+        assertTrue(autoTaskActivity.contains("fieldNav.bindFieldNavigation(scrollView, fields)"))
+
+        val helper = File(repositoryRoot, FIELD_NAVIGATION_PATH).readText()
+        assertTrue(helper.contains("recyclerView.scrollState == RecyclerView.SCROLL_STATE_IDLE"))
+        assertTrue(helper.contains("spanSizeLookup.getSpanIndex"))
+        assertTrue(helper.contains("scrollView.scrollTo(0, field.top)"))
+        assertTrue(helper.contains("fields.indexOfLast { it.top <= scrollY }"))
+        assertTrue(helper.contains("!scrollView.canScrollVertically(1)"))
+        assertFalse(helper.contains("AppColorScheme"))
     }
 
     private fun parse(path: String): Document =
@@ -154,9 +270,27 @@ class BookSourceEditLayoutTest {
         const val LAYOUT_PATH = "app/src/main/res/layout/activity_book_source_edit.xml"
         const val ACTIVITY_PATH =
             "app/src/main/java/io/legado/app/ui/book/source/edit/BookSourceEditActivity.kt"
+        const val BOOK_SOURCE_ADAPTER_PATH =
+            "app/src/main/java/io/legado/app/ui/book/source/edit/BookSourceEditAdapter.kt"
+        const val RSS_SOURCE_ADAPTER_PATH =
+            "app/src/main/java/io/legado/app/ui/rss/source/edit/RssSourceEditAdapter.kt"
         const val CARD_VIEW = "androidx.cardview.widget.CardView"
         const val FLEXBOX = "com.google.android.flexbox.FlexboxLayout"
+        const val TAB_LAYOUT = "com.google.android.material.tabs.TabLayout"
+        const val TEXT_INPUT_LAYOUT = "io.legado.app.ui.widget.text.TextInputLayout"
         const val THEME_CHECK_BOX = "io.legado.app.lib.theme.view.ThemeCheckBox"
+        const val RSS_LAYOUT_PATH = "app/src/main/res/layout/activity_rss_source_edit.xml"
+        const val RSS_ACTIVITY_PATH =
+            "app/src/main/java/io/legado/app/ui/rss/source/edit/RssSourceEditActivity.kt"
+        const val AUTO_TASK_LAYOUT_PATH = "app/src/main/res/layout/activity_auto_task_edit.xml"
+        const val AUTO_TASK_ACTIVITY_PATH =
+            "app/src/main/java/io/legado/app/ui/autoTask/AutoTaskEditActivity.kt"
+        const val FIELD_NAVIGATION_PATH =
+            "app/src/main/java/io/legado/app/ui/widget/FieldNavigationExtensions.kt"
+        const val LAYOUT_MANAGER_PATH =
+            "app/src/main/java/io/legado/app/ui/widget/recycler/NoChildScrollLinearLayoutManager.kt"
+        const val CODE_VIEW_PATH =
+            "app/src/main/java/io/legado/app/ui/widget/code/CodeView.kt"
         const val ANDROID_NAMESPACE = "http://schemas.android.com/apk/res/android"
         const val APP_NAMESPACE = "http://schemas.android.com/apk/res-auto"
         val CHECK_BOX_IDS = listOf(

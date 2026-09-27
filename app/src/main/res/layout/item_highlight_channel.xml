@@ -30,6 +30,21 @@
         android:textSize="13sp"
         android:visibility="gone" />
 
+    <TextView
+        android:id="@+id/tv_tune"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:minHeight="40dp"
+        android:minWidth="48dp"
+        android:paddingHorizontal="6dp"
+        android:textColor="@color/accent"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
     <FrameLayout
         android:id="@+id/v_swatch"
         android:layout_width="48dp"

@@ -32,6 +32,37 @@ class HighlightRuleMatcherTest {
     }
 
     @Test
+    fun `title and body scopes preserve local anchors and chapter offsets`() {
+        val matches = HighlightRuleMatcher.match(
+            "Title\nBody",
+            listOf(
+                Rule(
+                    1,
+                    "^Title$",
+                    true,
+                    style,
+                    applyToTitle = true,
+                    applyToBody = false
+                ),
+                Rule(2, "^Body$", true, style),
+                Rule(3, "Title\nBody", false, style, applyToTitle = true),
+                Rule(4, "Body", false, style, applyToBody = false)
+            ),
+            titleLength = 6
+        )
+
+        assertEquals(
+            listOf(1L to (0 to 5), 2L to (6 to 10), 3L to (0 to 10)),
+            matches.map { it.ruleId to (it.start to it.end) }
+        )
+        assertTrue(matches.first().applyToTitle)
+        assertFalse(matches.first().applyToBody)
+        assertTrue(matches[1].applyToBody)
+        assertFalse(matches[1].applyToTitle)
+        assertTrue(matches.last().applyToTitle && matches.last().applyToBody)
+    }
+
+    @Test
     fun `zero width and invalid regexes are skipped`() {
         assertTrue(
             HighlightRuleMatcher.match("bbb", listOf(Rule(1, "a*", true, style))).isEmpty()
@@ -57,19 +88,31 @@ class HighlightRuleMatcherTest {
     fun `catastrophic regex obeys its matching deadline`() {
         val startedAt = System.nanoTime()
 
-        val matches = HighlightRuleMatcher.match(
+        val result = HighlightRuleMatcher.matchDetailed(
             "a".repeat(10_000) + "!",
             listOf(Rule(1, "(a+)+$", true, style, timeoutMs = 5L))
         )
 
         val elapsedMs = (System.nanoTime() - startedAt) / 1_000_000L
-        assertTrue(matches.isEmpty())
+        assertTrue(result.matches.isEmpty())
+        assertFalse(result.completed)
         assertTrue("regex matching took $elapsedMs ms", elapsedMs < 2_000L)
     }
 
     @Test
+    fun `timed out regex marks its prefix matches incomplete`() {
+        val result = HighlightRuleMatcher.matchDetailed(
+            "ok" + "a".repeat(10_000) + "!",
+            listOf(Rule(1, "ok|(a+)+$", true, style, timeoutMs = 5L))
+        )
+
+        assertEquals(listOf(0 to 2), result.matches.map { it.start to it.end })
+        assertFalse(result.completed)
+    }
+
+    @Test
     fun `all rules share one chapter match limit`() {
-        val matches = HighlightRuleMatcher.match(
+        val result = HighlightRuleMatcher.matchDetailed(
             "aaaaa",
             listOf(
                 Rule(1, "a", false, style),
@@ -78,8 +121,9 @@ class HighlightRuleMatcherTest {
             maxMatches = 3
         )
 
-        assertEquals(3, matches.size)
-        assertTrue(matches.all { it.ruleId == 1L })
+        assertEquals(3, result.matches.size)
+        assertTrue(result.matches.all { it.ruleId == 1L })
+        assertFalse(result.completed)
     }
 
     @Test

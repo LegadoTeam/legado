@@ -6,11 +6,21 @@ import io.legado.app.utils.fromJsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LoginInfoMapInitializationTest {
+
+    @Test
+    fun `stored login info lookup does not initialize dynamic defaults`() {
+        val source = ReentrantLoginSource()
+
+        assertNull(source.getStoredLoginInfoMap())
+        assertEquals(0, source.evaluationCount)
+        assertNull(source.savedLoginInfo)
+    }
 
     @Test
     fun `login ui script can read login info during default initialization`() {

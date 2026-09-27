@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.view.View
 import androidx.preference.Preference
 import io.legado.app.R
+import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.prefs.SwitchPreference
@@ -21,10 +22,12 @@ import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.inputStream
 import io.legado.app.utils.putPrefString
+import io.legado.app.utils.postEvent
 import io.legado.app.utils.readUri
 import io.legado.app.utils.removePref
 import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.showDialogFragment
+import io.legado.app.utils.startActivity
 import io.legado.app.utils.toastOnUi
 import splitties.init.appCtx
 import java.io.FileOutputStream
@@ -32,21 +35,17 @@ import java.io.FileOutputStream
 class CoverConfigFragment : PreferenceFragment(),
     SharedPreferences.OnSharedPreferenceChangeListener {
 
-    private val requestCodeCover = 111
-    private val requestCodeCoverDark = 112
+    private val coverKeys = listOf(PreferKey.defaultCover, PreferKey.defaultCoverDark,
+        PreferKey.readRecordCover, PreferKey.readRecordCoverDark)
     private val selectImage = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
-            when (it.requestCode) {
-                requestCodeCover -> setCoverFromUri(PreferKey.defaultCover, uri)
-                requestCodeCoverDark -> setCoverFromUri(PreferKey.defaultCoverDark, uri)
-            }
+            it.value?.takeIf { key -> key in coverKeys }?.let { key -> setCoverFromUri(key, uri) }
         }
     }
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         addPreferencesFromResource(R.xml.pref_config_cover)
-        upPreferenceSummary(PreferKey.defaultCover, getPrefString(PreferKey.defaultCover))
-        upPreferenceSummary(PreferKey.defaultCoverDark, getPrefString(PreferKey.defaultCoverDark))
+        coverKeys.forEach { upPreferenceSummary(it, getPrefString(it)) }
         findPreference<SwitchPreference>(PreferKey.coverShowAuthor)
             ?.isEnabled = getPrefBoolean(PreferKey.coverShowName)
         findPreference<SwitchPreference>(PreferKey.coverShowAuthorN)
@@ -72,8 +71,14 @@ class CoverConfigFragment : PreferenceFragment(),
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
         sharedPreferences ?: return
         when (key) {
+            PreferKey.useDefaultCover -> {
+                BookCover.upDefaultCover()
+                postEvent(EventBus.BOOKSHELF_REFRESH, "")
+            }
             PreferKey.defaultCover,
-            PreferKey.defaultCoverDark -> {
+            PreferKey.defaultCoverDark,
+            PreferKey.readRecordCover,
+            PreferKey.readRecordCoverDark -> {
                 upPreferenceSummary(key, getPrefString(key))
             }
 
@@ -81,17 +86,20 @@ class CoverConfigFragment : PreferenceFragment(),
                 findPreference<SwitchPreference>(PreferKey.coverShowAuthor)
                     ?.isEnabled = getPrefBoolean(key)
                 BookCover.upDefaultCover()
+                postEvent(EventBus.BOOKSHELF_REFRESH, "")
             }
 
             PreferKey.coverShowNameN -> {
                 findPreference<SwitchPreference>(PreferKey.coverShowAuthorN)
                     ?.isEnabled = getPrefBoolean(key)
                 BookCover.upDefaultCover()
+                postEvent(EventBus.BOOKSHELF_REFRESH, "")
             }
 
             PreferKey.coverShowAuthor,
             PreferKey.coverShowAuthorN -> {
                 BookCover.upDefaultCover()
+                postEvent(EventBus.BOOKSHELF_REFRESH, "")
             }
         }
     }
@@ -99,11 +107,14 @@ class CoverConfigFragment : PreferenceFragment(),
     @SuppressLint("PrivateResource")
     override fun onPreferenceTreeClick(preference: Preference): Boolean {
         when (preference.key) {
+            ConfigTag.COVER_FONT_CONFIG -> startActivity<ConfigActivity> {
+                putExtra("configTag", ConfigTag.COVER_FONT_CONFIG)
+            }
             "coverRule" -> showDialogFragment(CoverRuleConfigDialog())
-            PreferKey.defaultCover ->
+            in coverKeys ->
                 if (getPrefString(preference.key).isNullOrEmpty()) {
                     selectImage.launch {
-                        requestCode = requestCodeCover
+                        value = preference.key
                         mode = HandleFileContract.IMAGE
                     }
                 } else {
@@ -118,37 +129,13 @@ class CoverConfigFragment : PreferenceFragment(),
                             BookCover.upDefaultCover()
                         } else {
                             selectImage.launch {
-                                requestCode = requestCodeCover
+                                value = preference.key
                                 mode = HandleFileContract.IMAGE
                             }
                         }
                     }
                 }
 
-            PreferKey.defaultCoverDark ->
-                if (getPrefString(preference.key).isNullOrEmpty()) {
-                    selectImage.launch {
-                        requestCode = requestCodeCoverDark
-                        mode = HandleFileContract.IMAGE
-                    }
-                } else {
-                    context?.selector(
-                        items = arrayListOf(
-                            getString(R.string.delete),
-                            getString(R.string.select_image)
-                        )
-                    ) { _, i ->
-                        if (i == 0) {
-                            removePref(preference.key)
-                            BookCover.upDefaultCover()
-                        } else {
-                            selectImage.launch {
-                                requestCode = requestCodeCoverDark
-                                mode = HandleFileContract.IMAGE
-                            }
-                        }
-                    }
-                }
         }
         return super.onPreferenceTreeClick(preference)
     }
@@ -156,8 +143,7 @@ class CoverConfigFragment : PreferenceFragment(),
     private fun upPreferenceSummary(preferenceKey: String, value: String?) {
         val preference = findPreference<Preference>(preferenceKey) ?: return
         when (preferenceKey) {
-            PreferKey.defaultCover,
-            PreferKey.defaultCoverDark -> preference.summary = if (value.isNullOrBlank()) {
+            in coverKeys -> preference.summary = if (value.isNullOrBlank()) {
                 getString(R.string.select_image)
             } else {
                 value

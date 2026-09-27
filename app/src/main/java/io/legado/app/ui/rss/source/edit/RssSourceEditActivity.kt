@@ -2,13 +2,13 @@ package io.legado.app.ui.rss.source.edit
 
 import android.content.Intent
 import android.graphics.Color
-import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.EditText
+import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
@@ -35,10 +35,14 @@ import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.qrcode.QrCodeResult
 import io.legado.app.ui.rss.source.debug.RssSourceDebugActivity
+import io.legado.app.ui.widget.bindFieldNavigation
+import io.legado.app.ui.widget.code.CodeView
 import io.legado.app.ui.widget.code.EditSafety
+import io.legado.app.ui.widget.code.resolveSelectionHandleClearance
 import io.legado.app.ui.widget.dialog.UrlOptionDialog
 import io.legado.app.ui.widget.dialog.VariableDialog
 import io.legado.app.ui.widget.keyboard.KeyboardToolPop
+import io.legado.app.ui.widget.setFieldLabels
 import io.legado.app.ui.widget.text.EditEntity
 import io.legado.app.utils.GSON
 import io.legado.app.utils.imeHeight
@@ -112,6 +116,7 @@ class RssSourceEditActivity :
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        onBackPressedDispatcher.addCallback(this) { finish() }
         softKeyboardTool.attachToWindow(window)
         initView()
         viewModel.initData(intent) {
@@ -291,32 +296,34 @@ class RssSourceEditActivity :
                 else -> 2 //占2个span（整行）
             }
         }
-        val gridLayoutManager = if (adapter.editEntityMaxLine < 999) {
-            object : GridLayoutManager(this, 2) {
-                init {
-                    spanSizeLookup = createSpanSizeLookup
-                }
-                override fun requestChildRectangleOnScreen(parent: RecyclerView, child: View, rect: Rect, immediate: Boolean, focusedChildVisible: Boolean) = false
-                override fun requestChildRectangleOnScreen(parent: RecyclerView, child: View, rect: Rect, immediate: Boolean) = false
-            }
-        } else {
-            GridLayoutManager(this, 2).apply {
+        val gridLayoutManager = object : GridLayoutManager(this, 2) {
+            init {
                 spanSizeLookup = createSpanSizeLookup
             }
+
+            override fun onRequestChildFocus(
+                parent: RecyclerView,
+                state: RecyclerView.State,
+                child: View,
+                focused: View?
+            ) = focused is CodeView
         }
         binding.recyclerView.layoutManager = gridLayoutManager
         binding.recyclerView.adapter = adapter
-        binding.recyclerView.viewTreeObserver.addOnGlobalFocusChangeListener { _, newFocus ->
-            if (newFocus is EditText) {
-                newFocus.postDelayed({ sendText("") }, 120)
-            }
+        binding.fieldNav.bindFieldNavigation(binding.recyclerView)
+        binding.recyclerView.viewTreeObserver.addOnGlobalFocusChangeListener { oldFocus, newFocus ->
+            (oldFocus as? CodeView)?.keepSelectionVisible = false
+            (newFocus as? CodeView)?.keepSelectionVisible = true
+        }
+        binding.recyclerView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            (binding.recyclerView.findFocus() as? CodeView)?.requestSelectionVisible()
         }
         val transparentBar = transparentNavBar && !AppConfig.isEInkMode
-        binding.tabLayout.setBackgroundColor(
-            if (transparentBar) Color.TRANSPARENT else backgroundColor
-        )
-        if (transparentBar) binding.tabLayout.elevation = 0f
-        binding.tabLayout.setSelectedTabIndicatorColor(accentColor)
+        listOf(binding.tabLayout, binding.fieldNav).forEach { tabs ->
+            tabs.setBackgroundColor(if (transparentBar) Color.TRANSPARENT else backgroundColor)
+            if (transparentBar) tabs.elevation = 0f
+            tabs.setSelectedTabIndicatorColor(accentColor)
+        }
         binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabReselected(tab: TabLayout.Tab?) {
 
@@ -330,10 +337,12 @@ class RssSourceEditActivity :
                 setEditEntities(tab?.position)
             }
         })
+        val selectionHandleClearance = resolveSelectionHandleClearance(this)
         binding.recyclerView.setOnApplyWindowInsetsListenerCompat { view, windowInsets ->
             val navigationBarHeight = windowInsets.navigationBarHeight
             val imeHeight = windowInsets.imeHeight
-            view.bottomPadding = if (imeHeight == 0) navigationBarHeight else 0
+            view.bottomPadding = if (imeHeight == 0) navigationBarHeight
+            else selectionHandleClearance
             softKeyboardTool.initialPadding = imeHeight
             windowInsets
         }
@@ -375,12 +384,14 @@ class RssSourceEditActivity :
     }
 
     private fun setEditEntities(tabPosition: Int?) {
-        when (tabPosition) {
-            1 -> adapter.editEntities = startEntities
-            2 -> adapter.editEntities = listEntities
-            3 -> adapter.editEntities = webViewEntities
-            else -> adapter.editEntities = sourceEntities
+        val entities = when (tabPosition) {
+            1 -> startEntities
+            2 -> listEntities
+            3 -> webViewEntities
+            else -> sourceEntities
         }
+        adapter.editEntities = entities
+        binding.fieldNav.setFieldLabels(entities.map { it.hint })
         binding.recyclerView.scrollToPosition(0)
         window.decorView.rootView.clearFocus()
     }
@@ -472,6 +483,7 @@ class RssSourceEditActivity :
                 )
             )
             add(EditEntity("ruleContent", rs.ruleContent, R.string.r_content))
+            add(EditEntity("nextContentUrl", rs.nextContentUrl, R.string.rule_next_content))
             add(EditEntity("style", rs.style, R.string.r_style))
             add(EditEntity("injectJs", rs.injectJs, R.string.r_inject_js))
             add(EditEntity("contentWhitelist", rs.contentWhitelist, R.string.c_whitelist))
@@ -576,6 +588,9 @@ class RssSourceEditActivity :
                 "ruleContent" -> source.ruleContent =
                     viewModel.ruleComplete(it.value, source.ruleArticles)
 
+                "nextContentUrl" -> source.nextContentUrl =
+                    viewModel.ruleComplete(it.value, type = 2)
+
                 "style" -> source.style = it.value
                 "injectJs" -> source.injectJs = it.value
                 "contentWhitelist" -> source.contentWhitelist = it.value
@@ -649,31 +664,6 @@ class RssSourceEditActivity :
                     edit.append(text)
                 } else {
                     edit.replace(start, end, text)//光标所在位置插入文字
-                }
-            }
-            if (adapter.editEntityMaxLine >= 999) {
-                view.post {
-                    val editTextLocation = IntArray(2)
-                    view.getLocationOnScreen(editTextLocation)
-                    val recyclerViewLocation = IntArray(2)
-                    binding.recyclerView.getLocationOnScreen(recyclerViewLocation)
-                    val layout = view.layout
-                    if (layout != null) {
-                        val line = layout.getLineForOffset(end)
-                        val cursorYInEditText = layout.getLineTop(line)
-                        // 光标相对于屏幕的位置
-                        val cursorYOnScreen = editTextLocation[1] + cursorYInEditText
-                        // 光标相对于RecyclerView的位置
-                        val cursorYInRecyclerView = cursorYOnScreen - recyclerViewLocation[1]
-                        val recyclerViewBottom = binding.recyclerView.height - 120 //考虑键盘的经验值
-                        // 如果光标不在可见范围内，则滚动到光标位置
-                        if (cursorYInRecyclerView !in 0..recyclerViewBottom) {
-                            val scrollDistance = cursorYInRecyclerView - recyclerViewBottom / 3
-                            if (scrollDistance > 0 && binding.recyclerView.canScrollVertically(1) || scrollDistance < 0 && binding.recyclerView.canScrollVertically(-1)) {
-                                binding.recyclerView.smoothScrollBy(0, scrollDistance)
-                            }
-                        }
-                    }
                 }
             }
         }

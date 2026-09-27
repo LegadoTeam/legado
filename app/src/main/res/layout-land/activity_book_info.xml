@@ -122,8 +122,9 @@
                             tools:ignore="UseCompoundDrawables">
 
                             <ImageView
-                                android:layout_width="20sp"
-                                android:layout_height="20sp"
+                                android:layout_width="18dp"
+                                android:layout_height="18dp"
+                                android:layout_marginEnd="6dp"
                                 android:contentDescription="@string/author"
                                 android:src="@drawable/ic_author"
                                 app:tint="@color/tv_text_summary" />
@@ -135,12 +136,10 @@
                                 android:layout_weight="1"
                                 android:ellipsize="end"
                                 android:includeFontPadding="false"
-                                android:paddingStart="8dp"
                                 android:singleLine="true"
                                 android:text="@string/author"
                                 android:textColor="@color/tv_text_summary"
-                                android:textSize="14sp"
-                                tools:ignore="RtlSymmetry" />
+                                android:textSize="14sp" />
                         </LinearLayout>
 
                         <LinearLayout
@@ -152,8 +151,9 @@
 
                             <ImageView
                                 android:id="@+id/iv_web"
-                                android:layout_width="20sp"
-                                android:layout_height="20sp"
+                                android:layout_width="18dp"
+                                android:layout_height="18dp"
+                                android:layout_marginEnd="6dp"
                                 android:contentDescription="@string/origin_format"
                                 android:src="@drawable/ic_web_outline"
                                 app:tint="@color/tv_text_summary" />
@@ -165,11 +165,9 @@
                                 android:layout_weight="1"
                                 android:ellipsize="end"
                                 android:includeFontPadding="false"
-                                android:paddingStart="8dp"
                                 android:singleLine="true"
                                 android:textColor="@color/tv_text_summary"
                                 android:textSize="14sp"
-                                tools:ignore="RtlSymmetry"
                                 tools:text="@string/origin_format" />
 
                             <io.legado.app.ui.widget.text.AccentBgTextView
@@ -193,8 +191,9 @@
 
                             <ImageView
                                 android:id="@+id/ic_book_last"
-                                android:layout_width="20sp"
-                                android:layout_height="20sp"
+                                android:layout_width="18dp"
+                                android:layout_height="18dp"
+                                android:layout_marginEnd="6dp"
                                 android:contentDescription="@string/read_dur_progress"
                                 android:src="@drawable/ic_book_last"
                                 app:tint="@color/tv_text_summary" />
@@ -206,11 +205,9 @@
                                 android:layout_weight="1"
                                 android:ellipsize="end"
                                 android:includeFontPadding="false"
-                                android:paddingStart="8dp"
                                 android:singleLine="true"
                                 android:textColor="@color/tv_text_summary"
                                 android:textSize="14sp"
-                                tools:ignore="RtlSymmetry"
                                 tools:text="@string/read_dur_progress" />
                         </LinearLayout>
 
@@ -222,8 +219,9 @@
                             android:paddingVertical="6dp">
 
                             <ImageView
-                                android:layout_width="20sp"
-                                android:layout_height="20sp"
+                                android:layout_width="18dp"
+                                android:layout_height="18dp"
+                                android:layout_marginEnd="6dp"
                                 android:contentDescription="@string/read_dur_progress"
                                 android:src="@drawable/ic_groups"
                                 app:tint="@color/tv_text_summary" />
@@ -235,11 +233,9 @@
                                 android:layout_weight="1"
                                 android:ellipsize="end"
                                 android:includeFontPadding="false"
-                                android:paddingStart="8dp"
                                 android:singleLine="true"
                                 android:textColor="@color/tv_text_summary"
                                 android:textSize="14sp"
-                                tools:ignore="RtlSymmetry"
                                 tools:text="@string/group_s" />
 
                             <io.legado.app.ui.widget.text.AccentBgTextView
@@ -262,8 +258,9 @@
                             android:paddingVertical="6dp">
 
                             <ImageView
-                                android:layout_width="20sp"
-                                android:layout_height="20sp"
+                                android:layout_width="18dp"
+                                android:layout_height="18dp"
+                                android:layout_marginEnd="6dp"
                                 android:contentDescription="@string/read_dur_progress"
                                 android:src="@drawable/ic_folder_open"
                                 app:tint="@color/tv_text_summary" />
@@ -275,11 +272,9 @@
                                 android:layout_weight="1"
                                 android:ellipsize="end"
                                 android:includeFontPadding="false"
-                                android:paddingStart="8dp"
                                 android:singleLine="true"
                                 android:textColor="@color/tv_text_summary"
                                 android:textSize="14sp"
-                                tools:ignore="RtlSymmetry"
                                 tools:text="@string/toc_s" />
 
                             <io.legado.app.ui.widget.text.AccentBgTextView

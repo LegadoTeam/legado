@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pdf_outline_page">Page %1$d</string>
+    <string name="pdf_outline_untitled">Untitled outline</string>
+    <string name="pdf_outline_expand">Expand outline</string>
+    <string name="pdf_outline_collapse">Collapse outline</string>
+</resources>

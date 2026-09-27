@@ -7,11 +7,13 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.removeAllBookType
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.http.StrResponse
 import io.legado.app.help.source.getBookType
+import io.legado.app.help.source.SuppressSourceNavigation
 import io.legado.app.model.Debug
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
@@ -24,6 +26,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Semaphore
 import kotlin.coroutines.CoroutineContext
 
@@ -53,9 +56,9 @@ object WebBook {
         page: Int? = 1,
         filter: ((name: String, author: String, kind: String?) -> Boolean)? = null,
         shouldBreak: ((size: Int) -> Boolean)? = null
-    ): ArrayList<SearchBook> {
+    ): ArrayList<SearchBook> = withContext(SuppressSourceNavigation) {
         if (bookSource.isJsSource()) {
-            return JsSourceBook.searchAwait(bookSource, key, page, filter)
+            return@withContext JsSourceBook.searchAwait(bookSource, key, page, filter)
         }
         val searchUrl = bookSource.searchUrl
         if (searchUrl.isNullOrBlank()) {
@@ -97,7 +100,7 @@ object WebBook {
             }
         }
         checkRedirect(bookSource, res)
-        return BookList.analyzeBookList(
+        BookList.analyzeBookList(
             bookSource = bookSource,
             ruleData = ruleData,
             analyzeUrl = analyzeUrl,
@@ -396,25 +399,41 @@ object WebBook {
         nextChapterUrl: String? = null,
         needSave: Boolean = true
     ): String {
+        val saveToken = if (needSave) {
+            BookHelp.contentSaveToken(book, bookChapter)
+        } else {
+            null
+        }
+        if (saveToken != null && saveToken.version > 0L) {
+            BookHelp.getContent(book, bookChapter, saveToken)?.let { return it }
+        }
         if (bookSource.isJsSource()) {
-            return JsSourceBook.getContentAwait(
+            val content = JsSourceBook.getContentAwait(
                 bookSource,
                 book,
                 bookChapter,
                 nextChapterUrl,
-                needSave
+                false,
             )
+            if (saveToken != null) {
+                val saved = BookHelp.saveContent(
+                    bookSource, book, bookChapter, content, saveToken
+                )
+                BookHelp.getContent(book, bookChapter, saveToken)?.let { return it }
+                if (!saved) throw NoStackTraceException("正文缓存已更新,请重试")
+            }
+            return content
+        }
+        if (bookChapter.isVolume && bookChapter.url.startsWith(bookChapter.title)) {
+            Debug.log(bookSource.bookSourceUrl, "⇒一级目录正文不解析规则")
+            return ""
         }
         val contentRule = bookSource.getContentRule()
         if (contentRule.content.isNullOrEmpty()) {
             Debug.log(bookSource.bookSourceUrl, "⇒正文规则为空,使用章节链接:${bookChapter.url}")
             return bookChapter.url
         }
-        if (bookChapter.isVolume && bookChapter.url.startsWith(bookChapter.title)) {
-            Debug.log(bookSource.bookSourceUrl, "⇒一级目录正文不解析规则")
-            return ""
-        }
-        return if (bookChapter.url == book.bookUrl && !book.tocHtml.isNullOrEmpty()) {
+        val content = if (bookChapter.url == book.bookUrl && !book.tocHtml.isNullOrEmpty()) {
             BookContent.analyzeContent(
                 bookSource = bookSource,
                 book = book,
@@ -423,7 +442,7 @@ object WebBook {
                 redirectUrl = bookChapter.getAbsoluteURL(),
                 body = book.tocHtml,
                 nextChapterUrl = nextChapterUrl,
-                needSave = needSave
+                needSave = false
             )
         } else {
             val analyzeUrl = AnalyzeUrl(
@@ -471,9 +490,44 @@ object WebBook {
                 redirectUrl = res.url,
                 body = res.body,
                 nextChapterUrl = nextChapterUrl,
-                needSave = needSave
+                needSave = false
             )
         }
+        if (saveToken != null) {
+            val saved = BookHelp.saveContent(
+                bookSource,
+                book,
+                bookChapter,
+                content,
+                saveToken,
+                saveChapterMetadata = true,
+            )
+            BookHelp.getContent(book, bookChapter, saveToken)?.let { return it }
+            if (!saved) throw NoStackTraceException("正文缓存已更新,请重试")
+        }
+        return content
+    }
+
+    /**
+     * 批量章节内容。
+     *
+     * 常规源走 contentBatch 规则,JS源走 getContentBatch 函数,
+     * 两者都通过 java.cacheContent 回存。
+     * 返回书源未回存的章节,调用方按普通单章流程兜底。
+     */
+    suspend fun getContentBatchAwait(
+        bookSource: BookSource,
+        book: Book,
+        chapters: List<BookChapter>
+    ): List<BookChapter> {
+        if (bookSource.isJsSource()) {
+            return JsSourceBook.getContentBatchAwait(bookSource, book, chapters)
+        }
+        return BookContent.analyzeContentBatch(
+            bookSource = bookSource,
+            book = book,
+            chapters = chapters
+        )
     }
 
     /**

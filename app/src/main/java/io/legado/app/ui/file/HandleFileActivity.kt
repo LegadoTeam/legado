@@ -361,6 +361,10 @@ class HandleFileActivity :
                 when (it) {
                     "*" -> types.add("*/*")
                     "txt", "xml" -> types.add("text/*")
+                    "js" -> {
+                        types.add("application/javascript")
+                        types.add("text/javascript")
+                    }
                     else -> {
                         val mime = MimeTypeMap.getSingleton()
                             .getMimeTypeFromExtension(it)

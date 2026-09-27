@@ -15,6 +15,7 @@ import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.constant.AppLog
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.utils.applyTint
 import io.legado.app.utils.registerForActivityResult
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.launch
@@ -214,6 +215,11 @@ class PermissionActivity : AppCompatActivity() {
         }
         permissions.forEach {
             if (getDenyCount(it) > 5) {
+                toastOnUi(rationale)
+                RequestPlugins.sRequestCallback?.onRequestPermissionsResult(
+                    permissions,
+                    IntArray(0)
+                )
                 finish()
                 return
             }
@@ -239,6 +245,7 @@ class PermissionActivity : AppCompatActivity() {
                 finish()
             }
             .show()
+            .applyTint()
     }
 
     private fun incrementDenyCount(permission: String): Int {

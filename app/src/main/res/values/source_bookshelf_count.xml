@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="source_bookshelf_count">书架：%1$d 本</string>
+</resources>

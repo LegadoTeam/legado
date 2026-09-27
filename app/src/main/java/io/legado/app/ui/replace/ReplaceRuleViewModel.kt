@@ -4,7 +4,9 @@ import android.app.Application
 import io.legado.app.base.BaseViewModel
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.ReplaceRule
+import io.legado.app.help.config.ReplacePreviewConfig
 import io.legado.app.utils.renameGroupExact
+import io.legado.app.utils.moveRelativeTo
 
 /**
  * 替换规则数据修改
@@ -18,9 +20,14 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
         }
     }
 
+    fun enable(id: Long, enable: Boolean) {
+        execute { appDb.replaceRuleDao.enable(id, enable) }
+    }
+
     fun delete(rule: ReplaceRule) {
         execute {
             appDb.replaceRuleDao.delete(rule)
+            ReplacePreviewConfig.removeSample(rule.id)
         }
     }
 
@@ -35,7 +42,7 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
         execute {
             var minOrder = appDb.replaceRuleDao.minOrder - rules.size
             rules.forEach {
-                it.order = ++minOrder
+                it.order = minOrder++
             }
             appDb.replaceRuleDao.update(*rules.toTypedArray())
         }
@@ -50,7 +57,7 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
 
     fun bottomSelect(rules: List<ReplaceRule>) {
         execute {
-            var maxOrder = appDb.replaceRuleDao.maxOrder
+            var maxOrder = appDb.replaceRuleDao.maxOrder + 1
             rules.forEach {
                 it.order = maxOrder++
             }
@@ -58,29 +65,44 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
         }
     }
 
-    fun upOrder() {
-        execute {
-            val rules = appDb.replaceRuleDao.all
-            for ((index, rule) in rules.withIndex()) {
-                rule.order = index + 1
+    fun move(ruleId: Long, targetId: Long, after: Boolean, onFinally: () -> Unit = {}) {
+        executeLazy {
+            appDb.runInTransaction {
+                val current = appDb.replaceRuleDao.all
+                val reordered = moveRelativeTo(current, ruleId, targetId, after) { it.id }
+                if (reordered == current) return@runInTransaction
+                appDb.replaceRuleDao.update(*reordered.mapIndexed { index, item ->
+                    item.copy(order = index)
+                }.toTypedArray())
             }
-            appDb.replaceRuleDao.update(*rules.toTypedArray())
-        }
+        }.onFinally { onFinally() }.start()
     }
 
     fun enableSelection(rules: List<ReplaceRule>) {
         execute {
-            val array = Array(rules.size) {
-                rules[it].copy(isEnabled = true)
-            }
-            appDb.replaceRuleDao.update(*array)
+            appDb.replaceRuleDao.enable(true, rules)
         }
     }
 
     fun disableSelection(rules: List<ReplaceRule>) {
         execute {
+            appDb.replaceRuleDao.enable(false, rules)
+        }
+    }
+
+    fun selectionAddToGroups(rules: List<ReplaceRule>, groups: String) {
+        execute {
             val array = Array(rules.size) {
-                rules[it].copy(isEnabled = false)
+                rules[it].copy().addGroup(groups)
+            }
+            appDb.replaceRuleDao.update(*array)
+        }
+    }
+
+    fun selectionRemoveFromGroups(rules: List<ReplaceRule>, groups: String) {
+        execute {
+            val array = Array(rules.size) {
+                rules[it].copy().removeGroup(groups)
             }
             appDb.replaceRuleDao.update(*array)
         }
@@ -89,6 +111,7 @@ class ReplaceRuleViewModel(application: Application) : BaseViewModel(application
     fun delSelection(rules: List<ReplaceRule>) {
         execute {
             appDb.replaceRuleDao.delete(*rules.toTypedArray())
+            rules.forEach { ReplacePreviewConfig.removeSample(it.id) }
         }
     }
 

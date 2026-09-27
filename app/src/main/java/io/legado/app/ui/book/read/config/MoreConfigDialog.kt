@@ -85,6 +85,7 @@ class MoreConfigDialog : BasePrefDialogFragment() {
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             addPreferencesFromResource(R.xml.pref_config_read)
             upPreferenceSummary(PreferKey.pageTouchSlop, slopSquare.toString())
+            upPreferenceSummary(PreferKey.pullBookmarkDistance, (slopSquare * 6).toString())
             if (!CanvasRecorderFactory.isSupport) {
                 removePref(PreferKey.optimizeRender)
                 preferenceScreen.removePreferenceRecursively(PreferKey.optimizeRender)
@@ -135,6 +136,7 @@ class MoreConfigDialog : BasePrefDialogFragment() {
                 PreferKey.textFullJustify,
                 PreferKey.textBottomJustify,
                 PreferKey.hangingPunctuation,
+                PreferKey.punctuationCompress,
                 PreferKey.useZhLayout,
                 PreferKey.adaptSpecialStyle-> {
                     postEvent(EventBus.UP_CONFIG, arrayListOf(5))
@@ -150,6 +152,7 @@ class MoreConfigDialog : BasePrefDialogFragment() {
                 }
 
                 PreferKey.showReadTitleAddition,
+                PreferKey.showReadTitleChapterNameOnly,
                 PreferKey.readBarStyleFollowPage -> {
                     postEvent(EventBus.UPDATE_READ_ACTION_BAR, true)
                 }
@@ -160,6 +163,10 @@ class MoreConfigDialog : BasePrefDialogFragment() {
 
                 PreferKey.noAnimScrollPage -> {
                     ReadBook.callBack?.upPageAnim()
+                }
+
+                PreferKey.pullToToggleBookmark -> {
+                    (activity as? ReadBookActivity)?.upBookmarkIndicator()
                 }
 
                 PreferKey.optimizeRender -> {
@@ -185,6 +192,10 @@ class MoreConfigDialog : BasePrefDialogFragment() {
                     (activity as? ReadBookActivity)?.showTextSelectMenuConfig()
                 }
 
+                "customReaderMenu" -> {
+                    (activity as? ReadBookActivity)?.showReaderMenuConfig()
+                }
+
                 PreferKey.pageTouchSlop -> {
                     NumberPickerDialog(requireContext())
                         .setTitle(getString(R.string.page_touch_slop_dialog_title))
@@ -194,6 +205,17 @@ class MoreConfigDialog : BasePrefDialogFragment() {
                         .show {
                             AppConfig.pageTouchSlop = it
                             postEvent(EventBus.UP_CONFIG, arrayListOf(4))
+                        }
+                }
+
+                PreferKey.pullBookmarkDistance -> {
+                    NumberPickerDialog(requireContext())
+                        .setTitle(getString(R.string.pull_bookmark_distance_dialog_title))
+                        .setMaxValue(9999)
+                        .setMinValue(0)
+                        .setValue(AppConfig.pullBookmarkDistance)
+                        .show {
+                            AppConfig.pullBookmarkDistance = it
                         }
                 }
 
@@ -218,6 +240,8 @@ class MoreConfigDialog : BasePrefDialogFragment() {
             when (preferenceKey) {
                 PreferKey.pageTouchSlop -> preference.summary =
                     getString(R.string.page_touch_slop_summary, value)
+                PreferKey.pullBookmarkDistance -> preference.summary =
+                    getString(R.string.pull_bookmark_distance_summary, value)
             }
         }
 

@@ -28,14 +28,39 @@ class HighlightStyleAppGsonTest {
         val style = HighlightStyle(
             fill = 0x80FFFF00.toInt(),
             fillShape = FillShape.MARKER,
+            pillPaddingScale = 1.25f,
             textColor = 0xFFFF0000.toInt(),
             bold = true,
-            underline = Underline(Kind.DASHED, 0xFF00FF00.toInt()),
+            underline = Underline(
+                kind = Kind.DASHED,
+                color = 0xFF00FF00.toInt(),
+                width = 3.5f,
+                distance = 2f,
+            ),
             strike = Deco(0xFF0000FF.toInt()),
             shadow = Shadow(4f, 0f, 0f, 0x80FFFFFF.toInt())
         )
         val restored = GSON.fromJsonObject<HighlightStyle>(GSON.toJson(style)).getOrThrow()
         assertEquals(style, restored)
+    }
+
+    @Test
+    fun `legacy underline json receives new defaults`() {
+        val restored = GSON.fromJsonObject<HighlightStyle>(
+            """{"underline":{"kind":"SOLID","color":7}}"""
+        ).getOrThrow()
+
+        assertEquals(Underline.DEFAULT_WIDTH, restored.underline?.width)
+        assertEquals(Underline.DEFAULT_DISTANCE, restored.underline?.distance)
+    }
+
+    @Test
+    fun `null underline kind normalizes to solid`() {
+        val restored = GSON.fromJsonObject<HighlightStyle>(
+            """{"underline":{"kind":null,"color":7}}"""
+        ).getOrThrow()
+
+        assertEquals(HighlightStyle.Kind.SOLID, restored.underline?.normalized()?.kind)
     }
 
     @Test
@@ -61,5 +86,22 @@ class HighlightStyleAppGsonTest {
 
         assertEquals("", missing.resolvedFontPath)
         assertEquals("", nullFont.resolvedFontPath)
+    }
+
+    @Test
+    fun `pill margin defaults validates and merges with the fill channel`() {
+        for (json in listOf("""{"fill":1}""", """{"fill":1,"pillPaddingScale":null}""")) {
+            val restored = GSON.fromJsonObject<HighlightStyle>(json).getOrThrow()
+            assertEquals(1f, restored.resolvedPillPaddingScale, 0f)
+        }
+        val base = HighlightStyle(fill = 1, pillPaddingScale = 1.5f)
+        assertEquals(1.5f, HighlightStyle.merge(base, HighlightStyle(bold = true)).resolvedPillPaddingScale, 0f)
+        assertEquals(1f, HighlightStyle.merge(base, HighlightStyle(fill = 2)).resolvedPillPaddingScale, 0f)
+        for ((input, expected) in listOf(Float.NaN to 1f, Float.POSITIVE_INFINITY to 1f,
+            -1f to 0.25f, 99f to 2f, 1.5f to 1.5f)) {
+            val normalized = base.copy(pillPaddingScale = input).normalized()
+            val restored = GSON.fromJsonObject<HighlightStyle>(GSON.toJson(normalized)).getOrThrow()
+            assertEquals(expected, restored.resolvedPillPaddingScale, 0f)
+        }
     }
 }

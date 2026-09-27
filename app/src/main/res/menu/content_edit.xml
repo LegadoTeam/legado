@@ -5,6 +5,12 @@
     tools:ignore="AlwaysShowAction">
 
     <item
+        android:id="@+id/menu_search"
+        android:icon="@drawable/ic_search"
+        android:title="@string/search"
+        app:showAsAction="ifRoom" />
+
+    <item
         android:id="@+id/menu_save"
         android:icon="@drawable/ic_save"
         android:title="@string/action_save"
@@ -18,6 +24,12 @@
     <item
         android:id="@+id/menu_copy_all"
         android:title="@string/copy_all"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_content_plain_text"
+        android:title="@string/content_edit_plain_text"
+        android:checkable="true"
         app:showAsAction="never" />
 
 </menu>

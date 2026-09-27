@@ -6,7 +6,6 @@
     placeholder="这里输出序列化的JSON数据,可直接导入'阅读'APP"
     :rows="30"
     @change="update"
-    style="margin-bottom: 4px"
   ></el-input>
 </template>
 <script setup lang="ts">
@@ -39,6 +38,9 @@ watchEffect(async () => {
   width: 100%;
 }
 :deep(#source-json) {
-  height: calc(100vh - 50px);
+  height: 100%;
+}
+:deep(#source-json .el-textarea__inner) {
+  height: 100%;
 }
 </style>

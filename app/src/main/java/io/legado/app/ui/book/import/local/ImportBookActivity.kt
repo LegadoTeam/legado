@@ -4,8 +4,11 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
+import android.widget.CheckBox
+import android.widget.LinearLayout
 import androidx.activity.addCallback
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
@@ -15,7 +18,7 @@ import io.legado.app.R
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.databinding.DialogEditTextBinding
-import io.legado.app.help.book.BookHelp
+import io.legado.app.help.book.cacheLocalUri
 import io.legado.app.help.book.removeLocalUriCache
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
@@ -28,6 +31,7 @@ import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.widget.SelectActionBar
 import io.legado.app.utils.ArchiveUtils
 import io.legado.app.utils.FileDoc
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.gone
 import io.legado.app.utils.isContentScheme
 import io.legado.app.utils.isUri
@@ -54,6 +58,7 @@ class ImportBookActivity : BaseImportBookActivity<ImportBookViewModel>(),
     private val adapter by lazy { ImportBookAdapter(this, this) }
     private var scanDocJob: Job? = null
     private var startReadJob: Job? = null
+    private var isRecursiveScan = false
 
     private val selectFolder = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
@@ -96,6 +101,19 @@ class ImportBookActivity : BaseImportBookActivity<ImportBookViewModel>(),
             R.id.menu_select_folder -> selectFolder.launch()
             R.id.menu_scan_folder -> scanFolder()
             R.id.menu_import_file_name -> alertImportFileName()
+            R.id.menu_local_book_save_path -> AlertDialog.Builder(this)
+                .setTitle(R.string.local_book_save_path)
+                .setMessage(AppConfig.defaultBookTreeUri ?: File(filesDir, "books").path)
+                .setPositiveButton(R.string.select_folder) { _, _ ->
+                    localBookTreeSelect.launch {
+                        title = getString(R.string.local_book_save_path)
+                        mode = HandleFileContract.DIR_SYS
+                    }
+                }
+                .setNegativeButton(R.string.shared_local_books_private) { _, _ ->
+                    AppConfig.defaultBookTreeUri = Uri.fromFile(File(filesDir, "books")).toString()
+                }
+                .show()
             R.id.menu_sort_name -> upSort(0)
             R.id.menu_sort_size -> upSort(1)
             R.id.menu_sort_time -> upSort(2)
@@ -121,11 +139,57 @@ class ImportBookActivity : BaseImportBookActivity<ImportBookViewModel>(),
     }
 
     override fun onClickSelectBarMainAction() {
-        viewModel.addToBookshelf(adapter.selected) {
-            adapter.selected.forEach {
+        val selected = HashSet(adapter.selected)
+        val groupName = (viewModel.subDocs.lastOrNull() ?: viewModel.rootDoc)?.name
+        if (selected.size < 2 || isRecursiveScan || groupName.isNullOrBlank()) {
+            addToBookshelf(selected)
+            return
+        }
+        lifecycleScope.launch(IO) {
+            val canAddGroup = appDb.bookGroupDao.canAddGroup
+            withContext(Main) {
+                alertDirectoryGroup(selected, groupName, canAddGroup)
+            }
+        }
+    }
+
+    private fun addToBookshelf(selected: HashSet<ImportBook>, groupName: String? = null) {
+        viewModel.addToBookshelf(selected, groupName) { importedUris ->
+            selected.filter { it.file.uri in importedUris }.forEach {
                 it.isOnBookShelf = true
             }
             adapter.selectAll(false)
+        }
+    }
+
+    private fun alertDirectoryGroup(
+        selected: HashSet<ImportBook>,
+        groupName: String,
+        canAddGroup: Boolean,
+    ) {
+        val checkBox = CheckBox(this).apply {
+            setText(R.string.import_directory_group)
+            isEnabled = canAddGroup
+        }
+        val view = LinearLayout(this).apply {
+            setPadding(16.dpToPx(), 0, 16.dpToPx(), 0)
+            addView(checkBox)
+        }
+        val dialog = alert(
+            titleResource = R.string.import_directory_group_title,
+            messageResource = if (canAddGroup) null else R.string.book_group_limit,
+        ) {
+            setCancelable(false)
+            customView { view }
+            okButton {
+                addToBookshelf(selected, groupName.takeIf { checkBox.isChecked })
+            }
+            cancelButton {
+                addToBookshelf(selected)
+            }
+        }
+        if (!canAddGroup) {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false
         }
     }
 
@@ -239,6 +303,7 @@ class ImportBookActivity : BaseImportBookActivity<ImportBookViewModel>(),
     }
 
     private fun upDocs(rootDoc: FileDoc) {
+        isRecursiveScan = false
         binding.tvEmptyMsg.gone()
         var path = rootDoc.name + File.separator
         var lastDoc = rootDoc
@@ -257,6 +322,7 @@ class ImportBookActivity : BaseImportBookActivity<ImportBookViewModel>(),
      */
     private fun scanFolder() {
         viewModel.rootDoc?.let { doc ->
+            isRecursiveScan = true
             adapter.clearItems()
             val lastDoc = viewModel.subDocs.lastOrNull() ?: doc
             binding.refreshProgressBar.isAutoLoading = true
@@ -318,20 +384,12 @@ class ImportBookActivity : BaseImportBookActivity<ImportBookViewModel>(),
                 val book = appDb.bookDao.getBook(filePath)
                     ?: appDb.bookDao.getBookByFileName(fileDoc.name)
                     ?: return@launch
-                val oldBook = book.copy()
-                val pathChanged = oldBook.bookUrl != filePath
                 LocalBook.withParserCacheInvalidated(
-                    oldBook.bookUrl,
-                    oldBook.originName,
+                    book.bookUrl,
+                    book.originName,
                 ) {
-                    oldBook.removeLocalUriCache()
-                    if (pathChanged) {
-                        book.bookUrl = filePath
-                        appDb.bookDao.replace(oldBook, book)
-                    }
-                }
-                if (pathChanged) {
-                    BookHelp.updateCacheFolder(oldBook, book)
+                    book.removeLocalUriCache()
+                    book.cacheLocalUri(fileDoc.uri)
                 }
                 withContext(Main) {
                     if (!isFinishing && !isDestroyed) {

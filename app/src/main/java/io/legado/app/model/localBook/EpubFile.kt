@@ -51,9 +51,17 @@ class EpubFile(var book: Book) : AutoCloseable {
         }
 
         @Synchronized
+        fun getToc(book: Book): List<EpubTocNode> =
+            epubTocNodes(getEFile(book).epubBook?.tableOfContents?.tocReferences.orEmpty())
+
+        @Synchronized
         override fun getContent(book: Book, chapter: BookChapter): String? {
             return getEFile(book).getContent(chapter)
         }
+
+        @Synchronized
+        fun repairCachedContent(book: Book, chapter: BookChapter, content: String): String =
+            getEFile(book).repairCachedContent(chapter, content)
 
         @Synchronized
         override fun getImage(
@@ -88,6 +96,8 @@ class EpubFile(var book: Book) : AutoCloseable {
      */
     private var fileDescriptor: ParcelFileDescriptor? = null
     private var zipFile: AndroidZipFile? = null
+    private var readingBoundaries: Map<String, BookChapter>? = null
+    private val checkedContentCaches = HashSet<String>()
     private var epubBook: EpubBook? = null
         get() {
             if (field == null || fileDescriptor == null) {
@@ -131,14 +141,34 @@ class EpubFile(var book: Book) : AutoCloseable {
         }.getOrThrow()
     }
 
-    private fun getContent(chapter: BookChapter): String? {
+    private fun readingBoundary(chapter: BookChapter): BookChapter {
+        if (readingBoundaries == null) getChapterList()
+        return readingBoundaries?.get(chapter.url) ?: chapter
+    }
+
+    private fun repairCachedContent(chapter: BookChapter, content: String): String {
+        val boundary = readingBoundary(chapter)
+        if (!checkedContentCaches.add(chapter.url)) return content
+        val changedBoundary = boundary.startFragmentId != chapter.startFragmentId ||
+            boundary.endFragmentId != chapter.endFragmentId ||
+            boundary.getVariable("nextUrl") != chapter.getVariable("nextUrl")
+        val crossResourceFragment = !chapter.endFragmentId.isNullOrBlank() &&
+            chapter.url.substringBeforeLast("#") != chapter.getVariable("nextUrl").substringBeforeLast("#")
+        if (!changedBoundary && !crossResourceFragment) return content
+        // Only replace an unchanged output of the old reader. A user's edited text wins.
+        if (content != getContent(chapter, legacyBoundary = true)) return content
+        return getContent(chapter) ?: content
+    }
+
+    private fun getContent(chapter: BookChapter, legacyBoundary: Boolean = false): String? {
         /*获取当前章节文本*/
         val contents = epubBookContents ?: return null
-        val nextChapterFirstResourceHref = chapter.getVariable("nextUrl").substringBeforeLast("#")
+        val boundary = if (legacyBoundary) chapter else readingBoundary(chapter)
+        val nextChapterFirstResourceHref = boundary.getVariable("nextUrl").substringBeforeLast("#")
         val currentChapterFirstResourceHref = chapter.url.substringBeforeLast("#")
         val isLastChapter = nextChapterFirstResourceHref.isBlank()
-        val startFragmentId = chapter.startFragmentId
-        val endFragmentId = chapter.endFragmentId
+        val startFragmentId = boundary.startFragmentId
+        val endFragmentId = boundary.endFragmentId
         val elements = Elements()
         var findChapterFirstSource = false
         val includeNextChapterResource = !endFragmentId.isNullOrBlank()
@@ -150,7 +180,8 @@ class EpubFile(var book: Book) : AutoCloseable {
                 findChapterFirstSource = true
                 // 第一个xhtml文件
                 elements.add(
-                    getBody(res, startFragmentId, endFragmentId)
+                    getBody(res, startFragmentId,
+                        endFragmentId.takeIf { legacyBoundary || currentChapterFirstResourceHref == nextChapterFirstResourceHref })
                 )
                 // 不是最后章节 且 已经遍历到下一章节的内容时停止
                 if (!isLastChapter && res.href == nextChapterFirstResourceHref) break
@@ -357,28 +388,33 @@ class EpubFile(var book: Book) : AutoCloseable {
                 }
             } else {
                 parseFirstPage(chapterList, refs)
-                parseMenu(chapterList, refs, 0)
-                for (i in chapterList.indices) {
-                    chapterList[i].index = i
-                }
+                parseMenu(chapterList, refs)
             }
         }
-        getWordCount(chapterList, book)
-        return chapterList
+        // Multiple navigation labels may point to the same content. Keep the established
+        // reading identities, and link boundaries between actual, distinct resources only.
+        val readingChapters = ArrayList(chapterList.distinctBy { it.url })
+        readingChapters.forEachIndexed { index, chapter ->
+            chapter.index = index
+            val next = readingChapters.getOrNull(index + 1)
+            chapter.endFragmentId = next?.startFragmentId
+            chapter.putVariable("nextUrl", next?.url)
+        }
+        getWordCount(readingChapters, book)
+        readingBoundaries = readingChapters.associate { it.url to it.copy() }
+        return readingChapters
     }
 
     /*获取书籍起始页内容。部分书籍第一章之前存在封面，引言，扉页等内容*/
     /*tile获取不同书籍风格杂乱，格式化处理待优化*/
-    private var durIndex = 0
     private fun parseFirstPage(
         chapterList: ArrayList<BookChapter>,
         refs: List<TOCReference>?
     ) {
         val contents = epubBook?.contents
         if (epubBook == null || contents == null || refs == null) return
-        val firstRef = refs.firstOrNull { it.resource != null } ?: return
+        val firstHref = epubTocNodes(refs).firstOrNull { it.href != null }?.href ?: return
         var i = 0
-        durIndex = 0
         while (i < contents.size) {
             val content = contents[i]
             if (!content.mediaType.toString().contains("htm")) {
@@ -390,7 +426,7 @@ class EpubFile(var book: Book) : AutoCloseable {
              * completeHref可能有fragment(#id) 必须去除
              * fix https://github.com/gedoor/legado/issues/1932
              */
-            if (firstRef.completeHref.substringBeforeLast("#") == content.href) break
+            if (firstHref.substringBeforeLast("#") == content.href) break
             val chapter = BookChapter()
             var title = content.title
             if (TextUtils.isEmpty(title)) {
@@ -413,7 +449,6 @@ class EpubFile(var book: Book) : AutoCloseable {
             chapterList.lastOrNull()?.endFragmentId = chapter.startFragmentId
             chapterList.lastOrNull()?.putVariable("nextUrl", chapter.url)
             chapterList.add(chapter)
-            durIndex++
             i++
         }
     }
@@ -421,7 +456,6 @@ class EpubFile(var book: Book) : AutoCloseable {
     private fun parseMenu(
         chapterList: ArrayList<BookChapter>,
         refs: List<TOCReference>?,
-        level: Int
     ) {
         refs?.forEach { ref ->
             if (ref.resource != null) {
@@ -430,20 +464,19 @@ class EpubFile(var book: Book) : AutoCloseable {
                 chapter.title = ref.title
                 chapter.url = ref.completeHref
                 chapter.startFragmentId = ref.fragmentId
-                chapterList.lastOrNull()?.endFragmentId = chapter.startFragmentId
-                chapterList.lastOrNull()?.putVariable("nextUrl", chapter.url)
+                chapter.isVolume = !ref.children.isNullOrEmpty()
                 chapterList.add(chapter)
-                durIndex++
             }
             if (ref.children != null && ref.children.isNotEmpty()) {
-                chapterList.lastOrNull()?.isVolume = true
-                parseMenu(chapterList, ref.children, level + 1)
+                parseMenu(chapterList, ref.children)
             }
         }
     }
 
 
     override fun close() {
+        readingBoundaries = null
+        checkedContentCaches.clear()
         epubBookContents = null
         epubBook = null
         val openedZip = zipFile

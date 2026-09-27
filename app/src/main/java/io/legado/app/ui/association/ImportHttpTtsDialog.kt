@@ -2,7 +2,6 @@ package io.legado.app.ui.association
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.DialogInterface
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
@@ -42,13 +41,6 @@ class ImportHttpTtsDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
     override fun onStart() {
         super.onStart()
         setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-    }
-
-    override fun onDismiss(dialog: DialogInterface) {
-        super.onDismiss(dialog)
-        if (arguments?.getBoolean("finishOnDismiss") == true) {
-            activity?.finish()
-        }
     }
 
     @SuppressLint("NotifyDataSetChanged")
@@ -142,11 +134,15 @@ class ImportHttpTtsDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
                 cbSourceName.isChecked = viewModel.selectStatus[holder.layoutPosition]
                 cbSourceName.text = item.name
                 val localSource = viewModel.checkSources[holder.layoutPosition]
-                tvSourceState.text = when {
-                    localSource == null -> "新增"
-                    item.lastUpdateTime > localSource.lastUpdateTime -> "更新"
-                    else -> "已有"
-                }
+                tvSourceState.setText(
+                    when {
+                        localSource == null -> R.string.import_status_new
+                        item.lastUpdateTime > localSource.lastUpdateTime ->
+                            R.string.import_status_update
+
+                        else -> R.string.import_status_exist
+                    }
+                )
             }
         }
 

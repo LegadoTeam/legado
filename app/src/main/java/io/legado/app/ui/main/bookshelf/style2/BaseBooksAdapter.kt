@@ -8,7 +8,6 @@ import androidx.recyclerview.widget.AsyncListDiffer
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.data.entities.Book
-import io.legado.app.data.entities.BookGroup
 
 abstract class BaseBooksAdapter<VH : RecyclerView.ViewHolder>(
     val context: Context,
@@ -33,8 +32,8 @@ abstract class BaseBooksAdapter<VH : RecyclerView.ViewHolder>(
                             && oldItem.author == newItem.author
                 }
 
-                oldItem is BookGroup && newItem is BookGroup -> {
-                    oldItem.groupId == newItem.groupId
+                oldItem is BookshelfGroupItem && newItem is BookshelfGroupItem -> {
+                    oldItem.group.groupId == newItem.group.groupId
                 }
 
                 else -> false
@@ -54,11 +53,9 @@ abstract class BaseBooksAdapter<VH : RecyclerView.ViewHolder>(
                             oldItem.getUnreadChapterNum() == newItem.getUnreadChapterNum()
                 }
 
-                oldItem is BookGroup && newItem is BookGroup -> {
-                    oldItem.groupName == newItem.groupName &&
-                            oldItem.cover == newItem.cover &&
-                            oldItem.enableRefresh == newItem.enableRefresh &&
-                            oldItem.onlyUpdateRead == newItem.onlyUpdateRead
+                oldItem is BookshelfGroupItem && newItem is BookshelfGroupItem -> {
+                    oldItem.group == newItem.group &&
+                            oldItem.coverSignature == newItem.coverSignature
                 }
 
                 else -> false
@@ -92,14 +89,18 @@ abstract class BaseBooksAdapter<VH : RecyclerView.ViewHolder>(
                     }
                 }
 
-                oldItem is BookGroup && newItem is BookGroup -> {
-                    if (oldItem.groupName != newItem.groupName) {
-                        bundle.putString("groupName", newItem.groupName)
+                oldItem is BookshelfGroupItem && newItem is BookshelfGroupItem -> {
+                    if (oldItem.group.groupName != newItem.group.groupName) {
+                        bundle.putString("groupName", newItem.group.groupName)
                     }
-                    if (oldItem.cover != newItem.cover) {
-                        bundle.putString("cover", newItem.cover)
+                    if (oldItem.group.cover != newItem.group.cover ||
+                        oldItem.coverSignature != newItem.coverSignature
+                    ) {
+                        bundle.putBoolean("cover", true)
                     }
-                    if (oldItem.enableRefresh != newItem.enableRefresh || oldItem.onlyUpdateRead != newItem.onlyUpdateRead) {
+                    if (oldItem.group.enableRefresh != newItem.group.enableRefresh ||
+                        oldItem.group.onlyUpdateRead != newItem.group.onlyUpdateRead
+                    ) {
                         bundle.putBoolean("unviewable", true)
                     }
                 }
@@ -150,7 +151,7 @@ abstract class BaseBooksAdapter<VH : RecyclerView.ViewHolder>(
     }
 
     override fun getItemViewType(position: Int): Int {
-        if (getItem(position) is BookGroup) {
+        if (getItem(position) is BookshelfGroupItem) {
             return 1
         }
         return 0

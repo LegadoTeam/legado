@@ -72,7 +72,9 @@ object JsSourceMarshaller {
             if (value.isJsonNull) return@forEach
             when (key) {
                 "name" -> if (canReName) book.name = value.asString
-                "author" -> book.author = value.asString
+                "author" -> if (canReName || book.author.isEmpty()) {
+                    book.author = value.asString
+                }
                 "intro" -> book.intro = value.asString
                 "coverUrl" -> book.coverUrl = value.asString
                 "kind" -> book.kind = value.asString

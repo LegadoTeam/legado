@@ -2,6 +2,7 @@
 
 package io.legado.app.ui.main
 
+import android.graphics.Rect
 import android.graphics.drawable.StateListDrawable
 import android.os.Bundle
 import android.text.format.DateUtils
@@ -9,6 +10,7 @@ import android.view.MenuItem
 import android.view.ViewGroup
 import androidx.activity.addCallback
 import androidx.activity.viewModels
+import androidx.core.view.doOnLayout
 import androidx.core.view.get
 import androidx.core.view.postDelayed
 import androidx.fragment.app.Fragment
@@ -37,6 +39,7 @@ import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.storage.Backup
 import io.legado.app.help.update.AppUpdate
+import io.legado.app.help.update.isIgnoredAppUpdate
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.service.BaseReadAloudService
@@ -61,6 +64,7 @@ import io.legado.app.utils.clearClip
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getClipText
 import io.legado.app.utils.isCreated
+import io.legado.app.utils.imeHeight
 import io.legado.app.utils.navigationBarHeight
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.setEdgeEffectColor
@@ -238,6 +242,16 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     }
 
     private fun initView() = binding.run {
+        root.setOnApplyWindowInsetsListenerCompat { view, windowInsets ->
+            val keyboardHeight = windowInsets.imeHeight
+            view.bottomPadding = keyboardHeight
+            if (keyboardHeight > 0) view.doOnLayout {
+                currentFocus?.takeIf { it.onCheckIsTextEditor() }?.let { input ->
+                    input.requestRectangleOnScreen(Rect(0, 0, input.width, input.height), true)
+                }
+            }
+            windowInsets
+        }
         viewPagerMain.setEdgeEffectColor(primaryColor)
         viewPagerMain.offscreenPageLimit = 3
         viewPagerMain.adapter = adapter
@@ -284,6 +298,10 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
                 if (LocalConfig.lastCheckUpdate + 24.hours.inWholeMilliseconds < System.currentTimeMillis()) {
                     AppUpdate.gitHubUpdate.check(lifecycleScope)
                         .onSuccess {
+                            if (isIgnoredAppUpdate(it.tagName, LocalConfig.ignoreUpdateVersion)) {
+                                return@onSuccess
+                            }
+                            if (supportFragmentManager.isStateSaved) return@onSuccess
                             showDialogFragment(
                                 UpdateDialog(it)
                             )
@@ -370,11 +388,18 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             val lastBackupFile =
                 withContext(IO) { AppWebDav.lastBackUp().getOrNull() } ?: return@launch
             if (lastBackupFile.lastModify - LocalConfig.lastBackup > DateUtils.MINUTE_IN_MILLIS) {
-                LocalConfig.lastBackup = lastBackupFile.lastModify
                 alert(R.string.restore, R.string.webdav_after_local_restore_confirm) {
-                    cancelButton()
+                    cancelButton {
+                        LocalConfig.lastBackup = maxOf(
+                            LocalConfig.lastBackup,
+                            lastBackupFile.lastModify,
+                        )
+                    }
                     okButton {
-                        viewModel.restoreWebDav(lastBackupFile.displayName)
+                        viewModel.restoreWebDav(
+                            lastBackupFile.displayName,
+                            lastBackupFile.lastModify,
+                        )
                     }
                 }
             }
@@ -443,6 +468,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
                 it,
                 onlyUpdateRead = false,
                 policy = TocUpdatePolicy.SKIP_PRE_DOWNLOAD,
+                refreshBookInfo = true,
             )
         }
     }

@@ -38,6 +38,7 @@ object AppCacheManager {
                 || it.startsWith("userInfo_")
                 || it.startsWith("loginHeader_")
                 || it.startsWith("sourceVariable_")
+                || it.startsWith("infoMap_")
             ) {
                 memoryLruCache.remove(it)
             }

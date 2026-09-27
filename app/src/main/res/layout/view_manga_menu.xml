@@ -112,6 +112,7 @@
                 android:layout_width="0dp"
                 android:layout_height="25dp"
                 android:layout_gravity="center_vertical"
+                android:mirrorForRtl="true"
                 android:layout_weight="1" />
 
             <TextView

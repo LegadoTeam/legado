@@ -29,7 +29,7 @@ class ItemTouchCallback(private val callback: Callback) : ItemTouchHelper.Callba
      * 当Item被长按的时候是否可以被拖拽
      */
     override fun isLongPressDragEnabled(): Boolean {
-        return isCanDrag
+        return isCanDrag && callback.canStartDrag()
     }
 
     /**
@@ -88,13 +88,14 @@ class ItemTouchCallback(private val callback: Callback) : ItemTouchHelper.Callba
     ): Boolean {
         val fromPosition: Int = srcViewHolder.bindingAdapterPosition
         val toPosition: Int = targetViewHolder.bindingAdapterPosition
+        if (fromPosition == RecyclerView.NO_POSITION || toPosition == RecyclerView.NO_POSITION) return false
         if (fromPosition < toPosition) {
             for (i in fromPosition until toPosition) {
-                callback.swap(i, i + 1)
+                if (!callback.swap(i, i + 1)) return false
             }
         } else {
             for (i in fromPosition downTo toPosition + 1) {
-                callback.swap(i, i - 1)
+                if (!callback.swap(i, i - 1)) return false
             }
         }
         return true
@@ -108,6 +109,7 @@ class ItemTouchCallback(private val callback: Callback) : ItemTouchHelper.Callba
         super.onSelectedChanged(viewHolder, actionState)
         val swiping = actionState == ItemTouchHelper.ACTION_STATE_DRAG
         swipeRefreshLayout?.isEnabled = !swiping
+        if (swiping && viewHolder != null) callback.onDragStarted(viewHolder)
     }
 
     override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
@@ -116,6 +118,10 @@ class ItemTouchCallback(private val callback: Callback) : ItemTouchHelper.Callba
     }
 
     interface Callback {
+
+        fun canStartDrag(): Boolean = true
+
+        fun onDragStarted(viewHolder: RecyclerView.ViewHolder) {}
 
         /**
          * 当某个Item被滑动删除的时候

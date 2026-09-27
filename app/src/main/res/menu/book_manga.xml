@@ -18,6 +18,11 @@
             app:showAsAction="always" />
 
         <item
+            android:id="@+id/menu_download"
+            android:title="@string/offline_cache"
+            app:showAsAction="never" />
+
+        <item
             android:id="@+id/menu_catalog"
             android:icon="@drawable/ic_toc"
             android:title="@string/chapter_list"
@@ -35,6 +40,13 @@
         android:checkable="true"
         android:checked="false"
         android:title="@string/disable_manga_scale"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_manga_long_click_save_image"
+        android:checkable="true"
+        android:checked="true"
+        android:title="@string/manga_long_click_save_image"
         app:showAsAction="never" />
 
     <item
@@ -69,6 +81,13 @@
         android:checkable="true"
         android:checked="false"
         android:title="@string/enable_manga_horizontal_scroll"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_manga_right_to_left"
+        android:checkable="true"
+        android:checked="false"
+        android:title="@string/manga_right_to_left"
         app:showAsAction="never" />
 
     <item

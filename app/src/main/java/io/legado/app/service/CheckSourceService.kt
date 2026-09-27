@@ -21,6 +21,7 @@ import io.legado.app.exception.TocEmptyException
 import io.legado.app.help.IntentData
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.source.exploreKinds
+import io.legado.app.help.source.SuppressSourceNavigation
 import io.legado.app.model.CheckSource
 import io.legado.app.model.CheckSourceResult
 import io.legado.app.model.CheckSourceStatus
@@ -43,6 +44,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.htmlunit.corejs.javascript.WrappedException
 import splitties.init.appCtx
@@ -67,7 +69,6 @@ internal fun parseCheckSourceEndpoint(domain: String): Pair<String, Int>? {
 class CheckSourceService : BaseService() {
     private data class CheckTarget(
         val selected: BookSourcePart,
-        val original: BookSource,
         val source: BookSource,
     )
 
@@ -187,7 +188,8 @@ class CheckSourceService : BaseService() {
                             ),
                         )
 
-                        source.lastUpdateTime != selected.lastUpdateTime ->
+                        source.lastUpdateTime != selected.lastUpdateTime ||
+                            appDb.bookSourceDao.getCheckState(source.bookSourceUrl)?.revision != selected.checkRevision ->
                             Debug.recordCheckResult(
                                 sessionId,
                                 selected.bookSourceUrl,
@@ -197,7 +199,7 @@ class CheckSourceService : BaseService() {
                                 ),
                             )
 
-                        else -> emit(CheckTarget(selected, source.copy(), source))
+                        else -> emit(CheckTarget(selected, source))
                     }
                 }
             }.onStart {
@@ -208,7 +210,7 @@ class CheckSourceService : BaseService() {
             }.mapParallel(threadCount) {
                 it to checkSource(it.source, sessionId)
             }.onEach { (target, outcome) ->
-                val (selected, original, source) = target
+                val (selected, source) = target
                 finishCount++
                 notificationMsg = getString(
                     R.string.progress_show,
@@ -217,17 +219,16 @@ class CheckSourceService : BaseService() {
                     originSize
                 )
                 upNotification()
-                val updated = appDb.bookSourceDao.updateCheckResult(
-                    source.bookSourceUrl,
-                    source.bookSourceGroup,
-                    source.bookSourceComment,
-                    source.respondTime,
-                    selected.lastUpdateTime,
-                    original.bookSourceGroup,
-                    original.bookSourceComment,
-                    original.respondTime,
+                currentCoroutineContext().ensureActive()
+                val detail = if (outcome.succeeded) "" else listOf(
+                    source.getInvalidGroupNames(), outcome.message,
+                    if (CheckSource.wSourceComment) source.bookSourceComment
+                        ?.lineSequence()?.firstOrNull { it.startsWith("// Error: ") }.orEmpty() else "",
+                ).filter { it.isNotEmpty() }.distinct().joinToString(" | ")
+                val updated = appDb.bookSourceDao.completeCheck(
+                    selected, outcome.succeeded, detail, source.respondTime,
                 )
-                if (updated == 0) {
+                if (!updated) {
                     val detail = "校验结果未写回：书源已变更或删除"
                     Debug.updateCheckMessage(
                         sessionId,
@@ -245,18 +246,6 @@ class CheckSourceService : BaseService() {
                         CheckSourceStatus.PASSED
                     } else {
                         CheckSourceStatus.FAILED
-                    }
-                    val detail = if (outcome.succeeded) {
-                        ""
-                    } else {
-                        listOf(
-                            source.getInvalidGroupNames(),
-                            source.bookSourceComment
-                                ?.lineSequence()
-                                ?.firstOrNull { it.startsWith("// Error: ") }
-                                .orEmpty(),
-                            outcome.message,
-                        ).filter { it.isNotEmpty() }.distinct().joinToString(" | ")
                     }
                     Debug.recordCheckResult(
                         sessionId,
@@ -291,7 +280,7 @@ class CheckSourceService : BaseService() {
         var succeeded = true
         kotlin.runCatching {
             withTimeout(CheckSource.timeout) {
-                doCheckSource(source, sessionId)
+                withContext(SuppressSourceNavigation) { doCheckSource(source, sessionId) }
             }
         }.onFailure {
             currentCoroutineContext().ensureActive()
@@ -354,7 +343,7 @@ class CheckSourceService : BaseService() {
                     checkBook(searchBooks.first().toBook(), source)
                 }
             } else {
-                source.addGroup("搜索链接规则为空")
+                throw NoStackTraceException("搜索链接规则为空")
             }
         }
         //校验发现书籍
@@ -363,7 +352,7 @@ class CheckSourceService : BaseService() {
                 !it.url.isNullOrBlank()
             }?.url
             if (url.isNullOrBlank()) {
-                source.addGroup("发现规则为空")
+                throw NoStackTraceException("发现规则为空")
             } else {
                 source.removeGroup("发现规则为空")
                 val exploreBooks = WebBook.exploreBookAwait(source, url)

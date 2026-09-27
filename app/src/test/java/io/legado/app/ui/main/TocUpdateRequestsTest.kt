@@ -2,6 +2,7 @@ package io.legado.app.ui.main
 
 import io.legado.app.constant.BookType
 import io.legado.app.data.entities.Book
+import io.legado.app.help.book.updateTo
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -11,6 +12,46 @@ import org.junit.Test
 import java.io.File
 
 class TocUpdateRequestsTest {
+
+    @Test
+    fun `book state merge preserves video and sync progress`() {
+        val current = Book(
+            type = BookType.audio or BookType.notShelf or BookType.updateError,
+            kind = "old kind",
+            coverUrl = "old cover",
+            intro = "old intro",
+            latestChapterTitle = "old latest",
+            totalChapterNum = 8,
+            durChapterIndex = 7,
+            durVolumeIndex = 2,
+            chapterInVolumeIndex = 3,
+            syncTime = 123L,
+        )
+        val refreshed = Book(
+            type = BookType.text,
+            kind = "new kind",
+            coverUrl = "new cover",
+            intro = "new intro",
+            latestChapterTitle = "new latest",
+            totalChapterNum = 12,
+        )
+
+        current.updateTo(refreshed)
+
+        assertEquals(7, refreshed.durChapterIndex)
+        assertEquals(2, refreshed.durVolumeIndex)
+        assertEquals(3, refreshed.chapterInVolumeIndex)
+        assertEquals(123L, refreshed.syncTime)
+        assertEquals(
+            BookType.text or BookType.notShelf or BookType.updateError,
+            refreshed.type,
+        )
+        assertEquals("new kind", refreshed.kind)
+        assertEquals("new cover", refreshed.coverUrl)
+        assertEquals("new intro", refreshed.intro)
+        assertEquals("new latest", refreshed.latestChapterTitle)
+        assertEquals(12, refreshed.totalChapterNum)
+    }
 
     @Test
     fun `selected update filters local and update-disabled books`() {
@@ -54,6 +95,43 @@ class TocUpdateRequestsTest {
         val request = requireNotNull(requests.poll())
 
         assertEquals(TocUpdatePolicy.SKIP_PRE_DOWNLOAD, requests.close(request))
+    }
+
+    @Test
+    fun `selected update refreshes book info when merged before execution`() {
+        val requests = TocUpdateRequests()
+        requests.enqueue("book", TocUpdatePolicy.ALLOW_PRE_DOWNLOAD)
+        requests.enqueue(
+            "book",
+            TocUpdatePolicy.SKIP_PRE_DOWNLOAD,
+            refreshBookInfo = true,
+        )
+        val request = requireNotNull(requests.poll())
+
+        assertTrue(requests.takeRefreshBookInfo(request))
+        assertEquals(TocUpdatePolicy.SKIP_PRE_DOWNLOAD, requests.close(request))
+    }
+
+    @Test
+    fun `late selected update queues a book info refresh`() {
+        val requests = TocUpdateRequests()
+        requests.enqueue("book", TocUpdatePolicy.ALLOW_PRE_DOWNLOAD)
+        val running = requireNotNull(requests.poll())
+        assertFalse(requests.takeRefreshBookInfo(running))
+
+        requests.enqueue(
+            "book",
+            TocUpdatePolicy.SKIP_PRE_DOWNLOAD,
+            refreshBookInfo = true,
+        )
+        assertEquals(TocUpdatePolicy.SKIP_PRE_DOWNLOAD, requests.close(running))
+        requests.finish(running, persistedBookUrl = "moved-book")
+
+        val followUp = requireNotNull(requests.poll())
+        assertEquals("moved-book", followUp.bookUrl)
+        assertNotEquals(running.generation, followUp.generation)
+        assertTrue(requests.takeRefreshBookInfo(followUp))
+        assertEquals(TocUpdatePolicy.SKIP_PRE_DOWNLOAD, requests.close(followUp))
     }
 
     @Test
@@ -119,7 +197,39 @@ class TocUpdateRequestsTest {
         assertTrue(manageActivity.contains("postEvent(EventBus.UP_BOOKS_TOC, books)"))
         assertTrue(mainActivity.contains("onlyUpdateRead = false"))
         assertTrue(mainActivity.contains("policy = TocUpdatePolicy.SKIP_PRE_DOWNLOAD"))
-        assertTrue(manageActivity.contains("R.string.update_toc_submitted"))
+        assertTrue(mainActivity.contains("refreshBookInfo = true"))
+        assertTrue(menu.contains("android:title=\"@string/update_book_info_toc\""))
+        assertTrue(manageActivity.contains("R.string.update_book_info_toc_submitted"))
+    }
+
+    @Test
+    fun `book info refresh preserves identity and runs toc pre-update rules`() {
+        val viewModel = source("app/src/main/java/io/legado/app/ui/main/MainViewModel.kt")
+        val bookExtensions = source("app/src/main/java/io/legado/app/help/book/BookExtensions.kt")
+
+        assertTrue(viewModel.contains("tocUpdateRequests.takeRefreshBookInfo(request)"))
+        assertTrue(
+            viewModel.contains(
+                "WebBook.getBookInfoAwait(source, book, canReName = false)"
+            )
+        )
+        assertTrue(viewModel.contains("runPerJs = refreshBookInfo"))
+        assertTrue(viewModel.contains("isFromBookInfo = refreshBookInfo"))
+        assertTrue(viewModel.contains("appDb.runInTransaction"))
+        assertTrue(viewModel.contains("currentBook.origin != source.bookSourceUrl"))
+        assertTrue(viewModel.contains("currentBook.name.ifBlank { book.name }"))
+        assertTrue(viewModel.contains("currentBook.author.ifBlank { book.author }"))
+        assertTrue(viewModel.contains("book.sync(currentBook, toc)"))
+        assertTrue(viewModel.contains("replacedBook = currentBook"))
+        assertTrue(viewModel.contains("appDb.bookDao.replace(currentBook, book)"))
+        assertTrue(viewModel.contains("persistedBookUrl = book.bookUrl"))
+        assertTrue(viewModel.contains("tocUpdateRequests.finish(request, persistedBookUrl)"))
+        assertTrue(viewModel.contains("appDb.bookDao.getBook(persistedBookUrl)"))
+        assertTrue(bookExtensions.contains("newBook.durVolumeIndex = durVolumeIndex"))
+        assertTrue(bookExtensions.contains("newBook.chapterInVolumeIndex = chapterInVolumeIndex"))
+        assertTrue(bookExtensions.contains("newBook.syncTime = syncTime"))
+        assertTrue(bookExtensions.contains("BookHelp.getDurChapter(currentBook, toc)"))
+        assertTrue(bookExtensions.contains("ContentProcessor.get(this).getTitleReplaceRules()"))
     }
 
     @Test

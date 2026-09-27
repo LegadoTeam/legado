@@ -699,7 +699,7 @@ class HttpReadAloudService : BaseReadAloudService(),
         playIndexJob?.cancel()
         val textChapter = textChapter ?: return
         playIndexJob = lifecycleScope.launch {
-            upTtsProgress(readAloudNumber + 1)
+            upTtsProgress(readAloudNumber)
             if (exoPlayer.duration <= 0) {
                 return@launch
             }

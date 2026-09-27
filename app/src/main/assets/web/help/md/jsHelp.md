@@ -1,7 +1,7 @@
 # js变量和函数
-> 阅读使用 [HtmlUnit Core JS 5.3.0-legado.3](https://github.com/skybbk1001/htmlunit-core-js/tree/e31799f290b50f99fe2cef1f14acd9725f69653c) 提供的 Rhino 兼容 JavaScript 引擎，以便于[调用Java类和方法](https://m.jb51.net/article/92138.htm)
+> 阅读使用 [HtmlUnit Core JS 5.3.0-legado.4](https://github.com/mgz0227/htmlunit-core-js/tree/3eb5071cdca4a357119d1063a53d5f2d47984ed2) 提供的 Rhino 兼容 JavaScript 引擎，以便于[调用Java类和方法](https://m.jb51.net/article/92138.htm)
 
-> [JavaScript运行时](https://github.com/skybbk1001/htmlunit-core-js/blob/e31799f290b50f99fe2cef1f14acd9725f69653c/src/repackaged-rhino/java/org/htmlunit/corejs/javascript/ScriptRuntime.java)懒加载导入的Java类和方法
+> [JavaScript运行时](https://github.com/mgz0227/htmlunit-rhino-fork/blob/76460c0312bfd351df6f2bb11168102cdb54170a/rhino/src/main/java/org/mozilla/javascript/ScriptRuntime.java)懒加载导入的Java类和方法
 
 |构造函数|函数|对象|调用类|简要说明|
 |------|-----|------|----|------|
@@ -231,7 +231,7 @@ java.webView(html: String?, url: String?, js: String?, cacheFirst: Boolean = fal
 java.webViewGetOverrideUrl(html: String?, url: String?, js: String?, overrideUrlRegex: String, cacheFirst: Boolean = false, delayTime: Long = 0): String?
 
 * 使用webView获取资源url
-java.webViewGetOverrideUrl(html: String?, url: String?, js: String?, overrideUrlRegex: String, cacheFirst: Boolean = false, delayTime: Long = 0): String?
+java.webViewGetSource(html: String?, url: String?, js: String?, sourceRegex: String, cacheFirst: Boolean = false, delayTime: Long = 0): String?
 
 * 使用内置浏览器打开链接，可用于获取验证码 手动验证网站防爬
 * @param url 要打开的链接
@@ -355,21 +355,66 @@ java.htmlFormat(str: String, redirectUrl: String): String
 >  所有对于文件的读写删操作都是相对路径,只能操作阅读缓存/android/data/{package}/cache/内的文件
 ```js
 //文件下载 url用于生成文件名，返回文件路径
-downloadFile(url: String): String
+java.downloadFile(url: String): String
 //文件解压,zipPath为压缩文件路径，返回解压路径
-unArchiveFile(zipPath: String): String
-unzipFile(zipPath: String): String
-unrarFile(zipPath: String): String
-un7zFile(zipPath: String): String
+java.unArchiveFile(zipPath: String): String
+java.unzipFile(zipPath: String): String
+java.unrarFile(zipPath: String): String
+java.un7zFile(zipPath: String): String
 //文件夹内所有文件读取
-getTxtInFolder(unzipPath: String): String
+java.getTxtInFolder(path: String): String
 //读取文本文件
-readTxtFile(path: String): String
+java.readTxtFile(path: String): String
 //删除文件
-deleteFile(path: String) 
+java.deleteFile(path: String): Boolean
+```
+* 批量正文
+> 只能在书源正文页的 `contentBatch` 规则里调用,其它场景调用会抛错。
+```js
+//回存本批次内某一章的正文,第一个参数传本批数组里的章节对象
+java.cacheContent(chapter: Object, content: String): Boolean
+//也接受章节 url,但仅限该 url 在本批内唯一
+java.cacheContent(chapterUrl: String, content: String): Boolean
+```
+`contentBatch` 规则执行时,阅读会额外注入两个变量:
+
+| 变量 | 说明 |
+| --- | --- |
+| `chapters` | 本批次需要缓存的章节数组,每项含 `url`、`title`、`index` 等字段 |
+| `result` | 同 `chapters`,与其它规则的 `result` 惯例保持一致 |
+
+**优先传章节对象。** 目录允许多章共用同一 url(靠序号、标题或 tag 区分),
+传 url 字符串必须在本批内唯一,有歧义时会直接报错,其中一章已回存也不例外。
+重复 url 必须传章节对象才能精确对应。参数不接受数组下标等纯数字,避免和 `chapter.index` 混淆。
+
+书源自行决定怎么取(合并成一次请求、并发拉取、按站点接口一次拿多章都可以),
+每处理完一章就调用 `java.cacheContent` 回存,不必等整批结束。回存的正文会自动
+套用书源的正文替换规则(`replaceRegex`),与单章下载保持一致。没有回存的章节
+阅读会自动退回普通单章流程重新下载,因此单章失败不会影响同批其它章节。
+
+`contentBatch` 支持裸 JavaScript、`<js>...</js>` 和 `@js:`。回存返回 `false` 表示替换后的正文为空白、正文在下载期间已被编辑或换源，或者该批次已结束；不会覆盖较新的正文。
+
+批量下载在手动缓存和阅读时的自动预下载中都会启用。每批算一次书源并发率,
+批内书源自己发出的请求仍各自受并发率限制。
+
+```js
+<js>
+// 正文页 › 批量正文规则(contentBatch)示例
+    for (var i = 0; i < chapters.length; i++) {
+        var chapter = chapters[i];
+        try {
+            var html = java.ajax(chapter.url);
+            java.cacheContent(chapter, 提取正文(html));
+        } catch (e) {
+            // 单章失败跳过,交给阅读退回单章下载
+        }
+    }
+</js>
 ```
 
 ### [js加解密类](https://github.com/LegadoTeam/legado/blob/master/app/src/main/java/io/legado/app/help/JsEncodeUtils.kt) 部分函数
+
+> 规则和 JavaScript 书源中可直接使用内置的 `CryptoJS`，例如 `CryptoJS.MD5("text").toString()`。
 
 > 提供在JavaScript环境中快捷调用crypto算法的函数，由[hutool-crypto](https://www.hutool.cn/docs/#/crypto/概述)实现  
 > 由于兼容性问题，hutool-crypto当前版本为5.8.22  
@@ -458,6 +503,7 @@ kind // 分类信息(书源获取)
 customTag // 分类信息(用户修改)
 coverUrl // 封面Url(书源获取)
 customCoverUrl // 封面Url(用户修改)
+persistedCoverUrl // 保存到本地的网络封面
 intro // 简介内容(书源获取)
 customIntro // 简介内容(用户修改)
 charset // 自定义字符集名称(仅适用于本地书籍)
@@ -599,14 +645,17 @@ cache.deleteMemory(key: String)
 ```js
 // 跳转外部链接，传入http链接或者scheme跳转到浏览器或其他应用
 // 指定mimeType，可以跳转指定类型应用，例如（video/*）
+// legado:// 或 yuedu:// 导入链接会直接打开应用内导入确认页
 java.openUrl(url: String, mimeType: String = null)
 ```
 ## 视频播放器函数
 ```js
 * @param url 视频播放链接
 * @param title 视频的标题
+* 省略 isFloat 时使用视频设置中的默认值
+java.openVideoPlayer(url: String, title: String)
 * @param isFloat 是否悬浮窗打开
-java.openVideoPlayer(url: String, title: String, isFloat: Boolean = false)
+java.openVideoPlayer(url: String, title: String, isFloat: Boolean)
 ```
 
 <!-- js-source-guide:start -->
@@ -722,6 +771,7 @@ function getContent(chapter, book, nextChapterUrl) {
 |`getBookInfo(book)`|文件源必选，其他类型可选|详情字段对象|
 |`getChapters(book)`|非文件源必选|非空章节数组|
 |`getContent(chapter, book, nextChapterUrl)`|非文件源必选|非空正文字符串|
+|`getContentBatch(chapters, book)`|可选，与 `config.maxBatchSize` 成对声明|返回值忽略，正文用 `java.cacheContent` 回存|
 |`login()`|`loginUi` 非空时必选|返回值不限，失败时可 `throw`|
 |`loginUi(state)`|动态登录界面，与 `loginAction` 成对声明|`{rows:[...]}`|
 |`loginAction(action, state, form)`|动态登录界面，与 `loginUi` 成对声明|命令对象或空值|
@@ -749,6 +799,7 @@ function loginUi(state) {
         { name: "验证码已发送至 " + state.phone, type: "label" },
         { key: "code", name: "验证码", type: "text" },
         { key: "line", name: "线路", type: "select", options: ["主线路", "备用线路"] },
+        { key: "remember", name: "记住登录", type: "toggle", value: "true" },
         { name: "登录", type: "button", action: "verify" }
     ] };
 }
@@ -777,6 +828,7 @@ function loginAction(action, state, form) {
 |`text`、`password`|`key`、`name`|文本或密码输入，可加 `hint`、`value`|
 |`label`|`name`|只读提示文字|
 |`select`|`key`、`name`、`options`|单选，值为选项字符串|
+|`toggle`|`key`、`name`|开关，值为字符串 `"true"`/`"false"`；可加 `value`、`action`|
 |`button`|`name`、`action`|派发动作，可加 `countdown` 秒数|
 
 `loginAction` 可以返回以下命令；未知键会被忽略并写入日志，非法命令对象会提示错误：
@@ -845,8 +897,45 @@ function getContent(chapter, book, nextChapterUrl) {
 应用不会自动把任意网页 HTML 转换成正文，需要时应由脚本提取正文节点，或显式调用
 `java.htmlFormat`；第二个参数用于按当前页面地址补全正文中的相对图片链接。
 
-### 登录与发现
+#### getContentBatch
 
+可选的批量正文函数,和 `config.maxBatchSize` 成对声明:只写其中一个会在导入/保存时报错。
+`maxBatchSize` 是每批最多的章节数,必须是大于 1 的整数,上限 50;不启用批量时删除该字段。
+
+```js
+const config = {
+    bookSourceName: "示例源",
+    bookSourceUrl: "https://example.com",
+    maxBatchSize: 10
+};
+
+function getContentBatch(chapters, book) {
+    // 站点支持一次取多章时,整批只发一次请求
+    var urls = chapters.map(function (c) { return c.url; });
+    var list = JSON.parse(java.post(
+        config.bookSourceUrl + "/api/contents",
+        JSON.stringify({ urls: urls }),
+        { "Content-Type": "application/json" }
+    ).body());
+    list.forEach(function (item, i) {
+        // 优先传章节对象,重复 url 的目录只有对象能精确对应
+        java.cacheContent(chapters[i], item.content);
+    });
+}
+```
+
+`chapters` 是本批需要缓存的章节数组,每项含 `url`、`title`、`index` 等字段。
+函数返回值会被忽略,正文一律通过 `java.cacheContent(chapter, content)` 回存,
+每回存一章即刻写入缓存,不必等整批结束。第一个参数也接受 url 字符串,但仅限该 url
+在本批内唯一;重复 url 字符串会报错,必须传章节对象才能保证不写错章节。
+
+回存的正文会自动套用书源的正文替换规则(`replaceRegex`)。没有回存的章节会自动
+退回 `getContent` 单章下载,所以部分章节失败不影响同批其它章节,也不需要在脚本里自己重试。
+
+手动缓存和阅读时的自动预下载都会使用批量。每批算一次书源并发率,批内脚本自己
+发出的请求仍各自受并发率限制。
+
+### 登录与发现
 - 只设置 `loginUrl` 时使用 WebView 登录，不要求实现 `login`。
 - 设置非空 `loginUi` 时必须实现顶层 `login` 函数。
 - 设置非空 `exploreUrl` 时必须实现顶层 `explore` 函数。
@@ -860,7 +949,8 @@ function getContent(chapter, book, nextChapterUrl) {
 ### 段评
 
 段评由两个成对的顶层函数提供。只有同时声明 `getReviewSummary` 和 `getReviewDetail` 才会启用，缺少任意一个
-函数时导入/保存会提示配对错误。章节加载后先调用统计函数，点击正文段评图标时再调用详情函数。
+函数时导入/保存会提示配对错误。可选声明 `getReviewReplies` 后，评论中的“查看更多回复”会按页调用它。
+章节加载后先调用统计函数，点击正文段评图标时再调用详情函数。
 
 ```js
 function getReviewSummary(chapter, book) {
@@ -885,11 +975,22 @@ function getReviewDetail(chapter, book, paraIndex, paraData, page) {
                 name: item.name,
                 avatar: item.avatar,
                 badge: item.badge,
-                content: item.content,
-                replies: item.replies || []
+                content: {
+                    text: item.content,
+                    replyCount: item.replyCount
+                }
             };
         }),
         nextPageUrl: json.hasNext ? "more" : null
+    };
+}
+
+function getReviewReplies(chapter, book, paraIndex, paraData, reviewId, page) {
+    var json = JSON.parse(java.ajax(
+        config.bookSourceUrl + "/review/replies?id=" + reviewId + "&page=" + page
+    ));
+    return {
+        items: json.items || []
     };
 }
 ```
@@ -897,9 +998,16 @@ function getReviewDetail(chapter, book, paraIndex, paraData, page) {
 - `getReviewSummary(chapter, book)` 返回数组，每项包含 `paraIndex`（正文段落序号，`-1` 表示章节标题）、`count`（评论数）和可选的
   `paraData`。`count` 小于等于 0 的条目不会显示图标；缺少 `paraData` 时默认使用段落序号字符串。
 - `getReviewDetail(chapter, book, paraIndex, paraData, page)` 返回 `{items, nextPageUrl}`。每项的 `content` 必填，
-  可选 `id`、`name`、`avatar`、`badge` 和递归 `replies`；缺少内容的条目会被忽略，递归回复会在界面中按顺序展示。
+  可返回文本或 `{text, replyToName, img, audio, time, likeCount, replyCount}`；`badge` 可返回字符串或字符串数组。其他可选字段包括
+  `id`、`name`、`avatar` 和递归 `replies`；缺少可显示内容的条目会被忽略，递归回复会在界面中按顺序展示。
 - `nextPageUrl` 只是是否继续请求的信号，不会作为 URL 使用。返回任意非空值表示还有下一页，返回 `null` 或省略表示结束；
   下一次调用会把 `page` 加一。
+- `getReviewReplies(chapter, book, paraIndex, paraData, reviewId, page)` 是可选的回复分页函数，返回 `{items}`；
+  `reviewId` 是主评论的非空 `id`，且详情项需要提供正数 `replyCount` 才会显示加载入口。页面从 `1` 开始，
+  返回首批回复，空数组表示没有更多回复。声明该函数时详情项不要内嵌 `replies`；未声明时仍可使用内嵌回复。
+  它必须与上述两个段评函数一起声明。
+- `id` 和 `reviewId` 是不透明字符串。超过 JavaScript 安全整数范围的数字 ID 必须在 `JSON.parse` 前保留为字符串；
+  一旦被 `JSON.parse` 舍入，应用无法恢复原值。
 - 段评函数异常会记录到日志，详情加载错误同时显示在弹窗中；返回空数组表示没有内容。
 
 ### 运行环境与并发

@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.mapLatest
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SearchViewModel(application: Application) : BaseViewModel(application) {
@@ -40,6 +41,7 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
     var searchKey: String = ""
     var hasMore = true
     private var searchID = 0L
+    private val searchCommands = SearchCommandGate()
     private val searchModel = SearchModel(viewModelScope, object : SearchModel.CallBack {
 
         override fun getSearchScope(): SearchScope {
@@ -126,18 +128,21 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
      * 开始搜索
      */
     fun search(key: String) {
+        val command = searchCommands.next()
         execute {
-            if ((searchKey == key) || key.isNotEmpty()) {
-                searchModel.cancelSearch()
-                searchID = System.currentTimeMillis()
-                searchBookLiveData.postValue(emptyList())
-                searchKey = key
-                hasMore = true
+            searchCommands.runIfCurrent(command) {
+                if ((searchKey == key) || key.isNotEmpty()) {
+                    searchModel.cancelSearch()
+                    searchID = command
+                    searchBookLiveData.postValue(emptyList())
+                    searchKey = key
+                    hasMore = true
+                }
+                if (searchKey.isEmpty()) {
+                    return@runIfCurrent
+                }
+                searchModel.search(searchID, searchKey)
             }
-            if (searchKey.isEmpty()) {
-                return@execute
-            }
-            searchModel.search(searchID, searchKey)
         }
     }
 
@@ -145,7 +150,7 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
      * 停止搜索
      */
     fun stop() {
-        searchModel.cancelSearch()
+        searchCommands.invalidate(searchModel::cancelSearch)
     }
 
     fun pause() {
@@ -186,7 +191,25 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
-        searchModel.close()
+        searchCommands.invalidate(searchModel::close)
     }
 
+}
+
+internal class SearchCommandGate {
+    private val sequence = AtomicLong()
+    private val lock = Any()
+
+    fun next(): Long = sequence.incrementAndGet()
+
+    fun runIfCurrent(command: Long, block: () -> Unit): Boolean = synchronized(lock) {
+        if (command != sequence.get()) return false
+        block()
+        true
+    }
+
+    fun invalidate(block: () -> Unit) {
+        sequence.incrementAndGet()
+        synchronized(lock) { block() }
+    }
 }

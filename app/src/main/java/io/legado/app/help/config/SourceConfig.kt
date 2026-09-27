@@ -31,12 +31,13 @@ object SourceConfig {
 
 
     fun removeSource(origin: String) {
-        val protectedOrigins = appDb.bookSourceDao.allPart
-            .map { it.bookSourceUrl }
-            .filterNot { it == origin }
-        sp.all.keys.filter {
-            belongsToSource(it, origin, protectedOrigins)
-        }.let {
+        removeSources(listOf(origin))
+    }
+
+    fun removeSources(origins: Collection<String>) {
+        if (origins.isEmpty()) return
+        val protectedOrigins = appDb.bookSourceDao.allPart.map { it.bookSourceUrl }
+        sourceConfigKeysToRemove(sp.all.keys, origins, protectedOrigins).let {
             sp.edit {
                 it.forEach {
                     remove(it)
@@ -52,11 +53,28 @@ internal fun belongsToSource(
     key: String,
     origin: String,
     protectedOrigins: Collection<String>,
-): Boolean {
-    val owner = (protectedOrigins.asSequence() + sequenceOf(origin))
-        .filter { candidate ->
-            key == candidate || key.startsWith("${candidate}_")
-        }
-        .maxByOrNull(String::length)
-    return owner == origin
+): Boolean = key in sourceConfigKeysToRemove(
+    listOf(key),
+    listOf(origin),
+    protectedOrigins,
+)
+
+internal fun sourceConfigKeysToRemove(
+    keys: Collection<String>,
+    removedOrigins: Collection<String>,
+    protectedOrigins: Collection<String>,
+): Set<String> {
+    val removed = removedOrigins.toHashSet()
+    val knownOrigins = protectedOrigins.toHashSet().apply { addAll(removed) }
+    return keys.filterTo(HashSet()) { sourceOwner(it, knownOrigins) in removed }
+}
+
+private fun sourceOwner(key: String, origins: Set<String>): String? {
+    if (key in origins) return key
+    var separator = key.lastIndexOf('_')
+    while (separator >= 0) {
+        key.substring(0, separator).takeIf { it in origins }?.let { return it }
+        separator = key.lastIndexOf('_', separator - 1)
+    }
+    return null
 }

@@ -14,6 +14,7 @@ import io.legado.app.help.JsExtensions
 import io.legado.app.help.http.CookieStore
 import io.legado.app.help.source.getShareScope
 import io.legado.app.help.source.getSharedGlobalStateKey
+import io.legado.app.model.BatchContentContext
 import io.legado.app.model.SharedJsScope
 import io.legado.app.utils.GSON
 import kotlinx.coroutines.CancellationException
@@ -38,9 +39,30 @@ class JsSourceEngine(
     private val coroutineContext: CoroutineContext? = null,
 ) : JsExtensions {
 
+    /** 批量正文上下文,只在 getContentBatch 调用期间设置,供 java.cacheContent 回存 */
+    private var batchContext: BatchContentContext? = null
+
     override fun getSource(): BaseSource = source
 
     override fun getTag(): String = source.getTag()
+
+    override fun getBatchContext(): BatchContentContext? = batchContext
+
+    /**
+     * 在批量正文上下文中调用 getContentBatch。
+     * 函数缺失时返回 exists=false,由调用方退回单章流程。
+     */
+    internal fun callContentBatch(
+        batchContext: BatchContentContext,
+        args: List<Pair<String, Any?>>,
+    ): OptionalCallResult {
+        this.batchContext = batchContext
+        try {
+            return callOptionalFunction("getContentBatch", args)
+        } finally {
+            this.batchContext = null
+        }
+    }
 
     /** 调用顶层函数并归一化返回值;函数缺失抛出明确错误 */
     fun callFunction(name: String, args: List<Pair<String, Any?>>): String? {

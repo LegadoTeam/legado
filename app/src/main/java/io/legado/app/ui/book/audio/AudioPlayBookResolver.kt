@@ -1,5 +1,11 @@
 package io.legado.app.ui.book.audio
 
+internal fun shouldReuseCurrentAudioPlay(
+    requestedBookUrl: String?,
+    currentBookUrl: String?,
+): Boolean = !currentBookUrl.isNullOrBlank() &&
+        (requestedBookUrl.isNullOrBlank() || requestedBookUrl == currentBookUrl)
+
 internal fun <T> resolveAudioPlayBook(
     requestedBookUrl: String?,
     cachedBook: T?,

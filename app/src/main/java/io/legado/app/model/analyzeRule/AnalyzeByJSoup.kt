@@ -16,10 +16,6 @@ import org.seimicrawler.xpath.JXNode
 @Keep
 class AnalyzeByJSoup(doc: Any) {
 
-    companion object {
-        private val nullSet = setOf(null)
-    }
-
     private var element: Element = parse(doc)
 
     private fun parse(doc: Any): Element {
@@ -27,14 +23,14 @@ class AnalyzeByJSoup(doc: Any) {
             return doc
         }
         if (doc is JXNode) {
-            return if (doc.isElement) doc.asElement() else Jsoup.parse(doc.toString())
+            return if (doc.isElement) doc.asElement() else parseSourceHtml(doc.toString())
         }
         kotlin.runCatching {
             if (doc.toString().startsWith("<?xml", true)) {
                 return Jsoup.parse(doc.toString(), Parser.xmlParser())
             }
         }
-        return Jsoup.parse(doc.toString())
+        return parseSourceHtml(doc.toString())
     }
 
     /**
@@ -164,7 +160,7 @@ class AnalyzeByJSoup(doc: Any) {
                         for (et in el) {
                             es.addAll(getElements(et, rl))
                         }
-                        el.clear()
+                        el.deselectAll()
                         el.addAll(es)
                     }
                     el
@@ -217,7 +213,6 @@ class AnalyzeByJSoup(doc: Any) {
             for (elt in elements) {
                 es.addAll(ElementsSingle().getElementsSingle(elt, rules[i]))
             }
-            elements.clear()
             elements = es
         }
         return if (elements.isEmpty()) null else getResultLast(elements, rules[last])
@@ -385,9 +380,9 @@ class AnalyzeByJSoup(doc: Any) {
              * */
             if (split == '!') { //排除
 
-                for (pcInt in indexSet) elements[pcInt] = null
-
-                elements.removeAll(nullSet) //测试过，这样就行
+                // Filter only the result list, without removing nodes from the source DOM.
+                // Work backwards so the remaining indexes stay valid.
+                for (pcInt in indexSet.sortedDescending()) elements.deselect(pcInt)
 
             } else if (split == '.') { //选择
 

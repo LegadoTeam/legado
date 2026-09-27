@@ -13,17 +13,25 @@ import android.view.View
 import android.widget.ImageView
 import androidx.annotation.ColorInt
 import androidx.annotation.StyleRes
+import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.core.graphics.alpha
+import androidx.core.view.forEach
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.children
 import com.google.android.material.appbar.AppBarLayout
+import com.google.android.material.tabs.TabLayout
 import io.legado.app.R
 import io.legado.app.help.config.AppConfig
+import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.elevation
+import io.legado.app.lib.theme.getToolbarTextColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.transparentNavBar
+import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.activity
+import io.legado.app.utils.applyTint
+import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.setOnApplyWindowInsetsListenerCompat
 import splitties.views.bottomPadding
 import splitties.views.topPadding
@@ -55,12 +63,16 @@ class TitleBar @JvmOverloads constructor(
         }
 
     private val displayHomeAsUp: Boolean
+    private val navigationDescription: CharSequence
     private val navigationIconTint: ColorStateList?
     private val navigationIconTintMode: Int
     private val fitStatusBar: Boolean
     private val fitNavigationBar: Boolean
     private val attachToActivity: Boolean
     private val opaque: Boolean
+    private val automaticForeground: Boolean
+    private val titleTextColorFromAttrs: Boolean
+    private val subtitleTextColorFromAttrs: Boolean
 
     init {
         val a = context.obtainStyledAttributes(
@@ -74,14 +86,19 @@ class TitleBar @JvmOverloads constructor(
         fitStatusBar = a.getBoolean(R.styleable.TitleBar_fitStatusBar, true)
         fitNavigationBar = a.getBoolean(R.styleable.TitleBar_fitNavigationBar, false)
         opaque = a.getBoolean(R.styleable.TitleBar_opaque, false)
+        val themeMode = a.getInt(R.styleable.TitleBar_themeMode, 0)
+        automaticForeground = themeMode == 0 && !opaque
 
         val navigationIcon = a.getDrawable(R.styleable.TitleBar_navigationIcon)
-        val navigationContentDescription =
+        navigationDescription =
             a.getText(R.styleable.TitleBar_navigationContentDescription)
+                ?: context.getText(R.string.back)
         val titleText = a.getString(R.styleable.TitleBar_title)
         val subtitleText = a.getString(R.styleable.TitleBar_subtitle)
+        titleTextColorFromAttrs = a.hasValue(R.styleable.TitleBar_titleTextColor)
+        subtitleTextColorFromAttrs = a.hasValue(R.styleable.TitleBar_subtitleTextColor)
 
-        when (a.getInt(R.styleable.TitleBar_themeMode, 0)) {
+        when (themeMode) {
             1 -> inflate(context, R.layout.view_title_bar_dark, this)
             else -> inflate(context, R.layout.view_title_bar, this)
         }
@@ -90,7 +107,7 @@ class TitleBar @JvmOverloads constructor(
         toolbar.apply {
             navigationIcon?.let {
                 this.navigationIcon = it
-                this.navigationContentDescription = navigationContentDescription
+                this.navigationContentDescription = navigationDescription
             }
 
             if (a.hasValue(R.styleable.TitleBar_titleTextAppearance)) {
@@ -100,7 +117,7 @@ class TitleBar @JvmOverloads constructor(
                 )
             }
 
-            if (a.hasValue(R.styleable.TitleBar_titleTextColor)) {
+            if (titleTextColorFromAttrs) {
                 this.setTitleTextColor(a.getColor(R.styleable.TitleBar_titleTextColor, -0x1))
             }
 
@@ -111,7 +128,7 @@ class TitleBar @JvmOverloads constructor(
                 )
             }
 
-            if (a.hasValue(R.styleable.TitleBar_subtitleTextColor)) {
+            if (subtitleTextColorFromAttrs) {
                 this.setSubtitleTextColor(a.getColor(R.styleable.TitleBar_subtitleTextColor, -0x1))
             }
 
@@ -198,6 +215,40 @@ class TitleBar @JvmOverloads constructor(
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         attachToActivity()
+        if (automaticForeground) {
+            post { applyForegroundColor() }
+        }
+    }
+
+    val usesTransparentForeground: Boolean
+        get() = automaticForeground && context.transparentNavBar &&
+            !AppConfig.isEInkMode && background?.alpha == 0
+
+    fun applyForegroundColor() {
+        if (!usesTransparentForeground) return
+        val color = context.getToolbarTextColor(true)
+        if (!titleTextColorFromAttrs) {
+            setTitleTextColor(color)
+        }
+        if (!subtitleTextColorFromAttrs) {
+            setSubTitleTextColor(color)
+        }
+        val colorFilter = PorterDuffColorFilter(color, PorterDuff.Mode.SRC_ATOP)
+        toolbar.navigationIcon?.colorFilter = colorFilter
+        toolbar.overflowIcon?.colorFilter = colorFilter
+        toolbar.findViewById<SearchView>(R.id.search_view)?.applyTint(color)
+        val tabUnselectedColor = context.getCompatColor(
+            if (ColorUtils.isColorLight(context.backgroundColor)) {
+                R.color.md_light_secondary
+            } else {
+                R.color.md_dark_secondary
+            }
+        )
+        toolbar.findViewById<TabLayout>(R.id.tab_layout)
+            ?.setTabTextColors(tabUnselectedColor, color)
+        toolbar.menu.forEach { item ->
+            (item.actionView as? SearchView)?.applyTint(color)
+        }
     }
 
     fun setNavigationOnClickListener(clickListener: ((View) -> Unit)) {
@@ -272,7 +323,12 @@ class TitleBar @JvmOverloads constructor(
         if (attachToActivity) {
             activity?.let {
                 it.setSupportActionBar(toolbar)
-                it.supportActionBar?.setDisplayHomeAsUpEnabled(displayHomeAsUp)
+                it.supportActionBar?.apply {
+                    setDisplayHomeAsUpEnabled(displayHomeAsUp)
+                    if (displayHomeAsUp) {
+                        setHomeActionContentDescription(navigationDescription)
+                    }
+                }
             }
         }
     }

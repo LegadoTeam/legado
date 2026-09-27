@@ -18,6 +18,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.addCallback
 import androidx.activity.viewModels
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.size
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
@@ -39,6 +40,7 @@ import io.legado.app.utils.keepScreenOn
 import io.legado.app.utils.longSnackbar
 import io.legado.app.utils.openUrl
 import io.legado.app.utils.sendToClip
+import io.legado.app.utils.setOnApplyWindowInsetsListenerCompat
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.toggleSystemBar
 import io.legado.app.utils.viewbindingdelegate.viewBinding
@@ -60,6 +62,7 @@ import io.legado.app.help.webView.WebViewPool.DATA_HTML
 import io.legado.app.help.webView.toWebViewRequestConfig
 import io.legado.app.model.Download
 import splitties.systemservices.powerManager
+import splitties.views.bottomPadding
 import java.lang.ref.WeakReference
 import java.net.URLDecoder
 import java.util.concurrent.CountDownLatch
@@ -98,6 +101,11 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        binding.root.setOnApplyWindowInsetsListenerCompat { view, windowInsets ->
+            val typeMask = WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime()
+            view.bottomPadding = windowInsets.getInsets(typeMask).bottom
+            windowInsets
+        }
         pooledWebView = WebViewPool.acquire(this)
         currentWebView = pooledWebView.realWebView
         binding.webViewContainer.addView(currentWebView)

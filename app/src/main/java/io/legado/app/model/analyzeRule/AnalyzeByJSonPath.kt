@@ -137,7 +137,7 @@ class AnalyzeByJSonPath(
         if (rules.size == 1) {
             ctx.let {
                 try {
-                    return it.read<ArrayList<Any>>(rules[0])
+                    return ArrayList(it.read<List<Any>>(rules[0]))
                 } catch (e: Exception) {
                     onError?.invoke(e) ?: e.printOnDebug()
                 }

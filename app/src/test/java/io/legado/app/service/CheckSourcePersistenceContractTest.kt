@@ -12,16 +12,12 @@ class CheckSourcePersistenceContractTest {
         val service = projectFile("app/src/main/java/io/legado/app/service/CheckSourceService.kt")
         val dao = projectFile("app/src/main/java/io/legado/app/data/dao/BookSourceDao.kt")
 
-        assertTrue(service.contains("bookSourceDao.updateCheckResult("))
+        assertTrue(service.contains("bookSourceDao.completeCheck("))
         assertFalse(service.contains("bookSourceDao.update(it)"))
         listOf(
-            "bookSourceGroup = :bookSourceGroup",
-            "bookSourceComment = :bookSourceComment",
             "respondTime = :respondTime",
-            "lastUpdateTime = :expectedLastUpdateTime",
-            "bookSourceGroup = :expectedBookSourceGroup",
-            "bookSourceComment = :expectedBookSourceComment",
-            "respondTime = :expectedRespondTime",
+            "revision = :revision and status = 'NEEDS_CHECK'",
+            "fun completeCheck(",
         ).forEach { assertTrue(dao.contains(it)) }
         assertTrue(service.contains("source.lastUpdateTime != selected.lastUpdateTime"))
         assertTrue(service.contains("Debug.recordCheckResult("))
@@ -31,7 +27,8 @@ class CheckSourcePersistenceContractTest {
     fun sessionStopCancelsBeforeStoppingAndDoneFollowsRelease() {
         val model = projectFile("app/src/main/java/io/legado/app/model/CheckSource.kt")
         val service = projectFile("app/src/main/java/io/legado/app/service/CheckSourceService.kt")
-        assertTrue(model.contains("val selectedSourcesKey = IntentData.put(sources.map { it.copy() })"))
+        assertTrue(model.contains("withContext(IO) { appDb.bookSourceDao.beginCheck(sources) }"))
+        assertTrue(model.indexOf("beginCheck(sources)") < model.indexOf("context.startService<CheckSourceService>"))
         assertTrue(model.contains("putExtra(EXTRA_SESSION_ID, sessionId)"))
         assertTrue(model.contains("fun stop(context: Context, sessionId: Long)"))
         assertFalse(model.contains("IntentData.put(\"checkSourceSelectedIds\""))

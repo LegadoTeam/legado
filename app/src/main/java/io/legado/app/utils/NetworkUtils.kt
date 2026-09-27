@@ -191,12 +191,16 @@ object NetworkUtils {
 
     fun getBaseUrl(url: String?): String? {
         url ?: return null
-        if (!url.startsWith("http://", true) &&
-            !url.startsWith("https://", true)
+        // A source may wrap a data URL as `https://host@js:'data:...'`.
+        // Resolve the transport host before validating the evaluated JS URL.
+        val jsIndex = url.indexOf("@js:", ignoreCase = true)
+        val urlToParse = if (jsIndex >= 0) url.substring(0, jsIndex) else url
+        if (!urlToParse.startsWith("http://", true) &&
+            !urlToParse.startsWith("https://", true)
         ) return null
-        val parsed = kotlin.runCatching { URL(url) }.getOrNull() ?: return null
+        val parsed = kotlin.runCatching { URL(urlToParse) }.getOrNull() ?: return null
         if (parsed.host.isEmpty()) return null
-        return "${url.substringBefore("://")}://${parsed.authority}"
+        return "${urlToParse.substringBefore("://")}://${parsed.authority}"
     }
 
     /**

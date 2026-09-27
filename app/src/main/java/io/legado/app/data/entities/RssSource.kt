@@ -1,7 +1,6 @@
 package io.legado.app.data.entities
 
 import android.os.Parcelable
-import android.text.TextUtils
 import android.webkit.JavascriptInterface
 import androidx.room.ColumnInfo
 import androidx.room.Entity
@@ -70,6 +69,8 @@ data class RssSource(
     var ruleLink: String? = null,
     /**正文规则**/
     var ruleContent: String? = null,
+    /**正文下一页规则**/
+    var nextContentUrl: String? = null,
     /**正文url白名单**/
     var contentWhitelist: String? = null,
     /**正文url黑名单**/
@@ -158,6 +159,7 @@ data class RssSource(
                 && equal(ruleDescription, source.ruleDescription)
                 && equal(ruleLink, source.ruleLink)
                 && equal(ruleContent, source.ruleContent)
+                && equal(nextContentUrl, source.nextContentUrl)
                 && enableJs == source.enableJs
                 && loadWithBaseUrl == source.loadWithBaseUrl
                 && equal(variableComment, source.variableComment)
@@ -187,18 +189,20 @@ data class RssSource(
     }
 
     fun addGroup(groups: String): RssSource {
-        sourceGroup?.splitNotBlank(AppPattern.splitGroupRegex)?.toHashSet()?.let {
+        sourceGroup?.splitNotBlank(AppPattern.splitGroupRegex)
+            ?.toCollection(linkedSetOf())?.let {
             it.addAll(groups.splitNotBlank(AppPattern.splitGroupRegex))
-            sourceGroup = TextUtils.join(",", it)
+            sourceGroup = it.joinToString(",")
         }
         if (sourceGroup.isNullOrBlank()) sourceGroup = groups
         return this
     }
 
     fun removeGroup(groups: String): RssSource {
-        sourceGroup?.splitNotBlank(AppPattern.splitGroupRegex)?.toHashSet()?.let {
+        sourceGroup?.splitNotBlank(AppPattern.splitGroupRegex)
+            ?.toCollection(linkedSetOf())?.let {
             it.removeAll(groups.splitNotBlank(AppPattern.splitGroupRegex).toSet())
-            sourceGroup = TextUtils.join(",", it)
+            sourceGroup = it.joinToString(",")
         }
         return this
     }

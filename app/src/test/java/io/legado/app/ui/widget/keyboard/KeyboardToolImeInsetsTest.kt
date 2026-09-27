@@ -1,9 +1,15 @@
 package io.legado.app.ui.widget.keyboard
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Test
 
 class KeyboardToolImeInsetsTest {
+
+    @Test
+    fun `keyboard config can be restored by FragmentManager`() {
+        assertNotNull(KeyboardAssistsConfig::class.java.getConstructor())
+    }
 
     @Test
     fun `visible ime uses its inset height`() {

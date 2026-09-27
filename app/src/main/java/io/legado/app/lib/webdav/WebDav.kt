@@ -325,12 +325,20 @@ open class WebDav(
      * 上传文件
      */
     @Throws(WebDavException::class)
-    suspend fun upload(localPath: String, contentType: String = DEFAULT_CONTENT_TYPE) {
-        upload(File(localPath), contentType)
+    suspend fun upload(
+        localPath: String,
+        contentType: String = DEFAULT_CONTENT_TYPE,
+        overwrite: Boolean = true,
+    ) {
+        upload(File(localPath), contentType, overwrite)
     }
 
     @Throws(WebDavException::class)
-    suspend fun upload(file: File, contentType: String = DEFAULT_CONTENT_TYPE) {
+    suspend fun upload(
+        file: File,
+        contentType: String = DEFAULT_CONTENT_TYPE,
+        overwrite: Boolean = true,
+    ) {
         kotlin.runCatching {
             withContext(IO) {
                 if (!file.exists()) throw WebDavException("文件不存在")
@@ -339,6 +347,7 @@ open class WebDav(
                 val url = httpUrl ?: throw WebDavException("url不能为空")
                 webDavClient.newCallResponse {
                     url(url)
+                    if (!overwrite) addHeader("If-None-Match", "*")
                     put(fileBody)
                 }.use {
                     checkResult(it)
@@ -347,7 +356,10 @@ open class WebDav(
         }.onFailure {
             currentCoroutineContext().ensureActive()
             AppLog.put("WebDav上传失败\n${it.localizedMessage}", it)
-            throw WebDavException("WebDav上传失败\n${it.localizedMessage}")
+            throw WebDavException(
+                "WebDav上传失败\n${it.localizedMessage}",
+                (it as? WebDavException)?.responseCode,
+            )
         }
     }
 
@@ -368,12 +380,19 @@ open class WebDav(
         }.onFailure {
             currentCoroutineContext().ensureActive()
             AppLog.put("WebDav上传失败\n${it.localizedMessage}", it)
-            throw WebDavException("WebDav上传失败\n${it.localizedMessage}")
+            throw WebDavException(
+                "WebDav上传失败\n${it.localizedMessage}",
+                (it as? WebDavException)?.responseCode,
+            )
         }
     }
 
     @Throws(WebDavException::class)
-    suspend fun upload(uri: Uri, contentType: String = DEFAULT_CONTENT_TYPE) {
+    suspend fun upload(
+        uri: Uri,
+        contentType: String = DEFAULT_CONTENT_TYPE,
+        overwrite: Boolean = true,
+    ) {
         // 务必注意RequestBody不要嵌套，不然上传时内容可能会被追加多余的文件信息
         kotlin.runCatching {
             withContext(IO) {
@@ -381,6 +400,7 @@ open class WebDav(
                 val url = httpUrl ?: throw NoStackTraceException("url不能为空")
                 webDavClient.newCallResponse {
                     url(url)
+                    if (!overwrite) addHeader("If-None-Match", "*")
                     put(fileBody)
                 }.use {
                     checkResult(it)
@@ -389,7 +409,10 @@ open class WebDav(
         }.onFailure {
             currentCoroutineContext().ensureActive()
             AppLog.put("WebDav上传失败\n${it.localizedMessage}", it)
-            throw WebDavException("WebDav上传失败\n${it.localizedMessage}")
+            throw WebDavException(
+                "WebDav上传失败\n${it.localizedMessage}",
+                (it as? WebDavException)?.responseCode,
+            )
         }
     }
 
@@ -440,17 +463,24 @@ open class WebDav(
             }
 
             if (response.message.isNotBlank() || body.isBlank()) {
-                throw WebDavException("${url}\n${response.code}:${response.message}")
+                throw WebDavException(
+                    "${url}\n${response.code}:${response.message}",
+                    response.code,
+                )
             }
             val document = Jsoup.parse(body)
             val exception = document.getElementsByTag("s:exception").firstOrNull()?.text()
             val message = document.getElementsByTag("s:message").firstOrNull()?.text()
             if (exception == "ObjectNotFound") {
                 throw ObjectNotFoundException(
-                    message ?: "$path doesn't exist. code:${response.code}"
+                    message ?: "$path doesn't exist. code:${response.code}",
+                    response.code,
                 )
             }
-            throw WebDavException(message ?: "未知错误 code:${response.code}")
+            throw WebDavException(
+                message ?: "未知错误 code:${response.code}",
+                response.code,
+            )
         }
     }
 

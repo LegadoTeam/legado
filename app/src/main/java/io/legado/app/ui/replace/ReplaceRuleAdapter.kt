@@ -130,8 +130,7 @@ class ReplaceRuleAdapter(context: Context, var callBack: CallBack) :
         binding.apply {
             swtEnabled.setOnUserCheckedChangeListener { isChecked ->
                 getItem(holder.layoutPosition)?.let {
-                    it.isEnabled = isChecked
-                    callBack.update(it)
+                    callBack.enable(isChecked, it)
                 }
             }
             ivEdit.setOnClickListener {
@@ -174,31 +173,56 @@ class ReplaceRuleAdapter(context: Context, var callBack: CallBack) :
         }
     }
 
+    private var dragStartPosition = RecyclerView.NO_POSITION
+    private var draggedKey: Long? = null
+    private var draggedHolder: RecyclerView.ViewHolder? = null
+
+    override fun canStartDrag() = !listUpdatesPaused
+
+    override fun onDragStarted(viewHolder: RecyclerView.ViewHolder) {
+        if (listUpdatesPaused) return
+        val position = viewHolder.bindingAdapterPosition
+        val source = getItem(position) ?: return
+        pauseListUpdates()
+        dragStartPosition = position
+        draggedKey = source.id
+        draggedHolder = viewHolder
+    }
+
     override fun swap(srcPosition: Int, targetPosition: Int): Boolean {
-        val srcItem = getItem(srcPosition)
-        val targetItem = getItem(targetPosition)
-        if (srcItem != null && targetItem != null) {
-            if (srcItem.order == targetItem.order) {
-                callBack.upOrder()
-            } else {
-                val srcOrder = srcItem.order
-                srcItem.order = targetItem.order
-                targetItem.order = srcOrder
-                movedItems.add(srcItem)
-                movedItems.add(targetItem)
-            }
+        val source = getItem(srcPosition) ?: return false
+        if (getItem(targetPosition) == null) return false
+        if (draggedHolder == null || source.id != draggedKey) {
+            return false
         }
         swapItem(srcPosition, targetPosition)
         return true
     }
 
-    private val movedItems = linkedSetOf<ReplaceRule>()
-
     override fun onClearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
-        if (movedItems.isNotEmpty()) {
-            callBack.update(*movedItems.toTypedArray())
-            movedItems.clear()
+        if (viewHolder !== draggedHolder) return
+        val start = dragStartPosition
+        val key = draggedKey
+        dragStartPosition = RecyclerView.NO_POSITION
+        draggedKey = null
+        draggedHolder = null
+        fun finish() {
+            resumeListUpdates()
+            callBack.reload()
         }
+        val end = viewHolder.bindingAdapterPosition
+        val moved = getItem(end)?.takeIf { it.id == key }
+        if (start == RecyclerView.NO_POSITION || end == RecyclerView.NO_POSITION || start == end || moved == null) {
+            finish()
+            return
+        }
+        val after = end > start
+        val target = getItem(if (after) end - 1 else end + 1)
+        if (target == null) {
+            finish()
+            return
+        }
+        callBack.move(moved.id, target.id, after, ::finish)
     }
 
     val dragSelectCallback: DragSelectTouchHelper.Callback =
@@ -229,12 +253,13 @@ class ReplaceRuleAdapter(context: Context, var callBack: CallBack) :
         }
 
     interface CallBack {
-        fun update(vararg rule: ReplaceRule)
+        fun enable(enable: Boolean, rule: ReplaceRule)
         fun delete(rule: ReplaceRule)
         fun edit(rule: ReplaceRule)
         fun toTop(rule: ReplaceRule)
         fun toBottom(rule: ReplaceRule)
-        fun upOrder()
+        fun move(ruleId: Long, targetId: Long, after: Boolean, onFinally: () -> Unit)
+        fun reload()
         fun upCountView()
     }
 }

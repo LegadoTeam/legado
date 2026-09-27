@@ -1,0 +1,251 @@
+diff --git a/it-android/src/main/assets/tests/missing-signature-methods.js b/it-android/src/main/assets/tests/missing-signature-methods.js
+new file mode 100644
+index 000000000..89fc810d5
+--- /dev/null
++++ b/it-android/src/main/assets/tests/missing-signature-methods.js
+@@ -0,0 +1,10 @@
++let target = Packages.org.mozilla.javascript.android.MissingSignatureMethods
++
++assertEquals("available", target.available() + "")
++
++if (android.os.Build.VERSION.SDK_INT >= 33) {
++    assertEquals("null", target.missingParameter(null) + "")
++    assertEquals(null, target.missingReturn())
++}
++
++"success"
+diff --git a/it-android/src/main/java/org/mozilla/javascript/android/MissingSignatureMethods.java b/it-android/src/main/java/org/mozilla/javascript/android/MissingSignatureMethods.java
+new file mode 100644
+index 000000000..be03b0ea6
+--- /dev/null
++++ b/it-android/src/main/java/org/mozilla/javascript/android/MissingSignatureMethods.java
+@@ -0,0 +1,20 @@
++package org.mozilla.javascript.android;
++
++import android.app.LocaleManager;
++
++public final class MissingSignatureMethods {
++
++    private MissingSignatureMethods() {}
++
++    public static String available() {
++        return "available";
++    }
++
++    public static String missingParameter(LocaleManager localeManager) {
++        return localeManager == null ? "null" : "available";
++    }
++
++    public static LocaleManager missingReturn() {
++        return null;
++    }
++}
+diff --git a/rhino/src/main/java/org/mozilla/javascript/BaseFunction.java b/rhino/src/main/java/org/mozilla/javascript/BaseFunction.java
+index af5ae9f07..a08873f9f 100644
+--- a/rhino/src/main/java/org/mozilla/javascript/BaseFunction.java
++++ b/rhino/src/main/java/org/mozilla/javascript/BaseFunction.java
+@@ -488,14 +488,30 @@ public class BaseFunction extends ScriptableObject implements Function {
+ 
+     private static Scriptable js_constructor(
+             Context cx, JSFunction f, Object nt, VarScope s, Object thisObj, Object[] args) {
+-        return jsConstructor(cx, f.getDeclarationScope(), args, false);
++        // legado
++        return jsConstructor(cx, dynamicConstructorScope(cx, f), args, false);
++        // end legado
+     }
+ 
+     private static Scriptable js_gen_constructor(
+             Context cx, JSFunction f, Object nt, VarScope s, Object thisObj, Object[] args) {
+-        return jsConstructor(cx, f.getDeclarationScope(), args, true);
++        // legado
++        return jsConstructor(cx, dynamicConstructorScope(cx, f), args, true);
++        // end legado
+     }
+ 
++    // legado: with FEATURE_LEGADO_DYNAMIC_EVAL_REALM, functions created via the Function
++    // constructor close over the current top call scope (dynamic, pre-realm-separation
++    // behavior) instead of the intrinsic's declaration realm
++    private static VarScope dynamicConstructorScope(Context cx, JSFunction f) {
++        if (cx.hasFeature(Context.FEATURE_LEGADO_DYNAMIC_EVAL_REALM)
++                && ScriptRuntime.hasTopCall(cx)) {
++            return ScriptRuntime.getTopCallScope(cx);
++        }
++        return f.getDeclarationScope();
++    }
++    // end legado
++
+     private static BaseFunction realFunction(Object thisObj, String functionName) {
+         if (thisObj == null) {
+             throw ScriptRuntime.notFunctionError(null);
+diff --git a/rhino/src/main/java/org/mozilla/javascript/Context.java b/rhino/src/main/java/org/mozilla/javascript/Context.java
+index c408b366b..66b2e948a 100644
+--- a/rhino/src/main/java/org/mozilla/javascript/Context.java
++++ b/rhino/src/main/java/org/mozilla/javascript/Context.java
+@@ -378,6 +378,31 @@ public class Context implements Closeable {
+      */
+     public static final int FEATURE_HTMLUNIT_ARRAY_SORT_COMPERATOR_ACCEPTS_BOOL = 106;
+ 
++    /**
++     * Special to legado's fork.
++     *
++     * <p>Non-strict functions invoked with an undefined/null {@code this} receive the global
++     * object of the current top call scope (dynamic, pre-realm-separation Rhino behavior)
++     * instead of the function's declaration realm global. Shared-library functions evaluated
++     * in a parent scope rely on {@code this} exposing the per-call execution bindings.
++     *
++     * <p>By default {@link #hasFeature(int)} returns false.
++     */
++    public static final int FEATURE_LEGADO_DYNAMIC_DEFAULT_THIS = 120;
++
++    /**
++     * Special to legado's fork.
++     *
++     * <p>Indirect {@code eval} calls (through the eval function object) and the {@code Function}
++     * constructor resolve their global environment from the current top call scope (dynamic,
++     * pre-realm-separation Rhino behavior) instead of the intrinsic's declaration realm. Scripts
++     * evaluated against per-call scopes chained to shared realms rely on eval'ed code seeing the
++     * per-call execution bindings.
++     *
++     * <p>By default {@link #hasFeature(int)} returns false.
++     */
++    public static final int FEATURE_LEGADO_DYNAMIC_EVAL_REALM = 121;
++
+     public static final String languageVersionProperty = "language version";
+     public static final String errorReporterProperty = "error reporter";
+ 
+diff --git a/rhino/src/main/java/org/mozilla/javascript/ContextFactory.java b/rhino/src/main/java/org/mozilla/javascript/ContextFactory.java
+index 3216457f2..e4c595c7d 100644
+--- a/rhino/src/main/java/org/mozilla/javascript/ContextFactory.java
++++ b/rhino/src/main/java/org/mozilla/javascript/ContextFactory.java
+@@ -279,6 +279,14 @@ public class ContextFactory {
+ 
+             case Context.FEATURE_HTMLUNIT_ARRAY_SORT_COMPERATOR_ACCEPTS_BOOL:
+                 return false;
++
++            // legado
++            case Context.FEATURE_LEGADO_DYNAMIC_DEFAULT_THIS:
++                return false;
++
++            case Context.FEATURE_LEGADO_DYNAMIC_EVAL_REALM:
++                return false;
++            // end legado
+         }
+         // It is a bug to call the method with unknown featureIndex
+         throw new IllegalArgumentException(String.valueOf(featureIndex));
+diff --git a/rhino/src/main/java/org/mozilla/javascript/JSFunction.java b/rhino/src/main/java/org/mozilla/javascript/JSFunction.java
+index 424167dd6..1f1962b96 100644
+--- a/rhino/src/main/java/org/mozilla/javascript/JSFunction.java
++++ b/rhino/src/main/java/org/mozilla/javascript/JSFunction.java
+@@ -150,6 +150,19 @@ public class JSFunction extends BaseFunction implements ScriptOrFn<JSFunction> {
+         if (descriptor.hasLexicalThis()) {
+             return lexicalThis;
+         } else if (!descriptor.isStrict() && (thisObj == null || Undefined.isUndefined(thisObj))) {
++            // legado
++            Context cx = Context.getCurrentContext();
++            if (cx != null
++                    && cx.hasFeature(Context.FEATURE_LEGADO_DYNAMIC_DEFAULT_THIS)
++                    && ScriptRuntime.hasTopCall(cx)) {
++                Scriptable dynThis =
++                        ScriptableObject.getTopLevelScope(ScriptRuntime.getTopCallScope(cx))
++                                .getGlobalThis();
++                if (dynThis != null) {
++                    return dynThis;
++                }
++            }
++            // end legado
+             var res = ScriptableObject.getTopLevelScope(getDeclarationScope()).getGlobalThis();
+             return res;
+         } else {
+diff --git a/rhino/src/main/java/org/mozilla/javascript/JavaMembers.java b/rhino/src/main/java/org/mozilla/javascript/JavaMembers.java
+index dd5c824f1..ed1e0ebe7 100644
+--- a/rhino/src/main/java/org/mozilla/javascript/JavaMembers.java
++++ b/rhino/src/main/java/org/mozilla/javascript/JavaMembers.java
+@@ -13,6 +13,7 @@ import java.io.Serial;
+ import java.lang.reflect.AccessibleObject;
+ import java.lang.reflect.Constructor;
+ import java.lang.reflect.Field;
++import java.lang.reflect.MalformedParameterizedTypeException;
+ import java.lang.reflect.Method;
+ import java.lang.reflect.Modifier;
+ import java.security.AccessControlContext;
+@@ -344,7 +345,9 @@ class JavaMembers {
+                                     Method registered = registerMethod(map, method);
+                                     // We don't want to replace the deprecated method here
+                                     // because it is not available on Android.
+-                                    if (includePrivate && !registered.isAccessible()) {
++                                    if (includePrivate
++                                            && registered != null
++                                            && !registered.isAccessible()) {
+                                         registered.setAccessible(true);
+                                     }
+                                 }
+@@ -397,10 +400,22 @@ class JavaMembers {
+     }
+ 
+     static Method registerMethod(Map<MethodSignature, Method> map, Method method) {
+-        MethodSignature sig = new MethodSignature(method);
+-        // Array may contain methods with same parameter signature but different return value!
+-        // (which is allowed in bytecode, but not in JLS) we will take the best method
+-        return map.merge(sig, method, JavaMembers::getMoreConcreteMethod);
++        try {
++            method.getGenericParameterTypes();
++            method.getGenericReturnType();
++            MethodSignature sig = new MethodSignature(method);
++            // Array may contain methods with same parameter signature but different return value!
++            // (which is allowed in bytecode, but not in JLS) we will take the best method
++            return map.merge(sig, method, JavaMembers::getMoreConcreteMethod);
++        } catch (LinkageError | TypeNotPresentException | MalformedParameterizedTypeException e) {
++            Context.reportWarning(
++                    "Could not resolve signature of method "
++                            + method.getName()
++                            + " of class "
++                            + method.getDeclaringClass().getName()
++                            + "; skipping it.");
++            return null;
++        }
+     }
+ 
+     private static Method getMoreConcreteMethod(Method oldValue, Method newValue) {
+diff --git a/rhino/src/main/java/org/mozilla/javascript/MemberBox.java b/rhino/src/main/java/org/mozilla/javascript/MemberBox.java
+index b40513c92..23d7b4165 100644
+--- a/rhino/src/main/java/org/mozilla/javascript/MemberBox.java
++++ b/rhino/src/main/java/org/mozilla/javascript/MemberBox.java
+@@ -19,6 +19,7 @@ import java.lang.reflect.Member;
+ import java.lang.reflect.Method;
+ import java.lang.reflect.Modifier;
+ 
++
+ /**
+  * Wrapper class for Method and Constructor instances to cache getParameterTypes() results, recover
+  * from IllegalAccessException in some cases and provide serialization support.
+@@ -286,8 +287,7 @@ final class MemberBox implements Serializable {
+             if (e instanceof ContinuationPending) throw (ContinuationPending) e;
+ 
+             // HtmlUnit
+-            if (e instanceof RhinoException) throw Context.throwAsScriptRuntimeEx(e);
+-            else throw new RuntimeException("Exception invoking " + method.getName(), e);
++            throw Context.throwAsScriptRuntimeEx(e);
+         } catch (IllegalArgumentException iae) {
+             StringBuilder builder = new StringBuilder();
+             for (Object arg : args) {
+diff --git a/rhino/src/main/java/org/mozilla/javascript/NativeGlobal.java b/rhino/src/main/java/org/mozilla/javascript/NativeGlobal.java
+index 40a2a8461..9001181bf 100644
+--- a/rhino/src/main/java/org/mozilla/javascript/NativeGlobal.java
++++ b/rhino/src/main/java/org/mozilla/javascript/NativeGlobal.java
+@@ -458,6 +458,16 @@ public class NativeGlobal implements Serializable {
+      */
+     private static Object js_eval(
+             Context cx, JSFunction f, Object nt, VarScope s, Object thisObj, Object[] args) {
++        // legado
++        if (cx.hasFeature(Context.FEATURE_LEGADO_DYNAMIC_EVAL_REALM)
++                && ScriptRuntime.hasTopCall(cx)) {
++            TopLevel dynTop = ScriptRuntime.getTopCallScope(cx);
++            ScriptableObject dynGlobal = dynTop.getGlobalThis();
++            if (dynGlobal != null) {
++                return ScriptRuntime.evalSpecial(cx, dynTop, dynGlobal, args, "eval code", 1);
++            }
++        }
++        // end legado
+         TopLevel top = ScriptableObject.getTopLevelScope(f.getDeclarationScope());
+         return ScriptRuntime.evalSpecial(cx, top, top.getGlobalThis(), args, "eval code", 1);
+     }

@@ -6,6 +6,8 @@ import {
   convertSourcesToMap,
 } from '@utils/souce'
 import type { BookSoure, RssSource, Source } from '@/source'
+import { sourceCheckContent, sourceCheckStatus, sourceCheckSnapshots } from '@/utils/sourceCheckState'
+import type { SourceCheckState, SourceCheckSnapshot } from '@/utils/sourceCheckState'
 
 const isBookSource = /bookSource/i.test(location.href)
 const emptySource = isBookSource ? emptyBookSource : emptyRssSource
@@ -17,9 +19,14 @@ export const useSourceStore = defineStore('source', {
       rssSources: shallowRef([] as RssSource[]), // 临时存放所有订阅源
       savedSources: [] as Source[], // 批量保存到阅读app成功的源
       currentSource: JSON.parse(JSON.stringify(emptySource)) as Source, // 当前编辑的源
+      sourceMode: 'json' as 'json' | 'javascript',
       currentTab: localStorage.getItem('tabName') || 'editTab',
       editTabSource: {} as Source, // 生成序列化的json数据
       isDebuging: false,
+      checkStatusFilter: '',
+      checkStates: {} as Record<string, SourceCheckState>,
+      checkSnapshots: {} as Record<string, SourceCheckSnapshot>,
+      checkSessionToken: null as string | null,
     }
   },
   getters: {
@@ -40,6 +47,32 @@ export const useSourceStore = defineStore('source', {
         : '',
   },
   actions: {
+    setCheckStates(states: SourceCheckState[], sessionToken: string | null = null) {
+      this.checkStates = Object.fromEntries(states.map(state => [state.bookSourceUrl, state]))
+      this.checkSessionToken = sessionToken
+    },
+    rememberDeviceSources(sources: Source[], states: SourceCheckState[]) {
+      this.setCheckStates(states)
+      this.checkSnapshots = sourceCheckSnapshots(sources, states)
+    },
+    rememberCheckStart(sources: Source[], revisions: Record<string, string>) {
+      sources.forEach(source => {
+        const url = getSourceUniqueKey(source)
+        this.checkSnapshots[url] = { content: sourceCheckContent(source), sourceRevision: revisions[url] }
+        this.checkStates[url] = { bookSourceUrl: url, sourceRevision: revisions[url], status: 'NEEDS_CHECK', detail: '' }
+      })
+    },
+    rememberSavedSources(sources: Source[], states: SourceCheckState[]) {
+      states.forEach(state => { this.checkStates[state.bookSourceUrl] = state })
+      Object.assign(this.checkSnapshots, sourceCheckSnapshots(sources, states))
+    },
+    invalidateCheckSources(sources: Source[]) {
+      sources.forEach(source => { delete this.checkSnapshots[getSourceUniqueKey(source)] })
+    },
+    checkStatus(source: Source) {
+      const url = getSourceUniqueKey(source)
+      return sourceCheckStatus(source, this.checkSnapshots[url], this.checkStates[url])
+    },
     startDebug() {
       this.currentTab = 'editDebug'
       this.isDebuging = true
@@ -77,9 +110,28 @@ export const useSourceStore = defineStore('source', {
       map.set(getSourceUniqueKey(source), JSON.parse(JSON.stringify(source)))
       this.saveSources(Array.from(map.values()))
     },
+    updateSource(oldKey: string, source: Source) {
+      const list = this.sources
+      const index = list.findIndex(item => getSourceUniqueKey(item) === oldKey)
+      if (index === -1) return
+      const next = [...list]
+      next[index] = source
+      this.saveSources(next)
+    },
+    saveJsSource(source: BookSoure, openedSourceUrl?: string) {
+      const map = this.sourcesMap
+      if (openedSourceUrl && openedSourceUrl !== source.bookSourceUrl) {
+        map.delete(openedSourceUrl)
+      }
+      map.set(source.bookSourceUrl, JSON.parse(JSON.stringify(source)))
+      this.saveSources(Array.from(map.values()))
+    },
     // 更改当前编辑的源qq
     changeCurrentSource(source: Source) {
       this.currentSource = JSON.parse(JSON.stringify(source))
+      if (isBookSource && (source as BookSoure).mainJs?.trim()) {
+        this.sourceMode = 'javascript'
+      }
     },
     // update editTab tabName and editTab info
     changeTabName(tabName: string) {

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/enabled"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="48dp"
+        android:text="@string/auto_backup_t" />
+
+    <RadioGroup
+        android:id="@+id/destination"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <RadioButton
+            android:id="@+id/local_only"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="@string/backup_local_only" />
+
+        <RadioButton
+            android:id="@+id/local_webdav"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="@string/backup_local_webdav" />
+    </RadioGroup>
+
+    <io.legado.app.ui.widget.text.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/auto_backup_interval_days">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/interval_days"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="number"
+            android:maxLines="1"
+            android:minHeight="48dp" />
+    </io.legado.app.ui.widget.text.TextInputLayout>
+</LinearLayout>

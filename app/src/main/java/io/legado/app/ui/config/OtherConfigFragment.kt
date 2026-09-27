@@ -2,11 +2,14 @@ package io.legado.app.ui.config
 
 import android.annotation.SuppressLint
 import android.content.ComponentName
+import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.provider.Settings
 import android.text.InputType
 import android.view.View
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.view.postDelayed
 import androidx.fragment.app.activityViewModels
 import androidx.preference.EditTextPreference
@@ -21,7 +24,6 @@ import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.AppFreezeMonitor
 import io.legado.app.help.DispatchersMonitor
 import io.legado.app.help.config.AppConfig
-import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.normalizeJsSourceApiToken
 import io.legado.app.help.http.Cronet
 import io.legado.app.lib.dialogs.alert
@@ -46,6 +48,8 @@ import io.legado.app.utils.removePref
 import io.legado.app.utils.restart
 import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.showDialogFragment
+import io.legado.app.utils.supportsPromotedNotifications
+import io.legado.app.utils.toastOnUi
 import splitties.init.appCtx
 
 /**
@@ -84,7 +88,11 @@ class OtherConfigFragment : PreferenceFragment(),
                 val token = normalizeJsSourceApiToken(newValue?.toString())
                 AppConfig.jsSourceApiToken = token
                 upPreferenceSummary(PreferKey.jsSourceApiToken, token)
-                if (McpService.isRun && previousToken != token) {
+                if (
+                    McpService.isRun &&
+                    AppConfig.jsSourceApiTokenRequired &&
+                    previousToken != token
+                ) {
                     if (token == null) {
                         McpService.stop(requireContext())
                     } else {
@@ -110,6 +118,8 @@ class OtherConfigFragment : PreferenceFragment(),
         onlyUpdateReadPref = findPreference<Preference>(PreferKey.onlyUpdateRead)?.also {
             it.isVisible = AppConfig.autoRefreshBook
         }
+        findPreference<Preference>(PreferKey.liveUpdateNotifications)?.isVisible =
+            canConfigurePromotedNotifications()
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -205,7 +215,6 @@ class OtherConfigFragment : PreferenceFragment(),
             }
 
             PreferKey.clearWebViewData -> clearWebViewData()
-            "localPassword" -> alertLocalPassword()
             PreferKey.shrinkDatabase -> shrinkDatabase()
         }
         return super.onPreferenceTreeClick(preference)
@@ -232,6 +241,16 @@ class OtherConfigFragment : PreferenceFragment(),
 
             PreferKey.mcpPort -> {
                 upPreferenceSummary(key, AppConfig.mcpPort.toString())
+                if (McpService.isRun) {
+                    McpService.restart(requireContext())
+                }
+            }
+
+            PreferKey.jsSourceApiTokenRequired -> {
+                if (WebService.isRun) {
+                    WebService.stop(requireContext())
+                    WebService.start(requireContext())
+                }
                 if (McpService.isRun) {
                     McpService.restart(requireContext())
                 }
@@ -287,8 +306,37 @@ class OtherConfigFragment : PreferenceFragment(),
                 val isEnabled = sharedPreferences?.getBoolean(key, false) ?: false
                 onlyUpdateReadPref?.isVisible = isEnabled
             }
+
+            PreferKey.liveUpdateNotifications -> {
+                if (
+                    supportsPromotedNotifications() &&
+                    sharedPreferences?.getBoolean(key, false) == true &&
+                    !NotificationManagerCompat.from(requireContext())
+                        .canPostPromotedNotifications()
+                ) {
+                    val intent = promotedNotificationSettingsIntent()
+                    if (intent.resolveActivity(requireContext().packageManager) != null) {
+                        startActivity(intent)
+                    } else {
+                        putPrefBoolean(PreferKey.liveUpdateNotifications, false)
+                        toastOnUi(R.string.tip_cannot_jump_setting_page)
+                    }
+                }
+            }
         }
     }
+
+    private fun canConfigurePromotedNotifications(): Boolean {
+        if (!supportsPromotedNotifications()) return false
+        val context = requireContext()
+        return NotificationManagerCompat.from(context).canPostPromotedNotifications() ||
+            promotedNotificationSettingsIntent().resolveActivity(context.packageManager) != null
+    }
+
+    private fun promotedNotificationSettingsIntent() =
+        Intent(Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS).apply {
+            putExtra(Settings.EXTRA_APP_PACKAGE, requireContext().packageName)
+        }
 
     private fun upPreferenceSummary(preferenceKey: String, value: String?) {
         val preference = findPreference<Preference>(preferenceKey) ?: return
@@ -408,21 +456,6 @@ class OtherConfigFragment : PreferenceFragment(),
                 componentName,
                 PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP
             )
-        }
-    }
-
-    private fun alertLocalPassword() {
-        context?.alert(R.string.set_local_password, R.string.set_local_password_summary) {
-            val editTextBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
-                editView.hint = "password"
-            }
-            customView {
-                editTextBinding.root
-            }
-            okButton {
-                LocalConfig.password = editTextBinding.editView.text.toString()
-            }
-            cancelButton()
         }
     }
 

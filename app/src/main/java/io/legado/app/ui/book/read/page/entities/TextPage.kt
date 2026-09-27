@@ -42,12 +42,11 @@ data class TextPage(
     var renderHeight: Int = 0
 ) {
 
-    private val hasShadowStyle: Boolean
-        get() = lines.any { it.hasShadowStyle }
-
     companion object {
         val readProgressFormatter = DecimalFormat("0.0%")
         val emptyTextPage = TextPage()
+        // 覆盖 10dp 装饰和最大 20px 阴影溢出，并为抗锯齿保留 1px。
+        private val recordPadding = maxOf(21, 10.dpToPx())
     }
 
     val lines: List<TextLine> get() = textLines
@@ -108,7 +107,13 @@ data class TextPage(
             val lastLine = textLines[leftLineSize - 1]
             if (lastLine.isImage) return@run
             val lastLineHeight = with(lastLine) { lineBottom - lineTop }
-            val pageHeight = lastLine.lineBottom + contentPaintTextHeight * lineSpacingExtra
+            val lineHeight = if (lastLine.isTitle && !lastLine.isTitleNumber) {
+                lastLine.height
+            } else {
+                contentPaintTextHeight
+            }
+            val pageHeight = lastLine.lineBottom +
+                    lineHeight * ChapterProvider.lineSpacingFor(lastLine)
             if (visibleHeight - pageHeight >= lastLineHeight) return@run
             val surplus = (visibleBottom - lastLine.lineBottom)
             if (surplus == 0f) return@run
@@ -126,7 +131,13 @@ data class TextPage(
             val lastLine = textLines.last()
             if (lastLine.isImage) return@run
             val lastLineHeight = with(lastLine) { lineBottom - lineTop }
-            val pageHeight = lastLine.lineBottom + contentPaintTextHeight * lineSpacingExtra
+            val lineHeight = if (lastLine.isTitle && !lastLine.isTitleNumber) {
+                lastLine.height
+            } else {
+                contentPaintTextHeight
+            }
+            val pageHeight = lastLine.lineBottom +
+                    lineHeight * ChapterProvider.lineSpacingFor(lastLine)
             if (visibleHeight - pageHeight >= lastLineHeight) return@run
             val surplus = (visibleBottom - lastLine.lineBottom)
             if (surplus == 0f) return@run
@@ -210,29 +221,25 @@ data class TextPage(
      * @param aloudSpanStart 朗读文字开始位置
      */
     fun upPageAloudSpan(aloudSpanStart: Int) {
-        removePageAloudSpan()
         var lineStart = 0
-        for (index in textLines.indices) {
-            val textLine = textLines[index]
-            val lineLength = textLine.text.length + if (textLine.isParagraphEnd) 1 else 0
-            if (aloudSpanStart >= lineStart && aloudSpanStart < lineStart + lineLength) {
-                for (i in index - 1 downTo 0) {
-                    if (textLines[i].isParagraphEnd) {
-                        break
-                    } else {
-                        textLines[i].isReadAloud = true
+        var inParagraph = false
+        hasReadAloudSpan = false
+        for (line in textLines) {
+            val lineLength = line.text.length + if (line.isParagraphEnd) 1 else 0
+            val startsHere = aloudSpanStart >= lineStart && aloudSpanStart < lineStart + lineLength
+            if (startsHere) inParagraph = true
+            line.isReadAloud = inParagraph
+            if (inParagraph) hasReadAloudSpan = true
+            if (inParagraph) {
+                var columnStart = lineStart
+                for (column in line.columns) {
+                    if (column is TextBaseColumn) {
+                        column.isReadAloud = !startsHere || columnStart + column.positionLength > aloudSpanStart
                     }
+                    columnStart += column.positionLength
                 }
-                for (i in index until textLines.size) {
-                    if (textLines[i].isParagraphEnd) {
-                        textLines[i].isReadAloud = true
-                        break
-                    } else {
-                        textLines[i].isReadAloud = true
-                    }
-                }
-                break
             }
+            if (line.isParagraphEnd) inParagraph = false
             lineStart += lineLength
         }
     }
@@ -299,9 +306,12 @@ data class TextPage(
     }
 
     fun draw(view: ContentTextView, canvas: Canvas, relativeOffset: Float) {
-        if (AppConfig.optimizeRender && !hasShadowStyle) {
+        if (AppConfig.optimizeRender) {
             recordIfCompleted(view)
-            canvas.withTranslation(0f, relativeOffset) {
+            canvas.withTranslation(
+                -recordPadding.toFloat(),
+                relativeOffset - recordPadding
+            ) {
                 canvasRecorder.draw(this)
             }
         } else {
@@ -326,9 +336,22 @@ data class TextPage(
         }
     }
 
+    @Suppress("DEPRECATION")
     private fun drawPage(view: ContentTextView, canvas: Canvas) {
+        val overflow = 10.dpToPx().toFloat()
         for (i in lines.indices) {
             val line = lines[i]
+            val renderBottom = line.renderBottom()
+            if (line.onlyTextColumn && !line.hasOverflowTextStyle && canvas.quickReject(
+                    0f,
+                    line.lineTop - overflow,
+                    view.width.toFloat(),
+                    renderBottom + overflow,
+                    Canvas.EdgeType.AA
+                )
+            ) {
+                continue
+            }
             canvas.withTranslation(0f, line.lineTop) {
                 line.draw(view, this)
             }
@@ -336,14 +359,18 @@ data class TextPage(
     }
 
     fun render(view: ContentTextView): Boolean {
-        if (hasShadowStyle) return false
         return recordIfCompleted(view)
     }
 
     private fun recordIfCompleted(view: ContentTextView): Boolean {
         if (!isCompleted) return false
-        return canvasRecorder.recordIfNeeded(view.width, renderHeight + 10.dpToPx()) { //高度留余，避免图片过高时被截断 下划线最远10dp
-            drawPage(view, this)
+        return canvasRecorder.recordIfNeeded(
+            view.width + recordPadding * 2,
+            renderHeight + recordPadding * 2
+        ) {
+            withTranslation(recordPadding.toFloat(), recordPadding.toFloat()) {
+                drawPage(view, this)
+            }
         }
     }
 
@@ -370,10 +397,6 @@ data class TextPage(
     }
 
     fun upRenderHeight() {
-        renderHeight = ceil(lines.last().lineBottom).toInt()
-        if (leftLineSize > 0 && leftLineSize != lines.size) {
-            val leftHeight = ceil(lines[leftLineSize - 1].lineBottom).toInt()
-            renderHeight = max(renderHeight, leftHeight)
-        }
+        renderHeight = ceil(lines.maxOf { it.renderBottom() }).toInt()
     }
 }

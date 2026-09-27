@@ -21,6 +21,7 @@ import io.legado.app.help.CacheManager
 import io.legado.app.help.WebCacheManager
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
+import io.legado.app.help.source.withSourceNavigationContext
 import io.legado.app.help.webView.PooledWebView
 import io.legado.app.help.webView.WebViewRequestConfig
 import io.legado.app.help.webView.WebJsExtensions
@@ -44,6 +45,7 @@ import splitties.init.appCtx
 import java.lang.ref.WeakReference
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.CoroutineContext
 
 /**
  * 后台webView
@@ -92,7 +94,7 @@ class BackstageWebView(
             }
             runOnUI {
                 try {
-                    load()
+                    load(block.context)
                 } catch (error: Throwable) {
                     destroy()
                     block.resumeWithException(error)
@@ -106,7 +108,7 @@ class BackstageWebView(
     }
 
     @Throws(AndroidRuntimeException::class)
-    private fun load() {
+    private fun load(navigationContext: CoroutineContext) {
         val requestConfig = headerMap.toWebViewRequestConfig(AppConfig.userAgent)
         val webView = createWebView(requestConfig)
         try {
@@ -116,8 +118,10 @@ class BackstageWebView(
                         webView.addJavascriptInterface(WebCacheManager, nameCache)
                         tag?.let { key ->
                            appDb.bookSourceDao.getBookSource(key)?.let {
-                               webView.addJavascriptInterface(it as BaseSource, nameSource)
-                               val webJsExtensions = WebJsExtensions(it, null, webView)
+                               val source = (it as BaseSource).withSourceNavigationContext(navigationContext)
+                               webView.addJavascriptInterface(source, nameSource)
+                               val webJsExtensions = WebJsExtensions(it, null, webView,
+                                   navigationContext = navigationContext)
                                webView.addJavascriptInterface(webJsExtensions, nameJava)
                             }
                         }

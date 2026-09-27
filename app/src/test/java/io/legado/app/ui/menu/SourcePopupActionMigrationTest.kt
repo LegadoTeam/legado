@@ -111,7 +111,8 @@ class SourcePopupActionMigrationTest {
             "\"bottomSource\" -> callBack.bottomSource(searchBook)",
             "\"editSource\" -> callBack.editSource(searchBook)",
             "\"disableSource\" -> callBack.disableSource(searchBook)",
-            "\"deleteSource\" -> context.alert(R.string.draw)",
+            "\"deleteSource\" -> {",
+            "deleteSourceDialog = context.alert(R.string.draw)",
             "callBack.deleteSource(searchBook)",
             "updateItems(0, itemCount, listOf<Int>())"
         )

@@ -1,28 +1,32 @@
 package io.legado.app.utils.canvasrecorder
 
 import androidx.annotation.CallSuper
+import java.util.concurrent.atomic.AtomicLong
 
 abstract class BaseCanvasRecorder : CanvasRecorder {
 
-    @JvmField
-    protected var isDirty = true
+    private val state = CanvasRecorderState()
 
     override fun invalidate() {
-        isDirty = true
+        state.invalidate()
     }
 
     @CallSuper
     override fun recycle() {
-        isDirty = true
+        state.invalidate()
+    }
+
+    protected fun markRecordingStarted() {
+        state.markRecordingStarted()
     }
 
     @CallSuper
     override fun endRecording() {
-        isDirty = false
+        state.markRecordingFinished()
     }
 
     override fun isDirty(): Boolean {
-        return isDirty
+        return state.isDirty()
     }
 
     override fun isLocked(): Boolean {
@@ -33,4 +37,31 @@ abstract class BaseCanvasRecorder : CanvasRecorder {
         return isDirty() && !isLocked()
     }
 
+}
+
+internal class CanvasRecorderState {
+
+    private val invalidationVersion = AtomicLong()
+
+    @Volatile
+    private var recordingVersion = Long.MIN_VALUE
+
+    @Volatile
+    private var renderedVersion = Long.MIN_VALUE
+
+    fun invalidate() {
+        invalidationVersion.incrementAndGet()
+    }
+
+    fun markRecordingStarted() {
+        recordingVersion = invalidationVersion.get()
+    }
+
+    fun markRecordingFinished() {
+        renderedVersion = recordingVersion
+    }
+
+    fun isDirty(): Boolean {
+        return renderedVersion != invalidationVersion.get()
+    }
 }

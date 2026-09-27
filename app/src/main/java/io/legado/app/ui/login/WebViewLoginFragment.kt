@@ -15,6 +15,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.fragment.app.activityViewModels
+import androidx.core.view.WindowInsetsCompat
 import io.legado.app.R
 import io.legado.app.base.BaseFragment
 import io.legado.app.data.entities.BaseSource
@@ -28,11 +29,13 @@ import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.gone
 import io.legado.app.utils.longSnackbar
 import io.legado.app.utils.openUrl
+import io.legado.app.utils.setOnApplyWindowInsetsListenerCompat
 import io.legado.app.utils.snackbar
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import androidx.core.net.toUri
 import io.legado.app.help.webView.WebViewPool
 import io.legado.app.help.webView.toWebViewRequestConfig
+import splitties.views.bottomPadding
 
 class WebViewLoginFragment : BaseFragment(R.layout.fragment_web_view_login) {
 
@@ -45,6 +48,11 @@ class WebViewLoginFragment : BaseFragment(R.layout.fragment_web_view_login) {
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         binding.root.setBackgroundColor(requireContext().backgroundColor)
+        binding.root.setOnApplyWindowInsetsListenerCompat { root, windowInsets ->
+            val typeMask = WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime()
+            root.bottomPadding = windowInsets.getInsets(typeMask).bottom
+            windowInsets
+        }
         setSupportToolbar(binding.titleBar.toolbar)
         viewModel.source?.let {
             binding.titleBar.title = getString(R.string.login_source, it.getTag())

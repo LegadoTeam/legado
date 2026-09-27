@@ -36,6 +36,25 @@ class HighlightAnchorTest {
     }
 
     @Test
+    fun `page start follows content inserted or removed before it`() {
+        val pageText = "current page starts here and remains unique"
+        val oldText = "old introduction\n$pageText"
+        val oldPosition = oldText.indexOf(pageText)
+        val anchorText = oldText.drop(oldPosition).take(64)
+        val insertedText = "new preface\n$oldText"
+        val removedText = pageText
+
+        assertEquals(
+            insertedText.indexOf(pageText),
+            HighlightAnchor.jumpPos(insertedText, oldPosition, anchorText)
+        )
+        assertEquals(
+            removedText.indexOf(pageText),
+            HighlightAnchor.jumpPos(removedText, oldPosition, anchorText)
+        )
+    }
+
+    @Test
     fun `missing source hides ranges but keeps jump fallback`() {
         assertNull(HighlightAnchor.reanchor("changed", 3, 7, "gone"))
         assertEquals(3, HighlightAnchor.jumpPos("changed", 3, "gone"))

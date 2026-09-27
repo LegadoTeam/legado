@@ -9,6 +9,7 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.AdapterView
 import android.widget.EditText
+import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
@@ -43,11 +44,15 @@ import io.legado.app.ui.code.CodeEditActivity
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.qrcode.QrCodeResult
+import io.legado.app.ui.widget.bindFieldNavigation
+import io.legado.app.ui.widget.code.CodeView
 import io.legado.app.ui.widget.code.EditSafety
+import io.legado.app.ui.widget.code.resolveSelectionHandleClearance
 import io.legado.app.ui.widget.dialog.UrlOptionDialog
 import io.legado.app.ui.widget.dialog.VariableDialog
 import io.legado.app.ui.widget.keyboard.KeyboardToolPop
 import io.legado.app.ui.widget.recycler.NoChildScrollLinearLayoutManager
+import io.legado.app.ui.widget.setFieldLabels
 import io.legado.app.ui.widget.text.EditEntity
 import io.legado.app.utils.GSON
 import io.legado.app.utils.imeHeight
@@ -143,6 +148,7 @@ class BookSourceEditActivity :
             }
             return
         }
+        onBackPressedDispatcher.addCallback(this) { finish() }
         softKeyboardTool.attachToWindow(window)
         initView()
         viewModel.initData(intent) {
@@ -254,12 +260,11 @@ class BookSourceEditActivity :
         when (item.itemId) {
             R.id.menu_fullscreen_edit -> onFullEditClicked()
 
-            R.id.menu_save -> viewModel.save(getSource()) {
-                setResult(RESULT_OK, Intent().putExtra("origin", it.bookSourceUrl))
+            R.id.menu_save -> saveSource {
                 finish()
             }
 
-            R.id.menu_debug_source -> viewModel.save(getSource()) { source ->
+            R.id.menu_debug_source -> saveSource { source ->
                 startActivity<BookSourceDebugActivity> {
                     putExtra("key", source.bookSourceUrl)
                 }
@@ -279,7 +284,7 @@ class BookSourceEditActivity :
 
             R.id.menu_log -> showDialogFragment<AppLogDialog>()
             R.id.menu_help -> showHelp("ruleHelp")
-            R.id.menu_login -> viewModel.save(getSource()) { source ->
+            R.id.menu_login -> saveSource { source ->
                 startActivity<SourceLoginActivity> {
                     putExtra("type", "bookSource")
                     putExtra("key", source.bookSourceUrl)
@@ -287,12 +292,19 @@ class BookSourceEditActivity :
             }
 
             R.id.menu_set_source_variable -> setSourceVariable()
-            R.id.menu_search -> viewModel.save(getSource()) { source ->
+            R.id.menu_search -> saveSource { source ->
                 SearchActivity.start(this, source)
             }
 
         }
         return super.onCompatOptionsItemSelected(item)
+    }
+
+    private fun saveSource(onSuccess: (BookSource) -> Unit) {
+        viewModel.save(getSource()) { source ->
+            setResult(RESULT_OK, Intent().putExtra("origin", source.bookSourceUrl))
+            onSuccess(source)
+        }
     }
 
     private fun initView() {
@@ -319,21 +331,22 @@ class BookSourceEditActivity :
             setText(R.string.source_tab_review)
         })
         binding.recyclerView.setEdgeEffectColor(primaryColor)
-        if (adapter.editEntityMaxLine < 999) {
-            binding.recyclerView.layoutManager = NoChildScrollLinearLayoutManager(this) //启用后会阻止RecyclerView跟随光标滚动,行数少时,用的TextView跟随
-        }
+        binding.recyclerView.layoutManager = NoChildScrollLinearLayoutManager(this)
         binding.recyclerView.adapter = adapter
-        binding.recyclerView.viewTreeObserver.addOnGlobalFocusChangeListener { _, newFocus ->
-            if (newFocus is EditText) {
-                newFocus.postDelayed({ sendText("") }, 120)
-            }
+        binding.fieldNav.bindFieldNavigation(binding.recyclerView)
+        binding.recyclerView.viewTreeObserver.addOnGlobalFocusChangeListener { oldFocus, newFocus ->
+            (oldFocus as? CodeView)?.keepSelectionVisible = false
+            (newFocus as? CodeView)?.keepSelectionVisible = true
+        }
+        binding.recyclerView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            (binding.recyclerView.findFocus() as? CodeView)?.requestSelectionVisible()
         }
         val transparentBar = transparentNavBar && !AppConfig.isEInkMode
-        binding.tabLayout.setBackgroundColor(
-            if (transparentBar) Color.TRANSPARENT else backgroundColor
-        )
-        if (transparentBar) binding.tabLayout.elevation = 0f
-        binding.tabLayout.setSelectedTabIndicatorColor(accentColor)
+        listOf(binding.tabLayout, binding.fieldNav).forEach { tabs ->
+            tabs.setBackgroundColor(if (transparentBar) Color.TRANSPARENT else backgroundColor)
+            if (transparentBar) tabs.elevation = 0f
+            tabs.setSelectedTabIndicatorColor(accentColor)
+        }
         binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabReselected(tab: TabLayout.Tab?) {
 
@@ -347,10 +360,12 @@ class BookSourceEditActivity :
                 setEditEntities(tab?.position)
             }
         })
+        val selectionHandleClearance = resolveSelectionHandleClearance(this)
         binding.recyclerView.setOnApplyWindowInsetsListenerCompat { view, windowInsets ->
             val navigationBarHeight = windowInsets.navigationBarHeight
             val imeHeight = windowInsets.imeHeight
-            view.bottomPadding = if (imeHeight == 0) navigationBarHeight else 0
+            view.bottomPadding = if (imeHeight == 0) navigationBarHeight
+            else selectionHandleClearance
             softKeyboardTool.initialPadding = imeHeight
             windowInsets
         }
@@ -430,7 +445,7 @@ class BookSourceEditActivity :
     }
 
     private fun setEditEntities(tabPosition: Int?) {
-        adapter.editEntities = when (tabPosition) {
+        val entities = when (tabPosition) {
             1 -> searchEntities
             2 -> exploreEntities
             3 -> infoEntities
@@ -439,6 +454,8 @@ class BookSourceEditActivity :
             6 -> reviewEntities
             else -> sourceEntities
         }
+        adapter.editEntities = entities
+        binding.fieldNav.setFieldLabels(entities.map { it.hint })
         binding.recyclerView.scrollToPosition(0)
         window.decorView.rootView.clearFocus()
     }
@@ -557,6 +574,8 @@ class BookSourceEditActivity :
             add(EditEntity("webJs", cr.webJs, R.string.rule_web_js))
             add(EditEntity("payAction", cr.payAction, R.string.rule_pay_action))
             add(EditEntity("callBackJs", cr.callBackJs, R.string.rule_call_back))
+            add(EditEntity("contentBatch", cr.contentBatch, R.string.rule_content_batch))
+            add(EditEntity("maxBatchSize", cr.maxBatchSize?.toString(), R.string.rule_max_batch_size))
         }
         // 段评
         val rr = bs.ruleReview ?: ReviewRule()
@@ -577,6 +596,7 @@ class BookSourceEditActivity :
             add(EditEntity("detailBadgeRule", rr.detailBadgeRule, R.string.rule_review_detail_badge))
             add(EditEntity("detailContentRule", rr.detailContentRule, R.string.rule_review_detail_content))
 
+            add(EditEntity("reviewQuoteUrl", rr.reviewQuoteUrl, R.string.rule_review_quote))
             add(EditEntity("replyListRule", rr.replyListRule, R.string.rule_review_reply_list))
             add(EditEntity("replyIdRule", rr.replyIdRule, R.string.rule_review_reply_id))
             add(EditEntity("replyAvatarRule", rr.replyAvatarRule, R.string.rule_review_reply_avatar))
@@ -782,6 +802,8 @@ class BookSourceEditActivity :
                 "imageDecode" -> contentRule.imageDecode = it.value
                 "payAction" -> contentRule.payAction = it.value
                 "callBackJs" -> contentRule.callBackJs = it.value
+                "contentBatch" -> contentRule.contentBatch = it.value
+                "maxBatchSize" -> contentRule.maxBatchSize = it.value?.toIntOrNull()
             }
         }
         reviewEntities.forEach {
@@ -800,6 +822,7 @@ class BookSourceEditActivity :
                 "detailNameRule" -> reviewRule.detailNameRule = it.value
                 "detailBadgeRule" -> reviewRule.detailBadgeRule = it.value
                 "detailContentRule" -> reviewRule.detailContentRule = it.value
+                "reviewQuoteUrl" -> reviewRule.reviewQuoteUrl = it.value
                 "replyListRule" -> reviewRule.replyListRule = it.value
                 "replyIdRule" -> reviewRule.replyIdRule = it.value
                 "replyAvatarRule" -> reviewRule.replyAvatarRule = it.value
@@ -889,36 +912,11 @@ class BookSourceEditActivity :
                     edit.replace(start, end, text)//光标所在位置插入文字
                 }
             }
-            if (adapter.editEntityMaxLine >= 999) {
-                view.post {
-                    val editTextLocation = IntArray(2)
-                    view.getLocationOnScreen(editTextLocation)
-                    val recyclerViewLocation = IntArray(2)
-                    binding.recyclerView.getLocationOnScreen(recyclerViewLocation)
-                    val layout = view.layout
-                    if (layout != null) {
-                        val line = layout.getLineForOffset(end)
-                        val cursorYInEditText = layout.getLineTop(line)
-                        // 光标相对于屏幕的位置
-                        val cursorYOnScreen = editTextLocation[1] + cursorYInEditText
-                        // 光标相对于RecyclerView的位置
-                        val cursorYInRecyclerView = cursorYOnScreen - recyclerViewLocation[1]
-                        val recyclerViewBottom = binding.recyclerView.height - 120 //考虑键盘的经验值
-                        // 如果光标不在可见范围内，则滚动到光标位置
-                        if (cursorYInRecyclerView !in 0..recyclerViewBottom) {
-                            val scrollDistance = cursorYInRecyclerView - recyclerViewBottom / 3
-                            if (scrollDistance > 0 && binding.recyclerView.canScrollVertically(1) || scrollDistance < 0 && binding.recyclerView.canScrollVertically(-1)) {
-                                binding.recyclerView.smoothScrollBy(0, scrollDistance)
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 
     private fun setSourceVariable() {
-        viewModel.save(getSource()) { source ->
+        saveSource { source ->
             lifecycleScope.launch {
                 val comment =
                     source.getDisplayVariableComment("源变量可在js中通过source.getVariable()获取")

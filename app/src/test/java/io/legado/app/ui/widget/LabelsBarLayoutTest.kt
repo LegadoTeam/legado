@@ -28,12 +28,12 @@ class LabelsBarLayoutTest {
     }
 
     @Test
-    fun `search and explore results keep labels on one line`() {
+    fun `search and explore results wrap labels within the available width`() {
         val labels = labelsBar("app/src/main/res/layout/item_search.xml", "ll_kind")
 
         assertEquals("0dp", labels.androidAttribute("layout_width"))
         assertEquals("row", labels.appAttribute("flexDirection"))
-        assertEquals("nowrap", labels.appAttribute("flexWrap"))
+        assertEquals("wrap", labels.appAttribute("flexWrap"))
         assertEquals("flex_start", labels.appAttribute("justifyContent"))
         assertEquals("center", labels.appAttribute("alignItems"))
         assertEquals("@id/tv_author", labels.appAttribute("layout_constraintTop_toBottomOf"))

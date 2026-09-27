@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mouse_wheel_scroll_speed" formatted="false">滚轮／旋钮滚动速度（%）</string>
+    <string name="mouse_wheel_scroll_speed_summary" formatted="false">100% 为默认速度，仅影响滚动模式；分页模式仍一次翻一页。</string>
+</resources>

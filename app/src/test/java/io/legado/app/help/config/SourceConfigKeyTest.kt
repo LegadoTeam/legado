@@ -1,5 +1,6 @@
 package io.legado.app.help.config
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -43,6 +44,35 @@ class SourceConfigKeyTest {
                 "${longSourceUrl}_book_author",
                 longSourceUrl,
                 listOf(shortSourceUrl),
+            )
+        )
+    }
+
+    @Test
+    fun `batch cleanup scans keys once and keeps overlapping source settings`() {
+        val removed = listOf(
+            "https://example.com/source",
+            "https://example.com/other",
+        )
+        val protected = listOf("https://example.com/source_backup")
+
+        assertEquals(
+            setOf(
+                "https://example.com/source",
+                "https://example.com/source_book_author",
+                "https://example.com/other_book_author",
+            ),
+            sourceConfigKeysToRemove(
+                listOf(
+                    "https://example.com/source",
+                    "https://example.com/source_book_author",
+                    "https://example.com/source_backup",
+                    "https://example.com/source_backup_book_author",
+                    "https://example.com/other_book_author",
+                    "unrelated",
+                ),
+                removed,
+                protected,
             )
         )
     }

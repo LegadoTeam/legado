@@ -1,6 +1,8 @@
 package io.legado.app.model.login
 
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.BookChapter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -91,6 +93,34 @@ class LoginUiV2EngineTest {
             declarative.evalLoginActionV2("submit", "{}", """{"account":"reader"}""")
         )
         assertEquals("""{"account":"reader"}""", result.loginJson)
+        assertTrue(result.close)
+    }
+
+    @Test
+    fun `v2 login script receives book and chapter context`() {
+        val source = BookSource(
+            bookSourceUrl = "https://context.example.com",
+            bookSourceName = "上下文登录测试",
+            loginUi = LoginUiV2.MARKER,
+            loginUrl = """
+                function loginUi(state) {
+                    return { rows: [{ name: book.bookUrl + ':' + chapter.index, type: 'label' }] };
+                }
+                function loginAction(action, state, form) {
+                    return { login: { context: book.bookUrl + ':' + chapter.index }, close: true };
+                }
+            """.trimIndent(),
+        )
+        val book = Book(bookUrl = "book://context")
+        val chapter = BookChapter(bookUrl = book.bookUrl, index = 7)
+
+        val rows = LoginUiV2.parseRender(source.evalLoginUiV2("{}", book, chapter))
+        assertEquals("book://context:7", rows!![0].name)
+
+        val result = LoginUiV2.parseActionResult(
+            source.evalLoginActionV2("submit", "{}", "{}", book, chapter)
+        )
+        assertEquals("""{"context":"book://context:7"}""", result.loginJson)
         assertTrue(result.close)
     }
 }

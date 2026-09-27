@@ -6,7 +6,9 @@ import androidx.appcompat.widget.AppCompatTextView
 import io.legado.app.R
 import io.legado.app.lib.theme.Selector
 import io.legado.app.lib.theme.ThemeStore
+import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.bottomBackground
+import io.legado.app.lib.theme.transparentNavBar
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getCompatColor
@@ -27,7 +29,9 @@ class AccentStrokeTextView(context: Context, attrs: AttributeSet) :
     }
 
     private fun upStyle() {
-        val isLight = ColorUtils.isColorLight(context.bottomBackground)
+        val isLight = ColorUtils.isColorLight(
+            if (context.transparentNavBar) context.backgroundColor else context.bottomBackground
+        )
         val disableColor = if (isBottomBackground) {
             if (isLight) {
                 context.getCompatColor(R.color.md_light_disabled)

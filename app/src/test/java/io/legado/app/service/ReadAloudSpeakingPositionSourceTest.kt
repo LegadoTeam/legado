@@ -35,6 +35,21 @@ class ReadAloudSpeakingPositionSourceTest {
         assertTrue(activityKt.contains("lastReadAloudChapterIndex = ReadAloud.readAloudChapterIndex"))
     }
 
+    @Test
+    fun `service does not restart without in memory reading state`() {
+        val onStart = readProjectFile("src/main/java/io/legado/app/service/BaseReadAloudService.kt")
+            .substringAfter("override fun onStartCommand")
+            .substringBefore("private fun newReadAloud")
+            .replace(Regex("\\s+"), " ")
+
+        assertTrue(
+            onStart.contains("if (intent == null) { stopSelfResult(startId) return START_NOT_STICKY }")
+        )
+        assertTrue(
+            onStart.contains("super.onStartCommand(intent, flags, startId) return START_NOT_STICKY")
+        )
+    }
+
     private fun readProjectFile(pathInApp: String): String {
         val candidates = listOf(
             File(pathInApp),

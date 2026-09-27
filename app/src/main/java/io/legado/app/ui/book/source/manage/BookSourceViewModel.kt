@@ -11,6 +11,7 @@ import io.legado.app.help.source.SourceHelp
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.cnCompare
+import io.legado.app.utils.moveRelativeTo
 import io.legado.app.utils.normalizeFileName
 import io.legado.app.utils.outputStream
 import io.legado.app.utils.renameGroupExact
@@ -60,11 +61,17 @@ class BookSourceViewModel(application: Application) : BaseViewModel(application)
         execute { appDb.bookSourceDao.update(*bookSource) }
     }
 
-    fun upOrder(items: List<BookSourcePart>) {
-        if (items.isEmpty()) return
-        execute {
-            appDb.bookSourceDao.upOrder(items)
-        }
+    fun move(sourceUrl: String, targetUrl: String, after: Boolean, onFinally: () -> Unit = {}) {
+        executeLazy {
+            appDb.runInTransaction {
+                val current = appDb.bookSourceDao.allPart
+                val reordered = moveRelativeTo(current, sourceUrl, targetUrl, after) { it.bookSourceUrl }
+                if (reordered == current) return@runInTransaction
+                appDb.bookSourceDao.upOrder(reordered.mapIndexed { index, source ->
+                    source.copy(customOrder = index)
+                })
+            }
+        }.onFinally { onFinally() }.start()
     }
 
     fun enable(enable: Boolean, items: List<BookSourcePart>) {

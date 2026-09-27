@@ -67,7 +67,7 @@ public class ZipFileWrapper {
         }
     }
 
-    public Enumeration entries() {
+    public Enumeration entries() throws IOException {
         checkType();
         if (zipFile instanceof java.util.zip.ZipFile) {
             return ((ZipFile) zipFile).entries();

@@ -11,6 +11,7 @@ import io.legado.app.help.HighlightStyle
 import io.legado.app.help.PaintPool
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.utils.dpToPx
+import io.legado.app.utils.spToPx
 
 object HighlightDraw {
 
@@ -24,7 +25,9 @@ object HighlightDraw {
             style = Paint.Style.FILL
         },
         val wavePath: Path = Path(),
-        val fillPath: Path = Path()
+        val fillPath: Path = Path(),
+        val pillBorderPath: Path = Path(),
+        val pillRadii: FloatArray = FloatArray(8)
     )
 
     private val drawState = object : ThreadLocal<DrawState>() {
@@ -34,6 +37,8 @@ object HighlightDraw {
     fun obtainTextPaint(base: Paint, style: HighlightStyle, color: Int, text: String): Paint {
         val paint = PaintPool.obtain()
         paint.set(base)
+        paint.textSize = textSize(base.textSize, style)
+        style.resolvedLetterSpacing?.let { paint.letterSpacing = it }
         paint.color = color
         paint.isFakeBoldText = paint.isFakeBoldText || style.bold
         if (style.italic) paint.textSkewX = -0.25f
@@ -46,11 +51,13 @@ object HighlightDraw {
                     it,
                     base.typeface?.style ?: Typeface.NORMAL
                 )
-                preserveTextAdvance(base, paint, text)
+                if (!style.changesTextMetrics) preserveTextAdvance(base, paint, text)
             }
         }
         return paint
     }
+
+    fun textSize(base: Float, style: HighlightStyle?): Float = style?.resolvedFontSize?.spToPx() ?: base
 
     private fun preserveTextAdvance(base: Paint, paint: Paint, text: String) {
         val targetWidth = base.measureText(text)
@@ -76,7 +83,9 @@ object HighlightDraw {
         top: Float,
         bottom: Float,
         fill: Int,
-        shape: HighlightStyle.FillShape
+        shape: HighlightStyle.FillShape,
+        pillLeftRadius: Float = (bottom - top) / 2f,
+        pillRightRadius: Float = pillLeftRadius
     ) {
         if (x1 <= x0 || bottom <= top) return
         val state = drawState.get()!!
@@ -131,25 +140,38 @@ object HighlightDraw {
             }
 
             HighlightStyle.FillShape.PILL -> {
-                val radius = (bottom - top) / 2f
+                val radiusY = (bottom - top) / 2f
+                val radiusScale = minOf(1f, (x1 - x0) / (pillLeftRadius + pillRightRadius).coerceAtLeast(1f))
+                val leftRadius = pillLeftRadius.coerceAtLeast(0f) * radiusScale
+                val rightRadius = pillRightRadius.coerceAtLeast(0f) * radiusScale
+                val radii = state.pillRadii
+                fun setRadii(inset: Float) {
+                    val left = (leftRadius - inset).coerceAtLeast(0f)
+                    val right = (rightRadius - inset).coerceAtLeast(0f)
+                    val scale = minOf(1f, (x1 - x0 - inset * 2f) / (left + right).coerceAtLeast(1f))
+                    for (corner in 0..3) {
+                        radii[corner * 2] = (if (corner == 0 || corner == 3) left else right) * scale
+                        radii[corner * 2 + 1] = (radiusY - inset).coerceAtLeast(0f)
+                    }
+                }
+                setRadii(0f)
+                state.fillPath.reset()
+                state.fillPath.addRoundRect(x0, top, x1, bottom, radii, Path.Direction.CW)
                 fillPaint.color = scaleAlpha(fill, 0.35f)
-                canvas.drawRoundRect(x0, top, x1, bottom, radius, radius, fillPaint)
-                val strokePaint = state.strokePaint
-                strokePaint.strokeWidth = 1f.dpToPx()
-                strokePaint.pathEffect = null
-                strokePaint.color = fill
-                val inset = strokePaint.strokeWidth / 2f
-                if (x1 - x0 > inset * 2f && bottom - top > inset * 2f) {
-                    val strokeRadius = (radius - inset).coerceAtLeast(0f)
-                    canvas.drawRoundRect(
-                        x0 + inset,
-                        top + inset,
-                        x1 - inset,
-                        bottom - inset,
-                        strokeRadius,
-                        strokeRadius,
-                        strokePaint
+                canvas.drawPath(state.fillPath, fillPaint)
+                val border = 1f.dpToPx()
+                if (x1 - x0 > border * 2f && bottom - top > border * 2f) {
+                    // Two nested ellipses keep the entire border inside the accepted bounds.
+                    // A stroked, horizontally compressed ellipse can extend farther into the ink.
+                    state.pillBorderPath.set(state.fillPath)
+                    state.pillBorderPath.fillType = Path.FillType.EVEN_ODD
+                    setRadii(border)
+                    state.pillBorderPath.addRoundRect(
+                        x0 + border, top + border, x1 - border, bottom - border,
+                        radii, Path.Direction.CW
                     )
+                    fillPaint.color = fill
+                    canvas.drawPath(state.pillBorderPath, fillPaint)
                 }
             }
         }
@@ -182,23 +204,25 @@ object HighlightDraw {
     ) {
         val state = drawState.get()!!
         val strokePaint = state.strokePaint
-        strokePaint.strokeWidth = 1.5f.dpToPx()
+        val defaultStrokeWidth = 1.5f.dpToPx()
+        strokePaint.strokeWidth = defaultStrokeWidth
         strokePaint.pathEffect = null
 
-        underline?.let {
+        underline?.normalized()?.takeIf { it.width > 0f }?.let {
             strokePaint.color = if (it.color != 0) it.color else fallbackColor
-            val y = height - 2f.dpToPx()
+            val width = it.width.dpToPx()
+            strokePaint.strokeWidth = width
+            val y = baseline + it.distance.dpToPx()
             when (it.kind) {
                 HighlightStyle.Kind.SOLID -> canvas.drawLine(x0, y, x1, y, strokePaint)
                 HighlightStyle.Kind.DOUBLE -> {
-                    strokePaint.strokeWidth = 1f.dpToPx()
+                    val separation = width + 1f.dpToPx()
                     canvas.drawLine(
-                        x0, height - 3.5f.dpToPx(), x1, height - 3.5f.dpToPx(), strokePaint
+                        x0, y - separation / 2f, x1, y - separation / 2f, strokePaint
                     )
                     canvas.drawLine(
-                        x0, height - 1.5f.dpToPx(), x1, height - 1.5f.dpToPx(), strokePaint
+                        x0, y + separation / 2f, x1, y + separation / 2f, strokePaint
                     )
-                    strokePaint.strokeWidth = 1.5f.dpToPx()
                 }
 
                 HighlightStyle.Kind.DASHED -> {
@@ -212,7 +236,7 @@ object HighlightDraw {
                 }
                 HighlightStyle.Kind.DOTTED -> {
                     val fillPaint = state.fillPaint
-                    val radius = 0.9f.dpToPx()
+                    val radius = width / 2f
                     val step = 3.5f.dpToPx()
                     fillPaint.color = strokePaint.color
                     var center = x0 + radius
@@ -227,6 +251,7 @@ object HighlightDraw {
             }
         }
 
+        strokePaint.strokeWidth = defaultStrokeWidth
         strike?.let {
             strokePaint.color = if (it.color != 0) it.color else fallbackColor
             val y = HighlightGeometry.strikeY(
@@ -269,8 +294,8 @@ object HighlightDraw {
         val points = HighlightGeometry.wavePoints(
             x0,
             x1,
-            y - 1f.dpToPx(),
-            1.5f.dpToPx(),
+            y,
+            paint.strokeWidth.coerceAtLeast(1f.dpToPx()),
             6f.dpToPx(),
             2f.dpToPx()
         )

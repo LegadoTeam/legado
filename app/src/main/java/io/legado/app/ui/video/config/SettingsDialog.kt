@@ -25,6 +25,7 @@ class SettingsDialog(private val context: Context, private val callBack: CallBac
         binding.run {
             tvPressSpeed.text = (VideoPlay.longPressSpeed / 10.0f).toPressSpeedStr()
             cbAutoPlay.isChecked = VideoPlay.autoPlay
+            cbDefaultFloatWindow.isChecked = VideoPlay.defaultFloatWindow
             cbStartFull.isChecked = VideoPlay.startFull
             cbFullBottomProgress.isChecked = VideoPlay.fullBottomProgressBar
         }
@@ -36,6 +37,9 @@ class SettingsDialog(private val context: Context, private val callBack: CallBac
             cbAutoPlay.setOnCheckedChangeListener { _, isChecked ->
                 VideoPlay.autoPlay = isChecked
                 ctStartFull.visibility = if (isChecked) View.VISIBLE else View.GONE
+            }
+            cbDefaultFloatWindow.setOnCheckedChangeListener { _, isChecked ->
+                VideoPlay.defaultFloatWindow = isChecked
             }
             cbStartFull.setOnCheckedChangeListener { _, isChecked ->
                 VideoPlay.startFull = isChecked

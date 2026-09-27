@@ -109,8 +109,10 @@ class HighlightRuleEditDialog : BaseDialogFragment(R.layout.dialog_highlight_rul
         etName.setText(rule.name)
         etPattern.setText(rule.pattern)
         cbUseRegex.isChecked = rule.isRegex
+        cbApplyToBody.isChecked = rule.applyToBody
         cbApplyToTitle.isChecked = rule.applyToTitle
         etScope.setText(rule.scope)
+        etGroup.setText(rule.group)
         editingStyle = rule.styleObj()
         upPreview()
         btnOk.isEnabled = true
@@ -121,8 +123,10 @@ class HighlightRuleEditDialog : BaseDialogFragment(R.layout.dialog_highlight_rul
             it.name = etName.text.toString()
             it.pattern = etPattern.text.toString()
             it.isRegex = cbUseRegex.isChecked
+            it.applyToBody = cbApplyToBody.isChecked
             it.applyToTitle = cbApplyToTitle.isChecked
             it.scope = etScope.text.toString().ifBlank { null }
+            it.group = etGroup.text.toString().trim().ifBlank { null }
             it.applyStyle(editingStyle)
         }
     }

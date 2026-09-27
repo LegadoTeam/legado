@@ -21,6 +21,13 @@ object HtmlFormatter {
     private val indent2Regex = "^[\\n\\s]+".toRegex()
     private val lastRegex = "[\\n\\s]+$".toRegex()
 
+    private fun normalizeEscapedLineBreaks(text: String): String {
+        return text
+            .replace("\\r\\n", "\n")
+            .replace("\\n", "\n")
+            .replace("\\r", "\n")
+    }
+
     fun format(html: String?, otherRegex: Regex = otherHtmlRegex): String {
         return formatText(html, otherRegex, "　　")
     }
@@ -31,7 +38,8 @@ object HtmlFormatter {
 
     private fun formatText(html: String?, otherRegex: Regex, paragraphIndent: String): String {
         html ?: return ""
-        return html.replace(nbspRegex, " ")
+        return normalizeEscapedLineBreaks(html)
+            .replace(nbspRegex, " ")
             .replace(espRegex, " ")
             .replace(noPrintRegex, "")
             .replace(wrapHtmlRegex, "\n")

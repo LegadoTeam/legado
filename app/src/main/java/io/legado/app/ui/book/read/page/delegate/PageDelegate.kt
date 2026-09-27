@@ -158,6 +158,7 @@ abstract class PageDelegate(protected val readView: ReadView) {
      * 判断是否有上一页
      */
     fun hasPrev(): Boolean {
+        if (readView.pageFactory.isRefreshingResources) return false
         val hasPrev = readView.pageFactory.hasPrev()
         if (!hasPrev) {
             if (!snackBar.isShown) {
@@ -172,6 +173,7 @@ abstract class PageDelegate(protected val readView: ReadView) {
      * 判断是否有下一页
      */
     fun hasNext(): Boolean {
+        if (readView.pageFactory.isRefreshingResources) return false
         val hasNext = readView.pageFactory.hasNext()
         if (!hasNext) {
             readView.callBack.autoPageStop()

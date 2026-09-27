@@ -24,6 +24,24 @@ class SourceLoginWebViewLayoutTest {
         )
     }
 
+    @Test
+    fun `web view roots stay above system bars and keyboard`() {
+        val sources = listOf(
+            readProjectFile("src/main/java/io/legado/app/ui/login/WebViewLoginFragment.kt"),
+            readProjectFile("src/main/java/io/legado/app/ui/browser/WebViewActivity.kt")
+        )
+
+        sources.forEach { source ->
+            assertTrue(source.contains("setOnApplyWindowInsetsListenerCompat"))
+            assertTrue(
+                source.contains(
+                    "WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime()"
+                )
+            )
+            assertTrue(source.contains("bottomPadding = windowInsets.getInsets(typeMask).bottom"))
+        }
+    }
+
     private fun readProjectFile(pathInApp: String): String {
         return sequenceOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull(File::isFile)

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="read_record_remove_author">移除作者名称</string>
+    <string name="read_record_remove_author_confirm">移除“%1$s”并保留全部阅读时长？如果剩余作者已有记录，将合并两份记录的阅读时长。</string>
+</resources>

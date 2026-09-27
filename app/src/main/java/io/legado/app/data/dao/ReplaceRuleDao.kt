@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import io.legado.app.constant.AppPattern
 import io.legado.app.data.entities.ReplaceRule
@@ -87,8 +88,15 @@ interface ReplaceRuleDao {
     @Query("SELECT * FROM replace_rules WHERE id = :id")
     fun findById(id: Long): ReplaceRule?
 
-    @Query("SELECT * FROM replace_rules WHERE id in (:ids)")
+    @Query("SELECT * FROM replace_rules WHERE id in (:ids) ORDER BY sortOrder ASC")
     fun findByIds(vararg ids: Long): List<ReplaceRule>
+
+    @Query(
+        "SELECT * FROM replace_rules " +
+            "WHERE NOT (scopeSource = 1 AND scopeTitle = 0 AND scopeContent = 0) " +
+            "ORDER BY sortOrder ASC"
+    )
+    fun findManualCandidates(): List<ReplaceRule>
 
     @Query(
         """SELECT * FROM replace_rules WHERE isEnabled = 1 and scopeContent = 1
@@ -106,6 +114,12 @@ interface ReplaceRuleDao {
     )
     fun findEnabledByTitleScope(name: String, origin: String): List<ReplaceRule>
 
+    @Query(
+        """SELECT * FROM replace_rules WHERE isEnabled = 1 and scopeSource = 1
+        ORDER BY sortOrder ASC"""
+    )
+    fun findEnabledBySourceScope(): List<ReplaceRule>
+
     @Query("select * from replace_rules where `group` like '%' || :group || '%'")
     fun getByGroup(group: String): List<ReplaceRule>
 
@@ -117,6 +131,16 @@ interface ReplaceRuleDao {
 
     @Query("UPDATE replace_rules SET isEnabled = :enable")
     fun enableAll(enable: Boolean)
+
+    @Query("UPDATE replace_rules SET isEnabled = :enable WHERE id = :id")
+    fun enable(id: Long, enable: Boolean)
+
+    @Transaction
+    fun enable(enable: Boolean, rules: List<ReplaceRule>) {
+        for (rule in rules) {
+            enable(rule.id, enable)
+        }
+    }
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insert(vararg replaceRule: ReplaceRule): List<Long>

@@ -12,6 +12,7 @@ import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppConst.dateFormat
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern
+import io.legado.app.constant.EventBus
 import io.legado.app.data.entities.BaseSource
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.config.AppConfig
@@ -22,9 +23,13 @@ import io.legado.app.help.http.SSLHelper
 import io.legado.app.help.http.StrResponse
 import io.legado.app.help.source.SourceHelp
 import io.legado.app.help.source.SourceVerificationHelp
+import io.legado.app.help.source.shouldSuppressSourceNavigation
 import io.legado.app.help.source.VerificationResult
 import io.legado.app.help.source.getSourceType
+import io.legado.app.help.book.BookHelp
+import io.legado.app.model.BatchContentContext
 import io.legado.app.model.Debug
+import io.legado.app.model.VideoPlay
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.analyzeRule.QueryTTF
 import io.legado.app.ui.association.OnLineImportActivity
@@ -50,6 +55,7 @@ import io.legado.app.utils.isMainThread
 import io.legado.app.utils.isSameOrDescendantOf
 import io.legado.app.utils.longToastOnUi
 import io.legado.app.utils.mapAsync
+import io.legado.app.utils.postEvent
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.stackTraceStr
 import io.legado.app.utils.startActivity
@@ -67,6 +73,7 @@ import org.htmlunit.corejs.javascript.Function
 import org.htmlunit.corejs.javascript.Scriptable
 import org.htmlunit.corejs.javascript.ScriptableObject
 import org.htmlunit.corejs.javascript.Undefined
+import org.htmlunit.corejs.javascript.Wrapper
 import splitties.init.appCtx
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -119,9 +126,49 @@ interface JsExtensions : JsEncodeUtils {
 
     fun getSource(): BaseSource?
     fun getTag(): String?
+    fun getSourceNavigationContext(): CoroutineContext = EmptyCoroutineContext
+
+    /**
+     * 当前批量正文下载上下文,非批量流程返回 null。
+     * 由 AnalyzeRule / JsSourceEngine 在执行 contentBatch 规则时提供。
+     */
+    fun getBatchContext(): BatchContentContext? = null
+
+    /**
+     * 批量下载时回存单章正文。
+     *
+     * 书源在 contentBatch 规则(或 JS 源的 getContentBatch 函数)里每处理完一章即可调用,
+     * 内容会立刻写入缓存目录,不必等整批结束。只能在批量流程内调用。
+     *
+     * @param chapter 本批章节数组里的章节对象,也可传章节 url;
+     *   目录里存在多章共用同一 url 时必须传章节对象,否则无法区分是哪一章
+     * @param content 章节正文,会套用书源的正文替换规则后保存
+     * @return 是否成功保存
+     */
+    @JavascriptInterface
+    fun cacheContent(chapter: Any?, content: String): Boolean {
+        rhinoContextOrNull?.ensureActive()
+        val batchContext = getBatchContext()
+            ?: throw NoStackTraceException("java.cacheContent 只能在批量正文规则中调用")
+        val identifier = if (chapter is Wrapper) chapter.unwrap() else chapter
+        return batchContext.saveContent(identifier, content)
+    }
+
+    fun refreshBookInfo() {
+        postEvent(EventBus.REFRESH_BOOK_INFO, true)
+    }
+
+    fun refreshBookToc() {
+        postEvent(EventBus.REFRESH_BOOK_TOC, true)
+    }
+
+    fun refreshContent() {
+        postEvent(EventBus.REFRESH_BOOK_CONTENT, true)
+    }
 
     private val context: CoroutineContext
-        get() = rhinoContextOrNull?.coroutineContext ?: EmptyCoroutineContext
+        get() = (rhinoContextOrNull?.coroutineContext ?: EmptyCoroutineContext) +
+            getSourceNavigationContext()
 
     /**
      * 访问网络,返回String
@@ -329,7 +376,7 @@ interface JsExtensions : JsEncodeUtils {
 
     @JavascriptInterface
     fun openVideoPlayer(url: String, title: String) {
-        openVideoPlayer(url, title, false)
+        openVideoPlayer(url, title, VideoPlay.defaultFloatWindow)
     }
 
     /**
@@ -340,6 +387,7 @@ interface JsExtensions : JsEncodeUtils {
      */
     @JavascriptInterface
     fun openVideoPlayer(url: String, title: String, isFloat: Boolean) {
+        if (!canOpenSourceUi()) return
         SourceHelp.openVideoPlayer(getSource(), url, title, isFloat)
     }
 
@@ -354,6 +402,7 @@ interface JsExtensions : JsEncodeUtils {
 
     fun startBrowser(url: String, title: String, html: String?) {
         rhinoContext.ensureActive()
+        if (!canOpenSourceUi()) return
         SourceVerificationHelp.startBrowser(getSource(), url, title, html=html)
     }
 
@@ -370,6 +419,7 @@ interface JsExtensions : JsEncodeUtils {
 
     fun startBrowserAwait(url: String, title: String, refetchAfterSuccess: Boolean, html: String?): StrResponse {
         rhinoContext.ensureActive()
+        if (!canOpenSourceUi()) throw NoStackTraceException("已阻止当前操作中的书源网页跳转")
         return when (val result = SourceVerificationHelp.getVerificationResult(
             getSource(), url, title, true, refetchAfterSuccess, html, context
         )) {
@@ -1198,6 +1248,7 @@ interface JsExtensions : JsEncodeUtils {
     fun openUrl(url: String, mimeType: String? = null) {
         require(url.length < 64 * 1024) { "openUrl parameter url too long" }
         rhinoContextOrNull?.ensureActive()
+        if (!canOpenSourceUi()) return
         if (url.startsWith("legado://") || url.startsWith("yuedu://")) {
             appCtx.startActivity<OnLineImportActivity> {
                 data = url.toUri()
@@ -1228,6 +1279,7 @@ interface JsExtensions : JsEncodeUtils {
         config: String?
     ) {
         rhinoContextOrNull?.ensureActive()
+        if (!canOpenSourceUi()) return
         val activity = LifecycleHelp.getTopActivity() as? AppCompatActivity ?: return
         val source = getSource() ?: return
         activity.runOnUiThread {
@@ -1242,6 +1294,12 @@ interface JsExtensions : JsEncodeUtils {
                 BottomWebViewDialog(source.getKey(), 0, url, html, preloadJs, config)
             )
         }
+    }
+
+    private fun canOpenSourceUi(): Boolean {
+        if (!shouldSuppressSourceNavigation(AppConfig.blockSourceNavigation, context)) return true
+        Debug.log(getTag(), "已阻止当前操作中的书源网页或视频跳转")
+        return false
     }
 
     fun singleFlight(

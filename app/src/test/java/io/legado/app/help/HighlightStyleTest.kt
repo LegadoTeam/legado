@@ -15,6 +15,22 @@ import org.junit.Test
 class HighlightStyleTest {
 
     @Test
+    fun `font metrics are optional normalized channels and zero spacing overrides the base`() {
+        val legacy = HighlightStyle(fontPath = "font.ttf")
+        assertFalse(legacy.changesTextMetrics)
+        val metrics = legacy.copy(fontSize = 42f, letterSpacing = -0.2f)
+        assertTrue(metrics.changesTextMetrics)
+        assertTrue(metrics.needsPerColumnDraw)
+        assertFalse(HighlightStyle(fontSize = 42f).isEmpty)
+        assertEquals(metrics.copy(letterSpacing = 0f),
+            HighlightStyle.merge(metrics, HighlightStyle(letterSpacing = 0f)))
+        assertEquals(HighlightStyle(), HighlightStyle(fontSize = Float.NaN, letterSpacing = Float.POSITIVE_INFINITY).normalized())
+        assertEquals(HighlightStyle(fontSize = 100f, letterSpacing = -0.5f),
+            HighlightStyle(fontSize = 200f, letterSpacing = -2f).normalized())
+        assertEquals(legacy, metrics.copy(fontSize = null, letterSpacing = null))
+    }
+
+    @Test
     fun `empty style needs no per-column drawing`() {
         val style = HighlightStyle()
         assertTrue(style.isEmpty)
@@ -83,6 +99,25 @@ class HighlightStyleTest {
     }
 
     @Test
+    fun `underline values are normalized before drawing`() {
+        val normalized = Underline(
+            kind = Kind.DASHED,
+            width = Float.POSITIVE_INFINITY,
+            distance = -4f,
+        ).normalized()
+
+        assertEquals(Underline.DEFAULT_WIDTH, normalized.width, 0f)
+        assertEquals(Underline.MIN_DISTANCE, normalized.distance, 0f)
+        assertEquals(Kind.DASHED, normalized.kind)
+        assertEquals(
+            Underline.MAX_WIDTH,
+            Underline(width = Underline.MAX_WIDTH + 1f).normalized().width,
+            0f,
+        )
+        assertEquals(Underline(), Underline(width = 1f, distance = 0f).normalized())
+    }
+
+    @Test
     fun `normalization reuses valid style instances`() {
         val shadow = Shadow(radius = 4f, dx = -2f, dy = 6f)
         val style = HighlightStyle(shadow = shadow)
@@ -105,6 +140,8 @@ class HighlightStyleTest {
             textColor = 0xFFFF0000.toInt(),
             bold = true,
             fontPath = "content://fonts/reader.ttf",
+            fontSize = 36f,
+            letterSpacing = -0.15f,
             underline = Underline(Kind.DASHED, 0xFF00FF00.toInt()),
             strike = Deco(0xFF0000FF.toInt())
         )

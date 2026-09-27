@@ -20,6 +20,17 @@ class SelectionIntervalGuardTest {
         }
     }
 
+    @Test
+    fun `book selection uses stable book urls`() {
+        val source = File(
+            sourceRoot,
+            "io/legado/app/ui/book/manage/BookAdapter.kt"
+        ).readText()
+        assertTrue(source.contains("HashSet<String>"))
+        assertTrue(source.contains("AdvanceCallback<String>"))
+        assertTrue(source.contains("selectedBookUrls.contains(it.bookUrl)"))
+    }
+
     private val sourceRoot: File by lazy {
         sequenceOf(File("src/main/java"), File("app/src/main/java"))
             .first { it.isDirectory }

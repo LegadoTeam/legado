@@ -13,6 +13,7 @@ import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
 import io.legado.app.constant.Theme
 import io.legado.app.help.DefaultData
+import io.legado.app.help.LifecycleHelp
 import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.model.BookCover
 import io.legado.app.utils.BitmapUtils
@@ -66,11 +67,15 @@ object ThemeConfig {
         return getTheme() == Theme.Dark
     }
 
-    fun applyDayNight(context: Context) {
+    fun applyDayNight(context: Context, recreateAllActivities: Boolean = false) {
         applyTheme(context)
         initNightMode()
         BookCover.upDefaultCover()
-        postEvent(EventBus.RECREATE, "")
+        if (recreateAllActivities) {
+            LifecycleHelp.recreateActivities()
+        } else {
+            postEvent(EventBus.RECREATE, "")
+        }
     }
 
     fun applyDayNightInit(context: Context) {

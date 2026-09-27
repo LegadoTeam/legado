@@ -96,7 +96,30 @@ class HighlightTocIntegrationTest {
         ).readText()
 
         assertTrue(fragment.contains("viewModel.searchKey?.takeIf { it.isNotBlank() }"))
-        assertTrue(fragment.contains("queryChapterIndexes(book, normalizedSearchKey)"))
+        assertTrue(fragment.contains("currentSearchKey = normalizedSearchKey"))
+        assertTrue(fragment.contains("val searchKey = currentSearchKey"))
+        assertTrue(fragment.contains("queryChapterIndexes(book, searchKey)"))
+    }
+
+    @Test
+    fun `recreated chapter page does not stack observers`() {
+        val fragment = projectFile(
+            "src/main/java/io/legado/app/ui/book/toc/ChapterListFragment.kt"
+        ).readText()
+        val eventBusExtensions = projectFile(
+            "src/main/java/io/legado/app/utils/EventBusExtensions.kt"
+        ).readText()
+        val fragmentObserver = eventBusExtensions
+            .substringAfter("inline fun <reified EVENT> Fragment.observeEvent(")
+            .substringBefore("inline fun <reified EVENT> Fragment.observeEventSticky(")
+        val fragmentStickyObserver = eventBusExtensions
+            .substringAfter("inline fun <reified EVENT> Fragment.observeEventSticky(")
+            .substringBefore("inline fun <reified EVENT> LifecycleService.observeEvent(")
+
+        assertTrue(fragment.contains("bookData.observe(viewLifecycleOwner)"))
+        assertTrue(!fragment.contains("observe(this@ChapterListFragment)"))
+        assertTrue(fragmentObserver.contains("observe(viewLifecycleOwner, o)"))
+        assertTrue(fragmentStickyObserver.contains("observeSticky(this, o)"))
     }
 
     @Test

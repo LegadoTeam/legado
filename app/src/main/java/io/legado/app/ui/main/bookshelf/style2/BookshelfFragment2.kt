@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.graphics.Rect
 import android.os.Bundle
 import android.view.View
+import android.view.ViewConfiguration
 import androidx.appcompat.widget.SearchView
 import androidx.core.view.isGone
 import androidx.lifecycle.Lifecycle
@@ -26,10 +27,13 @@ import io.legado.app.ui.book.group.GroupEditDialog
 import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.main.bookshelf.BaseBookshelfFragment
+import io.legado.app.utils.MenuExtensions
 import io.legado.app.utils.cnCompare
 import io.legado.app.utils.flowWithLifecycleAndDatabaseChangeFirst
+import io.legado.app.utils.getCompatDrawable
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.setEdgeEffectColor
+import io.legado.app.utils.setTintMutate
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.startActivityForBook
@@ -37,7 +41,9 @@ import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -67,6 +73,8 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         }
     }
     private var bookGroups: List<BookGroup> = emptyList()
+    private val bookGroupsFlow = MutableStateFlow<List<BookGroup>>(emptyList())
+    private var groupItems: List<BookshelfGroupItem> = emptyList()
     private var booksFlowJob: Job? = null
     override var groupId = BookGroup.IdRoot
     override var books: List<Book> = emptyList()
@@ -78,6 +86,7 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         setSupportToolbar(binding.titleBar.toolbar)
+        binding.titleBar.setNavigationOnClickListener { back() }
         bindShelfHeader(binding.shelfHeader)
         initRecyclerView()
         initBookGroupData()
@@ -86,6 +95,12 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
 
     private fun initRecyclerView() {
         binding.rvBookshelf.setEdgeEffectColor(primaryColor)
+        binding.rvBookshelf.canHandleHorizontalSwipe = { offset ->
+            adjacentBookshelfGroupId(bookGroups, groupId, offset) != null
+        }
+        binding.rvBookshelf.onHorizontalSwipe = ::switchBookGroup
+        binding.fastScroller.attachRecyclerView(binding.rvBookshelf)
+        upFastScrollerBar()
         binding.refreshLayout.setColorSchemeColors(accentColor)
         binding.refreshLayout.setOnRefreshListener {
             binding.refreshLayout.isRefreshing = false
@@ -141,17 +156,20 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         })
     }
 
+    private fun upFastScrollerBar() {
+        val show = AppConfig.showBookshelfFastScroller
+        binding.fastScroller.isEnabled = show
+        binding.rvBookshelf.scrollBarSize = if (show) {
+            0
+        } else {
+            ViewConfiguration.get(requireContext()).scaledScrollBarSize
+        }
+    }
+
     override fun upGroup(data: List<BookGroup>) {
         if (data != bookGroups) {
             bookGroups = data
-            booksAdapter.updateItems(groupId)
-            itemCount = getItemCount()
-            val spanCount = bookshelfLayout
-            if (spanCount >= 2) {
-                totalRows = if (itemCount % spanCount == 0) itemCount / spanCount else itemCount / spanCount + 1
-            }
-            binding.tvEmptyMsg.isGone = itemCount > 0
-            binding.refreshLayout.isEnabled = enableRefresh && itemCount > 0
+            bookGroupsFlow.value = data
         }
     }
 
@@ -160,6 +178,7 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
     }
 
     private fun initBooksData() {
+        upNavigationIcon()
         if (groupId == BookGroup.IdRoot) {
             if (isAdded) {
                 binding.titleBar.title = getString(R.string.bookshelf)
@@ -177,39 +196,44 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
             }
         }
         booksFlowJob?.cancel()
+        val currentGroupId = groupId
         booksFlowJob = viewLifecycleOwner.lifecycleScope.launch {
-            appDb.bookDao.flowByGroup(groupId).map { list ->
-                //排序
-                when (AppConfig.getBookSortByGroupId(groupId)) {
-                    1 -> list.sortedByDescending {
-                        it.latestChapterTime
-                    }
-
-                    2 -> list.sortedWith { o1, o2 ->
-                        o1.name.cnCompare(o2.name)
-                    }
-
-                    3 -> list.sortedBy {
-                        it.order
-                    }
-
-                    4 -> list.sortedByDescending {
-                        max(it.latestChapterTime, it.durChapterTime)
-                    }
-
-                    else -> list.sortedByDescending {
-                        it.durChapterTime
-                    }
+            val bookDao = appDb.bookDao
+            val sortedBooksFlow = bookDao.flowByGroup(currentGroupId).map { currentBooks ->
+                sortBooks(currentBooks, currentGroupId)
+            }
+            val booksFlow = if (currentGroupId == BookGroup.IdRoot) {
+                val shelfDataFlow = combine(
+                    sortedBooksFlow,
+                    bookDao.flowBookshelfBooks(),
+                ) { currentBooks, allBooks ->
+                    currentBooks to allBooks
+                }.flowWithLifecycleAndDatabaseChangeFirst(
+                    viewLifecycleOwner.lifecycle,
+                    Lifecycle.State.RESUMED,
+                    AppDatabase.BOOK_TABLE_NAME,
+                    AppDatabase.BOOK_GROUP_TABLE_NAME,
+                )
+                combine(shelfDataFlow, bookGroupsFlow) { (currentBooks, allBooks), groups ->
+                    currentBooks to buildBookshelfGroupItems(groups, allBooks)
                 }
-            }.flowWithLifecycleAndDatabaseChangeFirst(
-                viewLifecycleOwner.lifecycle,
-                Lifecycle.State.RESUMED,
-                AppDatabase.BOOK_TABLE_NAME
-            ).catch {
+            } else {
+                sortedBooksFlow.map { it to emptyList<BookshelfGroupItem>() }
+                    .flowWithLifecycleAndDatabaseChangeFirst(
+                        viewLifecycleOwner.lifecycle,
+                        Lifecycle.State.RESUMED,
+                        AppDatabase.BOOK_TABLE_NAME,
+                    )
+            }
+            booksFlow.catch {
                 AppLog.put("书架更新出错", it)
-            }.conflate().flowOn(Dispatchers.Default).collect { list ->
-                books = list
-                booksAdapter.updateItems(groupId)
+            }.conflate().flowOn(Dispatchers.Default).collect { (currentBooks, items) ->
+                if (groupId != currentGroupId) return@collect
+                books = currentBooks
+                if (currentGroupId == BookGroup.IdRoot) {
+                    groupItems = items
+                }
+                booksAdapter.updateItems(currentGroupId)
                 itemCount = getItemCount()
                 val spanCount = bookshelfLayout
                 if (spanCount >= 2) {
@@ -219,6 +243,39 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
                 binding.refreshLayout.isEnabled = enableRefresh && itemCount > 0
                 delay(100)
             }
+        }
+    }
+
+    private fun upNavigationIcon() {
+        binding.titleBar.toolbar.apply {
+            navigationIcon = if (groupId == BookGroup.IdRoot) {
+                null
+            } else {
+                getCompatDrawable(androidx.appcompat.R.drawable.abc_ic_ab_back_material)
+            }
+            navigationContentDescription = getString(R.string.back)
+            navigationIcon?.setTintMutate(
+                MenuExtensions.getMenuColor(
+                    requireContext(),
+                    transparentBar = binding.titleBar.usesTransparentForeground,
+                )
+            )
+        }
+    }
+
+    private fun switchBookGroup(offset: Int) {
+        val targetGroupId = adjacentBookshelfGroupId(bookGroups, groupId, offset) ?: return
+        groupId = targetGroupId
+        initBooksData()
+    }
+
+    private fun sortBooks(books: List<Book>, groupId: Long): List<Book> {
+        return when (AppConfig.getBookSortByGroupId(groupId)) {
+            1 -> books.sortedByDescending { it.latestChapterTime }
+            2 -> books.sortedWith { first, second -> first.name.cnCompare(second.name) }
+            3 -> books.sortedBy { it.order }
+            4 -> books.sortedByDescending { max(it.latestChapterTime, it.durChapterTime) }
+            else -> books.sortedByDescending { it.durChapterTime }
         }
     }
 
@@ -276,7 +333,7 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
 
     fun getItemCount(): Int {
         return if (groupId == BookGroup.IdRoot) {
-            bookGroups.size + books.size
+            groupItems.size + books.size
         } else {
             books.size
         }
@@ -286,7 +343,7 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         if (groupId != BookGroup.IdRoot) {
             return books
         }
-        return bookGroups + books
+        return groupItems + books
     }
 
     @SuppressLint("NotifyDataSetChanged")
@@ -297,6 +354,24 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         }
         observeEvent<String>(EventBus.BOOKSHELF_REFRESH) {
             booksAdapter.notifyDataSetChanged()
+            upFastScrollerBar()
         }
     }
+
+    override fun onDestroyView() {
+        binding.rvBookshelf.canHandleHorizontalSwipe = null
+        binding.rvBookshelf.onHorizontalSwipe = null
+        binding.fastScroller.detachRecyclerView()
+        super.onDestroyView()
+    }
+}
+
+internal fun adjacentBookshelfGroupId(
+    groups: List<BookGroup>,
+    currentGroupId: Long,
+    offset: Int,
+): Long? {
+    val currentIndex = groups.indexOfFirst { it.groupId == currentGroupId }
+    if (currentIndex < 0) return null
+    return groups.getOrNull(currentIndex + offset)?.groupId
 }

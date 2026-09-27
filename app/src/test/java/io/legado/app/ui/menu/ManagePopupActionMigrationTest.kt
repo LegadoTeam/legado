@@ -100,6 +100,65 @@ class ManagePopupActionMigrationTest {
     }
 
     @Test
+    fun `dialog overflow menus use the shared vertical bridge`() {
+        listOf(
+            "src/main/java/io/legado/app/ui/about/AppLogDialog.kt",
+            "src/main/java/io/legado/app/ui/about/CrashLogsDialog.kt",
+            "src/main/java/io/legado/app/ui/login/SourceLoginDialog.kt"
+        ).forEach { path ->
+            val source = readProjectFile(path)
+            assertContains(path, source, "installMd3OverflowMenu(")
+            assertContains(path, source, "showIcons = true")
+            assertContains(
+                path,
+                source,
+                "onOpenCustomMenu = { it.applyOpenTint(requireContext()) }"
+            )
+        }
+    }
+
+    @Test
+    fun `dialog menu actions provide icons for the vertical menu`() {
+        val menus = mapOf(
+            "app_log.xml" to listOf("menu_clear", "menu_export"),
+            "crash_log.xml" to listOf("menu_clear"),
+            "rss_read_record.xml" to listOf("menu_clear"),
+            "source_login.xml" to listOf(
+                "menu_ok",
+                "menu_show_login_header",
+                "menu_del_login_header",
+                "menu_clear_login_info",
+                "menu_log"
+            )
+        )
+        menus.forEach { (file, ids) ->
+            val source = readProjectFile("src/main/res/menu/$file")
+            ids.forEach { id ->
+                val item = source.substringAfter("android:id=\"@+id/$id\"")
+                    .substringBefore("/>")
+                assertTrue(
+                    "$file/$id should declare an icon",
+                    item.contains("android:icon=\"@drawable/")
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `dialog action icons use the shared toolbar tint`() {
+        mapOf(
+            "src/main/java/io/legado/app/ui/about/AppLogDialog.kt" to
+                "toolBar.menu.applyTint(requireContext())",
+            "src/main/java/io/legado/app/ui/about/CrashLogsDialog.kt" to
+                "binding.toolBar.menu.applyTint(requireContext())",
+            "src/main/java/io/legado/app/ui/rss/article/ReadRecordDialog.kt" to
+                "toolBar.menu.applyTint(requireContext())",
+        ).forEach { (path, expected) ->
+            assertContains(path, readProjectFile(path), expected)
+        }
+    }
+
+    @Test
     fun `five management adapters use the shared vertical menu`() {
         adapterFiles.forEach { path ->
             val source = readProjectFile(path)

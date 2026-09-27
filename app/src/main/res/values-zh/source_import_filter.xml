@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="import_remember_group">记住上次分组</string>
+    <string name="import_select_results">全选当前结果（%1$d/%2$d），共选中 %3$d 项</string>
+    <string name="import_unselect_results">取消当前全选（%1$d/%2$d），共选中 %3$d 项</string>
+    <string name="import_no_results">没有匹配的源</string>
+</resources>

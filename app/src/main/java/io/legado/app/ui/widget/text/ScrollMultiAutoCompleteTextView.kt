@@ -3,6 +3,7 @@ package io.legado.app.ui.widget.text
 import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Build
+import android.text.method.MetaKeyKeyListener
 import android.util.AttributeSet
 import android.view.GestureDetector
 import android.view.MotionEvent
@@ -17,6 +18,9 @@ import io.legado.app.utils.ColorUtils
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+
+internal fun IndexOutOfBoundsException.isMissingSelectionSpan(): Boolean =
+    message?.contains("setSpan (-1 ... -1)") == true
 
 /**
  * 嵌套惯性滚动 MultiAutoCompleteTextView
@@ -155,7 +159,13 @@ open class ScrollMultiAutoCompleteTextView @JvmOverloads constructor(
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        val result = super.onTouchEvent(event)
+        val result = try {
+            super.onTouchEvent(event)
+        } catch (error: IndexOutOfBoundsException) {
+            if (!error.isMissingSelectionSpan()) throw error
+            MetaKeyKeyListener.resetMetaState(editableText)
+            true
+        }
         //如果是需要拦截，则再拦截，这个方法会在onScrollChanged方法之后再调用一次
         if (disallowIntercept && lineCount > maxLines) {
             parent.requestDisallowInterceptTouchEvent(true)

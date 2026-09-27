@@ -9,12 +9,15 @@ import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.provider.Settings
 import android.util.AttributeSet
+import android.util.TypedValue
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
 import android.view.animation.Animation
 import android.widget.FrameLayout
 import android.widget.SeekBar
-import androidx.appcompat.widget.PopupMenu
+import androidx.constraintlayout.widget.ConstraintSet
+import androidx.core.view.doOnLayout
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import io.legado.app.R
@@ -37,7 +40,9 @@ import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.model.ReadBook
 import io.legado.app.model.SourceCallBack
+import io.legado.app.service.BaseReadAloudService
 import io.legado.app.ui.browser.WebViewActivity
+import io.legado.app.ui.widget.popupActionMenu
 import io.legado.app.ui.widget.seekbar.SeekBarChangeListener
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.ConstraintModify
@@ -70,6 +75,7 @@ class ReadMenu @JvmOverloads constructor(
     var canShowMenu: Boolean = false
     private val callBack: CallBack get() = activity as CallBack
     private val binding = ViewReadMenuBinding.inflate(LayoutInflater.from(context), this, true)
+    private val chapterNameTextSize = binding.tvChapterName.textSize
     private var confirmSkipToChapter: Boolean = false
     private var isMenuOutAnimating = false
     private val menuTopIn: Animation by lazy {
@@ -109,20 +115,6 @@ class ReadMenu @JvmOverloads constructor(
             PreferKey.showBrightnessView,
             true
         )
-    private val sourceMenu by lazy {
-        PopupMenu(context, binding.tvSourceAction).apply {
-            inflate(R.menu.book_read_source)
-            setOnMenuItemClickListener {
-                when (it.itemId) {
-                    R.id.menu_login -> callBack.showLogin()
-                    R.id.menu_chapter_pay -> callBack.payAction()
-                    R.id.menu_edit_source -> callBack.openSourceEditActivity()
-                    R.id.menu_disable_source -> callBack.disableSource()
-                }
-                true
-            }
-        }
-    }
     private val menuInListener = object : Animation.AnimationListener {
         override fun onAnimationStart(animation: Animation) {
             binding.tvSourceAction.text =
@@ -215,8 +207,12 @@ class ReadMenu @JvmOverloads constructor(
         fabReplaceRule.setColorFilter(textColor)
         fabNightTheme.backgroundTintList = bottomBackgroundList
         fabNightTheme.setColorFilter(textColor)
-        tvPre.setTextColor(textColor)
-        tvNext.setTextColor(textColor)
+        val chapterTextColor = Selector.colorBuild()
+            .setDefaultColor(textColor)
+            .setDisabledColor(ColorUtils.withAlpha(textColor, 0.4f))
+            .create()
+        tvPre.setTextColor(chapterTextColor)
+        tvNext.setTextColor(chapterTextColor)
         ivCatalog.setColorFilter(textColor, PorterDuff.Mode.SRC_IN)
         tvCatalog.setTextColor(textColor)
         ivReadAloud.setColorFilter(textColor, PorterDuff.Mode.SRC_IN)
@@ -225,6 +221,8 @@ class ReadMenu @JvmOverloads constructor(
         tvFont.setTextColor(textColor)
         ivSetting.setColorFilter(textColor, PorterDuff.Mode.SRC_IN)
         tvSetting.setTextColor(textColor)
+        ivMemo.setColorFilter(textColor, PorterDuff.Mode.SRC_IN)
+        tvMemo.setTextColor(textColor)
         vwBrightnessPosAdjust.setColorFilter(textColor, PorterDuff.Mode.SRC_IN)
         seekBrightness.applyTint(context.accentColor)
         llBrightness.setOnClickListener(null)
@@ -236,6 +234,7 @@ class ReadMenu @JvmOverloads constructor(
         } else {
             titleBarAddition.gone()
         }
+        updateTitleAdditionLayout()
         upBrightnessVwPos()
         /**
          * 确保视图不被导航栏遮挡
@@ -368,6 +367,9 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     fun runMenuIn(anim: Boolean = !AppConfig.isEInkMode) {
+        val showMemo = context.getPrefBoolean(PreferKey.showBookMemo, false)
+        binding.llMemo.isVisible = showMemo
+        binding.memoSpacer.isVisible = showMemo
         callBack.onMenuShow()
         this.visible()
         binding.titleBar.visible()
@@ -477,13 +479,23 @@ class ReadMenu @JvmOverloads constructor(
         }
         //书源操作
         tvSourceAction.onClick {
-            sourceMenu.menu.findItem(R.id.menu_login).isVisible =
-                ReadBook.bookSource?.hasLogin() == true
-            sourceMenu.menu.findItem(R.id.menu_chapter_pay).isVisible =
-                ReadBook.bookSource?.hasLogin() == true
-                        && ReadBook.curTextChapter?.isVip == true
-                        && ReadBook.curTextChapter?.isPay != true
-            sourceMenu.show()
+            val hasLogin = ReadBook.bookSource?.hasLogin() == true
+            val canPay = hasLogin
+                    && ReadBook.curTextChapter?.isVip == true
+                    && ReadBook.curTextChapter?.isPay != true
+            popupActionMenu(context) {
+                item(context.getString(R.string.login), "login", hasLogin)
+                item(context.getString(R.string.chapter_pay), "chapterPay", canPay)
+                item(context.getString(R.string.edit_book_source), "editSource")
+                item(context.getString(R.string.disable_book_source), "disableSource")
+            }.show(tvSourceAction) { action ->
+                when (action) {
+                    "login" -> callBack.showLogin()
+                    "chapterPay" -> callBack.payAction()
+                    "editSource" -> callBack.openSourceEditActivity()
+                    "disableSource" -> callBack.disableSource()
+                }
+            }
         }
         //亮度跟随
         ivBrightnessAuto.setOnClickListener {
@@ -581,7 +593,11 @@ class ReadMenu @JvmOverloads constructor(
         //朗读
         llReadAloud.setOnClickListener {
             runMenuOut {
-                callBack.onClickReadAloud()
+                if (BaseReadAloudService.isRun) {
+                    callBack.showReadAloudDialog()
+                } else {
+                    callBack.onClickReadAloud()
+                }
             }
         }
         llReadAloud.onLongClick {
@@ -602,6 +618,11 @@ class ReadMenu @JvmOverloads constructor(
                 callBack.showMoreSetting()
             }
         }
+        llMemo.setOnClickListener {
+            runMenuOut {
+                callBack.showBookMemo()
+            }
+        }
     }
 
     private fun initAnimation() {
@@ -616,16 +637,53 @@ class ReadMenu @JvmOverloads constructor(
             binding.tvChapterName.visible()
             if (!ReadBook.isLocalBook) {
                 binding.tvChapterUrl.text = it.chapter.getAbsoluteURL()
-                binding.tvChapterUrl.visible()
             } else {
+                binding.tvChapterUrl.text = null
                 binding.tvChapterUrl.gone()
             }
+            updateTitleAdditionLayout()
             upSeekBar()
             binding.tvPre.isEnabled = ReadBook.durChapterIndex != 0
             binding.tvNext.isEnabled = ReadBook.durChapterIndex != ReadBook.simulatedChapterSize - 1
         } ?: let {
             binding.tvChapterName.gone()
             binding.tvChapterUrl.gone()
+        }
+    }
+
+    private fun updateTitleAdditionLayout() = binding.run {
+        val chapterNameOnly = AppConfig.showReadTitleChapterNameOnly
+        val scaledDensity = resources.displayMetrics.scaledDensity
+        val hasChapterUrl = !tvChapterUrl.text.isNullOrBlank()
+        tvChapterName.gravity = Gravity.CENTER_VERTICAL
+        tvChapterUrl.gravity = Gravity.CENTER_VERTICAL
+        tvChapterName.setTextSize(
+            TypedValue.COMPLEX_UNIT_PX,
+            chapterNameTextSize + if (chapterNameOnly) 2f * scaledDensity else 0f
+        )
+        tvChapterUrl.alpha = if (chapterNameOnly && hasChapterUrl) 0f else 1f
+        if (hasChapterUrl) {
+            tvChapterUrl.visible()
+        } else {
+            tvChapterUrl.gone()
+        }
+        ConstraintSet().apply {
+            clone(titleBarAddition)
+            val bottomTarget = if (tvChapterUrl.isGone) {
+                R.id.tv_chapter_name
+            } else {
+                R.id.tv_chapter_url
+            }
+            connect(R.id.tv_custom_btn, ConstraintSet.BOTTOM, bottomTarget, ConstraintSet.BOTTOM)
+            connect(R.id.tv_source_action, ConstraintSet.BOTTOM, bottomTarget, ConstraintSet.BOTTOM)
+            applyTo(titleBarAddition)
+        }
+        tvChapterName.translationY = 0f
+        if (chapterNameOnly && tvChapterName.isVisible) {
+            titleBarAddition.doOnLayout {
+                tvChapterName.translationY =
+                    (titleBarAddition.height - tvChapterName.height) / 2f - tvChapterName.top
+            }
         }
     }
 
@@ -685,6 +743,7 @@ class ReadMenu @JvmOverloads constructor(
         fun openBookInfoActivity()
         fun showReadStyle()
         fun showMoreSetting()
+        fun showBookMemo()
         fun showReadAloudDialog()
         fun upSystemUiVisibility()
         fun onClickReadAloud()

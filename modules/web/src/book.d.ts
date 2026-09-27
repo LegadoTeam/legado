@@ -24,6 +24,8 @@ export type Book = BaseBook & {
   coverUrl?: string
   // 封面Url(用户修改)
   customCoverUrl?: string
+  // 保存到本地的网络封面
+  persistedCoverUrl?: string
   // 简介内容(书源获取)
   intro?: string
   // 简介内容(用户修改)
@@ -106,4 +108,40 @@ export type BookChapter = {
   startFragmentId?: string //EPUB书籍当前章节的fragmentId
   endFragmentId?: string //EPUB书籍下一章节的fragmentId
   variable?: string //变量
+}
+
+export type ReviewSummary = {
+  counts: Record<string, number>
+  keys: Record<string, string>
+}
+
+export type ReviewItem = {
+  id?: string | null
+  avatar?: string | null
+  name?: string | null
+  replyToName?: string | null
+  badges?: string[]
+  content?: string | null
+  imageUrl?: string | null
+  audioUrl?: string | null
+  time?: string | null
+  likeCount?: number | null
+  replyCount?: number | null
+  replies?: ReviewItem[]
+}
+
+export type ReviewPage = {
+  items: ReviewItem[]
+  nextCursor?: string | null
+  hasMore: boolean
+}
+
+export type ParagraphReview = {
+  count: number
+  paraData: string
+}
+
+export type ReviewTarget = ParagraphReview & {
+  chapterIndex: number
+  paraIndex: number
 }

@@ -44,4 +44,11 @@ class HighlightRuleTest {
         assertTrue(HighlightRule(pattern = "a\\|", isRegex = true).isValid())
     }
 
+    @Test
+    fun `group names are normalized for restored rules`() {
+        val rule = HighlightRule(group = "  Characters  ").normalizeForRestore()
+        assertEquals("Characters", rule.group)
+        assertEquals(null, HighlightRule(group = "  ").normalizeForRestore().group)
+    }
+
 }

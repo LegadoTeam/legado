@@ -14,6 +14,7 @@ import io.legado.app.data.dao.BookChapterDao
 import io.legado.app.data.dao.BookDao
 import io.legado.app.data.dao.BookGroupDao
 import io.legado.app.data.dao.BookHighlightDao
+import io.legado.app.data.dao.BookMemoDao
 import io.legado.app.data.dao.BookSourceDao
 import io.legado.app.data.dao.BookmarkDao
 import io.legado.app.data.dao.AutoTaskRuleDao
@@ -38,7 +39,9 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookHighlight
+import io.legado.app.data.entities.BookMemo
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.BookSourceCheckState
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.entities.AutoTaskRule
@@ -74,14 +77,15 @@ val appDb by lazy {
 }
 
 @Database(
-    version = 99,
+    version = 111,
     exportSchema = true,
     entities = [Book::class, BookGroup::class, BookSource::class, BookChapter::class,
         ReplaceRule::class, SearchBook::class, SearchKeyword::class, Cookie::class,
         RssSource::class, Bookmark::class, RssArticle::class, RssReadRecord::class,
         RssStar::class, TxtTocRule::class, ReadRecord::class, HttpTTS::class, Cache::class,
         RuleSub::class, DictRule::class, KeyboardAssist::class, Server::class,
-        AutoTaskRule::class, BookHighlight::class, HighlightRule::class],
+        AutoTaskRule::class, BookHighlight::class, HighlightRule::class, BookSourceCheckState::class,
+        BookMemo::class],
     views = [BookSourcePart::class],
     autoMigrations = [
         AutoMigration(from = 43, to = 44),
@@ -139,7 +143,12 @@ val appDb by lazy {
         AutoMigration(from = 95, to = 96),
         AutoMigration(from = 96, to = 97, spec = DatabaseMigrations.Migration_96_97::class),
         AutoMigration(from = 97, to = 98),
-        AutoMigration(from = 98, to = 99, spec = DatabaseMigrations.Migration_98_99::class)
+        AutoMigration(from = 98, to = 99, spec = DatabaseMigrations.Migration_98_99::class),
+        AutoMigration(from = 99, to = 100),
+        AutoMigration(from = 101, to = 102, spec = DatabaseMigrations.Migration_101_102::class),
+        AutoMigration(from = 102, to = 103),
+        AutoMigration(from = 103, to = 104),
+        AutoMigration(from = 110, to = 111)
     ]
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -148,6 +157,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract val bookDao: BookDao
     abstract val bookGroupDao: BookGroupDao
     abstract val bookHighlightDao: BookHighlightDao
+    abstract val bookMemoDao: BookMemoDao
     abstract val highlightRuleDao: HighlightRuleDao
     abstract val bookSourceDao: BookSourceDao
     abstract val bookChapterDao: BookChapterDao
@@ -174,6 +184,7 @@ abstract class AppDatabase : RoomDatabase() {
         const val DATABASE_NAME = "legado.db"
 
         const val BOOK_TABLE_NAME = "books"
+        const val BOOK_GROUP_TABLE_NAME = "book_groups"
         const val BOOK_SOURCE_TABLE_NAME = "book_sources"
         const val RSS_SOURCE_TABLE_NAME = "rssSources"
 

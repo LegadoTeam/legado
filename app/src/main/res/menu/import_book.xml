@@ -50,4 +50,9 @@
         android:title="@string/import_file_name"
         app:showAsAction="never" />
 
+    <item
+        android:id="@+id/menu_local_book_save_path"
+        android:title="@string/local_book_save_path"
+        app:showAsAction="never" />
+
 </menu>

@@ -193,6 +193,9 @@ object Debug {
         isChecking && activeCheckSessionId == sessionId
 
     @Synchronized
+    fun currentCheckSession(): Long? = activeCheckSessionId.takeIf { isChecking }
+
+    @Synchronized
     fun prepareCheckSession(sessionId: Long, sourceUrls: Collection<String>) {
         if (activeCheckSessionId != sessionId) return
         activeCheckSourceUrls.clear()

@@ -2,13 +2,16 @@ package io.legado.app.ui.book.manga
 
 import android.app.Application
 import android.content.Intent
+import android.net.Uri
 import io.legado.app.R
 import io.legado.app.base.BaseViewModel
+import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.BookType
 import io.legado.app.constant.EventBus
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.replaceBookAfterSourceChange
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookProgress
 import io.legado.app.exception.NoStackTraceException
@@ -18,14 +21,19 @@ import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isLocalModified
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.simulatedTotalChapterNum
+import io.legado.app.help.book.update
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.ReadManga
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.webBook.WebBook
+import io.legado.app.utils.ACache
+import io.legado.app.utils.FileDoc
+import io.legado.app.utils.createFileIfNotExist
 import io.legado.app.utils.mapParallelSafe
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.toastOnUi
+import io.legado.app.utils.writeFile
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.catch
@@ -121,7 +129,7 @@ class ReadMangaViewModel(application: Application) : BaseViewModel(application) 
         val oldBook = book.copy()
         WebBook.getChapterListAwait(bookSource, book, true).onSuccess { cList ->
             if (oldBook.bookUrl == book.bookUrl) {
-                appDb.bookDao.update(book)
+                book.update()
             } else {
                 appDb.bookDao.replace(oldBook, book)
                 BookHelp.updateCacheFolder(oldBook, book)
@@ -235,17 +243,18 @@ class ReadMangaViewModel(application: Application) : BaseViewModel(application) 
     /**
      * 换源
      */
-    fun changeTo(book: Book, toc: List<BookChapter>) {
+    fun changeTo(book: Book, toc: List<BookChapter>, onSuccess: () -> Unit = {}) {
         changeSourceCoroutine?.cancel()
         changeSourceCoroutine = execute {
             //换源中
+            ReadManga.upReadTime()
             ReadManga.book?.migrateTo(book, toc)
             book.removeType(BookType.updateError)
-            ReadManga.book?.delete()
-            appDb.bookDao.insert(book)
-            appDb.bookChapterDao.insert(*toc.toTypedArray())
+            replaceBookAfterSourceChange(ReadManga.book, book, toc)
             ReadManga.resetData(book)
             ReadManga.loadContent()
+        }.onSuccess {
+            onSuccess()
         }.onError {
             AppLog.put("换源失败\n$it", it, true)
         }.onFinally {
@@ -292,7 +301,26 @@ class ReadMangaViewModel(application: Application) : BaseViewModel(application) 
                 ?.let { chapter ->
                     BookHelp.delContent(book, chapter)
                     openChapter(ReadManga.durChapterIndex, ReadManga.durChapterPos)
-                }
+            }
+        }
+    }
+
+    fun saveImage(src: String?, uri: Uri) {
+        src ?: return
+        val book = ReadManga.book ?: return
+        execute {
+            BookHelp.saveImage(ReadManga.bookSource, book, src)
+            val image = BookHelp.getImage(book, src)
+            if (!image.isFile) throw NoStackTraceException("图片下载失败")
+            try {
+                FileDoc.fromDir(uri).createFileIfNotExist(image.name).writeFile(image)
+            } catch (error: Exception) {
+                ACache.get().remove(AppConst.imagePathKey)
+                throw error
+            }
+        }.onError {
+            AppLog.put("保存图片出错\n${it.localizedMessage}", it)
+            context.toastOnUi("保存图片出错\n${it.localizedMessage}")
         }
     }
 }
