@@ -18,7 +18,7 @@ buildscript {
 }
 
 // Version-pinned adaptation. Keep the checked-in official JAR byte-for-byte intact.
-// Cronet 155's public setLibraryLoader() is a no-op; reconnect its actual load site instead.
+// Cronet 152's public setLibraryLoader() is a no-op; reconnect its actual load site instead.
 def original = file('cronetlib/cronet_impl_native_java.jar')
 def adapted = layout.buildDirectory.file('cronet-dynamic/cronet_impl_native_java.jar')
 def adaptCronetLoader = tasks.register('adaptCronetLoader') {
@@ -27,9 +27,9 @@ def adaptCronetLoader = tasks.register('adaptCronetLoader') {
     inputs.property('version', CronetVersion)
     outputs.file(adapted)
     doLast {
-        if (CronetVersion != '155.0.8059.30' ||
+        if (CronetVersion != '152.0.7977.54' ||
                 MessageDigest.getInstance('SHA-256').digest(original.bytes).encodeHex().toString() !=
-                '2243d16922895bb1348deba00a3a30c78468ba8af794536590b165babe1e959d') {
+                '63e84592871f3d6e0509887c6d756a9c773385ef87e287f02ebc2a9314d6ffc8') {
             throw new GradleException('Review the dynamic loader against the new official Cronet JAR first')
         }
         def owner = 'org/chromium/net/impl/CronetLibraryLoader'
@@ -43,10 +43,11 @@ def adaptCronetLoader = tasks.register('adaptCronetLoader') {
                         def node = new ClassNode()
                         def reader = new ClassReader(bytes)
                         reader.accept(node, 0)
-                        def method = node.methods.find { it.name == 'loadLibrary' && it.desc == '()V' }
+                        def method = node.methods.find { it.name == 'loadLibraryInternal' &&
+                                it.desc == '(Lorg/chromium/net/impl/CronetLibraryLoader$LibraryLoaderLambda;)V' }
                         def instructions = method.instructions.toArray()
                         def calls = instructions.findAll { it instanceof MethodInsnNode &&
-                                it.owner == 'java/lang/System' && it.name == 'loadLibrary' }
+                                it.owner == owner + '$LibraryLoaderLambda' && it.name == 'loadLibrary' }
                         def flag = instructions.findAll { it instanceof FieldInsnNode &&
                                 it.opcode == Opcodes.PUTSTATIC && it.name == 'sLibAlreadyLoaded' }
                         assert calls.size() == 3 && flag.size() == 1
@@ -54,6 +55,9 @@ def adaptCronetLoader = tasks.register('adaptCronetLoader') {
                         // Keep the AOSP branch unchanged; redirect only the two standalone Cronet names.
                         calls.drop(1).each { call ->
                             def route = new InsnList()
+                            // Discard the original lambda receiver, retaining the library name.
+                            route.add(new InsnNode(Opcodes.SWAP))
+                            route.add(new InsnNode(Opcodes.POP))
                             route.add(new FieldInsnNode(Opcodes.GETSTATIC,
                                     'io/legado/app/lib/cronet/CronetLoader', 'INSTANCE',
                                     'Lio/legado/app/lib/cronet/CronetLoader;'))
@@ -85,7 +89,7 @@ def adaptCronetLoader = tasks.register('adaptCronetLoader') {
                 }
             }
         }
-        logger.lifecycle('Cronet 155: adapted only Java library loading; official native/JNI initialization unchanged')
+        logger.lifecycle('Cronet 152: adapted only Java library loading; official native/JNI initialization unchanged')
     }
 }
 ext.dynamicCronetJar = files(adapted).builtBy(adaptCronetLoader)
