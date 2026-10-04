@@ -1071,17 +1071,22 @@ class ReadView(context: Context, attrs: AttributeSet) :
      */
     suspend fun aloudStartSelect() {
         val selectStartPos = curPage.selectStartPos
+        if (!selectStartPos.isSelected()) return
         var pagePos = selectStartPos.relativePagePos
         val line = selectStartPos.lineIndex
         val column = selectStartPos.columnIndex
+        // Capture the selected page before navigation/rebinding clears or moves the selection.
+        val selectedPage = curPage.relativePage(pagePos)
+        val selectedPosition = selectedPage.chapterPosition + selectedPage.getPosByLineColumn(line, column)
         while (pagePos > 0) {
-            if (!ReadBook.moveToNextPage()) {
-                ReadBook.moveToNextChapterAwait(false)
-            }
+            if (!ReadBook.moveToNextPage() && !ReadBook.moveToNextChapterAwait(false)) return
             pagePos--
         }
-        val startPos = curPage.textPage.getPosByLineColumn(line, column)
-        ReadBook.readAloud(startPos = startPos)
+        val chapter = ReadBook.curTextChapter ?: return
+        if (chapter.chapter.index != selectedPage.chapterIndex) return
+        val startPos = selectedPosition - chapter.getReadLength(ReadBook.durPageIndex)
+        if (!BaseReadAloudService.isRun) ReadAloud.upReadAloudClass()
+        ReadBook.readAloud(startPos = startPos, rewindToSentenceStart = false)
     }
 
     /**
