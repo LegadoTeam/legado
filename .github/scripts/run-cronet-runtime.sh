@@ -32,6 +32,7 @@ grep -Fq 'CRONET_RUNTIME_PASSED' app/build/cronet-runtime/result.txt
 grep -Fq 'productionClientToggle=off,on,off,on' app/build/cronet-runtime/result.txt
 grep -Fq 'INSTRUMENTATION_CODE: -1' app/build/cronet-runtime/result.txt
 grep -Fq 'cachedBefore=false' app/build/cronet-runtime/result.txt
+grep -Fq 'webDav=authenticated,encoded-paths,cronet-first,on-off-on' app/build/cronet-runtime/result.txt
 grep -Fq 'loadFailureRecovery=true; componentFiles=1' app/build/cronet-runtime/result.txt
 adb pull /sdcard/Android/data/com.legado.app.release/files/cronet-runtime/storage.txt \
   app/build/cronet-runtime/cold-storage.txt
@@ -43,6 +44,7 @@ grep -Fq 'CRONET_RUNTIME_PASSED' app/build/cronet-runtime/cached-result.txt
 grep -Fq 'productionClientToggle=off,on,off,on' app/build/cronet-runtime/cached-result.txt
 grep -Fq 'INSTRUMENTATION_CODE: -1' app/build/cronet-runtime/cached-result.txt
 grep -Fq 'cachedBefore=true' app/build/cronet-runtime/cached-result.txt
+grep -Fq 'webDav=authenticated,encoded-paths,cronet-first,on-off-on' app/build/cronet-runtime/cached-result.txt
 adb pull /sdcard/Android/data/com.legado.app.release/files/cronet-runtime/storage.txt \
   app/build/cronet-runtime/cached-storage.txt
 python3 - <<'PY'

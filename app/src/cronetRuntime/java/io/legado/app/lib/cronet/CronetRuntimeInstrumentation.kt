@@ -2,6 +2,7 @@ package io.legado.app.lib.cronet
 
 import android.app.Activity
 import android.app.Instrumentation
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.system.Os
 import androidx.annotation.Keep
@@ -11,6 +12,10 @@ import io.legado.app.constant.PreferKey
 import io.legado.app.help.http.Cronet
 import io.legado.app.help.http.getProxyClient
 import io.legado.app.help.http.okHttpClient
+import io.legado.app.lib.webdav.Authorization
+import io.legado.app.lib.webdav.WebDav
+import kotlinx.coroutines.runBlocking
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.CookieJar
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -112,7 +117,7 @@ class CronetRuntimeInstrumentation : Instrumentation() {
             val abiDir = installed.parentFile!!
             try {
                 Os.chmod(abiDir.absolutePath, 0)
-                val failure = runCatching { CronetLibraryLoader.ensureInitialized(targetContext) }.exceptionOrNull()
+                val failure = runCatching { CronetLibraryLoader.loadLibrary() }.exceptionOrNull()
                 check(failure is UnsatisfiedLinkError) { "Expected an actual failed native load, got $failure" }
                 check(File("/proc/self/maps").readLines().none { it.contains(nativeName) }) {
                     "Failure case unexpectedly loaded Cronet"
@@ -129,6 +134,9 @@ class CronetRuntimeInstrumentation : Instrumentation() {
             .readTimeout(30, TimeUnit.SECONDS)
             .build()
         try {
+            // The first real network request is authenticated WebDAV with Cronet enabled,
+            // including on the second invocation after the script force-stops the process.
+            verifyWebDavDownloads(preferences)
             ServerSocket(0, 2, InetAddress.getByName("127.0.0.1")).use { server ->
                 server.soTimeout = 180_000
                 val payload = "Cronet 上传\n\n验证"
@@ -206,6 +214,7 @@ class CronetRuntimeInstrumentation : Instrumentation() {
             val evidence = File(targetContext.getExternalFilesDir(null), "cronet-runtime/storage.txt")
             evidence.parentFile!!.mkdirs()
             evidence.writeText("cachedBefore=$cachedBefore\nconcurrentInstallers=8\n" +
+                "webDav=authenticated,encoded-paths,cronet-first,on-off-on\n" +
                 "productionClientToggle=off,on,off,on\nordinaryRequests=${ordinaryRequests.get()}\n" +
                 "firstInstallFailures=$firstInstallFailures\n" +
                 "loadFailureRecovery=${!cachedBefore}\ncomponentFiles=${storage.size}\n" +
@@ -214,6 +223,7 @@ class CronetRuntimeInstrumentation : Instrumentation() {
                 File("/proc/self/maps").readLines().filter { it.contains(nativeName) }.joinToString("\n"))
             RssImageRuntimeRegression.verify(this)
             return "$version; productionClientToggle=off,on,off,on; cachedBefore=$cachedBefore; concurrentInstallers=8; " +
+                "webDav=authenticated,encoded-paths,cronet-first,on-off-on; " +
                 "firstInstallFailures=$firstInstallFailures; " +
                 "loadFailureRecovery=${!cachedBefore}; componentFiles=1; " +
                 "nativeBytes=${native.length()}; nativeMtime=${native.lastModified()}; nativeFile=$native"
@@ -224,6 +234,59 @@ class CronetRuntimeInstrumentation : Instrumentation() {
             executor.shutdownNow()
             client.dispatcher.executorService.shutdownNow()
             client.connectionPool.evictAll()
+        }
+    }
+
+    private fun verifyWebDavDownloads(preferences: SharedPreferences) {
+        val authorization = Authorization("runtime-user", "runtime-password")
+        val names = listOf("中文书名：测试？_作者.json", "ascii_author.json")
+        val progress = """{"durChapterIndex":12,"durChapterPos":34}"""
+        val executor = Executors.newSingleThreadExecutor()
+        try {
+            ServerSocket(0, 2, InetAddress.getByName("127.0.0.1")).use { server ->
+                server.soTimeout = 30_000
+                val base = "http://127.0.0.1:${server.localPort}/dav/legado/bookProgress/"
+                val enabled = listOf(true, false, true)
+                val served = executor.submit {
+                    enabled.forEach { _ ->
+                        names.forEach { name ->
+                            server.accept().use { socket ->
+                                socket.soTimeout = 30_000
+                                val input = socket.getInputStream().source().buffer()
+                                assertEquals("GET ${(base + name).toHttpUrl().encodedPath} HTTP/1.1",
+                                    input.readUtf8LineStrict())
+                                val headers = mutableListOf<Pair<String, String>>()
+                                while (true) {
+                                    val header = input.readUtf8LineStrict()
+                                    if (header.isEmpty()) break
+                                    headers += header.substringBefore(':').lowercase() to header.substringAfter(':').trim()
+                                }
+                                assertEquals(listOf(authorization.data), headers.filter { it.first == "authorization" }.map { it.second })
+                                assertEquals(listOf("127.0.0.1:${server.localPort}"), headers.filter { it.first == "host" }.map { it.second })
+                                assertEquals(0L, headers.firstOrNull { it.first == "content-length" }?.second?.toLong() ?: 0L)
+                                val bytes = progress.toByteArray(Charsets.UTF_8)
+                                socket.getOutputStream().apply {
+                                    write(("HTTP/1.1 200 OK\r\nContent-Length: ${bytes.size}\r\n" +
+                                        "Content-Type: application/json\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n")
+                                        .toByteArray(Charsets.US_ASCII))
+                                    write(bytes)
+                                    flush()
+                                }
+                            }
+                        }
+                    }
+                }
+                enabled.forEach { useCronet ->
+                    check(preferences.edit().putBoolean(PreferKey.cronet, useCronet).commit())
+                    names.forEach { name ->
+                        val actual = runBlocking { WebDav(base + name, authorization).download() }
+                        assertEquals(progress, actual.toString(Charsets.UTF_8))
+                    }
+                }
+                served.get(30, TimeUnit.SECONDS)
+            }
+        } finally {
+            executor.shutdownNow()
         }
     }
 
