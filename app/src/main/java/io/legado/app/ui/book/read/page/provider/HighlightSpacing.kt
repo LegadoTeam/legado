@@ -30,14 +30,19 @@ import kotlin.math.ceil
 data class HighlightSpacing(
     val columns: Map<Int, Insets> = emptyMap(),
     val paragraphEdges: List<ParagraphEdge> = emptyList(),
+    val nativeHtmlWidths: Map<Int, Float> = emptyMap(),
 ) {
-    data class ParagraphEdge(val start: Int, val end: Int, val padding: Float)
+    data class ParagraphEdge(val start: Int, val end: Int, val padding: Float, val explicit: Boolean = false)
 
     val isEmpty get() = columns.isEmpty() && paragraphEdges.isEmpty()
     val hasTextMetrics = columns.values.any { it.textAscent != null }
 
     fun edgePadding(start: Int, end: Int): Float = paragraphEdges.asSequence()
         .filter { it.start < end && it.end > start }.maxOfOrNull { it.padding } ?: 0f
+
+    fun hasExplicitPadding(start: Int, end: Int): Boolean = paragraphEdges.any {
+        it.explicit && it.start < end && it.end > start
+    }
 
     data class Insets(
         val length: Int,
@@ -75,7 +80,17 @@ data class HighlightSpacing(
                 if (inset.metricStyle != null && inset.before == 0f && inset.after == 0f) return@forEach
                 val original = getSpans(start, end, ReplacementSpan::class.java).firstOrNull()
                 original?.let(::removeSpan)
-                setSpan(PaddingSpan(inset, original), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                // A new replacement splits an HTML text run. Android 15 trims half the
+                // letter spacing from each adjacent native run; reserve that lost advance.
+                val before = original == null && nativeHtmlWidths.isNotEmpty() && start > 0 &&
+                    this[start - 1] != '\n' &&
+                    getSpans(start - 1, start, ReplacementSpan::class.java).isEmpty() &&
+                    entries.none { (pos, value) -> pos + value.length == position }
+                val after = original == null && nativeHtmlWidths.isNotEmpty() && end < length &&
+                    this[end] != '\n' && getSpans(end, end + 1, ReplacementSpan::class.java).isEmpty() &&
+                    chapterStart + end !in entries
+                setSpan(PaddingSpan(inset, original, (if (before) 1 else 0) + (if (after) 1 else 0)),
+                    start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
             finishRun()
         }
@@ -90,7 +105,7 @@ data class HighlightSpacing(
         override fun updateDrawState(paint: TextPaint) = updateMeasureState(paint)
     }
 
-    private class PaddingSpan(val inset: Insets, val original: ReplacementSpan?) : ReplacementSpan() {
+    private class PaddingSpan(val inset: Insets, val original: ReplacementSpan?, val nativeEdges: Int) : ReplacementSpan() {
         override fun getSize(paint: Paint, text: CharSequence, start: Int, end: Int, fm: Paint.FontMetricsInt?): Int {
             val originalWidth = original?.getSize(paint, text, start, end, fm)?.toFloat()
             if (original == null && fm != null) paint.getFontMetricsInt(fm)
@@ -100,7 +115,8 @@ data class HighlightSpacing(
             }
             val width = inset.contentWidth ?: originalWidth
                 ?: paint.measureText(text, start, end)
-            return ceil(width + inset.before + inset.after).toInt()
+            val edgeSpacing = if (Build.VERSION.SDK_INT >= 35) nativeEdges * paint.letterSpacing * paint.textSize * 0.5f else 0f
+            return ceil(width + inset.before + inset.after + edgeSpacing).toInt()
         }
 
         override fun draw(canvas: Canvas, text: CharSequence, start: Int, end: Int, x: Float,
@@ -159,6 +175,7 @@ data class HighlightSpacing(
         fun resolve(chapter: TextChapter, ranges: List<HighlightMatcher.Range>): HighlightSpacing {
             val result = linkedMapOf<Int, Insets>()
             val edges = mutableListOf<ParagraphEdge>()
+            val htmlWidths = linkedMapOf<Int, Float>()
             val paragraphs = mutableListOf<List<Cell>>()
             var cells = mutableListOf<Cell>()
             for (page in chapter.pages) {
@@ -202,7 +219,11 @@ data class HighlightSpacing(
                         var offset = 0
                         paragraph.forEachIndexed { index, cell ->
                             val end = offset + texts[index].length
-                            if (cell.baseTextSize == size) cell.nativeAdvance = (offset until end).sumOf { widths[it].toDouble() }.toFloat()
+                            if (cell.baseTextSize == size) {
+                                cell.nativeAdvance = if (cell.column is TextHtmlColumn) cell.column.end - cell.column.start
+                                    else (offset until end).sumOf { widths[it].toDouble() }.toFloat()
+                                if (cell.column is TextHtmlColumn) htmlWidths[cell.position] = checkNotNull(cell.nativeAdvance)
+                            }
                             offset = end
                         }
                     }
@@ -330,10 +351,11 @@ data class HighlightSpacing(
                 if (edgePadding > 0f) {
                     val tail = paragraph.last()
                     edges.add(ParagraphEdge(paragraph.first().position,
-                        tail.position + tail.column.positionLength, edgePadding))
+                        tail.position + tail.column.positionLength, edgePadding,
+                        paragraph.any { it.style?.resolvedHorizontalPadding != null }))
                 }
             }
-            return HighlightSpacing(result, edges)
+            return HighlightSpacing(result, edges, htmlWidths)
         }
     }
 }

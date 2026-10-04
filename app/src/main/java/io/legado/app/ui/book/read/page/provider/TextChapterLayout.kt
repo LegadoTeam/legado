@@ -782,6 +782,7 @@ class TextChapterLayout(
 
             val columns = mutableListOf<BaseColumn>()
             var charIndex = lineStart
+            var nativeAdvanceShift = 0f
             while (charIndex < lineEnd) {
                 var nextChar = charIndex + 1
                 if (spanned.getSpans(charIndex, nextChar, ReplacementSpan::class.java).isEmpty()) {
@@ -798,12 +799,12 @@ class TextChapterLayout(
                     charIndex = nextChar
                     continue
                 }
-                val charX = staticLayout.getPrimaryHorizontal(charIndex)
+                val charX = staticLayout.getPrimaryHorizontal(charIndex) + nativeAdvanceShift
                 val textSize = extractTextSize(spanned, charIndex, textPaint.textSize)
                 val textColor = extractTextColor(spanned, charIndex)
                 val linkUrl = extractLinkUrl(spanned, charIndex)
                 val charRight = if (nextChar < lineEnd) {
-                    staticLayout.getPrimaryHorizontal(nextChar)
+                    staticLayout.getPrimaryHorizontal(nextChar) + nativeAdvanceShift
                 } else {
                     tempPaint.textSize = textSize
                     val inset = highlightSpacing[chapterStart + charIndex]
@@ -910,6 +911,17 @@ class TextChapterLayout(
                 for (index in columnCount until columns.size) {
                     applyHighlightSpacing(columns[index], textLine, chapterStart + charIndex,
                         isFirst = index == 0)
+                    val column = columns[index]
+                    val inset = highlightSpacing[chapterStart + charIndex]
+                    if (column is TextHtmlColumn && inset?.metricStyle == null) {
+                        highlightSpacing.nativeHtmlWidths[chapterStart + charIndex]?.let { nativeWidth ->
+                            column.end = column.start + nativeWidth
+                        }
+                    }
+                    if (highlightSpacing.nativeHtmlWidths.isNotEmpty()) {
+                        nativeAdvanceShift += column.end + (inset?.after ?: 0f) -
+                            (absStartX + leftInset + charRight)
+                    }
                 }
                 charIndex = nextChar
                 if (charIndex == lineEnd && lineIndex == staticLayout.lineCount - 1) {
@@ -1569,12 +1581,15 @@ class TextChapterLayout(
         } else {
             columns.last()
         }
-        val endX = endColumn.end
+        val explicitPadding = highlightSpacing.hasExplicitPadding(textLine.chapterPosition,
+            textLine.chapterPosition + textLine.charSize)
+        val endX = if (explicitPadding) endColumn.end else endColumn.end.roundToInt().toFloat()
         if (endX > visibleEnd) {
             textLine.exceed = true
             // Native line breaking can omit edge letter spacing. Keep the fractional
             // correction: integer division leaves small overflows completely unchanged.
-            val cc = (endX - visibleEnd) / size
+            val cc = if (explicitPadding) (endX - visibleEnd) / size
+                else ((endX.toInt() - visibleEnd) / size).toFloat()
             for (i in 0..<size) {
                 textLine.getColumnReverseAt(i, offset).let {
                     val py = cc * (size - i)
