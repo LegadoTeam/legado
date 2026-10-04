@@ -44,7 +44,7 @@ zxingLite = "3.5.0"
 #不要更新版本
 #noinspection NewerVersionAvailable
 hutool = "5.8.22"
-bouncycastle = "1.85.2"
+bouncycastle = "1.86"
 pdfbox-android = "2.0.27.0"
 
 #noinspection NewerVersionAvailable
