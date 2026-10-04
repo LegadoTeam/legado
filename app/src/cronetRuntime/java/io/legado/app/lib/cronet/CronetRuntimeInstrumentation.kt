@@ -24,6 +24,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okio.buffer
 import okio.source
+import org.chromium.base.ContextUtils
 import org.chromium.net.impl.CronetUrlRequestContext
 import org.chromium.net.impl.CronetLibraryLoader
 import org.chromium.net.X509Util
@@ -51,6 +52,7 @@ class CronetRuntimeInstrumentation : Instrumentation() {
             waitForIdleSync()
             // Trust only the ephemeral CI fixture, before Cronet's first native load.
             val certificate = File(targetContext.getExternalFilesDir(null), "cronet-runtime/ca.der").readBytes()
+            ContextUtils.initApplicationContext(targetContext.applicationContext)
             X509Util.addTestRootCertificate(certificate)
             X509Util.setTestRootCertificateForBuiltin(certificate)
             val version = verifyNativeRequests()
