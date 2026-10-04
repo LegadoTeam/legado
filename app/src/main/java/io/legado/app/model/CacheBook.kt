@@ -16,6 +16,7 @@ import io.legado.app.help.book.isLocal
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.CompositeCoroutine
 import io.legado.app.help.coroutine.Coroutine
+import io.legado.app.help.source.SuppressSourceNavigation
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.CacheBookService
 import io.legado.app.utils.onEachParallel
@@ -153,7 +154,8 @@ object CacheBook {
             postEvent(EventBus.UP_DOWNLOAD_STATE, "")
         }.onEachParallel(AppConfig.threadCount) {
             coroutineScope {
-                it.download(this, context)
+                // The shared background queue also runs shelf preloads from CacheBookService.
+                it.download(this, context + SuppressSourceNavigation)
             }
         }.onCompletion {
             postEvent(EventBus.UP_DOWNLOAD_STATE, "")

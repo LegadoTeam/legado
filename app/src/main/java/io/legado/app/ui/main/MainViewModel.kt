@@ -24,6 +24,7 @@ import io.legado.app.help.book.sync
 import io.legado.app.help.book.update
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
+import io.legado.app.help.source.SuppressSourceNavigation
 import io.legado.app.model.CacheBook
 import io.legado.app.model.ReadBook
 import io.legado.app.model.webBook.WebBook
@@ -44,6 +45,7 @@ import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import kotlin.collections.forEach
@@ -160,7 +162,7 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
         postUpBooksLiveData()
         val generation = ++upTocJobGeneration
         val job = viewModelScope.launch(
-            context = upTocPool,
+            context = upTocPool + SuppressSourceNavigation,
             start = CoroutineStart.LAZY,
         ) {
             flow {
@@ -223,7 +225,7 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
                 if (eventListenerSource.putIfAbsent(source, true) == null) {
                     // 通知监听事件的书源，书架刷新开始
                     SourceCallBack.callBackSource(
-                        viewModelScope,
+                        viewModelScope + SuppressSourceNavigation,
                         SourceCallBack.START_SHELF_REFRESH,
                         source,
                     )
@@ -334,7 +336,7 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
         eventListenerSource.keys.toList().forEach { source ->
             if (eventListenerSource.remove(source) != null) {
                 SourceCallBack.callBackSource(
-                    viewModelScope,
+                    viewModelScope + SuppressSourceNavigation,
                     SourceCallBack.END_SHELF_REFRESH,
                     source,
                 )
