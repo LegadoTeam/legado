@@ -5,6 +5,7 @@ import android.app.Instrumentation
 import android.content.SharedPreferences
 import android.os.Bundle
 import android.system.Os
+import android.util.Base64
 import androidx.annotation.Keep
 import androidx.preference.PreferenceManager
 import io.legado.app.BuildConfig
@@ -41,8 +42,11 @@ import java.util.concurrent.atomic.AtomicInteger
 
 @Keep
 class CronetRuntimeInstrumentation : Instrumentation() {
+    private var fixtureCa: String? = null
+
     override fun onCreate(arguments: Bundle?) {
         super.onCreate(arguments)
+        fixtureCa = arguments?.getString("fixtureCa")
         start()
     }
 
@@ -51,7 +55,7 @@ class CronetRuntimeInstrumentation : Instrumentation() {
         try {
             waitForIdleSync()
             // Trust only the ephemeral CI fixture, before Cronet's first native load.
-            val certificate = File(targetContext.getExternalFilesDir(null), "cronet-runtime/ca.der").readBytes()
+            val certificate = Base64.decode(requireNotNull(fixtureCa), Base64.DEFAULT)
             ContextUtils.initApplicationContext(targetContext.applicationContext)
             X509Util.addTestRootCertificate(certificate)
             X509Util.setTestRootCertificateForBuiltin(certificate)
@@ -250,6 +254,7 @@ class CronetRuntimeInstrumentation : Instrumentation() {
         val authorization = Authorization("runtime-user", "runtime-password")
         val names = listOf("中文书名：测试？_作者.json", "ascii_author.json")
         val evidence = File(targetContext.getExternalFilesDir(null), "cronet-runtime/webdav-tls.jsonl")
+        evidence.parentFile!!.mkdirs()
         evidence.appendText("{\"event\":\"process-start\"}\n")
         val failures = mutableListOf<String>()
         for (port in listOf(19443, 19444)) {

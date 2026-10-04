@@ -30,6 +30,7 @@ openssl x509 -req -in "$fixture_dir/server.csr" -CA "$fixture_dir/ca.pem" \
   -CAkey "$fixture_dir/ca.key" -CAcreateserial -days 2 -sha256 \
   -extfile "$fixture_dir/server.ext" -out "$fixture_dir/server.pem" 2>/dev/null
 openssl x509 -in "$fixture_dir/ca.pem" -outform DER -out "$fixture_dir/ca.der"
+fixture_ca="$(base64 -w0 "$fixture_dir/ca.der")"
 node .github/scripts/cronet-webdav-fixture.cjs "$fixture_dir/server.key" \
   "$fixture_dir/server.pem" "$fixture_dir/ready" \
   > app/build/cronet-runtime/webdav-server.jsonl 2>&1 &
@@ -63,10 +64,8 @@ print(f'APK size: {Path(sys.argv[1]).stat().st_size} bytes')
 PY
 adb install -r -t "${apks[0]}"
 adb shell pm clear com.legado.app.release
-adb shell mkdir -p /sdcard/Android/data/com.legado.app.release/files/cronet-runtime
-adb push "$fixture_dir/ca.der" /sdcard/Android/data/com.legado.app.release/files/cronet-runtime/ca.der
 adb logcat -c
-timeout 300 adb shell am instrument -w -r \
+timeout 300 adb shell am instrument -w -r -e fixtureCa "$fixture_ca" \
   com.legado.app.release/io.legado.app.lib.cronet.CronetRuntimeInstrumentation \
   | tee app/build/cronet-runtime/result.txt
 grep -Fq 'CRONET_RUNTIME_PASSED' app/build/cronet-runtime/result.txt
@@ -78,7 +77,7 @@ grep -Fq 'loadFailureRecovery=true; componentFiles=1' app/build/cronet-runtime/r
 adb pull /sdcard/Android/data/com.legado.app.release/files/cronet-runtime/storage.txt \
   app/build/cronet-runtime/cold-storage.txt
 adb shell am force-stop com.legado.app.release
-timeout 300 adb shell am instrument -w -r \
+timeout 300 adb shell am instrument -w -r -e fixtureCa "$fixture_ca" \
   com.legado.app.release/io.legado.app.lib.cronet.CronetRuntimeInstrumentation \
   | tee app/build/cronet-runtime/cached-result.txt
 grep -Fq 'CRONET_RUNTIME_PASSED' app/build/cronet-runtime/cached-result.txt
