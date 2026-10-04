@@ -5,6 +5,7 @@ import android.app.Instrumentation
 import android.content.SharedPreferences
 import android.os.Bundle
 import android.system.Os
+import android.util.Base64
 import androidx.annotation.Keep
 import androidx.preference.PreferenceManager
 import io.legado.app.BuildConfig
@@ -14,6 +15,7 @@ import io.legado.app.help.http.getProxyClient
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.lib.webdav.Authorization
 import io.legado.app.lib.webdav.WebDav
+import io.legado.app.lib.webdav.WebDavException
 import kotlinx.coroutines.runBlocking
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.CookieJar
@@ -23,8 +25,10 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okio.buffer
 import okio.source
+import org.chromium.base.ContextUtils
 import org.chromium.net.impl.CronetUrlRequestContext
 import org.chromium.net.impl.CronetLibraryLoader
+import org.chromium.net.X509Util
 import org.json.JSONObject
 import java.io.File
 import java.math.BigInteger
@@ -38,8 +42,11 @@ import java.util.concurrent.atomic.AtomicInteger
 
 @Keep
 class CronetRuntimeInstrumentation : Instrumentation() {
+    private var fixtureCa: String? = null
+
     override fun onCreate(arguments: Bundle?) {
         super.onCreate(arguments)
+        fixtureCa = arguments?.getString("fixtureCa")
         start()
     }
 
@@ -47,6 +54,11 @@ class CronetRuntimeInstrumentation : Instrumentation() {
         super.onStart()
         try {
             waitForIdleSync()
+            // Trust only the ephemeral CI fixture, before Cronet's first native load.
+            val certificate = Base64.decode(requireNotNull(fixtureCa), Base64.DEFAULT)
+            ContextUtils.initApplicationContext(targetContext.applicationContext)
+            X509Util.addTestRootCertificate(certificate)
+            X509Util.setTestRootCertificateForBuiltin(certificate)
             val version = verifyNativeRequests()
             finish(Activity.RESULT_OK, Bundle().apply {
                 putString("stream", "CRONET_RUNTIME_PASSED $version; native GET/POST verified\n")
@@ -137,6 +149,7 @@ class CronetRuntimeInstrumentation : Instrumentation() {
             // The first real network request is authenticated WebDAV with Cronet enabled,
             // including on the second invocation after the script force-stops the process.
             verifyWebDavDownloads(preferences)
+            verifyTlsWebDavDownloads(preferences)
             ServerSocket(0, 2, InetAddress.getByName("127.0.0.1")).use { server ->
                 server.soTimeout = 180_000
                 val payload = "Cronet 上传\n\n验证"
@@ -235,6 +248,57 @@ class CronetRuntimeInstrumentation : Instrumentation() {
             client.dispatcher.executorService.shutdownNow()
             client.connectionPool.evictAll()
         }
+    }
+
+    private fun verifyTlsWebDavDownloads(preferences: SharedPreferences) {
+        val authorization = Authorization("runtime-user", "runtime-password")
+        val names = listOf("中文书名：测试？_作者.json", "ascii_author.json")
+        val evidence = File(targetContext.getExternalFilesDir(null), "cronet-runtime/webdav-tls.jsonl")
+        evidence.parentFile!!.mkdirs()
+        evidence.appendText("{\"event\":\"process-start\"}\n")
+        val failures = mutableListOf<String>()
+        for (port in listOf(19443, 19444)) {
+            for (enabled in listOf(true, false, true)) {
+                check(preferences.edit().putBoolean(PreferKey.cronet, enabled).commit())
+                for (route in listOf("dav", "redirect/same", "redirect/cross")) {
+                    for (name in names) {
+                        val url = "https://localhost:$port/$route/legado/bookProgress/$name".toHttpUrl()
+                        val result = runCatching {
+                            runBlocking { WebDav(url.toString(), authorization).download() }
+                        }
+                        val error = result.exceptionOrNull()
+                        val record = JSONObject().put("cronet", enabled).put("url", url.toString())
+                            .put("status", (error as? WebDavException)?.responseCode ?: if (error == null) 200 else -1)
+                        if (error != null) {
+                            record.put("error", error.toString())
+                            evidence.appendText("$record\n")
+                            failures += "cronet=$enabled $url: $error"
+                            continue
+                        }
+                        val wire = JSONObject(requireNotNull(result.getOrThrow()).toString(Charsets.UTF_8))
+                        record.put("wire", wire)
+                        evidence.appendText("$record\n")
+                        val cross = route == "redirect/cross"
+                        val targetPort = if (cross) { if (port == 19443) 19444 else 19443 } else port
+                        val targetHost = if (cross) "127.0.0.1" else "localhost"
+                        val targetPath = ("https://$targetHost:$targetPort/" +
+                            (if (cross) "signed" else "dav") + "/legado/bookProgress/$name").toHttpUrl().encodedPath
+                        assertEquals("GET", wire.getString("method"))
+                        assertEquals(targetPath, wire.getString("path"))
+                        assertEquals("$targetHost:$targetPort", wire.getString("authority"))
+                        assertEquals(if (cross) "" else authorization.data, wire.getString("authorization"))
+                        assertEquals(0, wire.getInt("bodyBytes"))
+                        assertEquals(if (targetPort == 19443) "2.0" else "1.1", wire.getString("httpVersion"))
+                        if (targetPort == 19443) assertEquals("h2", wire.getString("alpn"))
+                    }
+                }
+                val missing = runCatching {
+                    runBlocking { WebDav("https://localhost:$port/dav/missing.json", authorization).download() }
+                }.exceptionOrNull()
+                assertEquals(404, (missing as? WebDavException)?.responseCode)
+            }
+        }
+        check(failures.isEmpty()) { "TLS WebDAV regressions:\n${failures.joinToString("\n")}" }
     }
 
     private fun verifyWebDavDownloads(preferences: SharedPreferences) {
