@@ -11,6 +11,17 @@ object HighlightGeometry {
 
     data class Band(val top: Float, val bottom: Float)
 
+    /** Minimum ink-to-edge distance that retains the requested horizontal cap radius. */
+    fun pillClearance(radius: Float, inkTop: Float, inkBottom: Float,
+        top: Float, bottom: Float, border: Float): Float {
+        val radiusY = (bottom - top) / 2f - border
+        if (radiusY <= 0f) return maxOf(radius, border + 0.01f)
+        val centerY = (top + bottom) / 2f
+        val vertical = maxOf(kotlin.math.abs(inkTop - centerY), kotlin.math.abs(inkBottom - centerY))
+            .div(radiusY).coerceIn(0f, 1f)
+        return border + (radius - border).coerceAtLeast(0f) * (1f - sqrt(1f - vertical * vertical)) + 0.01f
+    }
+
     /** Largest horizontal end radius whose inner ellipse still contains this glyph's ink box. */
     fun pillRadiusX(
         desired: Float,
