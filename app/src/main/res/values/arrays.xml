@@ -228,4 +228,14 @@
 		<item>Customize</item>
 	</string-array>
 
+    <string-array name="book_metadata_sync_options">
+        <item>@string/book_metadata_sync_always</item>
+        <item>@string/book_metadata_sync_never</item>
+        <item>@string/book_metadata_sync_ask</item>
+    </string-array>
+    <string-array name="book_metadata_sync_values">
+        <item>always</item>
+        <item>never</item>
+        <item>ask</item>
+    </string-array>
 </resources>

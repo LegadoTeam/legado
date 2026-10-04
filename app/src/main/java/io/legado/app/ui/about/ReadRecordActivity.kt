@@ -48,6 +48,8 @@ import io.legado.app.utils.getInt
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.putInt
 import io.legado.app.utils.startActivityForBook
+import io.legado.app.utils.showDialogFragment
+import androidx.core.os.bundleOf
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Job
@@ -232,6 +234,8 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
         }
     }
 
+    internal fun onRecordMetadataSaved() = initData()
+
     private fun bindSummary(records: List<ReadRecordShow>) {
         val count = records.size.toString()
         val label = getString(R.string.read_record_book_count, records.size)
@@ -347,6 +351,13 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
 
         override fun registerListener(holder: ItemViewHolder, binding: ItemReadRecordDisplayBinding) {
             binding.apply {
+                root.setOnLongClickListener {
+                    val item = getItemByLayoutPosition(holder.layoutPosition) ?: return@setOnLongClickListener false
+                    showDialogFragment(ReadRecordEditDialog().apply {
+                        arguments = bundleOf("bookName" to item.bookName, "author" to item.author)
+                    })
+                    true
+                }
                 root.setOnClickListener {
                     val item = getItemByLayoutPosition(holder.layoutPosition) ?: return@setOnClickListener
                     lifecycleScope.launch {

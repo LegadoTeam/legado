@@ -592,6 +592,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefBoolean("readRecordFixedCard", true)
         set(value) { appCtx.putPrefBoolean("readRecordFixedCard", value) }
 
+    val bookMetadataSync: String
+        get() = appCtx.getPrefString(PreferKey.bookMetadataSync) ?: "never"
+
     var enableReadRecord: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.enableReadRecord, true)
         set(value) {
