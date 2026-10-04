@@ -18,7 +18,7 @@ buildscript {
 }
 
 // Version-pinned adaptation. Keep the checked-in official JAR byte-for-byte intact.
-// Cronet 153's public setLibraryLoader() is a no-op; reconnect its actual load site instead.
+// Cronet 155's public setLibraryLoader() is a no-op; reconnect its actual load site instead.
 def original = file('cronetlib/cronet_impl_native_java.jar')
 def adapted = layout.buildDirectory.file('cronet-dynamic/cronet_impl_native_java.jar')
 def adaptCronetLoader = tasks.register('adaptCronetLoader') {
@@ -27,9 +27,9 @@ def adaptCronetLoader = tasks.register('adaptCronetLoader') {
     inputs.property('version', CronetVersion)
     outputs.file(adapted)
     doLast {
-        if (CronetVersion != '153.0.8010.27' ||
+        if (CronetVersion != '155.0.8059.30' ||
                 MessageDigest.getInstance('SHA-256').digest(original.bytes).encodeHex().toString() !=
-                '775d145e5f33fd6157078a574f788b850bda5a0e7195aa9ec93e67afe6f64127') {
+                '2243d16922895bb1348deba00a3a30c78468ba8af794536590b165babe1e959d') {
             throw new GradleException('Review the dynamic loader against the new official Cronet JAR first')
         }
         def owner = 'org/chromium/net/impl/CronetLibraryLoader'
@@ -85,7 +85,7 @@ def adaptCronetLoader = tasks.register('adaptCronetLoader') {
                 }
             }
         }
-        logger.lifecycle('Cronet 153: adapted only Java library loading; official native/JNI initialization unchanged')
+        logger.lifecycle('Cronet 155: adapted only Java library loading; official native/JNI initialization unchanged')
     }
 }
 ext.dynamicCronetJar = files(adapted).builtBy(adaptCronetLoader)
