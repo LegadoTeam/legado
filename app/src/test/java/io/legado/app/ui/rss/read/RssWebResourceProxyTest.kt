@@ -16,6 +16,75 @@ import org.junit.Test
 class RssWebResourceProxyTest {
 
     @Test
+    fun webViewAbsoluteSeekDoesNotSkipAnAlreadyRangedResponseTwice() {
+        for (range in listOf("bytes=100-", "bytes=100-105")) {
+            rangeStream(range, "bytes 100-105/200").use { stream ->
+                assertEquals(0, stream.available())
+                assertEquals(40L, stream.skip(40))
+                assertEquals(60L, stream.skip(60))
+                assertEquals('a'.code, stream.read())
+                assertEquals(2L, stream.skip(2))
+                assertEquals("def", stream.readBytes().toString(Charsets.UTF_8))
+            }
+        }
+    }
+
+    @Test
+    fun directReadsAndSuffixRangesDoNotAcquireAnExtraOffset() {
+        for (range in listOf("bytes=100-", "bytes=-6")) {
+            rangeStream(range, "bytes 100-105/106").use { stream ->
+                assertEquals(0, stream.available())
+                assertEquals('a'.code, stream.read())
+                assertEquals(2L, stream.skip(2))
+                assertEquals("def", stream.readBytes().toString(Charsets.UTF_8))
+            }
+        }
+    }
+
+    @Test
+    fun onlyMatchingValidPartialResponsesAcknowledgeWebViewSeek() {
+        val invalid = listOf(
+            "bytes=100-" to "bytes 101-106/200",
+            "bytes=100-104" to "bytes 100-105/200",
+            "bytes=100-" to "bytes 100-99/200",
+            "bytes=100-" to "bytes 100-105/105",
+            "bytes=100-,200-" to "bytes 100-105/300",
+            "bytes=100-" to "bytes 100-105/999999999999999999999",
+            "bytes=100-999999999999999999999" to "bytes 100-105/200",
+            "bytes=100-" to "invalid",
+        )
+        invalid.forEach { (range, returned) ->
+            rangeStream(range, returned).use { stream ->
+                assertEquals(1L, stream.skip(1))
+                assertEquals('b'.code, stream.read())
+            }
+        }
+        rangeStream("bytes=100-", "bytes 100-105/200", code = 200).use { stream ->
+            assertEquals(1L, stream.skip(1))
+            assertEquals('b'.code, stream.read())
+        }
+    }
+
+    @Test
+    fun largeOffsetsRemainLongAndSkipPastInitialOffsetConsumesOnlyTheExcess() {
+        rangeStream("bytes=3000000000-", "bytes 3000000000-3000000005/*").use { stream ->
+            assertEquals(0L, stream.skip(-1))
+            assertEquals(0L, stream.skip(0))
+            assertEquals(3000000002L, stream.skip(3000000002L))
+            assertEquals("cdef", stream.readBytes().toString(Charsets.UTF_8))
+        }
+    }
+
+    private fun rangeStream(range: String, returned: String, code: Int = 206): RssProxyResponseInputStream {
+        val body = Buffer().writeUtf8("abcdef").asResponseBody()
+        val response = Response.Builder()
+            .request(Request.Builder().url("https://example.com/video.mp4").header("Range", range).build())
+            .protocol(Protocol.HTTP_1_1).code(code).message("OK")
+            .header("Content-Range", returned).body(body).build()
+        return RssProxyResponseInputStream(response, body)
+    }
+
+    @Test
     fun webViewCanQueryAndReadAfterEofUntilItClosesTheResponse() {
         var closeCount = 0
         val source = object : ForwardingSource(Buffer().writeUtf8("complete image bytes")) {

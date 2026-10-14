@@ -78,6 +78,13 @@ class HighlightStyleDialog : BottomSheetDialogFragment(),
                 .setCustomButton(R.string.btn_default_s) { apply(currentStyle().copy(letterSpacing = null)) }
                 .show { apply(currentStyle().copy(letterSpacing = (it - 50) / 100f)) }
         }
+        binding.tvHighlightHorizontalPadding.setOnClickListener {
+            NumberPickerDialog(requireContext()).setTitle(getString(R.string.highlight_horizontal_padding))
+                .setMinValue(0).setMaxValue(64)
+                .setValue(currentStyle().resolvedHorizontalPadding?.roundToInt() ?: 0)
+                .setCustomButton(R.string.btn_default_s) { apply(currentStyle().copy(horizontalPadding = null)) }
+                .show { apply(currentStyle().copy(horizontalPadding = it.toFloat())) }
+        }
         refresh()
     }
 
@@ -331,6 +338,8 @@ class HighlightStyleDialog : BottomSheetDialogFragment(),
             }
         }
         val fontPath = style.resolvedFontPath
+        binding.tvHighlightHorizontalPadding.text = getString(R.string.highlight_horizontal_padding) + " · " +
+            (style.resolvedHorizontalPadding?.let { "${it.roundToInt()} dp" } ?: getString(R.string.btn_default_s))
         binding.tvHighlightFontSize.text = getString(R.string.text_size) + " · " +
             (style.resolvedFontSize?.roundToInt()?.toString() ?: getString(R.string.btn_default_s))
         binding.tvHighlightLetterSpacing.text = getString(R.string.text_letter_spacing) + " · " +
