@@ -45,6 +45,7 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
     private val categoryTabs = arrayListOf<Pair<ExploreCategory, TabLayout.Tab>>()
     private var renderedCategories: List<ExploreCategory>? = null
     private var menuCategories: MenuItem? = null
+    private var menuReadRecord: MenuItem? = null
     private var menuAddLoadedBooks: MenuItem? = null
     private var menuPage: MenuItem? = null
 
@@ -59,7 +60,8 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
                 true
             }
         }
-        menu.add(R.string.show_search_read_record).apply {
+        menuReadRecord = menu.add(Menu.NONE, R.id.menu_show_read_record, Menu.NONE,
+            R.string.show_search_read_record).apply {
             isCheckable = true
             isChecked = AppConfig.showSearchReadRecord
             setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
@@ -138,6 +140,8 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
     override fun onResume() {
         super.onResume()
         updateCategories()
+        menuReadRecord?.isChecked = AppConfig.showSearchReadRecord
+        viewModel.upAdapterLiveData.postValue("hasReadRecord")
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

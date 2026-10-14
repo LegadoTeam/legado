@@ -19,11 +19,15 @@ import io.legado.app.R
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.ReadRecord
+import io.legado.app.data.entities.SearchBook
 import io.legado.app.data.entities.rule.ExploreRule
 import io.legado.app.databinding.ActivityExploreShowBinding
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.storage.Restore
 import io.legado.app.help.storage.writePreferenceSnapshot
+import io.legado.app.ui.book.search.SearchActivity
+import io.legado.app.ui.book.search.SearchAdapter
 import io.legado.app.utils.defaultSharedPreferences
 import io.legado.app.utils.dpToPx
 import kotlinx.coroutines.Dispatchers
@@ -47,6 +51,7 @@ class ExploreCategoriesTest {
     private val preferences = context.defaultSharedPreferences
     private val originalCategories = preferences.all[PreferKey.showExploreCategories]
     private val originalCronet = preferences.all[PreferKey.cronet]
+    private val originalReadRecord = preferences.all[PreferKey.showSearchReadRecord]
     private val slowStarted = CountDownLatch(1)
     private val releaseSlow = CountDownLatch(1)
     private val slowFinished = CountDownLatch(1)
@@ -109,7 +114,70 @@ class ExploreCategoriesTest {
             else putBoolean(PreferKey.showExploreCategories, originalCategories as Boolean)
             if (originalCronet == null) remove(PreferKey.cronet)
             else putBoolean(PreferKey.cronet, originalCronet as Boolean)
+            if (originalReadRecord == null) remove(PreferKey.showSearchReadRecord)
+            else putBoolean(PreferKey.showSearchReadRecord, originalReadRecord as Boolean)
         }.commit()
+    }
+
+    @Test
+    fun returningToSearchAndDiscoverRefreshesSharedReadRecordIndicators() {
+        lateinit var book: SearchBook
+        scenario!!.onActivity { book = it.model.getLoadedBooks().first() }
+        val record = ReadRecord(deviceId = UUID.randomUUID().toString(), bookName = book.name)
+        AppConfig.showSearchReadRecord = true
+        appDb.readRecordDao.insert(record)
+        var search: ActivityScenario<SearchActivity>? = null
+        fun exploreIndicator(activity: ExploreShowActivity): View? {
+            val recycler = activity.ui.recyclerView
+            val position = (recycler.adapter as ExploreShowAdapter).getHeaderCount()
+            return recycler.findViewHolderForAdapterPosition(position)?.itemView
+                ?.findViewById(R.id.iv_read_record)
+        }
+        try {
+            awaitActivity { exploreIndicator(it)?.isVisible == true }
+            scenario!!.moveToState(Lifecycle.State.CREATED)
+            AppConfig.showSearchReadRecord = false
+            scenario!!.moveToState(Lifecycle.State.RESUMED)
+            awaitActivity { exploreIndicator(it)?.isVisible == false }
+            scenario!!.onActivity {
+                assertFalse(it.ui.titleBar.menu.findItem(R.id.menu_show_read_record).isChecked)
+            }
+
+            search = ActivityScenario.launch(Intent(context, SearchActivity::class.java))
+            search!!.onActivity {
+                it.binding.llInputHelp.isVisible = false
+                (it.binding.recyclerView.adapter as SearchAdapter).setItems(listOf(book))
+            }
+            fun awaitSearchIndicator(visible: Boolean) {
+                val deadline = SystemClock.uptimeMillis() + 15000
+                do {
+                    var matches = false
+                    search!!.onActivity {
+                        val indicator = it.binding.recyclerView.findViewHolderForAdapterPosition(0)
+                            ?.itemView?.findViewById<View>(R.id.iv_read_record)
+                        matches = indicator?.isVisible == visible &&
+                            it.binding.titleBar.menu.findItem(R.id.menu_show_read_record).isChecked == visible
+                    }
+                    if (matches) return
+                    SystemClock.sleep(50)
+                } while (SystemClock.uptimeMillis() < deadline)
+                throw AssertionError("Search indicator and menu did not become $visible")
+            }
+            awaitSearchIndicator(false)
+            search!!.moveToState(Lifecycle.State.CREATED)
+            AppConfig.showSearchReadRecord = true
+            search!!.moveToState(Lifecycle.State.RESUMED)
+            awaitSearchIndicator(true)
+            search!!.close()
+            search = null
+            awaitActivity { exploreIndicator(it)?.isVisible == true }
+            scenario!!.onActivity {
+                assertTrue(it.ui.titleBar.menu.findItem(R.id.menu_show_read_record).isChecked)
+            }
+        } finally {
+            search?.close()
+            appDb.readRecordDao.delete(record)
+        }
     }
 
     @Test

@@ -111,6 +111,12 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
         receiptIntent(intent)
     }
 
+    override fun onResume() {
+        super.onResume()
+        showReadRecordMenuItem?.isChecked = AppConfig.showSearchReadRecord
+        viewModel.upAdapterLiveData.postValue("hasReadRecord")
+    }
+
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.book_search, menu)
         this.menu = menu

@@ -39,7 +39,7 @@ class ExploreReadRecordContractTest {
             "src/main/java/io/legado/app/ui/book/explore/ExploreShowActivity.kt"
         ).normalized()
 
-        assertTrue(activity.contains("menu.add(R.string.show_search_read_record)"))
+        assertTrue(activity.contains("menu.add(Menu.NONE, R.id.menu_show_read_record, Menu.NONE,"))
         assertTrue(activity.contains("isChecked = AppConfig.showSearchReadRecord"))
         assertTrue(activity.contains("return viewModel.hasReadRecord(book)"))
     }
