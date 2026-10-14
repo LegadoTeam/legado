@@ -43,7 +43,7 @@ object WebViewPool {
     // 获取一个WebView
     @Synchronized
     fun acquire(context: Context): PooledWebView {
-        android.util.Log.i("WebViewLifecycle", "pool acquire idle=${idlePool.size} inUse=${inUsePool.size} thread=${Thread.currentThread().name}")
+        WebViewDiagnostics.record("pool", "pool acquire idle=${idlePool.size} inUse=${inUsePool.size} thread=${Thread.currentThread().name}")
         val pooledWebView = if (idlePool.isNotEmpty()) {
             idlePool.pop() // 复用闲置实例
         } else {
@@ -61,14 +61,14 @@ object WebViewPool {
             isInUse = true
         }
         inUsePool[pooledWebView.id] = pooledWebView
-        android.util.Log.i("WebViewLifecycle", "pool acquired id=${pooledWebView.id} generation=${pooledWebView.recycleGeneration} view=${System.identityHashCode(pooledWebView.realWebView)} url=${pooledWebView.realWebView.url}")
+        WebViewDiagnostics.record("pool", "pool acquired id=${pooledWebView.id} generation=${pooledWebView.recycleGeneration} view=${System.identityHashCode(pooledWebView.realWebView)} url=${pooledWebView.realWebView.url}")
         return pooledWebView
     }
 
     // 释放WebView回池
     @Synchronized
     fun release(pooledWebView: PooledWebView) {
-        android.util.Log.i("WebViewLifecycle", "pool release id=${pooledWebView.id} generation=${pooledWebView.recycleGeneration} inUse=${pooledWebView.id in inUsePool} view=${System.identityHashCode(pooledWebView.realWebView)} url=${pooledWebView.realWebView.url}")
+        WebViewDiagnostics.record("pool", "pool release id=${pooledWebView.id} generation=${pooledWebView.recycleGeneration} inUse=${pooledWebView.id in inUsePool} view=${System.identityHashCode(pooledWebView.realWebView)} url=${pooledWebView.realWebView.url}")
         if (inUsePool.remove(pooledWebView.id) == null) return
         val recycleGeneration = ++pooledWebView.recycleGeneration
         val recycleUrl = "$BLANK_HTML?legado-recycle=$recycleGeneration"
@@ -107,7 +107,7 @@ object WebViewPool {
             webViewClient = object: WebViewClient() {
                 @SuppressLint("SetJavaScriptEnabled")
                 override fun onPageFinished(view: WebView?, url: String?) {
-                    android.util.Log.i("WebViewLifecycle", "pool recycle finished id=${pooledWebView.id} expected=$recycleUrl actual=$url")
+                    WebViewDiagnostics.record("pool", "pool recycle finished id=${pooledWebView.id} expected=$recycleUrl actual=$url")
                     if (url != recycleUrl) return
                     synchronized(this@WebViewPool) {
                         if (!pooledWebView.isInUse || pooledWebView.id in inUsePool) return
@@ -126,12 +126,20 @@ object WebViewPool {
                         pooledWebView.isInUse = false
                         pooledWebView.lastUseTime = System.currentTimeMillis()
                         idlePool.push(pooledWebView)
-                        android.util.Log.i("WebViewLifecycle", "pool recycled id=${pooledWebView.id} idle=${idlePool.size}")
+                        WebViewDiagnostics.record("pool", "pool recycled id=${pooledWebView.id} idle=${idlePool.size}")
                     }
                 }
             }
             loadUrl(recycleUrl)
-            android.util.Log.i("WebViewLifecycle", "pool recycle load returned id=${pooledWebView.id} url=$recycleUrl")
+            WebViewDiagnostics.record("pool", "pool recycle load returned id=${pooledWebView.id} url=$recycleUrl")
+        }
+    }
+
+    @Synchronized
+    fun diagnosticSnapshot() {
+        WebViewDiagnostics.record("pool-snapshot", "idle=${idlePool.size} inUse=${inUsePool.size}")
+        (inUsePool.values.toList() + idlePool).forEach { pooled ->
+            WebViewDiagnostics.record("lease=${pooled.id}", "generation=${pooled.recycleGeneration} inUseFlag=${pooled.isInUse} owned=${inUsePool[pooled.id] === pooled} ${WebViewDiagnostics.describe(pooled.realWebView)}")
         }
     }
 

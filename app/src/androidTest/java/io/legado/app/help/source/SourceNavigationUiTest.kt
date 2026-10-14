@@ -31,6 +31,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.CacheBook
+import io.legado.app.help.webView.WebViewDiagnostics
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.ui.book.source.manage.BookSourceActivity
@@ -249,14 +250,12 @@ class SourceNavigationUiTest {
                 for (blocked in listOf(true, false)) {
                     AppConfig.blockSourceNavigation = blocked
                     Log.i("SourceNavigationTest", "webjs start blocked=$blocked context=${currentCoroutineContext()}")
+                    WebViewDiagnostics.record("test", "webjs start blocked=$blocked starts=${starts.size} cacheRunning=${CacheBook.isRun} cacheModels=${CacheBook.cacheBookMap.size}")
                     val observer = Thread {
                         try {
                             Thread.sleep(5000)
-                            File(context.getExternalFilesDir("ui-regression"), "source-navigation-active-$blocked.txt")
-                                .writeText("blocked=$blocked; starts=${starts.size}\n" +
-                                    Thread.getAllStackTraces().entries.joinToString("\n\n") { (thread, stack) ->
-                                        "${thread.name}: ${thread.state}\n${stack.joinToString("\n")}"
-                                    })
+                            WebViewDiagnostics.record("test", "5s blocked=$blocked starts=${starts.size}")
+                            WebViewDiagnostics.captureActive("source-navigation-active-$blocked")
                         } catch (_: InterruptedException) { }
                     }.apply { isDaemon = true; start() }
                     val response = try { rule.getString("""@webjs:
@@ -270,11 +269,8 @@ class SourceNavigationUiTest {
                         console.info('navigation webjs: stored');
                         source.get('navigationTest') + ':' + document.querySelector('p').textContent + ':' + source.get('navigationLogin');
                     """.trimIndent()) } catch (error: Throwable) {
-                        File(context.getExternalFilesDir("ui-regression"), "source-navigation-timeout-$blocked.txt")
-                            .writeText("blocked=$blocked; starts=${starts.size}\n" +
-                                Thread.getAllStackTraces().entries.joinToString("\n\n") { (thread, stack) ->
-                                    "${thread.name}: ${thread.state}\n${stack.joinToString("\n")}"
-                                })
+                        WebViewDiagnostics.record("test", "failed blocked=$blocked starts=${starts.size} error=$error")
+                        WebViewDiagnostics.dump("source-navigation-timeout-$blocked")
                         throw error
                     } finally { observer.interrupt() }
                     Log.i("SourceNavigationTest", "webjs completed blocked=$blocked response=$response")

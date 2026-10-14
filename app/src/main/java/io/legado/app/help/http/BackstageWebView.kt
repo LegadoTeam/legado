@@ -30,6 +30,7 @@ import io.legado.app.help.webView.WebJsExtensions.Companion.nameCache
 import io.legado.app.help.webView.WebJsExtensions.Companion.nameJava
 import io.legado.app.help.webView.WebJsExtensions.Companion.nameSource
 import io.legado.app.help.webView.WebViewPool
+import io.legado.app.help.webView.WebViewDiagnostics
 import io.legado.app.help.webView.toWebViewRequestConfig
 import io.legado.app.model.Debug
 import io.legado.app.utils.runOnUI
@@ -71,8 +72,10 @@ class BackstageWebView(
     private var pooledWebView: PooledWebView? = null
 
     private fun diagnostic(message: String) {
-        android.util.Log.i("WebViewLifecycle", "request=${System.identityHashCode(this)} pool=${pooledWebView?.id} time=${android.os.SystemClock.uptimeMillis()} thread=${Thread.currentThread().name} $message")
+        WebViewDiagnostics.record("request=${System.identityHashCode(this)}", "pool=${pooledWebView?.id} $message")
     }
+
+    init { diagnostic("constructed rule=$isRule timeout=$timeout") }
 
     suspend fun getStrResponse(): StrResponse = withTimeout(timeout ?: 60000L) {
         suspendCancellableCoroutine { block ->
@@ -100,10 +103,12 @@ class BackstageWebView(
             if (javaScript == null && delayTime == 0L) {
                 delayTime = 900L
             }
+            diagnostic("UI load queued")
             runOnUI {
                 diagnostic("UI load dispatched active=${block.isActive}")
                 try {
                     load(block.context)
+                    diagnostic("UI load returned")
                 } catch (error: Throwable) {
                     destroy()
                     block.resumeWithException(error)
@@ -125,20 +130,30 @@ class BackstageWebView(
             when {
                 !html.isNullOrEmpty() -> {
                     if (isRule) {
+                        diagnostic("cache bridge binding begin")
                         webView.addJavascriptInterface(WebCacheManager, nameCache)
+                        diagnostic("cache bridge binding returned")
                         tag?.let { key ->
-                           appDb.bookSourceDao.getBookSource(key)?.let {
+                           diagnostic("source DAO begin")
+                           val storedSource = appDb.bookSourceDao.getBookSource(key)
+                           diagnostic("source DAO returned found=${storedSource != null}")
+                           storedSource?.let {
                                val source = (it as BaseSource).withSourceNavigationContext(navigationContext)
+                               diagnostic("source bridge binding begin")
                                webView.addJavascriptInterface(source, nameSource)
+                               diagnostic("source bridge binding returned; java bridge construction begin")
                                val webJsExtensions = WebJsExtensions(it, null, webView,
                                    navigationContext = navigationContext)
+                               diagnostic("java bridge construction returned; binding begin")
                                webView.addJavascriptInterface(webJsExtensions, nameJava)
+                               diagnostic("java bridge binding returned")
                             }
                         }
                     }
                     result?.let {
                         CacheManager.put("webview_result", it)
                     }
+                    diagnostic("loadData begin view=${System.identityHashCode(webView)}")
                     webView.loadDataWithBaseURL(url, html, "text/html", getEncoding(), url)
                     diagnostic("loadData returned view=${System.identityHashCode(webView)} url=$url")
                 }
@@ -157,10 +172,12 @@ class BackstageWebView(
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun createWebView(requestConfig: WebViewRequestConfig): WebView {
+        diagnostic("acquire begin")
         val pooledWebView = WebViewPool.acquire(appCtx)
         this.pooledWebView = pooledWebView
         diagnostic("acquired generation=${pooledWebView.recycleGeneration}")
         val webView = pooledWebView.realWebView
+        diagnostic("onResume begin")
         webView.onResume() //缓存库拿的需要激活
         diagnostic("onResume returned")
         val settings = webView.settings
@@ -177,11 +194,13 @@ class BackstageWebView(
                 }
             }
         }
-        if (sourceRegex.isNullOrBlank() && overrideUrlRegex.isNullOrBlank()) {
-            webView.webViewClient = HtmlWebViewClient()
+        val client = if (sourceRegex.isNullOrBlank() && overrideUrlRegex.isNullOrBlank()) {
+            HtmlWebViewClient()
         } else {
-            webView.webViewClient = SnifferWebClient()
+            SnifferWebClient()
         }
+        webView.webViewClient = client
+        diagnostic("client configured view=${System.identityHashCode(webView)} client=${System.identityHashCode(client)}")
         return webView
     }
 
@@ -244,9 +263,13 @@ class BackstageWebView(
 
         override fun onPageFinished(view: WebView, url: String) {
             diagnostic("page finished view=${System.identityHashCode(view)} url=$url progress=${view.progress}")
+            diagnostic("setCookie begin")
             setCookie(url)
+            diagnostic("setCookie returned")
             result?.let {
+                diagnostic("window.result eval begin")
                 view.evaluateJavascript("window.result = $nameCache.getFromMemory('webview_result')", null)
+                diagnostic("window.result eval returned")
             }
             val runnable = runnable ?: EvalJsRunnable(view, url, getJs()).also {
                 runnable = it
@@ -287,6 +310,7 @@ class BackstageWebView(
                         handleResult(it)
                     }
                 }
+                diagnostic("eval call returned ${diagnosticOwner()}")
             }
 
             private fun handleResult(result: String) = Coroutine.async {
