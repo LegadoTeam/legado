@@ -180,6 +180,27 @@ class HighlightStyleTest {
     }
 
     @Test
+    fun `text overlays preserve a padded background but geometry changes split it`() {
+        val base = HighlightStyle(fill = 1, fillShape = FillShape.PILL, horizontalPadding = 12f)
+        val merged = HighlightStyle.merge(base, HighlightStyle(textColor = 2, bold = true,
+            italic = true, underline = Underline(Kind.WAVY), fontPath = "font.ttf"))
+
+        assertTrue(base.hasSameFillGeometry(merged))
+        assertEquals(2, merged.textColor)
+        assertTrue(merged.bold && merged.italic)
+        assertEquals(Underline(Kind.WAVY), merged.underline)
+        assertFalse(base.hasSameFillGeometry(base.copy(fill = 2)))
+        assertFalse(base.hasSameFillGeometry(base.copy(fillShape = FillShape.RECTANGLE)))
+        assertFalse(base.hasSameFillGeometry(base.copy(horizontalPadding = 24f)))
+        assertFalse(base.hasSameFillGeometry(base.copy(horizontalPadding = null)))
+        assertFalse(base.hasSameFillGeometry(base.copy(pillPaddingScale = 0.5f)))
+        assertTrue(base.hasSameFillGeometry(base.copy(pillPaddingScale = 1f)))
+        val rectangle = base.copy(fillShape = null)
+        assertTrue(rectangle.hasSameFillGeometry(rectangle.copy(fillShape = FillShape.RECTANGLE,
+            pillPaddingScale = 0.5f)))
+    }
+
+    @Test
     fun `shape alone does not enable highlighting`() {
         val style = HighlightStyle(fillShape = FillShape.HALF)
 
