@@ -56,11 +56,11 @@ internal object RssVideoRuntimeRegression {
                                 headers[line.substringBefore(':').lowercase()] = line.substringAfter(':').trim()
                             }
                             if (request.split(' ')[1] != "/rss-video/seek.mp4") return@submit
+                            requests.add("${headers["range"] ?: "full"}; proxy=${headers["x-rss-runtime"]}")
                             check(headers["x-rss-runtime"] == "native-required") {
-                                "Video bypassed the RSS Cronet proxy"
+                                "Video bypassed the RSS Cronet proxy: $request; headers=$headers"
                             }
                             val range = headers["range"]
-                            requests.add(range ?: "full")
                             val size = fixture.length()
                             val bounds = range?.let { Regex("bytes=(\\d+)-(\\d*)").matchEntire(it) }
                             check(range == null || bounds != null) { "Unexpected video range: $range" }
@@ -114,7 +114,13 @@ internal object RssVideoRuntimeRegression {
             val web = checkNotNull(webView)
             val setupDeadline = SystemClock.uptimeMillis() + 15_000
             while (true) {
-                val state = evaluate(instrumentation, web, "")
+                val state = evaluate(instrumentation, web,
+                    "if(!v.__runtimeStarted){v.__runtimeStarted=true;v.play();}")
+                states.put(JSONObject().put("stage", "metadata").put("state", state))
+                File(report, "rss-video.json").writeText(JSONObject()
+                    .put("requests", JSONArray(requests.toList())).put("states", states)
+                    .put("serverFailures", failures.joinToString()).toString(2))
+                check(failures.isEmpty()) { "Video fixture server failed: ${failures.firstOrNull()}" }
                 check(state.optInt("error") == 0) { "Video failed before playback: $state" }
                 if (state.optDouble("duration", 0.0) > 55) break
                 check(SystemClock.uptimeMillis() < setupDeadline) { "Video metadata unavailable: $state" }
