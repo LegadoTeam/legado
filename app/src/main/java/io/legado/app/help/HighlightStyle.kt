@@ -105,6 +105,12 @@ data class HighlightStyle(
     val resolvedHorizontalPadding: Float?
         get() = horizontalPadding?.takeIf { it.isFinite() }?.coerceIn(0f, 64f)
 
+    // Text-only overlays must not introduce new background caps or padding boundaries.
+    fun hasSameFillGeometry(other: HighlightStyle): Boolean =
+        fill == other.fill && resolvedFillShape == other.resolvedFillShape &&
+            resolvedHorizontalPadding == other.resolvedHorizontalPadding &&
+            (resolvedFillShape != FillShape.PILL || resolvedPillPaddingScale == other.resolvedPillPaddingScale)
+
     val changesTextMetrics: Boolean
         get() = resolvedFontSize != null || resolvedLetterSpacing != null
 
