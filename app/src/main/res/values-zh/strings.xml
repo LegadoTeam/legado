@@ -395,8 +395,9 @@
     <string name="highlight_fill_half">半高</string>
     <string name="highlight_fill_baseline">底衬</string>
     <string name="highlight_fill_pill">胶囊</string>
-    <string name="highlight_pill_padding">胶囊弧度边距（%）</string>
-    <string name="highlight_pill_padding_value">边距 %1$d%%</string>
+    <string name="highlight_pill_padding">弧度（%）</string>
+    <string name="highlight_pill_padding_value">弧度 %1$d%%</string>
+    <string name="highlight_horizontal_padding">左右边距</string>
     <string name="highlight_rule">高亮规则</string>
     <string name="highlight_rule_add">新建高亮规则</string>
     <string name="highlight_rule_edit_title">编辑高亮规则</string>
