@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.WebSettings
 import android.webkit.WebView
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.RssSource
@@ -109,13 +110,19 @@ internal object RssVideoRuntimeRegression {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("origin", origin)
                 .putExtra("title", "RSS video seek runtime").putExtra("startHtml", html))
             var webView: WebView? = null
-            var userAgent = ""
+            var configuredUserAgent = ""
+            var providerUserAgent = ""
             instrumentation.runOnMainSync {
                 webView = findWebView(activity!!.window.decorView)
                 // Automate the user's play gesture; all resource handling remains production code.
                 webView?.settings?.mediaPlaybackRequiresUserGesture = false
-                userAgent = webView?.settings?.userAgentString.orEmpty()
+                configuredUserAgent = webView?.settings?.userAgentString.orEmpty()
+                // Read the provider identity separately: ReadRssActivity may override the
+                // page's User-Agent, while a legacy media player keeps the provider default.
+                providerUserAgent = WebSettings.getDefaultUserAgent(context)
             }
+            File(report, "rss-video-provider.txt").writeText(
+                "providerUserAgent=$providerUserAgent\nconfiguredUserAgent=$configuredUserAgent")
             val web = checkNotNull(webView)
             val setupDeadline = SystemClock.uptimeMillis() + 15_000
             while (true) {
@@ -128,11 +135,12 @@ internal object RssVideoRuntimeRegression {
                 // This exact stock provider delegates video to Android MediaPlayer outside
                 // shouldInterceptRequest; positive and old-wrapper CI controls both reject it.
                 // Chromium 44 media/base/android/java/src/org/chromium/media/MediaPlayerBridge.java.
-                if (userAgent.contains("Chrome/44.0.2403.119 ") && failures.isNotEmpty() &&
-                    failures.all { it is VideoProxyBypass && it.userAgent == userAgent }) {
+                if (providerUserAgent.contains("Chrome/44.0.2403.119 ") && failures.isNotEmpty() &&
+                    failures.all { it is VideoProxyBypass && it.userAgent == providerUserAgent }) {
                     val status = "unsupported-webview-44.0.2403.119"
                     File(report, "rss-video-unsupported.txt").writeText(
-                        "RSS_VIDEO_SEEK_UNSUPPORTED $status: native MediaPlayer bypasses interception; $requests")
+                        "RSS_VIDEO_SEEK_UNSUPPORTED $status: native MediaPlayer bypasses interception; " +
+                            "providerUserAgent=$providerUserAgent; configuredUserAgent=$configuredUserAgent; $requests")
                     return status
                 }
                 check(failures.isEmpty()) { "Video fixture server failed: ${failures.firstOrNull()}" }
