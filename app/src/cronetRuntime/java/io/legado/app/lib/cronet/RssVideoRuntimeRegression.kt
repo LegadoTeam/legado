@@ -25,7 +25,10 @@ import java.util.concurrent.TimeUnit
 
 /** CI-only: decode and seek a generated MP4 through the real RSS WebView and native Cronet. */
 internal object RssVideoRuntimeRegression {
-    fun verify(instrumentation: Instrumentation) {
+    private class VideoProxyBypass(val userAgent: String?) :
+        IllegalStateException("Video bypassed the RSS Cronet proxy; userAgent=$userAgent")
+
+    fun verify(instrumentation: Instrumentation): String {
         val context = instrumentation.targetContext
         val fixture = File(context.getExternalFilesDir(null), "rss-seek.mp4")
         check(fixture.length() > 5_000_000) { "Missing generated video fixture" }
@@ -57,8 +60,8 @@ internal object RssVideoRuntimeRegression {
                             }
                             if (request.split(' ')[1] != "/rss-video/seek.mp4") return@submit
                             requests.add("${headers["range"] ?: "full"}; proxy=${headers["x-rss-runtime"]}")
-                            check(headers["x-rss-runtime"] == "native-required") {
-                                "Video bypassed the RSS Cronet proxy: $request; headers=$headers"
+                            if (headers["x-rss-runtime"] != "native-required") {
+                                throw VideoProxyBypass(headers["user-agent"])
                             }
                             val range = headers["range"]
                             val size = fixture.length()
@@ -106,10 +109,12 @@ internal object RssVideoRuntimeRegression {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("origin", origin)
                 .putExtra("title", "RSS video seek runtime").putExtra("startHtml", html))
             var webView: WebView? = null
+            var userAgent = ""
             instrumentation.runOnMainSync {
                 webView = findWebView(activity!!.window.decorView)
                 // Automate the user's play gesture; all resource handling remains production code.
                 webView?.settings?.mediaPlaybackRequiresUserGesture = false
+                userAgent = webView?.settings?.userAgentString.orEmpty()
             }
             val web = checkNotNull(webView)
             val setupDeadline = SystemClock.uptimeMillis() + 15_000
@@ -120,6 +125,16 @@ internal object RssVideoRuntimeRegression {
                 File(report, "rss-video.json").writeText(JSONObject()
                     .put("requests", JSONArray(requests.toList())).put("states", states)
                     .put("serverFailures", failures.joinToString()).toString(2))
+                // This exact stock provider delegates video to Android MediaPlayer outside
+                // shouldInterceptRequest; positive and old-wrapper CI controls both reject it.
+                // Chromium 44 media/base/android/java/src/org/chromium/media/MediaPlayerBridge.java.
+                if (userAgent.contains("Chrome/44.0.2403.119 ") && failures.isNotEmpty() &&
+                    failures.all { it is VideoProxyBypass && it.userAgent == userAgent }) {
+                    val status = "unsupported-webview-44.0.2403.119"
+                    File(report, "rss-video-unsupported.txt").writeText(
+                        "RSS_VIDEO_SEEK_UNSUPPORTED $status: native MediaPlayer bypasses interception; $requests")
+                    return status
+                }
                 check(failures.isEmpty()) { "Video fixture server failed: ${failures.firstOrNull()}" }
                 check(state.optInt("error") == 0) { "Video failed before playback: $state" }
                 if (state.optDouble("duration", 0.0) > 55) break
@@ -155,6 +170,7 @@ internal object RssVideoRuntimeRegression {
             check(requests.mapNotNull { it.substringAfter("bytes=", "").substringBefore('-').toLongOrNull() }
                 .filter { it > 0 }.distinct().size >= 2) { "Seeks did not exercise distinct nonzero ranges: $requests" }
             File(report, "rss-video-passed.txt").writeText("RSS_VIDEO_SEEK_PASSED targets=0,40,10,50; ranges=$requests")
+            return "passed"
         } finally {
             activity?.let { screen -> instrumentation.runOnMainSync { screen.finish() } }
             appDb.rssSourceDao.delete(source)
