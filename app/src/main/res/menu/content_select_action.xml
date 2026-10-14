@@ -24,6 +24,10 @@
         android:title="@string/read_aloud" />
 
     <item
+        android:id="@+id/menu_aloud_from_here"
+        android:title="@string/read_aloud_from_here" />
+
+    <item
         android:id="@+id/menu_dict"
         android:title="@string/dict" />
 
