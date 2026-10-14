@@ -1029,8 +1029,9 @@ class TextChapterLayout(
                     if (i != columns.lastIndex) {
                         // 非最后一个字符，增加额外的间距
                         col.start = currentX
-                        col.end = currentX + width + charIncrement
-                        currentX = col.end
+                        // Keep image geometry intact; justification belongs after its slot.
+                        col.end = currentX + width + if (col is ImageColumn) 0f else charIncrement
+                        currentX += width + charIncrement
                     } else {
                         // 最后一个字符，不增加额外间距
                         col.start = currentX

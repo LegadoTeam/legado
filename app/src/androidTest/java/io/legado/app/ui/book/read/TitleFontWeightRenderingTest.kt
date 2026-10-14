@@ -894,6 +894,7 @@ class TitleFontWeightRenderingTest {
                     HighlightStyle(fill = Color.MAGENTA, fillShape = HighlightStyle.FillShape.PILL, pillPaddingScale = 0.5f),
                     HighlightStyle(fill = Color.MAGENTA, fillShape = HighlightStyle.FillShape.PILL, pillPaddingScale = 1.25f),
                     HighlightStyle(box = HighlightStyle.Deco(Color.MAGENTA)))
+                var nativeHtmlImageWidths: List<Float>? = null
                 for (mode in listOf("static", "zh", "html")) for (justify in listOf(false, true)) {
                     ReadBookConfig.useZhLayout = mode == "zh"
                     context.putPrefBoolean(PreferKey.textFullJustify, justify)
@@ -901,13 +902,26 @@ class TitleFontWeightRenderingTest {
                     val decoded = ImageProvider.getImage(book!!, imageSrc, 24, 24)
                     assertEquals("Real fixture image must decode, not an error icon", Color.BLUE, decoded.getPixel(12, 12))
                     val img = if (mode == "html") "<img src='$imageSrc'>" else """<img src="$imageSrc">"""
-                    val paragraphs = listOf("前$short${img}后", long)
+                    val paragraphs = listOf("前$short${img}后", if (mode == "html") "前${img}$long" else long)
                     val contents = if (mode == "html") listOf("<usehtml>" + paragraphs.joinToString("") { "<p>$it</p>" } + "</usehtml>")
                         else paragraphs.map { ReadBookConfig.paragraphIndent + it }
                     val scope = CoroutineScope(Dispatchers.Default)
                     val base = awaitLayout(ChapterProvider.getTextChapterAsync(scope, book!!, fixture,
                         "Padding", BookContent(false, contents, null), fixture.index + 1, saveChapterData = false))
                     val original = canonical(base)
+                    if (mode == "html") {
+                        val imageWidths = base.pages.flatMap { it.lines }.flatMap { it.columns }
+                            .filterIsInstance<ImageColumn>().map { it.end - it.start }
+                        assertEquals("Both real inline image fixtures must be present", 2, imageWidths.size)
+                        assertTrue("The long HTML image must exercise a wrapped line", base.pages.flatMap { it.lines }
+                            .any { !it.isParagraphEnd && it.columns.any { column -> column is ImageColumn } })
+                        if (!justify) nativeHtmlImageWidths = imageWidths else {
+                            assertEquals("Justified HTML keeps each inline image", nativeHtmlImageWidths!!.size, imageWidths.size)
+                            nativeHtmlImageWidths!!.zip(imageWidths).forEach { (expected, actual) ->
+                                assertEquals("Justification must not stretch inline images", expected, actual, 0.01f)
+                            }
+                        }
+                    }
                     val fixedMarginCurves = mutableListOf<Int>()
                     for ((styleIndex, originalStyle) in styles.withIndex()) {
                         val measuredGaps = mutableListOf<Float>()

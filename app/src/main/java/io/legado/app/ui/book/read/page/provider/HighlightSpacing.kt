@@ -223,8 +223,11 @@ data class HighlightSpacing(
                             if (cell.baseTextSize == size) {
                                 val nativeHtml = cell.line.isHtml &&
                                     (cell.column is TextHtmlColumn || cell.column is ImageColumn)
-                                cell.nativeAdvance = if (nativeHtml) cell.column.end - cell.column.start
-                                    else (offset until end).sumOf { widths[it].toDouble() }.toFloat()
+                                cell.nativeAdvance = when {
+                                    cell.column is TextHtmlColumn -> cell.column.nativeAdvance
+                                    nativeHtml -> cell.column.end - cell.column.start
+                                    else -> (offset until end).sumOf { widths[it].toDouble() }.toFloat()
+                                }
                                 if (nativeHtml) htmlWidths[cell.position] = checkNotNull(cell.nativeAdvance)
                             }
                             offset = end
