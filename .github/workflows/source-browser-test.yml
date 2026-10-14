@@ -147,7 +147,7 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: gradle/actions/setup-gradle@v6.3.0
+      - uses: gradle/actions/setup-gradle@v6.4.0
 
       - name: Build instrumented test APKs
         run: |
