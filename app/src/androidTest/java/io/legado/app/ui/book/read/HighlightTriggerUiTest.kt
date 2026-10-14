@@ -40,6 +40,8 @@ import io.legado.app.model.ReadBook
 import io.legado.app.ui.association.OpenUrlConfirmActivity
 import io.legado.app.ui.book.read.config.MoreConfigDialog
 import io.legado.app.ui.book.read.page.ReadView
+import io.legado.app.ui.book.read.page.ContentTextView
+import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.ui.book.read.page.entities.column.BaseColumn
 import io.legado.app.ui.book.read.page.entities.column.ImageColumn
 import io.legado.app.ui.book.read.page.entities.column.TextBaseColumn
@@ -65,7 +67,8 @@ class HighlightTriggerUiTest {
         PreferKey.clickActionML, PreferKey.clickActionMC, PreferKey.clickActionMR,
         PreferKey.clickActionBL, PreferKey.clickActionBC, PreferKey.clickActionBR)
     private val savedPrefs = (clickKeys + listOf(PreferKey.highlightActionTrigger, PreferKey.clickImgWay,
-        PreferKey.textSelectAble, PreferKey.adaptSpecialStyle, PreferKey.preDownloadNum))
+        PreferKey.textSelectAble, PreferKey.adaptSpecialStyle, PreferKey.preDownloadNum,
+        PreferKey.longPressSelectParagraph))
         .associateWith { prefs.all[it] }
     private val savedHelp = listOf("readHelpVersion", "readMenuHelpVersion").associateWith { LocalConfig.all[it] }
     private val savedRules = appDb.highlightRuleDao.all
@@ -266,6 +269,62 @@ class HighlightTriggerUiTest {
         noRulePopup()
     }
 
+    @Test fun missedHandleDragPreservesSelectionAndTapStillClearsIt() {
+        prefs.edit().putBoolean(PreferKey.longPressSelectParagraph, false).commit()
+        // Initial insets can queue ChapterProvider's 300ms height update after text is ready.
+        var previousPage: Any? = null
+        var previousSize = 0 to 0
+        var stableSince = 0L
+        awaitReader { view ->
+            val text = view.curPage.findViewById<ContentTextView>(R.id.content_text_view)
+            val page = view.curPage.textPage
+            val size = text.width to text.height
+            val ready = view.hasWindowFocus() && !view.isLayoutRequested && !text.isLayoutRequested &&
+                text.width > 0 && text.height > 0 &&
+                text.width == ChapterProvider.viewWidth && text.height == ChapterProvider.viewHeight &&
+                page.textChapter === ReadBook.curTextChapter && ReadBook.curTextChapter?.isCompleted == true
+            if (!ready || page !== previousPage || size != previousSize) {
+                previousPage = page
+                previousSize = size
+                stableSince = SystemClock.uptimeMillis()
+            }
+            ready && SystemClock.uptimeMillis() - stableSince >= 400
+        }
+        val alpha = point { it is TextBaseColumn && it.charData == "P" && it.highlightStyle != null }
+        val ordinary = point { it is TextBaseColumn && it.charData == "o" && it.highlightStyle == null }
+        hold(alpha)
+        var selected = ""
+        val page = ReadBook.durPageIndex
+        scenario!!.onActivity { activity ->
+            val view = activity.findViewById<ReadView>(R.id.read_view)
+            selected = view.getSelectText()
+            assertTrue(view.isTextSelected)
+            val down = SystemClock.uptimeMillis()
+            fun dispatch(action: Int, x: Float) {
+                val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, x, ordinary[1], 0)
+                logTouch(view, event)
+                try { assertTrue(view.dispatchTouchEvent(event)) } finally { event.recycle() }
+            }
+            dispatch(MotionEvent.ACTION_DOWN, ordinary[0])
+            dispatch(MotionEvent.ACTION_MOVE, ordinary[0] + view.width / 3)
+            dispatch(MotionEvent.ACTION_UP, ordinary[0] + view.width / 3)
+            assertTrue("Missing the handle must retain the selection", view.isTextSelected)
+            assertEquals(selected, view.getSelectText())
+            assertEquals("Dragging outside a handle must not turn the page", page, ReadBook.durPageIndex)
+        }
+        hold(ordinary)
+        scenario!!.onActivity {
+            val view = it.findViewById<ReadView>(R.id.read_view)
+            assertTrue("Long press can replace an existing selection", view.isTextSelected)
+            assertNotEquals(selected, view.getSelectText())
+        }
+        taps(ordinary)
+        scenario!!.onActivity {
+            assertFalse(it.findViewById<ReadView>(R.id.read_view).isTextSelected)
+            assertEquals("Clearing a selection must not also turn the page", page, ReadBook.durPageIndex)
+        }
+    }
+
     private fun point(occurrence: Int = 0, matches: (BaseColumn) -> Boolean): FloatArray {
         var point: FloatArray? = null
         scenario!!.onActivity { activity ->
@@ -294,6 +353,7 @@ class HighlightTriggerUiTest {
                     val down = SystemClock.uptimeMillis()
                     fun dispatch(action: Int) {
                         val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, point[0], point[1], 0)
+                        logTouch(view as ReadView, event)
                         try { assertTrue(view.dispatchTouchEvent(event)) } finally { event.recycle() }
                     }
                     dispatch(MotionEvent.ACTION_DOWN)
@@ -307,6 +367,13 @@ class HighlightTriggerUiTest {
                 }
             }
         })
+    }
+
+    private fun logTouch(view: ReadView, event: MotionEvent) {
+        val text = view.curPage.findViewById<ContentTextView>(R.id.content_text_view)
+        android.util.Log.i("HighlightGesture", "action=${event.action} x=${event.x} y=${event.y} " +
+            "page=${System.identityHashCode(view.curPage.textPage)} selected=${view.isTextSelected} " +
+            "content=${text.width}x${text.height} provider=${ChapterProvider.viewWidth}x${ChapterProvider.viewHeight}")
     }
 
     private fun clearSelection() { scenario!!.onActivity { it.findViewById<ReadView>(R.id.read_view).cancelSelect() } }
