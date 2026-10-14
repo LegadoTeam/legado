@@ -266,6 +266,41 @@ class HighlightTriggerUiTest {
         noRulePopup()
     }
 
+    @Test fun missedHandleDragPreservesSelectionAndTapStillClearsIt() {
+        val alpha = point { it is TextBaseColumn && it.charData == "P" && it.highlightStyle != null }
+        val ordinary = point { it is TextBaseColumn && it.charData == "o" && it.highlightStyle == null }
+        hold(alpha)
+        var selected = ""
+        val page = ReadBook.durPageIndex
+        scenario!!.onActivity { activity ->
+            val view = activity.findViewById<ReadView>(R.id.read_view)
+            selected = view.getSelectText()
+            assertTrue(view.isTextSelected)
+            val down = SystemClock.uptimeMillis()
+            fun dispatch(action: Int, x: Float) {
+                val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, x, ordinary[1], 0)
+                try { assertTrue(view.dispatchTouchEvent(event)) } finally { event.recycle() }
+            }
+            dispatch(MotionEvent.ACTION_DOWN, ordinary[0])
+            dispatch(MotionEvent.ACTION_MOVE, ordinary[0] + view.width / 3)
+            dispatch(MotionEvent.ACTION_UP, ordinary[0] + view.width / 3)
+            assertTrue("Missing the handle must retain the selection", view.isTextSelected)
+            assertEquals(selected, view.getSelectText())
+            assertEquals("Dragging outside a handle must not turn the page", page, ReadBook.durPageIndex)
+        }
+        hold(ordinary)
+        scenario!!.onActivity {
+            val view = it.findViewById<ReadView>(R.id.read_view)
+            assertTrue("Long press can replace an existing selection", view.isTextSelected)
+            assertNotEquals(selected, view.getSelectText())
+        }
+        taps(ordinary)
+        scenario!!.onActivity {
+            assertFalse(it.findViewById<ReadView>(R.id.read_view).isTextSelected)
+            assertEquals("Clearing a selection must not also turn the page", page, ReadBook.durPageIndex)
+        }
+    }
+
     private fun point(occurrence: Int = 0, matches: (BaseColumn) -> Boolean): FloatArray {
         var point: FloatArray? = null
         scenario!!.onActivity { activity ->
