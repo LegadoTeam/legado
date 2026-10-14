@@ -18,8 +18,8 @@ def disassemble(jar):
     ], text=True)
 
 before, after = disassemble(original), disassemble(adapted)
-start = "  public static void loadLibrary();"
-end = "  public static void switchToTestLibrary();"
+start = "  private static void loadLibraryInternal(org.chromium.net.impl.CronetLibraryLoader$LibraryLoaderLambda);"
+end = "  public static void loadLibrary();"
 def split(text):
     prefix, rest = text.split(start, 1)
     method, suffix = rest.split(end, 1)
@@ -27,12 +27,12 @@ def split(text):
 
 bp, bm, bs = split(before)
 ap, am, ass = split(after)
-assert bp == ap and bs == ass, "A method other than loadLibrary() changed"
-assert bm.count("Method java/lang/System.loadLibrary:") == 3
-assert am.count("Method java/lang/System.loadLibrary:") == 1
+assert bp == ap and bs == ass, "A method other than loadLibraryInternal() changed"
+assert bm.count("Method org/chromium/net/impl/CronetLibraryLoader$LibraryLoaderLambda.loadLibrary:") == 3
+assert am.count("Method org/chromium/net/impl/CronetLibraryLoader$LibraryLoaderLambda.loadLibrary:") == 1
 assert am.count("Method io/legado/app/lib/cronet/CronetLoader.loadLibrary:") == 2
 assert am.index("putstatic") > am.rindex("loadLibrary:"), "Loaded flag precedes successful loading"
 output = Path("app/build/cronet-runtime")
 output.mkdir(parents=True, exist_ok=True)
 (output / "adapted-loader-bytecode.txt").write_text(after)
-print("Only loadLibrary() changed; all other methods, initialization and version checks are identical.")
+print("Only loadLibraryInternal() changed; all other methods, initialization and version checks are identical.")
