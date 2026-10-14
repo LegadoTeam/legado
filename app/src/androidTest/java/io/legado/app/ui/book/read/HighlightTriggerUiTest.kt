@@ -65,7 +65,8 @@ class HighlightTriggerUiTest {
         PreferKey.clickActionML, PreferKey.clickActionMC, PreferKey.clickActionMR,
         PreferKey.clickActionBL, PreferKey.clickActionBC, PreferKey.clickActionBR)
     private val savedPrefs = (clickKeys + listOf(PreferKey.highlightActionTrigger, PreferKey.clickImgWay,
-        PreferKey.textSelectAble, PreferKey.adaptSpecialStyle, PreferKey.preDownloadNum))
+        PreferKey.textSelectAble, PreferKey.adaptSpecialStyle, PreferKey.preDownloadNum,
+        PreferKey.longPressSelectParagraph))
         .associateWith { prefs.all[it] }
     private val savedHelp = listOf("readHelpVersion", "readMenuHelpVersion").associateWith { LocalConfig.all[it] }
     private val savedRules = appDb.highlightRuleDao.all
@@ -267,6 +268,7 @@ class HighlightTriggerUiTest {
     }
 
     @Test fun missedHandleDragPreservesSelectionAndTapStillClearsIt() {
+        prefs.edit().putBoolean(PreferKey.longPressSelectParagraph, false).commit()
         val alpha = point { it is TextBaseColumn && it.charData == "P" && it.highlightStyle != null }
         val ordinary = point { it is TextBaseColumn && it.charData == "o" && it.highlightStyle == null }
         hold(alpha)
