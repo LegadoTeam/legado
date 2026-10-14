@@ -70,21 +70,29 @@ class BackstageWebView(
     private var callback: Callback? = null
     private var pooledWebView: PooledWebView? = null
 
+    private fun diagnostic(message: String) {
+        android.util.Log.i("WebViewLifecycle", "request=${System.identityHashCode(this)} pool=${pooledWebView?.id} time=${android.os.SystemClock.uptimeMillis()} thread=${Thread.currentThread().name} $message")
+    }
+
     suspend fun getStrResponse(): StrResponse = withTimeout(timeout ?: 60000L) {
         suspendCancellableCoroutine { block ->
+            diagnostic("response begin context=${block.context} isRule=$isRule")
             block.invokeOnCancellation {
+                diagnostic("response cancelled")
                 runOnUI {
                     destroy()
                 }
             }
             callback = object : Callback() {
                 override fun onResult(response: StrResponse) {
+                    diagnostic("response result completed=${block.isCompleted}")
                     if (!block.isCompleted) {
                         block.resume(response)
                     }
                 }
 
                 override fun onError(error: Throwable) {
+                    diagnostic("response error=$error completed=${block.isCompleted}")
                     if (!block.isCompleted)
                         block.resumeWithException(error)
                 }
@@ -93,6 +101,7 @@ class BackstageWebView(
                 delayTime = 900L
             }
             runOnUI {
+                diagnostic("UI load dispatched active=${block.isActive}")
                 try {
                     load(block.context)
                 } catch (error: Throwable) {
@@ -109,6 +118,7 @@ class BackstageWebView(
 
     @Throws(AndroidRuntimeException::class)
     private fun load(navigationContext: CoroutineContext) {
+        diagnostic("load context=$navigationContext")
         val requestConfig = headerMap.toWebViewRequestConfig(AppConfig.userAgent)
         val webView = createWebView(requestConfig)
         try {
@@ -130,6 +140,7 @@ class BackstageWebView(
                         CacheManager.put("webview_result", it)
                     }
                     webView.loadDataWithBaseURL(url, html, "text/html", getEncoding(), url)
+                    diagnostic("loadData returned view=${System.identityHashCode(webView)} url=$url")
                 }
 
                 else -> if (requestConfig.additionalHeaders.isEmpty()) {
@@ -148,8 +159,10 @@ class BackstageWebView(
     private fun createWebView(requestConfig: WebViewRequestConfig): WebView {
         val pooledWebView = WebViewPool.acquire(appCtx)
         this.pooledWebView = pooledWebView
+        diagnostic("acquired generation=${pooledWebView.recycleGeneration}")
         val webView = pooledWebView.realWebView
         webView.onResume() //缓存库拿的需要激活
+        diagnostic("onResume returned")
         val settings = webView.settings
         settings.blockNetworkImage = true
         settings.userAgentString = requestConfig.userAgent
@@ -173,8 +186,10 @@ class BackstageWebView(
     }
 
     private fun destroy() {
+        diagnostic("destroy begin")
         pooledWebView?.let { WebViewPool.release(it) }
         pooledWebView = null
+        diagnostic("destroy returned")
     }
 
     private fun getJs(): String {
@@ -200,6 +215,21 @@ class BackstageWebView(
         private var runnable: EvalJsRunnable? = null
         private var isRedirect = false
 
+        override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
+            diagnostic("page started view=${System.identityHashCode(view)} url=$url")
+            super.onPageStarted(view, url, favicon)
+        }
+
+        override fun onPageCommitVisible(view: WebView, url: String?) {
+            diagnostic("page visible view=${System.identityHashCode(view)} url=$url")
+            super.onPageCommitVisible(view, url)
+        }
+
+        override fun onReceivedError(view: WebView, request: WebResourceRequest, error: android.webkit.WebResourceError) {
+            diagnostic("page error main=${request.isForMainFrame} code=${error.errorCode} detail=${error.description}")
+            super.onReceivedError(view, request, error)
+        }
+
         override fun shouldOverrideUrlLoading(
             view: WebView,
             request: WebResourceRequest
@@ -213,6 +243,7 @@ class BackstageWebView(
         }
 
         override fun onPageFinished(view: WebView, url: String) {
+            diagnostic("page finished view=${System.identityHashCode(view)} url=$url progress=${view.progress}")
             setCookie(url)
             result?.let {
                 view.evaluateJavascript("window.result = $nameCache.getFromMemory('webview_result')", null)
@@ -222,6 +253,7 @@ class BackstageWebView(
             }
             mHandler.removeCallbacks(runnable)
             mHandler.postDelayed(runnable, 100L + delayTime)
+            diagnostic("eval scheduled delay=${100L + delayTime}")
         }
 
         @SuppressLint("WebViewClientOnReceivedSslError")
@@ -241,11 +273,16 @@ class BackstageWebView(
             private var retry = 0
             private val intervals = listOf(200L, 400L, 600L, 800L, 1000L)
             private val mWebView: WeakReference<WebView> = WeakReference(webView)
+            private val diagnosticLease = pooledWebView
+            private val diagnosticGeneration = pooledWebView?.recycleGeneration
+            private fun diagnosticOwner(): String = "lease=${diagnosticLease?.id} generation=$diagnosticGeneration currentGeneration=${diagnosticLease?.recycleGeneration} inUse=${diagnosticLease?.isInUse} owner=${pooledWebView === diagnosticLease && pooledWebView?.realWebView === mWebView.get() && diagnosticLease?.recycleGeneration == diagnosticGeneration}"
             private val jsStr = if (isRule) {
                 "$getInjectionString\n$mJavaScript"
             } else mJavaScript
             override fun run() {
+                diagnostic("eval executing view=${mWebView.get()?.let { System.identityHashCode(it) }} retry=$retry ${diagnosticOwner()}")
                 mWebView.get()?.evaluateJavascript(jsStr) {
+                    diagnostic("eval callback result=$it ${diagnosticOwner()}")
                     if (pooledWebView != null) {
                         handleResult(it)
                     }
@@ -253,6 +290,7 @@ class BackstageWebView(
             }
 
             private fun handleResult(result: String) = Coroutine.async {
+                diagnostic("handle result=$result ${diagnosticOwner()}")
                 if (result.isNotEmpty() && result != "null") {
                     val content = StringEscapeUtils.unescapeJson(result)
                         .replace(quoteRegex, "")
@@ -280,6 +318,7 @@ class BackstageWebView(
                     intervals.last()
                 }
                 retry++
+                diagnostic("eval retry scheduled retry=$retry delay=$nextDelay ${diagnosticOwner()}")
                 mHandler.postDelayed(this@EvalJsRunnable, nextDelay)
             }
 

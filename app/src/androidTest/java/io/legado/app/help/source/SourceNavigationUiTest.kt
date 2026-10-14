@@ -5,7 +5,6 @@ import android.app.Instrumentation
 import android.content.Intent
 import android.util.Log
 import androidx.test.core.app.ActivityScenario
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import fi.iki.elonen.NanoHTTPD
 import io.legado.app.constant.PreferKey
@@ -29,12 +28,17 @@ import kotlinx.coroutines.withContext
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import java.util.UUID
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 
-@RunWith(AndroidJUnit4::class)
-class SourceNavigationUiTest {
+@RunWith(Parameterized::class)
+class SourceNavigationUiTest(private val iteration: Int) {
+    companion object {
+        @JvmStatic @Parameterized.Parameters(name = "iteration={0}")
+        fun iterations() = (1..10).map { arrayOf(it) }
+    }
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
 
@@ -100,7 +104,17 @@ class SourceNavigationUiTest {
                 source.header = "@js:java.openUrl('https://navigation.invalid/header'); '{\"X-Navigation\":\"ok\"}'"
                 for (blocked in listOf(true, false)) {
                     AppConfig.blockSourceNavigation = blocked
-                    Log.i("SourceNavigationTest", "webjs start blocked=$blocked")
+                    Log.i("SourceNavigationTest", "webjs start iteration=$iteration blocked=$blocked context=${currentCoroutineContext()}")
+                    val observer = Thread {
+                        try {
+                            Thread.sleep(5000)
+                            File(context.getExternalFilesDir("ui-regression"), "source-navigation-active-$iteration-$blocked.txt")
+                                .writeText("blocked=$blocked; starts=${starts.size}\n" +
+                                    Thread.getAllStackTraces().entries.joinToString("\n\n") { (thread, stack) ->
+                                        "${thread.name}: ${thread.state}\n${stack.joinToString("\n")}"
+                                    })
+                        } catch (_: InterruptedException) { }
+                    }.apply { isDaemon = true; start() }
                     val response = try { rule.getString("""@webjs:
                         console.info('navigation webjs: started');
                         java.openUrl('https://navigation.invalid/java');
@@ -112,13 +126,13 @@ class SourceNavigationUiTest {
                         console.info('navigation webjs: stored');
                         source.get('navigationTest') + ':' + document.querySelector('p').textContent + ':' + source.get('navigationLogin');
                     """.trimIndent()) } catch (error: Throwable) {
-                        File(context.getExternalFilesDir("ui-regression"), "source-navigation-timeout-threads.txt")
+                        File(context.getExternalFilesDir("ui-regression"), "source-navigation-timeout-$iteration-$blocked.txt")
                             .writeText("blocked=$blocked; starts=${starts.size}\n" +
                                 Thread.getAllStackTraces().entries.joinToString("\n\n") { (thread, stack) ->
                                     "${thread.name}: ${thread.state}\n${stack.joinToString("\n")}"
                                 })
                         throw error
-                    }
+                    } finally { observer.interrupt() }
                     Log.i("SourceNavigationTest", "webjs completed blocked=$blocked response=$response")
                     assertEquals("stored:Background:ok", response)
                     assertEquals(if (blocked) 0 else 4, starts.size)
