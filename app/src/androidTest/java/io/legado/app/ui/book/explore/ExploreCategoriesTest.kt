@@ -143,6 +143,18 @@ class ExploreCategoriesTest {
             scenario!!.onActivity {
                 assertFalse(it.ui.titleBar.menu.findItem(R.id.menu_show_read_record).isChecked)
             }
+            scenario!!.moveToState(Lifecycle.State.CREATED)
+            AppConfig.showSearchReadRecord = true
+            scenario!!.moveToState(Lifecycle.State.RESUMED)
+            awaitActivity { exploreIndicator(it)?.isVisible == true }
+            scenario!!.onActivity {
+                assertTrue(it.ui.titleBar.menu.findItem(R.id.menu_show_read_record).isChecked)
+            }
+
+            // ActivityScenario starts a new task, so finish discovery before testing search.
+            scenario!!.close()
+            scenario = null
+            AppConfig.showSearchReadRecord = false
 
             search = ActivityScenario.launch(Intent(context, SearchActivity::class.java))
             search!!.onActivity {
@@ -169,12 +181,10 @@ class ExploreCategoriesTest {
             AppConfig.showSearchReadRecord = true
             search!!.moveToState(Lifecycle.State.RESUMED)
             awaitSearchIndicator(true)
-            search!!.close()
-            search = null
-            awaitActivity { exploreIndicator(it)?.isVisible == true }
-            scenario!!.onActivity {
-                assertTrue(it.ui.titleBar.menu.findItem(R.id.menu_show_read_record).isChecked)
-            }
+            search!!.moveToState(Lifecycle.State.CREATED)
+            AppConfig.showSearchReadRecord = false
+            search!!.moveToState(Lifecycle.State.RESUMED)
+            awaitSearchIndicator(false)
         } finally {
             search?.close()
             appDb.readRecordDao.delete(record)
