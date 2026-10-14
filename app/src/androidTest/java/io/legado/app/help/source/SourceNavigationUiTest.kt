@@ -27,18 +27,11 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.junit.Assert.*
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
 import java.util.UUID
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 
-@RunWith(Parameterized::class)
-class SourceNavigationUiTest(private val iteration: Int) {
-    companion object {
-        @JvmStatic @Parameterized.Parameters(name = "iteration={0}")
-        fun iterations() = (1..10).map { arrayOf(it) }
-    }
+class SourceNavigationUiTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
 
@@ -104,11 +97,11 @@ class SourceNavigationUiTest(private val iteration: Int) {
                 source.header = "@js:java.openUrl('https://navigation.invalid/header'); '{\"X-Navigation\":\"ok\"}'"
                 for (blocked in listOf(true, false)) {
                     AppConfig.blockSourceNavigation = blocked
-                    Log.i("SourceNavigationTest", "webjs start iteration=$iteration blocked=$blocked context=${currentCoroutineContext()}")
+                    Log.i("SourceNavigationTest", "webjs start blocked=$blocked context=${currentCoroutineContext()}")
                     val observer = Thread {
                         try {
                             Thread.sleep(5000)
-                            File(context.getExternalFilesDir("ui-regression"), "source-navigation-active-$iteration-$blocked.txt")
+                            File(context.getExternalFilesDir("ui-regression"), "source-navigation-active-$blocked.txt")
                                 .writeText("blocked=$blocked; starts=${starts.size}\n" +
                                     Thread.getAllStackTraces().entries.joinToString("\n\n") { (thread, stack) ->
                                         "${thread.name}: ${thread.state}\n${stack.joinToString("\n")}"
@@ -126,7 +119,7 @@ class SourceNavigationUiTest(private val iteration: Int) {
                         console.info('navigation webjs: stored');
                         source.get('navigationTest') + ':' + document.querySelector('p').textContent + ':' + source.get('navigationLogin');
                     """.trimIndent()) } catch (error: Throwable) {
-                        File(context.getExternalFilesDir("ui-regression"), "source-navigation-timeout-$iteration-$blocked.txt")
+                        File(context.getExternalFilesDir("ui-regression"), "source-navigation-timeout-$blocked.txt")
                             .writeText("blocked=$blocked; starts=${starts.size}\n" +
                                 Thread.getAllStackTraces().entries.joinToString("\n\n") { (thread, stack) ->
                                     "${thread.name}: ${thread.state}\n${stack.joinToString("\n")}"
