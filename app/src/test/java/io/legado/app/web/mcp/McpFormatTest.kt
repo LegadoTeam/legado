@@ -59,25 +59,35 @@ class McpFormatTest {
             bookSourceName = "未跑完",
             bookSourceUrl = "https://pending.example",
         )
+        val uncheckable = BookSourcePart(
+            bookSourceName = "无法校验",
+            bookSourceUrl = "local://uncheckable",
+        )
 
         val rendered = McpFormat.renderCheckSummary(
-            listOf(failed, passed, pending),
+            listOf(failed, passed, uncheckable, pending),
             mapOf(
                 failed.bookSourceUrl to CheckSourceResult(
                     CheckSourceStatus.FAILED,
                     "搜索失效 | // Error: 搜索超时",
                 ),
                 passed.bookSourceUrl to CheckSourceResult(CheckSourceStatus.PASSED),
+                uncheckable.bookSourceUrl to CheckSourceResult(
+                    CheckSourceStatus.UNCHECKABLE,
+                    "源地址不是http链接",
+                ),
             ),
             mapOf(pending.bookSourceUrl to "[00:01.000] 校验成功"),
         )
 
-        assertTrue(rendered.contains("失败 1/3"))
+        assertTrue(rendered.contains("失败 1/4"))
         assertTrue(rendered.contains("[失败] 坏站"))
         assertTrue(rendered.contains("// Error: 搜索超时"))
-        assertTrue(rendered.contains("通过 1/3"))
+        assertTrue(rendered.contains("通过 1/4"))
         assertTrue(rendered.contains("[通过] 好站"))
-        assertTrue(rendered.contains("未完成 1/3"))
+        assertTrue(rendered.contains("无法校验 1/4"))
+        assertTrue(rendered.contains("[无法校验] 无法校验"))
+        assertTrue(rendered.contains("未完成 1/4"))
         assertTrue(rendered.contains("[未完成] 未跑完"))
         assertTrue(rendered.contains("[00:01.000] 校验成功"))
     }
