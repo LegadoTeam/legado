@@ -22,6 +22,7 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.data.entities.rule.ExploreRule
+import io.legado.app.databinding.ActivityBookSearchBinding
 import io.legado.app.databinding.ActivityExploreShowBinding
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.storage.Restore
@@ -145,18 +146,18 @@ class ExploreCategoriesTest {
 
             search = ActivityScenario.launch(Intent(context, SearchActivity::class.java))
             search!!.onActivity {
-                it.binding.llInputHelp.isVisible = false
-                (it.binding.recyclerView.adapter as SearchAdapter).setItems(listOf(book))
+                it.ui.llInputHelp.isVisible = false
+                (it.ui.recyclerView.adapter as SearchAdapter).setItems(listOf(book))
             }
             fun awaitSearchIndicator(visible: Boolean) {
                 val deadline = SystemClock.uptimeMillis() + 15000
                 do {
                     var matches = false
                     search!!.onActivity {
-                        val indicator = it.binding.recyclerView.findViewHolderForAdapterPosition(0)
+                        val indicator = it.ui.recyclerView.findViewHolderForAdapterPosition(0)
                             ?.itemView?.findViewById<View>(R.id.iv_read_record)
                         matches = indicator?.isVisible == visible &&
-                            it.binding.titleBar.menu.findItem(R.id.menu_show_read_record).isChecked == visible
+                            it.ui.titleBar.menu.findItem(R.id.menu_show_read_record).isChecked == visible
                     }
                     if (matches) return
                     SystemClock.sleep(50)
@@ -325,6 +326,9 @@ class ExploreCategoriesTest {
 
     private val ExploreShowActivity.ui: ActivityExploreShowBinding
         get() = ActivityExploreShowBinding.bind(findViewById<View>(R.id.title_bar).parent as View)
+
+    private val SearchActivity.ui: ActivityBookSearchBinding
+        get() = ActivityBookSearchBinding.bind(findViewById<View>(R.id.title_bar).parent as View)
 
     private val ExploreShowActivity.model: ExploreShowViewModel
         get() = ViewModelProvider(this)[ExploreShowViewModel::class.java]
