@@ -913,7 +913,7 @@ class TextChapterLayout(
                         isFirst = index == 0)
                     val column = columns[index]
                     val inset = highlightSpacing[chapterStart + charIndex]
-                    if (column is TextHtmlColumn && inset?.metricStyle == null) {
+                    if ((column is TextHtmlColumn || column is ImageColumn) && inset?.metricStyle == null) {
                         highlightSpacing.nativeHtmlWidths[chapterStart + charIndex]?.let { nativeWidth ->
                             column.end = column.start + nativeWidth
                         }

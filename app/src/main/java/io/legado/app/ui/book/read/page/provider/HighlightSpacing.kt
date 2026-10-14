@@ -82,11 +82,12 @@ data class HighlightSpacing(
                 original?.let(::removeSpan)
                 // A new replacement splits an HTML text run. Android 15 trims half the
                 // letter spacing from each adjacent native run; reserve that lost advance.
-                val before = original == null && nativeHtmlWidths.isNotEmpty() && start > 0 &&
+                val nativeHtml = position in nativeHtmlWidths
+                val before = original == null && nativeHtml && start > 0 &&
                     this[start - 1] != '\n' &&
                     getSpans(start - 1, start, ReplacementSpan::class.java).isEmpty() &&
                     entries.none { (pos, value) -> pos + value.length == position }
-                val after = original == null && nativeHtmlWidths.isNotEmpty() && end < length &&
+                val after = original == null && nativeHtml && end < length &&
                     this[end] != '\n' && getSpans(end, end + 1, ReplacementSpan::class.java).isEmpty() &&
                     chapterStart + end !in entries
                 setSpan(PaddingSpan(inset, original, (if (before) 1 else 0) + (if (after) 1 else 0)),
@@ -220,9 +221,11 @@ data class HighlightSpacing(
                         paragraph.forEachIndexed { index, cell ->
                             val end = offset + texts[index].length
                             if (cell.baseTextSize == size) {
-                                cell.nativeAdvance = if (cell.column is TextHtmlColumn) cell.column.end - cell.column.start
+                                val nativeHtml = cell.line.isHtml &&
+                                    (cell.column is TextHtmlColumn || cell.column is ImageColumn)
+                                cell.nativeAdvance = if (nativeHtml) cell.column.end - cell.column.start
                                     else (offset until end).sumOf { widths[it].toDouble() }.toFloat()
-                                if (cell.column is TextHtmlColumn) htmlWidths[cell.position] = checkNotNull(cell.nativeAdvance)
+                                if (nativeHtml) htmlWidths[cell.position] = checkNotNull(cell.nativeAdvance)
                             }
                             offset = end
                         }
