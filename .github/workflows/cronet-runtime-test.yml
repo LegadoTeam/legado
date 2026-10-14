@@ -60,6 +60,8 @@ jobs:
             --build-cache --no-daemon --max-workers=2
       - name: Verify Java adaptation scope
         run: python3 .github/scripts/verify-cronet-dynamic.py
+      - name: Install generated video fixture encoder
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
