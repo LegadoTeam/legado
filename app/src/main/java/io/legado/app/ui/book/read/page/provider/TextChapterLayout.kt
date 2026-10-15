@@ -2,11 +2,13 @@ package io.legado.app.ui.book.read.page.provider
 
 import android.graphics.Paint
 import android.text.Layout
+import android.text.SpannableString
 import android.text.Spanned
 import android.text.StaticLayout
 import android.text.TextPaint
 import android.text.style.ForegroundColorSpan
 import android.text.style.ImageSpan
+import android.text.style.LeadingMarginSpan
 import android.text.style.RelativeSizeSpan
 import android.text.style.ReplacementSpan
 import android.text.style.URLSpan
@@ -727,16 +729,26 @@ class TextChapterLayout(
         val textViewTagHandler = TextViewTagHandler()
         val spanned = htmlContent.parseAsHtml(HtmlCompat.FROM_HTML_MODE_COMPACT, tagHandler = textViewTagHandler)
         val chapterStart = chapterPosition()
-        val measuredSpanned = highlightSpacing.withSpans(spanned, chapterStart)
-        val (leftInset, rightInset) = highlightLineInsets(chapterStart, chapterStart + spanned.length)
-        val width = (visibleWidth - leftInset - rightInset).coerceAtLeast(1)
+        var measuredSpanned = highlightSpacing.withSpans(spanned, chapterStart)
+        if (highlightSpacing.paragraphEdges.isNotEmpty()) {
+            val padded = SpannableString(measuredSpanned)
+            var start = 0
+            while (start < spanned.length) {
+                val end = spanned.indexOf('\n', start).let { if (it < 0) spanned.length else it + 1 }
+                val (left, right) = highlightLineInsets(chapterStart + start, chapterStart + end)
+                val inset = (left + right).coerceAtMost((visibleWidth - 1).coerceAtLeast(0))
+                if (inset > 0) padded.setSpan(LeadingMarginSpan.Standard(inset), start, end, Spanned.SPAN_PARAGRAPH)
+                start = end
+            }
+            measuredSpanned = padded
+        }
         val textPaint = contentPaint
         val textColor = ReadBookConfig.textColor
         if (textPaint.color != textColor) {
             textPaint.color = textColor
         }
         val staticLayout = if (atLeastApi28) {
-            StaticLayout.Builder.obtain(measuredSpanned, 0, measuredSpanned.length, textPaint, width)
+            StaticLayout.Builder.obtain(measuredSpanned, 0, measuredSpanned.length, textPaint, visibleWidth)
                 .setIncludePad(true)
                 .setUseLineSpacingFromFallbacks(true)
                 .build()
@@ -745,7 +757,7 @@ class TextChapterLayout(
             StaticLayout(
                 measuredSpanned,
                 textPaint,
-                width,
+                visibleWidth,
                 Layout.Alignment.ALIGN_NORMAL,
                 1f,
                 0f,
@@ -761,12 +773,17 @@ class TextChapterLayout(
             if (lineStart == lineEnd) { //这一行没有内容，跳过
                 continue
             }
+            val (leftInset, rightInset) = highlightLineInsets(chapterStart + lineStart, chapterStart + lineEnd)
+            val width = (visibleWidth - leftInset - rightInset).coerceAtLeast(1)
+            // The span reserves both edges; remove only its logical leading offset before placing the physical left edge.
+            val leadingInset = if (staticLayout.getParagraphDirection(lineIndex) > 0) visibleWidth - width else 0
             val textLine = TextLine(
                 isHtml = true,
                 reviewTitleOffset = reviewTitleOffset,
             )
             val lineText = StringBuilder()
-            val lineLeft = staticLayout.getLineLeft(lineIndex)
+            val lineLeft = staticLayout.getLineLeft(lineIndex) -
+                if (staticLayout.getParagraphAlignment(lineIndex) == Layout.Alignment.ALIGN_CENTER) leadingInset else 0
             val mLineTop = staticLayout.getLineTop(lineIndex).toFloat()
             val mLineBottom = staticLayout.getLineBottom(lineIndex).toFloat()
             val lineHeight = mLineBottom - mLineTop
@@ -799,12 +816,12 @@ class TextChapterLayout(
                     charIndex = nextChar
                     continue
                 }
-                val charX = staticLayout.getPrimaryHorizontal(charIndex) + nativeAdvanceShift
+                val charX = staticLayout.getPrimaryHorizontal(charIndex) - leadingInset + nativeAdvanceShift
                 val textSize = extractTextSize(spanned, charIndex, textPaint.textSize)
                 val textColor = extractTextColor(spanned, charIndex)
                 val linkUrl = extractLinkUrl(spanned, charIndex)
                 val charRight = if (nextChar < lineEnd) {
-                    staticLayout.getPrimaryHorizontal(nextChar) + nativeAdvanceShift
+                    staticLayout.getPrimaryHorizontal(nextChar) - leadingInset + nativeAdvanceShift
                 } else {
                     tempPaint.textSize = textSize
                     val inset = highlightSpacing[chapterStart + charIndex]
