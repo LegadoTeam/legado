@@ -729,6 +729,7 @@ class TextChapterLayout(
         val textViewTagHandler = TextViewTagHandler()
         val spanned = htmlContent.parseAsHtml(HtmlCompat.FROM_HTML_MODE_COMPACT, tagHandler = textViewTagHandler)
         val chapterStart = chapterPosition()
+        val layoutWidth = visibleWidth.coerceAtLeast(1)
         var measuredSpanned = highlightSpacing.withSpans(spanned, chapterStart)
         if (highlightSpacing.paragraphEdges.isNotEmpty()) {
             val padded = SpannableString(measuredSpanned)
@@ -736,7 +737,7 @@ class TextChapterLayout(
             while (start < spanned.length) {
                 val end = spanned.indexOf('\n', start).let { if (it < 0) spanned.length else it + 1 }
                 val (left, right) = highlightLineInsets(chapterStart + start, chapterStart + end)
-                val inset = (left + right).coerceAtMost((visibleWidth - 1).coerceAtLeast(0))
+                val inset = (left + right).coerceAtMost(layoutWidth - 1)
                 if (inset > 0) padded.setSpan(LeadingMarginSpan.Standard(inset), start, end, Spanned.SPAN_PARAGRAPH)
                 start = end
             }
@@ -748,7 +749,7 @@ class TextChapterLayout(
             textPaint.color = textColor
         }
         val staticLayout = if (atLeastApi28) {
-            StaticLayout.Builder.obtain(measuredSpanned, 0, measuredSpanned.length, textPaint, visibleWidth)
+            StaticLayout.Builder.obtain(measuredSpanned, 0, measuredSpanned.length, textPaint, layoutWidth)
                 .setIncludePad(true)
                 .setUseLineSpacingFromFallbacks(true)
                 .build()
@@ -757,7 +758,7 @@ class TextChapterLayout(
             StaticLayout(
                 measuredSpanned,
                 textPaint,
-                visibleWidth,
+                layoutWidth,
                 Layout.Alignment.ALIGN_NORMAL,
                 1f,
                 0f,
@@ -774,9 +775,9 @@ class TextChapterLayout(
                 continue
             }
             val (leftInset, rightInset) = highlightLineInsets(chapterStart + lineStart, chapterStart + lineEnd)
-            val width = (visibleWidth - leftInset - rightInset).coerceAtLeast(1)
+            val width = (layoutWidth - leftInset - rightInset).coerceAtLeast(1)
             // The span reserves both edges; remove only its logical leading offset before placing the physical left edge.
-            val leadingInset = if (staticLayout.getParagraphDirection(lineIndex) > 0) visibleWidth - width else 0
+            val leadingInset = if (staticLayout.getParagraphDirection(lineIndex) > 0) layoutWidth - width else 0
             val textLine = TextLine(
                 isHtml = true,
                 reviewTitleOffset = reviewTitleOffset,

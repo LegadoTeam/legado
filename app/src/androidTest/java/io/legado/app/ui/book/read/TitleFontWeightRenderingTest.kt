@@ -1044,9 +1044,9 @@ class TitleFontWeightRenderingTest {
         }
         fun canonical(chapter: TextChapter) = HighlightTextBuilder.build(chapter.pages.flatMap { it.lines }
             .map { HighlightTextBuilder.LineInput(it.text, it.isParagraphEnd) })
-        fun assertUnchangedParagraph(base: TextChapter, actual: TextChapter, start: Int, end: Int, label: String) {
-            val original = base.pages.flatMap { it.lines }.filter { it.chapterPosition in start until end }
-            val changed = actual.pages.flatMap { it.lines }.filter { it.chapterPosition in start until end }
+        fun assertUnchangedParagraphs(base: TextChapter, actual: TextChapter, paragraphs: Set<Int>, label: String) {
+            val original = base.pages.flatMap { it.lines }.filter { it.paragraphNum in paragraphs }
+            val changed = actual.pages.flatMap { it.lines }.filter { it.paragraphNum in paragraphs }
             assertTrue("The control paragraph must contain actual text: $label", original.isNotEmpty())
             assertEquals("Unhighlighted paragraph keeps its line breaks: $label",
                 original.map { it.chapterPosition to it.text }, changed.map { it.chapterPosition to it.text })
@@ -1072,6 +1072,16 @@ class TitleFontWeightRenderingTest {
                 AppConfig.adaptSpecialStyle = true
                 ChapterProvider.clearReviewProviders()
                 val fixture = BookChapter(bookUrl = book!!.bookUrl, url = "html-paragraph-insets", index = 10009)
+                val savedWidth = ChapterProvider.visibleWidth
+                try {
+                    // A narrow double-page viewport can leave a negative effective text width.
+                    ChapterProvider.visibleWidth = -1
+                    val narrow = awaitLayout(ChapterProvider.getTextChapterAsync(CoroutineScope(Dispatchers.Default), book!!,
+                        fixture, "Narrow", BookContent(false, listOf("<usehtml><p>甲</p></usehtml>"), null),
+                        fixture.index + 1, saveChapterData = false))
+                    assertTrue("Keep the existing minimum-width fallback", canonical(narrow).contains("甲"))
+                    narrow.pages.forEach(TextPage::recycleRecorders)
+                } finally { ChapterProvider.visibleWidth = savedWidth }
                 for ((direction, words) in listOf("ltr" to "甲乙 abc שלום 丙丁 ", "rtl" to "שלום 12 abc עולם ")) {
                     val control = words.repeat(3)
                     val highlighted = words.repeat(14)
@@ -1090,6 +1100,9 @@ class TitleFontWeightRenderingTest {
                         val end = start + highlighted.length
                         val afterStart = original.indexOf(after, end)
                         assertTrue("All three HTML paragraphs must be present", start > 0 && afterStart >= end)
+                        val paragraphs = base.pages.flatMap { it.lines }.groupBy { it.paragraphNum }
+                        val highlightedParagraph = paragraphs.values.single { lines -> lines.joinToString("") { it.text }.contains(highlighted) }
+                        val paragraphNumber = highlightedParagraph.first().paragraphNum
                         val originalImages = base.pages.flatMap { it.lines }.flatMap { it.columns }.filterIsInstance<ImageColumn>()
                         assertEquals("The control contains a real inline image", 1, originalImages.size)
                         val label = "$direction margins=$left/$right"
@@ -1099,15 +1112,15 @@ class TitleFontWeightRenderingTest {
                         val spacing = HighlightSpacing.resolve(base, ranges)
                         val chapter = awaitLayout(checkNotNull(base.layoutWithHighlightSpacing(scope, spacing)))
                         assertEquals("Reflow preserves canonical anchors: $label", original, canonical(chapter))
-                        assertUnchangedParagraph(base, chapter, 0, start, label)
-                        assertUnchangedParagraph(base, chapter, afterStart, original.length, label)
+                        assertUnchangedParagraphs(base, chapter, paragraphs.keys - paragraphNumber, label)
                         val highlightedLines = chapter.pages.flatMap { it.lines }
-                            .filter { it.chapterPosition in start until end }
+                            .filter { it.paragraphNum == paragraphNumber }
                         assertTrue("The highlighted paragraph must exercise wrapping: $label", highlightedLines.size > 1)
-                        val inset = ceil(spacing.edgePadding(start, end)).toInt()
+                        val inset = ceil(spacing.edgePadding(highlightedParagraph.first().chapterPosition,
+                            highlightedParagraph.last().let { it.chapterPosition + it.charSize })).toInt()
                         val leftEdge = maxOf(ChapterProvider.paddingLeft, inset).toFloat()
                         val rightEdge = ChapterProvider.viewWidth - maxOf(ChapterProvider.paddingRight, inset)
-                        val oldFirst = base.pages.flatMap { it.lines }.first { it.chapterPosition == start }.columns.first()
+                        val oldFirst = highlightedParagraph.first().columns.first()
                         val expectedShift = if (direction == "ltr") (inset - ChapterProvider.paddingLeft).coerceAtLeast(0)
                             else -(inset - ChapterProvider.paddingRight).coerceAtLeast(0)
                         assertEquals("Keep the existing blockquote inset in the paragraph direction: $label",
@@ -1118,14 +1131,14 @@ class TitleFontWeightRenderingTest {
                                     maxOf(column.start, column.end) <= rightEdge + 1f)
                         }
                         val restored = awaitLayout(checkNotNull(chapter.layoutWithHighlightSpacing(scope, HighlightSpacing())))
-                        assertUnchangedParagraph(base, restored, 0, original.length, "restored $label")
+                        assertUnchangedParagraphs(base, restored, paragraphs.keys, "restored $label")
                         if (left == 0 && right == 32) {
                             val page = chapter.pages.first()
                             val height = ceil(maxOf(page.height, page.renderHeight.toFloat())).toInt()
                             val view = ContentTextView(activity, null).apply { layout(0, 0, ChapterProvider.viewWidth, height); setContent(page) }
                             page.lines.forEach { line ->
                                 line.columns.filterIsInstance<TextBaseColumn>().forEach { column ->
-                                    column.highlightStyle = style.takeIf { line.chapterPosition in start until end }
+                                    column.highlightStyle = style.takeIf { line.paragraphNum == paragraphNumber }
                                 }
                                 line.invalidate()
                             }
