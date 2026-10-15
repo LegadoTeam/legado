@@ -783,8 +783,7 @@ class TextChapterLayout(
                 reviewTitleOffset = reviewTitleOffset,
             )
             val lineText = StringBuilder()
-            val lineLeft = staticLayout.getLineLeft(lineIndex) -
-                if (staticLayout.getParagraphAlignment(lineIndex) == Layout.Alignment.ALIGN_CENTER) leadingInset else 0
+            val lineLeft = staticLayout.getLineLeft(lineIndex) - leadingInset
             val mLineTop = staticLayout.getLineTop(lineIndex).toFloat()
             val mLineBottom = staticLayout.getLineBottom(lineIndex).toFloat()
             val lineHeight = mLineBottom - mLineTop
