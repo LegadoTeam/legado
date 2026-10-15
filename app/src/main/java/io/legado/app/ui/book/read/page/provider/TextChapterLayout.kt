@@ -765,7 +765,6 @@ class TextChapterLayout(
                 true
             )
         }
-        val tempPaint = TextPaint(textPaint)
         val clusterWidths = FloatArray(spanned.length)
         textPaint.getTextWidths(spanned, 0, spanned.length, clusterWidths)
         for (lineIndex in 0 until staticLayout.lineCount) {
@@ -824,11 +823,9 @@ class TextChapterLayout(
                 val charRight = if (nextChar < lineEnd) {
                     staticLayout.getPrimaryHorizontal(nextChar) - leadingInset + nativeAdvanceShift
                 } else {
-                    tempPaint.textSize = textSize
-                    val inset = highlightSpacing[chapterStart + charIndex]
-                    val charWidth = (inset?.contentWidth ?: tempPaint.measureText(char)) +
-                        (inset?.before ?: 0f) + (inset?.after ?: 0f)
-                    charX + charWidth
+                    // StaticLayout already includes the final glyph's shaped advance;
+                    // remeasuring it here can move a trailing space past the line edge.
+                    staticLayout.getPrimaryHorizontal(lineEnd) - leadingInset + nativeAdvanceShift
                 }
                 val columnCount = columns.size
                 var needAddText = true
