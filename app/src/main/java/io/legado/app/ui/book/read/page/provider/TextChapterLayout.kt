@@ -765,11 +765,13 @@ class TextChapterLayout(
                 true
             )
         }
+        val tempPaint = TextPaint(textPaint)
         val clusterWidths = FloatArray(spanned.length)
         textPaint.getTextWidths(spanned, 0, spanned.length, clusterWidths)
         for (lineIndex in 0 until staticLayout.lineCount) {
             val lineStart = staticLayout.getLineStart(lineIndex)
             val lineEnd = staticLayout.getLineEnd(lineIndex)
+            val visibleLineEnd = staticLayout.getLineVisibleEnd(lineIndex)
             if (lineStart == lineEnd) { //这一行没有内容，跳过
                 continue
             }
@@ -822,10 +824,16 @@ class TextChapterLayout(
                 val linkUrl = extractLinkUrl(spanned, charIndex)
                 val charRight = if (nextChar < lineEnd) {
                     staticLayout.getPrimaryHorizontal(nextChar) - leadingInset + nativeAdvanceShift
+                } else if (char.isNotEmpty() && char.all(Char::isWhitespace)) {
+                    val visibleRight = staticLayout.getPrimaryHorizontal(visibleLineEnd) -
+                        leadingInset + nativeAdvanceShift
+                    if (charIndex >= visibleLineEnd) charX else visibleRight
                 } else {
-                    // StaticLayout already includes the final glyph's shaped advance;
-                    // remeasuring it here can move a trailing space past the line edge.
-                    staticLayout.getPrimaryHorizontal(lineEnd) - leadingInset + nativeAdvanceShift
+                    tempPaint.textSize = textSize
+                    val inset = highlightSpacing[chapterStart + charIndex]
+                    val charWidth = (inset?.contentWidth ?: tempPaint.measureText(char)) +
+                        (inset?.before ?: 0f) + (inset?.after ?: 0f)
+                    charX + charWidth
                 }
                 val columnCount = columns.size
                 var needAddText = true
