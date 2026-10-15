@@ -3,14 +3,11 @@ package io.legado.app.ui.book.read
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
-import android.graphics.Rect
 import android.os.SystemClock
-import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import androidx.test.core.app.ActivityScenario
-import androidx.recyclerview.widget.RecyclerView
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.UiController
@@ -298,7 +295,6 @@ class HighlightTriggerUiTest {
             val down = SystemClock.uptimeMillis()
             fun dispatch(action: Int, x: Float) {
                 val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, x, ordinary[1], 0)
-                logTouch(view, event)
                 try { assertTrue(view.dispatchTouchEvent(event)) } finally { event.recycle() }
             }
             dispatch(MotionEvent.ACTION_DOWN, ordinary[0])
@@ -484,38 +480,8 @@ class HighlightTriggerUiTest {
             val preview = reader.curPage.createHighlight(HighlightStyle())
             assertNotNull("The selected body range must be highlightable before clicking", preview)
             expectedRange = preview!!.chapterPos to preview.chapterPosEnd
-            it.textActionMenu.setTouchInterceptor { _, event ->
-                Log.i("HighlightMenuTouch", "popup action=${event.action} raw=${event.rawX},${event.rawY}")
-                false
-            }
-            reader.setOnTouchListener { _, event ->
-                Log.i("HighlightMenuTouch", "reader action=${event.action} raw=${event.rawX},${event.rawY}")
-                false
-            }
         }
-        try {
-            onView(withText(R.string.highlight)).inRoot(isPlatformPopup()).perform(object : ViewAction {
-                override fun getConstraints(): Matcher<View> = isDisplayed()
-                override fun getDescription() = "Record the visible highlight menu item before a real click"
-                override fun perform(uiController: UiController, view: View) {
-                    val rect = Rect()
-                    view.getGlobalVisibleRect(rect)
-                    val parent = view.parent as? RecyclerView
-                    val holder = parent?.getChildViewHolder(view)
-                    val item = holder?.let {
-                        (it.bindingAdapter as? TextActionMenu.Adapter)?.getItem(it.layoutPosition)
-                    }
-                    Log.i("HighlightMenuTouch", "rect=$rect layout=${holder?.layoutPosition} " +
-                        "binding=${holder?.bindingAdapterPosition} item=${item?.itemId} " +
-                        "pending=${parent?.hasPendingAdapterUpdates()}")
-                }
-            }, click())
-        } finally {
-            scenario!!.onActivity {
-                it.textActionMenu.setTouchInterceptor(null)
-                it.findViewById<ReadView>(R.id.read_view).setOnTouchListener(null)
-            }
-        }
+        onView(withText(R.string.highlight)).inRoot(isPlatformPopup()).perform(click())
         assertTrue("Clicking Highlight must persist the selected range before opening its actions",
             manualHighlights().any { it.chapterPos == expectedRange.first &&
                 it.chapterPosEnd == expectedRange.second && it.bookText == text })
@@ -572,7 +538,6 @@ class HighlightTriggerUiTest {
                     val down = SystemClock.uptimeMillis()
                     fun dispatch(action: Int) {
                         val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, point[0], point[1], 0)
-                        logTouch(view as ReadView, event)
                         try { assertTrue(view.dispatchTouchEvent(event)) } finally { event.recycle() }
                     }
                     dispatch(MotionEvent.ACTION_DOWN)
@@ -586,13 +551,6 @@ class HighlightTriggerUiTest {
                 }
             }
         })
-    }
-
-    private fun logTouch(view: ReadView, event: MotionEvent) {
-        val text = view.curPage.findViewById<ContentTextView>(R.id.content_text_view)
-        android.util.Log.i("HighlightGesture", "action=${event.action} x=${event.x} y=${event.y} " +
-            "page=${System.identityHashCode(view.curPage.textPage)} selected=${view.isTextSelected} " +
-            "content=${text.width}x${text.height} provider=${ChapterProvider.viewWidth}x${ChapterProvider.viewHeight}")
     }
 
     private fun clearSelection() { scenario!!.onActivity { it.findViewById<ReadView>(R.id.read_view).cancelSelect() } }

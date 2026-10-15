@@ -313,7 +313,7 @@ class HighlightStyleDialog : BottomSheetDialogFragment(),
     }
 
     fun refresh() {
-        if (_binding == null) return
+        if (_binding == null || rows.size != channels.size) return
         val style = currentStyle()
         channels.forEachIndexed { index, channel ->
             val row = rows[index]
