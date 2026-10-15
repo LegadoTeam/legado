@@ -29,5 +29,6 @@ data class BookSourceCheckState(
         const val NEEDS_CHECK = "NEEDS_CHECK"
         const val PASSED = "PASSED"
         const val FAILED = "FAILED"
+        const val UNCHECKABLE = "UNCHECKABLE"
     }
 }

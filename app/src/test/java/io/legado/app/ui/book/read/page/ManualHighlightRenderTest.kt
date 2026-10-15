@@ -292,7 +292,7 @@ class ManualHighlightRenderTest {
         val draw = readProjectFile("src/main/java/io/legado/app/ui/book/read/page/HighlightDraw.kt")
 
         assertTrue(line.indexOf("drawHighlightFills(canvas)") < line.indexOf("checkFastDraw()"))
-        assertTrue(line.contains("nextStyle.resolvedFillShape == shape"))
+        assertTrue(line.contains("style.hasSameFillGeometry(nextStyle)"))
         assertTrue(line.contains("nextTextSize == textSize"))
         assertTrue(draw.contains("fun drawFillRun("))
         assertFalse(text.contains("highlightPaint("))

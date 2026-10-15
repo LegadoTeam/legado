@@ -38,7 +38,7 @@ class BookSourceAdapter(
     ItemTouchCallback.Callback {
 
     private val selected = linkedSetOf<BookSourcePart>()
-    private val finalMessageRegex = Regex("成功|失败")
+    private val finalMessageRegex = Regex("成功|失败|无法校验")
     private val handler = buildMainHandler()
     var showSourceHost = false
     var showCheckStatus = false
@@ -266,6 +266,7 @@ class BookSourceAdapter(
         val status = context.getString(when (item.checkStatus) {
             BookSourceCheckState.PASSED -> R.string.source_check_passed
             BookSourceCheckState.FAILED -> R.string.source_check_failed
+            BookSourceCheckState.UNCHECKABLE -> R.string.source_check_uncheckable
             else -> R.string.source_check_needed
         })
         ivDebugText.text = msg.ifEmpty {
