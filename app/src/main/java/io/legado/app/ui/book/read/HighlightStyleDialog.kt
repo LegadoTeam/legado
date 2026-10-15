@@ -88,6 +88,11 @@ class HighlightStyleDialog : BottomSheetDialogFragment(),
         refresh()
     }
 
+    override fun onViewStateRestored(savedInstanceState: Bundle?) {
+        super.onViewStateRestored(savedInstanceState)
+        refresh()
+    }
+
     override fun onDestroyView() {
         rows.clear()
         _binding = null

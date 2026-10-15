@@ -15,6 +15,9 @@ import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.UiController
 import androidx.test.espresso.ViewAction
+import androidx.test.espresso.action.GeneralClickAction
+import androidx.test.espresso.action.Press
+import androidx.test.espresso.action.Tap
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.closeSoftKeyboard
 import androidx.test.espresso.action.ViewActions.replaceText
@@ -24,6 +27,7 @@ import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.RootMatchers.isPlatformPopup
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.isChecked
 import androidx.test.espresso.matcher.ViewMatchers.isNotChecked
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
@@ -338,6 +342,7 @@ class HighlightTriggerUiTest {
         } == true }
         scenario!!.recreate()
         onView(withText(R.string.highlight_bold)).inRoot(isDialog()).check(matches(isNotChecked()))
+        onView(withText(R.string.highlight_bg_color)).inRoot(isDialog()).check(matches(isChecked()))
         channel(R.string.highlight_bg_color)
         onView(withText(R.string.highlight_bg_color)).inRoot(isDialog()).check(matches(isNotChecked()))
         assertTrue(manualHighlights().single().styleObj().isEmpty)
@@ -466,7 +471,11 @@ class HighlightTriggerUiTest {
             .putString(PreferKey.textSelectMenuConfig,
                 TextSelectMenuConfig(listOf(TextSelectMenuConfig.KEY_HIGHLIGHT)).normalized().toJson()).commit()
         awaitStableReader()
-        hold(point(occurrence) { it is TextBaseColumn && it.charData == character })
+        val point = point(occurrence) { it is TextBaseColumn && it.charData == character }
+        onView(withId(R.id.read_view)).perform(GeneralClickAction(Tap.LONG, { view ->
+            val location = IntArray(2).also(view::getLocationOnScreen)
+            floatArrayOf(location[0] + point[0], location[1] + point[1])
+        }, Press.FINGER))
         var expectedRange = 0 to 0
         scenario!!.onActivity {
             assertTrue(it.textActionMenu.isShowing)
