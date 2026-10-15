@@ -7,6 +7,7 @@ import android.view.View
 import androidx.core.net.toUri
 import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
@@ -35,6 +36,7 @@ import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
+import io.legado.app.data.entities.BookMemo
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.data.entities.rule.ContentRule
@@ -382,6 +384,68 @@ class ReaderSourceReimportUiTest {
         onView(withText(R.string.reimport_book_source)).check(doesNotExist())
         pressBack()
         main { ReadBook.book = book }
+    }
+
+    @Test fun previousReaderDestructionPreservesNewNonShelfBook() {
+        val newBook = book.copy(bookUrl = "${book.bookUrl}/next", name = "Next $id",
+            type = BookType.text or BookType.notShelf)
+        appDb.bookDao.insert(newBook)
+        appDb.bookMemoDao.insert(BookMemo(bookUrl = newBook.bookUrl, content = "Keep new book memo"))
+        val previousReader = main { it }
+        val currentReader = object : ReadBook.CallBack by previousReader {
+            override fun notifyBookChanged() = Unit
+        }
+        main { activity ->
+            activity.lifecycle.addObserver(LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_DESTROY) {
+                    // The framework has paused/stopped the old reader. Reproduce the new reader
+                    // registering before the old activity reaches its shared-state cleanup.
+                    ReadBook.register(currentReader)
+                    ReadBook.book = newBook
+                    ReadBook.inBookshelf = false
+                }
+            })
+        }
+        try {
+            scenario.close()
+            assertEquals(Lifecycle.State.DESTROYED, scenario.state)
+            // Removing a non-shelf book runs asynchronously; check throughout the idle interval
+            // instead of accepting its presence before the queued deletion has had time to run.
+            val deadline = SystemClock.uptimeMillis() + 1000
+            do {
+                instrumentation.waitForIdleSync()
+                assertSame(currentReader, ReadBook.callBack)
+                assertSame(newBook, ReadBook.book)
+                assertNotNull(appDb.bookDao.getBook(newBook.bookUrl))
+                assertEquals("Keep new book memo", appDb.bookMemoDao.get(newBook.bookUrl)?.content)
+                SystemClock.sleep(50)
+            } while (SystemClock.uptimeMillis() < deadline)
+        } finally {
+            instrumentation.runOnMainSync {
+                ReadBook.unregister(currentReader)
+                ReadBook.book = book
+                ReadBook.inBookshelf = true
+            }
+            appDb.bookDao.delete(newBook)
+        }
+    }
+
+    @Test fun currentReaderDestructionStillRemovesItsNonShelfBook() {
+        main { activity ->
+            activity.lifecycle.addObserver(LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_DESTROY) {
+                    ReadBook.inBookshelf = false
+                }
+            })
+        }
+        scenario.close()
+        val deadline = SystemClock.uptimeMillis() + 15000
+        while (appDb.bookDao.getBook(book.bookUrl) != null && SystemClock.uptimeMillis() < deadline) {
+            SystemClock.sleep(50)
+        }
+        assertNull(ReadBook.callBack)
+        assertNull(ReadBook.book)
+        assertNull(appDb.bookDao.getBook(book.bookUrl))
     }
 
     private fun launchReader() {

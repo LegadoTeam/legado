@@ -70,7 +70,8 @@ const sources = computed(() => store.sources)
 const sourcesFiltered = computed<Source[]>(() => {
   const key = searchKey.value
   return sources.value.filter(source =>
-    (key === '' || isSourceMatches(source, key)) &&
+    (key === '' || isSourceMatches(source, key) ||
+      (isBookSource && store.checkDetailMatches(source, key))) &&
     (!isBookSource || !store.checkStatusFilter || store.checkStatus(source) === store.checkStatusFilter))
 })
 // 计算当前筛选关键词下的选中源

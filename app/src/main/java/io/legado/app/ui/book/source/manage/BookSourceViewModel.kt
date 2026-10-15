@@ -166,18 +166,8 @@ class BookSourceViewModel(application: Application) : BaseViewModel(application)
         execute {
             val selection = adapter.selection
             val selectionSize = selection.size
-            val selectedRate = selectionSize.toFloat() / adapter.itemCount.toFloat()
-            val sources = if (selectedRate == 1f) {
-                getBookSources(searchKey, sortAscending, sort)
-            } else if (selectedRate < 0.3) {
-                selection.toBookSource()
-            } else {
-                val keys = selection.map { it.bookSourceUrl }.toHashSet()
-                val bookSources = getBookSources(searchKey, sortAscending, sort)
-                bookSources.filter {
-                    keys.contains(it.bookSourceUrl)
-                }
-            }
+            // Export exactly what is visible and selected, including status/detail filters.
+            val sources = selection.toBookSource()
             val name = if (selectionSize == 1) {
                 "bookSource_${selection.first().bookSourceName.normalizeFileName()}.json"
             } else {

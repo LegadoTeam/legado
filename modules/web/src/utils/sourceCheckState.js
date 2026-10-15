@@ -22,6 +22,10 @@ export const sourceCheckStatus = (source, snapshot, state) =>
   snapshot && state && snapshot.content === sourceCheckContent(source) &&
   snapshot.sourceRevision === state.sourceRevision ? state.status : 'NEEDS_CHECK'
 
+export const sourceCheckDetailMatches = (source, snapshot, state, searchKey) =>
+  sourceCheckStatus(source, snapshot, state) !== 'NEEDS_CHECK' &&
+  Boolean(state?.detail?.includes(searchKey))
+
 export const sourceCheckSnapshots = (sources, states) => {
   const revisions = new Map(states.map(state => [state.bookSourceUrl, state.sourceRevision]))
   return Object.fromEntries(sources.map(source => [source.bookSourceUrl, {
@@ -34,4 +38,5 @@ export const sourceCheckOptions = [
   { value: 'NEEDS_CHECK', label: '需要检验' },
   { value: 'PASSED', label: '检验成功' },
   { value: 'FAILED', label: '检验失败' },
+  { value: 'UNCHECKABLE', label: '无法校验' },
 ]

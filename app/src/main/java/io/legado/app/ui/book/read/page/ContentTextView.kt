@@ -964,6 +964,9 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         if (bodyEnd <= bodyStart) return null
         val bookText = getSelectedText()
         if (!bookText.hasHighlightableText()) return null
+        ReadBook.anchoredHighlightsOfChapter(chapter, titleLength)
+            .lastOrNull { (_, anchor) -> anchor.start == bodyStart && anchor.end == bodyEnd }
+            ?.first?.let { return it }
         return BookHighlight(
             bookUrl = book.bookUrl,
             chapterUrl = chapter.chapter.url,

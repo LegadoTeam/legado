@@ -70,7 +70,7 @@ interface BookHighlightDao {
     fun updateBookMetadata(bookUrl: String, bookName: String, bookAuthor: String)
 
     @Update
-    fun update(highlight: BookHighlight)
+    fun update(vararg highlight: BookHighlight)
 
     @Delete
     fun delete(vararg highlight: BookHighlight)
