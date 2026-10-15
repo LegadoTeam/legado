@@ -1116,9 +1116,11 @@ class TitleFontWeightRenderingTest {
                         assertEquals("Keep the existing blockquote inset in the paragraph direction: $label",
                             oldFirst.start + expectedShift, highlightedLines.first().columns.first().start, 0.02f)
                         highlightedLines.flatMap { it.columns }.forEach { column ->
-                            assertTrue("The capsule still has left/right page clearance: $label",
-                                minOf(column.start, column.end) >= leftEdge - 1f &&
-                                    maxOf(column.start, column.end) <= rightEdge + 1f)
+                            val low = minOf(column.start, column.end)
+                            val high = maxOf(column.start, column.end)
+                            assertTrue("The capsule still has left/right page clearance: $label " +
+                                "actual=$low/$high expected=$leftEdge/$rightEdge type=${column.javaClass.simpleName}",
+                                low >= leftEdge - 1f && high <= rightEdge + 1f)
                         }
                         val restored = awaitLayout(checkNotNull(chapter.layoutWithHighlightSpacing(scope, HighlightSpacing())))
                         assertUnchangedParagraphs(base, restored, paragraphs.keys, "restored $label")
