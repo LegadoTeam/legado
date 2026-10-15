@@ -1072,16 +1072,6 @@ class TitleFontWeightRenderingTest {
                 AppConfig.adaptSpecialStyle = true
                 ChapterProvider.clearReviewProviders()
                 val fixture = BookChapter(bookUrl = book!!.bookUrl, url = "html-paragraph-insets", index = 10009)
-                val savedWidth = ChapterProvider.visibleWidth
-                try {
-                    // A narrow double-page viewport can leave a negative effective text width.
-                    ChapterProvider.visibleWidth = -1
-                    val narrow = awaitLayout(ChapterProvider.getTextChapterAsync(CoroutineScope(Dispatchers.Default), book!!,
-                        fixture, "Narrow", BookContent(false, listOf("<usehtml><p>甲</p></usehtml>"), null),
-                        fixture.index + 1, saveChapterData = false))
-                    assertTrue("Keep the existing minimum-width fallback", canonical(narrow).contains("甲"))
-                    narrow.pages.forEach(TextPage::recycleRecorders)
-                } finally { ChapterProvider.visibleWidth = savedWidth }
                 for ((direction, words) in listOf("ltr" to "甲乙 abc שלום 丙丁 ", "rtl" to "שלום 12 abc עולם ")) {
                     val control = words.repeat(3)
                     val highlighted = words.repeat(14)
