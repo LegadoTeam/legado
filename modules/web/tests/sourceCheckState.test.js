@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { sourceCheckContent, sourceCheckStatus, sourceCheckSnapshots } from '../src/utils/sourceCheckState.js'
+import { sourceCheckContent, sourceCheckDetailMatches, sourceCheckOptions, sourceCheckStatus, sourceCheckSnapshots } from '../src/utils/sourceCheckState.js'
 
 const source = { bookSourceUrl: 'https://source', bookSourceName: 'Source', ruleSearch: { name: 'a' } }
 const snapshot = { content: sourceCheckContent(source), sourceRevision: 'original-rules' }
@@ -21,6 +21,15 @@ test('metadata and harmless JSON property order do not mark rules dirty or mutat
   assert.equal(JSON.stringify(local), before)
   assert.equal(sourceCheckStatus(source, snapshot, { ...passed, status: 'FAILED' }), 'FAILED')
   assert.equal(sourceCheckStatus(source, snapshot, { ...passed, status: 'NEEDS_CHECK' }), 'NEEDS_CHECK')
+})
+
+test('supports uncheckable results and searches only current check details', () => {
+  const state = { ...passed, status: 'UNCHECKABLE', detail: '源地址不是http链接' }
+  assert.equal(sourceCheckStatus(source, snapshot, state), 'UNCHECKABLE')
+  assert.equal(sourceCheckDetailMatches(source, snapshot, state, '不是http'), true)
+  assert.equal(sourceCheckDetailMatches(source, snapshot, { ...state, sourceRevision: 'stale' }, '不是http'), false)
+  assert.equal(sourceCheckDetailMatches({ ...source, bookSourceName: 'edited' }, snapshot, state, '不是http'), false)
+  assert.deepEqual(sourceCheckOptions.at(-1), { value: 'UNCHECKABLE', label: '无法校验' })
 })
 
 test('a saved device snapshot follows later checks without accepting unsaved edits or replacing other baselines', () => {

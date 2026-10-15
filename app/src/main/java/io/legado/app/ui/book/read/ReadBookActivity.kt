@@ -1298,10 +1298,8 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     override fun onHighlightStyleChanged(style: HighlightStyle) {
         editingHighlight?.let { highlight ->
-            val visibleStyle = visibleHighlightStyle(style)
-            highlight.applyStyle(visibleStyle)
-            ReadBook.updateHighlight(highlight)
-            ReadBook.saveLastHighlightStyle(visibleStyle)
+            ReadBook.updateHighlightStyle(highlight, style)
+            ReadBook.saveLastHighlightStyle(style)
         }
     }
 
@@ -2943,9 +2941,9 @@ class ReadBookActivity : BaseReadBookActivity(),
         readerOverflowPopup?.dismiss()
         highlightPopup?.dismiss()
         binding.readView.onDestroy()
-        ReadBook.unregister(this)
+        val wasCurrentReader = ReadBook.unregister(this)
         handler.removeCallbacksAndMessages(null) // 清理Handler消息
-        if (!ReadBook.inBookshelf && !isChangingConfigurations) {
+        if (wasCurrentReader && !ReadBook.inBookshelf && !isChangingConfigurations) {
             viewModel.removeFromBookshelf(null)
         }
         if (!BuildConfig.DEBUG) {

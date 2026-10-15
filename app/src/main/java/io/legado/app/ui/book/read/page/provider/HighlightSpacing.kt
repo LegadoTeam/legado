@@ -281,10 +281,9 @@ data class HighlightSpacing(
                     val explicit = style.resolvedHorizontalPadding != null
                     var end = i + 1
                     while (end < paragraph.size && paragraph[end].column is TextBaseColumn &&
-                        paragraph[end].style?.let { if (explicit || it.resolvedHorizontalPadding != null) it == style
-                        else it.fill == style.fill &&
-                            it.resolvedFillShape == style.resolvedFillShape &&
-                            it.resolvedPillPaddingScale == style.resolvedPillPaddingScale } == true &&
+                        paragraph[end].style?.let {
+                            if (style.fill != 0) style.hasSameFillGeometry(it) else it == style
+                        } == true &&
                         paragraph[end].textSize == first.textSize) end++
                     // A physical pixel between the cap and image keeps their antialiased
                     // coverage disjoint even when measured advances end on fractional pixels.

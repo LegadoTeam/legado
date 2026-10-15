@@ -849,6 +849,181 @@ class TitleFontWeightRenderingTest {
     }
 
     @Test
+    fun paddedCapsulesStayContinuousAcrossOverlappingTextStyles() {
+        launchReader()
+        val savedZh = ReadBookConfig.useZhLayout
+        val savedAdapt = AppConfig.adaptSpecialStyle
+        val savedJustify = ReadBookConfig.textFullJustify
+        fun awaitLayout(chapter: TextChapter): TextChapter = runBlocking {
+            withTimeout(30_000) { for (ignored in chapter.layoutChannel) Unit; while (!chapter.isCompleted) yield() }
+            chapter
+        }
+        fun canonical(chapter: TextChapter) = HighlightTextBuilder.build(chapter.pages.flatMap { it.lines }
+            .map { HighlightTextBuilder.LineInput(it.text, it.isParagraphEnd) })
+        try {
+            scenario!!.onActivity { activity ->
+                ReadBookConfig.titleMode = 2
+                ReadBookConfig.textSize = 26
+                ReadBookConfig.paddingLeft = 16
+                ReadBookConfig.paddingRight = 16
+                ReadBookConfig.letterSpacing = 0f
+                AppConfig.adaptSpecialStyle = true
+                context.putPrefBoolean(PreferKey.textFullJustify, true)
+                val dialogue = "“快点，洗脸刷牙，然后穿上衣服，我们九点就要出发了。”"
+                for (mode in listOf("static", "zh", "html")) {
+                    ReadBookConfig.useZhLayout = mode == "zh"
+                    ChapterProvider.upStyle()
+                    val content = "前${dialogue}后"
+                    val contents = if (mode == "html") listOf("<usehtml><p>$content</p></usehtml>")
+                        else listOf(ReadBookConfig.paragraphIndent + content)
+                    val scope = CoroutineScope(Dispatchers.Default)
+                    val fixture = BookChapter(bookUrl = book!!.bookUrl, url = "capsule-overlays", index = 10009)
+                    val base = awaitLayout(ChapterProvider.getTextChapterAsync(scope, book!!, fixture,
+                        "Capsule overlays", BookContent(false, contents, null), fixture.index + 1, saveChapterData = false))
+                    val original = canonical(base)
+                    val start = original.indexOf(dialogue)
+                    val end = start + dialogue.length
+                    val innerStart = original.indexOf("洗脸刷牙")
+                    val innerEnd = innerStart + "洗脸刷牙".length
+                    assertTrue(start >= 0 && innerStart > start && innerEnd < end)
+                    for (variant in listOf("default", "12dp", "different-fill", "different-padding")) {
+                        val split = variant.startsWith("different")
+                        val style = HighlightStyle(fill = Color.MAGENTA, fillShape = HighlightStyle.FillShape.PILL,
+                            pillPaddingScale = 0.5f, horizontalPadding = 12f.takeUnless { variant == "default" },
+                            textColor = Color.BLACK)
+                        fun overlay(text: String, overlayStyle: HighlightStyle): HighlightMatcher.Range {
+                            val offset = original.indexOf(text)
+                            assertTrue(offset >= start)
+                            return HighlightMatcher.Range(offset, offset + text.length, overlayStyle)
+                        }
+                        val ranges = mutableListOf(HighlightMatcher.Range(start, end, style),
+                            overlay("“", HighlightStyle(italic = true)),
+                            overlay("。”", HighlightStyle(bold = true)),
+                            overlay("快点", HighlightStyle(textColor = Color.BLUE)),
+                            overlay("洗脸刷牙", HighlightStyle(bold = true)),
+                            overlay("穿上衣服", HighlightStyle(italic = true)),
+                            overlay("九点", HighlightStyle(underline = HighlightStyle.Underline(color = Color.GREEN))))
+                        when (variant) {
+                            "different-fill" -> ranges += overlay("洗脸刷牙", style.copy(fill = Color.CYAN))
+                            "different-padding" -> ranges += overlay("洗脸刷牙", HighlightStyle(horizontalPadding = 24f))
+                        }
+                        val label = "$mode $variant"
+                        val spacing = HighlightSpacing.resolve(base, ranges)
+                        if (variant != "default") {
+                            val before = spacing.columns.filterValues { it.before > 0f }.keys
+                            val after = spacing.columns.filterValues { it.after > 0f }.keys
+                            assertEquals("Only real background starts reserve padding: $label",
+                                if (split) setOf(start, innerStart, innerEnd) else setOf(start), before)
+                            assertEquals("Text overlays cannot add interior padding: $label",
+                                if (split) setOf(innerStart - 1, innerEnd - 1, end - 1) else setOf(end - 1), after)
+                        }
+                        val chapter = awaitLayout(checkNotNull(base.layoutWithHighlightSpacing(scope, spacing)))
+                        assertEquals("Reflow preserves all text: $label", original, canonical(chapter))
+                        var continuousLines = 0
+                        var distinctBoundaries = 0
+                        var blueTextPixels = 0
+                        var greenUnderlinePixels = 0
+                        var cyanFillPixels = 0
+                        for (page in chapter.pages) {
+                            val width = ChapterProvider.viewWidth
+                            val height = ceil(maxOf(page.height, page.renderHeight.toFloat())).toInt()
+                            val view = ContentTextView(activity, null).apply { layout(0, 0, width, height); setContent(page) }
+                            assertEquals("No view background may hide holes in a capsule", null, view.background)
+                            val resolved = HighlightMatcher.resolve(chapter.getReadLength(page.index), page.lines.map { line ->
+                                HighlightMatcher.LineSpec(line.charSize, line.columns.map { it.positionLength },
+                                    line.isParagraphEnd, line.isTitle,
+                                    line.columns.map { (it as? TextBaseColumn)?.isParagraphIndent == true })
+                            }, ranges)
+                            page.lines.forEachIndexed { row, line -> line.columns.forEachIndexed { col, column ->
+                                if (column is TextBaseColumn) column.highlightStyle = resolved[row][col]
+                            } }
+                            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                            try {
+                                view.draw(Canvas(bitmap))
+                                assertEquals("The real page canvas retains transparent margins", 0, Color.alpha(bitmap.getPixel(0, 0)))
+                                if (page.index == 0) File(context.getExternalFilesDir("ui-regression"),
+                                    "highlight-capsule-overlays-$mode-$variant.png").outputStream().use {
+                                    assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+                                }
+                                for (line in page.lines) {
+                                    val selected = line.columns.filterIsInstance<TextBaseColumn>()
+                                        .filter { it.highlightStyle?.fill?.let { fill -> fill != 0 } == true }
+                                    if (selected.isEmpty()) continue
+                                    val band = HighlightGeometry.fillBand(line.lineBase - line.lineTop,
+                                        line.textPaint.textSize, line.height, HighlightStyle.FillShape.PILL, 1f.dpToPx())
+                                    if (!split && selected.size > 2) {
+                                        // An interior end cap leaves holes near the shoulder even if its middle touches.
+                                        val y = (line.lineTop + band.top + (band.bottom - band.top) * 0.15f).toInt()
+                                        for (x in ceil(selected.first().end).toInt()..floor(selected.last().start).toInt()) {
+                                            assertTrue("Background is continuous inside one dialogue: $label ($x,$y)",
+                                                Color.alpha(bitmap.getPixel(x, y)) > 40)
+                                        }
+                                        continuousLines++
+                                        if (variant == "12dp") {
+                                            val ink = Rect()
+                                            var inkLeft = Float.POSITIVE_INFINITY
+                                            var inkRight = Float.NEGATIVE_INFINITY
+                                            for (column in selected) {
+                                                val paint = HighlightDraw.obtainTextPaint(line.textPaint, column.highlightStyle!!, 0, column.charData)
+                                                try {
+                                                    paint.getTextBounds(column.charData, 0, column.charData.length, ink)
+                                                    val origin = column.start + ((column as? TextColumn)?.drawOffset ?: 0f)
+                                                    inkLeft = minOf(inkLeft, origin + ink.left)
+                                                    inkRight = maxOf(inkRight, origin + ink.right)
+                                                } finally { HighlightDraw.recycleTextPaint(paint) }
+                                            }
+                                            val middle = (line.lineTop + (band.top + band.bottom) / 2f).toInt()
+                                            val edges = (0 until width).filter { x ->
+                                                val pixel = bitmap.getPixel(x, middle)
+                                                Color.alpha(pixel) > 40 && Color.red(pixel) > 180 && Color.blue(pixel) > 180 && Color.green(pixel) < 100
+                                            }
+                                            assertTrue("Both real end caps remain visible: $label", edges.size >= 2)
+                                            assertEquals("Actual first-glyph left padding: $label", 12f.dpToPx(), inkLeft - edges.first(), 1.5f)
+                                            assertEquals("Actual last-glyph right padding: $label", 12f.dpToPx(), edges.last() - inkRight, 1.5f)
+                                        }
+                                    }
+                                    if (split) for ((previous, next) in selected.zipWithNext()) {
+                                        val previousStyle = previous.highlightStyle!!
+                                        val nextStyle = next.highlightStyle!!
+                                        if (previousStyle.fill == nextStyle.fill &&
+                                            previousStyle.resolvedHorizontalPadding == nextStyle.resolvedHorizontalPadding) continue
+                                        val middle = (line.lineTop + (band.top + band.bottom) / 2f).toInt()
+                                        assertTrue("Distinct backgrounds/padding keep separate caps: $label",
+                                            (ceil(previous.end).toInt()..floor(next.start).toInt()).any { x ->
+                                                Color.alpha(bitmap.getPixel(x, middle)) < 10
+                                            })
+                                        distinctBoundaries++
+                                    }
+                                    for (y in ceil(line.lineTop).toInt() until ceil(line.renderBottom()).toInt().coerceAtMost(height))
+                                        for (x in 0 until width) {
+                                            val pixel = bitmap.getPixel(x, y)
+                                            if (Color.alpha(pixel) > 100 && Color.blue(pixel) > 180 && Color.red(pixel) < 60 && Color.green(pixel) < 60) blueTextPixels++
+                                            if (Color.alpha(pixel) > 100 && Color.green(pixel) > 180 && Color.red(pixel) < 60 && Color.blue(pixel) < 60) greenUnderlinePixels++
+                                            if (Color.alpha(pixel) > 40 && Color.blue(pixel) > 180 && Color.green(pixel) > 180 && Color.red(pixel) < 60) cyanFillPixels++
+                                        }
+                                }
+                            } finally { bitmap.recycle(); page.recycleRecorders() }
+                        }
+                        if (!split) assertTrue("Real wrapped lines were checked: $label", continuousLines >= 2)
+                        if (split) assertTrue("A real internal cap boundary was checked: $label", distinctBoundaries > 0)
+                        assertTrue("The inner text-color rule still draws blue glyphs: $label", blueTextPixels > 10)
+                        assertTrue("The inner underline rule still draws a green line: $label", greenUnderlinePixels > 10)
+                        if (variant == "different-fill") assertTrue("A different background is not merged away: $label", cyanFillPixels > 10)
+                    }
+                    base.pages.forEach(TextPage::recycleRecorders)
+                }
+            }
+        } finally {
+            instrumentation.runOnMainSync {
+                ReadBookConfig.useZhLayout = savedZh
+                AppConfig.adaptSpecialStyle = savedAdapt
+                context.putPrefBoolean(PreferKey.textFullJustify, savedJustify)
+                ChapterProvider.upStyle()
+            }
+        }
+    }
+
+    @Test
     fun independentHorizontalPaddingReservesRealEdgesAcrossReaderLayouts() {
         launchReader()
         val savedZh = ReadBookConfig.useZhLayout

@@ -323,6 +323,40 @@ class BookSourceCheckUiTest {
         assertEquals("PASSED", dao.getCheckState(url)!!.status)
     }
 
+    @Test fun nonHttpDomainIsUncheckableAfterOtherChecksPass() = runBlocking {
+        val source = BookSource(
+            bookSourceUrl = "local://check-$id",
+            bookSourceName = "Local check fixture",
+            bookSourceGroup = group,
+            bookSourceComment = "Original comment",
+            mainJs = "function search(key, page) { return [{ name: 'fixture', bookUrl: 'fixture' }]; }",
+        )
+        val dao = appDb.bookSourceDao
+        dao.insert(source)
+        try {
+            CheckSource.checkDomain = true
+            CheckSource.checkSearch = true
+            CheckSource.checkDiscovery = false
+            CheckSource.checkInfo = false
+            CheckSource.checkCategory = false
+            CheckSource.checkContent = false
+            val session = Debug.tryStartCheckSession()!!
+            CheckSource.start(context, listOf(dao.getBookSourcePart(source.bookSourceUrl)!!), session)
+            waitUntil { !Debug.isChecking(session) }
+            assertEquals("UNCHECKABLE", dao.getCheckState(source.bookSourceUrl)!!.status)
+            assertEquals(source.bookSourceGroup, dao.getBookSource(source.bookSourceUrl)!!.bookSourceGroup)
+            assertEquals(source.bookSourceComment, dao.getBookSource(source.bookSourceUrl)!!.bookSourceComment)
+            source.mainJs = "function search(key, page) { return []; }"
+            dao.update(source)
+            val failedSession = Debug.tryStartCheckSession()!!
+            CheckSource.start(context, listOf(dao.getBookSourcePart(source.bookSourceUrl)!!), failedSession)
+            waitUntil { !Debug.isChecking(failedSession) }
+            assertEquals("FAILED", dao.getCheckState(source.bookSourceUrl)!!.status)
+        } finally {
+            dao.delete(source)
+        }
+    }
+
     private fun awaitItems(expected: List<String>) = waitUntil {
         var actual = emptyList<String>()
         var rendered = false

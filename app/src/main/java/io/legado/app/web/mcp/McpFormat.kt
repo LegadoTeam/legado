@@ -54,6 +54,7 @@ object McpFormat {
     ): String {
         val failed = mutableListOf<String>()
         val passed = mutableListOf<String>()
+        val uncheckable = mutableListOf<String>()
         val pending = mutableListOf<String>()
         requestedSources.forEach { requested ->
             val result = results[requested.bookSourceUrl]
@@ -61,6 +62,7 @@ object McpFormat {
             when (result?.status) {
                 CheckSourceStatus.FAILED -> failed += renderCheckResult(requested, result)
                 CheckSourceStatus.PASSED -> passed += renderCheckResult(requested, result)
+                CheckSourceStatus.UNCHECKABLE -> uncheckable += renderCheckResult(requested, result)
                 CheckSourceStatus.NOT_COMPLETED -> pending += renderCheckResult(requested, result)
                 null -> {
                     val label = "${requested.bookSourceName}(${requested.bookSourceUrl})"
@@ -76,6 +78,9 @@ object McpFormat {
             appendLine("通过 ${passed.size}/${requestedSources.size}:")
             appendLinesOrEmpty(passed)
             appendLine()
+            appendLine("无法校验 ${uncheckable.size}/${requestedSources.size}:")
+            appendLinesOrEmpty(uncheckable)
+            appendLine()
             appendLine("未完成 ${pending.size}/${requestedSources.size}:")
             appendLinesOrEmpty(pending)
         }.trimEnd()
@@ -85,6 +90,7 @@ object McpFormat {
         val state = when (result.status) {
             CheckSourceStatus.PASSED -> "通过"
             CheckSourceStatus.FAILED -> "失败"
+            CheckSourceStatus.UNCHECKABLE -> "无法校验"
             CheckSourceStatus.NOT_COMPLETED -> "未完成"
         }
         val detail = result.detail.takeIf { it.isNotEmpty() }?.let { ":$it" }.orEmpty()
