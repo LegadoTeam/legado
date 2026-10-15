@@ -1255,12 +1255,28 @@ class TextChapterLayout(
             )
             val lineHeight = lineHeights[lineIndex]
             prepareNextPageIfNeed(durY + lineHeight)
-            val lineStartX = absStartX + leftInset
             val lineStart = layout.getLineStart(lineIndex)
             val lineEnd = layout.getLineEnd(lineIndex)
             textLine.chapterPosition = chapterStart + lineStart
             val lineText = text.substring(lineStart, lineEnd)
             val (words, widths) = measureTextSplit(lineText, widthsArray, lineStart)
+            val lineIndentWidth = if (lineIndex == 0 && isFirstLine && !isTitle) {
+                if (textFullJustify) {
+                    paragraphIndent.length * indentCharWidth
+                } else {
+                    widths.take(paragraphIndent.length).fastSum()
+                }
+            } else {
+                0f
+            }
+            // The indent already protects a first-line pill from the page edge.
+            val lineLeftInset = if (lineIndentWidth > 0f) 0 else leftInset
+            val lineAvailableWidth = if (lineLeftInset != leftInset) {
+                (visibleWidth - lineLeftInset - rightInset).coerceAtLeast(1)
+            } else {
+                availableLineWidth
+            }
+            val lineStartX = absStartX + lineLeftInset
             if (
                 punctuationCompressMode.compressLineEnd &&
                 lineIndex < layout.lineCount - 1
@@ -1298,7 +1314,7 @@ class TextChapterLayout(
                     addCharsToLineFirst(
                         book, lineStartX, textLine, words, textPaint,
                         desiredWidth, widths, srcList, clickList, hangingWidth, drawOffsets,
-                        availableLineWidth
+                        lineAvailableWidth
                     )
                 }
                 layout.lineCount - 1 -> {
@@ -1307,20 +1323,20 @@ class TextChapterLayout(
                         book, lineStartX, textLine, words,
                         titleStartX ?: 0f, !isTitle && lineIndex == 0 && isFirstLine,
                         widths, srcList, clickList,
-                        if (lineIndex == 0) hangingWidth else 0f, drawOffsets, availableLineWidth
+                        if (lineIndex == 0) hangingWidth else 0f, drawOffsets, lineAvailableWidth
                     )
                 }
                 else -> {
                     if (titleStartX != null) {
                         addCharsToLineNatural(
                             book, lineStartX, textLine, words,
-                            titleStartX, false, widths, srcList, clickList, lineWidth = availableLineWidth
+                            titleStartX, false, widths, srcList, clickList, lineWidth = lineAvailableWidth
                         )
                     } else {
                         //中间行
                         addCharsToLineMiddle(
                             book, lineStartX, textLine, words, textPaint,
-                            desiredWidth, 0f, widths, srcList, clickList, drawOffsets, availableLineWidth
+                            desiredWidth, 0f, widths, srcList, clickList, drawOffsets, lineAvailableWidth
                         )
                     }
                 }

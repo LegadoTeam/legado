@@ -1024,6 +1024,91 @@ class TitleFontWeightRenderingTest {
     }
 
     @Test
+    fun plainTextPillInsetsDoNotAddToParagraphIndent() {
+        launchReader()
+        val savedAdapt = AppConfig.adaptSpecialStyle
+        val savedJustify = ReadBookConfig.textFullJustify
+        val savedZh = ReadBookConfig.useZhLayout
+        val savedIndent = ReadBookConfig.paragraphIndent
+        val savedLeft = ReadBookConfig.paddingLeft
+        val savedRight = ReadBookConfig.paddingRight
+        fun awaitLayout(chapter: TextChapter): TextChapter = runBlocking {
+            withTimeout(30_000) { for (ignored in chapter.layoutChannel) Unit; while (!chapter.isCompleted) yield() }
+            chapter
+        }
+        try {
+            scenario!!.onActivity {
+                ReadBookConfig.titleMode = 2
+                ReadBookConfig.textSize = 20
+                ReadBookConfig.paragraphIndent = ChapterProvider.indentChar.repeat(2)
+                ReadBookConfig.paddingLeft = 16
+                ReadBookConfig.paddingRight = 16
+                AppConfig.adaptSpecialStyle = true
+                ChapterProvider.clearReviewProviders()
+                val control = "未高亮段落用于对照，保留相同的段首缩进和换行。".repeat(3)
+                val highlighted = "中间内容带有高亮样式，首行不应重复计算段首缩进。".repeat(5)
+                val after = "后续段落用于确认其它段落的排版位置保持稳定。".repeat(3)
+                val fixture = BookChapter(bookUrl = book!!.bookUrl, url = "text-paragraph-insets", index = 10010)
+                val style = HighlightStyle(fill = Color.MAGENTA,
+                    fillShape = HighlightStyle.FillShape.PILL, horizontalPadding = 32f)
+                for (mode in listOf("static", "zh")) for (justify in listOf(false, true)) {
+                    ReadBookConfig.useZhLayout = mode == "zh"
+                    context.putPrefBoolean(PreferKey.textFullJustify, justify)
+                    ChapterProvider.upStyle()
+                    val scope = CoroutineScope(Dispatchers.Default)
+                    val contents = listOf(
+                        ReadBookConfig.paragraphIndent + control,
+                        ReadBookConfig.paragraphIndent + highlighted,
+                        ReadBookConfig.paragraphIndent + after,
+                    )
+                    val base = awaitLayout(ChapterProvider.getTextChapterAsync(scope, book!!, fixture,
+                        "Paragraphs", BookContent(false, contents, null), fixture.index + 1, saveChapterData = false))
+                    val original = HighlightTextBuilder.build(base.pages.flatMap { it.lines }
+                        .map { HighlightTextBuilder.LineInput(it.text, it.isParagraphEnd) })
+                    val start = original.indexOf("高亮样式")
+                    assertTrue("The highlighted range must exist: $mode justify=$justify", start >= 0)
+                    val spacing = HighlightSpacing.resolve(base,
+                        listOf(HighlightMatcher.Range(start, start + "高亮样式".length, style)))
+                    assertTrue("The test must exercise a paragraph edge inset: $mode justify=$justify",
+                        spacing.edgePadding(start, start + "高亮样式".length) > ChapterProvider.paddingLeft)
+                    val chapter = awaitLayout(checkNotNull(base.layoutWithHighlightSpacing(scope, spacing)))
+                    val baseParagraphs = base.pages.flatMap { it.lines }.groupBy { it.paragraphNum }
+                    val highlightedParagraph = baseParagraphs.values.single { lines ->
+                        lines.joinToString("") { it.text }.contains(highlighted)
+                    }
+                    val paragraphNum = highlightedParagraph.first().paragraphNum
+                    val actualParagraph = chapter.pages.flatMap { it.lines }.filter { it.paragraphNum == paragraphNum }
+                    val baseFirst = highlightedParagraph.first { line ->
+                        line.columns.any { (it as? TextBaseColumn)?.isParagraphIndent == true }
+                    }
+                    val actualFirst = actualParagraph.first { line ->
+                        line.columns.any { (it as? TextBaseColumn)?.isParagraphIndent == true }
+                    }
+                    fun bodyStart(line: TextLine) = line.columns
+                        .filterIsInstance<TextBaseColumn>()
+                        .first { !it.isParagraphIndent }
+                        .start
+                    assertEquals("Plain text highlight must keep the original paragraph indent: $mode justify=$justify",
+                        bodyStart(baseFirst), bodyStart(actualFirst), 0.02f)
+                    base.pages.forEach(TextPage::recycleRecorders)
+                    chapter.pages.forEach(TextPage::recycleRecorders)
+                }
+            }
+        } finally {
+            instrumentation.runOnMainSync {
+                AppConfig.adaptSpecialStyle = savedAdapt
+                context.putPrefBoolean(PreferKey.textFullJustify, savedJustify)
+                ReadBookConfig.useZhLayout = savedZh
+                ReadBookConfig.paragraphIndent = savedIndent
+                ReadBookConfig.paddingLeft = savedLeft
+                ReadBookConfig.paddingRight = savedRight
+                ChapterProvider.clearReviewProviders()
+                ChapterProvider.upStyle()
+            }
+        }
+    }
+
+    @Test
     fun htmlPillInsetsDoNotReflowUnhighlightedParagraphsInTheSameBlock() {
         launchReader()
         val savedAdapt = AppConfig.adaptSpecialStyle
