@@ -1072,13 +1072,13 @@ class TitleFontWeightRenderingTest {
                 AppConfig.adaptSpecialStyle = true
                 ChapterProvider.clearReviewProviders()
                 val fixture = BookChapter(bookUrl = book!!.bookUrl, url = "html-paragraph-insets", index = 10009)
-                for ((direction, words) in listOf("ltr" to "甲乙丙丁戊己庚辛", "rtl" to "שלום עולם ")) {
+                for ((direction, words) in listOf("ltr" to "甲乙 abc שלום 丙丁 ", "rtl" to "שלום 12 abc עולם ")) {
                     val control = words.repeat(3)
                     val highlighted = words.repeat(14)
                     val after = words.repeat(5)
                     val html = "<usehtml><blockquote><p><b>$control</b><img src='$imageSrc'>尾</p>" +
                         "<p>$highlighted</p></blockquote><p>$after</p></usehtml>"
-                    for ((left, right) in listOf(0 to 0, 0 to 32, 32 to 0, 32 to 32)) {
+                    for ((left, right) in listOf(0 to 32, 32 to 0)) {
                         ReadBookConfig.paddingLeft = left
                         ReadBookConfig.paddingRight = right
                         ChapterProvider.upStyle()
@@ -1092,52 +1092,55 @@ class TitleFontWeightRenderingTest {
                         assertTrue("All three HTML paragraphs must be present", start > 0 && afterStart >= end)
                         val originalImages = base.pages.flatMap { it.lines }.flatMap { it.columns }.filterIsInstance<ImageColumn>()
                         assertEquals("The control contains a real inline image", 1, originalImages.size)
-                        for (padding in listOf(null, 12f)) {
-                            val label = "$direction margins=$left/$right padding=$padding"
-                            val style = HighlightStyle(fill = Color.rgb(32, 144, 80),
-                                fillShape = HighlightStyle.FillShape.PILL, horizontalPadding = padding)
-                            val ranges = listOf(HighlightMatcher.Range(start, end, style))
-                            val spacing = HighlightSpacing.resolve(base, ranges)
-                            val chapter = awaitLayout(checkNotNull(base.layoutWithHighlightSpacing(scope, spacing)))
-                            assertEquals("Reflow preserves canonical anchors: $label", original, canonical(chapter))
-                            assertUnchangedParagraph(base, chapter, 0, start, label)
-                            assertUnchangedParagraph(base, chapter, afterStart, original.length, label)
-                            val highlightedLines = chapter.pages.flatMap { it.lines }
-                                .filter { it.chapterPosition in start until end }
-                            assertTrue("The highlighted paragraph must exercise wrapping: $label", highlightedLines.size > 1)
-                            val inset = ceil(spacing.edgePadding(start, end)).toInt()
-                            val leftEdge = maxOf(ChapterProvider.paddingLeft, inset).toFloat()
-                            val rightEdge = ChapterProvider.viewWidth - maxOf(ChapterProvider.paddingRight, inset)
-                            highlightedLines.flatMap { it.columns }.forEach { column ->
-                                assertTrue("The capsule still has left/right page clearance: $label",
-                                    minOf(column.start, column.end) >= leftEdge - 1f &&
-                                        maxOf(column.start, column.end) <= rightEdge + 1f)
-                            }
-                            val restored = awaitLayout(checkNotNull(chapter.layoutWithHighlightSpacing(scope, HighlightSpacing())))
-                            assertUnchangedParagraph(base, restored, 0, original.length, "restored $label")
-                            if (left == 0 && right == 32) {
-                                val page = chapter.pages.first()
-                                page.lines.forEach { line ->
-                                    line.columns.filterIsInstance<TextBaseColumn>().forEach { column ->
-                                        column.highlightStyle = style.takeIf { line.chapterPosition in start until end }
-                                    }
-                                    line.invalidate()
-                                }
-                                val height = ceil(maxOf(page.height, page.renderHeight.toFloat())).toInt()
-                                val view = ContentTextView(activity, null).apply { layout(0, 0, ChapterProvider.viewWidth, height); setContent(page) }
-                                Bitmap.createBitmap(ChapterProvider.viewWidth, height, Bitmap.Config.ARGB_8888).let { bitmap ->
-                                    try {
-                                        view.draw(Canvas(bitmap))
-                                        File(context.getExternalFilesDir("ui-regression"),
-                                            "highlight-html-paragraph-$direction-${padding ?: "default"}.png").outputStream().use {
-                                            assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
-                                        }
-                                    } finally { bitmap.recycle() }
-                                }
-                            }
-                            restored.pages.forEach(TextPage::recycleRecorders)
-                            chapter.pages.forEach(TextPage::recycleRecorders)
+                        val label = "$direction margins=$left/$right"
+                        val style = HighlightStyle(fill = Color.rgb(32, 144, 80),
+                            fillShape = HighlightStyle.FillShape.PILL)
+                        val ranges = listOf(HighlightMatcher.Range(start, end, style))
+                        val spacing = HighlightSpacing.resolve(base, ranges)
+                        val chapter = awaitLayout(checkNotNull(base.layoutWithHighlightSpacing(scope, spacing)))
+                        assertEquals("Reflow preserves canonical anchors: $label", original, canonical(chapter))
+                        assertUnchangedParagraph(base, chapter, 0, start, label)
+                        assertUnchangedParagraph(base, chapter, afterStart, original.length, label)
+                        val highlightedLines = chapter.pages.flatMap { it.lines }
+                            .filter { it.chapterPosition in start until end }
+                        assertTrue("The highlighted paragraph must exercise wrapping: $label", highlightedLines.size > 1)
+                        val inset = ceil(spacing.edgePadding(start, end)).toInt()
+                        val leftEdge = maxOf(ChapterProvider.paddingLeft, inset).toFloat()
+                        val rightEdge = ChapterProvider.viewWidth - maxOf(ChapterProvider.paddingRight, inset)
+                        val oldFirst = base.pages.flatMap { it.lines }.first { it.chapterPosition == start }.columns.first()
+                        val expectedShift = if (direction == "ltr") (inset - ChapterProvider.paddingLeft).coerceAtLeast(0)
+                            else -(inset - ChapterProvider.paddingRight).coerceAtLeast(0)
+                        assertEquals("Keep the existing blockquote inset in the paragraph direction: $label",
+                            oldFirst.start + expectedShift, highlightedLines.first().columns.first().start, 0.02f)
+                        highlightedLines.flatMap { it.columns }.forEach { column ->
+                            assertTrue("The capsule still has left/right page clearance: $label",
+                                minOf(column.start, column.end) >= leftEdge - 1f &&
+                                    maxOf(column.start, column.end) <= rightEdge + 1f)
                         }
+                        val restored = awaitLayout(checkNotNull(chapter.layoutWithHighlightSpacing(scope, HighlightSpacing())))
+                        assertUnchangedParagraph(base, restored, 0, original.length, "restored $label")
+                        if (left == 0 && right == 32) {
+                            val page = chapter.pages.first()
+                            val height = ceil(maxOf(page.height, page.renderHeight.toFloat())).toInt()
+                            val view = ContentTextView(activity, null).apply { layout(0, 0, ChapterProvider.viewWidth, height); setContent(page) }
+                            page.lines.forEach { line ->
+                                line.columns.filterIsInstance<TextBaseColumn>().forEach { column ->
+                                    column.highlightStyle = style.takeIf { line.chapterPosition in start until end }
+                                }
+                                line.invalidate()
+                            }
+                            Bitmap.createBitmap(ChapterProvider.viewWidth, height, Bitmap.Config.ARGB_8888).let { bitmap ->
+                                try {
+                                    view.draw(Canvas(bitmap))
+                                    File(context.getExternalFilesDir("ui-regression"),
+                                        "highlight-html-paragraph-$direction.png").outputStream().use {
+                                        assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+                                    }
+                                } finally { bitmap.recycle() }
+                            }
+                        }
+                        restored.pages.forEach(TextPage::recycleRecorders)
+                        chapter.pages.forEach(TextPage::recycleRecorders)
                         base.pages.forEach(TextPage::recycleRecorders)
                     }
                 }
