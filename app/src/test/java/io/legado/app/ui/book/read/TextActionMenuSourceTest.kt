@@ -38,6 +38,17 @@ class TextActionMenuSourceTest {
         assertFalse(source.contains("binding.root.height +"))
     }
 
+    @Test
+    fun `menu clicks keep the bound item when RecyclerView position is transient`() {
+        val source = projectFile(
+            "src/main/java/io/legado/app/ui/book/read/TextActionMenu.kt"
+        ).readText()
+
+        assertTrue(source.contains("root.setTag(R.id.tag, item)"))
+        assertTrue(source.contains("holder.itemView.getTag(R.id.tag) as? MenuItemImpl"))
+        assertFalse(source.contains("getItem(holder.layoutPosition)"))
+    }
+
     private fun projectFile(pathInApp: String): File {
         return sequenceOf(File(pathInApp), File("app/$pathInApp"))
             .firstOrNull(File::isFile)
