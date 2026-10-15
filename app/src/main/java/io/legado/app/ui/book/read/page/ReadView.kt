@@ -171,6 +171,11 @@ class ReadView(context: Context, attrs: AttributeSet) :
     private val longPressTimeout = 600L
     private val longPressRunnable = Runnable {
         longPressed = true
+        // 在已有选区时长按, 取消旧选区后重新选择, 之后的拖动用于扩展新选区
+        if (selectedOnDown) {
+            selectedOnDown = false
+            cancelSelect()
+        }
         onLongPress()
     }
     private var replacePreviewGestureState = ReplacePreviewGestureState.IDLE
@@ -187,6 +192,9 @@ class ReadView(context: Context, attrs: AttributeSet) :
     }
     var isTextSelected = false
     private var pressOnTextSelected = false
+
+    // 按下时已有选中文字: 点击取消选择, 拖动不作用于页面
+    private var selectedOnDown = false
     private val initialTextPos = TextPos(0, 0, 0)
     private var textMagnifier: SelectionMagnifierApi28? = null
     private val locationOnScreen = IntArray(2)
@@ -321,13 +329,9 @@ class ReadView(context: Context, attrs: AttributeSet) :
                 resetPullBookmarkGesture(animatePage = false)
                 dismissTextMagnifier()
                 callBack.screenOffTimerStart()
-                if (isTextSelected) {
-                    curPage.cancelSelect()
-                    isTextSelected = false
-                    pressOnTextSelected = true
-                } else {
-                    pressOnTextSelected = false
-                }
+                // 已有选区时先保留, 抬起时再决定是否取消, 以免拖动光标失手时丢失选区
+                selectedOnDown = isTextSelected
+                pressOnTextSelected = isTextSelected
                 longPressed = false
                 postDelayed(longPressRunnable, longPressTimeout)
                 pressDown = true
@@ -378,11 +382,15 @@ class ReadView(context: Context, attrs: AttributeSet) :
                 if (isMove) {
                     longPressed = false
                     removeCallbacks(longPressRunnable)
-                    if (isTextSelected) {
-                        selectText(event.x, event.y)
-                        showTextMagnifier(event.x, event.y)
-                    } else {
-                        pageDelegate?.onTouch(event)
+                    when {
+                        // 已有选区时拖动不作用于页面, 避免拖动光标失手时翻页
+                        selectedOnDown -> Unit
+                        isTextSelected -> {
+                            selectText(event.x, event.y)
+                            showTextMagnifier(event.x, event.y)
+                        }
+
+                        else -> pageDelegate?.onTouch(event)
                     }
                 }
             }
@@ -409,7 +417,10 @@ class ReadView(context: Context, attrs: AttributeSet) :
                 }
                 resetPullBookmarkGesture()
                 if (!pageDelegate!!.isMoved && !isMove) {
-                    if (!longPressed && !pressOnTextSelected) {
+                    if (selectedOnDown) {
+                        // 点击取消选择, 拖动过则保留选区
+                        cancelSelect()
+                    } else if (!longPressed && !pressOnTextSelected) {
                         if (!curPage.onClick(startX, startY)) {
                             onSingleTapUp()
                         }
@@ -559,6 +570,7 @@ class ReadView(context: Context, attrs: AttributeSet) :
         longPressed = false
         pressDown = false
         pressOnTextSelected = false
+        selectedOnDown = false
         resetPullBookmarkGesture(animatePage = false)
         finishReplacePreviewGesture(ReplacePreviewGestureState.IDLE)
     }
@@ -1071,17 +1083,22 @@ class ReadView(context: Context, attrs: AttributeSet) :
      */
     suspend fun aloudStartSelect() {
         val selectStartPos = curPage.selectStartPos
+        if (!selectStartPos.isSelected()) return
         var pagePos = selectStartPos.relativePagePos
         val line = selectStartPos.lineIndex
         val column = selectStartPos.columnIndex
+        // Capture the selected page before navigation/rebinding clears or moves the selection.
+        val selectedPage = curPage.relativePage(pagePos)
+        val selectedPosition = selectedPage.chapterPosition + selectedPage.getPosByLineColumn(line, column)
         while (pagePos > 0) {
-            if (!ReadBook.moveToNextPage()) {
-                ReadBook.moveToNextChapterAwait(false)
-            }
+            if (!ReadBook.moveToNextPage() && !ReadBook.moveToNextChapterAwait(false)) return
             pagePos--
         }
-        val startPos = curPage.textPage.getPosByLineColumn(line, column)
-        ReadBook.readAloud(startPos = startPos)
+        val chapter = ReadBook.curTextChapter ?: return
+        if (chapter.chapter.index != selectedPage.chapterIndex) return
+        val startPos = selectedPosition - chapter.getReadLength(ReadBook.durPageIndex)
+        if (!BaseReadAloudService.isRun) ReadAloud.upReadAloudClass()
+        ReadBook.readAloud(startPos = startPos, rewindToSentenceStart = false)
     }
 
     /**

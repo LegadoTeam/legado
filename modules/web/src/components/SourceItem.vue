@@ -11,7 +11,7 @@
     <span class="source-name" :title="getSourceName(source)">
       {{ getSourceName(source) }}
     </span>
-    <span v-if="'bookSourceUrl' in source" class="check-status" :title="store.checkStates[sourceUrl]?.detail">{{ checkLabel }}</span>
+    <span v-if="'bookSourceUrl' in source" class="check-status" :title="checkDetail">{{ checkLabel }}</span>
     <el-button
       class="edit-source"
       text
@@ -38,6 +38,7 @@ const checkLabel = computed(() => sourceCheckOptions.find(option => option.value
 
 const currentSourceUrl = computed(() => store.currentSourceUrl)
 const sourceUrl = computed(() => getSourceUniqueKey(props.source))
+const checkDetail = computed(() => store.checkStatus(props.source) === 'NEEDS_CHECK' ? '' : store.checkStates[sourceUrl.value]?.detail ?? '')
 
 const handleSourceClick = (source: Source) => {
   store.changeCurrentSource(source)

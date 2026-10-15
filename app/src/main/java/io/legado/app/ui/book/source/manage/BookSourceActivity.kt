@@ -124,7 +124,8 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
     private var showCheckStatus = AppConfig.showSourceCheckStatus
     private var checkStatusFilter = 0
     private val checkStatuses = listOf("", BookSourceCheckState.NEEDS_CHECK,
-        BookSourceCheckState.PASSED, BookSourceCheckState.FAILED)
+        BookSourceCheckState.PASSED, BookSourceCheckState.FAILED,
+        BookSourceCheckState.UNCHECKABLE)
     private val hostMap = hashMapOf<String, String>()
     private val qrResult = registerForActivityResult(QrCodeResult()) {
         it ?: return@registerForActivityResult
@@ -180,7 +181,8 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
         val savedSearch = savedInstanceState?.getString("sourceSearch")
         savedSearch?.let { searchView.setQuery(it, false) }
         checkStatusFilter = if (showCheckStatus) {
-            savedInstanceState?.getInt("checkStatusFilter")?.coerceIn(0, 3) ?: 0
+            savedInstanceState?.getInt("checkStatusFilter")
+                ?.coerceIn(0, checkStatuses.lastIndex) ?: 0
         } else 0
         binding.checkStatusFilter.setSelection(checkStatusFilter)
         binding.checkStatusFilter.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
@@ -409,7 +411,7 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
                 }
 
                 else -> {
-                    appDb.bookSourceDao.flowSearch(searchKey)
+                    appDb.bookSourceDao.flowSearchWithCheckDetail(searchKey)
                 }
             }.map { sources ->
                 val state = if (showCheckStatus) checkStatuses[checkStatusFilter] else ""

@@ -73,7 +73,7 @@ class CheckSourceService : BaseService() {
     )
 
     private data class CheckOutcome(
-        val succeeded: Boolean,
+        val status: CheckSourceStatus,
         val message: String,
     )
 
@@ -220,13 +220,13 @@ class CheckSourceService : BaseService() {
                 )
                 upNotification()
                 currentCoroutineContext().ensureActive()
-                val detail = if (outcome.succeeded) "" else listOf(
+                val detail = if (outcome.status == CheckSourceStatus.PASSED) "" else listOf(
                     source.getInvalidGroupNames(), outcome.message,
                     if (CheckSource.wSourceComment) source.bookSourceComment
                         ?.lineSequence()?.firstOrNull { it.startsWith("// Error: ") }.orEmpty() else "",
                 ).filter { it.isNotEmpty() }.distinct().joinToString(" | ")
                 val updated = appDb.bookSourceDao.completeCheck(
-                    selected, outcome.succeeded, detail, source.respondTime,
+                    selected, outcome.status.name, detail, source.respondTime,
                 )
                 if (!updated) {
                     val detail = "校验结果未写回：书源已变更或删除"
@@ -242,15 +242,10 @@ class CheckSourceService : BaseService() {
                     )
                 } else {
                     Debug.updateFinalMessage(sessionId, source.bookSourceUrl, outcome.message)
-                    val status = if (outcome.succeeded) {
-                        CheckSourceStatus.PASSED
-                    } else {
-                        CheckSourceStatus.FAILED
-                    }
                     Debug.recordCheckResult(
                         sessionId,
                         source.bookSourceUrl,
-                        CheckSourceResult(status, detail),
+                        CheckSourceResult(outcome.status, detail),
                     )
                 }
             }.collect()
@@ -277,14 +272,17 @@ class CheckSourceService : BaseService() {
 
     private suspend fun checkSource(source: BookSource, sessionId: Long): CheckOutcome {
         var resultMessage = "校验成功"
-        var succeeded = true
+        var status = CheckSourceStatus.PASSED
+        var domainUnchecked = false
         kotlin.runCatching {
             withTimeout(CheckSource.timeout) {
-                withContext(SuppressSourceNavigation) { doCheckSource(source, sessionId) }
+                domainUnchecked = withContext(SuppressSourceNavigation) {
+                    doCheckSource(source, sessionId)
+                }
             }
         }.onFailure {
             currentCoroutineContext().ensureActive()
-            succeeded = false
+            status = CheckSourceStatus.FAILED
             when (it) {
                 is TimeoutCancellationException -> source.addGroup("校验超时")
                 is ScriptException, is WrappedException -> source.addGroup("js失效")
@@ -295,8 +293,16 @@ class CheckSourceService : BaseService() {
             }
             resultMessage = "校验失败:${it.localizedMessage}"
         }
-        source.respondTime = Debug.getRespondTime(sessionId, source.bookSourceUrl, succeeded)
-        return CheckOutcome(succeeded, resultMessage)
+        if (status == CheckSourceStatus.PASSED && domainUnchecked) {
+            status = CheckSourceStatus.UNCHECKABLE
+            resultMessage = "无法校验:源地址不是http链接"
+        }
+        source.respondTime = Debug.getRespondTime(
+            sessionId,
+            source.bookSourceUrl,
+            status != CheckSourceStatus.FAILED,
+        )
+        return CheckOutcome(status, resultMessage)
     }
 
     private suspend fun isDomainReachable(endpoint: Pair<String, Int>): Boolean {
@@ -311,7 +317,8 @@ class CheckSourceService : BaseService() {
         }.getOrDefault(false)
     }
 
-    private suspend fun doCheckSource(source: BookSource, sessionId: Long) {
+    private suspend fun doCheckSource(source: BookSource, sessionId: Long): Boolean {
+        var domainUnchecked = false
         Debug.startChecking(sessionId, source)
         source.removeInvalidGroups()
         if (CheckSource.wSourceComment) {
@@ -322,7 +329,7 @@ class CheckSourceService : BaseService() {
             val domain = source.bookSourceUrl
             val endpoint = parseCheckSourceEndpoint(domain)
             if (endpoint == null) {
-                throw NoStackTraceException("源地址不是http链接")
+                domainUnchecked = true
             } else if (isDomainReachable(endpoint)) {
                 source.removeGroup("域名失效")
             } else {
@@ -368,6 +375,7 @@ class CheckSourceService : BaseService() {
         if (finalCheckMessage.isNotBlank()) {
             throw NoStackTraceException(finalCheckMessage)
         }
+        return domainUnchecked
     }
 
     /**
