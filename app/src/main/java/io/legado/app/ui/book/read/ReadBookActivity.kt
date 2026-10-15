@@ -2943,9 +2943,9 @@ class ReadBookActivity : BaseReadBookActivity(),
         readerOverflowPopup?.dismiss()
         highlightPopup?.dismiss()
         binding.readView.onDestroy()
-        ReadBook.unregister(this)
+        val wasCurrentReader = ReadBook.unregister(this)
         handler.removeCallbacksAndMessages(null) // 清理Handler消息
-        if (!ReadBook.inBookshelf && !isChangingConfigurations) {
+        if (wasCurrentReader && !ReadBook.inBookshelf && !isChangingConfigurations) {
             viewModel.removeFromBookshelf(null)
         }
         if (!BuildConfig.DEBUG) {

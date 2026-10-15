@@ -2127,11 +2127,11 @@ object ReadBook : CoroutineScope by MainScope() {
     /**
      * 取消注册回调
      */
-    fun unregister(cb: CallBack) {
-        if (callBack === cb) {
-            callBack = null
-        }
+    fun unregister(cb: CallBack): Boolean {
+        if (callBack !== cb) return false
+        callBack = null
         releaseAndCancel()
+        return true
     }
 
     private fun releaseAndCancel() {
