@@ -616,10 +616,27 @@ object ReadBook : CoroutineScope by MainScope() {
         callBack?.upContent(resetPageOffset = false)
     }
 
-    fun updateHighlight(highlight: BookHighlight) {
-        appDb.bookHighlightDao.update(highlight)
-        if (!highlight.isForBook(book)) return
-        highlights = highlights.map { if (it.time == highlight.time) highlight else it }
+    fun updateHighlightStyle(highlight: BookHighlight, style: HighlightStyle) {
+        highlight.applyStyle(style)
+        val chapter = listOfNotNull(prevTextChapter, curTextChapter, nextTextChapter)
+            .firstOrNull { highlight.isForChapter(book, it.chapter) }
+        val anchors = chapter?.takeIf { it.layoutTitleLength >= 0 }?.let {
+            anchoredHighlightsOfChapter(it, it.layoutTitleLength)
+        }.orEmpty()
+        val anchor = anchors.firstOrNull { it.first.time == highlight.time }?.second
+        // Older versions could stack records on the same range; keep their notes and identities.
+        val matching = if (anchor == null) listOf(highlight) else {
+            anchors.filter { it.second == anchor }.map { it.first }
+        }
+        matching.forEach { it.applyStyle(style) }
+        updateHighlight(*matching.toTypedArray())
+    }
+
+    fun updateHighlight(vararg updatedHighlights: BookHighlight) {
+        appDb.bookHighlightDao.update(*updatedHighlights)
+        val updated = updatedHighlights.filter { it.isForBook(book) }.associateBy { it.time }
+        if (updated.isEmpty()) return
+        highlights = highlights.map { updated[it.time] ?: it }
         highlightsVersion++
         invalidateHighlightSpacing()
         callBack?.upContent(resetPageOffset = false)

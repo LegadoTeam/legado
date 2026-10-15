@@ -1298,10 +1298,8 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     override fun onHighlightStyleChanged(style: HighlightStyle) {
         editingHighlight?.let { highlight ->
-            val visibleStyle = visibleHighlightStyle(style)
-            highlight.applyStyle(visibleStyle)
-            ReadBook.updateHighlight(highlight)
-            ReadBook.saveLastHighlightStyle(visibleStyle)
+            ReadBook.updateHighlightStyle(highlight, style)
+            ReadBook.saveLastHighlightStyle(style)
         }
     }
 
