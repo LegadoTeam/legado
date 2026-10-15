@@ -96,4 +96,11 @@ class EditSafetyTest {
         assertFalse(EditSafety.isTooLongForInline("x".repeat(EditSafety.MAX_INLINE_TEXT_LENGTH)))
         assertTrue(EditSafety.isTooLongForInline("x".repeat(EditSafety.MAX_INLINE_TEXT_LENGTH + 1)))
     }
+
+    @Test
+    fun `very long text is routed away from native editor`() {
+        assertFalse(EditSafety.isTooLongForNativeEditor("x".repeat(EditSafety.MAX_NATIVE_EDITOR_TEXT_LENGTH)))
+        assertTrue(EditSafety.isTooLongForNativeEditor("x".repeat(EditSafety.MAX_NATIVE_EDITOR_TEXT_LENGTH + 1)))
+        assertTrue(EditSafety.requiresSafeEditor("x".repeat(EditSafety.MAX_NATIVE_EDITOR_TEXT_LENGTH + 1)))
+    }
 }
