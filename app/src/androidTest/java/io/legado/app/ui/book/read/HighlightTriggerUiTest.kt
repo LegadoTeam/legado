@@ -3,11 +3,14 @@ package io.legado.app.ui.book.read
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Rect
 import android.os.SystemClock
+import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import androidx.test.core.app.ActivityScenario
+import androidx.recyclerview.widget.RecyclerView
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.UiController
@@ -464,11 +467,49 @@ class HighlightTriggerUiTest {
                 TextSelectMenuConfig(listOf(TextSelectMenuConfig.KEY_HIGHLIGHT)).normalized().toJson()).commit()
         awaitStableReader()
         hold(point(occurrence) { it is TextBaseColumn && it.charData == character })
+        var expectedRange = 0 to 0
         scenario!!.onActivity {
             assertTrue(it.textActionMenu.isShowing)
-            assertEquals(text, it.findViewById<ReadView>(R.id.read_view).getSelectText())
+            val reader = it.findViewById<ReadView>(R.id.read_view)
+            assertEquals(text, reader.getSelectText())
+            val preview = reader.curPage.createHighlight(HighlightStyle())
+            assertNotNull("The selected body range must be highlightable before clicking", preview)
+            expectedRange = preview!!.chapterPos to preview.chapterPosEnd
+            it.textActionMenu.setTouchInterceptor { _, event ->
+                Log.i("HighlightMenuTouch", "popup action=${event.action} raw=${event.rawX},${event.rawY}")
+                false
+            }
+            reader.setOnTouchListener { _, event ->
+                Log.i("HighlightMenuTouch", "reader action=${event.action} raw=${event.rawX},${event.rawY}")
+                false
+            }
         }
-        onView(withText(R.string.highlight)).inRoot(isPlatformPopup()).perform(click())
+        try {
+            onView(withText(R.string.highlight)).inRoot(isPlatformPopup()).perform(object : ViewAction {
+                override fun getConstraints(): Matcher<View> = isDisplayed()
+                override fun getDescription() = "Record the visible highlight menu item before a real click"
+                override fun perform(uiController: UiController, view: View) {
+                    val rect = Rect()
+                    view.getGlobalVisibleRect(rect)
+                    val parent = view.parent as? RecyclerView
+                    val holder = parent?.getChildViewHolder(view)
+                    val item = holder?.let {
+                        (it.bindingAdapter as? TextActionMenu.Adapter)?.getItem(it.layoutPosition)
+                    }
+                    Log.i("HighlightMenuTouch", "rect=$rect layout=${holder?.layoutPosition} " +
+                        "binding=${holder?.bindingAdapterPosition} item=${item?.itemId} " +
+                        "pending=${parent?.hasPendingAdapterUpdates()}")
+                }
+            }, click())
+        } finally {
+            scenario!!.onActivity {
+                it.textActionMenu.setTouchInterceptor(null)
+                it.findViewById<ReadView>(R.id.read_view).setOnTouchListener(null)
+            }
+        }
+        assertTrue("Clicking Highlight must persist the selected range before opening its actions",
+            manualHighlights().any { it.chapterPos == expectedRange.first &&
+                it.chapterPosEnd == expectedRange.second && it.bookText == text })
         onView(withText(R.string.highlight_style)).inRoot(isPlatformPopup()).check(matches(isDisplayed()))
     }
 
