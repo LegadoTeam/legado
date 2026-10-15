@@ -170,13 +170,12 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
         ) {
             with(binding) {
                 textView.text = item.title
-                root.setTag(R.id.tag, item)
             }
         }
 
         override fun registerListener(holder: ItemViewHolder, binding: ItemTextBinding) {
             holder.itemView.setOnClickListener {
-                (holder.itemView.getTag(R.id.tag) as? MenuItemImpl)?.let {
+                getItem(holder.layoutPosition)?.let {
                     if (!callBack.onMenuItemSelected(it.itemId)) {
                         onMenuItemSelected(it)
                     }
