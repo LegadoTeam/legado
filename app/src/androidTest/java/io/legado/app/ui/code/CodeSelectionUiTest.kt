@@ -76,6 +76,7 @@ import io.legado.app.ui.association.ImportRssSourceDialog
 import io.legado.app.ui.association.ImportRssSourceViewModel
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
 import io.legado.app.ui.book.source.edit.BookSourceEditAdapter
+import io.legado.app.ui.book.source.edit.BookSourceEditViewModel
 import io.legado.app.ui.widget.dialog.CodeDialog
 import io.legado.app.utils.GSON
 import io.legado.app.ui.widget.code.KeywordTokenizer
@@ -560,17 +561,18 @@ class CodeSelectionUiTest {
             await {
                 var ready = false
                 sourceScenario.onActivity { activity ->
-                    val adapter = activity.binding.recyclerView.adapter as BookSourceEditAdapter
+                    val adapter = activity.findViewById<RecyclerView>(R.id.recycler_view).adapter as BookSourceEditAdapter
                     fieldPosition = adapter.editEntities.indexOfFirst { it.key == "jsLib" }
                     ready = fieldPosition >= 0 && activity.window.decorView.hasWindowFocus()
                 }
                 ready
             }
-            sourceScenario.onActivity { it.binding.recyclerView.scrollToPosition(fieldPosition) }
+            sourceScenario.onActivity { it.findViewById<RecyclerView>(R.id.recycler_view).scrollToPosition(fieldPosition) }
             await {
                 var ready = false
                 sourceScenario.onActivity {
-                    ready = it.binding.recyclerView.findViewHolderForAdapterPosition(fieldPosition)?.itemView?.isShown == true
+                    ready = it.findViewById<RecyclerView>(R.id.recycler_view)
+                        .findViewHolderForAdapterPosition(fieldPosition)?.itemView?.isShown == true
                 }
                 ready
             }
@@ -620,7 +622,7 @@ class CodeSelectionUiTest {
             await {
                 var ready = false
                 sourceScenario.onActivity { activity ->
-                    val adapter = activity.binding.recyclerView.adapter as BookSourceEditAdapter
+                    val adapter = activity.findViewById<RecyclerView>(R.id.recycler_view).adapter as BookSourceEditAdapter
                     ready = activity.window.decorView.hasWindowFocus() &&
                         adapter.editEntities.single { it.key == "jsLib" }.value == edited
                 }
@@ -641,9 +643,9 @@ class CodeSelectionUiTest {
                     .flatMap(monitor::getActivitiesInStage).filterIsInstance<BookSourceEditActivity>()
                     .filter { it.intent.getStringExtra("sourceUrl") == url && !it.isFinishing && !it.isDestroyed }
                     .forEach { activity ->
-                        val adapter = activity.binding.recyclerView.adapter as? BookSourceEditAdapter
+                        val adapter = activity.findViewById<RecyclerView>(R.id.recycler_view).adapter as? BookSourceEditAdapter
                         adapter?.editEntities?.find { it.key == "jsLib" }?.let {
-                            activity.viewModel.bookSource?.jsLib = it.value
+                            ViewModelProvider(activity)[BookSourceEditViewModel::class.java].bookSource?.jsLib = it.value
                         }
                     }
             }
